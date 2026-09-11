@@ -2,7 +2,6 @@ import { treeGroups } from './commission/chart-moves'
 import { layoutTree, NODE_HEIGHT, NODE_WIDTH } from './org-layout'
 import {
   boundsOf,
-  envelopeOfRects,
   packPolygons,
   rectanglePoints,
   type Bounds,
@@ -53,8 +52,8 @@ export const SPACE_TEAM_GAP = 42
 export const SPACE_DEPARTMENT_GAP = 64
 export const SPACE_DEPARTMENT_PADDING = 28
 export const SPACE_DEPARTMENT_HEADER = 44
+export const SPACE_TEAM_HEADER = 38
 const TEAM_PADDING = 24
-const TEAM_LABEL_HEIGHT = 24
 const EMPTY_DEPARTMENT_WIDTH = 400
 const EMPTY_DEPARTMENT_HEIGHT = 220
 
@@ -135,25 +134,17 @@ function teamGeometry(
   if (!rectangles.size) return null
 
   const cardBounds = boundsOf([...rectangles.values()].flatMap(rectanglePoints))
-  const leader = rectangles.get(team.leaderId) ?? rectangles.values().next().value!
-  const labelPosition = { x: leader.x, y: cardBounds.y - TEAM_LABEL_HEIGHT - 14 }
-  const envelopeRects: Bounds[] = [...rectangles.values(), {
-    ...labelPosition,
-    width: Math.max(140, Math.min(360, team.label.length * 7 + 28)),
-    height: TEAM_LABEL_HEIGHT,
-  }]
-
-  for (const [id, rectangle] of rectangles) {
-    const parentId = byId.get(id)?.parentId
-    const parent = parentId ? rectangles.get(parentId) : undefined
-    if (!parent) continue
-    for (const point of spaceConnectionPoints(parent, rectangle)) {
-      // A small rectangle accounts for the line stroke before envelope padding.
-      envelopeRects.push({ x: point.x - 1, y: point.y - 1, width: 2, height: 2 })
-    }
+  const labelWidth = Math.max(140, Math.min(360, team.label.length * 7 + 28))
+  // A floating frame follows its contents; it has no fixed canvas slot or size.
+  // Orthogonal connector bends also stay within the cards' combined bounds.
+  const bounds: Bounds = {
+    x: cardBounds.x - TEAM_PADDING,
+    y: cardBounds.y - TEAM_PADDING - SPACE_TEAM_HEADER,
+    width: Math.max(cardBounds.width, labelWidth) + TEAM_PADDING * 2,
+    height: cardBounds.height + TEAM_PADDING * 2 + SPACE_TEAM_HEADER,
   }
-  const points = envelopeOfRects(envelopeRects, TEAM_PADDING)
-  return { ...team, points, bounds: boundsOf(points), labelPosition }
+  const labelPosition = { x: bounds.x + TEAM_PADDING, y: bounds.y + 10 }
+  return { ...team, points: rectanglePoints(bounds), bounds, labelPosition }
 }
 
 export function geometryForSpaces(
@@ -195,6 +186,70 @@ function translatePositions(positions: Map<string, Point>, ids: Iterable<string>
   }
 }
 
+function canonicalTeamPositions(team: SpaceTeam, byId: ReadonlyMap<string, SpaceMember>): Map<string, Point> {
+  const members = team.memberIds.map(id => byId.get(id)).filter((member): member is SpaceMember => !!member)
+  const memberIds = new Set(members.map(member => member.id))
+  const layout = layoutTree(members.map(member => ({
+    id: member.id,
+    parentId: member.parentId && memberIds.has(member.parentId) ? member.parentId : null,
+    label: member.name,
+  })))
+  const scaleX = Math.max(1, ...members.map(member => finiteDimension(member.width, NODE_WIDTH) / NODE_WIDTH))
+  const rowHeights = new Map<number, number>()
+  for (const [id, point] of layout.positions) {
+    rowHeights.set(point.depth, Math.max(rowHeights.get(point.depth) ?? NODE_HEIGHT,
+      finiteDimension(byId.get(id)?.height, NODE_HEIGHT)))
+  }
+  // Retain layoutTree's level spacing while making room for measured cards.
+  const firstChild = [...layout.positions.values()].find(point => point.depth > 0)
+  const rowGap = firstChild ? firstChild.y / firstChild.depth - NODE_HEIGHT : 0
+  const rowTop = new Map<number, number>([[0, 0]])
+  const maxDepth = Math.max(0, ...rowHeights.keys())
+  for (let depth = 1; depth <= maxDepth; depth++) {
+    rowTop.set(depth, rowTop.get(depth - 1)! + (rowHeights.get(depth - 1) ?? NODE_HEIGHT) + rowGap)
+  }
+  return new Map([...layout.positions].map(([id, point]) => [id, {
+    // Different-width cards share a column centre, not a ragged left edge.
+    x: (point.x + NODE_WIDTH / 2) * scaleX - finiteDimension(byId.get(id)?.width, NODE_WIDTH) / 2,
+    y: rowTop.get(point.depth)!,
+  }]))
+}
+
+function finitePoint(point: Point | undefined): point is Point {
+  return !!point && Number.isFinite(point.x) && Number.isFinite(point.y)
+}
+
+/**
+ * Align hierarchy rows inside freely positioned teams. A leader's exact world
+ * origin anchors its team, so organizing cards never snaps the frame to a grid.
+ * Department origins and unselected teams are copied without modification.
+ */
+export function alignSpaceTeams(
+  members: readonly SpaceMember[],
+  teams: readonly SpaceTeam[],
+  positions: ReadonlyMap<string, Point>,
+  anchorPositions: ReadonlyMap<string, Point> = positions,
+  teamIds?: readonly string[],
+): Map<string, Point> {
+  const next = new Map([...positions].map(([id, point]) => [id, { ...point }]))
+  const byId = new Map(members.map(member => [member.id, member]))
+  const selected = teamIds === undefined ? null : new Set(teamIds)
+  for (const team of teams) {
+    if (selected && !selected.has(team.id)) continue
+    const canonical = canonicalTeamPositions(team, byId)
+    const leader = canonical.get(team.leaderId)
+    if (!leader) continue
+    const requestedOrigin = anchorPositions.get(team.leaderId)
+    const currentOrigin = positions.get(team.leaderId)
+    const origin = finitePoint(requestedOrigin) ? requestedOrigin : finitePoint(currentOrigin) ? currentOrigin : leader
+    for (const [id, point] of canonical) next.set(id, {
+      x: point.x - leader.x + origin.x,
+      y: point.y - leader.y + origin.y,
+    })
+  }
+  return next
+}
+
 /** A readable starting layout; later collision resolution never calls this reset. */
 export function initialSpacePositions(
   departments: readonly SpaceDepartment[],
@@ -212,18 +267,7 @@ export function initialSpacePositions(
     let rowHeight = 0
     let rowCount = 0
     for (const team of teams.filter(candidate => candidate.departmentId === department.id)) {
-      const teamMembers = team.memberIds.map(id => byId.get(id)).filter((member): member is SpaceMember => !!member)
-      const memberIds = new Set(teamMembers.map(member => member.id))
-      const layout = layoutTree(teamMembers.map(member => ({
-        id: member.id,
-        parentId: member.parentId && memberIds.has(member.parentId) ? member.parentId : null,
-        label: member.name,
-      })))
-      const scaleX = Math.max(1, ...teamMembers.map(member => finiteDimension(member.width, NODE_WIDTH) / NODE_WIDTH))
-      const scaleY = Math.max(1, ...teamMembers.map(member => finiteDimension(member.height, NODE_HEIGHT) / NODE_HEIGHT))
-      for (const [id, point] of layout.positions) {
-        positions.set(id, { x: point.x * scaleX, y: point.y * scaleY })
-      }
+      for (const [id, point] of canonicalTeamPositions(team, byId)) positions.set(id, point)
       const shape = teamGeometry(team, byId, positions)
       if (!shape) continue
       if (rowCount >= 2 || (rowCount > 0 && cursorX + shape.bounds.width > 1200)) {

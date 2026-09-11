@@ -74,10 +74,10 @@ export default function HierarchyTabs({
               )
             ) : (
               <>
-                Explore every sub-department in one chart. Drag into open space to arrange,
-                or hold over a person until the transfer prompt appears, then release to
-                change upline. Drag a department heading to move its section. Teams make
-                space as you settle. The Team tab edits {subDept.name}.
+                Explore every sub-department on one canvas. Drag a team or department
+                border or heading to move it freely. Members align inside; teams grow
+                as people join and make space for each other. Hold over a person until
+                the transfer prompt appears to change upline. The Team tab edits {subDept.name}.
               </>
             )}
           </p>

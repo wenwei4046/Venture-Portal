@@ -11,11 +11,11 @@ import '@xyflow/react/dist/style.css'
 import { descendantsOf, NODE_HEIGHT, NODE_WIDTH } from '@/lib/org-layout'
 import { moveRefusal, refusalSentence } from '@/lib/commission/chart-moves'
 import { readManualLayout, writeManualLayout, type ManualLayout } from '@/lib/commission/chart-layout-store'
-import { boundsOf, rectanglePoints, roundedHullPath, type Point } from '@/lib/hierarchy-spaces'
+import { boundsOf, rectanglePoints, type Bounds, type Point } from '@/lib/hierarchy-spaces'
 import { planHierarchyTransfer } from '@/lib/hierarchy-transfer-layout'
 import {
-  buildSpaceTeams, departmentPositionKey, geometryForSpaces, initialSpacePositions,
-  resolveSpaceOverlaps, SPACE_DEPARTMENT_HEADER, type SpaceAnchor, type SpaceMember,
+  alignSpaceTeams, buildSpaceTeams, departmentPositionKey, geometryForSpaces, initialSpacePositions,
+  resolveSpaceOverlaps, SPACE_DEPARTMENT_HEADER, SPACE_TEAM_HEADER, type SpaceAnchor, type SpaceGeometry, type SpaceMember,
 } from '@/lib/hierarchy-space-layout'
 import { moveOnChart } from '../../../hierarchy-actions'
 import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
@@ -26,6 +26,7 @@ import { useHierarchyCamera } from './useHierarchyCamera'
 interface Props { departments: OrgDepartment[]; initialDepartmentId?: string }
 type ReportingEdge = Edge<{ fresh?: boolean }, 'line'>
 type DropTarget = { id: string; reason: string | null; armed: boolean; unchanged: boolean }
+type ArrangeOptions = { keepVisible?: boolean; alignMembers?: boolean; origin?: ManualLayout }
 const nodeTypes = { person: HierarchyPersonCard }
 const edgeTypes = { line: ReportingLine }
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -65,6 +66,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
   selectedRef.current = selected
   const [activeDepartment, setActiveDepartment] = useState<string | null>(initialDepartmentId ?? null)
   const [movingDepartment, setMovingDepartment] = useState<string | null>(null)
+  const [movingTeam, setMovingTeam] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [find, setFind] = useState('')
@@ -98,6 +100,9 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
   const storageKey = useMemo(() => `spaces.v1.${departments.map(department => department.schemeId).sort().join('.')}`, [departments])
   const model = useRef({ departments: departmentDefinitions, members, teams })
   model.current = { departments: departmentDefinitions, members, teams }
+  const geometryRef = useRef<SpaceGeometry>({ teams: [], departments: [] })
+  const geometryOverride = useRef<SpaceGeometry | null>(null)
+  const layoutRecords = useRef(records)
 
   const measuredMembers = useCallback(() => {
     const measured = new Map(nodesRef.current.map(node => [node.id, node.measured]))
@@ -107,11 +112,11 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       height: measured.get(member.id)?.height ?? member.height,
     }))
   }, [])
-  const geometry = useMemo(() => geometryForSpaces(departmentDefinitions, members.map(member => {
+  const geometry = useMemo(() => geometryOverride.current ?? (layoutRecords.current !== records && geometryRef.current.departments.length
+    ? geometryRef.current : geometryForSpaces(departmentDefinitions, members.map(member => {
     const node = nodes.find(node => node.id === member.id)
     return { ...member, width: node?.measured?.width ?? member.width, height: node?.measured?.height ?? member.height }
-  }), teams, positions.current), [departmentDefinitions, members, teams, nodes])
-  const geometryRef = useRef(geometry)
+  }), teams, positions.current)), [departmentDefinitions, members, teams, nodes, records])
   geometryRef.current = geometry
 
   const animation = useRef<number | null>(null)
@@ -120,14 +125,16 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
   const draggedMember = useRef<string | null>(null)
   const suppressClick = useRef(0)
   const groupDrag = useRef<{
-    pointerId: number; departmentId: string; x: number; y: number; zoom: number;
+    pointerId: number; departmentId: string; teamId?: string; x: number; y: number; zoom: number;
     original: ManualLayout; keys: Set<string>; moved: boolean;
+    element: HTMLButtonElement;
   } | null>(null)
 
   const cancelAnimation = useCallback(() => {
     if (animation.current !== null) cancelAnimationFrame(animation.current)
     animation.current = null
     settlingTarget.current = null
+    geometryOverride.current = null
     if (arrangeTimer.current) clearTimeout(arrangeTimer.current)
     arrangeTimer.current = null
   }, [])
@@ -143,49 +150,64 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     })
   }, [])
   const persist = useCallback((next: ManualLayout) => writeManualLayout(layoutStorage(), storageKey, next), [storageKey])
+  const completeSettling = () => {
+    // A group gesture starts from the committed layout, never a halfway transfer.
+    const target = settlingTarget.current
+    cancelAnimation()
+    if (target) publishPositions(target)
+  }
   const glide = useCallback((target: ManualLayout, springIds: readonly string[] = []) => {
+    const fromGeometry = geometryRef.current
     cancelAnimation()
     persist(target)
     settlingTarget.current = target
     const from = new Map(positions.current)
-    const changed = [...target].some(([id, point]) => {
+    const value = model.current
+    const targetGeometry = geometryForSpaces(value.departments, measuredMembers(), value.teams, target)
+    const changed = JSON.stringify(fromGeometry) !== JSON.stringify(targetGeometry) || [...target].some(([id, point]) => {
       const old = from.get(id)
       return !old || Math.hypot(point.x - old.x, point.y - old.y) > 0.1
     })
     if (!changed || reducedMotion()) { settlingTarget.current = null; publishPositions(target); return }
+    geometryOverride.current = interpolateGeometry(fromGeometry, targetGeometry, 0)
     const spring = new Set(springIds)
     const started = performance.now()
     const step = (now: number) => {
       const progress = Math.min(1, (now - started) / 500)
       const eased = 1 - (1 - progress) ** 3
       const current = new Map<string, Point>()
+      geometryOverride.current = interpolateGeometry(fromGeometry, targetGeometry, eased)
       for (const [id, end] of target) {
         const start = from.get(id) ?? end
         const amount = spring.has(id) ? springEase(progress) : eased
         current.set(id, { x: start.x + (end.x - start.x) * amount, y: start.y + (end.y - start.y) * amount })
       }
+      if (progress === 1) geometryOverride.current = null
       publishPositions(current)
       if (progress < 1) animation.current = requestAnimationFrame(step)
       else { animation.current = null; settlingTarget.current = null }
     }
     animation.current = requestAnimationFrame(step)
-  }, [cancelAnimation, persist, publishPositions])
-  const arrange = useCallback((anchor?: SpaceAnchor, keepVisible = false) => {
+  }, [cancelAnimation, persist, publishPositions, measuredMembers])
+  const arrange = useCallback((anchor?: SpaceAnchor, options: ArrangeOptions = {}) => {
     const value = model.current
     const measured = measuredMembers()
-    const target = resolveSpaceOverlaps(value.departments, measured, value.teams, positions.current, anchor)
-    if (keepVisible) {
+    const aligned = options.alignMembers
+      ? alignSpaceTeams(measured, value.teams, positions.current, options.origin ?? positions.current, anchor?.teamId ? [anchor.teamId] : undefined)
+      : positions.current
+    const target = resolveSpaceOverlaps(value.departments, measured, value.teams, aligned, anchor)
+    if (options.keepVisible) {
       const shapes = geometryForSpaces(value.departments, measured, value.teams, target)
       const frames = anchor?.teamId ? shapes.teams.filter(item => item.id === anchor.teamId)
         : anchor?.departmentId ? shapes.departments.filter(item => item.id === anchor.departmentId) : shapes.departments
       if (frames.length) makeRoom(boundsOf(frames.flatMap(item => rectanglePoints(item.bounds))), camera.generation.current)
     }
-    glide(target)
+    glide(target, options.alignMembers && anchor?.teamId ? value.teams.find(team => team.id === anchor.teamId)?.memberIds : [])
   }, [glide, measuredMembers, makeRoom, camera.generation])
   const scheduleArrange = useCallback((anchor?: SpaceAnchor) => {
     if (arrangeTimer.current) clearTimeout(arrangeTimer.current)
     arrangeTimer.current = setTimeout(() => {
-      if (!draggedMember.current && !groupDrag.current) arrange(anchor)
+      if (!draggedMember.current && !groupDrag.current) arrange(anchor, { alignMembers: true })
     }, 160)
   }, [arrange])
   useEffect(() => () => cancelAnimation(), [cancelAnimation])
@@ -198,10 +220,13 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     for (const [id, point] of remembered) if (next.has(id)) next.set(id, point)
     const transfer = incomingTransfer.current?.storageKey === storageKey ? incomingTransfer.current : null
     incomingTransfer.current = null
-    const resolved = transfer?.positions ?? resolveSpaceOverlaps(departmentDefinitions, members, teams, next)
+    const measured = measuredMembers()
+    const aligned = alignSpaceTeams(measured, teams, next)
+    const resolved = transfer?.positions ?? resolveSpaceOverlaps(departmentDefinitions, measured, teams, aligned)
     const sameCanvas = initializedKey.current === storageKey
     const oldNodes = new Map(sameCanvas ? nodesRef.current.map(node => [node.id, node]) : [])
     initializedKey.current = storageKey
+    layoutRecords.current = records
     const updated: PersonNode[] = records.map(record => ({
       id: record.id, type: 'person', position: oldNodes.get(record.id)?.position ?? resolved.get(record.id) ?? { x: 0, y: 0 },
       measured: oldNodes.get(record.id)?.measured,
@@ -222,7 +247,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     setNodes(updated)
     glide(resolved, transfer?.movedIds)
     setLoaded(true)
-  }, [storageKey, defaults, records, departmentDefinitions, members, teams, cancelAnimation, glide])
+  }, [storageKey, defaults, records, departmentDefinitions, members, teams, cancelAnimation, glide, measuredMembers])
 
   useEffect(() => {
     setNodes(previous => {
@@ -235,7 +260,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       nodesRef.current = updated
       return updated
     })
-  }, [selected, pending, fresh, dropTarget])
+  }, [selected, pending, fresh, dropTarget, records])
   useEffect(() => {
     if (!fresh) return
     const timer = setTimeout(() => setFresh(null), 1800)
@@ -300,7 +325,9 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       && point.y >= candidate.position.y && point.y <= candidate.position.y + (candidate.measured?.height ?? NODE_HEIGHT))
   }, [screenToFlowPosition])
   const onNodeDragStart: OnNodeDrag<PersonNode> = useCallback((_event, node) => {
+    const priorGeometry = geometryRef.current
     cancelAnimation()
+    geometryOverride.current = priorGeometry
     interruptCamera()
     clearDropTarget()
     draggedMember.current = node.id
@@ -357,22 +384,29 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       return
     }
     const team = teamByMember.get(node.id)
-    arrange({ teamId: team?.id, departmentId: team?.departmentId }, true)
+    arrange({ teamId: team?.id, departmentId: team?.departmentId }, { keepVisible: true, alignMembers: true, origin: session?.origin })
   }, [arrange, teamByMember, hitTarget, clearDropTarget, glide])
 
-  const groupDown = (event: PointerEvent<HTMLButtonElement>, departmentId: string) => {
+  const keysForGroup = (anchor: SpaceAnchor) => {
+    if (anchor.teamId) return new Set(teams.find(team => team.id === anchor.teamId)?.memberIds ?? [])
+    return new Set([...members.filter(member => member.departmentId === anchor.departmentId).map(member => member.id),
+      ...(anchor.departmentId ? [departmentPositionKey(anchor.departmentId)] : [])])
+  }
+  const groupDown = (event: PointerEvent<HTMLButtonElement>, anchor: SpaceAnchor) => {
     if ((event.button !== 0 && event.button !== 2) || groupDrag.current || writing.current) return
+    const departmentId = anchor.departmentId ?? teams.find(team => team.id === anchor.teamId)?.departmentId
+    if (!departmentId) return
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.focus({ preventScroll: true })
-    cancelAnimation()
+    completeSettling()
     interruptCamera()
     setPopover(null)
-    const keys = new Set(members.filter(member => member.departmentId === departmentId).map(member => member.id))
-    keys.add(departmentPositionKey(departmentId))
+    const keys = keysForGroup(anchor)
     groupDrag.current = {
-      pointerId: event.pointerId, departmentId, x: event.clientX, y: event.clientY,
+      pointerId: event.pointerId, departmentId, teamId: anchor.teamId, x: event.clientX, y: event.clientY,
       zoom: getZoom(), original: new Map(positions.current), keys, moved: false,
+      element: event.currentTarget,
     }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -384,7 +418,8 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     event.preventDefault()
     event.stopPropagation()
     drag.moved = true
-    setMovingDepartment(drag.departmentId)
+    if (drag.teamId) setMovingTeam(drag.teamId)
+    else setMovingDepartment(drag.departmentId)
     setActiveDepartment(drag.departmentId)
     suppressClick.current = performance.now() + 350
     const next = new Map(positions.current)
@@ -399,34 +434,66 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     if (!drag || drag.pointerId !== event.pointerId) return
     groupDrag.current = null
     setMovingDepartment(null)
+    setMovingTeam(null)
     if (drag.moved) {
       suppressClick.current = performance.now() + 350
-      arrange({ departmentId: drag.departmentId }, true)
+      arrange({ departmentId: drag.departmentId, teamId: drag.teamId }, { keepVisible: true })
     }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
-  const groupKey = (event: KeyboardEvent<HTMLButtonElement>, departmentId: string) => {
+  const cancelGroup = (pointerId?: number) => {
+    const drag = groupDrag.current
+    if (!drag || (pointerId !== undefined && drag.pointerId !== pointerId)) return
+    groupDrag.current = null
+    setMovingDepartment(null)
+    setMovingTeam(null)
+    suppressClick.current = performance.now() + 350
+    glide(drag.original)
+    if (drag.element.hasPointerCapture(drag.pointerId)) drag.element.releasePointerCapture(drag.pointerId)
+  }
+  const groupKey = (event: KeyboardEvent<HTMLButtonElement>, anchor: SpaceAnchor) => {
+    if (writing.current || pending || groupDrag.current) return
     const delta = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, number[]>)[event.key]
     if (!delta) return
     event.preventDefault()
     event.stopPropagation()
-    cancelAnimation()
+    completeSettling()
     interruptCamera()
     const step = (event.shiftKey ? 60 : 20) / getZoom(), next = new Map(positions.current)
-    const ids = members.filter(member => member.departmentId === departmentId).map(member => member.id)
-    ids.push(departmentPositionKey(departmentId))
-    for (const id of ids) {
+    for (const id of keysForGroup(anchor)) {
       const point = next.get(id)
       if (point) next.set(id, { x: point.x + delta[0] * step, y: point.y + delta[1] * step })
     }
     publishPositions(next)
-    arrange({ departmentId }, true)
+    arrange(anchor, { keepVisible: true })
   }
+
+  const focusTeam = (teamId: string) => {
+    if (performance.now() < suppressClick.current) return
+    const team = geometryRef.current.teams.find(item => item.id === teamId)
+    if (!team) return
+    interruptCamera()
+    setActiveDepartment(team.departmentId)
+    void fitBounds(team.bounds, { padding: 0.25, duration: duration(400) })
+  }
+  const frameBorders = (bounds: Bounds, anchor: SpaceAnchor, label: string, kind: 'team' | 'department') => borderStrips(bounds).map(({ side, ...style }) => (
+    <button type="button" key={`${anchor.teamId ?? anchor.departmentId}:${side}`} tabIndex={-1}
+      className={`space-frame-border nodrag nopan ${kind}`} style={style}
+      aria-label={`${label}: move ${kind} by ${side} border`}
+      disabled={pending} onPointerDown={event => groupDown(event, anchor)} onPointerMove={groupMove}
+      onPointerUp={groupEnd} onPointerCancel={event => cancelGroup(event.pointerId)}
+      onLostPointerCapture={event => cancelGroup(event.pointerId)} onContextMenu={event => event.preventDefault()}
+      onKeyDown={event => groupKey(event, anchor)}
+    />
+  ))
 
   const move = useCallback((childId: string, parentId: string | null, origin?: ManualLayout) => {
     const child = byId.get(childId), parent = parentId ? byId.get(parentId) : null
     if (!child || pending || writing.current) return
-    const restore = () => { if (origin) glide(origin, [childId]) }
+    const restore = () => {
+      if (origin) glide(origin, [childId])
+      else { geometryOverride.current = null; scheduleArrange() }
+    }
     if (parentId && (!parent || parent.department.id !== child.department.id)) {
       setError('Choose an upline within the same sub-department. Each department has its own hierarchy.')
       restore()
@@ -439,7 +506,9 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     }
     const uplineId = parent?.person.staffId ?? null
     if (child.person.uplineStaffId === uplineId) { setPopover(null); arrange(); return }
+    const priorGeometry = geometryRef.current
     cancelAnimation()
+    geometryOverride.current = priorGeometry
     const measured = measuredMembers()
     const value = model.current
     const plan = planHierarchyTransfer({ departments: value.departments, members: measured, positions: positions.current, childId, parentId, originPositions: origin })
@@ -467,7 +536,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
         restore()
       } finally { writing.current = false }
     })
-  }, [byId, pending, router, glide, arrange, cancelAnimation, measuredMembers, camera.generation, serverDepartments, followTransfer, storageKey])
+  }, [byId, pending, router, glide, arrange, cancelAnimation, measuredMembers, camera.generation, serverDepartments, followTransfer, storageKey, scheduleArrange])
   moveRef.current = move
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) move(connection.target, connection.source)
@@ -508,6 +577,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       if (/INPUT|TEXTAREA|SELECT/.test(target.tagName) || target.isContentEditable) return
       if (event.key === 'Escape') {
         interruptCamera()
+        if (groupDrag.current) { event.preventDefault(); cancelGroup() }
         if (dragSession.current) {
           dragSession.current.cancelled = true
           clearDropTarget()
@@ -544,7 +614,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
               </button>) : <p>No matching person.</p>}
             </div> : null}
           </div>
-          <button type="button" className="space-tidy" onClick={() => { interruptCamera(); arrange(undefined, true) }} title="Separate overlapping teams and departments; keep their internal arrangement">Tidy</button>
+          <button type="button" className="space-tidy" onClick={() => { interruptCamera(); arrange(undefined, { keepVisible: true, alignMembers: true }) }} title="Align members and separate overlapping teams; keep team locations">Tidy</button>
           <div className="org-zoom">
             <button type="button" onClick={() => { interruptCamera(); void zoomOut({ duration: duration(250) }) }} aria-label="Zoom out">−</button>
             <button type="button" className="lv" onClick={() => focusDepartment(null)} aria-label="Fit all departments"><ZoomReadout /></button>
@@ -552,17 +622,17 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
           </div>
         </div>
       </div>
-      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams</span><span>{pending ? 'Saving upline…' : 'Auto spacing'}</span></div>
+      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams</span><span>{pending ? 'Saving upline…' : 'Magnetic layout · Free canvas'}</span></div>
       <UplineContext.Provider value={openUpline}>
         <div ref={camera.canvas} onPointerDownCapture={interruptCamera} onWheelCapture={interruptCamera}
-          className={`org-canvas space-canvas${movingDepartment ? ' space-dragging' : ''}`}>
+          className={`org-canvas space-canvas${movingDepartment || movingTeam ? ' space-dragging' : ''}`}>
           <ReactFlow<PersonNode, ReportingEdge>
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
             onNodesChange={onNodesChange} onNodeDragStart={onNodeDragStart} onNodeDrag={onNodeDrag} onNodeDragStop={onNodeDragStop}
             onNodeClick={(_event, node) => { if (performance.now() >= suppressClick.current) setSelected(node.id) }}
             onPaneClick={() => { setSelected(null); setPopover(null) }} onConnect={onConnect}
-            minZoom={0.15} maxZoom={1.7} panOnDrag={movingDepartment ? false : [0, 1]}
-            zoomOnScroll={!movingDepartment} zoomOnPinch={!movingDepartment}
+            minZoom={0.15} maxZoom={1.7} panOnDrag={movingDepartment || movingTeam ? false : [0, 1]}
+            zoomOnScroll={!movingDepartment && !movingTeam} zoomOnPinch={!movingDepartment && !movingTeam}
             deleteKeyCode={null} nodesDraggable={!pending} nodesConnectable={!pending} elementsSelectable
             autoPanOnNodeDrag autoPanOnConnect
             proOptions={{ hideAttribution: false }}
@@ -570,16 +640,18 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
             <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgb(var(--cv-grid))" />
             <ViewportPortal>
               <svg className="space-boundaries" width="1" height="1" aria-hidden>
-                {geometry.departments.map(department => <rect key={department.id} {...department.bounds} rx="18"
+                {geometry.departments.map(department => <rect key={department.id} data-department-id={department.id} {...department.bounds} rx="18"
                   data-space-tone={departments.findIndex(item => item.id === department.id) % 3}
                   className={`space-department${activeDepartment === department.id ? ' active' : ''}${movingDepartment === department.id ? ' moving' : ''}`} />)}
-                {geometry.teams.map(team => <path key={team.id} d={roundedHullPath(team.points, 15)} className="space-team"
+                {geometry.teams.map(team => <rect key={team.id} data-team-id={team.id} {...team.bounds} rx="20" className={`space-team${movingTeam === team.id ? ' moving' : ''}`}
                   data-space-tone={departments.findIndex(item => item.id === team.departmentId) % 3} />)}
                 {previewParent && previewChild ? <path className="space-preview-line"
                   d={roundedReportingPath(previewParent.position.x + (previewParent.measured?.width ?? NODE_WIDTH) / 2,
                     previewParent.position.y + (previewParent.measured?.height ?? NODE_HEIGHT),
                     previewChild.position.x + (previewChild.measured?.width ?? NODE_WIDTH) / 2, previewChild.position.y)} /> : null}
               </svg>
+              {geometry.departments.flatMap(department => frameBorders(department.bounds, { departmentId: department.id }, department.name, 'department'))}
+              {geometry.teams.flatMap(team => frameBorders(team.bounds, { teamId: team.id, departmentId: team.departmentId }, team.label, 'team'))}
               {geometry.departments.map(department => {
                 const count = members.filter(member => member.departmentId === department.id).length
                 return <button type="button" key={department.id}
@@ -587,22 +659,26 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
                   style={{ left: department.bounds.x + 1, top: department.bounds.y + 1, width: department.bounds.width - 2, height: SPACE_DEPARTMENT_HEADER - 1 }}
                   aria-label={`${department.name}: drag to move department, click to focus`}
                   aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
-                  onPointerDown={event => groupDown(event, department.id)} onPointerMove={groupMove}
-                  onPointerUp={groupEnd} onPointerCancel={groupEnd} onLostPointerCapture={groupEnd}
-                  onContextMenu={event => event.preventDefault()} onKeyDown={event => groupKey(event, department.id)}
+                  disabled={pending} onPointerDown={event => groupDown(event, { departmentId: department.id })} onPointerMove={groupMove}
+                  onPointerUp={groupEnd} onPointerCancel={event => cancelGroup(event.pointerId)} onLostPointerCapture={event => cancelGroup(event.pointerId)}
+                  onContextMenu={event => event.preventDefault()} onKeyDown={event => groupKey(event, { departmentId: department.id })}
                   onClick={() => { if (performance.now() >= suppressClick.current) focusDepartment(department.id) }}
                 ><strong>{department.name}</strong><span>{teams.filter(team => team.departmentId === department.id).length} teams · {count} members</span><span className="space-grip" aria-hidden>⠿</span></button>
               })}
               {geometry.teams.map(team => <button type="button" key={team.id} className="space-team-heading nodrag nopan"
-                style={{ left: team.labelPosition.x, top: team.labelPosition.y }}
-                onClick={() => { interruptCamera(); setActiveDepartment(team.departmentId); void fitBounds(team.bounds, { padding: 0.25, duration: duration(400) }) }}
-              >{team.label}<span>{team.memberIds.length} ↗</span></button>)}
+                style={{ left: team.bounds.x + 1, top: team.bounds.y + 1, width: team.bounds.width - 2, height: SPACE_TEAM_HEADER - 1 }}
+                aria-label={`${team.label}: drag to move team, click to focus`} aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
+                disabled={pending} onPointerDown={event => groupDown(event, { teamId: team.id, departmentId: team.departmentId })} onPointerMove={groupMove}
+                onPointerUp={groupEnd} onPointerCancel={event => cancelGroup(event.pointerId)} onLostPointerCapture={event => cancelGroup(event.pointerId)}
+                onContextMenu={event => event.preventDefault()} onKeyDown={event => groupKey(event, { teamId: team.id, departmentId: team.departmentId })}
+                onClick={() => focusTeam(team.id)}
+              ><strong>{team.label}</strong><span>{team.memberIds.length} members</span><span className="space-grip" aria-hidden>⠿</span></button>)}
               {geometry.departments.filter(department => !members.some(member => member.departmentId === department.id)).map(department =>
                 <div key={`empty:${department.id}`} className="space-empty" style={{ left: department.bounds.x + 28, top: department.bounds.y + 90 }}>No members yet</div>)}
             </ViewportPortal>
           </ReactFlow>
           {dropTarget && dropPerson ? <div className={`space-drop-notice${dropTarget.reason ? ' refused' : ''}`} role="status">
-            {dropTarget.reason ?? (dropTarget.unchanged ? `Already under ${dropPerson.person.name} · release to arrange`
+            {dropTarget.reason ?? (dropTarget.unchanged ? `Already under ${dropPerson.person.name} · release to align`
               : `${dropTarget.armed ? 'Release' : 'Hold here'} to move under ${dropPerson.person.name} · ${dropPerson.department.name}`)}
             {!dropTarget.reason && !dropTarget.unchanged && carriedCount > 0 ? <span>Includes {carriedCount} downline{carriedCount === 1 ? '' : 's'} · titles and ranks stay the same</span> : null}
           </div> : null}
@@ -611,7 +687,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
       <div className="space-footer" aria-live="polite">
         <div>
           <strong>{selectedRecord ? `${selectedRecord.person.name} · ${selectedRecord.department.name}` : 'Sub-department → Team → Member'}</strong>
-          <span>{selectedRecord ? `${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}` : 'Drag to arrange · Hold over a person to change team · Drag a department heading to move its section'}</span>
+          <span>{selectedRecord ? `${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}` : 'Drag a team border or heading to move it · Members align inside · Hold over a person to change team'}</span>
         </div>
         {selectedRecord ? <div className="space-memberships" aria-label="This person's other memberships">
           {records.filter(record => record.person.staffId === selectedRecord.person.staffId && record.id !== selectedRecord.id).map(record =>
@@ -632,7 +708,46 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
 
 function ZoomReadout() { const { zoom } = useViewport(); return <>{Math.round(zoom * 100)}%</> }
 
-/** Matches spaceConnectionPoints, so every reporting line stays inside its envelope. */
+/** Borders are pointer handles; each heading provides the same keyboard action. */
+function borderStrips(bounds: Bounds) {
+  const { x, y, width, height } = bounds
+  return [
+    { side: 'top', left: x + 8, top: y - 6, width: width - 16, height: 12 },
+    { side: 'right', left: x + width - 6, top: y + 8, width: 12, height: height - 16 },
+    { side: 'bottom', left: x + 8, top: y + height - 6, width: width - 16, height: 12 },
+    { side: 'left', left: x - 6, top: y + 8, width: 12, height: height - 16 },
+  ]
+}
+
+/** Frame growth follows the settled team, not a card temporarily crossing the canvas. */
+function interpolateGeometry(from: SpaceGeometry, to: SpaceGeometry, amount: number): SpaceGeometry {
+  const oldTeams = new Map(from.teams.map(team => [team.id, team]))
+  const oldDepartments = new Map(from.departments.map(department => [department.id, department]))
+  const between = (start: Bounds | undefined, end: Bounds): Bounds => {
+    if (!start) return end
+    return {
+      x: start.x + (end.x - start.x) * amount,
+      y: start.y + (end.y - start.y) * amount,
+      width: start.width + (end.width - start.width) * amount,
+      height: start.height + (end.height - start.height) * amount,
+    }
+  }
+  return {
+    teams: to.teams.map(team => {
+      const old = oldTeams.get(team.id)
+      const bounds = between(old?.bounds, team.bounds)
+      return { ...team, bounds, points: rectanglePoints(bounds), labelPosition: {
+        x: (old?.labelPosition.x ?? team.labelPosition.x) + (team.labelPosition.x - (old?.labelPosition.x ?? team.labelPosition.x)) * amount,
+        y: (old?.labelPosition.y ?? team.labelPosition.y) + (team.labelPosition.y - (old?.labelPosition.y ?? team.labelPosition.y)) * amount,
+      } }
+    }),
+    departments: to.departments.map(department => ({ ...department,
+      bounds: between(oldDepartments.get(department.id)?.bounds, department.bounds),
+    })),
+  }
+}
+
+/** Matches spaceConnectionPoints, so every reporting line stays inside its team. */
 function roundedReportingPath(sourceX: number, sourceY: number, targetX: number, targetY: number) {
   const middle = (sourceY + targetY) / 2
   const vertical = Math.sign(targetY - sourceY), horizontal = Math.sign(targetX - sourceX)

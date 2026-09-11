@@ -1151,7 +1151,7 @@ of its own: it is read once, alongside the total it is holding back.
 
 **Org chart** (combined canvas, 2026-09-11). Built with **`@xyflow/react`**, with
 database-style connector lines and three visual levels: a tinted outer frame
-for each sub-department, elastic boundaries around its teams, and member
+for each sub-department, growing rounded rectangular frames around its teams, and member
 cards. The overview loads permitted active siblings of the route's department
 that have an active scheme. Each membership keeps its own title, rank and
 upline, even when the same person appears in several regions. Subdued title
@@ -1159,18 +1159,23 @@ badges show the full membership title and a small mnemonic; pay and rank chips
 remain neutral. Department shortcuts and search move the viewport without
 merging those memberships.
 
-**Drag to arrange or transfer.** Blank-space drops change a member's position;
-its team boundary and department frame expand to contain it. Holding over a
+**Drag to arrange or transfer.** Team borders and headings move whole teams to
+free world coordinates on the pannable canvas. Members align in hierarchy rows
+inside each team; a blank-space card drop springs back to its slot. Its frame
+stays steady while the card is carried. Holding over a
 specific person for 450ms arms a transfer, with the intended upline shown before
-release. An accepted transfer carries the member's subtree and preserves its
-internal positions. A failed or cancelled transfer returns to the starting
+release. An accepted transfer carries the member's subtree, preserving all
+descendant relationships, and realigns the affected teams around their existing
+leaders. Frames grow or shrink with those memberships. A failed or cancelled transfer returns to the starting
 arrangement. Blank-space drops never detach a member; the Upline menu's Top of
 team action does that explicitly.
 
-Dragging a department heading with the left or right mouse button, or touch,
-moves all its members together; arrow keys also move the section. On release,
-overlapping teams and departments move aside as whole groups. **Tidy** only
-repeats that spacing, preserving each team's internal arrangement.
+Dragging a team or department heading or border with the left or right mouse
+button, or touch, moves all its members together; heading arrow keys also move
+the group. Escape, pointer cancellation and lost capture restore its original
+layout. On release, overlapping teams and departments move aside as whole groups.
+**Tidy** aligns hierarchy rows and separates overlaps, keeping freely chosen
+team leader origins. There is no fixed page grid or manually resized team box.
 Browser layout memory is scoped to the set of schemes; each card is identified
 by scheme and staff ID.
 

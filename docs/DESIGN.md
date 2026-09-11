@@ -738,8 +738,9 @@ their own containers.
 
 Staff Hierarchy's chart combines the active sub-departments of the same parent
 department on one pannable canvas. Each sub-department has a labeled rounded
-outer frame; each reporting tree has a quieter, softly rounded convex envelope
-that follows its member cards and lines. Use the existing chart palette with
+outer frame; each reporting tree has a quieter rounded rectangular frame
+that grows with its measured, magnetically aligned members. Team frames have
+free world coordinates, not slots in a fixed page grid. Use the existing chart palette with
 restrained blue, violet and warm neutral department tints, paired with names.
 These categorical surfaces are the approved hierarchy-specific treatment.
 Within a card, a subdued title badge pairs the full title with a small mnemonic;
@@ -751,17 +752,22 @@ Senior Revenue Specialist, and yellow for Revenue Specialist. Use pale tinted
 badge fills and readable dark text; yellow uses dark ochre text. Dark mode keeps
 the same color families with lighter text.
 
-Dragging into blank space arranges a card; its team and department boundaries
-follow. Hold over a specific person for 450ms to arm a reporting-line change,
+Dragging a team border or heading moves the whole team freely on the canvas.
+Individual cards return to their hierarchy slots after blank-space drops;
+the frame stays steady while a card is being carried. Hold over a specific
+person for 450ms to arm a reporting-line change,
 with the target and intended upline shown before release. A valid drop transfers
-the member and their subtree while preserving its internal arrangement. Failed
+the member and their subtree, then aligns the affected teams around their
+existing leaders. Frames grow or shrink smoothly to fit those memberships. Failed
 or cancelled transfers return to their starting positions. Blank-space drops
 never detach a member; choose Top of team in the Upline menu for that action.
 
-Dragging a department headline, with either mouse button or touch, translates
-all its memberships together. On release, overlapping teams and departments
-move aside as intact groups. Tidy only separates overlaps and retains the
-arrangement. Transfers use a gentle 500ms spring, while neighboring groups
+Dragging a team or department headline or border, with either mouse button
+or touch, translates that entire group. Headings also support arrow keys.
+Escape, cancelled pointers and lost pointer capture restore its starting
+layout. On release, overlapping teams and departments move aside as intact
+groups. Tidy aligns member rows and separates overlaps while retaining each
+team's freely chosen leader origin. Transfers use a gentle 500ms spring, while neighboring groups
 settle over 500ms without overshoot. Rounded connectors and a fading landing
 halo reinforce the move. When needed, the camera eases out over 400ms, then
 focuses the destination after settling; pointer or wheel input cancels this
