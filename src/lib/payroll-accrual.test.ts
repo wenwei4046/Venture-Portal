@@ -38,6 +38,20 @@ describe('buildAccrualLines', () => {
 })
 
 describe('sumPayrollRows', () => {
+  it('balances a revenue commission budget with self-funded EPF and withholding', () => {
+    // 10,000 budget = 9,350 gross + 650 ER; 8,613 net = gross - 550 EE - 187 WHT.
+    const sums = sumPayrollRows([{
+      gross: 9350, non_statutory_allowance: 0, epf_er: 650, epf_ee: 550,
+      socso_er: 0, socso_ee: 0, eis_er: 0, eis_ee: 0,
+      pcb: 0, withholding_tax: 187, net: 8613, skbbk_amount: 0,
+    }])
+    const lines = buildAccrualLines(sums, "Sep'26")
+    expect(accrualTotal(sums)).toBe(10000)
+    expect(lines.reduce((sum, line) => sum + (line.debit ?? 0), 0)).toBe(10000)
+    expect(lines.reduce((sum, line) => sum + (line.credit ?? 0), 0)).toBe(10000)
+    expect(lines.find(line => line.description?.startsWith('Withholding Tax Payable'))?.credit).toBe(187)
+  })
+
   it('aggregates the verified mapping (gross − non-stat drives 9030)', () => {
     const s = sumPayrollRows([
       {

@@ -45,7 +45,7 @@ export function resolveCommissionWrite<T extends { commission_amount?: number }>
   if (Math.abs(Number(fields.commission_amount) - row.stored) > EPSILON) {
     throw new DerivedCommissionError(
       `${row.name}'s commission comes from the commission run and cannot be typed here. ` +
-        `Change it on the run for that month and apply it again.`,
+        `Recompute it in Revenue → Commission Calculation to sync it to payroll.`,
     )
   }
 

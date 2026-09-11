@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn, formatMoneyBare } from '@/lib/utils'
+import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
 import {
   dirtyFields,
   editFromRow,
   formatAmount,
   PAYROLL_FIELD_LABELS,
+  PAYROLL_EDIT_FIELDS,
   type PayrollEdit,
   type PayrollEditField,
 } from '@/lib/payroll-grid'
@@ -27,6 +29,7 @@ interface Props {
   alt: boolean
   /** Department folded away. Hidden, not unmounted, so unsaved edits survive. */
   hidden: boolean
+  showRevenueSplit?: boolean
   /** This row's paycheck window is up. */
   open: boolean
   onOpen: () => void
@@ -49,6 +52,7 @@ export default function PayrollRow({
   count,
   alt,
   hidden,
+  showRevenueSplit = false,
   open,
   onOpen,
   onClose,
@@ -65,17 +69,41 @@ export default function PayrollRow({
   const trRef = useRef<HTMLTableRowElement>(null)
   const chevRef = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(false)
+  const savedEditRef = useRef(editFromRow(row))
 
   const locked = row.status !== 'draft'
   const dirtyList = dirtyFields(edit, row, { commissionDerived: row.commission_is_derived })
   const dirty = dirtyList.length > 0
+  const revenuePayroll = row.revenue_payroll ?? row.source === 'commission'
+  const split = revenuePayroll ? calculateRevenuePayrollSplit(row) : null
+  const statementHref = row.commission_statements?.[0]?.href ?? row.commission_statement_href
+  const sourceLinked = row.source === 'commission' && Boolean(row.commission_statements?.length || row.commission_statement_href)
+
+  // Sync clean fields after a server refresh while retaining the user's
+  // unsaved work. The Revenue run always owns the gross commission field.
+  useEffect(() => {
+    const previous = savedEditRef.current
+    const next = editFromRow(row)
+    savedEditRef.current = next
+    setEdit(current => {
+      const merged = { ...current }
+      for (const field of PAYROLL_EDIT_FIELDS) {
+        if ((field === 'commission_amount' && row.commission_is_derived) || current[field] === previous[field]) {
+          merged[field] = next[field]
+        }
+      }
+      return PAYROLL_EDIT_FIELDS.some(field => merged[field] !== current[field]) ? merged : current
+    })
+  }, [row])
 
   // Report pending edits to the page-level draft context — powers the
   // header Save button and blocks Submit to Finance while unsaved.
   const { setRowEdit } = usePayrollDraft()
   useEffect(() => {
-    setRowEdit(row.id, dirty && !locked ? edit : null)
-  }, [row.id, dirty, locked, edit, setRowEdit])
+    const update: Partial<PayrollEdit> = { ...edit }
+    if (row.commission_is_derived) delete update.commission_amount
+    setRowEdit(row.id, dirty && !locked ? update : null)
+  }, [row.id, row.commission_is_derived, dirty, locked, edit, setRowEdit])
   useEffect(() => () => setRowEdit(row.id, null), [row.id, setRowEdit])
 
   // Opening scrolls the row into view (‹ › in the window can land anywhere
@@ -101,7 +129,9 @@ export default function PayrollRow({
     setSaved(false)
     startTransition(async () => {
       try {
-        await updatePayrollRow(row.id, edit)
+        const update: Partial<PayrollEdit> = { ...edit }
+        if (row.commission_is_derived) delete update.commission_amount
+        await updatePayrollRow(row.id, update)
         setSaved(true)
         router.refresh()
         setTimeout(() => setSaved(false), 1500)
@@ -145,10 +175,10 @@ export default function PayrollRow({
             type="checkbox"
             aria-label={`Select ${row.staff_name}`}
             checked={selected}
-            disabled={locked || selectDisabled}
+            disabled={locked || sourceLinked || selectDisabled}
             onChange={onToggleSelect}
             className="w-3.5 h-3.5 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
-            title={locked ? `Cannot delete — status is ${row.status}` : undefined}
+            title={locked ? `Cannot delete — status is ${row.status}` : sourceLinked ? 'Revenue rows are managed from the commission calculation' : undefined}
           />
         </td>
         <td className="pg-st l1 pg-name">
@@ -192,15 +222,38 @@ export default function PayrollRow({
           </button>
         </td>
 
+        {showRevenueSplit && (
+          <>
+            <td className={cn('num g1', split?.basicPay === 0 && 'zero')} data-label="Basic pay">
+              {split ? formatMoneyBare(split.basicPay) : '—'}
+            </td>
+            <td
+              className={cn('num', split?.commissionBalance === 0 && 'zero')}
+              data-label="Commission balance"
+              title={split ? 'Gross commission less basic pay, employer EPF and employee EPF. Recomputed when saved.' : undefined}
+            >
+              {split ? <span className={split.shortfall > 0 ? 'neg' : undefined}>{formatMoneyBare(split.commissionBalance)}</span> : '—'}
+            </td>
+          </>
+        )}
         <td className="pg-ed g1">{cell('basic_salary')}</td>
         <td className="pg-ed">{cell('statutory_allowance')}</td>
         <td className="pg-ed">{cell('non_statutory_allowance')}</td>
         <td className="pg-ed">{cell('ot_amount')}</td>
         {row.commission_is_derived ? (
           <td className={cn('num derived', row.commission_amount === 0 && 'zero')}>
-            {row.commission_statement_href ? (
+            {(row.commission_statements?.length ?? 0) > 1 ? (
+              <button
+                type="button"
+                onClick={onOpen}
+                className="text-accent underline decoration-dotted underline-offset-4"
+                title="Open paycheck to view all commission statements behind this figure"
+              >
+                {formatMoneyBare(row.commission_amount)}
+              </button>
+            ) : statementHref ? (
               <a
-                href={row.commission_statement_href}
+                href={statementHref}
                 title="This figure comes from the commission run — open the statement behind it"
               >
                 {formatMoneyBare(row.commission_amount)}

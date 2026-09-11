@@ -4003,6 +4003,7 @@ export type Database = {
         Row: {
           basic_salary: number
           commission_amount: number
+          commission_balance: number | null
           created_at: string
           created_by: string | null
           deduction_amount: number
@@ -4036,6 +4037,7 @@ export type Database = {
         Insert: {
           basic_salary?: number
           commission_amount?: number
+          commission_balance?: number | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number
@@ -4069,6 +4071,7 @@ export type Database = {
         Update: {
           basic_salary?: number
           commission_amount?: number
+          commission_balance?: number | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number
@@ -5619,6 +5622,7 @@ export type Database = {
           id: string
           it_opex_total: number
           marketing_opex_total: number
+          revenue_opex_total: number
           paid_at: string | null
           period_month: string
           rejected_at: string | null
@@ -5641,6 +5645,7 @@ export type Database = {
           id?: string
           it_opex_total?: number
           marketing_opex_total?: number
+          revenue_opex_total?: number
           paid_at?: string | null
           period_month: string
           rejected_at?: string | null
@@ -5663,6 +5668,7 @@ export type Database = {
           id?: string
           it_opex_total?: number
           marketing_opex_total?: number
+          revenue_opex_total?: number
           paid_at?: string | null
           period_month?: string
           rejected_at?: string | null

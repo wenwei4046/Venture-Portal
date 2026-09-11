@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { assertPeriodOpen } from '@/lib/period-lock'
 import type { InfotechRow } from '@/lib/import/infotech-payroll'
 
 export interface PreviewResult {
@@ -52,16 +53,17 @@ export async function previewInfotechImport(
   await requirePermission('hr_costing')
   const supabase = await createClient()
 
-  const [{ data: staffList }, { data: payroll }] = await Promise.all([
+  const [{ data: staffList, error: staffError }, { data: payroll, error: payrollError }] = await Promise.all([
     supabase
       .from('hr_staff_costs')
-      .select('id, employee_name, employee_code')
+      .select('id, employee_name, employee_code, departments(payroll_source)')
       .eq('status', 'active'),
     supabase
       .from('hr_monthly_payroll')
-      .select('id, staff_id, status')
+      .select('id, staff_id, status, source')
       .eq('period_month', period),
   ])
+  if (staffError || payrollError) throw new Error(`Could not check import: ${staffError?.message ?? payrollError?.message}`)
 
   const staff = staffList ?? []
   const payrollByStaff = new Map((payroll ?? []).map(p => [p.staff_id, p]))
@@ -80,7 +82,7 @@ export async function previewInfotechImport(
     const code = row.employeeCode
     const name = row.employeeName
 
-    let matched: { id: string; employee_name: string } | undefined
+    let matched: (typeof staff)[number] | undefined
     let matchedBy: 'employee_code' | 'employee_name_fuzzy' | null = null
 
     if (code) {
@@ -104,6 +106,10 @@ export async function previewInfotechImport(
     }
 
     const existing = payrollByStaff.get(matched.id)
+    if (existing?.source === 'commission' || matched.departments?.payroll_source === 'commission') {
+      skipped.push({ rowIndex: idx, reason: 'Synced from Revenue Commission Calculation — no InfoTech import needed', code, name })
+      return
+    }
     if (existing && existing.status !== 'draft') {
       skipped.push({
         rowIndex: idx,
@@ -161,6 +167,7 @@ export async function applyInfotechImport(
 ): Promise<{ updated: number; created: number; skipped: number; failed: number }> {
   const user = await requirePermission('hr_costing')
   const supabase = await createClient()
+  await assertPeriodOpen(supabase, period)
   const preview = await previewInfotechImport(rows, period)
 
   let updated = 0
@@ -172,7 +179,7 @@ export async function applyInfotechImport(
   }
 
   const writeVerbatim = async (staffId: string, row: InfotechRow) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('hr_monthly_payroll')
       .update({
         epf_er: row.epfEr,
@@ -189,7 +196,11 @@ export async function applyInfotechImport(
       .eq('staff_id', staffId)
       .eq('period_month', period)
       .eq('status', 'draft')
+      .eq('source', 'imported')
+      .select('id')
+      .maybeSingle()
     if (error) throw new Error(error.message)
+    if (!data) throw new Error('Payroll changed while importing. Refresh the preview before retrying.')
   }
 
   for (const item of preview.toCreate) {
@@ -223,7 +234,7 @@ export async function applyInfotechImport(
 
   for (const item of preview.toUpdate) {
     const row = rows[item.rowIndex]
-    const { error: updErr } = await supabase
+    const { data: updatedRow, error: updErr } = await supabase
       .from('hr_monthly_payroll')
       .update({
         basic_salary: row.basicSalary,
@@ -238,7 +249,10 @@ export async function applyInfotechImport(
       .eq('staff_id', item.staffId)
       .eq('period_month', period)
       .eq('status', 'draft')
-    if (updErr) {
+      .neq('source', 'commission')
+      .select('id')
+      .maybeSingle()
+    if (updErr || !updatedRow) {
       failed++
       continue
     }

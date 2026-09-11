@@ -56,13 +56,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
   // The live run is the single non-rejected one (partial unique index
   // guarantees <= 1). Rejected rows accumulate via the HR reopen flow
   // (mig 278) — the latest one drives the reopened/rejected notice.
-  const [{ data: rows }, { data: run }, { data: lastRejected }, { data: directorRows }] = await Promise.all([
+  const [{ data: rows, error: payrollError }, { data: run }, { data: lastRejected }, { data: directorRows }] = await Promise.all([
     supabase
       .from('hr_monthly_payroll')
       .select(`
         id, staff_id, period_month, status, source,
         basic_salary, statutory_allowance, non_statutory_allowance,
-        ot_hours, ot_amount, commission_amount, unpaid_leave_days,
+        ot_hours, ot_amount, commission_amount, commission_balance, unpaid_leave_days,
         deduction_amount, skbbk_amount,
         prorata_days_worked, prorata_days_in_month,
         epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
@@ -97,6 +97,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
       .eq('period_month', period)
       .order('director_id'),
   ])
+  if (payrollError) throw new Error(`Could not load payroll: ${payrollError.message}`)
 
   // Which salespeople have a statement behind this month's Commission figure.
   // The badge on a derived row links to it; without a computed run there is
@@ -109,7 +110,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
     .from('comm_runs')
     .select('id, comm_sub_departments (name)')
     .eq('period_month', period)
-    .in('status', ['computed', 'applied', 'locked'])
+    .in('status', ['applied', 'locked'])
   const commRuns = (commRunRows ?? []) as unknown as Array<{
     id: string
     comm_sub_departments: { name: string } | null
@@ -122,10 +123,14 @@ export default async function PayrollGridPage({ params }: PageProps) {
         .select('staff_id, run_id')
         .in('run_id', commRuns.map(r => r.id))
     : { data: null }
-  const statementSlug = new Map<string, string>()
+  const statementsByStaff = new Map<string, { label: string; href: string }[]>()
   for (const r of (commStatementRows ?? []) as Array<{ staff_id: string; run_id: string }>) {
     const name = subDeptOfRun.get(r.run_id)
-    if (name) statementSlug.set(r.staff_id, subDeptSlug(name))
+    if (name) {
+      const statements = statementsByStaff.get(r.staff_id) ?? []
+      statements.push({ label: name, href: revenuePath(subDeptSlug(name), period, 'statement', r.staff_id) })
+      statementsByStaff.set(r.staff_id, statements)
+    }
   }
 
   // Latest payment request for this run (if run exists). Order by created_at
@@ -212,6 +217,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
       ot_hours: Number(r.ot_hours),
       ot_amount: Number(r.ot_amount),
       commission_amount: Number(r.commission_amount),
+      commission_balance: r.commission_balance == null ? null : Number(r.commission_balance),
       unpaid_leave_days: Number(r.unpaid_leave_days),
       deduction_amount: Number(r.deduction_amount),
       skbbk_amount: Number(r.skbbk_amount ?? 0),
@@ -227,10 +233,10 @@ export default async function PayrollGridPage({ params }: PageProps) {
       withholding_tax: Number(r.withholding_tax ?? 0),
       gross: Number(r.gross),
       net: Number(r.net),
-      commission_is_derived: staff?.departments?.payroll_source === 'commission',
-      commission_statement_href: statementSlug.has(r.staff_id)
-        ? revenuePath(statementSlug.get(r.staff_id)!, period, 'statement', r.staff_id)
-        : null,
+      revenue_payroll: r.source === 'commission' && r.commission_balance != null,
+      commission_is_derived: r.source === 'commission' || staff?.departments?.payroll_source === 'commission',
+      commission_statements: statementsByStaff.get(r.staff_id) ?? [],
+      commission_statement_href: statementsByStaff.get(r.staff_id)?.[0]?.href ?? null,
     }
   })
 
@@ -472,9 +478,9 @@ export default async function PayrollGridPage({ params }: PageProps) {
           dangerAction={
             phase === 'drafting' && gridRows.length > 0
               ? {
-                  label: `Delete this month (${gridRows.length} rows)`,
+                  label: 'Delete imported / manual draft rows',
                   confirmText:
-                    `Delete ALL ${gridRows.length} draft payroll rows for ${formatPeriodLabel(period)}? ` +
+                    `Delete imported and manual draft payroll rows for ${formatPeriodLabel(period)}? Revenue commission rows stay linked to Commission Calculation. ` +
                     `This wipes the whole month — use it for test/wrongly-created periods. ` +
                     `Re-create via Import InfoTech or Create Period.`,
                   action: deletePayrollPeriod.bind(null, period),

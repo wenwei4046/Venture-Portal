@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import PaycheckWindow from './PaycheckWindow'
 import { editFromRow } from '@/lib/payroll-grid'
 import type { PayrollRowData } from './PayrollGrid'
@@ -161,5 +161,45 @@ describe('PaycheckWindow', () => {
     setup({ row: { ...row, pcb: 0, withholding_tax: 85 } })
     expect(screen.getByRole('dialog').textContent).toContain('Withholding tax')
     expect(screen.getByRole('dialog').textContent).not.toContain('PCB')
+  })
+
+  it('shows both Revenue payout amounts and every scheme statement', () => {
+    setup({
+      row: {
+        ...row, source: 'commission', revenue_payroll: true, commission_is_derived: true,
+        basic_salary: 5000, commission_amount: 10000, epf_er: 650, epf_ee: 550,
+        commission_statements: [
+          { label: 'Fair', href: '/revenue/fair/2026-08-01/statement/s1' },
+          { label: 'Company', href: '/revenue/company/2026-08-01/statement/s1' },
+        ],
+      },
+    })
+    const split = screen.getByRole('region', { name: 'Revenue payout split' })
+    expect(within(split).getByText('Basic pay')).toBeVisible()
+    expect(within(split).getByText('5,000.00')).toBeVisible()
+    expect(within(split).getByText('Commission balance')).toBeVisible()
+    expect(within(split).getByText('3,800.00')).toBeVisible()
+    expect(within(split).getByText('8,800.00')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Fair statement ↗' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/statement/s1')
+    expect(screen.getByRole('link', { name: 'Company statement ↗' })).toHaveAttribute('href', '/revenue/company/2026-08-01/statement/s1')
+    expect(screen.queryByLabelText('Commission')).toBeNull()
+  })
+
+  it('labels zero-basic Revenue as full commission and keeps a shortfall visible', () => {
+    const { props, rerender } = setup({
+      row: {
+        ...row, source: 'commission', revenue_payroll: true, basic_salary: 0,
+        commission_amount: 10000, epf_er: 0, epf_ee: 0,
+      },
+    })
+    let split = screen.getByRole('region', { name: 'Revenue payout split' })
+    expect(within(split).getByText('Full commission · RM')).toBeVisible()
+    expect(within(split).getByText('0.00')).toBeVisible()
+    expect(within(split).getAllByText('10,000.00')).toHaveLength(2)
+
+    rerender(<PaycheckWindow {...props} row={{ ...props.row, basic_salary: 11000 }} />)
+    split = screen.getByRole('region', { name: 'Revenue payout split' })
+    expect(within(split).getByText('(1,000.00)')).toBeVisible()
+    expect(within(split).getByText(/Commission is short by RM 1,000.00/)).toBeVisible()
   })
 })

@@ -88,7 +88,7 @@ interface StatementRow {
  * gaps that would make it wrong.
  *
  * The order of the page is the order of the work — import, fix what is flagged,
- * compute, read the statements, apply. Everything the run says about itself is
+ * compute and sync, then read the statements. Everything the run says about itself is
  * read from the RUN, not recomputed from sales_orders: re-importing a month
  * replaces every order row, and a page that recomputed its own history would
  * quietly disagree with the money already in payroll.
@@ -356,7 +356,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                 </div>
                 {run?.applied_at ? (
                   <div className="font-serif italic text-ledger text-xs mt-3">
-                    Written into the {period.slice(0, 7)} payroll.
+                    Synced to the {period.slice(0, 7)} payroll · basic pay and commission balance are split there.
                   </div>
                 ) : null}
               </div>
@@ -425,7 +425,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                             <div className="font-mono text-[10.5px] text-accent mt-0.5">
                               {run?.status === 'applied' ? 'TITLE RAISED TO' : 'TITLE → '}{' '}
                               {(one(s.promotes_to)?.name ?? 'a higher title').toUpperCase()}
-                              {run?.status === 'applied' ? '' : ' ON APPLY'}
+                              {run?.status === 'applied' ? '' : ' ON SYNC'}
                             </div>
                           ) : null}
                         </td>

@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoneyBare } from '@/lib/utils'
+import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
 import {
   columnTotals,
   formatAmount,
@@ -43,12 +44,16 @@ export interface PayrollRowData {
   /**
    * True for a salesperson in a `payroll_source = 'commission'` department.
    * Their Commission is DERIVED by the commission run, so the cell is read
-   * only — a hand edit would be silently overwritten by the next Apply after
+   * only — a hand edit would be overwritten by the next calculation after
    * diverging from the statement that explains it.
    */
   commission_is_derived: boolean
   /** Link to this month's statement, when a run has computed one. */
   commission_statement_href: string | null
+  /** Source-linked Revenue payroll; imported rows retain their own payroll treatment. */
+  revenue_payroll?: boolean
+  commission_balance?: number | null
+  commission_statements?: { label: string; href: string }[]
 }
 
 interface Props {
@@ -105,6 +110,7 @@ const TOTAL_KEYS = [
 export default function PayrollGrid({ rows, period }: Props) {
   const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
+  const [department, setDepartment] = useState('')
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
@@ -112,9 +118,17 @@ export default function PayrollGrid({ rows, period }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const groups = useMemo(() => groupByDepartment(rows), [rows])
+  const visibleGroups = useMemo(
+    () => groups.filter(g => !department || g.dept === department),
+    [groups, department],
+  )
+  const visibleRows = useMemo(() => visibleGroups.flatMap(g => g.rows), [visibleGroups])
+  const revenueRows = visibleRows.filter(r => r.revenue_payroll ?? r.source === 'commission')
+  const showRevenueSplit = revenueRows.length > 0
+  const splitTotals = columnTotals(revenueRows.map(calculateRevenuePayrollSplit), ['basicPay', 'commissionBalance'])
   // Display order — what ‹ › in the paycheck window step through.
-  const order = useMemo(() => groups.flatMap(g => g.rows.map(r => r.id)), [groups])
-  const totals = useMemo(() => columnTotals(rows, TOTAL_KEYS), [rows])
+  const order = useMemo(() => visibleRows.map(r => r.id), [visibleRows])
+  const totals = useMemo(() => columnTotals(visibleRows, TOTAL_KEYS), [visibleRows])
 
   // The frozen edge casts a shadow only once something has scrolled under it.
   useEffect(() => {
@@ -125,11 +139,13 @@ export default function PayrollGrid({ rows, period }: Props) {
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Only draft rows can be selected (and thus deleted). Non-draft rows
-  // live in an approved/submitted/paid payroll_run and must stay.
+  // Finalized rows and Revenue rows with applied source statements must stay.
+  // An unlinked Revenue draft can be removed after its source is reopened.
   const selectableIds = useMemo(
-    () => rows.filter(r => r.status === 'draft').map(r => r.id),
-    [rows],
+    () => visibleRows.filter(r => r.status === 'draft' && !(
+      r.source === 'commission' && (r.commission_statements?.length || r.commission_statement_href)
+    )).map(r => r.id),
+    [visibleRows],
   )
   const allSelectableChecked =
     selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
@@ -190,6 +206,32 @@ export default function PayrollGrid({ rows, period }: Props) {
 
   return (
     <div className="mb-12">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <label className="flex items-center gap-2 text-sm text-graphite">
+          Department
+          <select
+            value={department}
+            onChange={event => {
+              setDepartment(event.target.value)
+              setOpenId(null)
+              setSelected(new Set())
+              setDeleteError(null)
+            }}
+            className="rounded border border-hairline bg-surface px-3 py-2 text-ink"
+          >
+            <option value="">All departments</option>
+            {groups.map(group => <option key={group.dept} value={group.dept}>{group.dept}</option>)}
+          </select>
+        </label>
+        <span className="text-xs text-muted">{visibleRows.length} staff</span>
+      </div>
+      {showRevenueSplit && (
+        <p className="text-xs text-graphite mb-3">
+          Revenue payout: Basic pay + Commission balance. Commission balance = gross commission −
+          basic pay − EPF ER − EPF EE. Other payroll adjustments are included in Net.
+          {' '}Revenue rows are managed from the commission calculation.
+        </p>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3 min-h-[1.75rem]">
         {someSelected ? (
           <span className="font-serif italic text-graphite text-xs">
@@ -247,7 +289,15 @@ export default function PayrollGrid({ rows, period }: Props) {
                 <col>s (globals.css → col.col-*), not on the <th>s. */}
             <colgroup>
               {COLUMNS.map(c => (
-                <col key={c} className={`col-${c}`} />
+                <Fragment key={c}>
+                  <col className={`col-${c}`} />
+                  {c === 'act' && showRevenueSplit && (
+                    <>
+                      <col className="col-basic" />
+                      <col style={{ width: 118 }} />
+                    </>
+                  )}
+                </Fragment>
               ))}
             </colgroup>
             <thead>
@@ -256,6 +306,7 @@ export default function PayrollGrid({ rows, period }: Props) {
                 <th className="pg-st l2" colSpan={3}>
                   Payout
                 </th>
+                {showRevenueSplit && <th className="g1" colSpan={2}>Revenue payout</th>}
                 <th className="g1" colSpan={5}>
                   Earnings
                 </th>
@@ -281,6 +332,12 @@ export default function PayrollGrid({ rows, period }: Props) {
                 <th className="num pg-st l2 col-gross">Gross</th>
                 <th className="num pg-st l3 col-net">Net</th>
                 <th className="pg-st l4 col-act" />
+                {showRevenueSplit && (
+                  <>
+                    <th className="num g1">Basic pay</th>
+                    <th className="num" title="Gross commission less basic pay, employer EPF and employee EPF">Comm. balance</th>
+                  </>
+                )}
                 <th className="num g1 col-basic">Basic</th>
                 <th className="num col-stat">Stat.</th>
                 <th className="num col-ns">Non-stat.</th>
@@ -304,28 +361,37 @@ export default function PayrollGrid({ rows, period }: Props) {
             <tbody>
               {groups.map(g => {
                 const isFolded = folded.has(g.dept)
-                const commissionDept = g.rows.some(r => r.commission_is_derived)
+                const filteredOut = !!department && g.dept !== department
+                const groupRevenueRows = g.rows.filter(r => r.revenue_payroll ?? r.source === 'commission')
+                const groupSplit = columnTotals(groupRevenueRows.map(calculateRevenuePayrollSplit), ['basicPay', 'commissionBalance'])
                 return (
                   <Fragment key={g.dept}>
-                    <tr className="pg-band">
+                    <tr className="pg-band" hidden={filteredOut}>
                       <td className="pg-st l0 group-cell" colSpan={2}>
                         <button
                           type="button"
                           className="group-btn"
                           aria-expanded={!isFolded}
+                          aria-label={`${g.dept}, ${g.rows.length} staff`}
+                          title={g.dept}
                           onClick={() => toggleFold(g.dept)}
                         >
-                          <span className="chev" aria-hidden>
+                          <span className="chev shrink-0" aria-hidden>
                             ▾
                           </span>
-                          {g.dept}
-                          {commissionDept && <span className="tag">commission</span>}
-                          <span className="count">{g.rows.length}</span>
+                          <span className="min-w-0 truncate">{g.dept}</span>
+                          <span className="count shrink-0">{g.rows.length}</span>
                         </button>
                       </td>
                       <td className="pg-st l2 sub">{formatMoneyBare(g.gross)}</td>
                       <td className="pg-st l3 sub">{formatMoneyBare(g.net)}</td>
                       <td className="pg-st l4" />
+                      {showRevenueSplit && (
+                        <>
+                          <td className="num g1 sub">{groupRevenueRows.length ? formatMoneyBare(groupSplit.basicPay) : '—'}</td>
+                          <td className="num sub">{groupRevenueRows.length ? formatMoneyBare(groupSplit.commissionBalance) : '—'}</td>
+                        </>
+                      )}
                       <td colSpan={11} />
                     </tr>
                     {g.rows.map((r, i) => (
@@ -336,7 +402,8 @@ export default function PayrollGrid({ rows, period }: Props) {
                         index={order.indexOf(r.id)}
                         count={order.length}
                         alt={i % 2 === 1}
-                        hidden={isFolded}
+                        hidden={isFolded || filteredOut}
+                        showRevenueSplit={showRevenueSplit}
                         open={openId === r.id}
                         onOpen={() => setOpenId(r.id)}
                         onClose={() => setOpenId(null)}
@@ -356,11 +423,17 @@ export default function PayrollGrid({ rows, period }: Props) {
             <tfoot>
               <tr>
                 <td className="pg-st l0" colSpan={2} style={{ paddingLeft: 12 }}>
-                  Total · {rows.length} staff
+                  Total · {visibleRows.length} staff
                 </td>
                 <td className="num pg-st l2">{formatMoneyBare(totals.gross)}</td>
                 <td className="num pg-st l3">{formatMoneyBare(totals.net)}</td>
                 <td className="pg-st l4" />
+                {showRevenueSplit && (
+                  <>
+                    <td className="num g1">{formatMoneyBare(splitTotals.basicPay)}</td>
+                    <td className="num">{formatMoneyBare(splitTotals.commissionBalance)}</td>
+                  </>
+                )}
                 <td className="num g1">{formatMoneyBare(totals.basic_salary)}</td>
                 <td className="num sub">{formatMoneyBare(totals.statutory_allowance)}</td>
                 <td className="num sub">{formatMoneyBare(totals.non_statutory_allowance)}</td>

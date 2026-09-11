@@ -29,6 +29,11 @@ jobs:
       - name: Run unit tests
         run: npm run test:ci
 
+      - name: Verify Revenue payroll SQL integration
+        run: |
+          npm ci --prefix tests/revenue-payroll-sql
+          npm test --prefix tests/revenue-payroll-sql
+
       - name: Next.js build check
         run: npm run build
         env:

@@ -15,6 +15,52 @@ cross-apply the two programmes.
 
 ---
 
+## Payroll integration — 2026-09-11 amendment
+
+This amendment supersedes the older Apply step and the basic-plus-commission
+formula described below. Revenue's **Compute & sync payroll** saves a clean
+calculation and synchronizes payroll in one transaction. No separate Revenue
+submission is needed. Warnings leave a calculation unsynced; correct them and
+recompute. Payroll's existing monthly Finance/funding workflow remains shared.
+
+`commission_amount` is the sum of the person's gross commission across all
+applied/locked sub-departments for the month. A new commission payroll row uses
+the staff master's basic; subsequent syncs retain the month's edited basic.
+
+```text
+basic pay          = basic salary × saved pro-rata ratio (rounded to cents)
+commission balance = gross commission − basic pay − EPF employer − EPF employee
+gross pay          = gross commission − EPF employer + other earnings − deduction
+net pay            = gross pay − employee statutory − tax − SKBBK
+```
+
+Basic is funded from commission; employee EPF is counted once. A full commission
+person uses basic 0. Existing statutory/tax settings remain the lookup inputs;
+SOCSO/EIS, withholding/PCB and other adjustments retain their existing treatment.
+Negative commission balances remain visible and block Finance submission until
+resolved. Payroll funding includes Revenue CTC; accruals use its registered GL
+segment and record withholding in the LHDN payable account alongside PCB, with
+a separate description.
+
+Payroll adds a department selector and Basic pay / Commission balance payout
+columns; the paycheck and payslip explain the split and link its source
+statements. InfoTech import and copying last month never replace Revenue's
+commission. Source-linked rows are managed in Commission Calculation; an
+unlinked draft placeholder can be deleted from payroll. Reopening
+one programme removes only its share and preserves the others; finalized,
+funded, vouchered and closed periods cannot be changed by sync.
+
+Migrations `20260913010000` (split/funding) and `20260913020000` (automatic sync)
+do not rewrite historical payroll. `commission_balance = NULL` identifies the
+legacy formula; recomputing a draft converts it. An old finalized row keeps its
+original amounts and display. Deploy the migrations before the application.
+
+Verification: `node tests/revenue-payroll-sql/validate-revenue-payroll-sync.mjs` and
+`node tests/revenue-payroll-sql/validate-revenue-payroll.mjs` (isolated PostgreSQL/PGlite),
+plus the Revenue payroll helper, accrual and payroll UI Vitest tests.
+
+---
+
 ## 1. Problem
 
 Today every payroll row is *imported already-computed* from InfoTech
