@@ -259,7 +259,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           ) : null}
           {s.promotes_to_title_id ? (
             <p className="font-serif italic text-accent text-sm mt-3">
-              {run.status === 'applied' ? 'Title raised to ' : 'Applying this run raises their title to '}
+              {run.status === 'applied' || run.status === 'locked' ? 'Title raised to ' : 'Syncing this run raises their title to '}
               <strong>{oneOf(s.promotes_to)?.name ?? 'a higher title'}</strong>
               {run.status === 'applied'
                 ? ' — and it stays there: a title only ever goes up.'
@@ -398,7 +398,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               ))}</tbody>
             </table>
           </div>
-          {s.full_spec ? <p className="font-serif italic text-accent text-sm mt-3">Full Spec achieved: three qualifying groups, each with three immediate reports. {Number(s.group_incentive) > 0 ? 'Applying this package run permits opening a fourth line in this month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.' : 'The current manual percentage rank must be changed to the group package before the SDL qualification can be awarded.'}</p> : null}
+          {s.full_spec ? <p className="font-serif italic text-accent text-sm mt-3">Full Spec achieved: three qualifying groups, each with three immediate reports. {Number(s.group_incentive) > 0 ? 'Syncing this package run permits opening a fourth line in this month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.' : 'The current manual percentage rank must be changed to the group package before the SDL qualification can be awarded.'}</p> : null}
           {Number(s.group_subsidy_cap) > 0 ? <p className="font-serif italic text-graphite text-sm mt-3">Car/property subsidy cap: <strong>{formatMoney(Number(s.group_subsidy_cap))}</strong>. This is a separate non-cash Claims benefit, subject to the registered instalment. It is excluded from the cash commission total.</p> : null}
         </section>
       ) : null}

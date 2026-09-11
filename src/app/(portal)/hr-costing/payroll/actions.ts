@@ -91,6 +91,19 @@ export interface PayrollRowUpdate {
   skbbk_amount?: number
 }
 
+async function assertDraftRowsOpen(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ids: string[],
+): Promise<void> {
+  const uniqueIds = [...new Set(ids)]
+  const { data, error } = await supabase.from('hr_monthly_payroll')
+    .select('id, status, period_month').in('id', uniqueIds)
+  if (error) throw new Error(`Could not check payroll rows: ${error.message}`)
+  if (data?.length !== uniqueIds.length) throw new Error('Payroll row not found. Refresh before saving.')
+  if (data.some(row => row.status !== 'draft')) throw new Error('Only draft payroll can be edited. Refresh before saving.')
+  for (const period of new Set(data.map(row => row.period_month))) await assertPeriodOpen(supabase, period)
+}
+
 /**
  * Commission is not HR's to type for a Revenue salesperson — the commission run
  * owns that field. Looks up who is on commission payroll and hands each row to
@@ -107,14 +120,16 @@ async function stripDerivedCommission(
   const withCommission = rows.filter(r => r.fields.commission_amount !== undefined)
   if (withCommission.length === 0) return rows
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('hr_monthly_payroll')
-    .select('id, commission_amount, hr_staff_costs!inner (employee_name, departments!inner (payroll_source))')
+    .select('id, source, commission_amount, hr_staff_costs!inner (employee_name, departments (payroll_source))')
     .in('id', withCommission.map(r => r.id))
+  if (error) throw new Error(`Could not check commission ownership: ${error.message}`)
 
   const derived = new Map<string, DerivedCommissionRow>(
     ((data ?? []) as unknown as Array<{
       id: string
+      source: string
       commission_amount: number | string
       hr_staff_costs: {
         employee_name: string
@@ -129,7 +144,7 @@ async function stripDerivedCommission(
       return [
         r.id,
         {
-          isDerived: dept?.payroll_source === 'commission',
+          isDerived: r.source === 'commission' || dept?.payroll_source === 'commission',
           stored: Number(r.commission_amount),
           name: r.hr_staff_costs.employee_name,
         },
@@ -154,15 +169,19 @@ export async function updatePayrollRow(
   await requirePermission('hr_costing')
   const supabase = await createClient()
 
+  await assertDraftRowsOpen(supabase, [id])
   const [row] = await stripDerivedCommission(supabase, [{ id, fields }])
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('hr_monthly_payroll')
     .update(row.fields)
     .eq('id', id)
     .eq('status', 'draft')
+    .select('id')
+    .maybeSingle()
 
   if (error) throw new Error(`Failed to update payroll row: ${error.message}`)
+  if (!data) throw new Error('Payroll changed while saving. Refresh before retrying.')
 
   revalidatePath('/hr-costing/payroll', 'layout')
 }
@@ -180,17 +199,21 @@ export async function updatePayrollRows(
   if (updates.length === 0) return { saved: 0 }
 
   const supabase = await createClient()
+  await assertDraftRowsOpen(supabase, updates.map(row => row.id))
   const cleaned = await stripDerivedCommission(supabase, updates)
 
   let saved = 0
   const failures: string[] = []
   for (const u of cleaned) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('hr_monthly_payroll')
       .update(u.fields)
       .eq('id', u.id)
       .eq('status', 'draft')
+      .select('id')
+      .maybeSingle()
     if (error) failures.push(error.message)
+    else if (!data) failures.push('Payroll changed while saving. Refresh before retrying.')
     else saved++
   }
 
@@ -232,6 +255,7 @@ export async function updateStaffStatutory(
   const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
+  await assertDraftRowsOpen(supabase, [id])
   const allowed = new Set<StaffStatutoryField>(STAFF_STAT_FIELDS)
   const writes: Record<string, number> = {}
   for (const [k, v] of Object.entries(fields)) {
@@ -248,7 +272,7 @@ export async function updateStaffStatutory(
 
   const { data: row, error: fetchErr } = await supabase
     .from('hr_monthly_payroll')
-    .select('id, status, gross, epf_ee, socso_ee, eis_ee, pcb, withholding_tax')
+    .select('id, source, status, gross, epf_er, epf_ee, socso_ee, eis_ee, pcb, withholding_tax, skbbk_amount')
     .eq('id', id)
     .single()
   if (fetchErr || !row) throw new Error('Payroll row not found')
@@ -260,26 +284,34 @@ export async function updateStaffStatutory(
   // overridable statutory field — but it must stay in the formula or overriding
   // any statutory on a Revenue salesperson would quietly hand back their tax.
   const merged = { ...row, ...writes }
+  const gross = Number(row.gross) - (row.source === 'commission'
+    ? Number(merged.epf_er) - Number(row.epf_er)
+    : 0)
   const net = Math.round(
-    (Number(merged.gross ?? 0) -
+    (gross -
       Number(merged.epf_ee ?? 0) -
       Number(merged.socso_ee ?? 0) -
       Number(merged.eis_ee ?? 0) -
       Number(merged.pcb ?? 0) -
-      Number(row.withholding_tax ?? 0)) * 100
+      Number(row.withholding_tax ?? 0) -
+      Number(row.skbbk_amount ?? 0)) * 100
   ) / 100
 
-  const { error: updErr } = await supabase
+  const { data: updatedRow, error: updErr } = await supabase
     .from('hr_monthly_payroll')
     .update({
       ...writes,
+      gross,
       net,
       statutory_overridden_at: new Date().toISOString(),
       statutory_overridden_by: user.id,
     })
     .eq('id', id)
     .eq('status', 'draft')
+    .select('id')
+    .maybeSingle()
   if (updErr) throw new Error(`Failed to update statutory: ${updErr.message}`)
+  if (!updatedRow) throw new Error('Payroll changed while saving. Refresh before retrying.')
 
   revalidatePath('/hr-costing/payroll', 'layout')
 }
@@ -288,6 +320,7 @@ export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
   await requirePermission('hr_costing')
   const supabase = await createClient()
 
+  await assertDraftRowsOpen(supabase, [id])
   // Pull basic_salary so we can fire a no-op UPDATE that re-triggers the
   // compute_hr_monthly_payroll function. The trigger watches basic_salary,
   // so writing the same value back forces it to recompute statutory + net.
@@ -299,7 +332,7 @@ export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
   if (fetchErr || !row) throw new Error('Payroll row not found')
   if (row.status !== 'draft') throw new Error('Cannot reset statutory on a non-draft payroll row')
 
-  const { error: updErr } = await supabase
+  const { data: resetRow, error: updErr } = await supabase
     .from('hr_monthly_payroll')
     .update({
       basic_salary: row.basic_salary,
@@ -308,7 +341,10 @@ export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
     })
     .eq('id', id)
     .eq('status', 'draft')
+    .select('id')
+    .maybeSingle()
   if (updErr) throw new Error(`Failed to reset statutory: ${updErr.message}`)
+  if (!resetRow) throw new Error('Payroll changed while resetting. Refresh before retrying.')
 
   revalidatePath('/hr-costing/payroll', 'layout')
 }
@@ -382,6 +418,7 @@ export async function deletePayrollPeriod(period: string): Promise<{ deleted: nu
     .delete({ count: 'exact' })
     .eq('period_month', period)
     .eq('status', 'draft')
+    .neq('source', 'commission')
 
   if (error) throw new Error(`Failed to delete payroll month: ${error.message}`)
 
@@ -401,9 +438,10 @@ export async function createPayrollPeriod(period: string): Promise<{ created: nu
   await requirePermission('hr_costing')
   const supabase = await createClient()
 
+  await assertPeriodOpen(supabase, period)
   const { data: staff, error: staffErr } = await supabase
     .from('hr_staff_costs')
-    .select('id, basic_salary, allowances')
+    .select('id, basic_salary, allowances, departments(payroll_source)')
     .eq('status', 'active')
 
   if (staffErr) throw new Error(`Failed to read staff: ${staffErr.message}`)
@@ -415,7 +453,7 @@ export async function createPayrollPeriod(period: string): Promise<{ created: nu
     period_month: period,
     basic_salary: s.basic_salary,
     non_statutory_allowance: s.allowances,
-    source: 'carried_forward' as const,
+    source: s.departments?.payroll_source === 'commission' ? 'commission' as const : 'carried_forward' as const,
     status: 'draft' as const,
   }))
 
@@ -554,6 +592,7 @@ export async function cancelPayrollPaymentRequest(
 export async function copyFromLastMonth(period: string): Promise<{ copied: number }> {
   await requirePermission('hr_costing')
   const supabase = await createClient()
+  await assertPeriodOpen(supabase, period)
 
   const periodDate = new Date(period + 'T00:00:00Z')
   const lastMonth = new Date(periodDate)
@@ -562,14 +601,16 @@ export async function copyFromLastMonth(period: string): Promise<{ copied: numbe
 
   const { data: prior, error: readErr } = await supabase
     .from('hr_monthly_payroll')
-    .select('staff_id, basic_salary, statutory_allowance, non_statutory_allowance, ot_hours, ot_amount, commission_amount, unpaid_leave_days')
+    .select('staff_id, basic_salary, statutory_allowance, non_statutory_allowance, ot_hours, ot_amount, commission_amount, unpaid_leave_days, hr_staff_costs(departments(payroll_source))')
     .eq('period_month', lastPeriod)
+    .neq('source', 'commission')
 
   if (readErr) throw new Error(`Failed to read prior period: ${readErr.message}`)
   if (!prior || prior.length === 0) return { copied: 0 }
 
   let copied = 0
   for (const r of prior) {
+    if (r.hr_staff_costs?.departments?.payroll_source === 'commission') continue
     const { error } = await supabase
       .from('hr_monthly_payroll')
       .update({
@@ -584,6 +625,7 @@ export async function copyFromLastMonth(period: string): Promise<{ copied: numbe
       .eq('staff_id', r.staff_id)
       .eq('period_month', period)
       .eq('status', 'draft')
+      .neq('source', 'commission')
     if (!error) copied++
   }
 

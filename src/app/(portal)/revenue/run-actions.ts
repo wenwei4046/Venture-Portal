@@ -21,7 +21,7 @@ import type {
 } from '@/lib/commission/run-payload'
 
 /**
- * Computing and applying a month's commission.
+ * Computing a month's commission and syncing its clean result to payroll.
  *
  * The shape here follows the hybrid pattern the user chose for the salary
  * engine: the arithmetic is TypeScript (`src/lib/commission/engine.ts`, tested
@@ -62,11 +62,13 @@ export interface ComputeSummary {
   deferredCount: number
   penalisedCount: number
   releasedCount: number
+  payrollSynced: boolean
 }
 
 /**
- * Recompute the month from the imported sales orders and store the result as a
- * draft the human reviews. Nothing reaches payroll until Apply.
+ * Compute the month from sales orders. The save RPC also syncs a clean run to
+ * payroll, releases its orders and raises earned titles in the same transaction.
+ * A run with warnings remains computed until its inputs are corrected.
  */
 export async function computeRun(period: string, subDepartmentId?: string): Promise<ComputeSummary> {
   await requirePermission('revenue')
@@ -270,6 +272,8 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   if (saveError) throw new Error(saveError.message)
 
   revalidatePath('/revenue', 'layout')
+  revalidatePath('/hr-costing/payroll', 'layout')
+  revalidatePath('/team', 'layout')
 
   return {
     runId: runId as string,
@@ -280,46 +284,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     deferredCount: payload.p_deferred_orders.length,
     penalisedCount: payload.p_penalised_orders.length,
     releasedCount: payload.p_released_orders.length,
-  }
-}
-
-export interface ApplySummary {
-  staffWritten: number
-  ordersReleased: number
-  /** Titles the ratchet raised this apply — never lowered, never undone by reopen. */
-  titlesPromoted: number
-  totalCommission: number
-}
-
-/**
- * Write the computed run into `hr_monthly_payroll.commission_amount`, and
- * raise the title of anyone paid a rank above the title they hold.
- * The RPC does the checking: no outstanding warnings, payroll still draft,
- * no order another run has already paid.
- */
-export async function applyRun(runId: string): Promise<ApplySummary> {
-  await requirePermission('revenue')
-  const supabase = await client()
-
-  const { data, error } = await supabase.rpc('apply_commission_run', { p_run_id: runId })
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/revenue', 'layout')
-  revalidatePath('/hr-costing/payroll', 'layout')
-  // A raised title shows on the People roster too.
-  revalidatePath('/team', 'layout')
-
-  const out = data as {
-    staff_written: number
-    orders_released: number
-    titles_promoted: number
-    total_commission: number
-  }
-  return {
-    staffWritten: out.staff_written,
-    ordersReleased: out.orders_released,
-    titlesPromoted: out.titles_promoted ?? 0,
-    totalCommission: Number(out.total_commission),
+    payrollSynced: payload.p_warnings.length === 0,
   }
 }
 

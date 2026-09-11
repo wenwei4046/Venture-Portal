@@ -42,7 +42,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
     .select(`
       id, period_month, status,
       marketing_opex_total, hr_opex_total, finance_opex_total,
-      director_salary_total, total_amount,
+      director_salary_total, revenue_opex_total, total_amount,
       submitted_by, submitted_at, approved_by, approved_at,
       paid_at, rejected_at, rejection_reason
     `)
@@ -154,6 +154,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
         <OpexCard label="HR OPEX" amount={Number(run.hr_opex_total)} />
         <OpexCard label="Finance OPEX" amount={Number(run.finance_opex_total)} />
         <OpexCard label="Director Salary" amount={Number(run.director_salary_total)} />
+        {Number(run.revenue_opex_total) > 0 && <OpexCard label="Revenue OPEX" amount={Number(run.revenue_opex_total)} />}
       </div>
       <div className="border-y border-hairline py-4 mb-10 flex items-baseline justify-between">
         <span className="font-serif italic text-graphite text-sm uppercase tracking-wide">

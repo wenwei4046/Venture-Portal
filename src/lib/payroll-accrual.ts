@@ -34,6 +34,7 @@ export interface AccrualSums {
   skbbk: number
   eisBoth: number
   pcb: number
+  withholdingTax?: number
 }
 
 /** Build the JV lines in Finance's manual order, skipping zero lines. */
@@ -56,6 +57,7 @@ export function buildAccrualLines(s: AccrualSums, monthLabel: string): JournalLi
   cr('4072', s.skbbk, 'SKBBK Payable')
   cr('4073', s.eisBoth, 'EIS Payable')
   cr('4074', s.pcb, 'PCB Payable')
+  cr('4074', s.withholdingTax ?? 0, 'Withholding Tax Payable')
   return lines
 }
 
@@ -73,6 +75,7 @@ interface PayrollRowLike {
   eis_er: number
   eis_ee: number
   pcb: number
+  withholding_tax?: number
   net: number
   skbbk_amount: number | null
 }
@@ -81,6 +84,7 @@ export function sumPayrollRows(rows: PayrollRowLike[]): AccrualSums {
   const acc: AccrualSums = {
     basicEtc: 0, nonStatAllowance: 0, epfEr: 0, socsoEr: 0, eisEr: 0,
     net: 0, epfBoth: 0, socsoBoth: 0, skbbk: 0, eisBoth: 0, pcb: 0,
+    withholdingTax: 0,
   }
   for (const p of rows) {
     acc.basicEtc = r2(acc.basicEtc + Number(p.gross) - Number(p.non_statutory_allowance))
@@ -94,6 +98,7 @@ export function sumPayrollRows(rows: PayrollRowLike[]): AccrualSums {
     acc.skbbk = r2(acc.skbbk + Number(p.skbbk_amount ?? 0))
     acc.eisBoth = r2(acc.eisBoth + Number(p.eis_er) + Number(p.eis_ee))
     acc.pcb = r2(acc.pcb + Number(p.pcb))
+    acc.withholdingTax = r2((acc.withholdingTax ?? 0) + Number(p.withholding_tax ?? 0))
   }
   return acc
 }
@@ -116,6 +121,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   director_office: 'Director Office',
   director: 'Director',
   it: 'IT',
+  revenue_department: 'Revenue Department',
 }
 
 export interface AccrualPostResult {
@@ -159,13 +165,14 @@ export async function postPayrollAccrualJVs(
   if (opts.kind === 'staff') {
     const { data: rows, error } = await supabase
       .from('hr_monthly_payroll')
-      .select('gross, non_statutory_allowance, epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, net, skbbk_amount, hr_staff_costs!inner(department_id, departments!inner(name))')
+      .select('gross, non_statutory_allowance, epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax, net, skbbk_amount, hr_staff_costs!inner(department_id, departments!inner(name, segment_key, payroll_source))')
       .eq('period_month', period)
     if (error) throw new Error(`Failed to read staff payroll: ${error.message}`)
     const byDept = new Map<string, PayrollRowLike[]>()
-    for (const row of (rows ?? []) as unknown as Array<PayrollRowLike & { hr_staff_costs: { departments: { name: string } } }>) {
+    for (const row of (rows ?? []) as unknown as Array<PayrollRowLike & { hr_staff_costs: { departments: { name: string; segment_key: string | null; payroll_source: string } } }>) {
       const dept = row.hr_staff_costs?.departments?.name
-      const segment = dept ? SEGMENT_BY_DEPT[dept] : undefined
+      const department = row.hr_staff_costs?.departments
+      const segment = (dept ? SEGMENT_BY_DEPT[dept] : undefined) ?? (department?.payroll_source === 'commission' ? department.segment_key : undefined)
       if (!segment) continue
       const list = byDept.get(segment) ?? []
       list.push(row)
