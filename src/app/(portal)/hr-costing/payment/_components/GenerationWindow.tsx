@@ -59,6 +59,7 @@ export default function GenerationWindow({ label, title, description, step, clos
   return <dialog
     ref={dialogRef}
     className="pay-win pay-generation-window"
+    data-step={step}
     aria-label={label}
     aria-describedby={descriptionId}
     aria-modal="true"

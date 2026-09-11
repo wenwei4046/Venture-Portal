@@ -628,8 +628,16 @@ Both tables expose exactly two generation entry points:
 Statutory generation opens a centered native dialog for both entry points, rather
 than inserting an editor below the table. Department navigation, employee/date
 selection, review and success remain inside that window. The header and totals /
-action footer stay visible while the body scrolls. On phones, department choices
-wrap and the employee table can scroll horizontally inside the dialog. Use the
+action footer stay visible. Selection uses a bounded window height with a fixed
+department rail, payment-date fields and table header; only the employee table
+scrolls. The rail has its own overflow for short windows or many departments.
+Changing departments resets the table's scroll position without clearing its
+saved selections or date. Review and results retain the scrolling dialog body.
+On phones, department choices use a fixed horizontal scrolling strip above the
+employee pane, and table overflow stays inside that pane. Use the
+same fixed rail in short landscape windows; when the viewport is no taller than
+560px, the right pane scrolls its date fields and table together so the table
+remains reachable. Use the
 existing surface/chrome colors and typography. Native modality blocks background
 interaction; lock the portal's scrolling `main` and restore its position and the
 trigger's focus on close. Close, Escape and backdrop dismiss the window, except
@@ -640,7 +648,7 @@ the grid uses `surface-2` behind the full-height rail, with a `surface` employee
 pane and a `hairline` divider. A `paper` body frames the bordered workspace and
 tables; the fixed footer uses solid `surface-2`. Use subtle alternating rows and
 `accent-bg` plus an inset accent rule for checked employees and the active
-department. On phones the rail becomes a horizontal strip above the employee
+department. On phones the rail becomes a single horizontal strip above the employee
 pane, separated by a bottom rule. Keep the existing typography and amounts.
 
 There is no independent PV-format toggle. Existing coverage cannot be selected
