@@ -141,6 +141,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
         <Section title="Identity">
           <Field label="NRIC" value={staff.nric} mono />
           <Field label="Employee Code" value={staff.employee_code} mono />
+          <Field label="InfoTech No" value={staff.infotech_code} mono />
           <Field
             label="Employment Type"
             value={

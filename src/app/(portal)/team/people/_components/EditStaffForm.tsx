@@ -27,6 +27,8 @@ export interface StaffRow {
   allowances: number
   non_statutory_allowance: number | null
   employee_code: string | null
+  /** InfoTech's own employee number — what the imports match on (2026-09-12). */
+  infotech_code?: string | null
   hire_date: string | null
   resignation_date: string | null
   epf_category: string
@@ -172,6 +174,24 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             name="employee_code"
             defaultValue={staff.employee_code ?? ''}
             placeholder="HV001"
+            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+            InfoTech No{' '}
+            <span className="text-xs text-muted ml-1 font-normal">
+              (InfoTech&apos;s own code · the imports match on it)
+            </span>
+          </label>
+          {/* Separate from the HV code since 2026-09-12: InfoTech numbers
+              people its own way and does not follow the portal's sequence.
+              The employee-list import learns it; this is where a mismatch
+              is corrected by hand. */}
+          <input
+            name="infotech_code"
+            defaultValue={staff.infotech_code ?? ''}
+            placeholder="HV022"
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>

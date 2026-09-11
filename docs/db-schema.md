@@ -633,6 +633,8 @@ hr_staff_costs (
     reports_to      uuid FK → hr_staff_costs NULL    -- 直属上司，全公司（2026-09-01）
     employee_code   text NULL                        -- HV001, HV002 …（2026-09-12）：trigger 发号 = 全表最大号 + 1（inactive 也算），
                                                      --   一旦有了就不会被清空；partial UNIQUE (employee_code) WHERE status = 'active'
+    infotech_code   text NULL                        -- InfoTech 自己的 Emp No（2026-09-12）：两个 import 先按它配人、再按名字；
+                                                     --   UNIQUE WHERE NOT NULL；EmpList import 写入，Edit 页可手改
     basic_salary    decimal(15,2) NOT NULL
     allowances      decimal(15,2) DEFAULT 0
     employment_type enum ('salaried','commission_eligible','variable') DEFAULT 'salaried'
@@ -668,9 +670,21 @@ across the company (rung top down, title A→Z, name A→Z, unplaced titles afte
 no title last), everybody active before the three who had left, who keep
 HV059–HV061; the `TEST-SEP26-*` rows kept their codes. Since then the roster
 orders one title's holders by their code (`compareByLadder`, `lib/ladder.ts`
-reading `lib/staff-codes.ts`), so the column reads in sequence. The InfoTech
-payroll import and the EmpList import both match on this column, so a file
-exported before the renumbering no longer names the same people.
+reading `lib/staff-codes.ts`), so the column reads in sequence.
+
+**InfoTech number (2026-09-12, migration `20260915050000_infotech_code`).**
+InfoTech numbers people its own way and does not follow the renumbering, so
+its "Code" lives in `infotech_code`, unique where present. Both imports — the
+payroll summary (`hr-costing/payroll/[period]/import`) and the employee list
+(`team/people/import`) — match a file row on it first and on the name second
+(`lib/import/staff-match.ts`: case, spacing and punctuation ignored; a name
+two people share matches nobody and says so), never on `employee_code`. The
+employee-list import writes it: the file's code for a new person (whose HV
+code the trigger hands out) and for one it could only match by name, so the
+next file finds them by number; the payroll import only reads it. Backfilled
+for the 27 people InfoTech had numbered (their pre-renumbering codes,
+HV007–HV032 and HVI001; 22 cross-checked against `payroll_voucher_lines`
+snapshots). Editable on the person's Edit form ("InfoTech No").
 
 5.3 hr_staff_allocation
 ```sql

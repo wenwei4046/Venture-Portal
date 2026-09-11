@@ -197,7 +197,7 @@ export default function ImportWizard({ period }: Props) {
                       </span>
                     </td>
                     <td className="font-sans text-xs text-muted m-hide" data-label="Matched by">
-                      {u.matchedBy === 'employee_code' ? 'code' : 'name'}
+                      {u.matchedBy === 'infotech_code' ? 'InfoTech No' : 'name'}
                     </td>
                     <td className="num m-hide" data-label="Gross">{formatMoney(u.gross)}</td>
                     <td className="num">{formatMoney(u.net)}</td>

@@ -102,6 +102,12 @@ export async function updateStaff(id: string, formData: FormData) {
   const hireDate = (formData.get('hire_date') as string) || null
   const resignDate = (formData.get('resignation_date') as string) || null
   const employeeCode = ((formData.get('employee_code') as string) || '').trim() || null
+  // InfoTech's own number (2026-09-12). Only a form that carries the field
+  // may change it; blank clears it — unlike the HV code, it is not ours to
+  // keep, and a wrong one would match the wrong file row.
+  const infotech = formData.has('infotech_code')
+    ? { infotech_code: ((formData.get('infotech_code') as string) || '').trim() || null }
+    : {}
   const bankName = ((formData.get('bank_name') as string) || '').trim() || null
   const bankAccountNo = ((formData.get('bank_account_no') as string) || '').trim() || null
   // Older clients and imports that only carry Account 1 must not clear Account 2.
@@ -168,6 +174,7 @@ export async function updateStaff(id: string, formData: FormData) {
       ...titleChange,
       ...pay,
       employee_code: employeeCode,
+      ...infotech,
       hire_date: hireDate,
       resignation_date: resignDate,
       bank_name: bankName,
@@ -184,7 +191,13 @@ export async function updateStaff(id: string, formData: FormData) {
     .eq('id', id)
 
   if (error) {
-    if (error.code === '23505') throw new Error('Employee code already used by another active staff')
+    if (error.code === '23505') {
+      throw new Error(
+        error.message.includes('infotech')
+          ? 'That InfoTech No already belongs to somebody else on the roster'
+          : 'Employee code already used by another active staff',
+      )
+    }
     throw new Error(`Failed to update: ${error.message}`)
   }
 
