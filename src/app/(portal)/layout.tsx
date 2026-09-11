@@ -3,6 +3,7 @@ import PortalFrame from '@/components/layout/PortalFrame'
 import { emptyNavData, type NavData } from '@/components/layout/nav-config'
 import { canAccessRevenue } from '@/lib/roles'
 import { listSubDepartments } from './revenue/_lib/sub-departments'
+import { redirect } from 'next/navigation'
 
 export default async function PortalLayout({
   children,
@@ -10,6 +11,7 @@ export default async function PortalLayout({
   children: React.ReactNode
 }) {
   const user = await requireAuth()
+  if (user.role === 'revenue_member') redirect('/member')
 
   // Almost all of the nav is a constant, but the Revenue group lists the
   // Revenue Department's sub-departments — Fair today, more when they are

@@ -7847,7 +7847,7 @@ export type Database = {
       statement_direction: "receivable" | "payable"
       statement_line_type: "invoice" | "contra"
       statement_status: "draft" | "issued" | "paid" | "partial" | "overdue"
-      user_role: "principal" | "finance" | "hr" | "dept_manager"
+      user_role: "principal" | "finance" | "hr" | "dept_manager" | "revenue_member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8169,7 +8169,7 @@ export const Constants = {
       statement_direction: ["receivable", "payable"],
       statement_line_type: ["invoice", "contra"],
       statement_status: ["draft", "issued", "paid", "partial", "overdue"],
-      user_role: ["principal", "finance", "hr", "dept_manager"],
+      user_role: ["principal", "finance", "hr", "dept_manager", "revenue_member"],
     },
   },
 } as const

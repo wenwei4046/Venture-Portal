@@ -8,7 +8,7 @@
 // Pure. It normalises as well as checks, so the action writes exactly what
 // came back and nothing it re-derives itself.
 
-export const INVITE_ROLES = ['principal', 'finance', 'hr', 'dept_manager'] as const
+export const INVITE_ROLES = ['principal', 'finance', 'hr', 'dept_manager', 'revenue_member'] as const
 export type InviteRole = (typeof INVITE_ROLES)[number]
 
 /** Supabase hard-floors this and answers a shorter one with a 422. */
