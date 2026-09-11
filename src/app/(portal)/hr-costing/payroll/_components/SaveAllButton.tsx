@@ -1,30 +1,49 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { updatePayrollRows } from '../actions'
 import { usePayrollDraft } from './PayrollDraftContext'
 
 export default function SaveAllButton() {
   const router = useRouter()
-  const { edits, dirtyCount } = usePayrollDraft()
-  const [isPending, startTransition] = useTransition()
+  const { edits, commissionReviews, dirtyCount } = usePayrollDraft()
+  const [isPending, setPending] = useState(false)
+  const inFlight = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
-  function handleSave() {
+  async function handleSave() {
+    if (inFlight.current) return
+    inFlight.current = true
+    setPending(true)
     setError(null)
-    const entries = Object.entries(edits).map(([id, fields]) => ({ id, fields }))
-    startTransition(async () => {
-      try {
-        await updatePayrollRows(entries)
-        setSaved(true)
-        router.refresh()
-        setTimeout(() => setSaved(false), 2500)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Save failed')
+    setSaved(false)
+    const reviews = Object.entries(commissionReviews)
+    const reviewedIds = new Set(reviews.map(([id]) => id))
+    // A reviewed Revenue row owns its mixed edits in one checked action.
+    // Never send the same row through the ordinary batch afterward.
+    const entries = Object.entries(edits)
+      .filter(([id]) => !reviewedIds.has(id))
+      .map(([id, fields]) => ({ id, fields }))
+    try {
+      // Keep modal-opening updates outside a transition while awaiting input.
+      for (const [, review] of reviews) {
+        if (!(await review())) {
+          setError('Save cancelled. Remaining edits have not been saved.')
+          return
+        }
       }
-    })
+      if (entries.length > 0) await updatePayrollRows(entries)
+      setSaved(true)
+      router.refresh()
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      inFlight.current = false
+      setPending(false)
+    }
   }
 
   if (dirtyCount === 0) {

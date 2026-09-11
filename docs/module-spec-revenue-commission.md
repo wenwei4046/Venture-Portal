@@ -23,6 +23,15 @@ confirmed source, requested gross and signed adjustment, and requires a reason
 such as a debit note or dropped sale. Saving uses a dedicated audited adjustment
 action, not the ordinary payroll input update.
 
+Gross Commission uses the same inline amount input and row Save button as other
+payroll fields. Save opens the adjustment review window with that draft amount;
+Cancel leaves the inline draft intact. Header Save also requires that review
+before saving an adjusted row. When normal inputs such as Basic change together
+with Gross Commission, the reviewed save commits both in one transaction.
+A nonzero saved adjustment has a small dot within the existing cell; hover shows
+the amount and reason, and clicking opens the paycheck detail. Zero adjustments
+have no marker or second line, keeping the grid's existing row and column sizes.
+
 `payroll gross commission = synced Revenue commission + payroll adjustment`.
 For a source of RM13,000, entering RM14,000 records +RM1,000; entering RM12,000
 records −RM1,000. The source statements, sales, commission rules and upstream

@@ -113,6 +113,7 @@ try{
  const placeholderId=await one("INSERT INTO hr_monthly_payroll(staff_id,period_month,basic_salary,source) VALUES($1,$2,0,'commission') RETURNING id",[staff2,period]);
  const beforeMigration=await q('SELECT id, to_jsonb(p) data FROM hr_monthly_payroll p ORDER BY id');
  await migrate('20260915010000_revenue_payroll_adjustments');
+ await migrate('20260915020000_revenue_payroll_atomic_row');
  const newFields=['commission_synced_amount','commission_adjustment_amount','commission_adjustment_reason','commission_adjusted_at','commission_adjusted_by'];
  check(await q('SELECT id,to_jsonb(p)-$1::text[] data FROM hr_monthly_payroll p ORDER BY id',[newFields]),beforeMigration);
  check(Number(await one('SELECT commission_synced_amount FROM hr_monthly_payroll WHERE id=$1',[legacyId])),9000);
@@ -300,12 +301,56 @@ try{
  check(Number((await row(recoveredId)).commission_synced_amount),13000);
  check(Number((await row(recoveredId)).commission_adjustment_amount),1000);
  check(Number((await row(recoveredId)).commission_amount),14000);
+ // Inline Basic + Gross uses one authenticated transaction. The wrapper
+ // delegates money/source/audit checks to the production adjustment routine.
+ const january='2027-01-01';const januaryBatch=await batch(fair,january);
+ await save({month:january,batchId:januaryBatch,statements:[statement(staff1,10000)]});
+ const atomicId=await one('SELECT id FROM hr_monthly_payroll WHERE staff_id=$1 AND period_month=$2',[staff1,january]);
+ const atomic=(gross,base,delta,fields,reason='Reviewed inline row')=>one(
+   'SELECT save_revenue_payroll_row($1,$2,$3,$4,$5,$6)',[atomicId,gross,base,delta,reason,JSON.stringify(fields)]);
+ await q('UPDATE hr_monthly_payroll SET pcb_override_amount=77.77 WHERE id=$1',[atomicId]);
+ await asUser(principal);
+ const mixed=await atomic(11000,10000,0,{basic_salary:6000});
+ check(mixed.row_changed,true);check(mixed.changed,true);
+ let atomicRow=await row(atomicId);
+ check(Number(atomicRow.basic_salary),6000);check(Number(atomicRow.commission_amount),11000);
+ check(Number(atomicRow.epf_er),780);check(Number(atomicRow.epf_ee),660);
+ check(Number(atomicRow.pcb_override_amount),77.77);check(Number(atomicRow.pcb),77.77);
+ check(Number(atomicRow.basic_pay_net),5256.23);check(Number(atomicRow.commission_balance),4207);
+ check(Number(atomicRow.net),9463.23);
+ // Same requested gross is not a no-op for ordinary inputs.
+ const sameGross=await atomic(11000,10000,1000,{non_statutory_allowance:123.45});
+ check(sameGross.changed,false);check(sameGross.row_changed,true);
+ check(Number((await row(atomicId)).net),9586.68);
+ await q('UPDATE hr_monthly_payroll SET epf_er=812,epf_ee=690,socso_er=22,socso_ee=8,eis_er=5,eis_ee=3 WHERE id=$1',[atomicId]);
+ const customAtomic=await row(atomicId);
+ // Empty and unchanged ordinary payloads must preserve manual EE/ER and PCB.
+ check((await atomic(12000,10000,1000,{})).row_changed,false);
+ check((await atomic(13000,10000,2000,{basic_salary:6000})).row_changed,false);
+ for(const k of ['basic_salary','epf_er','epf_ee','socso_er','socso_ee','eis_er','eis_ee','pcb','pcb_override_amount','basic_pay_net'])check((await row(atomicId))[k],customAtomic[k]);
+ const beforeAtomicFailure=await row(atomicId);
+ const beforeAtomicAudit=await q('SELECT * FROM revenue_payroll_commission_adjustments WHERE payroll_row_id=$1 ORDER BY id',[atomicId]);
+ // Stale adjustment/source validation cannot save Basic ahead of the review.
+ await assert.rejects(()=>atomic(14000,9999,3000,{basic_salary:7000}),/source changed/);checks++;
+ check(await row(atomicId),beforeAtomicFailure);
+ await assert.rejects(()=>atomic(14000,10000,2000,{basic_salary:7000}),/adjustment changed/);checks++;
+ check(await row(atomicId),beforeAtomicFailure);
+ // Conversely, a late ordinary-input failure rolls back the already executed
+ // valid adjustment AND its audit, proving both writes share one transaction.
+ await assert.rejects(()=>atomic(14000,10000,3000,{basic_salary:100000000000000}),/numeric field overflow/);checks++;
+ check(await row(atomicId),beforeAtomicFailure);
+ check(await q('SELECT * FROM revenue_payroll_commission_adjustments WHERE payroll_row_id=$1 ORDER BY id',[atomicId]),beforeAtomicAudit);
+ for(const fields of [{commission_amount:14000},{pcb:0},{status:'paid'},{basic_salary:'7000'},[],{basic_salary:-1},{basic_salary:1.001}]) {
+   await assert.rejects(()=>atomic(14000,10000,3000,fields),/protected|number|object|negative|decimal/);checks++;
+ }
+ await asUser(principal,true);
  // Inactive, Finance, anonymous and Revenue-only accounts cannot adjust.
  const outsider='10000000-0000-4000-8000-000000000099';
  await q("INSERT INTO users(id,email,name,role) VALUES($1,'finance@example.com','Finance','finance')",[outsider]);
  const countBefore=Number(await one('SELECT count(*) FROM revenue_payroll_commission_adjustments'));
  await asUser(outsider);
  await denied(18000,17000,-1000,'unauthorized',/Only active Principal or HR/);
+ await assert.rejects(()=>atomic(14000,10000,3000,{basic_salary:7000}),/Only active Principal or HR/);checks++;
  await reject('SELECT * FROM revenue_payroll_adjustments($1,$2)',[fair,period],/Revenue access/);
  check(Number(await one('SELECT count(*) FROM revenue_payroll_commission_adjustments')),0);
  await reject("INSERT INTO revenue_payroll_commission_adjustments(reason) VALUES('spoof')",[],/permission denied/);

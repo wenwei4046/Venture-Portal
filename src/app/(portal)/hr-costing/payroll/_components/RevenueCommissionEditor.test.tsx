@@ -1,16 +1,30 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useEffect, useRef, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import RevenueCommissionEditor, { type RevenueCommissionEditorProps } from './RevenueCommissionEditor'
 
+function ControlledFixture(props: RevenueCommissionEditorProps) {
+  const [open, setOpen] = useState(props.open)
+  const returnFocusRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => setOpen(props.open), [props.open])
+  return <>
+    <button ref={returnFocusRef} onClick={() => setOpen(true)} disabled={props.disabled}>Row Save</button>
+    <RevenueCommissionEditor {...props} open={open} returnFocusRef={returnFocusRef}
+      onClose={() => { props.onClose(); setOpen(false) }} />
+  </>
+}
+
 function setup(overrides: Partial<RevenueCommissionEditorProps> = {}) {
   const onSave = vi.fn().mockResolvedValue(undefined)
-  const props = { baseAmount: 13000, currentAdjustment: 0, currentGross: 13000, staffName: 'B03', onSave, ...overrides }
-  const view = render(<RevenueCommissionEditor {...props} />)
-  return { ...view, props, onSave: props.onSave }
+  let props: RevenueCommissionEditorProps = { open: false, requestedGross: overrides.currentGross ?? 13000, onClose: vi.fn(),
+    baseAmount: 13000, currentAdjustment: 0, currentGross: 13000, staffName: 'B03', onSave, ...overrides }
+  const view = render(<ControlledFixture {...props} />)
+  return { ...view, props, onSave: props.onSave, onClose: props.onClose,
+    rerenderProps: (next: Partial<RevenueCommissionEditorProps>) => { props = { ...props, ...next }; view.rerender(<ControlledFixture {...props} />) } }
 }
 
 function open() {
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Gross Commission — B03' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Row Save' }))
   return screen.getByRole('dialog', { name: 'Edit Gross Commission' })
 }
 
@@ -27,15 +41,66 @@ function summaryAmount(label: string) {
 }
 
 describe('RevenueCommissionEditor', () => {
+  it('renders no inline trigger, adjustment line or dialog while closed', () => {
+    const { container } = render(<RevenueCommissionEditor open={false} requestedGross={14000} onClose={vi.fn()}
+      baseAmount={13000} currentGross={13000} currentAdjustment={0} onSave={vi.fn()} />)
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Adj\./)).not.toBeInTheDocument()
+  })
+
+  it('seeds from the row Save amount once per opening and respects an external close', () => {
+    const { rerenderProps, onClose } = setup({ open: true, requestedGross: 14000 })
+    expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue('14,000.00')
+    changeGross('14200')
+    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'In-progress review' } })
+    rerenderProps({ requestedGross: 16000 })
+    expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue('14200')
+    expect(screen.getByLabelText('Adjustment reason')).toHaveValue('In-progress review')
+    rerenderProps({ open: false })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Row Save' })).toHaveFocus()
+    expect(onClose).not.toHaveBeenCalled()
+    rerenderProps({ open: true, requestedGross: 15000 })
+    expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue('15,000.00')
+    expect(screen.getByLabelText('Adjustment reason')).toHaveValue('')
+  })
+
+  it.each([NaN, Infinity, -1])('blocks invalid inline requested amount %s until corrected', amount => {
+    const { onSave } = setup({ open: true, requestedGross: amount })
+    expect(screen.getByRole('alert')).toHaveTextContent('finite Gross Commission')
+    expect(screen.getByRole('button', { name: 'Save adjustment' })).toBeDisabled()
+    fireEvent.submit(screen.getByLabelText('Adjustment reason').closest('form')!)
+    expect(onSave).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to Revenue source' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue('13,000.00')
+  })
+
+  it('does not let completion of an externally closed review dismiss a newly opened one', async () => {
+    let finishSave!: () => void
+    const onSave = vi.fn(() => new Promise<void>(resolve => { finishSave = resolve }))
+    const { rerenderProps, onClose } = setup({ open: true, requestedGross: 14000, onSave })
+    fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'First review' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save adjustment' }))
+    rerenderProps({ open: false })
+    rerenderProps({ open: true, requestedGross: 12000 })
+    await act(async () => { finishSave() })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue('12,000.00')
+    expect(screen.getByRole('button', { name: 'Save adjustment' })).toBeEnabled()
+  })
+
   it.each([
     ['14000', '14,000.00', '+1,000.00', 14000, 'DN adjustment'],
     ['12000', '12,000.00', '-1,000.00', 12000, 'Dropped sales'],
   ])('reviews %s against the intact source with a signed adjustment and a reason', async (raw, formatted, adjustment, gross, reason) => {
-    const { onSave } = setup()
-    const trigger = screen.getByRole('button', { name: 'Edit Gross Commission — B03' })
-    expect(trigger).toHaveTextContent('13,000.00')
+    const { onSave, onClose } = setup({ requestedGross: gross })
+    const trigger = screen.getByRole('button', { name: 'Row Save' })
     open()
-    changeGross(raw)
+    expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue(formatted)
     expect(summaryAmount('Synced from Revenue')).toHaveTextContent('13,000.00')
     expect(summaryAmount('Requested Gross Commission')).toHaveTextContent(formatted)
     expect(summaryAmount('Difference from current')).toHaveTextContent(adjustment)
@@ -47,14 +112,13 @@ describe('RevenueCommissionEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save adjustment' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ gross, expectedSynced: 13000, expectedAdjustment: 0, reason }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(onClose).toHaveBeenCalledOnce()
     expect(trigger).toHaveFocus()
   })
 
   it('distinguishes a decrease from the current gross and a remaining positive adjustment', () => {
-    setup({ currentAdjustment: 1000, currentGross: 14000 })
-    expect(screen.getByLabelText('Current commission adjustment')).toHaveTextContent('+1,000.00')
+    setup({ currentAdjustment: 1000, currentGross: 14000, requestedGross: 13500 })
     open()
-    changeGross('13500')
     expect(summaryAmount('Difference from current')).toHaveTextContent('-500.00')
     expect(summaryAmount('Payroll adjustment to Revenue source')).toHaveTextContent('+500.00')
   })
@@ -96,21 +160,21 @@ describe('RevenueCommissionEditor', () => {
   })
 
   it('shows a resynced source with the existing adjustment and requires review if it changes while editing', async () => {
-    const { props, rerender, onSave } = setup({ currentAdjustment: 1000, currentGross: 14000 })
-    rerender(<RevenueCommissionEditor {...props} baseAmount={15000} currentGross={16000} />)
-    expect(screen.getByRole('button', { name: 'Edit Gross Commission — B03' })).toHaveTextContent('16,000.00')
-    expect(screen.getByLabelText('Current commission adjustment')).toHaveTextContent('+1,000.00')
-    open(); changeGross('16500')
-    rerender(<RevenueCommissionEditor {...props} baseAmount={15500} currentGross={16500} />)
+    const { rerenderProps, onSave } = setup({ currentAdjustment: 1000, currentGross: 14000 })
+    rerenderProps({ baseAmount: 15000, currentGross: 16000, requestedGross: 16500 })
+    open()
+    expect(summaryAmount('Synced from Revenue')).toHaveTextContent('15,000.00')
+    expect(summaryAmount('Requested Gross Commission')).toHaveTextContent('16,500.00')
+    rerenderProps({ baseAmount: 15500, currentGross: 16500 })
     expect(screen.getByRole('alert')).toHaveTextContent('Cancel and reopen')
     expect(screen.getByRole('button', { name: 'Save adjustment' })).toBeDisabled()
     fireEvent.submit(screen.getByLabelText('Adjustment reason').closest('form')!)
     expect(onSave).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    rerenderProps({ requestedGross: 17000 })
     open()
     expect(summaryAmount('Synced from Revenue')).toHaveTextContent('15,500.00')
-    expect(summaryAmount('Payroll adjustment to Revenue source')).toHaveTextContent('+1,000.00')
-    changeGross('17000')
+    expect(summaryAmount('Payroll adjustment to Revenue source')).toHaveTextContent('+1,500.00')
     fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Updated DN' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save adjustment' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ gross: 17000, expectedSynced: 15500, expectedAdjustment: 1000, reason: 'Updated DN' }))
@@ -139,18 +203,18 @@ describe('RevenueCommissionEditor', () => {
   })
 
   it('honors caller eligibility before and during editing without applying its own phase rule', () => {
-    const { props, rerender, onSave } = setup({ disabled: true })
-    expect(screen.getByRole('button', { name: 'Edit Gross Commission — B03' })).toBeDisabled()
-    rerender(<RevenueCommissionEditor {...props} disabled={false} />)
+    const { rerenderProps, onSave } = setup({ disabled: true })
+    expect(screen.getByRole('button', { name: 'Row Save' })).toBeDisabled()
+    rerenderProps({ disabled: false })
     open()
-    rerender(<RevenueCommissionEditor {...props} disabled />)
+    rerenderProps({ disabled: true })
     expect(screen.getByRole('alert')).toHaveTextContent('editing is no longer available')
     fireEvent.submit(screen.getByLabelText('Adjustment reason').closest('form')!)
     expect(onSave).not.toHaveBeenCalled()
   })
 
   it('cancels without mutation, clears abandoned edits and confines keyboard focus to the dialog', () => {
-    const { onSave } = setup()
+    const { onSave, onClose } = setup()
     const dialog = open(); changeGross('14000')
     fireEvent.change(screen.getByLabelText('Adjustment reason'), { target: { value: 'Abandoned change' } })
     const save = screen.getByRole('button', { name: 'Save adjustment' })
@@ -161,6 +225,7 @@ describe('RevenueCommissionEditor', () => {
     expect(save).toHaveFocus()
     fireEvent.keyDown(dialog, { key: 'Escape' })
     expect(onSave).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledOnce()
     open()
     expect(screen.getByLabelText('Adjustment reason')).toHaveValue('')
     expect(screen.getByLabelText('Requested Gross Commission')).toHaveValue('13,000.00')
