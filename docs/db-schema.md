@@ -662,12 +662,15 @@ max is over the whole table, not the caller's RLS view) and callable by any
 signed-in user — the Add Staff form shows it as the number the person will
 get. The roster was renumbered once by the same migration, from the highest
 position to the lowest: the Director department first (CEO = HV001, then the
-directors A→Z), then `compareByLadder`'s order across the company (rung top
-down, title A→Z, name A→Z, unplaced titles after, no title last), everybody
-active before the three who had left, who keep HV059–HV061; the `TEST-SEP26-*`
-rows kept their codes. The InfoTech payroll import and the EmpList import both
-match on this column, so a file exported before the renumbering no longer
-names the same people.
+directors — set by hand afterwards to the user's order, LIM WEI SIANG HV002,
+CHAI MENG KEAT HV003, LIM WEI LIANG HV004), then `compareByLadder`'s order
+across the company (rung top down, title A→Z, name A→Z, unplaced titles after,
+no title last), everybody active before the three who had left, who keep
+HV059–HV061; the `TEST-SEP26-*` rows kept their codes. Since then the roster
+orders one title's holders by their code (`compareByLadder`, `lib/ladder.ts`
+reading `lib/staff-codes.ts`), so the column reads in sequence. The InfoTech
+payroll import and the EmpList import both match on this column, so a file
+exported before the renumbering no longer names the same people.
 
 5.3 hr_staff_allocation
 ```sql

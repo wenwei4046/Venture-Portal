@@ -21,7 +21,9 @@
 --      the roster reads HV001 … HV058 straight down without a gap. The three
 --      who have left keep a number of their own after the last active one
 --      (no two people ever share a code); the TEST-SEP26 rows and an
---      inactive row with no code are left alone.
+--      inactive row with no code are left alone. (The directors' own order
+--      was then set by hand on the live table — LIM WEI SIANG HV002, CHAI
+--      MENG KEAT HV003, LIM WEI LIANG HV004 — the user's, not the alphabet's.)
 --
 --   2. The sequence, from now on. A person filed without a code — the Add
 --      Staff form has no code field, an invite creates a row, an import may

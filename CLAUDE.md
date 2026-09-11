@@ -67,7 +67,9 @@ src/
 │   │   │                              largest HV number on the table + 1
 │   │   │                              (inactive rows count; a code is never
 │   │   │                              cleared). Add Staff has no code field —
-│   │   │                              it shows `next_staff_code()`. Mig
+│   │   │                              it shows `next_staff_code()`. Inside one
+│   │   │                              title the roster sorts by code
+│   │   │                              (`compareByLadder`). Mig
 │   │   │                              `20260915040000`.
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)

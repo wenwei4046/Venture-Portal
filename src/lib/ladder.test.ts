@@ -193,6 +193,32 @@ describe('compareByLadder', () => {
     expect(compareByLadder(a, { ...a })).toBe(0)
     expect(compareByLadder(p('Z', null, null), p('A', 'T', null))).toBeGreaterThan(0)
   })
+
+  it('orders one title by employee code, the number the user gave (2026-09-12)', () => {
+    // The Director group as the user set it: LIM WEI SIANG 002, CHAI MENG
+    // KEAT 003, LIM WEI LIANG 004 — names A→Z would read 003, 004, 002.
+    const c = (name: string, title: string | null, levelRank: number | null, code: string | null) => ({
+      ...p(name, title, levelRank),
+      code,
+    })
+    const board = [
+      c('CHAI MENG KEAT', 'DIRECTOR', null, 'HV003'),
+      c('LIM WEI LIANG', 'DIRECTOR', null, 'HV004'),
+      c('LOO WEN WEI', 'CHIEF EXECUTIVE OFFICER', null, 'HV001'),
+      c('LIM WEI SIANG', 'DIRECTOR', null, 'HV002'),
+    ]
+    expect([...board].sort(compareByLadder).map(x => x.code)).toEqual(['HV001', 'HV002', 'HV003', 'HV004'])
+
+    // The title still comes first; the code only settles a tie inside one.
+    expect(compareByLadder(c('B', 'A TITLE', 2, 'HV099'), c('A', 'B TITLE', 2, 'HV001'))).toBeLessThan(0)
+    // Ten sorts after two — a number, not a string.
+    expect(compareByLadder(c('A', 'X', 2, 'HV010'), c('B', 'X', 2, 'HV2'))).toBeGreaterThan(0)
+    // No HV number reads after those with one; names settle the rest.
+    expect(compareByLadder(c('A', 'X', 2, 'TEST-SEP26-B01'), c('B', 'X', 2, 'HV050'))).toBeGreaterThan(0)
+    expect(compareByLadder(c('B', 'X', 2, null), c('A', 'X', 2, null))).toBeGreaterThan(0)
+    // A caller without codes at all is exactly what it was.
+    expect(compareByLadder(p('B', 'X', 2), p('A', 'X', 2))).toBeGreaterThan(0)
+  })
 })
 
 // ─── Roster ordering (2026-09-07) ────────────────────────────────────────────
