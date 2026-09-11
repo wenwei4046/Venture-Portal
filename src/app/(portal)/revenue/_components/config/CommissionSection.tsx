@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { compareRankPay, rankLetters, rankPayLabelOf, rankPayOf } from '@/lib/commission/ranks'
 import {
@@ -35,6 +35,7 @@ import {
 } from '@/components/RowForm'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import { resolveRulesTab, visibleRulesTabs, type RulesTab } from '@/lib/commission/rules-tabs'
+import { orderSchemeRules, type SchemeRuleKey } from '@/lib/commission/scheme-rule-order'
 import type { CommissionSettingsData, SchemeRow } from './types'
 
 /**
@@ -184,6 +185,143 @@ function IrParameter() {
 }
 
 function SchemeRules({ scheme }: { scheme: SchemeRow }) {
+  // One row per rule, keyed. The ORDER is the saved scheme's — the IR
+  // parameters, then what is on, then what is off, Default rate mode last
+  // (`orderSchemeRules`); a row moves when Save lands, not while a box is ticked.
+  const rows: Record<SchemeRuleKey, ReactNode> = {
+    product_revenue: (
+      <tr key="product_revenue">
+        <td>Product revenue commission</td>
+        <td><Tick name="enable_product_revenue" defaultChecked={scheme.enable_product_revenue} /></td>
+        <td className="text-muted font-serif italic text-xs">
+          the salesperson&apos;s rate × their commissionable revenue
+        </td>
+      </tr>
+    ),
+    kpi: (
+      <tr key="kpi">
+        <td>KPI item allowance</td>
+        <td><Tick name="enable_kpi" defaultChecked={scheme.enable_kpi} /></td>
+        <td className="text-muted font-serif italic text-xs">
+          flat RM per unit; that item&apos;s revenue leaves the commission base
+        </td>
+      </tr>
+    ),
+    open_bill: (
+      <tr key="open_bill">
+        <td>Open Bill bonus</td>
+        <td><Tick name="enable_open_bill" defaultChecked={scheme.enable_open_bill} /></td>
+        <td>
+          <select
+            name="open_bill_basis"
+            defaultValue={scheme.open_bill_basis}
+            aria-label="Open Bill basis"
+            className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
+          >
+            <option value="uplift_on_commission">uplift on that bill&apos;s commission</option>
+            <option value="pct_of_revenue">% of that bill&apos;s revenue</option>
+          </select>
+        </td>
+      </tr>
+    ),
+    override: (
+      <tr key="override">
+        <td>Hierarchy override</td>
+        <td><Tick name="enable_override" defaultChecked={scheme.enable_override} /></td>
+        <td className="font-sans text-xs text-graphite">
+          <label className="inline-flex items-center gap-2">
+            <Tick name="override_includes_kpi" defaultChecked={scheme.override_includes_kpi} ariaLabel="override includes KPI revenue" />
+            include KPI revenue in the override base
+          </label>
+        </td>
+      </tr>
+    ),
+    margin_penalty: (
+      <tr key="margin_penalty">
+        <td>Below-margin penalty</td>
+        <td><Tick name="enable_margin_penalty" defaultChecked={scheme.enable_margin_penalty} /></td>
+        <td className="text-muted font-serif italic text-xs">
+          per bill — also cuts every upline&apos;s override on it
+        </td>
+      </tr>
+    ),
+    group_incentive: (
+      <tr key="group_incentive">
+        <td>Group incentive package</td>
+        <td><Tick name="enable_group_incentive" defaultChecked={scheme.enable_group_incentive ?? false} /></td>
+        <td className="text-muted font-serif italic text-xs">
+          monthly fixed pay per qualifying direct group, replacing percentage commission; amounts are set in Ranks
+        </td>
+      </tr>
+    ),
+    group_sales_depth: (
+      <tr key="group_sales_depth">
+        <td>Group sales layers</td>
+        <td><IrParameter /></td>
+        <td className="font-sans text-xs text-graphite">
+          <Field name="group_sales_depth" type="number" step="1" width="w-20" defaultValue={scheme.group_sales_depth ?? ''} ariaLabel="Group sales layers" />
+          <span className="ml-2">2 = directs and their directs; blank = all layers</span>
+        </td>
+      </tr>
+    ),
+    override_depth: (
+      <tr key="override_depth">
+        <td>Override layers</td>
+        <td><IrParameter /></td>
+        <td className="font-sans text-xs text-graphite">
+          <Field name="override_depth" type="number" step="1" width="w-20" defaultValue={scheme.override_depth ?? ''} ariaLabel="Override layers" />
+          <span className="ml-2">2 = at most two layers; blank = all layers</span>
+        </td>
+      </tr>
+    ),
+    direct_line_limit: (
+      <tr key="direct_line_limit">
+        <td>Direct-line limit</td>
+        <td><IrParameter /></td>
+        <td className="font-sans text-xs text-graphite">
+          <Field name="direct_line_limit" type="number" step="1" width="w-20" defaultValue={scheme.direct_line_limit ?? ''} ariaLabel="Direct-line limit" />
+          <span className="ml-2">Base 3 for group packages. Full Spec permits a fourth line that month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.</span>
+        </td>
+      </tr>
+    ),
+    margin_incentive: (
+      <tr key="margin_incentive">
+        <td>Monthly margin incentive</td>
+        <td><Tick name="enable_margin_incentive" defaultChecked={scheme.enable_margin_incentive} /></td>
+        <td className="text-muted font-serif italic text-xs">
+          every brand sold must clear the tier
+        </td>
+      </tr>
+    ),
+    deposit_gate: (
+      <tr key="deposit_gate">
+        <td>Deposit gate</td>
+        <td><Tick name="deposit_gate_on" defaultChecked={scheme.deposit_threshold_pct !== null} /></td>
+        <td className="font-sans text-xs text-graphite">
+          <Field name="deposit_threshold_pct" type="number" step="0.01" width="w-20" defaultValue={toPct(scheme.deposit_threshold_pct)} ariaLabel="deposit threshold percent" />
+          <span className="ml-2">% of the order total before any of it pays</span>
+        </td>
+      </tr>
+    ),
+    default_rate_mode: (
+      <tr key="default_rate_mode">
+        <td>Default rate mode</td>
+        <td className="text-muted font-serif italic text-xs">—</td>
+        <td>
+          <select
+            name="default_rate_mode"
+            defaultValue={scheme.default_rate_mode}
+            aria-label="Default rate mode"
+            className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
+          >
+            <option value="variable">Scheme target — recomputed monthly</option>
+            <option value="fixed">Manual — whatever rank they are moved to</option>
+          </select>
+        </td>
+      </tr>
+    ),
+  }
+
   return (
     <section>
       <SectionHead title="I. Scheme rules" />
@@ -191,7 +329,8 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
         Which components this sub-department pays at all. Switching one off makes the engine
         skip it entirely, so a sub-department that only pays a flat percentage of revenue
         reuses the same engine rather than getting a bespoke one. A sub-department that started
-        blank has every switch off until you turn it on here.
+        blank has every switch off until you turn it on here. IR&apos;s three parameters lead the
+        table; below them, what is on comes before what is off.
       </Hint>
       <ActionForm action={updateScheme}>
         {({ pending }) => (
@@ -205,115 +344,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
                   <th>Setting</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>Product revenue commission</td>
-                  <td><Tick name="enable_product_revenue" defaultChecked={scheme.enable_product_revenue} /></td>
-                  <td className="text-muted font-serif italic text-xs">
-                    the salesperson&apos;s rate × their commissionable revenue
-                  </td>
-                </tr>
-                <tr>
-                  <td>KPI item allowance</td>
-                  <td><Tick name="enable_kpi" defaultChecked={scheme.enable_kpi} /></td>
-                  <td className="text-muted font-serif italic text-xs">
-                    flat RM per unit; that item&apos;s revenue leaves the commission base
-                  </td>
-                </tr>
-                <tr>
-                  <td>Open Bill bonus</td>
-                  <td><Tick name="enable_open_bill" defaultChecked={scheme.enable_open_bill} /></td>
-                  <td>
-                    <select
-                      name="open_bill_basis"
-                      defaultValue={scheme.open_bill_basis}
-                      aria-label="Open Bill basis"
-                      className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
-                    >
-                      <option value="uplift_on_commission">uplift on that bill&apos;s commission</option>
-                      <option value="pct_of_revenue">% of that bill&apos;s revenue</option>
-                    </select>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Hierarchy override</td>
-                  <td><Tick name="enable_override" defaultChecked={scheme.enable_override} /></td>
-                  <td className="font-sans text-xs text-graphite">
-                    <label className="inline-flex items-center gap-2">
-                      <Tick name="override_includes_kpi" defaultChecked={scheme.override_includes_kpi} ariaLabel="override includes KPI revenue" />
-                      include KPI revenue in the override base
-                    </label>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Below-margin penalty</td>
-                  <td><Tick name="enable_margin_penalty" defaultChecked={scheme.enable_margin_penalty} /></td>
-                  <td className="text-muted font-serif italic text-xs">
-                    per bill — also cuts every upline&apos;s override on it
-                  </td>
-                </tr>
-                <tr>
-                  <td>Group incentive package</td>
-                  <td><Tick name="enable_group_incentive" defaultChecked={scheme.enable_group_incentive ?? false} /></td>
-                  <td className="text-muted font-serif italic text-xs">
-                    monthly fixed pay per qualifying direct group, replacing percentage commission; amounts are set in Ranks
-                  </td>
-                </tr>
-                <tr>
-                  <td>Group sales layers</td>
-                  <td><IrParameter /></td>
-                  <td className="font-sans text-xs text-graphite">
-                    <Field name="group_sales_depth" type="number" step="1" width="w-20" defaultValue={scheme.group_sales_depth ?? ''} ariaLabel="Group sales layers" />
-                    <span className="ml-2">2 = directs and their directs; blank = all layers</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Override layers</td>
-                  <td><IrParameter /></td>
-                  <td className="font-sans text-xs text-graphite">
-                    <Field name="override_depth" type="number" step="1" width="w-20" defaultValue={scheme.override_depth ?? ''} ariaLabel="Override layers" />
-                    <span className="ml-2">2 = at most two layers; blank = all layers</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Direct-line limit</td>
-                  <td><IrParameter /></td>
-                  <td className="font-sans text-xs text-graphite">
-                    <Field name="direct_line_limit" type="number" step="1" width="w-20" defaultValue={scheme.direct_line_limit ?? ''} ariaLabel="Direct-line limit" />
-                    <span className="ml-2">Base 3 for group packages. Full Spec permits a fourth line that month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Monthly margin incentive</td>
-                  <td><Tick name="enable_margin_incentive" defaultChecked={scheme.enable_margin_incentive} /></td>
-                  <td className="text-muted font-serif italic text-xs">
-                    every brand sold must clear the tier
-                  </td>
-                </tr>
-                <tr>
-                  <td>Deposit gate</td>
-                  <td><Tick name="deposit_gate_on" defaultChecked={scheme.deposit_threshold_pct !== null} /></td>
-                  <td className="font-sans text-xs text-graphite">
-                    <Field name="deposit_threshold_pct" type="number" step="0.01" width="w-20" defaultValue={toPct(scheme.deposit_threshold_pct)} ariaLabel="deposit threshold percent" />
-                    <span className="ml-2">% of the order total before any of it pays</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>Default rate mode</td>
-                  <td className="text-muted font-serif italic text-xs">—</td>
-                  <td>
-                    <select
-                      name="default_rate_mode"
-                      defaultValue={scheme.default_rate_mode}
-                      aria-label="Default rate mode"
-                      className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
-                    >
-                      <option value="variable">Scheme target — recomputed monthly</option>
-                      <option value="fixed">Manual — whatever rank they are moved to</option>
-                    </select>
-                  </td>
-                </tr>
-              </tbody>
+              <tbody>{orderSchemeRules(scheme).map(k => rows[k])}</tbody>
             </table>
             <div className="px-4 py-3 border-t border-hairline">
               <SaveButton pending={pending} label="Save scheme rules" />

@@ -961,6 +961,14 @@ since 2026-09-11 it wears an **`IR`** chip instead, on every sub-department's
 page, so the row says whose parameters these are (user: "把那个 dash 换成
 IR … 这样就知道它是属于 IR").
 
+The table's ORDER is the saved scheme's, not the catalogue's (same day, user:
+"默认是 IR 专属的排在最上面 … 接下来排我现在打勾的那些 … 剩下的 balance，你就放那些没
+有打勾的"): the three IR parameters first, then the switches that are on, then
+the switches that are off, Default rate mode last. Inside a group the
+catalogue order holds, and a row moves only when Save lands — the page
+re-reads the scheme — never while a box is being ticked.
+`lib/commission/scheme-rule-order.ts`.
+
 **II. Title ladder** — `comm_ranks`. One rung per title. The **title is
 fixed** once the rung exists (2026-09-05 evening: "选好后 title 就是 fixed 的") —
 only the blank row at the bottom, the one that adds a rung, has the title
