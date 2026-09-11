@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { InfotechRow } from '@/lib/import/infotech-payroll'
+import { buildStaffMatcher, type StaffMatchedBy } from '@/lib/import/staff-match'
 
 export interface PreviewResult {
   /** Matched staff whose period row will be overwritten with the file's figures. */
@@ -12,7 +13,7 @@ export interface PreviewResult {
     rowIndex: number
     staffId: string
     staffName: string
-    matchedBy: 'employee_code' | 'employee_name_fuzzy'
+    matchedBy: StaffMatchedBy
     gross: number
     net: number
   }>
@@ -21,15 +22,11 @@ export interface PreviewResult {
     rowIndex: number
     staffId: string
     staffName: string
-    matchedBy: 'employee_code' | 'employee_name_fuzzy'
+    matchedBy: StaffMatchedBy
     gross: number
     net: number
   }>
   skipped: Array<{ rowIndex: number; reason: string; code: string; name: string }>
-}
-
-function normalise(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 /**
@@ -39,6 +36,12 @@ function normalise(name: string): string {
  * ER+EE, PCB, gross and net are ALL written exactly as exported. The system
  * does NOT recompute statutory on import. Editing an input field on the grid
  * later still re-triggers the JADUAL recompute for that row.
+ *
+ * A row is matched on InfoTech's number (`infotech_code`) first and on the
+ * name second — `lib/import/staff-match.ts`. Never on `employee_code`: since
+ * 2026-09-12 that is the portal's own HV sequence, and an old file's HV013
+ * is not the portal's HV013. This import only reads the number; the
+ * employee-list import is the one that learns it.
  *
  * Rows are CREATED when the staff has no hr_monthly_payroll row for the
  * period yet — no need to pre-generate the period before importing.
@@ -56,7 +59,7 @@ export async function previewInfotechImport(
   const [{ data: staffList, error: staffError }, { data: payroll, error: payrollError }] = await Promise.all([
     supabase
       .from('hr_staff_costs')
-      .select('id, employee_name, employee_code, departments(payroll_source)')
+      .select('id, employee_name, infotech_code, departments(payroll_source)')
       .eq('status', 'active'),
     supabase
       .from('hr_monthly_payroll')
@@ -67,12 +70,7 @@ export async function previewInfotechImport(
 
   const staff = staffList ?? []
   const payrollByStaff = new Map((payroll ?? []).map(p => [p.staff_id, p]))
-  const staffByCode = new Map(
-    staff
-      .filter(s => s.employee_code)
-      .map(s => [s.employee_code as string, s]),
-  )
-  const staffByNormName = new Map(staff.map(s => [normalise(s.employee_name), s]))
+  const match = buildStaffMatcher(staff)
 
   const toUpdate: PreviewResult['toUpdate'] = []
   const toCreate: PreviewResult['toCreate'] = []
@@ -82,28 +80,13 @@ export async function previewInfotechImport(
     const code = row.employeeCode
     const name = row.employeeName
 
-    let matched: (typeof staff)[number] | undefined
-    let matchedBy: 'employee_code' | 'employee_name_fuzzy' | null = null
-
-    if (code) {
-      const hit = staffByCode.get(code)
-      if (hit) {
-        matched = hit
-        matchedBy = 'employee_code'
-      }
-    }
-    if (!matched && name) {
-      const hit = staffByNormName.get(normalise(name))
-      if (hit) {
-        matched = hit
-        matchedBy = 'employee_name_fuzzy'
-      }
-    }
-
-    if (!matched || !matchedBy) {
-      skipped.push({ rowIndex: idx, reason: 'No matching staff', code, name })
+    const found = match(row)
+    if (!found.staff) {
+      skipped.push({ rowIndex: idx, reason: found.reason, code, name })
       return
     }
+    const matched = found.staff
+    const matchedBy = found.matchedBy
 
     const existing = payrollByStaff.get(matched.id)
     if (existing?.source === 'commission' || matched.departments?.payroll_source === 'commission') {

@@ -68,6 +68,7 @@ export default async function EditStaffPage({ params }: PageProps) {
           allowances: Number(staff.allowances),
           non_statutory_allowance: staff.non_statutory_allowance == null ? null : Number(staff.non_statutory_allowance),
           employee_code: staff.employee_code,
+          infotech_code: staff.infotech_code,
           hire_date: staff.hire_date,
           resignation_date: staff.resignation_date,
           epf_category: staff.epf_category,

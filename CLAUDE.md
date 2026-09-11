@@ -70,7 +70,11 @@ src/
 │   │   │                              it shows `next_staff_code()`. Inside one
 │   │   │                              title the roster sorts by code
 │   │   │                              (`compareByLadder`). Mig
-│   │   │                              `20260915040000`.
+│   │   │                              `20260915040000`. InfoTech's own number
+│   │   │                              is `infotech_code` (mig `20260915050000`):
+│   │   │                              both imports match on it first, name
+│   │   │                              second, never on the HV code
+│   │   │                              (`lib/import/staff-match.ts`).
 │   │   ├── director-salary/         (Phase 3)
 │   │   ├── hr-costing/              (Phase 3 — staff directory moved to team/)
 │   │   │                              payment/ = monthly Payment statement

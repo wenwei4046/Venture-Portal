@@ -109,12 +109,17 @@ export default function ImportStaffWizard() {
         <div className="mt-5 text-xs font-sans text-muted space-y-1">
           <p className="font-serif italic text-graphite">Imported per row:</p>
           <ul className="list-disc ml-5 space-y-0.5">
-            <li>Employee code, name, designation, department (mapped from InfoTech dept code)</li>
+            <li>
+              InfoTech No, name, designation, department (mapped from InfoTech dept code) — the
+              portal&apos;s own HV code is given on save
+            </li>
             <li>Basic salary (contract master), hire date, NRIC</li>
             <li>Bank account number (bank name must be filled manually later)</li>
           </ul>
           <p className="mt-2 text-muted italic">
-            Re-importing updates existing staff to match the file — InfoTech is the contract master.
+            Rows are matched to people by InfoTech No first, by name second — never by the
+            portal&apos;s HV code. Re-importing updates existing staff to match the file — InfoTech
+            is the contract master.
             Statutory categories default to Part A / First / KA1 / not exempt — HR adjusts per staff if needed.
           </p>
         </div>
@@ -159,6 +164,11 @@ export default function ImportStaffWizard() {
               value={preview.deptMissing.length}
               danger={preview.deptMissing.length > 0}
             />
+            <Stat
+              label="Needs a look"
+              value={preview.skipped.length}
+              danger={preview.skipped.length > 0}
+            />
           </div>
           {preview.directors.length > 0 && (
             <p className="font-serif italic text-muted text-xs mt-3">
@@ -197,7 +207,7 @@ export default function ImportStaffWizard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                    <th className="text-left py-2 px-4 font-medium">Code</th>
+                    <th className="text-left py-2 px-4 font-medium">InfoTech No</th>
                     <th className="text-left py-2 px-4 font-medium">Name</th>
                     <th className="text-left py-2 px-4 font-medium">Designation</th>
                     <th className="text-left py-2 px-4 font-medium">Department</th>
@@ -286,6 +296,34 @@ export default function ImportStaffWizard() {
                 <div key={d.rowIndex} className="text-sm font-sans text-graphite">
                   <span className="font-mono">{d.employee_code}</span> · {d.employee_name} ·{' '}
                   <span className="italic text-danger">{d.dept_code}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        {/* A row the matcher would not guess at (2026-09-12): a name two
+            people share, or somebody whose InfoTech No is known under a
+            different number in the file. Neither an update nor a new person
+            until somebody has looked. */}
+        {preview.skipped.length > 0 && (
+          <details className="mb-6" open>
+            <summary className="cursor-pointer font-serif text-lg text-danger">
+              Needs a look{' '}
+              <span className="text-muted font-sans text-sm ml-2">
+                ({preview.skipped.length}) — rows skipped
+              </span>
+            </summary>
+            <p className="text-xs font-sans text-muted italic mt-2 mb-3">
+              Rows are matched by InfoTech No first, then by name. These matched nobody safely —
+              set the InfoTech No on the right person&apos;s card (Edit) and upload again.
+            </p>
+            <div className="space-y-1">
+              {preview.skipped.map(s => (
+                <div key={s.rowIndex} className="text-sm font-sans text-graphite">
+                  <span className="font-mono">{rows[s.rowIndex]?.employeeCode}</span> ·{' '}
+                  {rows[s.rowIndex]?.employeeName} ·{' '}
+                  <span className="italic text-danger">{s.reason}</span>
                 </div>
               ))}
             </div>

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import type { InfotechStaffRow } from '@/lib/import/infotech-staff'
+import { buildStaffMatcher } from '@/lib/import/staff-match'
 import { bankNameFromCode } from '@/lib/banks'
 
 /**
@@ -39,9 +40,13 @@ export interface StaffUpdateItem extends StaffPreviewItem {
 
 export interface StaffPreviewResult {
   toCreate: StaffPreviewItem[]
-  /** Existing staff (matched by employee_code) whose master fields will be
-   *  synced to the file. Re-import is the contract update path (user decision
-   *  2026-06-05 — supersedes the old skip-as-duplicate behaviour). */
+  /** Existing staff — matched on InfoTech's number (`infotech_code`) first,
+   *  the name second, never on the portal's own HV code (2026-09-12,
+   *  `lib/import/staff-match.ts`) — whose master fields will be synced to
+   *  the file. Re-import is the contract update path (user decision
+   *  2026-06-05 — supersedes the old skip-as-duplicate behaviour). Somebody
+   *  matched by name has the file's number written as their `infotech_code`,
+   *  so the next file finds them by it. */
   toUpdate: StaffUpdateItem[]
   /** Existing staff whose file row matches the DB exactly — nothing to do. */
   unchanged: Array<{
@@ -70,19 +75,17 @@ export async function previewInfotechStaffImport(
   const supabase = await createClient()
 
   const [{ data: existing }, { data: departments }] = await Promise.all([
+    // Everybody, whatever their status and whether or not they carry a
+    // number yet: a name is the fallback key, and somebody who left may be
+    // back on the list.
     supabase
       .from('hr_staff_costs')
-      .select('id, employee_code, employee_name, department_id, designation, basic_salary, hire_date, nric, bank_name, bank_account_no')
-      .not('employee_code', 'is', null),
+      .select('id, infotech_code, employee_name, department_id, designation, basic_salary, hire_date, nric, bank_name, bank_account_no'),
     // is_internal=false — the 'Venture Office' pseudo-dept is not a staff dept.
     supabase.from('departments').select('id, name').eq('is_internal', false),
   ])
 
-  const existingByCode = new Map(
-    (existing ?? [])
-      .filter(s => s.employee_code)
-      .map(s => [s.employee_code as string, s]),
-  )
+  const match = buildStaffMatcher(existing ?? [])
   const deptByName = new Map(
     (departments ?? []).map(d => [d.name.toLowerCase(), d.id]),
   )
@@ -119,7 +122,15 @@ export async function previewInfotechStaffImport(
       return
     }
 
-    const current = existingByCode.get(row.employeeCode)
+    const found = match(row)
+    // A conflict — a shared name, or a known person under a different
+    // number — is nobody's to guess: not an update, and not a new person
+    // either. It goes to the list somebody reads.
+    if (!found.staff && found.miss !== 'none') {
+      result.skipped.push({ rowIndex: idx, reason: found.reason })
+      return
+    }
+    const current = found.staff
     if (current) {
       // Existing staff — diff the master fields against the file and sync.
       const incomingNric = row.nric ? row.nric.replace(/[-\s]/g, '') : null
@@ -130,6 +141,8 @@ export async function previewInfotechStaffImport(
         const t = to == null || to === '' ? null : String(to)
         if (f !== t) diffs.push({ field, from: f ?? '—', to: t ?? '—' })
       }
+      // First, so a name-only match shows the number about to be learnt.
+      compare('infotech_code', current.infotech_code, row.employeeCode)
       compare('employee_name', current.employee_name, row.employeeName)
       compare('department', current.department_id, deptId)
       compare('designation', current.designation, row.designation)
@@ -240,9 +253,12 @@ export async function applyInfotechStaffImport(
     const nric = src.nric ? src.nric.replace(/[-\s]/g, '') : null
     const bankName = bankNameFromCode(src.bankCode)
 
+    // The file's code is InfoTech's number and is kept as such; the
+    // portal's own `employee_code` is handed out by the database on insert
+    // (HV + the largest number + 1, trigger `hr_staff_costs_assign_code`).
     const { error } = await supabase.from('hr_staff_costs').insert({
       employee_name: src.employeeName,
-      employee_code: src.employeeCode,
+      infotech_code: src.employeeCode,
       department_id: deptId,
       designation: src.designation,
       basic_salary: src.basicSalary,
@@ -305,6 +321,8 @@ export async function applyInfotechStaffImport(
     const { error } = await supabase
       .from('hr_staff_costs')
       .update({
+        // Learnt here when the row was matched by name; a no-op otherwise.
+        infotech_code: src.employeeCode,
         employee_name: src.employeeName,
         department_id: deptId,
         designation: src.designation,

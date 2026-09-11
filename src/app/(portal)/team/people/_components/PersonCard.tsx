@@ -374,6 +374,7 @@ function Details({ person }: { person: PersonCardData }) {
       </Section>
       <Section title="Identity">
         <Field label="Employee code" value={s.employee_code} mono />
+        <Field label="InfoTech No" value={s.infotech_code ?? null} mono />
         <Field label="NRIC" value={s.nric} mono />
         <Field
           label="Hire date"

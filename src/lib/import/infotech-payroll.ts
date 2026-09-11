@@ -24,7 +24,10 @@
  * imported verbatim, including statutory + gross + net; the system does NOT
  * recompute on import. The earlier 2026-04-26 "never write basic" rule is
  * superseded):
- *   Code          → matches hr_staff_costs.employee_code (primary match)
+ *   Code          → matches hr_staff_costs.infotech_code (primary match —
+ *                   InfoTech's own number; the portal's employee_code is an
+ *                   HV sequence of its own since 2026-09-12, see
+ *                   lib/import/staff-match.ts)
  *   Emp. Name     → matches hr_staff_costs.employee_name (fallback fuzzy)
  *   Tot. Sal      → basic_salary (per-month figure, verbatim)
  *   OT Amt        → ot_amount (+ Shift + Rest/PH Amount folded in —

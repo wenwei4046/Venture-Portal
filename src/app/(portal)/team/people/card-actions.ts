@@ -182,6 +182,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       allowances: Number(row.allowances ?? 0),
       non_statutory_allowance: Number(row.non_statutory_allowance ?? 0),
       employee_code: row.employee_code ?? null,
+      infotech_code: row.infotech_code ?? null,
       hire_date: row.hire_date ?? null,
       resignation_date: row.resignation_date ?? null,
       epf_category: row.epf_category,
