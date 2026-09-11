@@ -16,7 +16,17 @@ function fmt(n: number): string {
   return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export default function ReconcilePayrollBillingButton({ currentPeriod }: { currentPeriod: string }) {
+interface Props {
+  currentPeriod: string
+}
+
+// One instance per month — see CreateInvoiceButton. Both the delta lookup and
+// the top-up drafts use the local `period`, seeded once.
+export default function ReconcilePayrollBillingButton(props: Props) {
+  return <ReconcilePayrollBillingButtonBody key={props.currentPeriod} {...props} />
+}
+
+function ReconcilePayrollBillingButtonBody({ currentPeriod }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
