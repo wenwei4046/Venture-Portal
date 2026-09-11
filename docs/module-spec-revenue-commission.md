@@ -913,6 +913,21 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 > Staff Hierarchy's **Team** tab (§10) — beside the chart that moves them —
 > and the same evening the number went to the ninth tab, **Ranks** (§3.1):
 > the rate catalogue the ladder picks from.
+>
+> **Gated 2026-09-11.** The rail shows only the tabs the scheme uses. Scheme
+> rules, Title ladder and Ranks are always there; every other tab is a table
+> one switch on Scheme rules reads, and it appears only while that switch is
+> on (user, on IR's page: "上面的 tab 是 depend on 我 turn on 它才会跳出来"):
+> KPI item allowance → Item groups, KPI items, KPI threshold ladder; Open
+> Bill bonus → Open Bill rates; Below-margin penalty *or* Monthly margin
+> incentive → Brands & margin bands (one brand ladder holds both kinds of
+> rung). Promotion criteria has no switch — it is recorded policy — so it
+> shows while anything is recorded. One guard: a scheme that has already
+> classified item groups keeps that tab whatever its switches say, because
+> Product revenue commission reads the classification (§4.0) and a rule the
+> run applies must stay in sight. So IR shows three tabs and Fair nine; a
+> `?tab=` naming a hidden tab opens Scheme rules, where its switch is.
+> `lib/commission/rules-tabs.ts`.
 
 One page holds every rule, threshold and per-person tick, laid out as dense
 tables following `DESIGN.md` v3.0 (`.ledger-table`, `.num`, `.sect-head`).
@@ -936,6 +951,23 @@ Hierarchy override                      [✓]        include KPI revenue in the 
 Deposit gate                            [✓]        threshold  [ 50 ] % of order total
 Default rate mode                                  ( ) Fixed   (•) Variable
 ```
+
+The three group-package parameters IR added (§15.3) — Group sales layers,
+Override layers, Direct-line limit — sit in the same table but are not
+switches: `updateScheme` requires them at 2 / 2 / 3 whenever Group incentive
+package is on, and blank means "every layer" for a percentage-only scheme.
+Their ON cell wore a dash, which read as a switch that cannot be turned on;
+since 2026-09-11 it wears an **`IR`** chip instead, on every sub-department's
+page, so the row says whose parameters these are (user: "把那个 dash 换成
+IR … 这样就知道它是属于 IR").
+
+The table's ORDER is the saved scheme's, not the catalogue's (same day, user:
+"默认是 IR 专属的排在最上面 … 接下来排我现在打勾的那些 … 剩下的 balance，你就放那些没
+有打勾的"): the three IR parameters first, then the switches that are on, then
+the switches that are off, Default rate mode last. Inside a group the
+catalogue order holds, and a row moves only when Save lands — the page
+re-reads the scheme — never while a box is being ticked.
+`lib/commission/scheme-rule-order.ts`.
 
 **II. Title ladder** — `comm_ranks`. One rung per title. The **title is
 fixed** once the rung exists (2026-09-05 evening: "选好后 title 就是 fixed 的") —

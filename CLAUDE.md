@@ -88,7 +88,12 @@ src/
 │   │   │                              in a VERTICAL sidebar since 2026-09-07 —
 │   │   │                              nine labels never fitted one rail, so the
 │   │   │                              cure for the page's scroll had become a
-│   │   │                              scroll over the nav itself. The
+│   │   │                              scroll over the nav itself. Since
+│   │   │                              2026-09-11 a section is in the nav only
+│   │   │                              while the Scheme-rules switch that reads
+│   │   │                              it is on (`lib/commission/rules-tabs.ts`):
+│   │   │                              IR shows Scheme rules / Title ladder /
+│   │   │                              Ranks, Fair all nine. The
 │   │   │                              ninth, **Ranks**, is the rate catalogue
 │   │   │                              `comm_rank_defs` — a rank is percentage
 │   │   │                              pay OR a fixed group-incentive package,
