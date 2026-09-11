@@ -113,7 +113,7 @@ try{
  const placeholderId=await one("INSERT INTO hr_monthly_payroll(staff_id,period_month,basic_salary,source) VALUES($1,$2,0,'commission') RETURNING id",[staff2,period]);
  const beforeMigration=await q('SELECT id, to_jsonb(p) data FROM hr_monthly_payroll p ORDER BY id');
  await migrate('20260915010000_revenue_payroll_adjustments');
- await migrate('20260915020000_revenue_payroll_atomic_row');
+ await migrate('20260915030000_revenue_payroll_atomic_row');
  const newFields=['commission_synced_amount','commission_adjustment_amount','commission_adjustment_reason','commission_adjusted_at','commission_adjusted_by'];
  check(await q('SELECT id,to_jsonb(p)-$1::text[] data FROM hr_monthly_payroll p ORDER BY id',[newFields]),beforeMigration);
  check(Number(await one('SELECT commission_synced_amount FROM hr_monthly_payroll WHERE id=$1',[legacyId])),9000);
