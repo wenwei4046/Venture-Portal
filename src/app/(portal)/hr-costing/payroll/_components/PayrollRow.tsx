@@ -8,6 +8,7 @@ import {
   dirtyFields,
   editFromRow,
   formatAmount,
+  parseAmount,
   PAYROLL_FIELD_LABELS,
   PAYROLL_EDIT_FIELDS,
   type PayrollEdit,
@@ -68,22 +69,30 @@ export default function PayrollRow({
   const [edit, setEdit] = useState<PayrollEdit>(() => editFromRow(row))
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [commissionInputError, setCommissionInputError] = useState<string | null>(null)
+  const saveRef = useRef<HTMLButtonElement>(null)
+  const reviewResultRef = useRef<((saved: boolean) => void) | null>(null)
+  const requestReviewRef = useRef<() => Promise<boolean>>(null)
   const trRef = useRef<HTMLTableRowElement>(null)
   const chevRef = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(false)
   const savedEditRef = useRef(editFromRow(row))
 
   const locked = row.status !== 'draft'
-  const dirtyList = dirtyFields(edit, row, { commissionDerived: row.commission_is_derived })
-  const dirty = dirtyList.length > 0
   const revenuePayroll = row.revenue_payroll ?? row.source === 'commission'
   const split = revenuePayroll ? calculateRevenuePayrollSplit(row) : null
   const reviewedCommissionSource = row.commission_confirmed_amount ?? row.commission_synced_amount
+  const commissionEditable = !!split && row.payout_split_version === 2 && reviewedCommissionSource != null
+  const dirtyList = dirtyFields(edit, row, { commissionDerived: row.commission_is_derived && !commissionEditable })
+  const commissionDirty = commissionEditable && (dirtyList.includes('commission_amount') || !!commissionInputError)
+  const regularDirty = dirtyList.some(field => field !== 'commission_amount' || !row.commission_is_derived)
+  const dirty = dirtyList.length > 0 || commissionDirty
   const statementHref = row.commission_statements?.[0]?.href ?? row.commission_statement_href
   const sourceLinked = row.source === 'commission' && Boolean(row.commission_statements?.length || row.commission_statement_href)
 
   // Sync clean fields after a server refresh while retaining the user's
-  // unsaved work. The Revenue run always owns the gross commission field.
+  // unsaved work, including a Gross Commission amount awaiting review.
   useEffect(() => {
     const previous = savedEditRef.current
     const next = editFromRow(row)
@@ -91,23 +100,28 @@ export default function PayrollRow({
     setEdit(current => {
       const merged = { ...current }
       for (const field of PAYROLL_EDIT_FIELDS) {
-        if ((field === 'commission_amount' && row.commission_is_derived) || current[field] === previous[field]) {
+        if ((field === 'commission_amount' && row.commission_is_derived && !commissionEditable) || current[field] === previous[field]) {
           merged[field] = next[field]
         }
       }
       return PAYROLL_EDIT_FIELDS.some(field => merged[field] !== current[field]) ? merged : current
     })
-  }, [row])
+  }, [row, commissionEditable])
 
   // Report pending edits to the page-level draft context — powers the
   // header Save button and blocks Submit to Finance while unsaved.
-  const { setRowEdit } = usePayrollDraft()
+  const { setRowEdit, setCommissionReview } = usePayrollDraft()
   useEffect(() => {
     const update: Partial<PayrollEdit> = { ...edit }
     if (row.commission_is_derived) delete update.commission_amount
-    setRowEdit(row.id, dirty && !locked ? update : null)
-  }, [row.id, row.commission_is_derived, dirty, locked, edit, setRowEdit])
+    setRowEdit(row.id, regularDirty && !locked ? update : null)
+  }, [row.id, row.commission_is_derived, regularDirty, locked, edit, setRowEdit])
   useEffect(() => () => setRowEdit(row.id, null), [row.id, setRowEdit])
+  useEffect(() => {
+    setCommissionReview(row.id, commissionDirty && !locked ? () => requestReviewRef.current!() : null)
+    return () => setCommissionReview(row.id, null)
+  }, [row.id, commissionDirty, locked, setCommissionReview])
+  useEffect(() => () => { reviewResultRef.current?.(false) }, [])
 
   // Opening scrolls the row into view (‹ › in the window can land anywhere
   // in the list); closing hands focus back to the chevron that opened it.
@@ -130,6 +144,10 @@ export default function PayrollRow({
   function handleSave() {
     setError(null)
     setSaved(false)
+    if (commissionDirty) {
+      void requestReviewRef.current?.()
+      return
+    }
     startTransition(async () => {
       try {
         const update: Partial<PayrollEdit> = { ...edit }
@@ -144,9 +162,39 @@ export default function PayrollRow({
     })
   }
 
+  requestReviewRef.current = () => {
+    if (commissionInputError) {
+      setError(commissionInputError)
+      return Promise.resolve(false)
+    }
+    if (locked || isPending || reviewOpen || reviewResultRef.current || !commissionEditable) return Promise.resolve(false)
+    setError(null)
+    setSaved(false)
+    setReviewOpen(true)
+    return new Promise(resolve => { reviewResultRef.current = resolve })
+  }
+
+  function closeReview() {
+    setReviewOpen(false)
+    reviewResultRef.current?.(false)
+    reviewResultRef.current = null
+  }
+
   async function handleCommissionAdjustment(input: RevenueCommissionAdjustmentInput) {
-    await adjustRevenueCommission(row.id, input)
+    // Send only changed ordinary inputs. The dedicated action saves these and
+    // the reviewed adjustment atomically, so a rejected adjustment saves neither.
+    const update: Partial<PayrollEdit> = {}
+    for (const field of dirtyList) {
+      if (field !== 'commission_amount') update[field] = Number(edit[field].toFixed(2))
+    }
+    await adjustRevenueCommission(row.id, input, update)
+    setEdit(current => ({ ...current, ...update, commission_amount: input.gross }))
+    setCommissionInputError(null)
+    setSaved(true)
+    reviewResultRef.current?.(true)
+    reviewResultRef.current = null
     router.refresh()
+    setTimeout(() => setSaved(false), 1500)
   }
 
   // An editable figure — a field on a draft row, a bare figure once the
@@ -223,10 +271,11 @@ export default function PayrollRow({
         <td className="pg-st l4 pg-act">
           {dirty && !locked && (
             <button
+              ref={saveRef}
               type="button"
               className="pg-save"
               onClick={handleSave}
-              disabled={isPending}
+              disabled={isPending || reviewOpen}
             >
               {isPending ? '…' : 'Save'}
             </button>
@@ -255,24 +304,31 @@ export default function PayrollRow({
               {split ? formatMoneyBare(split.basicPay) : '—'}
             </td>
             <td
-              className={cn('num', split && row.commission_is_derived && 'derived', split && row.commission_amount === 0 && 'zero')}
+              className={cn(commissionEditable && !locked ? 'pg-ed' : 'num', split && !commissionEditable && row.commission_is_derived && 'derived', split && row.commission_amount === 0 && 'zero')}
               data-label="Gross Commission"
             >
-              {split ? row.payout_split_version === 2 && reviewedCommissionSource != null ? (
-                <div className="flex flex-col items-end gap-1" title={dirty ? 'Save other row changes before adjusting commission' : row.commission_adjustment_reason ?? undefined}>
-                  <RevenueCommissionEditor
-                    baseAmount={reviewedCommissionSource}
-                    currentAdjustment={row.commission_adjustment_amount ?? 0}
-                    currentGross={row.commission_amount}
-                    staffName={row.staff_name}
-                    disabled={locked || dirty || isPending}
-                    onSave={handleCommissionAdjustment}
-                  />
-                  {statementHref && (
-                    (row.commission_statements?.length ?? 0) > 1 ? (
-                      <button type="button" onClick={onOpen} className="text-xs text-accent underline" title="View source commission statements">Sources ↗</button>
-                    ) : <a href={statementHref} className="text-xs text-accent underline" title="View the Revenue source commission">Source ↗</a>
-                  )}
+              {split ? commissionEditable ? (
+                <div className="relative" onChangeCapture={event => {
+                  if (!(event.target instanceof HTMLInputElement)) return
+                  setCommissionInputError(parseAmount(event.target.value) === null
+                    ? 'Enter a valid Gross Commission amount of zero or more.' : null)
+                }}>
+                  {locked ? formatMoneyBare(row.commission_amount) : <AmountInput
+                    value={edit.commission_amount}
+                    onChange={value => setField('commission_amount', Math.round((value + Number.EPSILON) * 100) / 100)}
+                    disabled={isPending || reviewOpen}
+                    dirty={commissionDirty}
+                    aria-label={`Gross Commission — ${row.staff_name}`}
+                    aria-invalid={!!commissionInputError}
+                    className={row.commission_adjustment_amount ? '!pl-5' : undefined}
+                  />}
+                  {!!row.commission_adjustment_amount && <button
+                    type="button"
+                    className="absolute inset-y-0 left-0 flex w-5 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    aria-label={`Commission adjustment ${row.commission_adjustment_amount > 0 ? '+' : '-'}RM ${formatMoneyBare(Math.abs(row.commission_adjustment_amount))} — ${row.staff_name}. Open details`}
+                    title={`Adjustment ${row.commission_adjustment_amount > 0 ? '+' : '-'}RM ${formatMoneyBare(Math.abs(row.commission_adjustment_amount))}${row.commission_adjustment_reason ? ` · ${row.commission_adjustment_reason}` : ''}. Open paycheck for details.`}
+                    onClick={onOpen}
+                  ><span className="h-1.5 w-1.5 rounded-full bg-danger" aria-hidden="true" /></button>}
                 </div>
               ) : <>
                 {grossCommission}
@@ -309,6 +365,19 @@ export default function PayrollRow({
         {num(row.socso_er)}
         {num(row.eis_er)}
       </tr>
+
+      {commissionEditable && <RevenueCommissionEditor
+        open={reviewOpen}
+        requestedGross={edit.commission_amount}
+        baseAmount={reviewedCommissionSource!}
+        currentAdjustment={row.commission_adjustment_amount ?? 0}
+        currentGross={row.commission_amount}
+        staffName={row.staff_name}
+        disabled={locked || isPending}
+        returnFocusRef={saveRef}
+        onClose={closeReview}
+        onSave={handleCommissionAdjustment}
+      />}
 
       {open && (
         <PaycheckWindow

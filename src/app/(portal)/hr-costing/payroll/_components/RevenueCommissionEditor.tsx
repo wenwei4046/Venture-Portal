@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { cn, formatMoneyBare } from '@/lib/utils'
 import { parseAmount } from '@/lib/payroll-grid'
@@ -14,6 +14,11 @@ export interface RevenueCommissionChange {
 }
 
 export interface RevenueCommissionEditorProps {
+  open: boolean
+  /** The row's inline draft, captured each time the confirmation opens. */
+  requestedGross: number
+  onClose: () => void
+  returnFocusRef?: RefObject<HTMLElement | null>
   baseAmount: number
   currentAdjustment: number
   currentGross: number
@@ -32,48 +37,52 @@ const roundMoney = (amount: number) => Math.round((amount + Number.EPSILON) * 10
 const signedMoney = (amount: number) => `${amount > 0 ? '+' : amount < 0 ? '-' : ''}${formatMoneyBare(Math.abs(amount))}`
 const amountError = 'Enter a finite Gross Commission amount of zero or more.'
 
-/** A payroll adjustment to a synced commission pool; eligibility belongs to the caller. */
-export default function RevenueCommissionEditor({
+/** The row owns opening/closing; each opening gets a fresh, fixed review snapshot. */
+export default function RevenueCommissionEditor({ open, ...props }: RevenueCommissionEditorProps) {
+  return open ? <RevenueCommissionDialog {...props} /> : null
+}
+
+function RevenueCommissionDialog({
+  requestedGross: initialRequestedGross,
+  onClose,
+  returnFocusRef,
   baseAmount,
   currentAdjustment,
   currentGross,
   disabled = false,
   staffName,
   onSave,
-}: RevenueCommissionEditorProps) {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
-  const [requested, setRequested] = useState(currentGross)
+}: Omit<RevenueCommissionEditorProps, 'open'>) {
+  const [snapshot] = useState<Snapshot>(() => ({ base: baseAmount, adjustment: currentAdjustment, gross: currentGross }))
+  const [requested, setRequested] = useState(() => roundMoney(initialRequestedGross))
   const [reason, setReason] = useState('')
-  const [inputError, setInputError] = useState<string | null>(null)
+  const [inputError, setInputError] = useState<string | null>(() =>
+    Number.isFinite(roundMoney(initialRequestedGross)) && initialRequestedGross >= 0 ? null : amountError)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const savingRef = useRef(false)
-  const triggerRef = useRef<HTMLButtonElement>(null)
+  const mountedRef = useRef(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const descriptionId = useId()
   const propsValid = [baseAmount, currentAdjustment, currentGross].every(Number.isFinite)
     && baseAmount >= 0 && currentGross >= 0
-  const sourceChanged = !!snapshot && (baseAmount !== snapshot.base
-    || currentAdjustment !== snapshot.adjustment || currentGross !== snapshot.gross)
+  const sourceChanged = baseAmount !== snapshot.base
+    || currentAdjustment !== snapshot.adjustment || currentGross !== snapshot.gross
 
   useEffect(() => {
-    if (!snapshot) return
+    mountedRef.current = true
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     dialogRef.current?.focus({ preventScroll: true })
-    return () => triggerRef.current?.focus({ preventScroll: true })
-  }, [snapshot])
-
-  function open() {
-    if (disabled || !propsValid) return
-    setSnapshot({ base: baseAmount, adjustment: currentAdjustment, gross: currentGross })
-    setRequested(roundMoney(currentGross))
-    setReason('')
-    setInputError(null)
-    setError(null)
-  }
+    return () => {
+      mountedRef.current = false
+      const target = returnFocusRef?.current ?? previousFocus
+      if (target?.isConnected) target.focus({ preventScroll: true })
+    }
+  }, [returnFocusRef])
 
   function close() {
-    if (!savingRef.current) setSnapshot(null)
+    if (!savingRef.current) onClose()
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -95,7 +104,7 @@ export default function RevenueCommissionEditor({
 
   async function save(event: FormEvent) {
     event.preventDefault()
-    if (!snapshot || savingRef.current || disabled || sourceChanged || !propsValid) return
+    if (savingRef.current || disabled || sourceChanged || !propsValid) return
     const gross = roundMoney(requested)
     if (inputError || !Number.isFinite(gross) || gross < 0) { setError(amountError); return }
     if (!reason.trim()) { setError('Enter a reason for this adjustment.'); return }
@@ -104,32 +113,21 @@ export default function RevenueCommissionEditor({
     setError(null)
     try {
       await onSave({ gross, expectedSynced: snapshot.base, expectedAdjustment: snapshot.adjustment, reason: reason.trim() })
-      setSnapshot(null)
+      if (mountedRef.current) onClose()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save the commission adjustment. Try again.')
+      if (mountedRef.current) setError(cause instanceof Error ? cause.message : 'Could not save the commission adjustment. Try again.')
     } finally {
       savingRef.current = false
-      setPending(false)
+      if (mountedRef.current) setPending(false)
     }
   }
 
   const requestedGross = roundMoney(requested)
-  const adjustment = snapshot ? roundMoney(requestedGross - snapshot.base) : 0
-  const difference = snapshot ? roundMoney(requestedGross - snapshot.gross) : 0
+  const adjustment = roundMoney(requestedGross - snapshot.base)
+  const difference = roundMoney(requestedGross - snapshot.gross)
   const locked = pending || disabled || sourceChanged || !propsValid
 
-  return <>
-    <span className="inline-flex w-full flex-col items-end gap-1">
-      <button ref={triggerRef} type="button" onClick={open} disabled={disabled || !propsValid}
-        aria-label={staffName ? `Edit Gross Commission — ${staffName}` : 'Edit Gross Commission'}
-        title="Edit Gross Commission"
-        className="num inline-flex items-center gap-1 text-accent underline underline-offset-2 disabled:text-muted disabled:no-underline disabled:cursor-not-allowed">
-        {Number.isFinite(currentGross) ? formatMoneyBare(currentGross) : 'Unavailable'}
-        <svg aria-hidden="true" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m10 3 3 3M3 10l7-7a2.1 2.1 0 0 1 3 3l-7 7-4 1 1-4Z" /></svg>
-      </button>
-      <span className="text-xs text-graphite" aria-label="Current commission adjustment" title="Current payroll adjustment to the Revenue source">Adj. <span className="num">{Number.isFinite(currentAdjustment) ? signedMoney(roundMoney(currentAdjustment)) : 'Unavailable'}</span></span>
-    </span>
-    {snapshot && createPortal(<>
+  return createPortal(<>
       <div className="pg-scrim" style={{ zIndex: 70 }} onClick={close} aria-hidden="true" />
       <div ref={dialogRef} className="pg-win" style={{ maxWidth: 560, zIndex: 71 }} role="dialog" aria-modal="true"
         aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} onKeyDown={onKeyDown}>
@@ -182,6 +180,5 @@ export default function RevenueCommissionEditor({
           </div>
         </form>
       </div>
-    </>, document.body)}
-  </>
+    </>, document.body)
 }

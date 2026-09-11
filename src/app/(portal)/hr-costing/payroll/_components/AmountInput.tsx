@@ -14,6 +14,7 @@ interface Props {
   dirty?: boolean
   className?: string
   'aria-label': string
+  'aria-invalid'?: boolean
 }
 
 /**

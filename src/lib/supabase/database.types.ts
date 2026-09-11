@@ -7081,6 +7081,10 @@ export type Database = {
         Returns: Json
       }
       adjust_revenue_payroll_commission: { Args: { p_payroll_id: string; p_gross: number; p_expected_synced: number; p_expected_adjustment: number; p_reason: string }; Returns: Json }
+      save_revenue_payroll_row: {
+        Args: { p_payroll_id: string; p_gross: number; p_expected_synced: number; p_expected_adjustment: number; p_reason: string; p_row_updates?: Json }
+        Returns: Json
+      }
       revenue_payroll_adjustments: {
         Args: { p_sub_department_id: string; p_period: string; p_staff_id?: string | null }
         Returns: {
