@@ -36,7 +36,7 @@ describe("Principal Revenue workspace", () => {
     render(<MemberWorkspace initialData={data()} />);
     expect(screen.getByRole("heading", { name: "Revenue overview" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "View portal as role" })).toHaveValue("revenue_member");
-    expect(screen.getByRole("option", { name: "Principal", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Principal" })).toBeInTheDocument();
     expect(screen.queryByText("No member profile linked")).not.toBeInTheDocument();
     expect(screen.queryByText("Fixed salary", { exact: true })).not.toBeInTheDocument();
   });
@@ -48,12 +48,12 @@ describe("Principal Revenue workspace", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Revenue department" }), { target: { value: "ir" } });
     expect(screen.getByRole("heading", { name: "Revenue overview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "IR workspace" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Quote", exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quote" })).not.toBeInTheDocument();
   });
 
   it("renders the full hierarchy with no self member and supports search", () => {
     render(<MemberWorkspace initialData={data()} />);
-    fireEvent.click(within(screen.getByRole("navigation", { name: "Desktop navigation" })).getByRole("button", { name: "Team", exact: true }));
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Desktop navigation" })).getByRole("button", { name: "Team" }));
     expect(screen.getByRole("heading", { name: "Team Lead" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sales Member" })).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search members by name" }), { target: { value: "Sales Member" } });
@@ -72,7 +72,7 @@ describe("Principal Revenue workspace", () => {
 
   it("routes staff request management through Principal services, never a resubmission", () => {
     render(<MemberWorkspace initialData={data()} />);
-    fireEvent.click(within(screen.getByRole("navigation", { name: "Desktop navigation" })).getByRole("button", { name: "Requests", exact: true }));
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Desktop navigation" })).getByRole("button", { name: "Requests" }));
     expect(screen.queryByRole("button", { name: "Submit Claim" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Member accommodation/ }));
     expect(screen.queryByRole("button", { name: "Update details and resubmit" })).not.toBeInTheDocument();
