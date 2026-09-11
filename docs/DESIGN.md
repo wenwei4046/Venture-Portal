@@ -603,8 +603,10 @@ shape), and the ground is the only non-paper surface — everything around it
 ### Payment statement (v3.7, 2026-09-11 — HR › Payment)
 
 The approved combination uses concept A's reporting and concept B's table hierarchy.
-The route-scoped `.payment-statement-shell` has a light neutral sidebar and topbar;
-`.payment-statement` uses a serif Payment title, thin rules, square table surfaces,
+Payment inherits the same Plaster/Walnut/Harbour palette, sidebar and topbar as
+the other portal pages, including their dark theme. It must not override shared
+theme tokens or reskin the portal shell. `.payment-statement` keeps the serif
+Payment title, thin rules, square table surfaces,
 shaded headers, right-aligned monetary columns and compact status text. Styles live
 in `payment/payment-statement.css` and `_components/payment-tables.css`.
 
