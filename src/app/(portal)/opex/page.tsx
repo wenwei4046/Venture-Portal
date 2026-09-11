@@ -125,7 +125,7 @@ export default async function OpexPage({ searchParams }: Props) {
           <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
             Total OPEX (this month)
           </div>
-          <div className="num text-num-ink text-2xl tracking-[-0.01em] mt-1">{formatMoney(monthOpex)}</div>
+          <div className="statement-amount text-num-ink mt-1">{formatMoney(monthOpex)}</div>
           <p className="font-serif italic text-muted text-xs mt-1">
             Basic + KPI + Allowance + ER Statutory
           </p>

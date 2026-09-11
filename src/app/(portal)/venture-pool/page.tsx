@@ -145,7 +145,7 @@ export default async function VenturePoolPage() {
         <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
           <div className="font-serif italic text-graphite text-sm mb-1">Running balance</div>
           <div
-            className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${
+            className={`statement-amount ${
               balance < 0 ? 'text-danger' : 'text-num-ink'
             }`}
           >
@@ -281,7 +281,7 @@ function Kpi({
       <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
         {label}
       </div>
-      <div className={`font-serif text-2xl mt-1 ${colour}`}>{formatMoney(amount)}</div>
+      <div className={`statement-amount mt-1 ${colour}`}>{formatMoney(amount)}</div>
       {subtitle ? (
         <p className="font-serif italic text-muted text-xs mt-1">{subtitle}</p>
       ) : null}

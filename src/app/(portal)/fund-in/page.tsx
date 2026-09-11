@@ -161,11 +161,11 @@ export default async function FundInPage({ searchParams }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             Total paid capital
           </div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="statement-amount text-num-ink">
             {totalPaid > 0 ? (
               <>
                 RM {formatMoney(totalPaid).replace('RM ', '').replace(/\.\d{2}$/, '')}
-                <span className="text-[32px] text-graphite">
+                <span className="text-graphite">
                   {formatMoney(totalPaid).slice(-3)}
                 </span>
               </>

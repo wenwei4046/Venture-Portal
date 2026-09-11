@@ -53,9 +53,7 @@ export default function TopBar({ user }: TopBarProps) {
         {/* Below sm the greeting clause is dropped rather than truncated: an
             ellipsis eats the name ("Good even…") and the name is the half that
             carries meaning. */}
-        {/* pr-1: `truncate` clips overflow, and the name renders in italic —
-            without the gutter the final letter's tail is shaved off. */}
-        <div className="font-serif text-[18px] md:text-[20px] text-ink truncate leading-none pr-1">
+        <div className="font-sans text-[13px] font-normal text-ink truncate leading-none pr-1">
           {/* suppressHydrationWarning covers the sliver the fixed zone cannot:
               server and client render the same string unless the request and
               the hydration land either side of an hour boundary, which is a
@@ -63,7 +61,7 @@ export default function TopBar({ user }: TopBarProps) {
           <span className="hidden sm:inline" suppressHydrationWarning>
             {clock.greeting},{' '}
           </span>
-          <span className="italic text-accent">{displayName}</span>
+          <span className="text-accent">{displayName}</span>
           <span className="hidden sm:inline">.</span>
         </div>
       </div>
@@ -90,7 +88,7 @@ export default function TopBar({ user }: TopBarProps) {
               defaultValue={user.role}
               onChange={() => viewAsFormRef.current?.requestSubmit()}
               aria-label="View portal as role"
-              className="bg-transparent font-serif italic text-[13.5px] text-graphite hover:text-accent cursor-pointer focus:outline-none"
+              className="bg-transparent font-sans font-normal text-[13.5px] text-graphite hover:text-accent cursor-pointer focus:outline-none"
             >
               <option value="principal">Principal</option>
               <option value="finance">Finance view</option>
@@ -100,7 +98,7 @@ export default function TopBar({ user }: TopBarProps) {
         ) : null}
         <div className="hidden sm:flex items-baseline gap-3 font-mono text-[11px] text-muted tracking-[0.02em]">
           {!principalAccount ? (
-            <span className="inline-flex items-baseline gap-1.5 font-serif italic text-[13.5px] text-graphite">
+            <span className="inline-flex items-baseline gap-1.5 font-sans font-normal text-[13.5px] text-graphite">
               <span aria-hidden className="w-[5px] h-[5px] rounded-full bg-ledger inline-block translate-y-[-2px]" />
               {getRoleLabel(user.role)}
             </span>

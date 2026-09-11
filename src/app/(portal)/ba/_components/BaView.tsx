@@ -629,7 +629,7 @@ function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
                 <span className="font-serif italic text-muted text-xs">no limit set</span>
               )}
             </div>
-            <div className="font-serif text-2xl text-num-ink tabular mb-1">RM {money(c.used)}</div>
+            <div className="statement-amount text-num-ink mb-1">RM {money(c.used)}</div>
             <div className="font-mono text-[11px] text-muted mb-2">
               outstanding · limit {c.limit > 0 ? `RM ${money(c.limit)}` : '—'} ·{' '}
               <span className={c.available < 0 ? 'text-danger font-semibold' : ''}>

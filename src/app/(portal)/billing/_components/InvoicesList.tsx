@@ -305,7 +305,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               <div className="font-serif italic text-accent text-base mb-1">
                 Total for {dayjs(period).format('MMMM YYYY')}
               </div>
-              <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-ink leading-none">
+              <div className="statement-amount text-ink">
                 {formatMoney(grandTotal)}
               </div>
             </div>

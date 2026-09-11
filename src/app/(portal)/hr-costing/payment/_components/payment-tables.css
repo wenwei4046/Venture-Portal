@@ -1,6 +1,6 @@
 .payment-statement .payment-tabs { display:flex; gap:28px; border-bottom:1px solid rgb(var(--hairline)); margin-top:28px; }
 .payment-statement .payment-tabs button { padding:11px 2px; border:0; border-bottom:2px solid transparent; background:transparent; color:rgb(var(--graphite)); font:inherit; font-size:14px; cursor:pointer; }
-.payment-statement .payment-tabs button[aria-selected="true"] { border-bottom-color:rgb(var(--ledger)); color:rgb(var(--ledger)); font-weight:500; }
+.payment-statement .payment-tabs button[aria-selected="true"] { border-bottom-color:rgb(var(--accent)); color:rgb(var(--accent)); font-weight:500; }
 .payment-statement [role="tabpanel"][hidden] { display:none; }
 .payment-statement .payment-section { margin-top:24px; }
 .payment-statement .payment-section + .payment-section { margin-top:32px; }
@@ -9,7 +9,7 @@
 .payment-statement .pay-section-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px 18px; flex-wrap:wrap; margin-bottom:12px; }
 .payment-statement .pay-section-toolbar h2 { margin:0; }
 .payment-statement .pay-table-wrap { width:100%; max-width:100%; overflow-x:auto; }
-.payment-statement .pay-statement-table { width:100%; border-collapse:collapse; font-size:13px; border-radius:0; }
+.payment-statement .pay-statement-table { width:100%; border-collapse:collapse; font-size:13px; border-radius:0; background:rgb(var(--surface)); }
 .payment-statement .pay-statement-table th, .payment-statement .pay-statement-table td { text-align:left; border-bottom:1px solid rgb(var(--hairline)); padding:13px 10px; vertical-align:middle; }
 .payment-statement .pay-statement-table thead th { background:rgb(var(--surface-2)); border-top:1px solid rgb(var(--hairline)); font-size:11px; font-weight:400; color:rgb(var(--graphite)); padding:9px 10px; white-space:nowrap; }
 .payment-statement .pay-statement-table tbody th { background:transparent; font-weight:500; }
@@ -36,15 +36,15 @@
 .payment-statement .pay-generation-grid { display:grid; grid-template-columns:150px minmax(0,1fr); gap:20px; }
 .payment-statement .pay-department-picker { display:flex; flex-direction:column; gap:2px; }
 .payment-statement .pay-department-picker button { border:0; background:transparent; text-align:left; padding:9px; font:inherit; font-size:12px; cursor:pointer; }
-.payment-statement .pay-department-picker button[aria-pressed="true"] { background:rgb(var(--ledger-bg)); color:rgb(var(--ledger)); }
+.payment-statement .pay-department-picker button[aria-pressed="true"] { background:rgb(var(--accent-bg)); color:rgb(var(--accent)); }
 .payment-statement .pay-department-picker small { display:block; color:rgb(var(--graphite)); font-size:11px; margin-top:2px; }
 .payment-statement .pay-generation-people { min-width:0; }
 .payment-statement .pay-generation-fields { display:flex; gap:20px; align-items:flex-start; justify-content:space-between; font-size:12px; margin-bottom:14px; flex-wrap:wrap; }
 .payment-statement .pay-generation-fields label, .payment-statement .pay-generation-fields strong { display:flex; flex-direction:column; gap:4px; }
 .payment-statement .pay-generation-fields strong { margin-top:4px; font-weight:500; }
-.payment-statement .pay-generation table { background:rgb(var(--paper)); }
+.payment-statement .pay-generation table { background:rgb(var(--surface)); }
 .payment-statement .pay-generation table td { padding:11px 9px; }
-.payment-statement input[type="checkbox"] { accent-color:rgb(var(--ledger)); width:16px; height:16px; cursor:pointer; }
+.payment-statement input[type="checkbox"] { accent-color:rgb(var(--accent)); width:16px; height:16px; cursor:pointer; }
 .payment-statement input[type="checkbox"]:disabled { cursor:default; }
 .payment-statement .pay-generation-footer { border-top:1px solid rgb(var(--hairline)); margin-top:15px; padding-top:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:12px; }
 .payment-statement .pay-generation-footer strong { display:block; font-variant-numeric:tabular-nums; font-size:22px; font-weight:500; margin-top:3px; }

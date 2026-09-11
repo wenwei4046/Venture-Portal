@@ -61,8 +61,16 @@ const config: Config = {
         // inline `italic` on those elements simply slants Inter.
         sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
         serif: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['Georgia', '"Times New Roman"', 'var(--font-cjk)', 'serif'],
         mono: ['var(--font-mono)', '"Chivo Mono"', 'Menlo', 'monospace'],
         cjk: ['var(--font-cjk)', '"Noto Sans SC"', 'sans-serif'],
+      },
+
+      // Shared statement weight: medium emphasis throughout the portal.
+      // Explicit strong emphasis stays one step above ordinary labels.
+      fontWeight: {
+        semibold: '500',
+        bold: '600',
       },
 
       fontSize: {
@@ -71,7 +79,7 @@ const config: Config = {
         'mono-sm': ['12px', { lineHeight: '16px', letterSpacing: '0' }],
         xs: ['11px', '16px'],
         sm: ['13px', '20px'],
-        base: ['14px', '20px'],
+        base: ['13px', '20px'],
         md: ['15px', '24px'],
         lg: ['18px', '24px'],
         xl: ['22px', '28px'],

@@ -205,7 +205,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
                 <div className="text-xs text-muted uppercase tracking-wide font-sans mb-1">
                   Amount
                 </div>
-                <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em]">
+                <div className="statement-amount text-num-ink">
                   {voucherContext.voucher.direction === 'credit' ? '+' : ''}
                   {formatMoney(Number(voucherContext.voucher.amount))}
                 </div>

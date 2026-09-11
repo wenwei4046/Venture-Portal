@@ -253,7 +253,7 @@ export default function StatementView({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-ledger text-sm mb-1">To Collect</div>
-          <div className="font-serif text-2xl text-num-ink tabular">
+          <div className="statement-amount text-num-ink">
             RM {formatMoneyBare(totals.collectPrincipal + totals.collectInterest)}
           </div>
           <div className="font-mono text-[11px] text-graphite mt-1.5">
@@ -262,7 +262,7 @@ export default function StatementView({
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-alert text-sm mb-1">To Repay</div>
-          <div className="font-serif text-2xl text-num-ink tabular">
+          <div className="statement-amount text-num-ink">
             RM {formatMoneyBare(totals.repayPrincipal + totals.repayInterest)}
           </div>
           <div className="font-mono text-[11px] text-graphite mt-1.5">
@@ -272,7 +272,7 @@ export default function StatementView({
         <div className="border border-hairline rounded-md bg-surface p-5">
           <div className="font-serif italic text-graphite text-sm mb-1">Net</div>
           <div
-            className={`font-serif text-2xl tabular ${totals.net >= 0 ? 'text-ledger' : 'text-danger'}`}
+            className={`statement-amount ${totals.net >= 0 ? 'text-ledger' : 'text-danger'}`}
           >
             {totals.net >= 0 ? 'Collect ' : 'Repay '}RM {formatMoneyBare(Math.abs(totals.net))}
           </div>

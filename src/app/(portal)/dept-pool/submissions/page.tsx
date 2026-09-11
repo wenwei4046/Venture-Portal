@@ -99,7 +99,7 @@ export default async function PastMonthSubmissionsPage() {
                     <em className={`font-serif italic text-sm ${label.className}`}>
                       {label.text}
                     </em>
-                    <span className="num text-num-ink text-xl tracking-[-0.01em]">
+                    <span className="statement-amount compact text-num-ink">
                       {formatMoney(total)}
                     </span>
                     {(user.role === 'finance' || user.role === 'principal') && sub.execution_state === 'approved_for_execution' && (

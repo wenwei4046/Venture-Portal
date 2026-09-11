@@ -159,7 +159,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
         <span className="font-serif italic text-graphite text-sm uppercase tracking-wide">
           Total payroll outflow
         </span>
-        <span className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em]">
+        <span className="statement-amount text-num-ink">
           {formatMoney(Number(run.total_amount))}
         </span>
       </div>

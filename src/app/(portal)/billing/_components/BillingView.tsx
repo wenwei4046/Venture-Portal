@@ -508,7 +508,7 @@ export default async function BillingView({ searchParams }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             {dayjs(period).format('MMMM YYYY')}
           </div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-ink leading-none">
+          <div className="statement-amount text-ink">
             {invoiceList.length > 0
               ? formatMoney(invoiceTotal)
               : payrollSubmitted || directorSubmitted
@@ -894,7 +894,7 @@ function DeptCostCard({
   return (
     <div className="border border-hairline rounded-md bg-surface p-5 flex flex-col">
       <div className="font-serif italic text-accent text-sm mb-1">{label}</div>
-      <div className={`font-serif text-3xl leading-none ${muted ? 'text-muted' : 'text-ink'}`}>
+      <div className={`statement-amount ${muted ? 'text-muted' : 'text-ink'}`}>
         {formatMoney(amount)}
       </div>
       <div className="font-mono text-xs text-muted mt-2">{note}</div>

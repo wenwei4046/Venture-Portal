@@ -133,7 +133,7 @@ export default async function AllocationPage({ params }: PageProps) {
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Total Employer Cost
               </div>
-              <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">
+              <div className="statement-amount text-num-ink mt-1">
                 {formatMoney(totalCost)}
               </div>
             </div>
@@ -141,7 +141,7 @@ export default async function AllocationPage({ params }: PageProps) {
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Staff Allocated
               </div>
-              <div className="num text-graphite text-md mt-1">
+              <div className="statement-amount compact text-graphite mt-1">
                 {staffWithAlloc} / {staff.length}
               </div>
             </div>
@@ -149,13 +149,13 @@ export default async function AllocationPage({ params }: PageProps) {
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Billed to Subsidiaries
               </div>
-              <div className="num text-graphite text-md mt-1">{formatMoney(billedTotal)}</div>
+              <div className="statement-amount compact text-graphite mt-1">{formatMoney(billedTotal)}</div>
             </div>
             <div>
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 HV — Venture Own Share
               </div>
-              <div className="num text-graphite text-md mt-1">{formatMoney(hvTotal)}</div>
+              <div className="statement-amount compact text-graphite mt-1">{formatMoney(hvTotal)}</div>
             </div>
           </div>
 

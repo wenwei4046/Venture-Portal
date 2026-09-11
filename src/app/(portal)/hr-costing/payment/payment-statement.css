@@ -1,85 +1,5 @@
-/* Payment statement: the approved neutral ledger palette is scoped to this route. */
-.payment-statement-shell {
-  --statement-paper: 255 254 250;
-  --statement-rail: 242 241 236;
-  --statement-head: 238 240 237;
-  --statement-ink: 37 44 40;
-  --statement-muted: 102 110 102;
-  --statement-line: 216 221 212;
-  --statement-green: 45 98 74;
-  --statement-green-bg: 237 243 237;
-  --statement-amber: 130 90 36;
-  --statement-amber-bg: 245 239 228;
-}
-[data-theme="dark"] .payment-statement-shell {
-  --statement-paper: 32 34 31;
-  --statement-rail: 24 26 24;
-  --statement-head: 43 48 44;
-  --statement-ink: 227 231 224;
-  --statement-muted: 162 173 162;
-  --statement-line: 65 72 63;
-  --statement-green: 155 199 169;
-  --statement-green-bg: 41 58 47;
-  --statement-amber: 225 183 124;
-  --statement-amber-bg: 60 51 40;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .payment-statement-shell {
-    --statement-paper: 32 34 31;
-    --statement-rail: 24 26 24;
-    --statement-head: 43 48 44;
-    --statement-ink: 227 231 224;
-    --statement-muted: 162 173 162;
-    --statement-line: 65 72 63;
-    --statement-green: 155 199 169;
-    --statement-green-bg: 41 58 47;
-    --statement-amber: 225 183 124;
-    --statement-amber-bg: 60 51 40;
-  }
-}
-.payment-statement-shell,
-.payment-statement-shell .sidebar-contrast {
-  --paper: var(--statement-paper);
-  --surface: var(--statement-paper);
-  --surface-2: var(--statement-head);
-  --chrome: var(--statement-rail);
-  --hairline: var(--statement-line);
-  --ink: var(--statement-ink);
-  --num-ink: var(--statement-ink);
-  --graphite: var(--statement-muted);
-  --muted: var(--statement-muted);
-  --accent: var(--statement-green);
-  --accent-hover: var(--statement-green);
-  --accent-bg: var(--statement-green-bg);
-  --accent-border: var(--statement-line);
-  --ledger: var(--statement-green);
-  --ledger-bg: var(--statement-green-bg);
-  --alert: var(--statement-amber);
-  --alert-bg: var(--statement-amber-bg);
-  color: rgb(var(--ink));
-}
-.payment-statement-shell .sidebar-contrast {
-  --surface: var(--statement-rail);
-  border-radius: 0;
-  box-shadow: none;
-  border-right: 1px solid rgb(var(--hairline));
-  margin: 0;
-  height: 100%;
-}
-.payment-statement-shell .sidebar-contrast .text-\[30px\] { font-size: 24px; }
-.payment-statement-shell .sidebar-contrast .italic { font-style: normal; }
-.payment-statement-shell .bg-chrome {
-  background: rgb(var(--paper));
-  border: 0;
-  border-bottom: 1px solid rgb(var(--hairline));
-  border-radius: 0;
-  margin: 0;
-  height: 52px;
-}
-.payment-statement-shell .bg-chrome > div:first-child > div { font-size: 13px; }
-.payment-statement-shell .bg-chrome .italic { font-style: normal; }
-.payment-statement-shell .page-enter { padding-top: 28px; }
-.payment-statement-shell .pay-board { --pay-card: var(--statement-paper); --pay-well: var(--statement-rail); }
+/* Preserve the statement layout while inheriting the portal's shared theme. */
+.pay-board.payment-statement { --pay-card: var(--surface); --pay-well: var(--chrome); }
 .payment-statement { font-size: 13px; line-height: 1.5; }
 .payment-statement .page-head { align-items: flex-end; gap: 18px; margin-bottom: 20px; }
 .payment-statement .page-eyebrow { color: rgb(var(--muted)); font-size: 11px; letter-spacing: .13em; }
@@ -137,9 +57,8 @@
 .payment-statement .payment-report-confirm { margin-top: 12px; }
 .payment-statement .pay-btn,
 .payment-statement .pay-cta { font-family: inherit; font-size: 11px; font-style: normal; font-weight: 500; border-radius: 3px; box-shadow: none; padding: 7px 10px; min-height: 32px; }
-.payment-statement .pay-btn.pri,
-.payment-statement .pay-cta { color: rgb(var(--paper)); background: rgb(var(--ink)); border-color: rgb(var(--ink)); }
-.payment-statement .pay-btn.sec { background: rgb(var(--paper)); color: rgb(var(--ink)); border-color: rgb(var(--hairline)); }
+.payment-statement .pay-btn.pri { border-color: rgb(var(--accent)); }
+.payment-statement .pay-btn.sec { background: rgb(var(--surface)); color: rgb(var(--ink)); border-color: rgb(var(--hairline)); }
 .payment-statement .pay-btn:hover:not(:disabled),
 .payment-statement .pay-cta:hover:not(:disabled) { filter: brightness(.96); text-decoration: none; }
 .payment-statement button:focus-visible,

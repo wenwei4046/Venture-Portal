@@ -82,7 +82,7 @@ export default async function StatementDetailPage({ params }: Props) {
         <div className="font-serif italic text-accent text-base mb-1">
           Net amount
         </div>
-        <div className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
+        <div className={`statement-amount ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
           {formatMoney(Number(statement.net_amount))}
         </div>
         <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
@@ -194,7 +194,7 @@ export default async function StatementDetailPage({ params }: Props) {
         </div>
         <div className="flex items-baseline justify-between">
           <span className="font-serif italic text-md text-accent">Net payable</span>
-          <span className={`font-serif text-2xl tabular tracking-[-0.01em] ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
+          <span className={`statement-amount ${Number(statement.net_amount) < 0 ? 'text-danger' : 'text-num-ink'}`}>
             {formatMoney(Number(statement.net_amount))}
           </span>
         </div>

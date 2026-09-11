@@ -221,7 +221,7 @@ function Kpi({
   return (
     <div>
       <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">{label}</div>
-      <div className={`font-serif text-2xl mt-1 ${colour}`}>{formatMoney(amount)}</div>
+      <div className={`statement-amount mt-1 ${colour}`}>{formatMoney(amount)}</div>
       {subtitle ? <p className="font-serif italic text-muted text-xs mt-1">{subtitle}</p> : null}
     </div>
   )
