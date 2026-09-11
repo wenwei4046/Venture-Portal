@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { addStaff } from '../actions'
-import { titlesForDepartment, type TitleOption } from '@/lib/staff-form'
+import { offersVariablePay, titlesForDepartment, type TitleOption } from '@/lib/staff-form'
 import { BANK_NAMES } from '@/lib/banks'
 
 export interface AddStaffDepartment {
@@ -12,6 +12,8 @@ export interface AddStaffDepartment {
   name: string
   /** 'commission' is a department the commission engine pays (Revenue). */
   payroll_source: string
+  /** 'director' is the department the Director Salary engine pays. */
+  segment_key: string | null
 }
 
 interface Props {
@@ -42,7 +44,10 @@ const rmPrefix =
  * basic and no statutory allowance, 100% of their pay is commission derived
  * from the sales import. Picking one ticks "Full commission" and locks the
  * three pay fields at 0.00; the tick can be cleared for the odd Revenue hire
- * who does draw a basic.
+ * who does draw a basic. The Director department (2026-09-11) offers
+ * "Variable pay" the same way: a director's figure is worked out every month
+ * by the Director Salary engine and keyed in for that month, so there is no
+ * basic to file — the record is saved as `employment_type = 'variable'`.
  */
 export default function AddStaffForm({ departments, titles }: Props) {
   const router = useRouter()
@@ -53,10 +58,14 @@ export default function AddStaffForm({ departments, titles }: Props) {
   const [departmentId, setDepartmentId] = useState('')
   const [titleId, setTitleId] = useState('')
   const [fullCommission, setFullCommission] = useState(false)
+  const [variablePay, setVariablePay] = useState(false)
   const [pay, setPay] = useState({ basic: '', allowances: ZERO, nonStat: ZERO })
 
   const department = departments.find(d => d.id === departmentId) ?? null
   const isCommissionDept = department?.payroll_source === 'commission'
+  const isDirectorDept = offersVariablePay(department)
+  // Whichever tick is on, the three pay fields are locked at 0.00.
+  const payLocked = fullCommission || variablePay
   const titleChoices = useMemo(
     () => titlesForDepartment(titles, departmentId),
     [titles, departmentId],
@@ -74,11 +83,10 @@ export default function AddStaffForm({ departments, titles }: Props) {
     }
   }, [error])
 
-  function setFullCommissionTo(on: boolean) {
-    setFullCommission(on)
-    // On, every pay field reads 0.00 so the locked fields say what will be
-    // saved. Off again, a basic the tick had zeroed goes blank so `required`
-    // asks for a real figure instead of accepting the 0.00 it left behind.
+  // On, every pay field reads 0.00 so the locked fields say what will be
+  // saved. Off again, a basic the tick had zeroed goes blank so `required`
+  // asks for a real figure instead of accepting the 0.00 it left behind.
+  function setPayLocked(on: boolean) {
     setPay(prev =>
       on
         ? { basic: ZERO, allowances: ZERO, nonStat: ZERO }
@@ -88,10 +96,27 @@ export default function AddStaffForm({ departments, titles }: Props) {
     )
   }
 
+  function setFullCommissionTo(on: boolean) {
+    setFullCommission(on)
+    setPayLocked(on)
+  }
+
+  function setVariablePayTo(on: boolean) {
+    setVariablePay(on)
+    setPayLocked(on)
+  }
+
   function pickDepartment(id: string) {
+    const dept = departments.find(d => d.id === id) ?? null
     setDepartmentId(id)
     setTitleId('')
-    setFullCommissionTo(departments.find(d => d.id === id)?.payroll_source === 'commission')
+    // Each department decides which tick it offers, on by default; switching
+    // resets both so a tick from the old department never rides along hidden.
+    const commission = dept?.payroll_source === 'commission'
+    const variable = offersVariablePay(dept)
+    setFullCommission(commission)
+    setVariablePay(variable)
+    setPayLocked(commission || variable)
   }
 
   function handleSubmit(formData: FormData) {
@@ -107,7 +132,8 @@ export default function AddStaffForm({ departments, titles }: Props) {
     })
   }
 
-  const payHint = (normal: string) => (fullCommission ? 'none on full commission' : normal)
+  const payHint = (normal: string) =>
+    fullCommission ? 'none on full commission' : variablePay ? 'keyed monthly on payroll' : normal
 
   return (
     <form
@@ -207,6 +233,31 @@ export default function AddStaffForm({ departments, titles }: Props) {
         </label>
       ) : null}
 
+      {isDirectorDept && department ? (
+        <label
+          htmlFor="staff-variable-pay"
+          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-4 cursor-pointer"
+        >
+          <input
+            id="staff-variable-pay"
+            type="checkbox"
+            name="variable_pay"
+            checked={variablePay}
+            onChange={e => setVariablePayTo(e.target.checked)}
+            className="w-4 h-4 accent-accent mt-0.5 shrink-0"
+          />
+          <span>
+            <span className="block text-sm font-sans font-medium text-ink">Variable pay</span>
+            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+              Calculated by variable — a {department.name} salary is worked out every month by
+              the Director Salary engine and keyed in for that month, so there is no basic
+              salary or allowance to file here. EPF / SOCSO / EIS follow whatever is keyed.
+              Untick for a director who draws a fixed basic.
+            </span>
+          </span>
+        </label>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 mb-4">
         <div>
           <label htmlFor="staff-basic" className={labelBase}>
@@ -220,8 +271,8 @@ export default function AddStaffForm({ departments, titles }: Props) {
               type="number"
               step="0.01"
               min="0"
-              required={!fullCommission}
-              disabled={fullCommission}
+              required={!payLocked}
+              disabled={payLocked}
               value={pay.basic}
               onChange={e => setPay(p => ({ ...p, basic: e.target.value }))}
               placeholder="0.00"
@@ -243,7 +294,7 @@ export default function AddStaffForm({ departments, titles }: Props) {
               type="number"
               step="0.01"
               min="0"
-              disabled={fullCommission}
+              disabled={payLocked}
               value={pay.allowances}
               onChange={e => setPay(p => ({ ...p, allowances: e.target.value }))}
               className={moneyInput}
@@ -262,7 +313,7 @@ export default function AddStaffForm({ departments, titles }: Props) {
               type="number"
               step="0.01"
               min="0"
-              disabled={fullCommission}
+              disabled={payLocked}
               value={pay.nonStat}
               onChange={e => setPay(p => ({ ...p, nonStat: e.target.value }))}
               className={moneyInput}

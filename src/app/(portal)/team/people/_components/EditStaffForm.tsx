@@ -3,7 +3,12 @@
 import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateStaff } from '../actions'
-import { isFullyCommissionBased, titlesForDepartment, type TitleRow } from '@/lib/staff-form'
+import {
+  isFullyCommissionBased,
+  isVariablePay,
+  titlesForDepartment,
+  type TitleRow,
+} from '@/lib/staff-form'
 
 export interface StaffRow {
   id: string
@@ -13,6 +18,9 @@ export interface StaffRow {
   department_name: string
   /** True in a department the commission engine pays (`payroll_source = 'commission'`). */
   commission_dept: boolean
+  /** True in the Director department (`segment_key = 'director'`) — the one
+   *  that offers "Variable pay" in place of the pay fields. */
+  director_dept: boolean
   /** Authoritative since 2026-09-01; `designation` is the text it mirrors. */
   title_id: string | null
   basic_salary: number
@@ -76,6 +84,11 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
   // for the Employment Type select, and while it is on the pay and statutory
   // fields are not asked at all — they would be 0, or decide nothing.
   const [fullCommission, setFullCommission] = useState(isFullyCommissionBased(staff))
+  // Variable pay. In the Director department the tick stands in for the
+  // Employment Type select the same way; while it is on, the three pay
+  // fields are not asked, but the statutory categories still are — the
+  // month's keyed figure attracts EPF / SOCSO / EIS / PCB by them.
+  const [variablePay, setVariablePay] = useState(isVariablePay(staff))
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -174,7 +187,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
           />
         </div>
-        {staff.commission_dept ? null : (
+        {staff.commission_dept || staff.director_dept ? null : (
           <div>
             <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Employment Type</label>
             <select
@@ -213,7 +226,9 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
 
       {/* Section 2 — Salary. In a commission department the tick below is
           the whole answer: while it is on, the pay and statutory fields are
-          not on the form, and the save leaves the categories as they were. */}
+          not on the form, and the save leaves the categories as they were.
+          In the Director department "Variable pay" hides only the three pay
+          fields — the statutory categories stay, and are written. */}
       <h3 className="font-serif text-lg text-ink mb-4">Salary</h3>
       {staff.commission_dept ? (
         <label
@@ -241,6 +256,30 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           </span>
         </label>
       ) : null}
+      {staff.director_dept ? (
+        <label
+          htmlFor="edit-variable-pay"
+          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-6 cursor-pointer"
+        >
+          <input
+            id="edit-variable-pay"
+            type="checkbox"
+            name="variable_pay"
+            checked={variablePay}
+            onChange={e => setVariablePay(e.target.checked)}
+            className="w-4 h-4 accent-accent mt-0.5 shrink-0"
+          />
+          <span>
+            <span className="block text-sm font-sans font-medium text-ink">Variable pay</span>
+            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+              Calculated by variable — the figure is worked out every month by the Director
+              Salary engine and keyed in for that month, so there is no basic salary or
+              allowance on the record. Statutory follows whatever is keyed, by the categories
+              below. Untick to give them a fixed basic.
+            </span>
+          </span>
+        </label>
+      ) : null}
       {fullCommission ? (
         <p className="font-serif italic text-muted text-sm mb-6">
           Saved as fully commission based — basic, statutory allowance and non-statutory
@@ -248,6 +287,12 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         </p>
       ) : (
         <>
+      {variablePay ? (
+        <p className="font-serif italic text-muted text-sm mb-6">
+          Saved as variable pay — basic, statutory allowance and non-statutory allowance all
+          0.00; the month&apos;s figure is keyed on that month&apos;s payroll.
+        </p>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div>
           <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
@@ -290,6 +335,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           />
         </div>
       </div>
+      )}
 
       {/* Section 3 — Statutory categories */}
       <h3 className="font-serif text-lg text-ink mb-4">Statutory</h3>

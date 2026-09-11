@@ -7786,7 +7786,7 @@ export type Database = {
         | "director"
         | "revenue_department"
         | "it"
-      hr_employment_type: "salaried" | "commission_eligible"
+      hr_employment_type: "salaried" | "commission_eligible" | "variable"
       hr_monthly_payroll_source:
         | "imported"
         | "manual"
@@ -8101,7 +8101,7 @@ export const Constants = {
         "revenue_department",
         "it",
       ],
-      hr_employment_type: ["salaried", "commission_eligible"],
+      hr_employment_type: ["salaried", "commission_eligible", "variable"],
       hr_monthly_payroll_source: [
         "imported",
         "manual",
