@@ -10,12 +10,14 @@ export default async function NewStaffPage() {
 
   // is_internal=false excludes the hidden 'Venture Office' pseudo-department —
   // staff can't be assigned to it. payroll_source says which department the
-  // commission engine pays, and so which one offers "Full commission".
+  // commission engine pays, and so which one offers "Full commission";
+  // segment_key 'director' is the one the Director Salary engine pays, and so
+  // the one that offers "Variable pay".
   // Titles are rows since 2026-09-01; only the active ones are on offer.
   const [{ data: departments }, { data: titles }] = await Promise.all([
     supabase
       .from('departments')
-      .select('id, name, payroll_source')
+      .select('id, name, payroll_source, segment_key')
       .eq('is_internal', false)
       .order('name'),
     supabase

@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import type { TitleRow } from '@/lib/staff-form'
+import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
 import EditStaffForm from '../../_components/EditStaffForm'
 
 interface PageProps {
@@ -17,7 +17,7 @@ export default async function EditStaffPage({ params }: PageProps) {
   const [{ data: staff }, { data: titles }] = await Promise.all([
     supabase
       .from('hr_staff_costs')
-      .select('*, departments(name, payroll_source)')
+      .select('*, departments(name, payroll_source, segment_key)')
       .eq('id', id)
       .maybeSingle(),
     supabase.from('titles').select('id, name, department_id, is_active').order('name'),
@@ -29,6 +29,8 @@ export default async function EditStaffPage({ params }: PageProps) {
   const deptName = (staff as any).departments?.name ?? '—'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const commissionDept = (staff as any).departments?.payroll_source === 'commission'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const directorDept = offersVariablePay((staff as any).departments)
 
   return (
     <div>
@@ -60,6 +62,7 @@ export default async function EditStaffPage({ params }: PageProps) {
           department_id: staff.department_id,
           department_name: deptName,
           commission_dept: commissionDept,
+          director_dept: directorDept,
           title_id: staff.title_id ?? null,
           basic_salary: Number(staff.basic_salary),
           allowances: Number(staff.allowances),

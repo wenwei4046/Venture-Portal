@@ -9,7 +9,7 @@ import PersonPermissions from '../../_components/PersonPermissions'
 import EditStaffForm from './EditStaffForm'
 import Promotion from './Promotion'
 import Employment from './Employment'
-import { isFullyCommissionBased } from '@/lib/staff-form'
+import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
 import { getPersonCard, type PersonCardData } from '../card-actions'
 
 dayjs.extend(relativeTime)
@@ -403,6 +403,16 @@ function Details({ person }: { person: PersonCardData }) {
         {isFullyCommissionBased(s) ? (
           // No basic, no allowance, statutory at 0 — the one line says it all.
           <Field label="Pay basis" value="Fully commission based" />
+        ) : isVariablePay(s) ? (
+          // No fixed figure on the record; the month's is keyed on payroll and
+          // still attracts statutory, so the EPF category is worth showing.
+          <>
+            <Field label="Pay basis" value="Variable — keyed monthly" />
+            <Field
+              label="EPF"
+              value={s.is_epf_exempt ? 'Exempt' : `Part ${s.epf_category}`}
+            />
+          </>
         ) : (
           <>
             <Field label="Basic" value={s.basic_salary.toFixed(2)} mono />
