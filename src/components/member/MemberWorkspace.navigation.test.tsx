@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { memberDemo } from "@/lib/member/demo";
 import MemberWorkspace from "./MemberWorkspace";
 
+vi.mock("@/components/layout/view-as-actions", () => ({ setViewAs: vi.fn() }));
+
 vi.mock("next/link", () => ({
   default: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props} />,
 }));

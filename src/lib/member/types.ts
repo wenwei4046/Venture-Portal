@@ -60,6 +60,7 @@ export interface MemberKpi {
   unit: string;
 }
 export interface MemberOrder {
+  schemeId?: string;
   id: string;
   number: string;
   brand: string;
@@ -116,6 +117,8 @@ export interface MemberMemo {
   departments: string[];
 }
 export interface MemberData {
+  /** Authenticated Principal overview; never an impersonated staff account. */
+  principalView?: boolean;
   demo: boolean;
   configured: boolean;
   message?: string;

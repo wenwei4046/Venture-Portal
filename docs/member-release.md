@@ -1,6 +1,10 @@
 # Revenue member workspace
 
-The member entry point is `/member/login`, using the selected Warm Editorial design and the HOUZS VENTURE brand. The responsive workspace is `/member`; existing administrative accounts retain their portal navigation. Principal and authorised HR users manage member requests, memos, capacity and catalogue options at `/member-admin`.
+The only sign-in entry point for every account is `/login`, using the selected Warm Editorial design and the HOUZS VENTURE brand. The old `/member/login` URL is a redirect only. Revenue members enter `/member`; administrative accounts enter their existing portal. An actual, active Principal can choose **Revenue View** in the shared view selector and return to Principal, Finance or HR without signing in again. Principal and authorised HR users manage requests, memos, capacity and catalogue options at `/member-admin`.
+
+Principal Revenue View is a department overview, with the real Principal identity and no employee-link requirement. It includes current team hierarchy, actual aggregate commission, requests, published memos and the Fair calculator. It never presents a fabricated personal salary, marks memos on an employee’s behalf or submits employee requests. Management buttons restore Principal view before opening administration. Raw product costs remain server-side.
+
+Apply `20260912090000_member_principal_view.sql` before deploying this access change. The two new read functions check the stored active Principal role in the database; an app view cookie cannot grant Principal access. Existing employee-specific read/write policies are unchanged. The local regression suite contains 199 SQL checks, including original member privacy boundaries and Principal accounts without a linked employee.
 
 ## Release contents
 

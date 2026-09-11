@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUser } from "@/lib/auth";
+import { isPrincipalAccount } from "@/lib/view-as";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { calculateQuote, cents, customerQuote } from "./calculator";
@@ -117,10 +118,17 @@ function message(error: unknown): string {
     return "A matching active request already exists. Follow its progress in My requests instead of submitting it again.";
   return raw.slice(0, 400);
 }
-async function session(permission?: string): Promise<SupabaseClient> {
+async function session(
+  permission?: string,
+  allowPrincipal = false,
+): Promise<SupabaseClient> {
   const user = await getUser();
   if (!user?.is_active) throw new Error("Sign in with an active work account.");
-  if (permission && !user.permissions.includes(permission))
+  if (
+    permission &&
+    !user.permissions.includes(permission) &&
+    !(allowPrincipal && isPrincipalAccount(user))
+  )
     throw new Error(
       "This account does not have access to this member feature.",
     );
@@ -193,8 +201,10 @@ function requestLabels(request: MemberRequest): MemberRequest {
 /** No demo fallback and no privileged row query: the database resolves the caller. */
 export async function loadMemberData(): Promise<MemberData> {
   const user = await getUser();
+  const principalView = !!user && isPrincipalAccount(user);
   const empty: MemberData = {
     demo: false,
+    principalView,
     configured: false,
     refreshedAt: new Date().toISOString(),
     profile: {
@@ -214,8 +224,11 @@ export async function loadMemberData(): Promise<MemberData> {
     memos: [],
   };
   try {
-    const client = await session("member_portal");
-    const data = await rpc<MemberData>(client, "member_data_snapshot");
+    const client = await session("member_portal", principalView);
+    const data = await rpc<MemberData>(
+      client,
+      principalView ? "member_principal_snapshot" : "member_data_snapshot",
+    );
     if (!data || !Array.isArray(data.memberships) || !data.profile?.id)
       throw new Error("Member information is temporarily unavailable.");
     // Defense in depth: explicitly project catalogue fields even if a future
@@ -223,6 +236,7 @@ export async function loadMemberData(): Promise<MemberData> {
     return {
       ...data,
       demo: false,
+      principalView,
       memberships: data.memberships.map((membership) => ({
         ...membership,
         title: legacyLabel(membership.title),
@@ -318,10 +332,12 @@ export async function calculateMemberQuote(
       cents(input.delivery || "0") === null
     )
       throw new Error("Enter a valid amount with up to two decimal places.");
-    const client = await session("member_quote");
+    const user = await getUser();
+    const principalView = !!user && isPrincipalAccount(user);
+    const client = await session("member_quote", principalView);
     const context = await rpc<{ bands: MemberBand[] }>(
       client,
-      "member_quote_context",
+      principalView ? "member_principal_quote_context" : "member_quote_context",
       { p_scheme: input.schemeId },
     );
     const brands = [...new Set(context.bands.map((b) => b.brand))];

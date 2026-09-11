@@ -1,13 +1,12 @@
 'use client'
 
-import { useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
 import { officeClock } from '@/lib/office-clock'
-import { isPrincipalAccount, isMasked } from '@/lib/view-as'
-import { setViewAs } from './view-as-actions'
+import { isPrincipalAccount } from '@/lib/view-as'
+import PortalViewSwitcher from './PortalViewSwitcher'
 import ThemeToggle from './ThemeToggle'
 
 interface TopBarProps {
@@ -16,9 +15,7 @@ interface TopBarProps {
 
 export default function TopBar({ user }: TopBarProps) {
   const router = useRouter()
-  const viewAsFormRef = useRef<HTMLFormElement>(null)
   const principalAccount = isPrincipalAccount(user)
-  const masked = isMasked(user)
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -71,31 +68,7 @@ export default function TopBar({ user }: TopBarProps) {
             app-layer experience (sidebar, gates, buttons) to the chosen
             role; auth identity stays the Principal. Always visible (also on
             mobile) so a masked session can switch back anywhere. */}
-        {principalAccount ? (
-          <form
-            ref={viewAsFormRef}
-            action={setViewAs}
-            className="inline-flex items-baseline gap-1.5"
-            title="Switch the whole portal to another role's view — you stay signed in as Principal"
-          >
-            <span
-              aria-hidden
-              className={`w-[5px] h-[5px] rounded-full inline-block translate-y-[-2px] ${masked ? 'bg-alert' : 'bg-ledger'}`}
-            />
-            <select
-              key={user.role}
-              name="role"
-              defaultValue={user.role}
-              onChange={() => viewAsFormRef.current?.requestSubmit()}
-              aria-label="View portal as role"
-              className="bg-transparent font-sans font-normal text-[13.5px] text-graphite hover:text-accent cursor-pointer focus:outline-none"
-            >
-              <option value="principal">Principal</option>
-              <option value="finance">Finance view</option>
-              <option value="hr">HR view</option>
-            </select>
-          </form>
-        ) : null}
+        {principalAccount ? <PortalViewSwitcher value={user.role} /> : null}
         <div className="hidden sm:flex items-baseline gap-3 font-mono text-[11px] text-muted tracking-[0.02em]">
           {!principalAccount ? (
             <span className="inline-flex items-baseline gap-1.5 font-sans font-normal text-[13.5px] text-graphite">
