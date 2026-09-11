@@ -155,7 +155,7 @@ differently and there is no meaningful department-level view of a calculation:
 | View | Route | What it is |
 |---|---|---|
 | Comm Cal | `/revenue/<sub>` | the months, and this sub-department's run against each. Titled *Commission Calculation* on the page |
-| Staff Hierarchy | `…/hierarchy` | who is under who — two tabs on the page: the org chart, and the **Team** table (`?tab=team`) where a rank is set (§10) |
+| Staff Hierarchy | `…/hierarchy` | a combined chart of active sibling sub-departments, and the route's **Team** table (`?tab=team`) where a rank is set (§10) |
 | Rules | `…/rules` | every rule the engine reads — eight tabs, one section each (`?tab=`, §9) |
 
 They are **children of the sub-department in the sidebar**, not a tab rail on
@@ -788,9 +788,10 @@ Changes to existing tables: `departments.payroll_source`,
 **Cycle safety, twice.** `comm_hierarchy` has a `BEFORE` trigger that walks the
 chain and rejects a cycle (depth cap 20); the engine independently carries a
 visited set and depth cap, in both the override roll-up and the group-revenue
-roll-up. Dragging a manager under their own downline in the org chart is exactly
-how one gets created, and a cycle here would be a silent money bug rather than a
-crash.
+roll-up. Assigning a manager to their own downline through a targeted card drop,
+the Upline picker or a connector would create one; each path rejects that move.
+A cycle here would be a silent money bug rather than a crash. Blank-space
+dragging only changes the visual layout.
 
 **RLS:** `principal` ALL, `hr` ALL, `finance` **DENY**, `dept_manager` DENY.
 These tables *are* individual salary detail, and CLAUDE.md's standing rule is
@@ -1076,9 +1077,10 @@ page.)*
 
 ## 10. Other UI
 
-Every route below `/revenue/<sub>` is scoped to that sub-department: its runs
-(`uq_comm_run_per_sub_dept_period`), its scheme's rules, its people and its
-sales batches. The IR continuation adds `sales_import_batches.sub_department_id`
+Below `/revenue/<sub>`, runs (`uq_comm_run_per_sub_dept_period`), scheme rules,
+the Team table and sales batches stay scoped to that sub-department. The
+hierarchy canvas also shows its active sibling sub-departments, with each
+scheme and membership kept separate. The IR continuation adds `sales_import_batches.sub_department_id`
 and one committed batch per (sub-department, period). Carry-forward and paid
 order identities use that same boundary. The existing Houzs ERP feed always
 belongs to Fair; an IR file import cannot supersede Fair's batch.
@@ -1087,7 +1089,7 @@ belongs to Fair; an IR file import cannot supersede Fair's batch.
 |---|---|
 | `/revenue` | no page of its own — redirects to the first sub-department. Serves the old `/hr-costing/commission/*` links and the not-set-up-yet case |
 | `/revenue/<sub>` | **Commission Calculation** — months with sales data and this sub-department's run status against each. Sidebar: *Comm Cal* |
-| `…/<sub>/hierarchy` | **Staff Hierarchy** — the org chart, and `?tab=team` the Team table (both below) |
+| `…/<sub>/hierarchy` | **Staff Hierarchy** — the combined department chart, and `?tab=team` the route's Team table (both below) |
 | `…/<sub>/rules` | **Rules** — every rule the engine reads (§9) |
 | `…/<sub>/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
 | `…/<sub>/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
@@ -1101,28 +1103,60 @@ narrows to Principal (`canAccessProductList`).
 The deferred-orders list is a section on the run dashboard rather than a page
 of its own: it is read once, alongside the total it is holding back.
 
-**Org chart.** A tree diagram with n8n-style connector lines where a salesperson
-can be **dragged onto another team member** to re-parent them. Library:
-**`@xyflow/react`**. **One line (2026-09-10):** a drop writes
-`hr_staff_costs.reports_to` — the same line People draws — through
-`moveReportingLine`, and the database derives the effective-dated
-`comm_hierarchy` position from it (upline = reports_to; rank = the title's floor
-when first opened, ratcheted up). Refused before the round trip and again by
-trigger: under yourself, under your own report, under a title the ladder
-ranks below yours, across the department's edge, or under a title that cannot
-hold downlines (SRS and above may; an RS reporting to an RS is not a line that
-exists).
+**Org chart** (combined canvas, 2026-09-11). Built with **`@xyflow/react`**, with
+database-style connector lines and three visual levels: a tinted outer frame
+for each sub-department, elastic boundaries around its teams, and member
+cards. The overview loads permitted active siblings of the route's department
+that have an active scheme. Each membership keeps its own title, rank and
+upline, even when the same person appears in several regions. Subdued title
+badges show the full membership title and a small mnemonic; pay and rank chips
+remain neutral. Department shortcuts and search move the viewport without
+merging those memberships.
+
+**Drag to arrange or transfer.** Blank-space drops change a member's position;
+its team boundary and department frame expand to contain it. Holding over a
+specific person for 450ms arms a transfer, with the intended upline shown before
+release. An accepted transfer carries the member's subtree and preserves its
+internal positions. A failed or cancelled transfer returns to the starting
+arrangement. Blank-space drops never detach a member; the Upline menu's Top of
+team action does that explicitly.
+
+Dragging a department heading with the left or right mouse button, or touch,
+moves all its members together; arrow keys also move the section. On release,
+overlapping teams and departments move aside as whole groups. **Tidy** only
+repeats that spacing, preserving each team's internal arrangement.
+Browser layout memory is scoped to the set of schemes; each card is identified
+by scheme and staff ID.
+
+**Motion.** Transferred members settle with a gentle 500ms spring; neighboring
+groups use a 500ms transition without overshoot. Connectors have rounded corners,
+and a fading halo marks the landing. If needed, the camera eases out over 400ms,
+then focuses the destination after the cards settle. Pointer or wheel input
+cancels automatic camera movement. Reduced motion skips these animations.
+
+**Validated upline edits:** targeted drops, a card's Upline picker, the selected
+member's Change upline action, and connectors within a sub-department all call
+`moveOnChart` with the membership's scheme and raw staff IDs. On the home
+sub-department, `moveReportingLine` writes `hr_staff_costs.reports_to`, and the
+database derives the effective-dated `comm_hierarchy` position from the
+company line and title. Elsewhere, `moveMembership` changes that scheme's own
+membership without touching People. Existing cycle, title, direct-line
+capacity and permission checks still apply. Cross-sub-department drops and
+connectors are refused, including between two memberships of the same person.
+Rearranging cards, or passing over a target without arming and releasing it,
+does not change an upline, title or rank.
 
 **Team tab** (2026-09-05, was Rules IX). One row per salesperson: name, the
 title they hold, their rank, rate mode, upline, Withholding Tax. The user's
 line between the two tabs: "Hierarchy table 那边 … 是可以随意调动的; Team
-table 那边 … 只可以换它的 rank 罢了" — so the chart moves people between
-trees freely, and the table changes **nothing but the rank** (with the rate
+table 那边 … 只可以换它的 rank 罢了" — so the chart's targeted drops, Upline
+picker and connectors change the line, and the table changes **nothing but the rank** (with the rate
 mode, which is the rank's own setting; `setStaffRank`). Its Upline column is
 text — who they earn under here. A title gives its rank on its own (the floor
-rung, by trigger), so the table only ever raises one. Both tabs read one
-`loadTeam`, so a move on the chart is what the table shows the moment it
-re-renders. Withholding Tax stays editable here because it is a payroll fact of
+rung, by trigger), so the table only ever raises one. The route's chart region
+and Team tab share one `loadTeam` read; other chart regions load their own
+schemes. An explicit upline edit is therefore what that sub-department's table
+shows when it re-renders. Withholding Tax stays editable here because it is a payroll fact of
 the person with no other home in the module.
 
 Two shapes since 2026-09-10 (memberships per sub-department): on the **home**
@@ -1172,7 +1206,7 @@ statutory on a Revenue row would have quietly handed back their tax.
 | 4 | ERP parser + tests | ✅ 25 tests, verified against the real file |
 | 5 | **Create the ~39 salespeople** in the Revenue Department | ⛔ blocked — needs the staff list (Q2) |
 | 6 | The rules page (§9) + Product list | ✅ built; moved out of Settings 2026-08-31 |
-| 7 | Org chart (`@xyflow/react`, drag-to-reparent) | ✅ built |
+| 7 | Org chart (`@xyflow/react`, nested department spaces, layout dragging and explicit upline edits) | ✅ built |
 | 8 | Import wizard + agent matching | ✅ built |
 | 9 | Open Bill board | ✅ built |
 | 10 | `save_` / `apply_` / `reopen_commission_run` RPCs + run dashboard + statement drill-down | ✅ built, **applied live** 2026-08-31 |

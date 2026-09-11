@@ -728,6 +728,41 @@ their own containers.
 
 ## Component Vocabulary
 
+### Revenue hierarchy spaces (approved 2026-09-11)
+
+Staff Hierarchy's chart combines the active sub-departments of the same parent
+department on one pannable canvas. Each sub-department has a labeled rounded
+outer frame; each reporting tree has a quieter, softly rounded convex envelope
+that follows its member cards and lines. Use the existing chart palette with
+restrained blue, violet and warm neutral department tints, paired with names.
+These categorical surfaces are the approved hierarchy-specific treatment.
+Within a card, a subdued title badge pairs the full title with a small mnemonic;
+rank and pay chips stay neutral. Title styling follows that membership's title,
+including when the same person holds different titles in different regions.
+
+Dragging into blank space arranges a card; its team and department boundaries
+follow. Hold over a specific person for 450ms to arm a reporting-line change,
+with the target and intended upline shown before release. A valid drop transfers
+the member and their subtree while preserving its internal arrangement. Failed
+or cancelled transfers return to their starting positions. Blank-space drops
+never detach a member; choose Top of team in the Upline menu for that action.
+
+Dragging a department headline, with either mouse button or touch, translates
+all its memberships together. On release, overlapping teams and departments
+move aside as intact groups. Tidy only separates overlaps and retains the
+arrangement. Transfers use a gentle 500ms spring, while neighboring groups
+settle over 500ms without overshoot. Rounded connectors and a fading landing
+halo reinforce the move. When needed, the camera eases out over 400ms, then
+focuses the destination after settling; pointer or wheel input cancels this
+automatic camera movement. Respect reduced motion throughout.
+
+Targeted drops, Upline menus and connectors use the existing validated Server
+Actions with same-department, cycle, title, capacity and permission checks.
+Namespace every node by scheme and person: arrangement is a browser preference,
+and an accepted transfer changes only that membership's reporting line.
+Department shortcuts and other-membership links focus a region without changing
+the route's editable Team tab.
+
 Components required for Phase 1 (many already exist, need restyling):
 
 | Component | Role | Key style notes |

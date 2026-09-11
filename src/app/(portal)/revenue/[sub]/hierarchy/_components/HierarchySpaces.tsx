@@ -1,0 +1,646 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent, type PointerEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  Background, BackgroundVariant, ReactFlow, ReactFlowProvider, ViewportPortal,
+  applyNodeChanges, useReactFlow, useViewport,
+  type Connection, type Edge, type EdgeProps, type NodeChange, type OnNodeDrag,
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import { descendantsOf, NODE_HEIGHT, NODE_WIDTH } from '@/lib/org-layout'
+import { moveRefusal, refusalSentence } from '@/lib/commission/chart-moves'
+import { readManualLayout, writeManualLayout, type ManualLayout } from '@/lib/commission/chart-layout-store'
+import { boundsOf, rectanglePoints, roundedHullPath, type Point } from '@/lib/hierarchy-spaces'
+import { planHierarchyTransfer } from '@/lib/hierarchy-transfer-layout'
+import {
+  buildSpaceTeams, departmentPositionKey, geometryForSpaces, initialSpacePositions,
+  resolveSpaceOverlaps, SPACE_DEPARTMENT_HEADER, type SpaceAnchor, type SpaceMember,
+} from '@/lib/hierarchy-space-layout'
+import { moveOnChart } from '../../../hierarchy-actions'
+import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
+import HierarchyPersonCard, { UplineContext, type PersonNode } from './HierarchyPersonCard'
+import { membershipKey, type OrgDepartment } from './org-chart-types'
+import { useHierarchyCamera } from './useHierarchyCamera'
+
+interface Props { departments: OrgDepartment[]; initialDepartmentId?: string }
+type ReportingEdge = Edge<{ fresh?: boolean }, 'line'>
+type DropTarget = { id: string; reason: string | null; armed: boolean; unchanged: boolean }
+const nodeTypes = { person: HierarchyPersonCard }
+const edgeTypes = { line: ReportingLine }
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+const layoutStorage = () => { try { return window.localStorage } catch { return null } }
+const duration = (ms: number) => reducedMotion() ? 0 : ms
+const springEase = (t: number) => 1 + 1.8 * (t - 1) ** 3 + 0.8 * (t - 1) ** 2
+const pointerOf = (event: MouseEvent | TouchEvent) => {
+  const pointer = 'touches' in event ? event.touches[0] ?? event.changedTouches[0] : event
+  return { x: pointer?.clientX ?? 0, y: pointer?.clientY ?? 0 }
+}
+
+/** Deliberate card drops, Upline picks and connectors share the validated writer. */
+export default function HierarchySpaces(props: Props) {
+  return <ReactFlowProvider><SpaceChart {...props} /></ReactFlowProvider>
+}
+
+function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Props) {
+  const router = useRouter()
+  const { fitBounds, setCenter, getZoom, zoomIn, zoomOut, screenToFlowPosition } = useReactFlow()
+  const camera = useHierarchyCamera()
+  const { interrupt: interruptCamera, makeRoom, followTransfer } = camera
+  // A successful write can be shown immediately; the next server snapshot is authoritative.
+  const [savedMoves, setSavedMoves] = useState<Map<string, { source: OrgDepartment[]; parentId: string | null }>>(new Map())
+  const departments = useMemo(() => serverDepartments.map(department => ({ ...department,
+    people: department.people.map(person => {
+      const saved = savedMoves.get(membershipKey(department.schemeId, person.staffId))
+      return saved?.source === serverDepartments ? { ...person, uplineStaffId: saved.parentId } : person
+    }),
+  })), [serverDepartments, savedMoves])
+  const [pending, startTransition] = useTransition()
+  const [nodes, setNodes] = useState<PersonNode[]>([])
+  const nodesRef = useRef<PersonNode[]>([])
+  const positions = useRef<ManualLayout>(new Map())
+  const [loaded, setLoaded] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
+  const [activeDepartment, setActiveDepartment] = useState<string | null>(initialDepartmentId ?? null)
+  const [movingDepartment, setMovingDepartment] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const [find, setFind] = useState('')
+  const [popover, setPopover] = useState<{ id: string; anchor: PopAnchor } | null>(null)
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+  const dropTargetRef = useRef<DropTarget | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dragSession = useRef<{ id: string; origin: ManualLayout; cancelled: boolean } | null>(null)
+  const writing = useRef(false)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const incomingTransfer = useRef<(NonNullable<ReturnType<typeof planHierarchyTransfer>> & { storageKey: string }) | null>(null)
+  const moveRef = useRef<(childId: string, parentId: string | null, origin?: ManualLayout) => void>(() => {})
+
+  const records = useMemo(() => departments.flatMap((department, tone) => department.people.map(person => ({
+    id: membershipKey(department.schemeId, person.staffId), person, department, tone: tone % 3,
+  }))), [departments])
+  const byId = useMemo(() => new Map(records.map(record => [record.id, record])), [records])
+  const departmentDefinitions = useMemo(() => departments.map(({ id, name }) => ({ id, name })), [departments])
+  const members: SpaceMember[] = useMemo(() => records.map(record => ({
+    id: record.id,
+    departmentId: record.department.id,
+    parentId: record.person.uplineStaffId ? membershipKey(record.department.schemeId, record.person.uplineStaffId) : null,
+    name: record.person.name,
+    width: NODE_WIDTH,
+    height: record.person.directLineLimit != null ? NODE_HEIGHT + 20 : NODE_HEIGHT,
+  })), [records])
+  const teams = useMemo(() => buildSpaceTeams(members), [members])
+  const teamByMember = useMemo(() => new Map(teams.flatMap(team => team.memberIds.map(id => [id, team] as const))), [teams])
+  const defaults = useMemo(() => initialSpacePositions(departmentDefinitions, members, teams), [departmentDefinitions, members, teams])
+  const storageKey = useMemo(() => `spaces.v1.${departments.map(department => department.schemeId).sort().join('.')}`, [departments])
+  const model = useRef({ departments: departmentDefinitions, members, teams })
+  model.current = { departments: departmentDefinitions, members, teams }
+
+  const measuredMembers = useCallback(() => {
+    const measured = new Map(nodesRef.current.map(node => [node.id, node.measured]))
+    return model.current.members.map(member => ({
+      ...member,
+      width: measured.get(member.id)?.width ?? member.width,
+      height: measured.get(member.id)?.height ?? member.height,
+    }))
+  }, [])
+  const geometry = useMemo(() => geometryForSpaces(departmentDefinitions, members.map(member => {
+    const node = nodes.find(node => node.id === member.id)
+    return { ...member, width: node?.measured?.width ?? member.width, height: node?.measured?.height ?? member.height }
+  }), teams, positions.current), [departmentDefinitions, members, teams, nodes])
+  const geometryRef = useRef(geometry)
+  geometryRef.current = geometry
+
+  const animation = useRef<number | null>(null)
+  const settlingTarget = useRef<ManualLayout | null>(null)
+  const arrangeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draggedMember = useRef<string | null>(null)
+  const suppressClick = useRef(0)
+  const groupDrag = useRef<{
+    pointerId: number; departmentId: string; x: number; y: number; zoom: number;
+    original: ManualLayout; keys: Set<string>; moved: boolean;
+  } | null>(null)
+
+  const cancelAnimation = useCallback(() => {
+    if (animation.current !== null) cancelAnimationFrame(animation.current)
+    animation.current = null
+    settlingTarget.current = null
+    if (arrangeTimer.current) clearTimeout(arrangeTimer.current)
+    arrangeTimer.current = null
+  }, [])
+  const publishPositions = useCallback((next: ManualLayout) => {
+    positions.current = new Map(next)
+    setNodes(previous => {
+      const updated = previous.map(node => {
+        const point = next.get(node.id)
+        return point ? { ...node, position: point } : node
+      })
+      nodesRef.current = updated
+      return updated
+    })
+  }, [])
+  const persist = useCallback((next: ManualLayout) => writeManualLayout(layoutStorage(), storageKey, next), [storageKey])
+  const glide = useCallback((target: ManualLayout, springIds: readonly string[] = []) => {
+    cancelAnimation()
+    persist(target)
+    settlingTarget.current = target
+    const from = new Map(positions.current)
+    const changed = [...target].some(([id, point]) => {
+      const old = from.get(id)
+      return !old || Math.hypot(point.x - old.x, point.y - old.y) > 0.1
+    })
+    if (!changed || reducedMotion()) { settlingTarget.current = null; publishPositions(target); return }
+    const spring = new Set(springIds)
+    const started = performance.now()
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - started) / 500)
+      const eased = 1 - (1 - progress) ** 3
+      const current = new Map<string, Point>()
+      for (const [id, end] of target) {
+        const start = from.get(id) ?? end
+        const amount = spring.has(id) ? springEase(progress) : eased
+        current.set(id, { x: start.x + (end.x - start.x) * amount, y: start.y + (end.y - start.y) * amount })
+      }
+      publishPositions(current)
+      if (progress < 1) animation.current = requestAnimationFrame(step)
+      else { animation.current = null; settlingTarget.current = null }
+    }
+    animation.current = requestAnimationFrame(step)
+  }, [cancelAnimation, persist, publishPositions])
+  const arrange = useCallback((anchor?: SpaceAnchor, keepVisible = false) => {
+    const value = model.current
+    const measured = measuredMembers()
+    const target = resolveSpaceOverlaps(value.departments, measured, value.teams, positions.current, anchor)
+    if (keepVisible) {
+      const shapes = geometryForSpaces(value.departments, measured, value.teams, target)
+      const frames = anchor?.teamId ? shapes.teams.filter(item => item.id === anchor.teamId)
+        : anchor?.departmentId ? shapes.departments.filter(item => item.id === anchor.departmentId) : shapes.departments
+      if (frames.length) makeRoom(boundsOf(frames.flatMap(item => rectanglePoints(item.bounds))), camera.generation.current)
+    }
+    glide(target)
+  }, [glide, measuredMembers, makeRoom, camera.generation])
+  const scheduleArrange = useCallback((anchor?: SpaceAnchor) => {
+    if (arrangeTimer.current) clearTimeout(arrangeTimer.current)
+    arrangeTimer.current = setTimeout(() => {
+      if (!draggedMember.current && !groupDrag.current) arrange(anchor)
+    }, 160)
+  }, [arrange])
+  useEffect(() => () => cancelAnimation(), [cancelAnimation])
+
+  const initializedKey = useRef<string | null>(null)
+  useEffect(() => {
+    const remembered = initializedKey.current === storageKey ? settlingTarget.current ?? positions.current : readManualLayout(layoutStorage(), storageKey)
+    cancelAnimation()
+    const next = new Map(defaults)
+    for (const [id, point] of remembered) if (next.has(id)) next.set(id, point)
+    const transfer = incomingTransfer.current?.storageKey === storageKey ? incomingTransfer.current : null
+    incomingTransfer.current = null
+    const resolved = transfer?.positions ?? resolveSpaceOverlaps(departmentDefinitions, members, teams, next)
+    const sameCanvas = initializedKey.current === storageKey
+    const oldNodes = new Map(sameCanvas ? nodesRef.current.map(node => [node.id, node]) : [])
+    initializedKey.current = storageKey
+    const updated: PersonNode[] = records.map(record => ({
+      id: record.id, type: 'person', position: oldNodes.get(record.id)?.position ?? resolved.get(record.id) ?? { x: 0, y: 0 },
+      measured: oldNodes.get(record.id)?.measured,
+      className: oldNodes.get(record.id)?.className,
+      initialWidth: NODE_WIDTH, initialHeight: record.person.directLineLimit != null ? NODE_HEIGHT + 20 : NODE_HEIGHT,
+      draggable: true,
+      selected: selectedRef.current === record.id,
+      ariaLabel: `${record.person.name}, ${record.department.name}, ${record.person.titleName ?? 'no title'}`,
+      data: {
+        membershipId: record.id, person: record.person, departmentName: record.department.name, tone: record.tone,
+        uplineName: record.department.people.find(person => person.staffId === record.person.uplineStaffId)?.name ?? null,
+        selected: selectedRef.current === record.id, pending: false,
+      },
+    }))
+    nodesRef.current = updated
+    positions.current = new Map(resolved)
+    for (const node of updated) positions.current.set(node.id, node.position)
+    setNodes(updated)
+    glide(resolved, transfer?.movedIds)
+    setLoaded(true)
+  }, [storageKey, defaults, records, departmentDefinitions, members, teams, cancelAnimation, glide])
+
+  useEffect(() => {
+    setNodes(previous => {
+      const updated = previous.map(node => {
+        const className = [fresh === node.id ? 'space-node-fresh' : '', dropTarget?.id === node.id
+          ? dropTarget.reason ? 'space-node-refused' : dropTarget.armed ? 'space-node-target' : 'space-node-hover' : ''].filter(Boolean).join(' ')
+        return node.selected === (selected === node.id) && node.data.selected === (selected === node.id) && node.data.pending === pending && node.className === className
+          ? node : { ...node, className, draggable: !pending, selected: selected === node.id, data: { ...node.data, selected: selected === node.id, pending } }
+      })
+      nodesRef.current = updated
+      return updated
+    })
+  }, [selected, pending, fresh, dropTarget])
+  useEffect(() => {
+    if (!fresh) return
+    const timer = setTimeout(() => setFresh(null), 1800)
+    return () => clearTimeout(timer)
+  }, [fresh])
+  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current) }, [])
+
+  const focusDepartment = useCallback((id: string | null) => {
+    interruptCamera()
+    setActiveDepartment(id)
+    setFind('')
+    const frames = geometryRef.current.departments.filter(department => id === null || department.id === id)
+    if (!frames.length) return
+    const bounds = boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds)))
+    void fitBounds(bounds, { padding: 0.1, duration: duration(400) })
+  }, [fitBounds, interruptCamera])
+  const firstFocus = useRef(false)
+  useEffect(() => {
+    if (!loaded || firstFocus.current) return
+    const timer = setTimeout(() => {
+      firstFocus.current = true
+      focusDepartment(initialDepartmentId ?? null)
+    }, 80)
+    return () => clearTimeout(timer)
+  }, [loaded, initialDepartmentId, focusDepartment])
+
+  const onNodesChange = useCallback((changes: NodeChange<PersonNode>[]) => {
+    if (dragSession.current?.cancelled) changes = changes.filter(change => change.type !== 'position')
+    let needsSpacing = false
+    let anchor: SpaceAnchor | undefined
+    for (const change of changes) {
+      if (change.type === 'select') {
+        setSelected(current => change.selected ? change.id : current === change.id ? null : current)
+      }
+      if (change.type === 'position' && change.position) {
+        positions.current.set(change.id, { ...change.position })
+        if (!draggedMember.current && !change.dragging) {
+          const team = teamByMember.get(change.id)
+          anchor = { teamId: team?.id, departmentId: team?.departmentId }
+          needsSpacing = true
+        }
+      }
+      if (change.type === 'dimensions') needsSpacing = true
+    }
+    setNodes(previous => {
+      const updated = applyNodeChanges(changes, previous)
+      nodesRef.current = updated
+      return updated
+    })
+    if (needsSpacing) scheduleArrange(anchor)
+  }, [scheduleArrange, teamByMember])
+  const clearDropTarget = useCallback(() => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    hoverTimer.current = null
+    dropTargetRef.current = null
+    setDropTarget(null)
+  }, [])
+  const hitTarget = useCallback((event: MouseEvent | TouchEvent, id: string) => {
+    const point = screenToFlowPosition(pointerOf(event))
+    return nodesRef.current.find(candidate => candidate.id !== id
+      && point.x >= candidate.position.x && point.x <= candidate.position.x + (candidate.measured?.width ?? NODE_WIDTH)
+      && point.y >= candidate.position.y && point.y <= candidate.position.y + (candidate.measured?.height ?? NODE_HEIGHT))
+  }, [screenToFlowPosition])
+  const onNodeDragStart: OnNodeDrag<PersonNode> = useCallback((_event, node) => {
+    cancelAnimation()
+    interruptCamera()
+    clearDropTarget()
+    draggedMember.current = node.id
+    dragSession.current = { id: node.id, origin: new Map(positions.current), cancelled: false }
+    setDragging(node.id)
+    setPopover(null)
+    setNote(null)
+    setError(null)
+  }, [cancelAnimation, interruptCamera, clearDropTarget])
+  const onNodeDrag: OnNodeDrag<PersonNode> = useCallback((event, node) => {
+    if (dragSession.current?.cancelled || writing.current) return
+    const hit = hitTarget(event, node.id)
+    if (!hit) { if (dropTargetRef.current) clearDropTarget(); return }
+    if (dropTargetRef.current?.id === hit.id) return
+    clearDropTarget()
+    const child = byId.get(node.id), parent = byId.get(hit.id)
+    if (!child || !parent) return
+    let reason: string | null = null
+    const unchanged = child.department.id === parent.department.id && child.person.uplineStaffId === parent.person.staffId
+    if (child.department.id !== parent.department.id) reason = 'Each sub-department has its own hierarchy. Choose an upline here.'
+    else if (!unchanged) {
+      const graph = child.department.people.map(person => ({ id: person.staffId, parentId: person.uplineStaffId, label: person.name }))
+      const refusal = moveRefusal(subjectOf(child.person), subjectOf(parent.person), descendantsOf(graph, child.person.staffId))
+      if (refusal) reason = refusalSentence(refusal, subjectOf(child.person), subjectOf(parent.person))
+    }
+    const target: DropTarget = { id: hit.id, reason, unchanged, armed: false }
+    dropTargetRef.current = target
+    setDropTarget(target)
+    if (!reason && !unchanged) hoverTimer.current = setTimeout(() => {
+      if (dropTargetRef.current?.id !== target.id || !dragSession.current || dragSession.current.cancelled) return
+      const ready = { ...target, armed: true }
+      dropTargetRef.current = ready
+      setDropTarget(ready)
+      hoverTimer.current = null
+    }, 450)
+  }, [byId, hitTarget, clearDropTarget])
+  const onNodeDragStop: OnNodeDrag<PersonNode> = useCallback((event, node) => {
+    const session = dragSession.current, target = dropTargetRef.current
+    const hit = target ? hitTarget(event, node.id) : null
+    if (!session?.cancelled) positions.current.set(node.id, { ...node.position })
+    draggedMember.current = null
+    dragSession.current = null
+    setDragging(null)
+    clearDropTarget()
+    suppressClick.current = performance.now() + 350
+    setSelected(node.id)
+    if (session?.cancelled || (target?.reason && hit?.id === target.id)) {
+      if (target?.reason && !session?.cancelled) setError(target.reason)
+      if (session) glide(session.origin, [node.id])
+      return
+    }
+    if (target?.armed && hit?.id === target.id && session) {
+      moveRef.current(node.id, target.id, session.origin)
+      return
+    }
+    const team = teamByMember.get(node.id)
+    arrange({ teamId: team?.id, departmentId: team?.departmentId }, true)
+  }, [arrange, teamByMember, hitTarget, clearDropTarget, glide])
+
+  const groupDown = (event: PointerEvent<HTMLButtonElement>, departmentId: string) => {
+    if ((event.button !== 0 && event.button !== 2) || groupDrag.current || writing.current) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.focus({ preventScroll: true })
+    cancelAnimation()
+    interruptCamera()
+    setPopover(null)
+    const keys = new Set(members.filter(member => member.departmentId === departmentId).map(member => member.id))
+    keys.add(departmentPositionKey(departmentId))
+    groupDrag.current = {
+      pointerId: event.pointerId, departmentId, x: event.clientX, y: event.clientY,
+      zoom: getZoom(), original: new Map(positions.current), keys, moved: false,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const groupMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const drag = groupDrag.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const dx = event.clientX - drag.x, dy = event.clientY - drag.y
+    if (!drag.moved && Math.hypot(dx, dy) <= 5) return
+    event.preventDefault()
+    event.stopPropagation()
+    drag.moved = true
+    setMovingDepartment(drag.departmentId)
+    setActiveDepartment(drag.departmentId)
+    suppressClick.current = performance.now() + 350
+    const next = new Map(positions.current)
+    for (const id of drag.keys) {
+      const origin = drag.original.get(id)
+      if (origin) next.set(id, { x: origin.x + dx / drag.zoom, y: origin.y + dy / drag.zoom })
+    }
+    publishPositions(next)
+  }
+  const groupEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    const drag = groupDrag.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    groupDrag.current = null
+    setMovingDepartment(null)
+    if (drag.moved) {
+      suppressClick.current = performance.now() + 350
+      arrange({ departmentId: drag.departmentId }, true)
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+  const groupKey = (event: KeyboardEvent<HTMLButtonElement>, departmentId: string) => {
+    const delta = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, number[]>)[event.key]
+    if (!delta) return
+    event.preventDefault()
+    event.stopPropagation()
+    cancelAnimation()
+    interruptCamera()
+    const step = (event.shiftKey ? 60 : 20) / getZoom(), next = new Map(positions.current)
+    const ids = members.filter(member => member.departmentId === departmentId).map(member => member.id)
+    ids.push(departmentPositionKey(departmentId))
+    for (const id of ids) {
+      const point = next.get(id)
+      if (point) next.set(id, { x: point.x + delta[0] * step, y: point.y + delta[1] * step })
+    }
+    publishPositions(next)
+    arrange({ departmentId }, true)
+  }
+
+  const move = useCallback((childId: string, parentId: string | null, origin?: ManualLayout) => {
+    const child = byId.get(childId), parent = parentId ? byId.get(parentId) : null
+    if (!child || pending || writing.current) return
+    const restore = () => { if (origin) glide(origin, [childId]) }
+    if (parentId && (!parent || parent.department.id !== child.department.id)) {
+      setError('Choose an upline within the same sub-department. Each department has its own hierarchy.')
+      restore()
+      return
+    }
+    const graph = child.department.people.map(person => ({ id: person.staffId, parentId: person.uplineStaffId, label: person.name }))
+    if (parent) {
+      const refusal = moveRefusal(subjectOf(child.person), subjectOf(parent.person), descendantsOf(graph, child.person.staffId))
+      if (refusal) { setError(refusalSentence(refusal, subjectOf(child.person), subjectOf(parent.person))); restore(); return }
+    }
+    const uplineId = parent?.person.staffId ?? null
+    if (child.person.uplineStaffId === uplineId) { setPopover(null); arrange(); return }
+    cancelAnimation()
+    const measured = measuredMembers()
+    const value = model.current
+    const plan = planHierarchyTransfer({ departments: value.departments, members: measured, positions: positions.current, childId, parentId, originPositions: origin })
+    if (!plan) { restore(); return }
+    const priorTeam = geometryRef.current.teams.find(team => team.memberIds.includes(childId))
+    const afterTeam = geometryForSpaces(value.departments, plan.members, plan.teams, plan.positions).teams.find(team => team.id === plan.teamId)
+    const cameraToken = camera.generation.current
+    writing.current = true
+    setError(null)
+    setPopover(null)
+    startTransition(async () => {
+      try {
+        const result = await moveOnChart(child.department.schemeId, child.person.staffId, uplineId)
+        if (!result.ok) { setError(result.reason); restore(); return }
+        incomingTransfer.current = { ...plan, storageKey }
+        setSavedMoves(current => new Map(current).set(childId, { source: serverDepartments, parentId: uplineId }))
+        setFresh(childId)
+        setActiveDepartment(child.department.id)
+        setNote(`${child.person.name} · ${child.department.name}: ${parent ? `now under ${parent.person.name}` : 'now at the top of their own team'}.`)
+        setSelected(childId)
+        if (priorTeam && afterTeam) followTransfer(priorTeam.bounds, afterTeam.bounds, cameraToken)
+        router.refresh()
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : 'Could not change their upline.')
+        restore()
+      } finally { writing.current = false }
+    })
+  }, [byId, pending, router, glide, arrange, cancelAnimation, measuredMembers, camera.generation, serverDepartments, followTransfer, storageKey])
+  moveRef.current = move
+  const onConnect = useCallback((connection: Connection) => {
+    if (connection.source && connection.target) move(connection.target, connection.source)
+  }, [move])
+  const openUpline = useCallback((id: string, anchor: PopAnchor) => {
+    setPopover(current => current?.id === id ? null : { id, anchor })
+  }, [])
+  const reveal = useCallback((id: string) => {
+    const point = positions.current.get(id), record = byId.get(id)
+    if (!point || !record) return
+    interruptCamera()
+    setSelected(id)
+    setActiveDepartment(record.department.id)
+    setFind('')
+    void setCenter(point.x + NODE_WIDTH / 2, point.y + NODE_HEIGHT / 2, { zoom: Math.max(0.9, getZoom()), duration: duration(400) })
+  }, [byId, getZoom, setCenter, interruptCamera])
+  const matches = useMemo(() => {
+    const query = find.trim().toLowerCase()
+    return query ? records.filter(record => `${record.person.name} ${record.person.code ?? ''} ${record.department.name}`.toLowerCase().includes(query)).slice(0, 12) : []
+  }, [records, find])
+  const edges: ReportingEdge[] = useMemo(() => records.flatMap(record => {
+    if (!record.person.uplineStaffId) return []
+    const source = membershipKey(record.department.schemeId, record.person.uplineStaffId)
+    return byId.has(source) ? [{ id: `${source}->${record.id}`, source, target: record.id, type: 'line' as const,
+      className: fresh === record.id ? 'fresh' : undefined, data: { fresh: fresh === record.id } }] : []
+  }), [records, byId, fresh])
+  const selectedRecord = selected ? byId.get(selected) : undefined
+  const mover = popover ? byId.get(popover.id) : undefined
+  const distinctPeople = new Set(records.map(record => record.person.staffId)).size
+  const dropPerson = dropTarget ? byId.get(dropTarget.id) : null
+  const carriedCount = dragging ? descendantsOf(members.map(member => ({ id: member.id, parentId: member.parentId, label: member.name })), dragging).size : 0
+  const previewParent = dropTarget && !dropTarget.reason ? nodes.find(node => node.id === dropTarget.id) : undefined
+  const previewChild = dragging ? nodes.find(node => node.id === dragging) : undefined
+
+  return (
+    <div className="hierarchy-spaces" onKeyDown={event => {
+      const target = event.target as HTMLElement
+      if (/INPUT|TEXTAREA|SELECT/.test(target.tagName) || target.isContentEditable) return
+      if (event.key === 'Escape') {
+        interruptCamera()
+        if (dragSession.current) {
+          dragSession.current.cancelled = true
+          clearDropTarget()
+          glide(dragSession.current.origin, [dragSession.current.id])
+        }
+        setSelected(null); setPopover(null)
+      }
+      if (/^[0-9]$/.test(event.key)) {
+        const index = Number(event.key) - 1
+        if (event.key === '0' || departments[index]) {
+          event.preventDefault()
+          focusDepartment(event.key === '0' ? null : departments[index].id)
+        }
+      }
+    }}>
+      {error ? <div role="alert" className="mb-3 rounded-control border border-danger/50 bg-danger-bg p-3 text-sm text-danger">{error}</div> : null}
+      {note ? <p role="status" className="mb-3 text-sm text-graphite">{note}</p> : null}
+      <div className="space-toolbar">
+        <div className="space-jumps" aria-label="Jump to a sub-department">
+          <button type="button" aria-pressed={activeDepartment === null} onClick={() => focusDepartment(null)}>All departments</button>
+          {departments.map((department, index) => <button
+            type="button" key={department.id} aria-pressed={activeDepartment === department.id}
+            onClick={() => focusDepartment(department.id)} title={`Jump to ${department.name}${index < 9 ? ` · ${index + 1}` : ''}`}
+          >{department.name}<span className="space-shortcut">{index < 9 ? index + 1 : ''}</span></button>)}
+        </div>
+        <div className="space-actions">
+          <div className="space-search">
+            <input type="search" value={find} onChange={event => setFind(event.target.value)}
+              onKeyDown={event => { if (event.key === 'Enter' && matches[0]) reveal(matches[0].id); if (event.key === 'Escape') setFind('') }}
+              placeholder="Find a person…" aria-label="Find a person across departments" />
+            {find.trim() ? <div className="space-search-results">
+              {matches.length ? matches.map(record => <button type="button" key={record.id} onClick={() => reveal(record.id)}>
+                <strong>{record.person.name}</strong><span>{record.department.name} · {record.person.titleName ?? 'no title'}</span>
+              </button>) : <p>No matching person.</p>}
+            </div> : null}
+          </div>
+          <button type="button" className="space-tidy" onClick={() => { interruptCamera(); arrange(undefined, true) }} title="Separate overlapping teams and departments; keep their internal arrangement">Tidy</button>
+          <div className="org-zoom">
+            <button type="button" onClick={() => { interruptCamera(); void zoomOut({ duration: duration(250) }) }} aria-label="Zoom out">−</button>
+            <button type="button" className="lv" onClick={() => focusDepartment(null)} aria-label="Fit all departments"><ZoomReadout /></button>
+            <button type="button" onClick={() => { interruptCamera(); void zoomIn({ duration: duration(250) }) }} aria-label="Zoom in">+</button>
+          </div>
+        </div>
+      </div>
+      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams</span><span>{pending ? 'Saving upline…' : 'Auto spacing'}</span></div>
+      <UplineContext.Provider value={openUpline}>
+        <div ref={camera.canvas} onPointerDownCapture={interruptCamera} onWheelCapture={interruptCamera}
+          className={`org-canvas space-canvas${movingDepartment ? ' space-dragging' : ''}`}>
+          <ReactFlow<PersonNode, ReportingEdge>
+            nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
+            onNodesChange={onNodesChange} onNodeDragStart={onNodeDragStart} onNodeDrag={onNodeDrag} onNodeDragStop={onNodeDragStop}
+            onNodeClick={(_event, node) => { if (performance.now() >= suppressClick.current) setSelected(node.id) }}
+            onPaneClick={() => { setSelected(null); setPopover(null) }} onConnect={onConnect}
+            minZoom={0.15} maxZoom={1.7} panOnDrag={movingDepartment ? false : [0, 1]}
+            zoomOnScroll={!movingDepartment} zoomOnPinch={!movingDepartment}
+            deleteKeyCode={null} nodesDraggable={!pending} nodesConnectable={!pending} elementsSelectable
+            autoPanOnNodeDrag autoPanOnConnect
+            proOptions={{ hideAttribution: false }}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={26} size={1} color="rgb(var(--cv-grid))" />
+            <ViewportPortal>
+              <svg className="space-boundaries" width="1" height="1" aria-hidden>
+                {geometry.departments.map(department => <rect key={department.id} {...department.bounds} rx="18"
+                  data-space-tone={departments.findIndex(item => item.id === department.id) % 3}
+                  className={`space-department${activeDepartment === department.id ? ' active' : ''}${movingDepartment === department.id ? ' moving' : ''}`} />)}
+                {geometry.teams.map(team => <path key={team.id} d={roundedHullPath(team.points, 15)} className="space-team"
+                  data-space-tone={departments.findIndex(item => item.id === team.departmentId) % 3} />)}
+                {previewParent && previewChild ? <path className="space-preview-line"
+                  d={roundedReportingPath(previewParent.position.x + (previewParent.measured?.width ?? NODE_WIDTH) / 2,
+                    previewParent.position.y + (previewParent.measured?.height ?? NODE_HEIGHT),
+                    previewChild.position.x + (previewChild.measured?.width ?? NODE_WIDTH) / 2, previewChild.position.y)} /> : null}
+              </svg>
+              {geometry.departments.map(department => {
+                const count = members.filter(member => member.departmentId === department.id).length
+                return <button type="button" key={department.id}
+                  className="space-department-heading nodrag nopan" data-space-tone={departments.findIndex(item => item.id === department.id) % 3}
+                  style={{ left: department.bounds.x + 1, top: department.bounds.y + 1, width: department.bounds.width - 2, height: SPACE_DEPARTMENT_HEADER - 1 }}
+                  aria-label={`${department.name}: drag to move department, click to focus`}
+                  aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
+                  onPointerDown={event => groupDown(event, department.id)} onPointerMove={groupMove}
+                  onPointerUp={groupEnd} onPointerCancel={groupEnd} onLostPointerCapture={groupEnd}
+                  onContextMenu={event => event.preventDefault()} onKeyDown={event => groupKey(event, department.id)}
+                  onClick={() => { if (performance.now() >= suppressClick.current) focusDepartment(department.id) }}
+                ><strong>{department.name}</strong><span>{teams.filter(team => team.departmentId === department.id).length} teams · {count} members</span><span className="space-grip" aria-hidden>⠿</span></button>
+              })}
+              {geometry.teams.map(team => <button type="button" key={team.id} className="space-team-heading nodrag nopan"
+                style={{ left: team.labelPosition.x, top: team.labelPosition.y }}
+                onClick={() => { interruptCamera(); setActiveDepartment(team.departmentId); void fitBounds(team.bounds, { padding: 0.25, duration: duration(400) }) }}
+              >{team.label}<span>{team.memberIds.length} ↗</span></button>)}
+              {geometry.departments.filter(department => !members.some(member => member.departmentId === department.id)).map(department =>
+                <div key={`empty:${department.id}`} className="space-empty" style={{ left: department.bounds.x + 28, top: department.bounds.y + 90 }}>No members yet</div>)}
+            </ViewportPortal>
+          </ReactFlow>
+          {dropTarget && dropPerson ? <div className={`space-drop-notice${dropTarget.reason ? ' refused' : ''}`} role="status">
+            {dropTarget.reason ?? (dropTarget.unchanged ? `Already under ${dropPerson.person.name} · release to arrange`
+              : `${dropTarget.armed ? 'Release' : 'Hold here'} to move under ${dropPerson.person.name} · ${dropPerson.department.name}`)}
+            {!dropTarget.reason && !dropTarget.unchanged && carriedCount > 0 ? <span>Includes {carriedCount} downline{carriedCount === 1 ? '' : 's'} · titles and ranks stay the same</span> : null}
+          </div> : null}
+        </div>
+      </UplineContext.Provider>
+      <div className="space-footer" aria-live="polite">
+        <div>
+          <strong>{selectedRecord ? `${selectedRecord.person.name} · ${selectedRecord.department.name}` : 'Sub-department → Team → Member'}</strong>
+          <span>{selectedRecord ? `${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}` : 'Drag to arrange · Hold over a person to change team · Drag a department heading to move its section'}</span>
+        </div>
+        {selectedRecord ? <div className="space-memberships" aria-label="This person's other memberships">
+          {records.filter(record => record.person.staffId === selectedRecord.person.staffId && record.id !== selectedRecord.id).map(record =>
+            <button type="button" key={record.id} onClick={() => reveal(record.id)}>{record.department.name} · {record.person.titleName ?? 'No title'} ↗</button>)}
+          <button type="button" disabled={pending} data-org-open onClick={event => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            openUpline(selectedRecord.id, { left: rect.left, top: rect.top, bottom: rect.bottom })
+          }}>Change upline</button>
+        </div> : null}
+      </div>
+      {popover && mover ? <MovePopover key={popover.id} mover={mover.person} people={mover.department.people}
+        graph={mover.department.people.map(person => ({ id: person.staffId, parentId: person.uplineStaffId, label: person.name }))}
+        anchor={popover.anchor} onClose={() => setPopover(null)}
+        onPick={id => move(popover.id, id ? membershipKey(mover.department.schemeId, id) : null)} /> : null}
+    </div>
+  )
+}
+
+function ZoomReadout() { const { zoom } = useViewport(); return <>{Math.round(zoom * 100)}%</> }
+
+/** Matches spaceConnectionPoints, so every reporting line stays inside its envelope. */
+function roundedReportingPath(sourceX: number, sourceY: number, targetX: number, targetY: number) {
+  const middle = (sourceY + targetY) / 2
+  const vertical = Math.sign(targetY - sourceY), horizontal = Math.sign(targetX - sourceX)
+  const radius = Math.min(9, Math.abs(targetY - sourceY) / 4, Math.abs(targetX - sourceX) / 2)
+  return `M ${sourceX} ${sourceY} V ${middle - vertical * radius} Q ${sourceX} ${middle} ${sourceX + horizontal * radius} ${middle} H ${targetX - horizontal * radius} Q ${targetX} ${middle} ${targetX} ${middle + vertical * radius} V ${targetY}`
+}
+
+function ReportingLine({ sourceX, sourceY, targetX, targetY, data }: EdgeProps<ReportingEdge>) {
+  return <path d={roundedReportingPath(sourceX, sourceY, targetX, targetY)} pathLength={data?.fresh ? 1 : undefined}
+    className="react-flow__edge-path" style={{ strokeLinejoin: 'round' }} />
+}
