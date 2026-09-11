@@ -8,14 +8,19 @@ import { can, type Permission } from '@/lib/permissions'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
-// (auth.getUser + users row + permissions) into one set per HTTP request.
+// (JWT verification + users row + permissions) into one set per HTTP request.
 export const getUser = cache(async (): Promise<User | null> => {
   const supabase = await createClient()
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser()
-
-  if (!authUser) return null
+  // Who is calling, from the JWT's own claims. `getClaims()` verifies the
+  // token's signature locally against the project's cached public keys (the
+  // tokens are ES256, asymmetric) where `getUser()` asked the auth server on
+  // every request — three times per Server Action: the middleware, the action
+  // and its render (2026-09-11). Everything about the PERSON is still read
+  // fresh below, so a deactivated account or a changed title takes effect on
+  // the next request exactly as before.
+  const { data: verified } = await supabase.auth.getClaims()
+  const authUserId = verified?.claims.sub
+  if (!authUserId) return null
 
   // View-as mask (unified portal 2026-07-16): a Principal may flip the
   // app-layer role via the TopBar switcher. Every gate and role-driven UI
@@ -29,7 +34,7 @@ export const getUser = cache(async (): Promise<User | null> => {
   const viewAs = isViewAsRole(viewAsCookie) ? viewAsCookie : null
 
   const [{ data }, { data: perms }, masked] = await Promise.all([
-    supabase.from('users').select('*').eq('id', authUser.id).single(),
+    supabase.from('users').select('*').eq('id', authUserId).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
     // defaults. RLS derives its scopes from the same set, so the page and its

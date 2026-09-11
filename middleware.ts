@@ -28,10 +28,13 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session — must be called before any redirect checks
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Refresh the session and establish who is calling — before any redirect
+  // check. `getClaims()` verifies the JWT's signature locally against the
+  // project's cached public keys (ES256), so unlike `getUser()` it costs no
+  // round trip to the auth server on every request (2026-09-11). An expired
+  // session is still refreshed through the cookies exactly as before.
+  const { data: verified } = await supabase.auth.getClaims()
+  const user = verified?.claims ?? null
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login')
 
