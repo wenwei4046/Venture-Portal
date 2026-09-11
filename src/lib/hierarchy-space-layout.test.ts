@@ -3,22 +3,23 @@ import {
   alignSpaceTeams,
   buildSpaceTeams,
   departmentPositionKey,
-  directorRowHeight,
+  directorRail,
   geometryForSpaces,
   initialSpacePositions,
   resolveSpaceOverlaps,
   spaceConnectionPoints,
   SPACE_DEPARTMENT_GAP,
-  SPACE_DEPARTMENT_HEADER,
-  SPACE_DEPARTMENT_PADDING,
-  SPACE_DIRECTOR_GAP,
   SPACE_DIRECTOR_X_GAP,
+  SPACE_RAIL_EXIT,
+  SPACE_RAIL_GAP,
+  SPACE_RAIL_LABEL,
+  SPACE_RAIL_STEP,
   SPACE_TEAM_GAP,
   SPACE_TEAM_HEADER,
   type SpaceMember,
 } from './hierarchy-space-layout'
 import { NODE_HEIGHT, NODE_WIDTH } from './org-layout'
-import { collisionOffset, rectanglePoints, type Bounds, type Point } from './hierarchy-spaces'
+import { boundsOf, collisionOffset, rectanglePoints, type Bounds, type Point } from './hierarchy-spaces'
 
 const departments = [{ id: 'fa', name: 'FA' }, { id: 'ir', name: 'IR' }]
 const member = (id: string, departmentId: string, parentId: string | null = null, name = id): SpaceMember => (
@@ -285,69 +286,121 @@ describe('resolveSpaceOverlaps', () => {
   })
 })
 
-describe('the director row (Revenue Director, 2026-09-11)', () => {
-  const directed = [
-    { id: 'fa', name: 'FA', directors: [{ id: 'fa:peter', name: 'PETER' }, { id: 'fa:kris', name: 'KRIS' }] },
-    { id: 'ir', name: 'IR', directors: [{ id: 'ir:peter', name: 'PETER' }] },
-  ]
+describe('the director rail (design A, 2026-09-12)', () => {
   const members = [
     member('anthony', 'fa', null, 'Anthony'), member('yuny', 'fa', 'anthony', 'Yuny'),
     member('chea', 'fa', null, 'Chea'), member('rachael', 'ir', null, 'Rachael'),
   ]
+  const kris = { id: 'kris', name: 'KRIS', departmentIds: ['fa'] }
+  const peter = { id: 'peter', name: 'PETER', departmentIds: ['fa', 'ir'] }
+  const teams = buildSpaceTeams(members)
+  const positions = initialSpacePositions(departments, members, teams)
+  const frames = geometryForSpaces(departments, members, teams, positions).departments
+  const frameOf = (id: string) => frames.find(frame => frame.id === id)!.bounds
+  const highest = Math.min(...frames.map(frame => frame.bounds.y))
+  const union = boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds)))
+  const shifted = (id: string | null, delta: Point) => frames.map(frame => id !== null && frame.id !== id ? frame
+    : { ...frame, bounds: { ...frame.bounds, x: frame.bounds.x + delta.x, y: frame.bounds.y + delta.y } })
 
-  it('reserves a row above the teams, inside the frame, and places the cards side by side under the header', () => {
-    const teams = buildSpaceTeams(members)
-    const positions = initialSpacePositions(directed, members, teams)
-    const plain = geometryForSpaces(departments, members, teams, positions).departments.find(d => d.id === 'fa')!
-    const fa = geometryForSpaces(directed, members, teams, positions).departments.find(d => d.id === 'fa')!
-    expect(fa.directors.map(d => d.id)).toEqual(['fa:peter', 'fa:kris'])
-    expect(fa.bounds.height - plain.bounds.height).toBe(directorRowHeight(directed[0]))
-    expect(fa.bounds.y).toBe(plain.bounds.y - directorRowHeight(directed[0]))
-    // Under the header, above every team, and inside the frame.
-    const [peter, kris] = fa.directors
-    expect(peter.y).toBe(fa.bounds.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING)
-    expect(kris.y).toBe(peter.y)
-    expect(kris.x - peter.x).toBe(NODE_WIDTH + SPACE_DIRECTOR_X_GAP)
-    expect(peter.x).toBeGreaterThanOrEqual(fa.bounds.x)
-    expect(kris.x + NODE_WIDTH).toBeLessThanOrEqual(fa.bounds.x + fa.bounds.width)
-    const teamTop = Math.min(...geometryForSpaces(directed, members, teams, positions).teams
-      .filter(team => team.departmentId === 'fa').map(team => team.bounds.y))
-    expect(peter.y + NODE_HEIGHT + SPACE_DIRECTOR_GAP).toBeLessThanOrEqual(teamTop)
-    expect(fa.contentTop).toBe(peter.y + NODE_HEIGHT + SPACE_DIRECTOR_GAP)
+  it('stands every director once in a row above the highest frame, 24 apart, centred over the union of the frames', () => {
+    const rail = directorRail([kris, peter], frames)
+    expect(rail.cards.map(card => card.id)).toEqual(['kris', 'peter'])
+    const [k, p] = rail.cards
+    expect(p.y).toBe(k.y)
+    expect(p.x - k.x).toBe(NODE_WIDTH + SPACE_DIRECTOR_X_GAP)
+    expect((k.x + p.x + NODE_WIDTH) / 2).toBeCloseTo(union.x + union.width / 2, 6)
+    expect(k.y + NODE_HEIGHT).toBeLessThan(highest)
+    // With one bus level the cards stand 48 above the highest frame, the bus midway.
+    const alone = directorRail([kris], frames)
+    expect(alone.cards[0].y).toBe(highest - 2 * SPACE_RAIL_GAP - NODE_HEIGHT)
+    expect(alone.buses).toHaveLength(1)
+    expect(alone.buses[0].y).toBe(highest - SPACE_RAIL_GAP)
+    expect(alone.bounds).toEqual({
+      x: alone.cards[0].x, y: alone.cards[0].y - SPACE_RAIL_LABEL, width: NODE_WIDTH, height: NODE_HEIGHT + SPACE_RAIL_LABEL,
+    })
   })
 
-  it('widens a narrow frame symmetrically so two directors fit, and keeps a plain frame as it was', () => {
-    const teams = buildSpaceTeams(members)
-    const positions = initialSpacePositions(directed, members, teams)
-    const geometry = geometryForSpaces(directed, members, teams, positions)
-    const ir = geometry.departments.find(d => d.id === 'ir')!
-    const plainIr = geometryForSpaces(departments, members, teams, positions).departments.find(d => d.id === 'ir')!
-    // One director fits inside a one-team frame: no widening.
-    expect(ir.bounds.width).toBe(plainIr.bounds.width)
-    expect(ir.bounds.x).toBe(plainIr.bounds.x)
-    // Two would not fit inside IR's width; give IR both and it grows both ways.
-    const wide = geometryForSpaces([directed[0], { ...directed[1], directors: directed[0].directors }], members, teams, positions)
-      .departments.find(d => d.id === 'ir')!
-    const rowWidth = 2 * NODE_WIDTH + SPACE_DIRECTOR_X_GAP + 2 * SPACE_DEPARTMENT_PADDING
-    expect(wide.bounds.width).toBe(Math.max(plainIr.bounds.width, rowWidth))
-    expect(wide.bounds.x + wide.bounds.width / 2).toBeCloseTo(plainIr.bounds.x + plainIr.bounds.width / 2, 6)
+  it('draws one drop per director and sub-department, joined on one bus per frame that lands on its top edge', () => {
+    const rail = directorRail([kris, peter], frames)
+    expect(rail.drops.map(drop => `${drop.directorId}:${drop.departmentId}`).sort()).toEqual(['kris:fa', 'peter:fa', 'peter:ir'])
+    expect(rail.buses.map(bus => bus.departmentId)).toEqual(['fa', 'ir'])
+    const fa = rail.buses.find(bus => bus.departmentId === 'fa')!
+    const faDrops = rail.drops.filter(drop => drop.departmentId === 'fa')
+    expect(faDrops).toHaveLength(2)
+    // Every drop starts at the cards' bottom edge; Fair's two end on the same bar.
+    for (const drop of rail.drops) expect(drop.top).toBe(rail.cards[0].y + NODE_HEIGHT)
+    for (const drop of faDrops) expect(drop.bottom).toBe(fa.y)
+    // The bar spans every drop and the landing; the trunk lands top-centre on the frame.
+    const frame = frameOf('fa')
+    expect(fa.landing).toEqual({ x: frame.x + frame.width / 2, y: frame.y })
+    expect(fa.x1).toBe(Math.min(...faDrops.map(drop => drop.x), fa.landing.x))
+    expect(fa.x2).toBe(Math.max(...faDrops.map(drop => drop.x), fa.landing.x))
+    expect(fa.y).toBeLessThan(fa.landing.y)
+    // Each drop leaves from within its own card.
+    for (const drop of rail.drops) {
+      const card = rail.cards.find(card => card.id === drop.directorId)!
+      expect(drop.x).toBeGreaterThan(card.x)
+      expect(drop.x).toBeLessThan(card.x + NODE_WIDTH)
+    }
   })
 
-  it('gives an empty department its director row above the empty notice', () => {
-    const withEmpty = [...directed, { id: 'faa', name: 'FAA', directors: [{ id: 'faa:kris', name: 'KRIS' }] }]
-    const teams = buildSpaceTeams(members)
-    const positions = initialSpacePositions(withEmpty, members, teams)
-    const faa = geometryForSpaces(withEmpty, members, teams, positions).departments.find(d => d.id === 'faa')!
-    expect(faa.directors).toHaveLength(1)
-    expect(faa.contentTop).toBe(faa.directors[0].y + NODE_HEIGHT + SPACE_DIRECTOR_GAP)
-    expect(faa.contentTop).toBeLessThan(faa.bounds.y + faa.bounds.height)
+  it('sends a director’s second line out 50 apart, on a bus of its own when the two bars would touch', () => {
+    const rail = directorRail([kris, peter], frames)
+    const toFair = rail.drops.find(drop => drop.directorId === 'peter' && drop.departmentId === 'fa')!
+    const toIr = rail.drops.find(drop => drop.directorId === 'peter' && drop.departmentId === 'ir')!
+    // IR stands to the right of Fair, so the IR line leaves to the right.
+    expect(toIr.x - toFair.x).toBe(SPACE_RAIL_EXIT)
+    const [fa, ir] = rail.buses
+    // Fifty pixels is within the clearance: IR's bar takes the level above Fair's.
+    expect(ir.y).toBe(fa.y - SPACE_RAIL_STEP)
+    expect(toIr.bottom).toBe(ir.y)
+    expect(toFair.bottom).toBe(fa.y)
+    // The rail rose for the extra level: the top bus 24 below the cards, the lowest 24 above the frames.
+    expect(rail.cards[0].y + NODE_HEIGHT + SPACE_RAIL_GAP).toBe(ir.y)
+    expect(fa.y + SPACE_RAIL_GAP).toBe(highest)
   })
 
-  it('keeps every department clear of its neighbours with the row included', () => {
-    const teams = buildSpaceTeams(members)
-    const positions = resolveSpaceOverlaps(directed, members, teams, initialSpacePositions(directed, members, teams))
-    const geometry = geometryForSpaces(directed, members, teams, positions)
-    const [a, b] = geometry.departments
-    expect(collisionOffset(rectanglePoints(a.bounds), rectanglePoints(b.bounds), SPACE_DEPARTMENT_GAP)).toBeNull()
+  it('keeps every bus on one level while the bars are clear of each other, and separates bars that would cross', () => {
+    const zara = { id: 'zara', name: 'ZARA', departmentIds: ['ir'] }
+    // KRIS's card on the left directs the left frame, ZARA's on the right the right one: two short bars, one level.
+    const rail = directorRail([kris, zara], frames)
+    const [fa, ir] = rail.buses
+    expect(ir.y).toBe(fa.y)
+    expect(rail.cards[0].y).toBe(highest - 2 * SPACE_RAIL_GAP - NODE_HEIGHT)
+    expect(rail.drops).toHaveLength(2)
+    // The other way round the bars would run through each other, so one takes the level above.
+    const crossed = directorRail([zara, kris], frames)
+    expect(crossed.buses.find(bus => bus.departmentId === 'ir')!.y).toBe(crossed.buses.find(bus => bus.departmentId === 'fa')!.y - SPACE_RAIL_STEP)
+  })
+
+  it('follows the frames: moves with all of them, re-centres when one moves, and only the highest sets its height', () => {
+    const rail = directorRail([kris, peter], frames)
+    const delta = { x: 137.5, y: -61.25 }
+    const moved = directorRail([kris, peter], shifted(null, delta))
+    moved.cards.forEach((card, index) => {
+      expect(card.x).toBeCloseTo(rail.cards[index].x + delta.x, 6)
+      expect(card.y).toBeCloseTo(rail.cards[index].y + delta.y, 6)
+    })
+    moved.buses.forEach((bus, index) => {
+      expect(bus.y).toBeCloseTo(rail.buses[index].y + delta.y, 6)
+      expect(bus.landing.x).toBeCloseTo(rail.buses[index].landing.x + delta.x, 6)
+      expect(bus.landing.y).toBeCloseTo(rail.buses[index].landing.y + delta.y, 6)
+    })
+    // IR dragged lower: its landing follows and its trunk lengthens; Fair, still the highest, keeps the rail where it is.
+    const lowered = directorRail([kris, peter], shifted('ir', { x: 0, y: 300 }))
+    expect(lowered.cards.map(card => card.y)).toEqual(rail.cards.map(card => card.y))
+    const before = rail.buses.find(bus => bus.departmentId === 'ir')!
+    const after = lowered.buses.find(bus => bus.departmentId === 'ir')!
+    expect(after.landing.y).toBe(before.landing.y + 300)
+    expect(after.y).toBe(before.y)
+  })
+
+  it('is empty without directors or frames, and leaves out a director whose departments have no frame', () => {
+    expect(directorRail([], frames)).toEqual({ cards: [], drops: [], buses: [], bounds: null })
+    expect(directorRail([kris, peter], [])).toEqual({ cards: [], drops: [], buses: [], bounds: null })
+    const rail = directorRail([kris, { id: 'faa-head', name: 'ALEX', departmentIds: ['faa'] }], frames)
+    expect(rail.cards.map(card => card.id)).toEqual(['kris'])
+    expect(rail.drops).toHaveLength(1)
+    expect(rail.buses).toHaveLength(1)
   })
 })

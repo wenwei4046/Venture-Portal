@@ -1,6 +1,68 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-12 · Director Line → design A)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-12 · Director Line design A BUILT)
 
-## ═══ CHECKPOINT 2026-09-12 — read this first ═══
+## ═══ CHECKPOINT 2026-09-12 (later) — design A is built; read this first ═══
+
+**Where things stand.** Design A from the block below is IMPLEMENTED on branch
+`feat/director-rail` (worktree `.claude/worktrees/director-rail`, cut from main
+`9dc751e`); a PR is open against main and NOT merged — the user merges. Verified
+on the worktree's dev server (`:3000`) against the live data as Principal:
+KRIS and PETER once each on the rail, Fair's bus with one landing dot on its
+top edge, PETER's second line to IR on a bus one level up, `Reports to KRIS ·
+PETER` on Fair's header, the rail re-centring when Fair is dragged and staying
+put when a lower frame moves, dark mode fine. Full Vitest suite green (1783).
+
+**What changed.**
+- `src/lib/hierarchy-space-layout.ts`: the director ROW is gone
+  (`directorRowHeight`, `SpaceDepartment.directors`,
+  `SpaceDepartmentGeometry.directors`, `contentTop`, `SPACE_DIRECTOR_GAP`);
+  frames are content-only again. New pure `directorRail(directors, frames)` →
+  `{ cards, drops, buses, bounds }`: cards centred over the union of the
+  frames, `SPACE_DIRECTOR_X_GAP` 24 apart; one drop per (director, frame) and
+  one bus per frame (bar + trunk to the frame's top-centre). A director's lines
+  leave the card `SPACE_RAIL_EXIT` 50 apart (leftmost landing → leftmost
+  exit); a bar within `SPACE_RAIL_CLEARANCE` 64 of another takes the level
+  above (`SPACE_RAIL_STEP` 18); the rail rises with the levels so the top bus
+  is `SPACE_RAIL_GAP` 24 below the cards and the lowest 24 above the highest
+  frame. `SPACE_RAIL_LABEL` 22 is the label's room above the cards.
+- `HierarchySpaces.tsx`: `railDirectors` (deduped by staffId, A→Z, with
+  `departmentIds`/`departmentNames`), `rail = directorRail(...)` recomputed from
+  `geometry.departments` on every render (so it glides with the frames —
+  `interpolateGeometry` lost its directors branch). DOM: drops
+  `.space-director-line[data-director-line="<staffId>:<deptId>"]`, buses
+  `g[data-director-bus="<deptId>"] > .space-director-bus + .space-director-dot`,
+  the label `.space-rail-label` and the cards `.space-director[data-director]`
+  as HTML in the ViewportPortal (not nodes), the frame header's third span
+  `.space-heads` (`Reports to KRIS · PETER`). `focusDepartment` fits the rail
+  too: every card for All departments, the department's own directors' cards
+  for one. Overview counts distinct directors.
+- **Pre-existing bug found by E2E, fixed:** `glide`'s `progress` was not
+  clamped at 0. Chrome stamps the first rAF frame EARLIER than the
+  `performance.now()` sampled when the glide was scheduled (a first load in a
+  background tab), so the frames extrapolated backwards — Fair's frame got
+  height −53 and `rectanglePoints` threw inside `directorRail` (the old
+  drawing swallowed the same negative rect silently). Clamped; regression test
+  "never runs a glide backwards…" in `HierarchySpaces.test.tsx`.
+- CSS (`globals.css`): `.space-rail-label` (canvas mono caps, `--cv-shelf`),
+  `.space-director-bus` + `.space-director-dot` (with `.space-director-line`,
+  `--cv-line`), `.space-department-heading .space-heads` (+ `.k`); the director
+  card's top border is `--title-head`.
+- Docs: DESIGN.md `.space-director` row rewritten + change-log entry
+  2026-09-12; commission spec §10 "Reports to" paragraph; CLAUDE.md tree
+  paragraph; the hierarchy page intro (`HierarchyTabs.tsx`).
+- Tests: `hierarchy-space-layout.test.ts` "the director rail (design A)" × 6;
+  `HierarchySpaces.test.tsx` directors describe × 6 (2 cards deduped, 3 drops
+  + 2 buses, header/card/popover wording, drag re-centres, glide clamp,
+  detach note).
+
+**To know.** The live DB has a THIRD sub-department "TEST SEP26 Payroll Full
+Cycle" (empty, no directors) — it gets a frame and no line. People › Hierarchy's
+own per-root dashed lines (a fan under KRIS with lines to PETER) are untouched,
+as the plan said. Run_code screenshots land in the MAIN checkout root, the MCP
+screenshot tool's in the worktree root — both cleaned up. Worktree teardown
+per the memory note (junction `node_modules` first, kill the `next dev` node
+children on :3000).
+
+## ═══ CHECKPOINT 2026-09-12 — the plan this was built from ═══
 
 **Where things stand.** PR #106 (Revenue Director layer, below) is MERGED and
 LIVE (`620bfca`; main has since taken #107, #108, #109 and is `02b3cd7`). What

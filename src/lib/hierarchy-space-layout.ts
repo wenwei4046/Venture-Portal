@@ -18,21 +18,21 @@ export interface SpaceMember {
   height?: number
 }
 
-/** A department head drawn above the teams: the Revenue Director layer (2026-09-11). */
-export interface SpaceDirector {
+export interface SpaceDepartment {
   id: string
   name: string
 }
 
-export interface SpaceDepartment {
+/**
+ * A department head on the rail above the frames — the Revenue Director layer
+ * (2026-09-11), drawn as a rail since 2026-09-12. One entry per PERSON: the
+ * same director may direct several sub-departments, and is drawn once.
+ */
+export interface SpaceDirector {
   id: string
   name: string
-  /**
-   * Who this sub-department reports to. They stand in a row of their own
-   * between the frame's header and its first team, and every team's leader
-   * is drawn under each of them — a reporting line only, never an upline.
-   */
-  directors?: readonly SpaceDirector[]
+  /** The sub-departments they direct, in the canvas's department order. */
+  departmentIds: readonly string[]
 }
 
 export interface SpaceTeam {
@@ -50,18 +50,44 @@ export interface SpaceTeamGeometry extends SpaceTeam {
   labelPosition: Point
 }
 
-/** A director's card, placed. */
-export interface SpaceDirectorSlot extends SpaceDirector {
+export interface SpaceDepartmentGeometry extends SpaceDepartment {
+  bounds: Bounds
+}
+
+/** A director's card on the rail, placed. */
+export interface RailCard extends SpaceDirector {
   x: number
   y: number
 }
 
-export interface SpaceDepartmentGeometry extends SpaceDepartment {
-  bounds: Bounds
-  /** The department's heads, in a row under the header. Empty when it has none. */
-  directors: SpaceDirectorSlot[]
-  /** Where the teams (or the empty notice) begin — below the director row when there is one. */
-  contentTop: number
+/** The vertical from a director's card down to one directed department's bus. */
+export interface RailDrop {
+  directorId: string
+  departmentId: string
+  x: number
+  top: number
+  bottom: number
+}
+
+/**
+ * One bus per directed department: the bar at `y` joining every drop that
+ * lands on it, and the trunk from `(landing.x, y)` down to `landing` — the
+ * top-centre of the department's frame, where a dot marks the landing.
+ */
+export interface RailBus {
+  departmentId: string
+  y: number
+  x1: number
+  x2: number
+  landing: Point
+}
+
+export interface DirectorRail {
+  cards: RailCard[]
+  drops: RailDrop[]
+  buses: RailBus[]
+  /** The cards and the label above them; null when nothing is on the rail. */
+  bounds: Bounds | null
 }
 
 export interface SpaceGeometry {
@@ -79,52 +105,21 @@ export const SPACE_DEPARTMENT_GAP = 64
 export const SPACE_DEPARTMENT_PADDING = 28
 export const SPACE_DEPARTMENT_HEADER = 44
 export const SPACE_TEAM_HEADER = 38
-/** Between a director card's bottom edge and the first team frame. */
-export const SPACE_DIRECTOR_GAP = 36
-/** Between two director cards standing side by side. */
+/** Between two director cards standing side by side on the rail. */
 export const SPACE_DIRECTOR_X_GAP = 24
+/** Rail card bottom → the topmost bus, and the lowest bus → the highest frame's top. */
+export const SPACE_RAIL_GAP = 24
+/** Between two bus levels, when bars would otherwise touch. */
+export const SPACE_RAIL_STEP = 18
+/** Two bars closer than this along x take different levels. */
+export const SPACE_RAIL_CLEARANCE = 64
+/** A director's lines leave the card this far apart. */
+export const SPACE_RAIL_EXIT = 50
+/** The label's room above the cards. */
+export const SPACE_RAIL_LABEL = 22
 const TEAM_PADDING = 24
 const EMPTY_DEPARTMENT_WIDTH = 400
 const EMPTY_DEPARTMENT_HEIGHT = 220
-
-/** The row a department reserves above its teams for its heads; 0 without any. */
-export function directorRowHeight(department: Pick<SpaceDepartment, 'directors'>): number {
-  return department.directors?.length ? NODE_HEIGHT + SPACE_DIRECTOR_GAP : 0
-}
-
-/**
- * A department's frame, with its heads placed. `content` is the frame the
- * teams alone would need (header and padding included); the director row is
- * added above them, and the frame widens symmetrically when the row of cards
- * is wider than the teams below it.
- */
-function departmentGeometry(department: SpaceDepartment, content: Bounds): SpaceDepartmentGeometry {
-  const directors = department.directors ?? []
-  const inner = content.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING
-  if (!directors.length) return { ...department, bounds: content, directors: [], contentTop: inner }
-
-  const rowWidth = directors.length * NODE_WIDTH + (directors.length - 1) * SPACE_DIRECTOR_X_GAP
-  const row = directorRowHeight(department)
-  const extra = Math.max(0, rowWidth + SPACE_DEPARTMENT_PADDING * 2 - content.width)
-  const bounds: Bounds = {
-    x: content.x - extra / 2,
-    y: content.y - row,
-    width: content.width + extra,
-    height: content.height + row,
-  }
-  const top = bounds.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING
-  const left = bounds.x + (bounds.width - rowWidth) / 2
-  return {
-    ...department,
-    bounds,
-    directors: directors.map((director, index) => ({
-      ...director,
-      x: left + index * (NODE_WIDTH + SPACE_DIRECTOR_X_GAP),
-      y: top,
-    })),
-    contentTop: top + NODE_HEIGHT + SPACE_DIRECTOR_GAP,
-  }
-}
 
 /** Stored alongside member positions, so an empty department can be dragged too. */
 export function departmentPositionKey(id: string): string {
@@ -232,19 +227,91 @@ export function geometryForSpaces(
         x: (index % 2) * (EMPTY_DEPARTMENT_WIDTH + SPACE_DEPARTMENT_GAP),
         y: Math.floor(index / 2) * (EMPTY_DEPARTMENT_HEIGHT + SPACE_DEPARTMENT_GAP),
       }
-      return departmentGeometry(department, {
-        ...origin, width: EMPTY_DEPARTMENT_WIDTH, height: EMPTY_DEPARTMENT_HEIGHT,
-      })
+      return { ...department, bounds: { ...origin, width: EMPTY_DEPARTMENT_WIDTH, height: EMPTY_DEPARTMENT_HEIGHT } }
     }
     const contentBounds = boundsOf(contents.flatMap(team => rectanglePoints(team.bounds)))
-    return departmentGeometry(department, {
+    return { ...department, bounds: {
       x: contentBounds.x - SPACE_DEPARTMENT_PADDING,
       y: contentBounds.y - SPACE_DEPARTMENT_PADDING - SPACE_DEPARTMENT_HEADER,
       width: contentBounds.width + SPACE_DEPARTMENT_PADDING * 2,
       height: contentBounds.height + SPACE_DEPARTMENT_PADDING * 2 + SPACE_DEPARTMENT_HEADER,
-    })
+    } }
   })
   return { teams: teamShapes, departments: departmentShapes }
+}
+
+/**
+ * The director rail (design A, 2026-09-12): every director ONCE, in one row
+ * above all the sub-department frames, centred over their union; from each
+ * card one dashed line per directed sub-department, landing on that frame's
+ * TOP EDGE — never on a team inside it, so no line ever crosses a team.
+ *
+ * Two directors of one frame join on a single bus bar and share one landing.
+ * A director's lines leave the card `SPACE_RAIL_EXIT` apart, the leftmost
+ * landing taking the leftmost exit, so their own drops never cross. A bar
+ * within `SPACE_RAIL_CLEARANCE` of another along x takes the next level up
+ * (`SPACE_RAIL_STEP` higher), as the mockup drew PETER's line to IR; the rail
+ * rises with the number of levels so the lowest bus stays `SPACE_RAIL_GAP`
+ * above the highest frame and the topmost `SPACE_RAIL_GAP` below the cards.
+ *
+ * Pure, and a function of the frames alone: dragging a frame moves its
+ * landing, the rail re-centres, nothing is stored.
+ */
+export function directorRail(
+  directors: readonly SpaceDirector[],
+  frames: readonly { id: string; bounds: Bounds }[],
+): DirectorRail {
+  const frameById = new Map(frames.map(frame => [frame.id, frame.bounds]))
+  const onRail = directors
+    .map(director => ({ ...director, departmentIds: director.departmentIds.filter(id => frameById.has(id)) }))
+    .filter(director => director.departmentIds.length > 0)
+  if (!onRail.length) return { cards: [], drops: [], buses: [], bounds: null }
+
+  const union = boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds)))
+  const frameTop = Math.min(...frames.map(frame => frame.bounds.y))
+  const rowWidth = onRail.length * NODE_WIDTH + (onRail.length - 1) * SPACE_DIRECTOR_X_GAP
+  const left = union.x + union.width / 2 - rowWidth / 2
+  const landingOf = (departmentId: string): Point => {
+    const frame = frameById.get(departmentId)!
+    return { x: frame.x + frame.width / 2, y: frame.y }
+  }
+
+  // Exits first: they only need the cards' x, which the union alone decides.
+  const exits: { directorId: string; departmentId: string; x: number }[] = []
+  onRail.forEach((director, index) => {
+    const centre = left + index * (NODE_WIDTH + SPACE_DIRECTOR_X_GAP) + NODE_WIDTH / 2
+    const ordered = [...director.departmentIds].sort((a, b) => landingOf(a).x - landingOf(b).x)
+    ordered.forEach((departmentId, position) => exits.push({
+      directorId: director.id, departmentId,
+      x: centre + (position - (ordered.length - 1) / 2) * SPACE_RAIL_EXIT,
+    }))
+  })
+
+  // One bus per directed department, in the departments' own order; a bar
+  // takes the lowest level no earlier bar occupies within its clearance.
+  const bars: { departmentId: string; x1: number; x2: number; level: number }[] = []
+  for (const frame of frames) {
+    const xs = exits.filter(exit => exit.departmentId === frame.id).map(exit => exit.x)
+    if (!xs.length) continue
+    const landing = landingOf(frame.id)
+    const x1 = Math.min(...xs, landing.x), x2 = Math.max(...xs, landing.x)
+    let level = 0
+    while (bars.some(bar => bar.level === level && bar.x1 - SPACE_RAIL_CLEARANCE < x2 && x1 < bar.x2 + SPACE_RAIL_CLEARANCE)) level++
+    bars.push({ departmentId: frame.id, x1, x2, level })
+  }
+  const levels = Math.max(...bars.map(bar => bar.level))
+  const busY = (level: number) => frameTop - SPACE_RAIL_GAP - level * SPACE_RAIL_STEP
+  const cardBottom = busY(levels) - SPACE_RAIL_GAP
+  const cardTop = cardBottom - NODE_HEIGHT
+
+  const cards = onRail.map((director, index) => ({ ...director, x: left + index * (NODE_WIDTH + SPACE_DIRECTOR_X_GAP), y: cardTop }))
+  const levelOf = new Map(bars.map(bar => [bar.departmentId, bar.level]))
+  const drops = exits.map(exit => ({ ...exit, top: cardBottom, bottom: busY(levelOf.get(exit.departmentId)!) }))
+  const buses = bars.map(bar => ({ departmentId: bar.departmentId, y: busY(bar.level), x1: bar.x1, x2: bar.x2, landing: landingOf(bar.departmentId) }))
+  return {
+    cards, drops, buses,
+    bounds: { x: left, y: cardTop - SPACE_RAIL_LABEL, width: rowWidth, height: NODE_HEIGHT + SPACE_RAIL_LABEL },
+  }
 }
 
 function translatePositions(positions: Map<string, Point>, ids: Iterable<string>, delta: Point): void {

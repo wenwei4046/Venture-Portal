@@ -79,9 +79,10 @@ export default function HierarchyTabs({
               )
             ) : (
               <>
-                Explore every sub-department on one canvas. Its Revenue Director stands at the
-                top of the frame, and every team leader and standalone member reports to them —
-                a reporting line only, with no override. Drag a team or department border or
+                Explore every sub-department on one canvas. Its Revenue Directors stand on a rail
+                above the frames, one line down to each sub-department they direct, and every team
+                leader and standalone member reports to them — a reporting line only, with no
+                override. Drag a team or department border or
                 heading to move it freely. Hold over a person until the transfer prompt appears
                 to change upline. The Team tab edits {subDept.name}.
               </>

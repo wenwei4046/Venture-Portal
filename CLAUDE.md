@@ -145,7 +145,19 @@ src/
 │   │   │                              tree up to them is DERIVED on both charts
 │   │   │                              (`lib/department-heads.ts`), never written
 │   │   │                              per person — two directors do not fit one
-│   │   │                              `reports_to`. The commission line stops
+│   │   │                              `reports_to`. On the REVENUE chart the
+│   │   │                              directors are a RAIL above every
+│   │   │                              sub-department frame (design A,
+│   │   │                              2026-09-12): each director once, A→Z,
+│   │   │                              one dashed line per frame they direct
+│   │   │                              landing on its TOP EDGE (two directors of
+│   │   │                              one frame join on a bus bar; PETER's line
+│   │   │                              to IR on a bus of its own), `Reports to
+│   │   │                              KRIS · PETER` on the frame's header,
+│   │   │                              nothing drawn inside the frame —
+│   │   │                              `directorRail` in
+│   │   │                              `lib/hierarchy-space-layout.ts`. The
+│   │   │                              commission line stops
 │   │   │                              below a head: `comm_sync_position` writes
 │   │   │                              a null upline for anybody whose
 │   │   │                              `reports_to` heads the department, and
