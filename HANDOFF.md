@@ -1,15 +1,21 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-12 · Director Line design A BUILT)
+# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-12 · Director Line design A MERGED + PROD LIVE)
 
-## ═══ CHECKPOINT 2026-09-12 (later) — design A is built; read this first ═══
+## ═══ CHECKPOINT 2026-09-12 (later) — design A is MERGED and LIVE; read this first ═══
 
-**Where things stand.** Design A from the block below is IMPLEMENTED on branch
-`feat/director-rail` (worktree `.claude/worktrees/director-rail`, cut from main
-`9dc751e`); a PR is open against main and NOT merged — the user merges. Verified
-on the worktree's dev server (`:3000`) against the live data as Principal:
-KRIS and PETER once each on the rail, Fair's bus with one landing dot on its
-top edge, PETER's second line to IR on a bus one level up, `Reports to KRIS ·
-PETER` on Fair's header, the rail re-centring when Fair is dragged and staying
-put when a lower frame moves, dark mode fine. Full Vitest suite green (1783).
+**Where things stand.** Design A from the block below is **PR #112, MERGED
+into main as `781ccf7` (the user said MERGE) and PROD LIVE** — Vercel production
+deployment of that commit READY, verified read-only on prod as Principal: KRIS
+and PETER once each on the rail, Fair's bus with one landing dot on its top
+edge, PETER's second line to IR on a bus one level up, `Reports to KRIS ·
+PETER` on Fair's header and `Reports to PETER` on IR's, 11 leader cards reading
+`Reports to`, no page errors. Main's CI on the merge commit green. Branch
+`feat/director-rail` deleted locally and on origin; worktree `director-rail`
+removed. PRs #110 (Revenue header proportions) and #111 (employee codes HV001…,
+`compareByLadder` by code) landed on main between the branch cut (`9dc751e`)
+and the merge; #111 touches `lib/ladder.ts`, not `lib/department-heads.ts`, so
+the rail's A→Z `sortHeads` is unaffected. Before the merge the same drawing was
+verified on the worktree's dev server against the live data (drag re-centring,
+dark mode) and the full Vitest suite was green (1783).
 
 **What changed.**
 - `src/lib/hierarchy-space-layout.ts`: the director ROW is gone
@@ -54,13 +60,13 @@ put when a lower frame moves, dark mode fine. Full Vitest suite green (1783).
   + 2 buses, header/card/popover wording, drag re-centres, glide clamp,
   detach note).
 
-**To know.** The live DB has a THIRD sub-department "TEST SEP26 Payroll Full
-Cycle" (empty, no directors) — it gets a frame and no line. People › Hierarchy's
-own per-root dashed lines (a fan under KRIS with lines to PETER) are untouched,
-as the plan said. Run_code screenshots land in the MAIN checkout root, the MCP
-screenshot tool's in the worktree root — both cleaned up. Worktree teardown
-per the memory note (junction `node_modules` first, kill the `next dev` node
-children on :3000).
+**To know.** The dev database had a THIRD sub-department "TEST SEP26 Payroll
+Full Cycle" (empty, no directors) — it gets a frame and no line; prod showed
+only Fair and IR. People › Hierarchy's own per-root dashed lines (a fan under
+KRIS with lines to PETER) are untouched, as the plan said; the CEO layer, FAA
+and the person card on People Management stay in TODOS. Run_code screenshots
+land in the MAIN checkout root, the MCP screenshot tool's in the worktree root
+— both cleaned up.
 
 ## ═══ CHECKPOINT 2026-09-12 — the plan this was built from ═══
 
