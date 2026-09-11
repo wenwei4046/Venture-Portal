@@ -13,6 +13,9 @@ import Link from "next/link";
 import { bandFor } from "@/lib/member/calculator";
 import MemberQuoteBuilder from "./MemberQuoteBuilder";
 import MemberSearch, { type MemberSearchItem } from "./MemberSearch";
+import PortalViewSwitcher from "@/components/layout/PortalViewSwitcher";
+import PrincipalRevenuePanels, { RevenueManagementButton } from "./PrincipalRevenuePanels";
+import principalStyles from "./PrincipalRevenuePanels.module.css";
 import { categoryLabel } from "@/lib/member/catalog";
 import {
   getMemberBackTarget,
@@ -376,6 +379,7 @@ export default function MemberWorkspace({
     [teamSearch, setTeamSearch] = useState(""),
     [busyAck, setBusyAck] = useState(false);
   const membershipsRef = useRef(data.memberships);
+  const principalView = data.principalView === true;
   membershipsRef.current = data.memberships;
   const member =
     data.memberships.find((m) => m.id === department) ?? data.memberships[0];
@@ -387,7 +391,7 @@ export default function MemberWorkspace({
   const memos = data.memos.filter(
     (m) => !m.departments.length || m.departments.includes(member?.name ?? ""),
   );
-  const actionCount = memos.filter(
+  const actionCount = principalView ? 0 : memos.filter(
     (m) => m.requiresAck && !m.acknowledgedAt,
   ).length;
   const attentionCount =
@@ -657,7 +661,7 @@ export default function MemberWorkspace({
         : []),
       {
         id: "income",
-        label: "My income",
+        label: principalView ? "Team income" : "My income",
         description: "Commission, salary and incentives",
         keywords: "rank payout earnings",
         group: "Quick links",
@@ -665,7 +669,7 @@ export default function MemberWorkspace({
       },
       {
         id: "team",
-        label: "My team",
+        label: principalView ? "Team hierarchy" : "My team",
         description: "People and reporting relationships",
         keywords: "hierarchy members capacity",
         group: "Quick links",
@@ -689,7 +693,7 @@ export default function MemberWorkspace({
       },
       {
         id: "account",
-        label: "My account",
+        label: principalView ? "Principal account" : "My account",
         description: "Department, appearance and preferences",
         keywords: "settings profile dark light fair ir switch",
         group: "Quick links",
@@ -838,6 +842,7 @@ export default function MemberWorkspace({
   }
   async function readMemo(m: MemberMemo) {
     setSelectedMemo(m.id);
+    if (principalView) return;
     if (m.readAt) return;
     if (data.demo) {
       setData((d) => ({
@@ -864,6 +869,7 @@ export default function MemberWorkspace({
     }
   }
   async function ackMemo(m: MemberMemo) {
+    if (principalView) return;
     setBusyAck(true);
     try {
       if (!data.demo) {
@@ -2006,7 +2012,7 @@ export default function MemberWorkspace({
               </div>
               <Icon name="chevron" size={16} />
             </button>
-            <Link className={s.listRow} href="/member/login">
+            <Link className={s.listRow} href="/login">
               <div className={s.listIcon}>
                 <Icon name="user" />
                 <span>Member sign-in</span>
@@ -2077,6 +2083,12 @@ export default function MemberWorkspace({
           </div>
         </aside>
         <div className={s.shell}>
+          {principalView && <div className={principalStyles.toolbar}>
+            <PortalViewSwitcher value="revenue_member" />
+            <label><span>Department</span><select aria-label="Revenue department" value={member?.id ?? ""} onChange={event => changeDepartment(event.target.value)}>
+              {data.memberships.map(membership => <option key={membership.id} value={membership.id}>{membership.name}</option>)}
+            </select></label>
+          </div>}
           <header className={s.topbar}>
             {backTarget && (
               <button
@@ -2104,7 +2116,7 @@ export default function MemberWorkspace({
             <button
               type="button"
               className={s.workspaceNotifications}
-              aria-label={`Notifications, ${actionCount} awaiting acknowledgement`}
+              aria-label={principalView ? "Team memos" : `Notifications, ${actionCount} awaiting acknowledgement`}
               onClick={() => navigate("memos")}
             >
               <Icon name="bell" size={21} />
@@ -2130,22 +2142,27 @@ export default function MemberWorkspace({
               <>
                 <div className={s.titleRow}>
                   <div>
-                    <h1>Your workspace is being prepared</h1>
+                    <h1>{principalView ? "Revenue setup" : "Your workspace is being prepared"}</h1>
                     <p className={`${s.sub} ${s.intro}`}>
                       {data.message ??
-                        "Ask HR to link your member account and sub-department."}
+                        (principalView ? "Configure an active Revenue scheme to open the team workspace." : "Ask HR to link your member account and sub-department.")}
                     </p>
                   </div>
                 </div>
-                <Empty title="No member profile linked">
-                  Your income and team become available once your access and
-                  appointment are confirmed.
+                <Empty title={principalView ? "Revenue information is not available yet" : "No member profile linked"}>
+                  {principalView ? "Your Principal account can manage Revenue configuration and member services." : "Your income and team become available once your access and appointment are confirmed."}
                 </Empty>
+                {principalView && <RevenueManagementButton destination="/revenue">Revenue configuration</RevenueManagementButton>}
               </>
             ) : (
               <>
-                {page === "today" && Today()}
-                {page === "income" && Income()}
+                {principalView && page !== "quote" && <PrincipalRevenuePanels
+                  key={`${member.id}-${page}`} data={data} member={member} page={page}
+                  navigate={navigate} onRequest={setSelectedRequest} onMemo={setSelectedMemo}
+                  dark={dark} onTheme={theme}
+                />}
+                {!principalView && page === "today" && Today()}
+                {!principalView && page === "income" && Income()}
                 {page === "quote" && member.calculator && (
                   <MemberQuoteBuilder
                     data={data}
@@ -2158,10 +2175,10 @@ export default function MemberWorkspace({
                     productSelection={productSelection}
                   />
                 )}{" "}
-                {page === "team" && Team()}
-                {page === "requests" && Requests()}
-                {page === "memos" && Memos()}
-                {page === "account" && Account()}
+                {!principalView && page === "team" && Team()}
+                {!principalView && page === "requests" && Requests()}
+                {!principalView && page === "memos" && Memos()}
+                {!principalView && page === "account" && Account()}
               </>
             )}
             <div className={s.freshness}>
@@ -2191,7 +2208,7 @@ export default function MemberWorkspace({
           {dialog.content}
         </Modal>
       )}
-      {requestKind && member && (
+      {requestKind && member && !principalView && (
         <Modal
           title={
             {
@@ -2230,7 +2247,7 @@ export default function MemberWorkspace({
                       : "neutral"
                 }
               >
-                {activeMemo.acknowledgedAt
+                {principalView ? "Team memo" : activeMemo.acknowledgedAt
                   ? "Acknowledged"
                   : activeMemo.requiresAck
                     ? "Your acknowledgement is needed"
@@ -2245,7 +2262,7 @@ export default function MemberWorkspace({
               {activeMemo.effectiveAt}
             </p>
             <div className={s.memoBody}>{activeMemo.body}</div>
-            {activeMemo.requiresAck && (
+            {activeMemo.requiresAck && !principalView && (
               <button
                 className={`${s.button} ${s.primary} ${s.full}`}
                 disabled={!!activeMemo.acknowledgedAt || busyAck || !online}
@@ -2377,7 +2394,8 @@ function RequestDetail({
         <span className={s.caption}>{date(request.createdAt)}</span>
       </div>
       <p className={s.caption}>Request ID · {request.id}</p>
-      {["needs_info", "returned"].includes(request.status) && (
+      {data.principalView && <RevenueManagementButton>Review in Member Services</RevenueManagementButton>}
+      {!data.principalView && ["needs_info", "returned"].includes(request.status) && (
         <button className={s.button + " " + s.primary} onClick={onEdit}>
           Update details and resubmit
         </button>

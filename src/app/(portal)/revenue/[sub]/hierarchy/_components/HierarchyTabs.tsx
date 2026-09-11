@@ -17,7 +17,10 @@ export type HierarchyTab = 'chart' | 'team'
  *   chart  arranges independent department memberships on one canvas;
  *          targeted drops, Upline and connector edits change reporting lines;
  *   table  changes nothing but the RANK (and the rate mode that rides with
- *          it); the upline column is who they report to, read-only.
+ *          it); the upline column is who they report to, read-only. Since
+ *          2026-09-11 it also says who the sub-department REPORTS TO — its
+ *          Revenue Director(s), a reporting line above every tree that no
+ *          override climbs — and that is set there.
  *
  * The tab is `?tab=team`, pushed with the browser's own history so Next
  * syncs `useSearchParams` without a round trip.
@@ -61,23 +64,26 @@ export default function HierarchyTabs({
             {tab === 'team' ? (
               subDept.isHome ? (
                 <>
-                  Everyone on {subDept.name}: the title they hold, the rank they are paid from, and
-                  who they report to. Only the <em>rank</em> is set here — a title gives its rank
-                  on its own, and who somebody reports to is moved on the chart.
+                  Who {subDept.name} reports to, then everyone on it: the title they hold, the
+                  rank they are paid from, and who they report to. Only the <em>rank</em> is set
+                  here — a title gives its rank on its own, and who somebody reports to is moved
+                  on the chart.
                 </>
               ) : (
                 <>
-                  Who is in {subDept.name}, the title each holds <em>here</em>, the rank they are
-                  paid from, and who they earn under. Titles, ranks and membership are set here;
-                  who earns under whom is moved on the chart. None of it touches People.
+                  Who {subDept.name} reports to, then who is in it: the title each holds{' '}
+                  <em>here</em>, the rank they are paid from, and who they earn under. Titles,
+                  ranks and membership are set here; who earns under whom is moved on the chart.
+                  None of it touches People.
                 </>
               )
             ) : (
               <>
-                Explore every sub-department on one canvas. Drag a team or department
-                border or heading to move it freely. Members align inside; teams grow
-                as people join and make space for each other. Hold over a person until
-                the transfer prompt appears to change upline. The Team tab edits {subDept.name}.
+                Explore every sub-department on one canvas. Its Revenue Director stands at the
+                top of the frame, and every team leader and standalone member reports to them —
+                a reporting line only, with no override. Drag a team or department border or
+                heading to move it freely. Hold over a person until the transfer prompt appears
+                to change upline. The Team tab edits {subDept.name}.
               </>
             )}
           </p>
@@ -92,6 +98,9 @@ export default function HierarchyTabs({
           ranks={team.ranks}
           titles={team.titles}
           candidates={team.candidates}
+          directors={team.directors}
+          directorCandidates={team.directorCandidates}
+          subDepartmentId={team.subDepartmentId}
           schemeId={schemeId}
           subDeptName={subDept.name}
           isHome={subDept.isHome}

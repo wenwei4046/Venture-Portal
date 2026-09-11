@@ -14,6 +14,20 @@ complete. QA audit on 2026-04-11. See `.gstack/qa-reports/qa-report-phase3-2026-
 
 ---
 
+## Owed — Revenue Director (2026-09-11)
+
+- **The CEO above the directors.** The user: "Revenue Director 上面就是
+  CEO（CEO 部分后续再处理）". Today a director reports to nobody on the
+  People chart. When the CEO layer comes: a `titles` flag or a company-level
+  row above `is_department_head`, drawn above every director on People, and
+  nothing on Revenue (no override, no rank there either).
+- **FAA.** The user named FAIR / FAA as the sub-departments reporting to Chris
+  and Peter. Only Fair and IR exist; when FAA is created, add its directors on
+  its Team tab (Reports to) — nothing else is needed.
+- **The person card on People Management** (`card-actions.ts`) still shows
+  only `reports_to` under *Reports to*; the derived director line is drawn on
+  the two charts and the two tables, not there yet.
+
 ## Owed — one line (2026-09-10)
 
 - ~~Person → sub-department column~~ — done 2026-09-10 the other way round:

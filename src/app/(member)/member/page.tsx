@@ -8,7 +8,7 @@ export const metadata = { title: "My Revenue · HOUZS Venture" };
 
 export default async function MemberPage() {
   const user = await getUser();
-  if (!user) redirect("/member/login");
+  if (!user) redirect("/login");
   const data = await loadMemberData();
   return <MemberWorkspace initialData={data} />;
 }

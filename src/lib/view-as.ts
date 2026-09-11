@@ -8,7 +8,7 @@ export const VIEW_AS_COOKIE = 'vp-view-as'
 
 // dept_manager is excluded: their pages key off user.department_id, which a
 // Principal account doesn't have.
-export const VIEW_AS_ROLES = ['hr', 'finance'] as const
+export const VIEW_AS_ROLES = ['hr', 'finance', 'revenue_member'] as const
 export type ViewAsRole = (typeof VIEW_AS_ROLES)[number]
 
 export function isViewAsRole(value: string): value is ViewAsRole {

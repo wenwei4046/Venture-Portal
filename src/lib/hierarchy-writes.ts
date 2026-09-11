@@ -142,9 +142,9 @@ async function updateChecked(
  * and RLS-shaped text would be rendered verbatim to whoever made the move.
  * Known codes get a sentence written here; the triggers that refuse a line
  * write theirs for a reader (23LAD the ladder, 23BND the department edge,
- * 23REC a title that cannot hold downlines, 23RNK a title with no rung) and
- * those pass through; anything else gets a shrug, and the detail stays in the
- * server log.
+ * 23REC a title that cannot hold downlines, 23RNK a title with no rung,
+ * 23DIR a department head where one may not be) and those pass through;
+ * anything else gets a shrug, and the detail stays in the server log.
  */
 export function safeReason(error: { code?: string; message: string }): string {
   switch (error.code) {
@@ -156,6 +156,7 @@ export function safeReason(error: { code?: string; message: string }): string {
     case '23RNK':
     case '23CAP':
     case '23MEM':
+    case '23DIR':
       return error.message
     case '23P01':
       return 'they already hold a position covering that period'
@@ -177,6 +178,12 @@ export interface LineFacts extends LineManager {
   reportsTo: string | null
   titleId: string | null
   departmentId: string | null
+  /**
+   * Their title heads the department (Revenue Director, 2026-09-11). Inside a
+   * commission department the line to them is derived from the sub-department
+   * rather than written: see `moveReportingLine`.
+   */
+  isDepartmentHead: boolean
 }
 
 interface StaffRow {
@@ -186,7 +193,7 @@ interface StaffRow {
   reports_to: string | null
   title_id: string | null
   department_id: string | null
-  titles: { name: string } | { name: string }[] | null
+  titles: { name: string; is_department_head: boolean | null } | { name: string; is_department_head: boolean | null }[] | null
   departments:
     | { name: string; payroll_source: string }
     | Array<{ name: string; payroll_source: string }>
@@ -215,7 +222,7 @@ export async function loadLineFacts(
   const { data, error } = await supabase
     .from('hr_staff_costs')
     .select(
-      'id, employee_name, status, reports_to, title_id, department_id, titles (name), departments (name, payroll_source)',
+      'id, employee_name, status, reports_to, title_id, department_id, titles (name, is_department_head), departments (name, payroll_source)',
     )
     .in('id', wanted)
   if (error) throw new Error(`Could not read the roster: ${safeReason(error)}`)
@@ -252,6 +259,7 @@ export async function loadLineFacts(
           department: dept?.name ?? null,
           commissionDept: dept?.payroll_source === 'commission',
           canRecruit: recruit.get(r.id) ?? null,
+          isDepartmentHead: one(r.titles)?.is_department_head === true,
         },
       ]
     }),
@@ -262,9 +270,13 @@ export async function loadLineFacts(
  * What a move came back with. Returned, never thrown, because Next redacts
  * the message of an error thrown out of a Server Action in production and
  * the reason is the whole point of a refusal.
+ *
+ * `reportsTo` is what the column now holds — not always the manager that was
+ * asked for: dropping a Revenue person on the department's head writes null
+ * (see `moveReportingLine`), and an undo has to put back what was written.
  */
 export type LineResult =
-  | { ok: true; mover: LineFacts; manager: LineFacts | null }
+  | { ok: true; mover: LineFacts; manager: LineFacts | null; reportsTo: string | null }
   | { ok: false; reason: string }
 
 /**
@@ -281,6 +293,15 @@ export type LineResult =
  * The home membership follows inside the same statement — the trigger runs
  * before this returns — so a caller that re-reads the chart afterwards sees
  * both already agreeing.
+ *
+ * REVENUE DIRECTOR (2026-09-11): inside a commission department the head of
+ * the department is where every line ENDS, not somebody to point a column
+ * at. Which head(s) the top of a tree reports to is a fact of the
+ * sub-department (`comm_sub_department_directors`) and is drawn from there —
+ * two directors would not fit in one column anyway. So a move "under" a head
+ * writes null: the person becomes the top of a tree, nobody earns an override
+ * on their sales, and the chart draws the director line itself. Outside a
+ * commission department a head is an ordinary manager and the line is kept.
  */
 export async function moveReportingLine(
   supabase: SupabaseClient,
@@ -301,11 +322,13 @@ export async function moveReportingLine(
   const refusal = lineRefusal(mover, manager)
   if (refusal) return { ok: false, reason: refusal }
 
-  if (mover.reportsTo === reportsToId) return { ok: true, mover, manager }
+  const written = mover.commissionDept && manager?.isDepartmentHead ? null : reportsToId
+
+  if (mover.reportsTo === written) return { ok: true, mover, manager, reportsTo: written }
 
   const { data, error } = await supabase
     .from('hr_staff_costs')
-    .update({ reports_to: reportsToId })
+    .update({ reports_to: written })
     .eq('id', staffId)
     .select('id')
   if (error) return { ok: false, reason: safeReason(error) }
@@ -313,7 +336,7 @@ export async function moveReportingLine(
     return { ok: false, reason: 'the row is gone, or is not visible to this account' }
   }
 
-  return { ok: true, mover: { ...mover, reportsTo: reportsToId }, manager }
+  return { ok: true, mover: { ...mover, reportsTo: written }, manager, reportsTo: written }
 }
 
 /** What a membership write is asked to change. Anything absent is kept. */
@@ -563,4 +586,49 @@ async function loadNames(supabase: SupabaseClient, ids: Array<string | null>): P
   if (wanted.length === 0) return new Map()
   const { data } = await supabase.from('hr_staff_costs').select('id, employee_name').in('id', wanted)
   return new Map(((data ?? []) as Array<{ id: string; employee_name: string }>).map(r => [r.id, r.employee_name]))
+}
+
+/**
+ * Make a department head a director of a sub-department: from now on every
+ * team leader and standalone member there reports to them (2026-09-11). A
+ * reporting line only — nothing in `comm_hierarchy` moves, and no override
+ * reaches a director. The database refuses anybody who is not on the roster,
+ * not in the sub-department's department, or not holding a title that heads
+ * it (`comm_sub_department_directors_guard`, 23DIR).
+ */
+export async function assignDirector(
+  supabase: SupabaseClient,
+  userId: string,
+  subDepartmentId: string,
+  staffId: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const { error } = await supabase.from('comm_sub_department_directors').insert({
+    sub_department_id: subDepartmentId,
+    staff_id: staffId,
+    created_by: userId,
+  })
+  if (error) {
+    if (error.code === '23505') return { ok: false, reason: 'They already direct this sub-department.' }
+    return { ok: false, reason: safeReason(error) }
+  }
+  return { ok: true }
+}
+
+/** A sub-department stops reporting to one of its directors. Nobody else moves. */
+export async function unassignDirector(
+  supabase: SupabaseClient,
+  subDepartmentId: string,
+  staffId: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const { data, error } = await supabase
+    .from('comm_sub_department_directors')
+    .delete()
+    .eq('sub_department_id', subDepartmentId)
+    .eq('staff_id', staffId)
+    .select('staff_id')
+  if (error) return { ok: false, reason: safeReason(error) }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'They do not direct this sub-department, or the row is not visible to this account.' }
+  }
+  return { ok: true }
 }

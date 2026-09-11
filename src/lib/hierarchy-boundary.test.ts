@@ -79,6 +79,13 @@ describe('recruitRefusal', () => {
     expect(recruitRefusal(rev('Ali'), leader('Ben'))).toBeNull()
   })
 
+  it('allows the department head, who has no rung and may hold everybody (2026-09-11)', () => {
+    // `comm_title_can_recruit` answers true for a title that heads the
+    // department, so the facts arrive with canRecruit = true and no rung.
+    expect(recruitRefusal(rev('Ali'), leader('Peter', { title: 'Revenue Director', canRecruit: true }))).toBeNull()
+    expect(lineRefusal(rev('Ali'), leader('Peter', { title: 'Revenue Director', canRecruit: true }))).toBeNull()
+  })
+
   it('refuses a title that cannot hold downlines — an RS under an RS is not a line', () => {
     const note = recruitRefusal(rev('Ali'), leader('Ben', { title: 'Revenue Specialist', canRecruit: false }))
     expect(note).toBe(

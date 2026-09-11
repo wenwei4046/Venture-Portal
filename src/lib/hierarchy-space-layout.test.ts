@@ -3,15 +3,21 @@ import {
   alignSpaceTeams,
   buildSpaceTeams,
   departmentPositionKey,
+  directorRowHeight,
   geometryForSpaces,
   initialSpacePositions,
   resolveSpaceOverlaps,
   spaceConnectionPoints,
   SPACE_DEPARTMENT_GAP,
+  SPACE_DEPARTMENT_HEADER,
+  SPACE_DEPARTMENT_PADDING,
+  SPACE_DIRECTOR_GAP,
+  SPACE_DIRECTOR_X_GAP,
   SPACE_TEAM_GAP,
   SPACE_TEAM_HEADER,
   type SpaceMember,
 } from './hierarchy-space-layout'
+import { NODE_HEIGHT, NODE_WIDTH } from './org-layout'
 import { collisionOffset, rectanglePoints, type Bounds, type Point } from './hierarchy-spaces'
 
 const departments = [{ id: 'fa', name: 'FA' }, { id: 'ir', name: 'IR' }]
@@ -276,5 +282,72 @@ describe('resolveSpaceOverlaps', () => {
     for (const department of geometry.departments.filter(department => department.id !== 'empty')) {
       expect(collisionOffset(rectanglePoints(empty.bounds), rectanglePoints(department.bounds), SPACE_DEPARTMENT_GAP)).toBeNull()
     }
+  })
+})
+
+describe('the director row (Revenue Director, 2026-09-11)', () => {
+  const directed = [
+    { id: 'fa', name: 'FA', directors: [{ id: 'fa:peter', name: 'PETER' }, { id: 'fa:kris', name: 'KRIS' }] },
+    { id: 'ir', name: 'IR', directors: [{ id: 'ir:peter', name: 'PETER' }] },
+  ]
+  const members = [
+    member('anthony', 'fa', null, 'Anthony'), member('yuny', 'fa', 'anthony', 'Yuny'),
+    member('chea', 'fa', null, 'Chea'), member('rachael', 'ir', null, 'Rachael'),
+  ]
+
+  it('reserves a row above the teams, inside the frame, and places the cards side by side under the header', () => {
+    const teams = buildSpaceTeams(members)
+    const positions = initialSpacePositions(directed, members, teams)
+    const plain = geometryForSpaces(departments, members, teams, positions).departments.find(d => d.id === 'fa')!
+    const fa = geometryForSpaces(directed, members, teams, positions).departments.find(d => d.id === 'fa')!
+    expect(fa.directors.map(d => d.id)).toEqual(['fa:peter', 'fa:kris'])
+    expect(fa.bounds.height - plain.bounds.height).toBe(directorRowHeight(directed[0]))
+    expect(fa.bounds.y).toBe(plain.bounds.y - directorRowHeight(directed[0]))
+    // Under the header, above every team, and inside the frame.
+    const [peter, kris] = fa.directors
+    expect(peter.y).toBe(fa.bounds.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING)
+    expect(kris.y).toBe(peter.y)
+    expect(kris.x - peter.x).toBe(NODE_WIDTH + SPACE_DIRECTOR_X_GAP)
+    expect(peter.x).toBeGreaterThanOrEqual(fa.bounds.x)
+    expect(kris.x + NODE_WIDTH).toBeLessThanOrEqual(fa.bounds.x + fa.bounds.width)
+    const teamTop = Math.min(...geometryForSpaces(directed, members, teams, positions).teams
+      .filter(team => team.departmentId === 'fa').map(team => team.bounds.y))
+    expect(peter.y + NODE_HEIGHT + SPACE_DIRECTOR_GAP).toBeLessThanOrEqual(teamTop)
+    expect(fa.contentTop).toBe(peter.y + NODE_HEIGHT + SPACE_DIRECTOR_GAP)
+  })
+
+  it('widens a narrow frame symmetrically so two directors fit, and keeps a plain frame as it was', () => {
+    const teams = buildSpaceTeams(members)
+    const positions = initialSpacePositions(directed, members, teams)
+    const geometry = geometryForSpaces(directed, members, teams, positions)
+    const ir = geometry.departments.find(d => d.id === 'ir')!
+    const plainIr = geometryForSpaces(departments, members, teams, positions).departments.find(d => d.id === 'ir')!
+    // One director fits inside a one-team frame: no widening.
+    expect(ir.bounds.width).toBe(plainIr.bounds.width)
+    expect(ir.bounds.x).toBe(plainIr.bounds.x)
+    // Two would not fit inside IR's width; give IR both and it grows both ways.
+    const wide = geometryForSpaces([directed[0], { ...directed[1], directors: directed[0].directors }], members, teams, positions)
+      .departments.find(d => d.id === 'ir')!
+    const rowWidth = 2 * NODE_WIDTH + SPACE_DIRECTOR_X_GAP + 2 * SPACE_DEPARTMENT_PADDING
+    expect(wide.bounds.width).toBe(Math.max(plainIr.bounds.width, rowWidth))
+    expect(wide.bounds.x + wide.bounds.width / 2).toBeCloseTo(plainIr.bounds.x + plainIr.bounds.width / 2, 6)
+  })
+
+  it('gives an empty department its director row above the empty notice', () => {
+    const withEmpty = [...directed, { id: 'faa', name: 'FAA', directors: [{ id: 'faa:kris', name: 'KRIS' }] }]
+    const teams = buildSpaceTeams(members)
+    const positions = initialSpacePositions(withEmpty, members, teams)
+    const faa = geometryForSpaces(withEmpty, members, teams, positions).departments.find(d => d.id === 'faa')!
+    expect(faa.directors).toHaveLength(1)
+    expect(faa.contentTop).toBe(faa.directors[0].y + NODE_HEIGHT + SPACE_DIRECTOR_GAP)
+    expect(faa.contentTop).toBeLessThan(faa.bounds.y + faa.bounds.height)
+  })
+
+  it('keeps every department clear of its neighbours with the row included', () => {
+    const teams = buildSpaceTeams(members)
+    const positions = resolveSpaceOverlaps(directed, members, teams, initialSpacePositions(directed, members, teams))
+    const geometry = geometryForSpaces(directed, members, teams, positions)
+    const [a, b] = geometry.departments
+    expect(collisionOffset(rectanglePoints(a.bounds), rectanglePoints(b.bounds), SPACE_DEPARTMENT_GAP)).toBeNull()
   })
 })

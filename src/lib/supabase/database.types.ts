@@ -6603,6 +6603,7 @@ export type Database = {
           department_id: string | null
           id: string
           is_active: boolean
+          is_department_head: boolean
           level_id: string | null
           name: string
           sort_order: number
@@ -6614,6 +6615,7 @@ export type Database = {
           department_id?: string | null
           id?: string
           is_active?: boolean
+          is_department_head?: boolean
           level_id?: string | null
           name: string
           sort_order?: number
@@ -6625,6 +6627,7 @@ export type Database = {
           department_id?: string | null
           id?: string
           is_active?: boolean
+          is_department_head?: boolean
           level_id?: string | null
           name?: string
           sort_order?: number

@@ -46,11 +46,11 @@ export async function middleware(request: NextRequest) {
   const { data: verified } = await supabase.auth.getClaims()
   const user = verified?.claims ?? null
 
-  const isLoginPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/member/login'
+  const isLoginPage = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/member/login'
 
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone()
-    url.pathname = request.nextUrl.pathname.startsWith('/member') ? '/member/login' : '/login'
+    url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 

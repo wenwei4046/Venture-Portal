@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { promotesTo, type LadderRung } from '@/lib/commission/titles'
 import {
+  assignDirector,
   closeMembership,
   loadOpenPositions,
   loadRungs,
@@ -14,6 +15,7 @@ import {
   openMembership,
   safeReason,
   setMembership,
+  unassignDirector,
   type LineResult,
 } from '@/lib/hierarchy-writes'
 import { listSubDepartments, type SubDepartment } from './_lib/sub-departments'
@@ -254,6 +256,47 @@ export async function removeMember(formData: FormData): Promise<RankOutcome> {
   }
 
   const result = await closeMembership(supabase, schemeId, staffId)
+  if (!result.ok) return { ok: false, note: result.reason }
+  refresh()
+  return { ok: true, note: null }
+}
+
+/**
+ * Who a sub-department REPORTS TO (user, 2026-09-11): a department head —
+ * the Revenue Director — added on the Team tab. From then on every team
+ * leader and standalone member of the sub-department reports to them, drawn
+ * above every tree on the chart. A reporting line only: the director holds
+ * no rank and no override reaches them, so nothing in `comm_hierarchy` moves.
+ * The database refuses anybody who does not hold a title that heads the
+ * department (23DIR); the reason comes back as the note.
+ */
+export async function addDirector(formData: FormData): Promise<RankOutcome> {
+  const user = await requirePermission('revenue')
+  const supabase = await client()
+
+  const subDepartmentId = ((formData.get('sub_department_id') as string) ?? '').trim()
+  const staffId = ((formData.get('staff_id') as string) ?? '').trim()
+  if (!subDepartmentId || !staffId) return { ok: false, note: 'Pick a director.' }
+
+  const sub = (await listSubDepartments()).find(s => s.id === subDepartmentId)
+  if (!sub) return { ok: false, note: 'That sub-department does not exist.' }
+
+  const result = await assignDirector(supabase, user.id, subDepartmentId, staffId)
+  if (!result.ok) return { ok: false, note: result.reason }
+  refresh()
+  return { ok: true, note: null }
+}
+
+/** A sub-department stops reporting to one of its directors. Nobody else moves. */
+export async function removeDirector(formData: FormData): Promise<RankOutcome> {
+  await requirePermission('revenue')
+  const supabase = await client()
+
+  const subDepartmentId = ((formData.get('sub_department_id') as string) ?? '').trim()
+  const staffId = ((formData.get('staff_id') as string) ?? '').trim()
+  if (!subDepartmentId || !staffId) return { ok: false, note: 'Which director?' }
+
+  const result = await unassignDirector(supabase, subDepartmentId, staffId)
   if (!result.ok) return { ok: false, note: result.reason }
   refresh()
   return { ok: true, note: null }

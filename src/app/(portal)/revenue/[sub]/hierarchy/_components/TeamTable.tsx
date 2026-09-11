@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { earnedFloor } from '@/lib/commission/titles'
 import { rankLabelOf } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
+import { headsLabel } from '@/lib/department-heads'
 import { addMember, removeMember, setStaffRank, updateStaffTax, type RankOutcome } from '../../../hierarchy-actions'
+import DirectorsSection from './DirectorsSection'
 import {
   ActionForm,
   Choice,
@@ -17,7 +19,7 @@ import {
   Tick,
   toPct,
 } from '@/components/RowForm'
-import type { MemberCandidate, RankRow, SalespersonRow, TitleRow } from '../../../_components/config/types'
+import type { DirectorRow, MemberCandidate, RankRow, SalespersonRow, TitleRow } from '../../../_components/config/types'
 
 /**
  * The Team table — one row per member of this sub-department.
@@ -44,6 +46,12 @@ import type { MemberCandidate, RankRow, SalespersonRow, TitleRow } from '../../.
  * editable here because it is a payroll fact of the person with no other
  * home in the module.
  *
+ * Above the members sits who the sub-department REPORTS TO — its Revenue
+ * Director(s), 2026-09-11 (`DirectorsSection`). A director is never a row
+ * here: they hold no rank. The Upline column of somebody at the top of a
+ * tree names them instead of "top of a tree", because that is who the leader
+ * reports to — a reporting line, with no override.
+ *
  * Every save goes through `setStaffRank`, which writes a new effective-dated
  * position. It comes back with a note — the rank now sits above the title,
  * or why it could not be set — by returning, not throwing, so `RowForm`'s
@@ -54,6 +62,9 @@ export default function TeamTable({
   ranks,
   titles,
   candidates,
+  directors,
+  directorCandidates,
+  subDepartmentId,
   schemeId,
   subDeptName,
   isHome,
@@ -62,12 +73,17 @@ export default function TeamTable({
   ranks: RankRow[]
   titles: TitleRow[]
   candidates: MemberCandidate[]
+  directors: DirectorRow[]
+  directorCandidates: DirectorRow[]
+  subDepartmentId: string
   schemeId: string
   subDeptName: string
   isHome: boolean
 }) {
   const [note, setNote] = useState<RankOutcome | null>(null)
   const nameOf = new Map(people.map(p => [p.staff_id, p.employee_name]))
+  // Who the top of a tree reports to: the sub-department's directors, A→Z.
+  const reportsTo = headsLabel(directors.map(d => d.employee_name))
 
   // The ladder, top down — the most senior title first, the same title
   // together, names A→Z on a rung — the order the People roster reads in
@@ -105,6 +121,24 @@ export default function TeamTable({
 
   return (
     <section>
+      {note?.note ? (
+        <div
+          className={`rounded-md p-3 mb-4 text-sm font-sans border ${
+            note.ok ? 'bg-accent-bg border-accent-border text-accent' : 'bg-danger-bg border-danger/50 text-danger'
+          }`}
+        >
+          {note.note}
+        </div>
+      ) : null}
+
+      <DirectorsSection
+        directors={directors}
+        candidates={directorCandidates}
+        subDepartmentId={subDepartmentId}
+        subDeptName={subDeptName}
+        onDone={done}
+      />
+
       <SectionHead title="Team" count={`${people.length} PEOPLE`} />
       <Hint>
         {isHome ? (
@@ -134,16 +168,6 @@ export default function TeamTable({
           <> Group packages are checked each month, including a manually assigned package rank. If no direct group qualifies, the percentage rank below the package applies for that month.</>
         ) : null}
       </Hint>
-
-      {note?.note ? (
-        <div
-          className={`rounded-md p-3 mb-4 text-sm font-sans border ${
-            note.ok ? 'bg-accent-bg border-accent-border text-accent' : 'bg-danger-bg border-danger/50 text-danger'
-          }`}
-        >
-          {note.note}
-        </div>
-      ) : null}
 
       {!isHome ? (
         <div className="border border-hairline rounded-md bg-surface p-4 mb-4">
@@ -309,6 +333,13 @@ export default function TeamTable({
                     <td className="font-serif italic text-sm whitespace-nowrap">
                       {p.upline_staff_id ? (
                         <span className="text-graphite">{nameOf.get(p.upline_staff_id) ?? 'somebody not on this chart'}</span>
+                      ) : reportsTo ? (
+                        <span
+                          className="text-muted"
+                          title="The top of a tree reports to the sub-department's director — a reporting line only, no override."
+                        >
+                          top of a tree · reports to {reportsTo}
+                        </span>
                       ) : (
                         <span className="text-muted">top of a tree</span>
                       )}

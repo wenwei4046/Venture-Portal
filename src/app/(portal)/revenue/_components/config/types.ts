@@ -202,14 +202,32 @@ export interface MemberCandidate {
   company_title_name: string | null
 }
 
+/**
+ * A department head — somebody holding a title with `is_department_head`
+ * (2026-09-11). A director of a sub-department, or one who could be.
+ */
+export interface DirectorRow {
+  staff_id: string
+  employee_name: string
+  employee_code: string | null
+  title_name: string | null
+}
+
 /** Staff Hierarchy's load: the ladder, the members, and who could still join. */
 export interface TeamData {
+  /** The sub-department the scheme belongs to — what the directors hang off. */
+  subDepartmentId: string
   ranks: RankRow[]
+  /** The members. A department head is never one: they hold no rank. */
   people: SalespersonRow[]
-  /** Titles a membership may hold — the commission departments' rows of `titles`. */
+  /** Titles a membership may hold — the commission departments' rows of `titles`, heads excluded. */
   titles: TitleRow[]
   /** Empty on the home sub-department: everybody in the department is a member there. */
   candidates: MemberCandidate[]
+  /** Who this sub-department reports to, A→Z. A reporting line only: no override reaches them. */
+  directors: DirectorRow[]
+  /** Heads of the department who do not direct this sub-department yet. */
+  directorCandidates: DirectorRow[]
 }
 
 export interface ProductRow {
