@@ -5,13 +5,14 @@
  * different sub-departments remain independent. Empty sections also store
  * their own origin.
  *
- * Blank-space card drops and department-heading drags change this reading
- * layout. A targeted drop armed by a 450ms hover, an Upline action or a
- * connector writes the validated reporting line separately. Transfers keep
- * the subtree's internal arrangement; failed or cancelled transfers restore
+ * Team/department border and heading drags change this reading layout. Members
+ * align inside each team around its freely chosen leader origin. Blank-space
+ * card drops spring back to their slots. A targeted drop armed by a 450ms hover,
+ * an Upline action or a connector writes the validated reporting line separately.
+ * Transfers align the affected trees; failed or cancelled transfers restore
  * its starting positions. Blank-space drops never detach an upline.
  * On release, overlap resolution shifts teams or departments as whole groups.
- * Tidy repeats that spacing without resetting or clearing this memory.
+ * Tidy aligns members and repeats spacing without resetting team origins.
  *
  * Kept behind a `StorageLike` so the parsing can be tested with a Map and the
  * component never touches `window` during a server render.

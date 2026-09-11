@@ -1837,7 +1837,14 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .space-department { fill: rgb(var(--space-tone) / .08); stroke: rgb(var(--space-tone) / .6); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
 .space-department.active { fill: rgb(var(--space-tone) / .12); stroke: rgb(var(--space-tone) / .9); }
 .space-department.moving { stroke-width: 1.8; }
-.space-team { fill: rgb(var(--cv-card) / .5); stroke: rgb(var(--space-tone) / .4); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.space-team { fill: rgb(var(--cv-card) / .82); stroke: rgb(var(--space-tone) / .45); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.space-team.moving { stroke: rgb(var(--space-tone)); stroke-width: 1.8; }
+.space-frame-border {
+  position: absolute; z-index: 1; padding: 0; border: 0; border-radius: 4px;
+  background: transparent; pointer-events: auto; cursor: grab; touch-action: none;
+}
+.space-frame-border:hover { background: rgb(var(--accent) / .12); }
+.space-frame-border:focus-visible { outline: 2px solid rgb(var(--accent)); }
 .space-department-heading {
   position: absolute; display: flex; align-items: center; gap: 12px; padding: 0 18px;
   border: 0; border-bottom: 1px solid rgb(var(--space-tone) / .18); border-radius: 17px 17px 0 0;
@@ -1849,15 +1856,19 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .space-department-heading .space-grip { margin-left: auto; color: rgb(var(--space-tone)); font-size: 22px; opacity: .7; }
 .space-department-heading:hover { background: rgb(var(--space-tone) / .08); }
 .space-department-heading:focus-visible, .space-team-heading:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
-.space-dragging .space-department-heading, .space-dragging .react-flow__pane { cursor: grabbing; }
+.space-dragging .space-department-heading, .space-dragging .space-team-heading,
+.space-dragging .space-frame-border, .space-dragging .react-flow__pane { cursor: grabbing; }
 .space-team-heading {
-  position: absolute; display: flex; align-items: center; gap: 12px;
-  height: 24px; max-width: 360px; padding: 0; border: 0; background: transparent;
-  font: 400 13px/24px var(--font-sans), sans-serif; color: rgb(var(--cv-graphite));
-  white-space: nowrap; text-overflow: ellipsis; overflow: hidden; cursor: pointer; pointer-events: auto;
+  position: absolute; z-index: 2; display: flex; align-items: center; gap: 10px;
+  padding: 0 18px; border: 0; border-bottom: 1px solid rgb(var(--cv-border) / .65);
+  border-radius: 19px 19px 0 0; background: rgb(var(--cv-card) / .2);
+  font: 400 13px/1.4 var(--font-sans), sans-serif; color: rgb(var(--cv-graphite));
+  white-space: nowrap; overflow: hidden; cursor: grab; pointer-events: auto; touch-action: none; user-select: none;
 }
-.space-team-heading span { padding-left: 10px; border-left: 1px solid rgb(var(--cv-border)); color: rgb(var(--cv-muted)); flex-shrink: 0; }
-.space-team-heading:hover { color: rgb(var(--cv-ink)); }
+.space-team-heading strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.space-team-heading > span { color: rgb(var(--cv-muted)); flex-shrink: 0; font-size: 11px; }
+.space-team-heading .space-grip { margin-left: auto; font-size: 20px; opacity: .7; }
+.space-team-heading:hover { color: rgb(var(--cv-ink)); background: rgb(var(--cv-card) / .5); }
 .space-empty { position: absolute; color: rgb(var(--cv-graphite)); font: 400 14px/1.5 var(--font-sans), sans-serif; }
 .space-canvas .space-person:hover { transform: none; }
 .space-canvas .space-person { border-top: 2px solid rgb(var(--space-tone) / .7); }
