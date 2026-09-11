@@ -60,8 +60,8 @@ export default function DeptRows({
             </button>
           ))}
         </div>
-        <Link href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`} className="pay-btn sec" title={`Export every staff department for ${payoutBank?.name ?? 'Alliance Bank'}`}>
-          Alliance file · all staff
+        <Link href={`/hr-costing/payroll/${period}/bank-transfer?format=alliance`} className="pay-btn sec" title={`Export all generated staff salary PVs, including paid PVs, for ${payoutBank?.name ?? 'Alliance Bank'}. Open PV records to download a specific payment.`}>
+          All staff generated PVs · includes paid
         </Link>
       </div>
       <div className="pay-table-wrap">
@@ -137,7 +137,7 @@ export default function DeptRows({
           </tfoot>
         </table>
       </div>
-      <p className="pay-muted">Generate by Department creates one PV for all remaining people. Manual generate creates one PV per selected employee. Existing PVs are excluded.</p>
+      <p className="pay-muted">Generate by Department groups remaining payments by department and component. Manual generate creates one PV per selected payment. Payments already covered by a PV are excluded.</p>
     </div>
   )
 }
