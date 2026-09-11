@@ -10,30 +10,35 @@
 .payment-statement .pay-rail a.cur { background: transparent; border-bottom-color: rgb(var(--accent)); box-shadow: none; }
 .payment-statement .pay-rail a b { font-size: 12px; font-weight: 500; }
 .payment-statement .pay-rail a i { font-size: 10px; font-style: normal; color: rgb(var(--muted)); }
-.payment-statement .payment-summary { display: grid; grid-template-columns: 1.22fr 1fr 1fr; padding: 20px 0; margin-bottom: 18px; border-top: 2px solid rgb(var(--ink)); border-bottom: 1px solid rgb(var(--hairline)); }
+.payment-statement .payment-overview { container: payment-report / inline-size; background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-top: 2px solid rgb(var(--ink)); border-radius: 6px; }
+.payment-statement .payment-summary { display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr) minmax(0, 1fr); padding: 20px 24px; margin: 0; background: rgb(var(--surface-2)); border-bottom: 1px solid rgb(var(--hairline)); border-radius: 5px 5px 0 0; }
 .payment-statement .payment-summary > div + div { border-left: 1px solid rgb(var(--hairline)); padding-left: 22px; }
-.payment-statement .payment-label { color: rgb(var(--muted)); font-size: 11px; margin-bottom: 5px; }
+.payment-statement .payment-label { color: rgb(var(--graphite)); font-size: 11px; margin-bottom: 5px; }
 .payment-statement .payment-amount { font-size: 26px; letter-spacing: -.025em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .payment-statement .payment-amount small { font-size: 11px; font-weight: 400; letter-spacing: 0; margin-right: 5px; }
 .payment-statement .payment-under { font-size: 11px; color: rgb(var(--muted)); margin-top: 5px; }
 .payment-statement .good { color: rgb(var(--ledger)); }
 .payment-statement .pending { color: rgb(var(--alert)); }
-.payment-statement .payment-allocation { display: grid; grid-template-columns: 1.3fr 1fr; gap: 28px; padding-bottom: 19px; border-bottom: 1px solid rgb(var(--hairline)); }
+.payment-statement .payment-allocation { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; padding: 22px 24px; }
+.payment-statement .payment-allocation > div { min-width: 0; }
+.payment-statement .payment-allocation > div + div { padding-left: 24px; border-left: 1px solid rgb(var(--hairline)); }
 .payment-statement .payment-allocation h3 { font-size: 12px; font-weight: 500; margin: 0 0 9px; }
 .payment-statement .payment-metric { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 4px 0; font-size: 12px; }
 .payment-statement .payment-metric > :last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .payment-statement .payment-metric.total { border-top: 1px solid rgb(var(--hairline)); margin-top: 5px; padding-top: 8px; font-weight: 500; }
 .payment-statement .payment-contributions { margin-top: 6px; }
-.payment-statement .payment-contributions summary { cursor: pointer; color: rgb(var(--muted)); font-size: 11px; padding: 4px 0; width: fit-content; }
+.payment-statement .payment-contributions summary { cursor: pointer; color: rgb(var(--graphite)); font-size: 11px; padding: 4px 0; width: fit-content; }
 .payment-statement .payment-contrib-table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 11px; font-variant-numeric: tabular-nums; }
-.payment-statement .payment-contrib-table th { text-align: left; font-weight: 400; color: rgb(var(--muted)); }
+.payment-statement .payment-contrib-table th { text-align: left; font-weight: 400; color: rgb(var(--graphite)); }
+.payment-statement .payment-contrib-table thead,
+.payment-statement .payment-contrib-table tfoot { background: rgb(var(--surface-2)); }
 .payment-statement .payment-contrib-table td,
-.payment-statement .payment-contrib-table th { padding: 5px 0; border-bottom: 1px solid rgb(var(--hairline)); }
+.payment-statement .payment-contrib-table th { padding: 6px 8px; border-bottom: 1px solid rgb(var(--hairline)); }
 .payment-statement .payment-contrib-table td,
 .payment-statement .payment-contrib-table th + th { text-align: right; white-space: nowrap; }
 .payment-statement .payment-contrib-table tfoot th,
 .payment-statement .payment-contrib-table tfoot td { font-weight: 500; color: rgb(var(--ink)); border-bottom: 0; }
-.payment-statement .payment-funding-received { margin-top: 10px; color: rgb(var(--muted)); }
+.payment-statement .payment-funding-received { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgb(var(--hairline)); color: rgb(var(--muted)); }
 .payment-statement .payment-funding-received .payment-metric { font-size: 11px; }
 .payment-statement .payment-funding-received p { font-size: 10px; margin-top: 3px; overflow-wrap: anywhere; }
 .payment-statement .payment-funding { padding: 10px 12px; border-left: 2px solid rgb(var(--ledger)); background: rgb(var(--ledger-bg)); margin-bottom: 15px; }
@@ -51,10 +56,10 @@
 .payment-statement .next .payment-date-state,
 .payment-statement .late .payment-date-state { color: rgb(var(--alert)); }
 .payment-statement .payment-bank { font-size: 10px; color: rgb(var(--muted)); margin: 10px 0 0; }
-.payment-statement .payment-next-action { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 14px 0 0; }
+.payment-statement .payment-next-action { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 24px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2) / .4); border-radius: 0 0 5px 5px; }
 .payment-statement .payment-next-action strong { font-size: 12px; font-weight: 500; }
 .payment-statement .payment-next-action p { font-size: 11px; color: rgb(var(--muted)); margin-top: 2px; }
-.payment-statement .payment-report-confirm { margin-top: 12px; }
+.payment-statement .payment-report-confirm { padding: 12px 24px 18px; }
 .payment-statement .pay-btn,
 .payment-statement .pay-cta { font-family: inherit; font-size: 11px; font-style: normal; font-weight: 500; border-radius: 3px; box-shadow: none; padding: 7px 10px; min-height: 32px; }
 .payment-statement .pay-btn.pri { border-color: rgb(var(--accent)); }
@@ -70,17 +75,23 @@
   .payment-statement .payment-summary > div + div { padding-left: 14px; }
   .payment-statement .payment-amount { font-size: 23px; }
   .payment-statement .payment-allocation { gap: 20px; }
+  .payment-statement .payment-allocation > div + div { padding-left: 20px; }
 }
 @media (max-width: 680px) {
   .payment-statement .page-title { font-size: 30px; }
   .payment-statement .pay-rail { max-width: 100%; }
   .payment-statement .pay-rail a { padding-inline: 8px; min-width: 43px; }
-  .payment-statement .payment-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 17px 0; }
-  .payment-statement .payment-summary > div:first-child { grid-column: 1 / -1; }
+}
+/* The pinned sidebar can narrow the report before the viewport is phone-sized. */
+@container payment-report (max-width: 680px) {
+  .payment-statement .payment-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 17px 14px; }
+  .payment-statement .payment-summary > div:first-child { grid-column: 1 / -1; padding-bottom: 12px; border-bottom: 1px solid rgb(var(--hairline)); }
   .payment-statement .payment-summary > div:nth-child(2) { padding-left: 0; border-left: 0; }
   .payment-statement .payment-amount { font-size: 21px; }
-  .payment-statement .payment-allocation { grid-template-columns: 1fr; gap: 20px; }
-  .payment-statement .payment-next-action { align-items: flex-start; flex-wrap: wrap; }
+  .payment-statement .payment-allocation { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 18px 14px; }
+  .payment-statement .payment-allocation > div + div { padding-left: 0; padding-top: 18px; border-left: 0; border-top: 1px solid rgb(var(--hairline)); }
+  .payment-statement .payment-next-action { align-items: flex-start; flex-wrap: wrap; padding: 14px; }
+  .payment-statement .payment-report-confirm { padding: 12px 14px 18px; }
 }
 @media (pointer: coarse) {
   .payment-statement .pay-btn,

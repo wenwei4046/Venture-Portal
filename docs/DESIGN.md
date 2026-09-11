@@ -594,6 +594,17 @@ Payment title, thin rules, square table surfaces,
 shaded headers, right-aligned monetary columns and compact status text. Styles live
 in `payment/payment-statement.css` and `_components/payment-tables.css`.
 
+The upper report is one continuous sheet on `--surface`, with a hairline outer
+border and a 2px ink top rule. Its three totals sit on a `--surface-2` band; the
+reconciliation and dates share the lighter body, separated by a vertical hairline
+that becomes horizontal on phones. Keep the header/month rail outside the sheet.
+The action footer and contribution table headers/totals get restrained surface
+tints. This separates the report from the page without shadows, extra cards,
+new colors, or changes to the approved typography. Use 24px desktop / 14px phone
+horizontal insets and allow focus rings to extend outside the sheet.
+The sheet is an inline-size container: totals and detail columns stack when the
+report itself is 680px or narrower, including a tablet with its sidebar pinned.
+
 The shared report remains above two tabs: **Salary** (default) and **Statutory**.
 It contains total payroll cost, actual salary paid, statutory outstanding, payroll
 reconciliation, expandable contribution breakdown, current HR pool/funding gap,
