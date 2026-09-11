@@ -51,6 +51,7 @@
 .payment-statement .pay-win .tiles .tile { border-radius:2px; }
 .payment-statement .pay-win .pay-people-table .state-cell, .payment-statement .pay-win .pay-state { white-space:nowrap; }
 .payment-statement .pay-win.pay-generation-window { inset:0; margin:auto; width:min(1120px,calc(100vw - 48px)); max-width:none; height:fit-content; max-height:min(840px,calc(100dvh - 48px)); padding:0; color:rgb(var(--ink)); border-radius:8px; }
+.payment-statement .pay-win.pay-generation-window[data-step="selection"] { height:min(840px,calc(100dvh - 48px)); }
 .payment-statement .pay-generation-window:not([open]) { display:none; }
 .payment-statement .pay-generation-window::backdrop { background:rgb(var(--scrim) / .45); }
 .payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { flex-shrink:0; }
@@ -59,14 +60,18 @@
 .payment-statement .pay-generation-window .x { min-width:36px; min-height:36px; }
 .payment-statement .pay-generation-window .x:disabled { opacity:.5; cursor:wait; }
 .payment-statement .pay-generation-window .wb { min-height:0; padding:20px; background:rgb(var(--paper)); overscroll-behavior:contain; scrollbar-gutter:stable; }
+.payment-statement .pay-generation-window[data-step="selection"] .wb { overflow:hidden; scrollbar-gutter:auto; }
 .payment-statement .pay-generation-window .wb h3 { margin:0; }
 .payment-statement .pay-generation-window .wf { flex-direction:column; align-items:stretch; gap:6px; background:rgb(var(--surface-2)); }
 .payment-statement .pay-generation-window .wf > .pay-muted { margin:0; font-size:11px; }
-.payment-statement .pay-generation-window .pay-generation-grid { grid-template-columns:174px minmax(0,1fr); gap:0; background:rgb(var(--surface-2)); border:1px solid rgb(var(--hairline)); border-radius:4px; }
-.payment-statement .pay-generation-window .pay-department-picker { align-self:start; position:sticky; top:0; padding:10px; }
+.payment-statement .pay-generation-window .pay-generation-grid { flex:1; min-height:0; grid-template-columns:174px minmax(0,1fr); grid-template-rows:minmax(0,1fr); gap:0; overflow:hidden; background:rgb(var(--surface-2)); border:1px solid rgb(var(--hairline)); border-radius:4px; }
+.payment-statement .pay-generation-window .pay-department-picker { min-height:0; align-self:stretch; position:static; overflow:auto; overscroll-behavior:contain; padding:10px; }
 .payment-statement .pay-generation-window .pay-department-picker button { border-radius:2px; }
 .payment-statement .pay-generation-window .pay-department-picker button[aria-pressed="true"] { box-shadow:inset 3px 0 0 rgb(var(--accent)); }
-.payment-statement .pay-generation-window .pay-generation-people { padding:18px; background:rgb(var(--surface)); border-left:1px solid rgb(var(--hairline)); border-radius:0 3px 3px 0; }
+.payment-statement .pay-generation-window .pay-generation-people { min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:18px; background:rgb(var(--surface)); border-left:1px solid rgb(var(--hairline)); border-radius:0 3px 3px 0; }
+.payment-statement .pay-generation-window .pay-generation-fields { flex-shrink:0; }
+.payment-statement .pay-generation-window .pay-generation-people > .pay-table-wrap { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.payment-statement .pay-generation-window .pay-generation-people .pay-statement-table thead th { position:sticky; top:0; z-index:1; box-shadow:0 1px 0 rgb(var(--hairline)); }
 .payment-statement .pay-generation-window .pay-table-wrap { border:1px solid rgb(var(--hairline)); border-radius:3px; background:rgb(var(--surface)); }
 .payment-statement .pay-generation-window .pay-statement-table { min-width:520px; }
 .payment-statement .pay-generation-window .pay-statement-table thead th { border-top:0; }
@@ -79,12 +84,18 @@
   .payment-statement .pay-department-picker { flex-direction:row; flex-wrap:wrap; }
   .payment-statement .pay-win { width:100vw; }
   .payment-statement .pay-win.pay-generation-window { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
+  .payment-statement .pay-win.pay-generation-window[data-step="selection"] { height:calc(100dvh - 16px); }
   .payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { padding:12px 14px; }
   .payment-statement .pay-generation-window .wb { padding:14px; }
-  .payment-statement .pay-generation-window .pay-generation-grid { grid-template-columns:minmax(0,1fr); }
-  .payment-statement .pay-generation-window .pay-department-picker { position:static; padding:8px; }
+  .payment-statement .pay-generation-window .pay-generation-grid { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
+  .payment-statement .pay-generation-window .pay-department-picker { flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding:8px; }
+  .payment-statement .pay-generation-window .pay-department-picker button { flex:none; white-space:nowrap; }
   .payment-statement .pay-generation-window .pay-generation-people { padding:12px; border-left:0; border-top:1px solid rgb(var(--hairline)); border-radius:0 0 3px 3px; }
   .payment-statement .pay-generation-footer { align-items:flex-start; }
+}
+@media(max-height:560px) {
+  .payment-statement .pay-generation-window .pay-generation-people { display:block; overflow:auto; overscroll-behavior:contain; }
+  .payment-statement .pay-generation-window .pay-generation-people > .pay-table-wrap { overscroll-behavior:auto; scrollbar-gutter:auto; }
 }
 @media(pointer:coarse) {
   .payment-statement .payment-tabs button, .payment-statement .pay-row-actions button, .payment-statement .pay-department-picker button { min-height:44px; }

@@ -83,7 +83,7 @@ export default function StatutoryGenerator({ period, body, mode, groups, rows, c
           const available = statutorySelection(item.people, schemes, coverage, null, mode).count
           return <button type="button" key={item.key} aria-pressed={item.key === group.key} onClick={() => { setGroupKey(item.key); setError(null) }} disabled={busy}>{item.name}<small>{available} remaining</small></button>
         })}</nav>
-        <div className="pay-generation-people">
+        <div key={group.key} className="pay-generation-people">
           <div className="pay-generation-fields"><div>Pay to<strong>{body}</strong></div><label>Payment date<input type="date" className="pay-date" value={date} onChange={e => setDate(e.target.value)} disabled={locked} /></label></div>
           <div className="pay-table-wrap"><table className="pay-statement-table"><thead><tr>
             {mode === 'employee' ? <th><input type="checkbox" aria-label="Select all remaining employees" checked={selection.count > 0 && selection.count === selection.eligible.length} disabled={locked || selection.eligible.length === 0} onChange={e => setSelectedIds(current => ({ ...current, [group.key]: e.target.checked ? selection.eligible.map(person => person.row_id) : [] }))} /></th> : null}
