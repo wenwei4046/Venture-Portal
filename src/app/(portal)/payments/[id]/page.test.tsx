@@ -5,7 +5,7 @@ vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ notFound: mocks.notFound }))
 vi.mock('../actions', () => ({ submitForApproval: vi.fn(), approveVoucher: vi.fn(), voidVoucher: vi.fn(), voidPaidReceipt: vi.fn(), reversePaidPayment: vi.fn(), returnVoucherToDraft: vi.fn() }))
-vi.mock('./_components/VoucherActions', () => ({ default: () => <div data-testid="voucher-actions" /> }))
+vi.mock('./_components/VoucherActions', () => ({ default: (props: { reversePaidPayment?: unknown }) => <div data-testid="voucher-actions" data-can-reverse={Boolean(props.reversePaidPayment)} /> }))
 vi.mock('./_components/CopyVoucherButton', () => ({ default: () => <div data-testid="copy-voucher" /> }))
 vi.mock('./_components/ReassignGlAccountButton', () => ({ default: () => <div data-testid="reassign-gl" /> }))
 vi.mock('./_components/AttachmentUploader', () => ({ default: () => <div data-testid="attachment-uploader" /> }))
@@ -26,8 +26,8 @@ function database(referenceType = 'payroll_statutory', salaryLines: Record<strin
     }
     return query
   })
-  mocks.createClient.mockResolvedValue({ from })
-  return { from, filters }
+  mocks.createClient.mockResolvedValue({ from, rpc: vi.fn().mockResolvedValue({ data: [], error: null }) })
+  return { from, filters, voucher }
 }
 
 beforeEach(() => {
@@ -65,8 +65,17 @@ describe('HR payroll voucher detail access', () => {
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(filters).toEqual([])
     expect(screen.getByTestId('voucher-actions')).toBeInTheDocument()
+    expect(screen.getByTestId('voucher-actions')).toHaveAttribute('data-can-reverse', 'true')
     expect(screen.getByTestId('copy-voucher')).toBeInTheDocument()
     expect(screen.getByTestId('attachment-uploader')).toBeInTheDocument()
+  })
+
+  it('does not expose generic financial reversal for a paid salary PV', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    const { voucher } = database('payroll_disbursement')
+    voucher.status = 'paid'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByTestId('voucher-actions')).toHaveAttribute('data-can-reverse', 'false')
   })
 
   it('shows net basic and commission with their recorded receiving accounts as one person', async () => {

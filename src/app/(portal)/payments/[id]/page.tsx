@@ -519,7 +519,7 @@ export default async function PaymentDetailPage({ params }: Props) {
         voidVoucher={voidVoucher}
         returnToDraft={returnVoucherToDraft}
         voidPaidReceipt={voidPaidReceipt}
-        reversePaidPayment={reversePaidPayment}
+        reversePaidPayment={voucher.reference_type === 'payroll_disbursement' ? undefined : reversePaidPayment}
         direction={voucher.direction}
         voucherType={voucher.voucher_type}
       /> : null}

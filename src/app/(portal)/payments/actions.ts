@@ -1467,7 +1467,10 @@ export async function reversePaidPayment(formData: FormData) {
   if (v.voucher_type === 'loan_repayment' && v.loan_id) {
     throw new Error('Loan-repayment vouchers tied to a loan can’t be reversed here — void and recreate.')
   }
-  if (v.voucher_type === 'payroll_bank_transfer' || v.voucher_type === 'salary_payout') {
+  // Salary component status updates also reconcile payroll coverage. This
+  // multi-request reversal cannot atomically unwind that lifecycle: reject
+  // before changing bank/GL/pools, including salary PVs typed as 'other'.
+  if (v.voucher_type === 'payroll_bank_transfer' || v.voucher_type === 'salary_payout' || v.reference_type === 'payroll_disbursement') {
     throw new Error('Payroll / salary payments must be reversed through the payroll flow.')
   }
   if (v.reference_type === 'dept_payment_request') {
