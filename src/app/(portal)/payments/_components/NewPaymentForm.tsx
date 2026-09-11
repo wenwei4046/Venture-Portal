@@ -482,7 +482,7 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
             <input type="hidden" name="amount" value={amount} />
             <div className="flex flex-col justify-center">
               <div className="text-xs text-muted uppercase tracking-wide font-sans">Repayment total</div>
-              <div className="font-serif text-2xl text-ink tabular">
+              <div className="statement-amount text-ink">
                 RM {repaymentSum.toFixed(2)}
               </div>
               <div className="text-xs text-muted font-mono mt-1">auto from split below</div>

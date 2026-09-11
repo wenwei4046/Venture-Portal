@@ -392,7 +392,7 @@ export default async function DashboardPage() {
                 </div>
                 <div className="border border-hairline rounded-md bg-surface p-5">
                   <div className="font-serif italic text-accent text-sm mb-1">Total gross</div>
-                  <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+                  <div className="statement-amount text-num-ink">
                     {formatMoney(Number(director?.total_gross ?? 0))}
                   </div>
                   <div className="font-mono text-xs text-muted mt-2">
@@ -401,14 +401,14 @@ export default async function DashboardPage() {
                 </div>
                 <div className="border border-hairline rounded-md bg-surface p-5">
                   <div className="font-serif italic text-accent text-sm mb-1">Payroll net</div>
-                  <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+                  <div className="statement-amount text-num-ink">
                     {formatMoney(Number(director?.total_payroll_net ?? 0))}
                   </div>
                   <div className="font-mono text-xs text-muted mt-2">paid via payroll</div>
                 </div>
                 <div className="border border-hairline rounded-md bg-surface p-5">
                   <div className="font-serif italic text-accent text-sm mb-1">Invoice total</div>
-                  <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+                  <div className="statement-amount text-num-ink">
                     {formatMoney(Number(director?.total_invoice ?? 0))}
                   </div>
                   <div className="font-mono text-xs text-muted mt-2">
@@ -547,7 +547,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 Pool balance
               </div>
-              <div className={`font-serif text-2xl tabular tracking-[-0.01em] leading-none ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
+              <div className={`statement-amount ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
                 {formatMoney(balance)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -558,7 +558,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 Revenue {dayjs(period).format('MMM')}
               </div>
-              <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+              <div className="statement-amount text-num-ink">
                 {formatMoney(np.revenue)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -569,7 +569,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 This month NP
               </div>
-              <div className={`font-serif text-2xl tabular tracking-[-0.01em] leading-none ${np.net_profit < 0 ? 'text-danger' : 'text-num-ink'}`}>
+              <div className={`statement-amount ${np.net_profit < 0 ? 'text-danger' : 'text-num-ink'}`}>
                 {formatMoney(np.net_profit)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -580,7 +580,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 Awaiting Principal
               </div>
-              <div className="font-serif text-3xl text-num-ink tabular leading-none">
+              <div className="statement-amount text-num-ink">
                 {pendingCount}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -593,7 +593,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 本月开单 Billed {dayjs(period).format('MMM')}
               </div>
-              <div className="font-serif text-2xl text-num-ink tabular tracking-[-0.01em] leading-none">
+              <div className="statement-amount text-num-ink">
                 {formatMoney(billedThisMonth)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -604,7 +604,7 @@ export default async function DashboardPage() {
               <div className="font-serif italic text-sm text-accent mb-1">
                 未收 To collect
               </div>
-              <div className={`font-serif text-2xl tabular tracking-[-0.01em] leading-none ${dmOutstanding > 0 ? 'text-alert' : 'text-num-ink'}`}>
+              <div className={`statement-amount ${dmOutstanding > 0 ? 'text-alert' : 'text-num-ink'}`}>
                 {formatMoney(dmOutstanding)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">
@@ -821,7 +821,7 @@ export default async function DashboardPage() {
           <div className="font-serif italic text-accent text-base mb-1">
             Venture Pool
           </div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none mb-3 tabular tracking-[-0.01em]">
+          <div className="statement-amount text-num-ink mb-3">
             {hasAnyData ? (
               <span className={(summary.hv_fund_balance ?? 0) < 0 ? 'text-danger' : ''}>
                 {formatMoney(summary.hv_fund_balance ?? 0)}
@@ -1316,7 +1316,7 @@ export default async function DashboardPage() {
                   ) : null}
                 </div>
                 <div className="font-mono text-xs text-muted mb-3">{b.account_number}</div>
-                <div className="font-serif text-2xl text-ink">
+                <div className="statement-amount text-ink">
                   {formatMoney(Number(b.current_balance))}
                 </div>
               </div>
@@ -1324,7 +1324,7 @@ export default async function DashboardPage() {
             <div className="border border-hairline rounded-md bg-surface p-5">
               <div className="font-serif text-md text-graphite mb-2">Total balance</div>
               <div className="font-mono text-xs text-muted mb-3">across all accounts</div>
-              <div className="font-serif text-2xl text-ink font-medium">
+              <div className="statement-amount text-ink">
                 {formatMoney(totalBankBalance)}
               </div>
             </div>
@@ -1341,7 +1341,7 @@ export default async function DashboardPage() {
             <div className="font-serif italic text-accent text-sm mb-1">
               Billing float
             </div>
-            <div className="font-serif text-2xl text-ink leading-none">
+            <div className="statement-amount text-ink">
               {formatMoney(Number(summary.billing_float ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
@@ -1356,8 +1356,8 @@ export default async function DashboardPage() {
             <div
               className={
                 Number(summary.dept_pool_total ?? 0) < 0
-                  ? 'font-serif text-2xl text-danger leading-none'
-                  : 'font-serif text-2xl text-ink leading-none'
+                  ? 'statement-amount text-danger'
+                  : 'statement-amount text-ink'
               }
             >
               {formatMoney(Number(summary.dept_pool_total ?? 0))}
@@ -1386,7 +1386,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="border border-hairline rounded-md bg-surface p-5">
             <div className="font-serif italic text-accent text-sm mb-1">Director Pool</div>
-            <div className="font-serif text-2xl text-ink leading-none">
+            <div className="statement-amount text-ink">
               {formatMoney(Number(summary.salary_pool_total ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
@@ -1401,8 +1401,8 @@ export default async function DashboardPage() {
             <div
               className={
                 Number(summary.hv_fund_balance ?? 0) < 0
-                  ? 'font-serif text-2xl text-danger leading-none'
-                  : 'font-serif text-2xl text-ink leading-none'
+                  ? 'statement-amount text-danger'
+                  : 'statement-amount text-ink'
               }
             >
               {formatMoney(Number(summary.hv_fund_balance ?? 0))}
@@ -1414,7 +1414,7 @@ export default async function DashboardPage() {
 
           <div className="border border-hairline rounded-md bg-surface p-5">
             <div className="font-serif italic text-accent text-sm mb-1">Director Invoice</div>
-            <div className="font-serif text-2xl text-ink leading-none">
+            <div className="statement-amount text-ink">
               {formatMoney(Number(summary.invoice_pool_balance ?? 0))}
             </div>
             <p className="font-mono text-xs text-muted mt-2">
@@ -1483,8 +1483,8 @@ function MarketingNpCard({ mkNp }: { mkNp: MarketingNp | undefined }) {
       <div
         className={
           isLoss
-            ? 'font-serif text-2xl text-danger leading-none'
-            : 'font-serif text-2xl text-ink leading-none'
+            ? 'statement-amount text-danger'
+            : 'statement-amount text-ink'
         }
       >
         {formatMoney(netProfit)}

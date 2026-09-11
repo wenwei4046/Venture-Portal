@@ -136,7 +136,7 @@ export default async function LoanDetailPage({ params }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             {loan.status === 'active' ? 'Outstanding' : 'Principal'}
           </div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="statement-amount text-num-ink">
             {formatMoney(
               loan.status === 'active' ? outstandingAmount : Number(loan.principal)
             )}
@@ -172,7 +172,7 @@ export default async function LoanDetailPage({ params }: Props) {
               <div className="font-serif italic text-accent text-base mb-1">
                 Monthly interest
               </div>
-              <div className="font-serif text-xl text-num-ink tabular">
+              <div className="statement-amount compact text-num-ink">
                 {formatMoney(monthlyInterest)}
               </div>
             </div>

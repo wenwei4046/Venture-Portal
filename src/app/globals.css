@@ -20,10 +20,12 @@
    Red / amber / green are load-bearing and can't move, which leaves blue.
    A *surface* is free to be any hue; a *signal* is not.
 
-   Typography unchanged — Inter throughout, Chivo Mono for numbers.
+   Typography — Georgia page titles, Inter body/headline amounts, and
+   Chivo Mono for dense table figures, dates and reference codes.
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
+  --font-display: Georgia, 'Times New Roman', var(--font-cjk), serif;
   --paper: 242 239 234;
   --surface: 252 250 247;
   --surface-2: 235 230 223;
@@ -298,16 +300,20 @@ html {
 body {
   background: rgb(var(--paper));
   color: rgb(var(--ink));
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
-/* Headings — modern sans, semibold (was Instrument Serif 400) */
+/* Statement typography: quiet page titles, medium-weight section headings. */
 h1, h2, h3, h4 {
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   color: rgb(var(--ink));
 }
+h2.font-serif { font-size: 18px; font-weight: 500; font-style: normal; }
+h3.font-serif { font-size: 15px; font-weight: 500; font-style: normal; }
+/* Legacy labels used an italic Inter alias; the statement uses upright UI text. */
+.font-serif.italic { font-style: normal; }
 
 /* Tabular numbers for money + data */
 .tabular,
@@ -425,7 +431,7 @@ h1, h2, h3, h4 {
   border-radius: 6px;
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   transition: background 120ms ease-out;
 }
@@ -444,7 +450,7 @@ h1, h2, h3, h4 {
   padding: 8px 16px;
   border-radius: 6px;
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: background 120ms ease-out, color 120ms ease-out;
@@ -555,13 +561,27 @@ select:focus {
     letter-spacing: 0;
   }
   .num { font-weight: 500; font-size: 13.5px; }
-  .num-hero { font-weight: 400; font-size: 56px; line-height: 0.95; letter-spacing: -0.01em; }
+  .num-hero { font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-weight: 500; font-size: 26px; line-height: 1.2; letter-spacing: -0.025em; }
   .num.neg, .num-hero.neg { color: rgb(var(--danger)); }
   /* Decoration (RM, %, /mo, cents) sits one tier back so the digit jumps */
   .num .unit, .num .cents, .num-hero .unit, .num-hero .cents { color: rgb(var(--graphite)); font-weight: 400; }
-  .num-hero .cents { font-size: 28px; }
-  .num-hero .unit  { font-size: 22px; }
+  .num-hero .cents { font-size: inherit; }
+  .num-hero .unit  { font-size: 11px; }
 }
+
+/* Headline values use the approved Payment statement scale. Keep .num,
+   .mono and .tabular as dense-data roles; a KPI must opt into this role. */
+.statement-amount {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 26px;
+  font-weight: 500;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+.statement-amount.compact { font-size: 18px; letter-spacing: -0.015em; }
+.statement-amount .unit { font-size: 11px; font-weight: 400; letter-spacing: 0; }
 
 /* Ledger table — surface panel + zebra + accent hover. Opt-in via class. */
 table.ledger-table {
@@ -571,16 +591,16 @@ table.ledger-table {
   border: 1px solid rgb(var(--hairline));
   border-radius: 6px;
   overflow: hidden;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 table.ledger-table thead th {
   text-align: left;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
   color: rgb(var(--graphite));
-  font-weight: 600;
-  padding: 13px 16px;
+  font-weight: 400;
+  padding: 9px 12px;
   background: rgb(var(--surface-2));
   border-bottom: 1px solid rgb(var(--hairline));
 }
@@ -619,7 +639,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong td {
 table.ledger-table.gl-report tbody tr:hover { background: rgb(var(--accent-bg)); }
 table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb(var(--accent-bg)); }
 table.ledger-table td {
-  padding: 14px 16px;
+  padding: 13px 12px;
   vertical-align: baseline;
   color: rgb(var(--ink));
 }
@@ -840,10 +860,10 @@ tr:hover .icon-btn { opacity: 1; }
 }
 .page-eyebrow {
   font-family: var(--font-mono), 'Chivo Mono', Menlo, var(--font-cjk), monospace;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.13em;
   color: rgb(var(--graphite));
   display: inline-flex;
   align-items: center;
@@ -854,22 +874,24 @@ tr:hover .icon-btn { opacity: 1; }
   color: rgb(var(--accent));
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
   font-style: normal;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 13px;
   text-transform: none;
   letter-spacing: 0.01em;
 }
-.page-title {
-  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
-  font-weight: 600;
-  font-size: 30px;
-  line-height: 1.1;
+h1:not(.sr-only), .page-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-style: normal;
+  font-size: 36px;
+  line-height: 1.18;
   margin: 0;
   color: rgb(var(--ink));
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
+.page-head p { font-size: 12px; font-weight: 400; font-style: normal; line-height: 1.5; }
 
-/* Section head — italic serif title + hairline rule extending right */
+/* Section head — medium sans title + hairline rule extending right */
 .sect-head {
   display: flex;
   align-items: baseline;
@@ -878,8 +900,9 @@ tr:hover .icon-btn { opacity: 1; }
 }
 .sect-head h2 {
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
-  font-weight: 600;
-  font-size: 19px;
+  font-weight: 500;
+  font-size: 18px;
+  font-style: normal;
   color: rgb(var(--ink));
   margin: 0;
   flex-shrink: 0;
@@ -1111,14 +1134,18 @@ table.ledger-table tr.lt-detail {
   .text-2xl { font-size: 24px; line-height: 28px; }
   .text-hero { font-size: 40px; line-height: 1; }
   .text-hero-lg { font-size: 44px; line-height: 1; }
-  .num-hero { font-size: 36px; }
-  .num-hero .cents { font-size: 20px; }
-  .num-hero .unit { font-size: 16px; }
 
   /* Seven-figure sums still need every pixel — kill the negative tracking
      that the hero pattern applies for optical tightening at desktop sizes. */
   .text-3xl.tabular,
   .text-3xl.mono { letter-spacing: 0; }
+}
+@media (max-width: 1000px) {
+  .statement-amount, .num-hero { font-size: 23px; }
+}
+@media (max-width: 680px) {
+  h1:not(.sr-only), .page-title { font-size: 30px; }
+  .statement-amount, .num-hero { font-size: 21px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1359,7 +1386,7 @@ table.payroll-grid tbody tr.pg-band td.sub {
   font-family: var(--font-mono), 'Chivo Mono', monospace;
   font-variant-numeric: tabular-nums;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: rgb(var(--band-ink));
   text-align: right;
   padding: 0 8px;
@@ -1394,7 +1421,7 @@ table.payroll-grid td.pg-chk,
 table.payroll-grid th.col-chk { padding: 0 0 0 12px; }
 table.payroll-grid td.num.zero { color: rgb(var(--muted)); font-weight: 400; }
 table.payroll-grid td.pg-gross { font-weight: 500; }
-table.payroll-grid td.pg-net { font-weight: 600; font-size: 14px; }
+table.payroll-grid td.pg-net { font-weight: 500; font-size: 13.5px; }
 table.payroll-grid td.derived a {
   color: rgb(var(--accent));
   text-decoration: none;
@@ -1478,7 +1505,7 @@ table.payroll-grid tfoot td {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: rgb(var(--graphite));
-  font-weight: 600;
+  font-weight: 500;
 }
 table.payroll-grid tfoot td.pg-st { z-index: 3; }
 table.payroll-grid tfoot td.num {
@@ -1486,7 +1513,7 @@ table.payroll-grid tfoot td.num {
   letter-spacing: 0;
   text-transform: none;
   color: rgb(var(--num-ink));
-  font-weight: 600;
+  font-weight: 500;
 }
 table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphite)); }
 

@@ -113,7 +113,7 @@ export default async function FundOutPage({ searchParams }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             Total outstanding
           </div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="statement-amount text-num-ink">
             {totalOutstanding > 0 ? (
               formatMoney(totalOutstanding)
             ) : (

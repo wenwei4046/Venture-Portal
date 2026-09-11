@@ -266,7 +266,7 @@ export default async function VoucherLedger({
           <div className="font-serif italic text-accent text-sm mb-1">
             {isReceipts ? 'Total received' : 'Total paid'}
           </div>
-          <div className="font-serif text-3xl text-num-ink tabular">{formatMoney(totalPaid)}</div>
+          <div className="statement-amount text-num-ink">{formatMoney(totalPaid)}</div>
           <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
             {extraRows.length > 0
               ? isReceipts
@@ -277,7 +277,7 @@ export default async function VoucherLedger({
         </div>
         <div>
           <div className="font-serif italic text-alert text-sm mb-1">Pending pipeline</div>
-          <div className="font-serif text-3xl text-num-ink tabular">{formatMoney(pendingAmount)}</div>
+          <div className="statement-amount text-num-ink">{formatMoney(pendingAmount)}</div>
           <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
             {counts.draft} DRAFT · {counts.pending_approval} PENDING · {counts.approved} APPROVED
           </div>
@@ -286,7 +286,7 @@ export default async function VoucherLedger({
           <div className="font-serif italic text-graphite text-sm mb-1">
             All {noun}s
           </div>
-          <div className="font-serif text-3xl text-num-ink tabular">{counts.all}</div>
+          <div className="statement-amount text-num-ink">{counts.all}</div>
           <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
             {counts.voided} VOIDED
           </div>

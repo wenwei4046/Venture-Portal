@@ -251,7 +251,7 @@ export default async function PaymentDetailPage({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-5">
           <div className="font-serif italic text-accent text-base mb-1">Amount</div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="statement-amount text-num-ink">
             {voucher.direction === 'credit' ? '+' : ''}{formatMoney(Number(voucher.amount))}
           </div>
           <div className="mt-3 space-y-1">

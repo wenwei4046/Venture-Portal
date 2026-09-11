@@ -195,7 +195,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             Principal
           </div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+          <div className="statement-amount text-num-ink">
             {formatMoney(Number(source.amount))}
           </div>
           <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
@@ -207,7 +207,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           <div className="font-serif italic text-accent text-base mb-1">
             Outstanding
           </div>
-          <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em]">
+          <div className="statement-amount text-num-ink">
             {formatMoney(outstanding)}
           </div>
           {totalPrincipalPaid > 0 ? (
@@ -239,7 +239,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
               <div className="font-serif italic text-accent text-base mb-1">
                 Monthly payment
               </div>
-              <div className="font-serif text-xl text-num-ink tabular">
+              <div className="statement-amount compact text-num-ink">
                 {formatMoney(monthlyPayment)}
               </div>
               <div className="font-mono text-[11.5px] text-graphite mt-2 tracking-[0.02em] font-medium">

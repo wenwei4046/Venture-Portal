@@ -102,7 +102,7 @@ export default async function DebtorAgingPage() {
       {/* Hero */}
       <div className="mb-8">
         <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total outstanding</div>
-        <div className="text-num-ink tabular tracking-[-0.01em] text-4xl mt-1">{formatMoney(aging.totals.total)}</div>
+        <div className="statement-amount text-num-ink mt-1">{formatMoney(aging.totals.total)}</div>
         <div className="font-sans text-xs text-muted mt-1">
           {aging.totals.count} unpaid invoice{aging.totals.count === 1 ? '' : 's'} ·{' '}
           {formatMoney(Math.round((aging.totals.total - aging.totals.buckets.this_month) * 100) / 100)} over a month old

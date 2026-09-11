@@ -4,8 +4,8 @@ import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
 // Typography — loaded via next/font for zero-CLS self-hosting.
-// 2026-06-24: Instrument Serif retired; Inter is the single UI typeface
-// (display + body), Chivo Mono for figures, Noto Sans SC for CJK.
+// Inter for body and headline amounts; Chivo Mono for dense table figures.
+// Page titles use the system Georgia stack, with Noto Sans SC for CJK.
 
 const inter = Inter({
   subsets: ['latin'],

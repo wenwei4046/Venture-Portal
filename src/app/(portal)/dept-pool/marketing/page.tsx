@@ -117,7 +117,7 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
               <div className="font-serif italic text-graphite text-sm mb-1">
                 Pool balance
               </div>
-              <div className={`font-serif text-[30px] sm:text-[44px] md:text-hero leading-none tabular tracking-[-0.01em] ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
+              <div className={`statement-amount ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
                 {formatMoney(balance)}
               </div>
               <div className="font-mono text-xs text-muted mt-2">

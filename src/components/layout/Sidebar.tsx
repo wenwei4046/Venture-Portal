@@ -153,8 +153,8 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
               className={
                 'flex-1 min-w-0 truncate ' +
                 (lit
-                  ? `${labelPad(depth, true)} font-serif italic ${labelSize(depth, true)}`
-                  : `${labelPad(depth, false)} font-sans tracking-[0.005em] ${labelSize(depth, false)}`)
+                  ? `${labelPad(depth, true)} font-sans font-medium ${labelSize(depth, true)}`
+                  : `${labelPad(depth, false)} font-sans font-normal tracking-[0.005em] ${labelSize(depth, false)}`)
               }
             >
               {group.label}
@@ -177,8 +177,8 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
             className={
               'nav-link relative w-full flex items-center justify-between mb-0.5 rounded-md ' +
               (lit
-                ? `bg-accent-bg text-accent font-serif italic ${labelPad(depth, true)} ${labelSize(depth, true)}`
-                : `text-graphite hover:bg-surface-2 hover:text-ink font-sans tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`)
+                ? `bg-accent-bg text-accent font-sans font-medium ${labelPad(depth, true)} ${labelSize(depth, true)}`
+                : `text-graphite hover:bg-surface-2 hover:text-ink font-sans font-normal tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`)
             }
           >
             <Marker active={lit} depth={depth} />
@@ -210,8 +210,8 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
         className={
           'nav-link relative block truncate mb-0.5 rounded-md ' +
           (active
-            ? `bg-accent-bg text-accent font-serif italic ${labelPad(depth, true)} ${labelSize(depth, true)}`
-            : `text-graphite hover:bg-surface-2 hover:text-ink font-sans tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`)
+            ? `bg-accent-bg text-accent font-sans font-medium ${labelPad(depth, true)} ${labelSize(depth, true)}`
+            : `text-graphite hover:bg-surface-2 hover:text-ink font-sans font-normal tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`)
         }
       >
         <Marker active={active} depth={depth} />
@@ -260,13 +260,13 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
       {/* Brand mark */}
       <div className="px-6 pt-7 pb-5 flex items-start justify-between relative">
         <div>
-          <div className="font-serif text-[30px] leading-none tracking-[-0.015em] text-ink">
+          <div className="font-sans font-normal text-[24px] leading-none tracking-[-0.015em] text-ink">
             HOUZS
             <br />
-            <span className="italic text-ink">Venture</span>
+            <span className="text-ink">Venture</span>
             <span className="text-accent ml-1">·</span>
           </div>
-          <p className="font-serif italic text-[12.5px] text-graphite mt-1 tracking-[0.01em]">
+          <p className="font-sans font-normal text-[12.5px] text-graphite mt-1 tracking-[0.01em]">
             INTERNAL LEDGER · <span className="text-accent not-italic font-sans tracking-wider text-[10.5px]">内部账册</span>
           </p>
         </div>
@@ -305,10 +305,10 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
             >
               {section.label ? (
                 <div className="flex items-baseline gap-2 px-3 pt-1 pb-2">
-                  <span className="font-serif italic text-[11px] text-accent tracking-[0.02em]">
+                  <span className="font-sans font-normal text-[11px] text-accent tracking-[0.02em]">
                     {roman}.
                   </span>
-                  <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
+                  <span className="font-sans text-[10px] font-medium uppercase tracking-[0.18em] text-muted">
                     {section.label}
                   </span>
                   <span
@@ -336,13 +336,12 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
   )
 }
 
-// Type shrinks one step per level so three levels still read as a hierarchy
-// inside 220px. An active row sits a shade larger and in the serif italic —
-// the portal's "you are here" everywhere else too.
+// Keep labels near 13px and use weight for the active state. Preserve the
+// existing line-box heights so the navigation targets do not become smaller.
 function labelSize(depth: number, active: boolean): string {
-  if (depth === 0) return active ? 'text-[15.5px]' : 'text-[13px]'
-  if (depth === 1) return active ? 'text-[14px]' : 'text-[12.5px]'
-  return active ? 'text-[13px]' : 'text-[12px]'
+  if (depth === 0) return active ? 'text-[13px] leading-[23.25px]' : 'text-[13px] leading-[19.5px]'
+  if (depth === 1) return active ? 'text-[13px] leading-[21px]' : 'text-[13px] leading-[18.75px]'
+  return active ? 'text-[12.5px] leading-[19.5px]' : 'text-[12.5px] leading-[18px]'
 }
 
 function labelPad(depth: number, active: boolean): string {

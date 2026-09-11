@@ -346,7 +346,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                 <div className="font-serif italic text-accent text-base mb-1">
                   Commission this month
                 </div>
-                <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tabular tracking-[-0.01em]">
+                <div className="statement-amount text-num-ink">
                   {formatMoney(runTotal)}
                 </div>
                 <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
@@ -623,8 +623,8 @@ function Tile({
       <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
       <div
         className={[
-          'num tabular tracking-[-0.01em]',
-          big ? 'text-2xl' : 'text-xl',
+          'statement-amount',
+          big ? '' : 'compact',
           warn ? 'text-danger' : 'text-num-ink',
         ].join(' ')}
       >

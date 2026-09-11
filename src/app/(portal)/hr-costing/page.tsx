@@ -143,7 +143,7 @@ export default async function HRCostingPage() {
           </div>
           <div className="flex items-baseline justify-between font-mono text-sm border-t border-hairline pt-2 mt-2">
             <em className="font-serif text-md text-ink">total CTC</em>
-            <span className="text-num-ink tabular font-semibold">
+            <span className="statement-amount compact text-num-ink">
               {formatMoney(liveTotals.total_ctc)}
             </span>
           </div>

@@ -132,15 +132,15 @@ export default function ScheduleView({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div>
           <div className="font-serif italic text-accent text-sm mb-1">To collect · {monthLabel}</div>
-          <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em] text-ledger">{formatMoney(collectTot)}</div>
+          <div className="statement-amount text-num-ink text-ledger">{formatMoney(collectTot)}</div>
         </div>
         <div>
           <div className="font-serif italic text-accent text-sm mb-1">To repay · {monthLabel}</div>
-          <div className="font-serif text-3xl text-num-ink tabular tracking-[-0.01em]"><span className="neg">{formatMoney(-repayTot)}</span></div>
+          <div className="statement-amount text-num-ink"><span className="neg">{formatMoney(-repayTot)}</span></div>
         </div>
         <div>
           <div className="font-serif italic text-accent text-sm mb-1">Net</div>
-          <div className={`font-serif text-3xl tabular tracking-[-0.01em] ${net >= 0 ? 'text-ledger' : 'text-danger'}`}>
+          <div className={`statement-amount ${net >= 0 ? 'text-ledger' : 'text-danger'}`}>
             {net < 0 ? <span className="neg">{formatMoney(net)}</span> : formatMoney(net)}
           </div>
         </div>

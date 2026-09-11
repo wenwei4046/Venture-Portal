@@ -478,19 +478,19 @@ function SubmissionTab({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 border-y border-hairline py-6">
           <div>
             <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross (InfoTech)</div>
-            <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">{formatMoney(totals.gross)}</div>
+            <div className="statement-amount text-num-ink mt-1">{formatMoney(totals.gross)}</div>
           </div>
           <div>
             <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Net to Directors</div>
-            <div className="num text-num-ink text-md mt-1 font-semibold">{formatMoney(totals.payrollNet)}</div>
+            <div className="statement-amount compact text-num-ink mt-1">{formatMoney(totals.payrollNet)}</div>
           </div>
           <div>
             <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Employer Statutory</div>
-            <div className="num text-graphite text-md mt-1">{formatMoney(totals.statutoryEr)}</div>
+            <div className="statement-amount compact text-graphite mt-1">{formatMoney(totals.statutoryEr)}</div>
           </div>
           <div>
             <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Directors</div>
-            <div className="num text-graphite text-md mt-1">{totals.directors}</div>
+            <div className="statement-amount compact text-graphite mt-1">{totals.directors}</div>
           </div>
         </div>
       )}
@@ -511,7 +511,7 @@ function SubmissionTab({
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Billed to Subsidiaries
               </div>
-              <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">
+              <div className="statement-amount text-num-ink mt-1">
                 {formatMoney(gap.ctcTotal)}
               </div>
               <div className="font-mono text-[11px] text-muted mt-1">
@@ -522,7 +522,7 @@ function SubmissionTab({
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Actually Paid Out
               </div>
-              <div className="num text-num-ink text-xl tracking-[-0.01em] mt-1">
+              <div className="statement-amount text-num-ink mt-1">
                 {formatMoney(gap.cashOut)}
               </div>
               <div className="font-mono text-[11px] text-muted mt-1">
@@ -533,7 +533,7 @@ function SubmissionTab({
               <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
                 Difference
               </div>
-              <div className="num text-accent text-xl tracking-[-0.01em] mt-1">
+              <div className="statement-amount text-accent mt-1">
                 {formatMoney(gap.gap)}
               </div>
               <div className="font-mono text-[11px] text-muted mt-1">

@@ -1,9 +1,9 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version:** 3.0
-**Last updated:** 2026-04-25
+**Version:** 3.2
+**Last updated:** 2026-09-11
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.0 (Ledger Dense / Finance Readability pass) — single source of truth for all UI work
+**Status:** v3.2 (Shared statement typography / Walnut palette) — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -21,18 +21,18 @@ These six rules are non-negotiable for any new or amended page. The CSS / Tailwi
          <em>I.</em> SECTION · PAGE NAME
        </div>
        <h1 className="page-title">Page Title</h1>
-       <p className="font-serif italic text-graphite text-base mt-3">…description…</p>
+       <p className="text-graphite text-sm mt-3">…description…</p>
      </div>
      {/* optional right-side action button */}
    </div>
    ```
    The roman numeral inside `<em>` mirrors the sidebar section it belongs to. Eyebrow text is `UPPERCASE · UPPERCASE`, mono.
 
-2. **Money cells use `.num`.** Never hand-roll `font-mono tabular text-ink`. Use `<td className="num">{formatMoney(x)}</td>`. Negatives get `<span className="neg">`. Hero figures use `.num-hero` and reserve `--num-ink` for the digit, `--graphite` for `RM` / `.cents` / `% /mo`.
+2. **Money cells use `.num`.** Never hand-roll `font-mono tabular text-ink`. Use `<td className="num">{formatMoney(x)}</td>`. Negatives get `<span className="neg">`. Headline figures use `.statement-amount` (or `.num-hero`) for Inter medium tabular digits; add `.compact` for narrow summary columns. Reserve `--num-ink` for the digit and `--graphite` for supporting units.
 
 3. **Data tables use `.ledger-table`.** `<table className="ledger-table">` with `<th>` / `<td>` only — the class wires up surface bg, zebra rows, accent-bg hover, hairline borders, header padding, right-aligned `.num` cells. Stop writing `<table className="w-full text-sm"><thead><tr className="border-b…">…`.
 
-4. **Section headings use `.sect-head`.** `<div className="sect-head"><h2>…</h2><span className="rule" /><span className="count">N ITEMS</span></div>`. Italic serif title + hairline rule extending right + uppercase mono counter.
+4. **Section headings use `.sect-head`.** `<div className="sect-head"><h2>…</h2><span className="rule" /><span className="count">N ITEMS</span></div>`. Medium-weight upright sans title + hairline rule extending right + uppercase mono counter.
 
 5. **Colors come from CSS variables, never hex.** Use Tailwind classes (`text-ink`, `text-num-ink`, `bg-paper`, `border-hairline`, `text-accent`, `text-danger`) or `rgb(var(--xxx))` inside SVG. Hardcoded `#xxxxxx` is forbidden outside `globals.css` itself.
 
@@ -44,8 +44,8 @@ These six rules are non-negotiable for any new or amended page. The CSS / Tailwi
    that a single form wraps** — the panel would duplicate its named inputs and
    the stale hidden copy is what gets submitted; use `.table-scroll` there.
    Full rules, including the four cases that legitimately keep every column,
-   are in **Responsive** below. A hero figure uses
-   `text-[30px] sm:text-[44px] md:text-hero`, never a bare `text-[44px]`.
+   are in **Responsive** below. A headline figure uses `.statement-amount`, which scales from 26px to 23px
+   and 21px at smaller widths. Narrow summary columns use `.statement-amount.compact` (18px).
 
 ### Canonical reference pages
 
@@ -88,7 +88,7 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 
 > **VP is a warm research journal for a family office.** Friendly but precise. The Principal opens it every morning and feels like reading his own handwritten notes, not signing a notarized contract. Same paper aesthetic as old-school banking, less severity. Anthropic-flavored, not Bloomberg terminal.
 
-**Mood:** Institutional calm with warmth. Cream paper. Clean modern sans headings (Inter semibold). A single rust accent that appears only where decisions happen. _(Pre-2026-06-24 this used serif headings — see the Typography note for the switch to Inter.)_
+**Mood:** Institutional calm with warmth. Plaster paper, Walnut surfaces and Harbour blue interactions. Georgia page titles, medium-weight Inter section headings and quiet, aligned figures. The Payment statement is the shared typographic reference.
 
 ---
 
@@ -117,76 +117,60 @@ HOUZS Venture Portal (VP) 是 HOUZS Venture Sdn Bhd 的内部银行系统。User
 
 ## Typography
 
-> **2026-06-24 — Instrument Serif retired.** The portal moved to a single modern
-> sans typeface (**Inter**) across display + body, to match the HOUZS Century
-> house style. `--font-serif` is gone; Tailwind's `serif` family now aliases the
-> sans stack, so any legacy `font-serif` utility renders Inter (no per-page
-> edits). The warm cream **background was kept** — only the typeface changed.
-> Numbers still use Chivo Mono.
+> **2026-09-11 — shared Payment statement typography.** The user approved the
+> Payment page's numbers, font weights and hierarchy for the rest of the portal.
+> Apply this typography within the existing Plaster / Walnut / Harbour palette;
+> do not introduce route-specific chrome or a new color theme.
 
 ### Font stack
 
+Inter, Chivo Mono and Noto Sans SC are loaded with `next/font` in `layout.tsx`.
+Georgia is a system font and needs no download. Every display chain includes
+`--font-cjk` for consistent Simplified Chinese fallback.
+
 ```css
 :root {
-  /* --font-cjk is appended into EVERY chain below (after the Latin face, before
-     the generic) so Latin glyphs use the Latin face and CJK codepoints fall
-     through to one consistent Chinese face everywhere — never the OS default. */
-  --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, var(--font-cjk), sans-serif;
-  --font-mono:  'Chivo Mono', 'SF Mono', Menlo, Consolas, var(--font-cjk), monospace;
-  --font-cjk:   'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  /* --font-serif retired — Tailwind `serif` aliases --font-sans (Inter). */
+  --font-display: Georgia, 'Times New Roman', var(--font-cjk), serif;
+  /* --font-sans, --font-mono and --font-cjk come from next/font. */
 }
 ```
 
-The UI is authored in **Simplified Chinese**, so CJK = a simplified sans (Noto
-Sans SC) that pairs cleanly with Inter and stays legible in dense ledger tables.
-Loaded via `next/font` in `layout.tsx` (variable `--font-cjk`, `preload: false`).
+Tailwind's legacy `font-serif` continues to alias Inter. Do not change that alias:
+existing navigation, controls and labels use it. Actual display titles use
+`.page-title` / `h1` or `font-display`. Only page titles use Georgia; sections,
+buttons, navigation, labels and figures remain upright sans or mono.
 
-**Load via Google Fonts:**
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-```
+### Roles and scale
 
-All 3 fonts are free. No licensing cost.
-
-### Roles
-
-| Role | Font | Weight | Usage |
+| Role | Font | Size / weight | Usage |
 |---|---|---|---|
-| Display — page titles, section titles | **Inter** | 600 semibold | `<h1>` / `.page-title`, `.sect-head h2`. `page-title` is 30px (was 38px serif). |
-| Emphasis, active states, labels | **Inter** | 500/600 (italic only if intentional) | Active sidebar item, key labels. Legacy `font-serif italic` now renders italic Inter — drop the italic if it reads oddly. |
-| Body — UI text, descriptions, form labels | **Inter** | 400/500/600 | Most body copy, form labels, button text |
-| Data — money, rates, dates | **Chivo Mono** | 400/500 | All money columns, rate values, date strings. `font-variant-numeric: tabular-nums` |
-| CJK — Chinese labels | **Noto Sans SC** | 400/500/700 | 董事长 · 本月对账单 · 内部账册. Simplified sans; pairs with Inter. Latin always uses the Latin face — CJK falls through `--font-cjk`. |
+| Page title | Georgia | 36px / 400; 30px below 680px | `.page-title`, visible `h1` |
+| Section title | Inter | 18px / 500 | `.sect-head h2`, legacy `h2.font-serif` |
+| Subsection title | Inter | 15px / 500 | Legacy `h3.font-serif` |
+| Headline amount or count | Inter, tabular digits | 26px / 500; 23px below 1000px; 21px below 680px | `.statement-amount`, `.num-hero`; Payment's `.payment-amount` |
+| Compact summary amount | Inter, tabular digits | 18px / 500 | `.statement-amount.compact` in narrow multi-column summaries |
+| Dense ledger figures | Chivo Mono, tabular digits | 13.5px / 500 | `.num`; preserve decimal and column alignment |
+| Body and navigation | Inter | 13px / 400; active items 500 | Body, `text-sm`, `text-base`; deeper nav labels may be 12.5px |
+| Supporting copy | Inter | 12px / 400 | Page descriptions, explanatory text |
+| Table header | Inter | 11px / 400 | `.ledger-table thead th`, sentence case |
+| Page eyebrow | Chivo Mono | 11px / 500 | `.page-eyebrow`, restrained tracking |
+| Dates, IDs, rates and metadata | Chivo Mono | 11–13px / 400–500 | `.tabular`, `.mono`, `font-mono` |
+| Buttons | Inter | 12px / 500 | Existing padding and touch targets stay intact |
+| CJK | Noto Sans SC | Inherits role | Consistent fallback after the Latin font |
 
-**Key rule:** Everything is **Inter** (display = semibold, body = regular/medium). Data = Chivo Mono. CJK = Noto Sans SC. No serif anywhere. No exceptions without explicit DESIGN.md update.
+Use medium emphasis for ordinary labels and totals. Tailwind `font-medium` and
+`font-semibold` resolve to 500; `font-bold` resolves to 600 for stronger emphasis.
+Avoid heavy 700-weight monetary figures and oversized 40–64px dashboard totals.
+The legacy size utilities remain available for nonfinancial displays; new KPI
+markup must use the semantic amount classes instead of size/weight utility stacks.
 
-### Type scale
+Do not replace `.tabular` globally with sans: it also represents dates and
+reference codes. A headline value opts into `.statement-amount`; table values
+remain `.num`. The amount class does not change color, financial calculations or
+status semantics. Preserve existing group bands, zebra rows and responsive table
+behavior. Payroll retains its compact row geometry and frozen columns.
 
-| Token | Size | Line-height | Font | Use case |
-|---|---|---|---|---|
-| `text-mono-xs` | 11px | 16px | mono | Table meta, dates, labels |
-| `text-mono-sm` | 12px | 16px | mono | Table cell numbers |
-| `text-xs` | 11px | 16px | sans | Labels, captions |
-| `text-sm` | 13px | 20px | sans | Body UI, descriptions |
-| `text-base` | 14px | 20px | sans | Form inputs, table rows |
-| `text-md` | 15px | 24px | sans | Approval card titles |
-| `text-lg` | 18px | 24px | sans | Card titles, section subheads |
-| `text-xl` | 22px | 28px | sans | Page subheads |
-| `text-2xl` | 28px | 32px | sans (600) | Section titles |
-| `text-3xl` | 40px | 44px | sans (600) | Page titles (`.page-title` itself is 30px) |
-| `text-hero` | 64px | 64px | sans / mono | Solvency hero number on Dashboard (figures stay Chivo Mono) |
-| `text-hero-lg` | 72px | 72px | sans / mono | Reserved for single most important number |
-
-**Money numbers always use tabular-nums (plain zero):**
-```css
-.tabular, .mono {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-```
+Mobile form inputs retain their 16px type and 44px touch-target safeguards.
 
 ---
 
