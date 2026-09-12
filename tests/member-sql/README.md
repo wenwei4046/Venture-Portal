@@ -14,10 +14,19 @@ The lockfile pins PGlite 0.5.8. Dependency installation requires the npm registr
 Expected final output:
 
 ```text
-PASS: 199 member SQL checks. Disposable synthetic auth/payroll/Storage; real Revenue and member migrations. No live database connection.
+PASS: 268 member SQL checks. Disposable synthetic auth/payroll/Storage; real Revenue and member migrations. No live database connection.
 ```
 
 The process exits nonzero on a failed assertion or SQL error. The same two commands can be used in CI; no database service, credentials or browser is required. Keep this package's `node_modules` and any `.env` files untracked.
+
+The Insight checks in `insight-checks.mjs` load a scenario of their own —
+revenue held under the deposit gate, an order carried in from last month, one
+already released by a run, a non-commissionable item group and an order with no
+cost — and verify that the live figures count exactly what the engine would,
+that the board lists every member including those with no orders and no user
+account, that the downline never contains the caller, that a requested month is
+clamped to the present, and that no commission, rate or salary reaches any of
+it. The scope guards are switched off only while the fixture is loaded.
 
 Coverage includes own-data privacy, neutral member permission boundaries, claim attachment/hash/idempotency and revision linkage, memo acknowledgement, cross-department waiting requests, capacity reservation/allocation and the service-only scheduled queue worker. The actual legacy HOME Fair roster synchronization functions are exercised too.
 

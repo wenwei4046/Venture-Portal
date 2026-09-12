@@ -17,6 +17,9 @@ This document records implementation, verification and operational requirements.
 | `supabase/migrations/20260912050000_member_hr_management.sql` | HR review, candidate binding/creation, allocation verification, capacity configuration, Principal product publication and memo publication. |
 | `supabase/migrations/20260912060000_member_permission_boundary.sql` | Caps neutral member permissions even when its title or per-user overrides contain broad management permissions. |
 | `supabase/migrations/20260912070000_member_queue_worker.sql` | Service-role-only serial queue sweep and private run audit; no external schedule is installed by the migration. |
+| `supabase/migrations/20260916010000_member_insight.sql` | The `member_insight` permission and its place in the neutral member allowlist; `member_scoreboard` (live commissionable performance per salesperson for a scheme-month), the department and downline boards over it, `member_insight_snapshot` and `member_org_map`. All read-only, all `SECURITY DEFINER`; the scoreboard and both boards are revoked from every role and reachable only through the two granted snapshots. |
+| `src/lib/member/insight.ts` | The arithmetic the three Insight screens read: blended margin, competition ranking, gate progress, streak state, margin levels, downline branches, month pace. Pure, unit-tested. |
+| `src/lib/member/org-map-layout.ts` | Where every card, frame and line sits on the team map, over the shared `layoutTree`. Pure, unit-tested. |
 
 `loadMemberData()` returns `MemberData` directly. Other functions return `{ ok: true, data }` or `{ ok: false, error }`; `refreshMemberData()` is the action wrapper for refresh. Production configuration failures return an unconfigured state, never demo business data.
 
@@ -28,12 +31,14 @@ This document records implementation, verification and operational requirements.
 
 - Identity is derived from the logged-in account and its linked active `hr_staff_costs.user_id` record in a commission department. Callers cannot choose the snapshot staff ID.
 - The snapshot exposes the caller's salary/commission/orders and authorized hierarchy. The department directory exposes only `id`, `name`, `capacity`, `occupied` for active sub-departments in that staff member's Revenue department. It does not grant membership in those departments.
-- The neutral role resolves only `member_portal`, `member_quote`, `member_requests`, `member_memos`; their permission scopes are `none`. Broad title inheritance and broad per-user grants cannot elevate this role. Existing roles retain their prior permission resolution. No provisioning RPC is required.
+- The neutral role resolves only `member_portal`, `member_quote`, `member_requests`, `member_memos`, `member_insight`; their permission scopes are `none`. Broad title inheritance and broad per-user grants cannot elevate this role. Existing roles retain their prior permission resolution. No provisioning RPC is required.
 - Public products and RPCs omit unit costs. The server reads selected current costs only after Fair membership authorization, validates main/gift metadata and size compatibility, and uses the shared calculator. `customerText` is generated with those same current product rows. Product/version JSON formatting matches the server version pair.
 - Precise margin and price mathematically reveal the selected combination's total cost; this is the inherent boundary explained in DESIGN.md, not a promise of absolute cost secrecy.
 - `member-invoices` is private, limited to 3 MB per JPG/PNG/PDF. The server inspects file bytes/MIME and records SHA-256. Only the server service role can attest an attachment; the submission RPC requires that attestation and stored object to match the current request hash. Corrected invoices retain old private objects for history. Signed reviewer URLs expire after 120 seconds.
 - Claim approval/rejection/payment uses the existing Claims flow. Member HR management can request information from a pending claim, but cannot create an alternative payout approval path.
 - Memo read and acknowledgement are separate, idempotent timestamps tied to immutable publication version and authorized audience. A publication creates a new row; old acknowledgements are retained.
+- Insight reports another member's name, title, sales, order count, KPI units, margin and last order date. It never reports anybody's commission, commission rate or salary, the caller's included: pay stays in the statement, which only its owner, HR and the Principal can read. `member_org_map` reports names, titles, staff codes and reporting lines, and no pay of any kind. Both are read-only and resolve the caller from the session, never from an argument.
+- Insight's figures are estimates from committed orders and are labelled as such on every screen. They apply the deposit gate and carry-forward exactly as the engine does, so a figure shown here is the figure a run would compute from the same orders; the statement remains what pays.
 
 ## Migration and setup order
 

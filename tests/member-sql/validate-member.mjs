@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 import { principalViewChecks } from './principal-view-checks.mjs'
+import { insightChecks } from './insight-checks.mjs'
 const migrations = new URL('../../supabase/migrations/', import.meta.url)
 const db=new PGlite({extensions:{btree_gist}})
 const principal='10000000-0000-4000-8000-000000000001',dept='10000000-0000-4000-8000-000000000002'
@@ -214,5 +215,6 @@ try{
  check((await q('SELECT name FROM storage.objects WHERE name=$1',[guardedPath])).length,1);
  await asUser(second);check((await q('SELECT name FROM storage.objects WHERE name=$1',[guardedPath])).length,0);
  await principalViewChecks({db,q,one,check,reject,migrate,asUser,principal,first,second,dept,fair,ir,scheme,staff1,staff2,product,run,batch,period,today,memo,allocated});
+ await insightChecks({db,q,one,check,reject,migrate,asUser,principal,first,second,dept,fair,ir,scheme,staff1,staff2,product,run,batch,period,today});
  console.log(`PASS: ${checks} member SQL checks. Disposable synthetic auth/payroll/Storage; real Revenue and member migrations. No live database connection.`)
 }catch(error){console.error(JSON.stringify({message:error.message,code:error.code,where:error.where,detail:error.detail,query:error.query,stack:error.name==='AssertionError'?error.stack:undefined},null,2));process.exitCode=1}finally{await db.close()}
