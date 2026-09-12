@@ -63,7 +63,7 @@ const labels: Record<MemberPage, string> = {
   team: "My team",
   requests: "Requests",
   memos: "Memos & notifications",
-  account: "My account",
+  account: "Profile",
 };
 const statusLabels: Record<string, string> = {
   draft: "Draft",
@@ -591,8 +591,8 @@ export default function MemberWorkspace({
             {
               id: "insight",
               label: "Insight",
-              description: "Live sales, ranking and downline",
-              keywords: "ranking leaderboard margin downline performance target 100k",
+              description: "Live sales, ranking and downline · in Profile",
+              keywords: "ranking leaderboard margin downline performance target 100k profile",
               group: "Quick links",
               action: () => navigate("insight"),
             },
@@ -631,9 +631,9 @@ export default function MemberWorkspace({
       },
       {
         id: "account",
-        label: principalView ? "Principal account" : "My account",
-        description: "Department, appearance and preferences",
-        keywords: "settings profile dark light fair ir switch",
+        label: principalView ? "Principal profile" : "Profile",
+        description: "Insight, department, appearance and preferences",
+        keywords: "settings account profile insight dark light fair ir switch",
         group: "Quick links",
         action: () => navigate("account"),
       },
@@ -855,15 +855,12 @@ export default function MemberWorkspace({
   }
   const navItems: { page: MemberPage; icon: string; label: string }[] = [
     { page: "today", icon: "home", label: "Today" },
-    ...(principalView
-      ? []
-      : [{ page: "insight" as const, icon: "chart", label: "Insight" }]),
     { page: "income", icon: "wallet", label: "Income" },
     ...(member?.calculator
       ? [{ page: "quote" as const, icon: "calculator", label: "Quote" }]
       : []),
     { page: "team", icon: "team", label: "Team" },
-    { page: "account", icon: "user", label: "Account" },
+    { page: "account", icon: "user", label: "Profile" },
   ];
   const renderNav = (desktop = false) =>
     (desktop
@@ -880,9 +877,9 @@ export default function MemberWorkspace({
         className={`${s.navButton} ${n.page === "quote" ? s.navPrimary : ""}`}
         aria-current={
           page === n.page ||
-          (!desktop &&
-            n.page === "account" &&
-            ["requests", "memos"].includes(page))
+          (n.page === "account" &&
+            (page === "insight" ||
+              (!desktop && ["requests", "memos"].includes(page))))
             ? "page"
             : undefined
         }
@@ -1850,6 +1847,24 @@ export default function MemberWorkspace({
         </div>
         <div className={s.grid}>
           <div className={s.stack}>
+            {!principalView && (
+              <section className={s.card}>
+                <p className={s.eyebrow}>WHERE YOU STAND TODAY</p>
+                <h2>Insight</h2>
+                <p className={s.sub} style={{ marginBottom: 18 }}>
+                  Your live sales, the department ranking and your downline,
+                  read from committed orders.
+                </p>
+                <button
+                  className={`${s.button} ${s.primary} ${s.full}`}
+                  onClick={() => navigate("insight")}
+                >
+                  <Icon name="chart" />
+                  Open Insight
+                  <Icon name="arrow" size={17} />
+                </button>
+              </section>
+            )}
             <section className={s.card}>
               <h2>Current role</h2>
               <label className={s.field}>
@@ -1881,6 +1896,9 @@ export default function MemberWorkspace({
               <h2>My work</h2>
               {(
                 [
+                  ...(principalView
+                    ? []
+                    : ([["insight", "chart", "Insight · sales, ranking & downline"]] as const)),
                   ["requests", "receipt", "Requests"],
                   ["memos", "bell", "Memos & notifications"],
                   ["team", "team", "Team & capacity"],
@@ -1901,7 +1919,7 @@ export default function MemberWorkspace({
             </section>
           </div>
           <section className={s.card}>
-            <h2>Account preferences</h2>
+            <h2>Profile preferences</h2>
             <button
               className={s.listRow}
               onClick={() => setPrivateMode((v) => !v)}

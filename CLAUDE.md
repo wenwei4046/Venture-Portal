@@ -197,8 +197,10 @@ src/
 │   │                                  workspace for a salesperson, NOT the portal.
 │   │                                  Its own design language (warm editorial,
 │   │                                  `components/member/member.module.css`), its
-│   │                                  own nav: Today / **Insight** / Income /
-│   │                                  Quote / Team / Account. `preview/` renders
+│   │                                  own nav: Today / Income / Quote / Team /
+│   │                                  **Profile** (was Account until 2026-09-13;
+│   │                                  Insight lives INSIDE it, first card, and
+│   │                                  `page=insight` keeps Profile lit). `preview/` renders
 │   │                                  it in a phone frame on demo data
 │   │                                  (`lib/member/demo*.ts`); dev-only, and
 │   │                                  Principal/HR in production.
