@@ -1,0 +1,45 @@
+.theme {
+  color-scheme: light;
+  --insight-paper: 232 222 210;
+  --insight-surface: 255 252 247;
+  --insight-ink: 61 40 31;
+  --insight-muted: 115 93 80;
+  --insight-rule: 205 188 174;
+  --insight-on-primary: 255 252 247;
+  --insight-hue0-light: 239 228 217;
+  --insight-hue0-mid: 185 154 128;
+  --insight-hue0-deep: 75 48 36;
+  --insight-hue1-light: 249 231 216;
+  --insight-hue1-mid: 218 152 107;
+  --insight-hue1-deep: 163 78 37;
+  --insight-hue2-light: 238 240 226;
+  --insight-hue2-mid: 168 175 133;
+  --insight-hue2-deep: 88 98 68;
+  --insight-hue3-light: 230 237 241;
+  --insight-hue3-mid: 159 175 186;
+  --insight-hue3-deep: 78 101 116;
+  --insight-primary: var(--insight-hue0-deep);
+  --insight-secondary: var(--insight-hue1-deep);
+  --insight-tertiary: var(--insight-hue2-deep);
+  --insight-fourth: var(--insight-hue3-deep);
+}
+.theme[data-insight-design="b"] {
+  --insight-paper: 233 220 208;
+  --insight-surface: 255 250 244;
+  --insight-ink: 71 45 35;
+  --insight-muted: 116 91 77;
+  --insight-rule: 207 185 166;
+  --insight-on-primary: 255 250 244;
+  --insight-hue0-light: 240 226 213;
+  --insight-hue0-mid: 185 142 114;
+  --insight-hue0-deep: 87 56 40;
+  --insight-hue1-light: 251 232 214;
+  --insight-hue1-mid: 227 171 125;
+  --insight-hue1-deep: 161 77 38;
+  --insight-hue2-light: 245 232 229;
+  --insight-hue2-mid: 203 168 160;
+  --insight-hue2-deep: 139 90 85;
+  --insight-hue3-light: 245 237 216;
+  --insight-hue3-mid: 213 188 129;
+  --insight-hue3-deep: 128 99 46;
+}
