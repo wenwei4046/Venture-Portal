@@ -4,6 +4,8 @@ import { memberDemo } from "@/lib/member/demo";
 import MemberWorkspace from "@/components/member/MemberWorkspace";
 import MemberAdmin from "@/components/member/MemberAdmin";
 import MemberLoginScreen from "@/components/member/MemberLoginScreen";
+import InsightDesignPreview from "@/components/member/design-preview/InsightDesignPreview";
+import InsightDesignReview from "@/components/member/design-preview/InsightDesignReview";
 import type { AdminMemberData } from "@/lib/member/server";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,8 @@ export default async function MemberPreview({
     height?: string;
     page?: string;
     quoteView?: string;
+    design?: string;
+    view?: string;
   }>;
 }) {
   if (process.env.NODE_ENV !== "development") {
@@ -26,6 +30,12 @@ export default async function MemberPreview({
     if (!user || !["principal", "hr"].includes(user.role)) notFound();
   }
   const params = await searchParams;
+  if (params.view?.startsWith("insight")) {
+    if (params.design === "compare") return <InsightDesignReview />;
+    if (params.design === "a" || params.design === "b") {
+      return <InsightDesignPreview design={params.design} />;
+    }
+  }
   if (params.device === "phone") {
     const phoneWidth =
       params.width && ["320", "375", "390", "430"].includes(params.width)
