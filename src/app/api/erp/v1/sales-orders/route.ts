@@ -99,7 +99,14 @@ export async function POST(request: Request) {
 
   if (applied > 0) revalidatePath('/revenue', 'layout')
 
-  return NextResponse.json({ ok: true, received: parsed.orders.length, applied, results })
+  // `outcome` is the portal's one word for what it did — applied / duplicate /
+  // stale / held / skipped — which the ERP's outbox records beside its own
+  // `sent` (`portal_outcome`, read from `outcome ?? result`). Its page shows
+  // it so a held month is never mistaken for a paid one. A backfill batch that
+  // did not all end the same way says `mixed`; `results` carries each one.
+  const outcome = results.every(r => r.status === results[0].status) ? results[0].status : 'mixed'
+
+  return NextResponse.json({ ok: true, outcome, received: parsed.orders.length, applied, results })
 }
 
 export async function GET() {

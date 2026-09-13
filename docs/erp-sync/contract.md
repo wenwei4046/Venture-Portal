@@ -67,7 +67,7 @@ the outbox row pending and retries it forever.** So:
 
 | Status | Meaning | Outbox should |
 |---|---|---|
-| **200** | Delivered. The body says what the portal did (§4). A `duplicate`, `stale`, `held` or `skipped` outcome is **still a successful delivery** — the portal chose not to apply it and recorded why. | mark **done** |
+| **200** | Delivered. The body says what the portal did (§4): `outcome` is the one word (`applied` / `duplicate` / `stale` / `held` / `skipped`; `mixed` for a backfill batch whose documents ended differently — 2026-09-13, so the ERP's `portal_outcome` column can carry it), `results[]` has it per document. A `duplicate`, `stale`, `held` or `skipped` outcome is **still a successful delivery** — the portal chose not to apply it and recorded why. | mark **done** |
 | 401 | Wrong or missing secret. | stays pending; a human fixes the config |
 | 422 | Unreadable delivery (`docNo` missing, `header.so_date` not a date, `items` not an array). Body names the document and the reason. Logged on the portal as `rejected`. | stays pending; a human fixes the payload — it will not fix itself |
 | 503 | Portal has no `ERP_SYNC_SECRET` configured yet. | stays pending (retry) |
