@@ -735,6 +735,23 @@ their own containers.
 
 ## Component Vocabulary
 
+### ERP link card (2026-09-13 — Revenue › Comm Cal, Fair only)
+
+A `.sect-head` section ("Houzs ERP link", counter `LINKED · HOST` or `NOT
+LINKED`) holding one bordered `bg-surface` card in the Settings composition:
+serif host as the title, mono meta line beneath (company · key `····a1b2` ·
+linked by · date), a `.chip` (`ledger` Connected / `danger` Check failed) on the
+right, then a 4-column fact grid (mono-caps labels: Signed in as / Last check /
+Last sync / Remembered) and a row of text actions (accent "Test connection",
+"Replace key"; danger "Unlink"). Unlinked, the same card is the link form —
+ERP address, API key (`type=password`, never echoed back), Company — with the
+seal button *Link ERP*. Below a linked card sits the sync control: a mono
+`type=month` input, a "re-read every order" tick, the seal button *Sync
+<Month>*, and an italic-serif progress line ("reading 60 of 300 changed
+orders…") that settles into the summary ("300 listed · 288 unchanged · 12 read
+· 9 applied"). Errors per document are mono 11px `--danger`, at most eight.
+`src/app/(portal)/revenue/_components/ErpLinkPanel.tsx`.
+
 ### Revenue hierarchy spaces (approved 2026-09-11)
 
 Staff Hierarchy's chart combines the active sub-departments of the same parent

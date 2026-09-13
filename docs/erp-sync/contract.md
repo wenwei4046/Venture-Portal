@@ -268,3 +268,61 @@ A window of 401s between the two only delays deliveries — the outbox retries.
 | Which companies feed commission | **assumed** Houzs (1) only — `vp.companies` |
 | Sub-department scoping | The existing endpoint always targets Fair. Batches, releases, held deliveries and run locks are scoped to Fair; IR uses a separate feed and may reuse document numbers. No ERP payload change is needed. |
 | Salesperson self-service page in the portal | separate feature, not part of this contract |
+
+---
+
+## 8. The other road in — the ERP link (pull), 2026-09-13
+
+Nothing in §5 has been applied on the ERP side (its repository holds no
+`venture_portal_outbox`, no drain, no config table — checked 2026-09-13), so
+the portal now also **pulls**. The two roads share everything after the
+receiver: the same `ingest_erp_sales_order`, the same batches, orders, lines,
+`erp_sync_events`, held/replay and salesperson matching. They may run at once.
+
+| | Push (§1–§6) | Pull (this section) |
+|---|---|---|
+| Who starts it | the ERP's database, seconds after a save | a person on Comm Cal → Fair pressing **Sync <month>** |
+| What the ERP needs | pg_net + pg_cron + the three SQL files + config rows | **nothing** — a bearer key it already issues |
+| Auth | `ERP_SYNC_SECRET` on Vercel, `x-sync-secret` header | the ERP's key, pasted once, kept in Supabase Vault |
+| Latency | ≤ 10 s | when someone syncs (no cron yet) |
+| Change detection | the outbox row | a hash of each header row in the month's list (`erp_pull_docs`) |
+
+**What the portal calls on the ERP** (all `GET`, all with `Authorization: Bearer <key>`
+and `X-Company-Id: <company>`, read from the ERP source the same day):
+
+| Call | Used for | Answer the portal reads |
+|---|---|---|
+| `/api/auth/me` | proving the key when it is pasted, and **Test connection** | `user.id` (0 = the shared service key `DASHBOARD_API_KEY`, else a person), `user.name`, `user.role_name` |
+| `/api/scm/mfg-sales-orders?page=N&pageSize=100&from=&to=&sort=doc_no:asc` | listing a month | `salesOrders[]` (header rows of `mfg_sales_orders_with_payment_totals` + `paid_total_sen`, `balance_sen_live`), `total` |
+| `/api/scm/mfg-sales-orders/:docNo` | a changed document | `salesOrder` (header + `salesperson_name`, signed live `balance_sen`), `items[]` (with `line_cost_sen`); 404 = deleted |
+| `/api/scm/mfg-sales-orders/:docNo/payments` | the same document | `payments[]` |
+
+**Which key.** `/api/auth/me` accepts the ERP's service key (`DASHBOARD_API_KEY`
+in the Worker's secrets; answers as user 0 "Service", every permission, never
+expires) or any person's session token (7 days, ends at sign-out). The link
+card says which it was given and warns on a personal one. The ERP has no
+per-user API-key screen (checked); IT hands the service key out.
+
+**How a sync runs.** Plan: list the month, hash the commission-relevant header
+fields of each row (`LIST_HASH_FIELDS` in `src/lib/erp-link/pull.ts`), compare
+with `erp_pull_docs`, and queue the new/changed ones plus any remembered
+document the ERP no longer lists. Pull, thirty documents a step, four in
+flight: detail + payments → the §3 delivery shape (`buildDelivery`, with
+`snapshotAt` = the moment the portal read it) → `toCanonicalOrder` →
+`ingest_erp_sales_order` under the signed-in user's session. Record: the
+outcome on the link card ("300 listed · 288 unchanged · 12 read · 9 applied ·
+2 held"). A 404 on a remembered document becomes a `deleted: true` delivery.
+
+**Secret handling.** The key is stored with `erp_link_put_secret` and read with
+`erp_link_get_secret` — SECURITY DEFINER functions over Vault that only the
+service role may execute (migration `20260916090000_erp_link`). The server
+actions reach them through the admin client after `requirePermission('revenue')`;
+an HR user's browser session cannot. `erp_links` (RLS: admin + hr) holds the
+address, company, last four characters of the key, who linked it, the last
+check and the last sync — never the key.
+
+**PROVEN** (2026-09-13): the production ERP answers `/api/auth/me` 401 without
+a key and `/health` 200 on the Worker host; the pull end to end against a
+stand-in ERP shaped like the routes above (see the PR); the Vault round-trip on
+the live schema. **UNTESTED**: a full month against the production ERP — that
+needs the key, which only IT holds.

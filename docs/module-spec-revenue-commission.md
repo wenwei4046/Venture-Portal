@@ -1451,6 +1451,14 @@ The contract the ERP team builds against, and the SQL they apply, live in
 `docs/erp-sync/`. The receiver is the portal's only POST route handler — the
 machine-ingest exception in CLAUDE.md.
 
+**Pull (2026-09-13).** The ERP side of the push was never applied, so Fair's
+Comm Cal page also carries a **Houzs ERP link** card: paste the ERP's API key,
+the portal proves it and keeps it in Vault, and **Sync <month>** reads the
+month's sales orders from the ERP's REST API — only the documents whose header
+changed since the last sync — and puts each through the same
+`ingest_erp_sales_order`. Same batches, same outcomes, same held/replay and
+salesperson matching. `docs/erp-sync/contract.md` §8.
+
 ---
 
 ## 13. Non-goals (v1)

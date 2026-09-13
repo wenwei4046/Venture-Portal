@@ -61,8 +61,9 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
 
       {!data.lastEventAt ? (
         <Hint>
-          The Houzs Century ERP posts every changed sales order here the moment it is saved. Nothing
-          has arrived yet — the ERP side is wired from <code className="font-mono text-xs">docs/erp-sync/contract.md</code>.
+          Every sales order the ERP link syncs, and every one the ERP&apos;s push feed posts, lands
+          here with what the portal did with it. Nothing has arrived yet — sync a month above, or
+          wire the push side from <code className="font-mono text-xs">docs/erp-sync/contract.md</code>.
         </Hint>
       ) : null}
 
