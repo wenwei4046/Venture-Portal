@@ -3,7 +3,8 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
 import { parseErpSyncBody, type CanonicalOrder } from '@/lib/erp-sync/contract'
-import { providedSecret, secretConfigured, secretMatches } from '@/lib/erp-sync/auth'
+import { acceptedSecrets, providedSecret, secretMatchesAny } from '@/lib/erp-sync/auth'
+import { storedFeedSecret } from '@/lib/erp-sync/feed-secret'
 
 /**
  * POST /api/erp/v1/sales-orders — the ERP live feed's receiver.
@@ -14,7 +15,8 @@ import { providedSecret, secretConfigured, secretMatches } from '@/lib/erp-sync/
  * and has no session; a machine-to-machine ingest is the case the rule was not
  * written for. The exception is narrow on purpose:
  *
- *   - authenticated by a static secret (ERP_SYNC_SECRET), never a session;
+ *   - authenticated by a static secret, the key the ERP generated and
+ *     somebody pasted on Comm Cal, or ERP_SYNC_SECRET, never a session;
  *   - the service-role client is used for ONE thing: calling the ingest RPC
  *     that owns every write (and logging what could not reach it);
  *   - the path is excluded from the session middleware;
@@ -48,11 +50,14 @@ interface IngestResult {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.ERP_SYNC_SECRET
-  if (!secretConfigured(secret)) {
+  // The key pasted on Comm Cal (Vault) and/or ERP_SYNC_SECRET (Vercel env),
+  // whichever is set. Neither: 503, and the ERP's outbox waits without
+  // spending an attempt. Wrong: 401, likewise.
+  const secrets = acceptedSecrets(process.env.ERP_SYNC_SECRET, await storedFeedSecret())
+  if (secrets.length === 0) {
     return NextResponse.json({ error: 'erp sync not configured' }, { status: 503 })
   }
-  if (!secretMatches(providedSecret(request.headers), secret)) {
+  if (!secretMatchesAny(providedSecret(request.headers), secrets)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

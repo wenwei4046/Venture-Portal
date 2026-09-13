@@ -53,7 +53,7 @@ a cold compile). The Comm Cal page shows "LAST EVENT 12 S AGO" and ticks.
 | Receiver | `POST https://<portal-host>/api/erp/v1/sales-orders` |
 | Health | `GET https://<portal-host>/api/erp/v1/health` → `{ ok: true, service: "venture-portal", feed: "sales-orders", version: 1, time }` |
 | Auth | `x-sync-secret: <shared secret>` — the same header the ERP's own mirror receivers use. `Authorization: Bearer <secret>` is accepted too. Compared in constant time. |
-| Secret | ≥ 32 characters. Lives in the portal's `ERP_SYNC_SECRET` (Vercel env, Production) and in the ERP DB's `scm.venture_portal_sync_config` row `vp.secret`. Never in either repository. |
+| Secret | ≥ 32 characters. **Generated on the ERP's Venture Portal Feed page and pasted on the portal** (Revenue › Fair › Commission Calculation › *Houzs ERP link*, 2026-09-13), where it is kept in Supabase Vault and read by the receiver through service-role-only functions (mig `20260916100000_erp_feed_key`). `ERP_SYNC_SECRET` on Vercel is accepted as well while it is set. Never in either repository. |
 | Body | JSON, one delivery (§3), or `{ "orders": [ …up to 200… ] }` for a backfill tool. |
 | Size | Vercel accepts up to 100 MB; a sales order is a few KB. |
 
@@ -199,6 +199,23 @@ ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v;
 history older than the first commission month stay out unless widened.
 
 ### Rollout order
+
+**As built (2026-09-13).** The ERP implemented this contract its own way — a
+Worker cron drain rather than pg_cron + pg_net (its `docs/modules/venture-portal-feed.md`,
+PR #3751) — and the three SQL files below are the original specification, kept
+for the shape they describe. The steps that actually turn it on are now:
+
+1. On the portal, nothing to deploy: the receiver is live.
+2. ERP → Venture Portal Feed → Connection → **Generate API key** (the hand-off
+   `docs/HANDOFF-2026-09-13-venture-portal-api-key-and-seconds.md` in the ERP
+   repo); paste it on the portal's *Houzs ERP link* card. The receiver address
+   the ERP needs is shown on that card.
+3. ERP → **Test connection** → expect `200 {"ok":true,…}` → companies `1`,
+   since `2026-08-01` → **Turn on** → **Queue anything not delivered** to
+   backfill.
+4. Portal → Comm Cal: match the salespeople the feed could not place.
+
+The original plan, for the record:
 
 1. **Portal:** set `ERP_SYNC_SECRET` on Vercel (Production) and redeploy. Until
    then the receiver answers 503 and nothing else changes.

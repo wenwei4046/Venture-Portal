@@ -20,3 +20,13 @@ export function formatAgo(iso: string | null | undefined, now: number = Date.now
   if (d < 7) return `${d} d ago`
   return formatDate(iso)
 }
+
+/**
+ * Enough of a key to tell which one is in, never enough to use: the last four
+ * characters. A key too short to show four of stays fully hidden.
+ */
+export function keyHint(key: string): string {
+  const k = (key ?? '').trim()
+  if (k.length < 12) return '····'
+  return `····${k.slice(-4)}`
+}

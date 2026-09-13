@@ -6,8 +6,11 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../_lib/sub-departments'
+import { headers } from 'next/headers'
 import { loadErpSyncPanelData } from '../_lib/erp-sync-panel'
+import { loadErpLinkView, receiverUrlFor } from '../_lib/erp-link'
 import ErpSyncPanel from '../_components/ErpSyncPanel'
+import ErpLinkPanel from '../_components/ErpLinkPanel'
 import { formatAgo } from '@/lib/erp-sync/format'
 
 interface PageProps {
@@ -50,6 +53,14 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
       .eq('sub_department_id', subDept.id),
     loadErpSyncPanelData(supabase, subDept.id),
   ])
+  // The link card belongs to the programme the ERP feed belongs to (Fair),
+  // which is what a non-null sync panel says. The receiver address the ERP
+  // must send to is this very host.
+  let link = null
+  if (sync) {
+    const h = await headers()
+    link = await loadErpLinkView(supabase, subDept.id, receiverUrlFor(h.get('x-forwarded-host') ?? h.get('host')))
+  }
 
   const runByPeriod = new Map(
     ((runs ?? []) as Array<{ period_month: string; status: string; total_commission: number | string; staff_count: number }>)
@@ -164,8 +175,8 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
           <p className="font-serif text-2xl text-ink mb-3">No sales data yet.</p>
           <p className="font-serif italic text-muted text-sm mb-8 max-w-lg mx-auto">
             Commission is worked out from the ERP&apos;s sales orders — one row per product line,
-            with the salesperson on each order. They arrive live from the ERP once its feed is
-            switched on; until then, import a month&apos;s export to begin.
+            with the salesperson on each order. They arrive live from the ERP once its key is
+            pasted below and its feed is switched on; until then, import a month&apos;s export to begin.
           </p>
           <Link
             href={revenuePath(subDept.slug, thisPeriod, 'import')}
@@ -176,6 +187,7 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
         </div>
       )}
 
+      {link ? <ErpLinkPanel view={link} lastEventAt={sync?.lastEventAt ?? null} /> : null}
       {sync ? <ErpSyncPanel data={sync} /> : null}
     </div>
   )
