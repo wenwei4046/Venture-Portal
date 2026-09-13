@@ -207,6 +207,22 @@ src/
 │   │   │                              sub_department_id, including committed
 │   │   │                              batch uniqueness and carry-forward.
 │   │   │                              The Houzs ERP feed belongs to Fair.
+│   │   │                              **THE ERP'S KEY (2026-09-13):** the ERP
+│   │   │                              built the push side (its PR #3751, a
+│   │   │                              Worker cron drain, *Venture Portal Feed*
+│   │   │                              page); its page GENERATES the secret and
+│   │   │                              somebody pastes it once on Fair's Comm
+│   │   │                              Cal — the **Houzs ERP link** card above
+│   │   │                              the live-feed panel — where it lives in
+│   │   │                              Vault (mig `20260916100000`) and the
+│   │   │                              receiver accepts it (or `ERP_SYNC_SECRET`,
+│   │   │                              optional now). The card shows the
+│   │   │                              receiver address and the last delivery;
+│   │   │                              everything else (on/off, companies,
+│   │   │                              queue) is on the ERP's page.
+│   │   │                              `lib/erp-sync/feed-key.ts`,
+│   │   │                              `revenue/link-actions.ts`,
+│   │   │                              `_components/ErpLinkPanel.tsx`.
 │   │   │                              IR rules: commission spec §15; two layers,
 │   │   │                              repeated own sales per group, monthly
 │   │   │                              packages and a 4% fallback. SDL retains
@@ -277,9 +293,12 @@ src/
 │   │   ├── client.ts               ← Browser client (anon key + RLS)
 │   │   ├── server.ts               ← Server client (anon key + RLS via SSR cookies)
 │   │   ├── admin.ts                ← Service role client. BYPASSES RLS. 'server-only',
-│   │   │                              built on FIRST USE not at import time. Exactly two
-│   │   │                              callers: the ERP receiver and team/people invites.
-│   │   │                              A third is a decision, not a detail.
+│   │   │                              built on FIRST USE not at import time. Exactly three
+│   │   │                              callers: the ERP receiver, team/people invites, and
+│   │   │                              `lib/erp-sync/feed-key.ts` (the ERP's feed key in and
+│   │   │                              out of Vault — four service-role-only RPCs, nothing
+│   │   │                              else; 2026-09-13). A fourth is a decision, not a
+│   │   │                              detail.
 │   │   └── database.types.ts       ← Generated from Supabase
 │   ├── auth.ts                     ← requireAuth / requireRole helpers
 │   ├── roles.ts                    ← canAccess* helpers for sidebar visibility
@@ -429,7 +448,7 @@ Server Components by default — Client Components only when needed (forms, inte
 Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
 Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5).
 Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
-Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly two callers: `app/api/erp/v1/sales-orders/route.ts` (which uses it for one thing — calling the ingest RPC) and `team/people/invite-actions.ts`. Reach for it only when a machine path has no session to act under, never to dodge an RLS policy that is merely inconvenient.
+Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly three callers: `app/api/erp/v1/sales-orders/route.ts` (which uses it for one thing — calling the ingest RPC), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
 Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases.

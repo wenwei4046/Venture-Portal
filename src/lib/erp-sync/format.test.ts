@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAgo } from './format'
+import { formatAgo, keyHint } from './format'
 
 const NOW = Date.parse('2026-09-05T10:00:00Z')
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString()
@@ -22,5 +22,17 @@ describe('formatAgo', () => {
 
   it('never goes negative on a clock ahead of the server', () => {
     expect(formatAgo(ago(-30), NOW)).toBe('just now')
+  })
+})
+
+describe('keyHint', () => {
+  it('shows only the last four characters', () => {
+    expect(keyHint('abcdefghijklmnopqrstuvwxyz')).toBe('····wxyz')
+    expect(keyHint('  abcdefghijklmnop  ')).toBe('····mnop')
+  })
+
+  it('hides a short key entirely', () => {
+    expect(keyHint('short')).toBe('····')
+    expect(keyHint('')).toBe('····')
   })
 })

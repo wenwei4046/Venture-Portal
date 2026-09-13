@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ERP_SYNC_SECRET_MIN_LENGTH, providedSecret, secretConfigured, secretMatches } from './auth'
+import { ERP_SYNC_SECRET_MIN_LENGTH, acceptedSecrets, providedSecret, secretConfigured, secretMatches, secretMatchesAny } from './auth'
 
 const SECRET = 'a'.repeat(ERP_SYNC_SECRET_MIN_LENGTH)
 
@@ -30,5 +30,33 @@ describe('secretMatches', () => {
     expect(secretMatches(SECRET + 'a', SECRET)).toBe(false)
     expect(secretMatches('', SECRET)).toBe(false)
     expect(secretMatches(SECRET, '')).toBe(false)
+  })
+})
+
+describe('acceptedSecrets', () => {
+  const pasted = 'p'.repeat(48)
+
+  it('keeps the real ones, trimmed, without repeats', () => {
+    expect(acceptedSecrets(SECRET, pasted)).toEqual([SECRET, pasted])
+    expect(acceptedSecrets(` ${SECRET} `, SECRET)).toEqual([SECRET])
+    expect(acceptedSecrets(undefined, pasted)).toEqual([pasted])
+    expect(acceptedSecrets(SECRET, null)).toEqual([SECRET])
+  })
+
+  it('is empty when nothing real is configured, so the receiver answers 503', () => {
+    expect(acceptedSecrets(undefined, null)).toEqual([])
+    expect(acceptedSecrets('', 'short')).toEqual([])
+  })
+})
+
+describe('secretMatchesAny', () => {
+  const pasted = 'p'.repeat(48)
+
+  it('accepts either configured secret and nothing else', () => {
+    expect(secretMatchesAny(SECRET, [SECRET, pasted])).toBe(true)
+    expect(secretMatchesAny(pasted, [SECRET, pasted])).toBe(true)
+    expect(secretMatchesAny('q'.repeat(48), [SECRET, pasted])).toBe(false)
+    expect(secretMatchesAny(SECRET, [])).toBe(false)
+    expect(secretMatchesAny('', [SECRET])).toBe(false)
   })
 })

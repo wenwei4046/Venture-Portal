@@ -1451,6 +1451,13 @@ The contract the ERP team builds against, and the SQL they apply, live in
 `docs/erp-sync/`. The receiver is the portal's only POST route handler — the
 machine-ingest exception in CLAUDE.md.
 
+**The key (2026-09-13).** The ERP built the push side as a Worker cron drain
+(its PR #3751, *Venture Portal Feed* page). The secret it sends with is
+generated on that page and pasted once on Fair's Comm Cal page — the *Houzs ERP
+link* card — where it is kept in Vault and read by the receiver; `ERP_SYNC_SECRET`
+on Vercel is optional from here on. The card also shows the receiver address the
+ERP must send to and when the last delivery landed. `docs/erp-sync/contract.md` §2 / §5.
+
 ---
 
 ## 13. Non-goals (v1)

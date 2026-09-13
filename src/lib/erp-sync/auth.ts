@@ -7,8 +7,10 @@
  * constant time, failing CLOSED when the secret is unset). `Authorization:
  * Bearer` is accepted too for anything that is not pg_net.
  *
- * The secret lives in ERP_SYNC_SECRET on the portal (Vercel env) and in the
- * ERP database's sync config; it never appears in either repository.
+ * Which secret (2026-09-13): the key the ERP's Venture Portal Feed page
+ * generated and somebody pasted on Fair's Commission Calculation page (kept in
+ * Vault, read through erp-sync/feed-key.ts), or ERP_SYNC_SECRET on Vercel if
+ * that is set too. Either is accepted; neither appears in any repository.
  */
 
 import { timingSafeEqual } from 'node:crypto'
@@ -36,4 +38,28 @@ export function secretMatches(provided: string, secret: string): boolean {
   const b = Buffer.from(secret, 'utf8')
   if (a.length !== b.length) return false
   return timingSafeEqual(a, b)
+}
+
+/**
+ * The secrets the receiver will accept: every candidate that is a real one
+ * (long enough, not a placeholder), trimmed, without repeats. Empty means the
+ * feed is not configured and the receiver must answer 503, never open.
+ */
+export function acceptedSecrets(...candidates: Array<string | null | undefined>): string[] {
+  const out: string[] = []
+  for (const c of candidates) {
+    if (!secretConfigured(c)) continue
+    const t = c.trim()
+    if (!out.includes(t)) out.push(t)
+  }
+  return out
+}
+
+/** True when the provided secret equals any accepted one. Every candidate is compared. */
+export function secretMatchesAny(provided: string, secrets: readonly string[]): boolean {
+  let ok = false
+  for (const s of secrets) {
+    if (secretMatches(provided, s)) ok = true
+  }
+  return ok
 }
