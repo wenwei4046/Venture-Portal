@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
@@ -25,6 +26,10 @@ export interface VoucherRow {
   /** Override for the View link — synthetic rows (loan repayments, fund-in
    *  receipts on /receipts) point at their own module instead of /payments. */
   href?: string
+  /** Rows sharing a batchKey collapse into one summary line (user 2026-09-15
+   *  "hr 的 payroll voucher 我不想要显示这么多"): payroll disbursements are
+   *  one voucher per person, 26 a month, and drowned the ledger. */
+  batchKey?: string
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -36,10 +41,104 @@ const STATUS_STYLES: Record<string, string> = {
   voided: 'text-muted',
 }
 
-export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
+interface Batch {
+  key: string
+  members: VoucherRow[]
+  total: number
+  latest: string
+  /** e.g. "26 paid" or "20 paid · 6 pending approval". */
+  statusText: string
+}
+
+function groupBatches(rows: VoucherRow[]): { plain: VoucherRow[]; batches: Batch[] } {
+  const plain: VoucherRow[] = []
+  const byKey = new Map<string, VoucherRow[]>()
+  for (const r of rows) {
+    if (!r.batchKey) {
+      plain.push(r)
+      continue
+    }
+    const list = byKey.get(r.batchKey) ?? []
+    list.push(r)
+    byKey.set(r.batchKey, list)
+  }
+  const batches: Batch[] = [...byKey.entries()].map(([key, members]) => {
+    const counts = new Map<string, number>()
+    for (const m of members) counts.set(m.status, (counts.get(m.status) ?? 0) + 1)
+    return {
+      key,
+      members,
+      total: Math.round(members.reduce((s, m) => s + m.amount, 0) * 100) / 100,
+      latest: members.reduce((d, m) => (m.paymentOrCreatedDate > d ? m.paymentOrCreatedDate : d), ''),
+      statusText: [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([s, n]) => `${n} ${s.replace('_', ' ')}`)
+        .join(' · '),
+    }
+  })
+  batches.sort((a, b) => (a.latest < b.latest ? 1 : -1))
+  return { plain, batches }
+}
+
+export default function VouchersTable({
+  rows,
+  collapseBatches = true,
+}: {
+  rows: VoucherRow[]
+  /** false = render every row flat (used for the expanded members and when a
+   *  text search is active, so a searched-for person is not hidden). */
+  collapseBatches?: boolean
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const { plain, batches } = collapseBatches ? groupBatches(rows) : { plain: rows, batches: [] as Batch[] }
+  const toggle = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
   return (
-    <SortableTable<VoucherRow>
-      rows={rows}
+    <div>
+      {batches.length > 0 ? (
+        <div className="mb-4 border border-hairline rounded-md bg-surface divide-y divide-hairline">
+          {batches.map((b) => {
+            const open = expanded.has(b.key)
+            return (
+              <div key={b.key}>
+                <button
+                  type="button"
+                  onClick={() => toggle(b.key)}
+                  aria-expanded={open}
+                  className="w-full flex items-center justify-between gap-4 px-4 py-2.5 text-left hover:bg-paper transition-colors"
+                >
+                  <span className="min-w-0 flex items-baseline gap-3">
+                    <span className="font-mono text-xs text-muted w-3 shrink-0">{open ? '▾' : '▸'}</span>
+                    <span className="font-serif text-[15px] text-ink truncate">{b.key}</span>
+                    <span className="font-mono text-xs text-muted whitespace-nowrap">
+                      {b.members.length} 张 · {b.statusText}
+                    </span>
+                  </span>
+                  <span className="flex items-baseline gap-4 shrink-0">
+                    <span className="font-mono text-sm font-semibold">−{formatMoney(b.total).replace('RM ', '')}</span>
+                    <span className="font-mono text-xs text-graphite">{b.latest ? dayjs(b.latest).format('D MMM') : ''}</span>
+                    <span className="text-xs font-serif italic text-accent">{open ? '收起' : '展开'}</span>
+                  </span>
+                </button>
+                {open ? (
+                  <div className="px-3 pb-3 pt-1 bg-paper">
+                    <VouchersTable rows={b.members} collapseBatches={false} />
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+      {plain.length === 0 && batches.length > 0 ? null : (
+        <SortableTable<VoucherRow>
+      rows={plain}
       getRowKey={(v) => v.id}
       // Date (not voucher #) so unnumbered synthetic rows interleave
       // chronologically with HV-* vouchers.
@@ -151,6 +250,8 @@ export default function VouchersTable({ rows }: { rows: VoucherRow[] }) {
           ),
         },
       ]}
-    />
+        />
+      )}
+    </div>
   )
 }

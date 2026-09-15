@@ -351,6 +351,14 @@ export default async function VoucherLedger({
                       poolLabel = POOL_LABELS[v.source_pool] ?? v.source_pool.replace(/_/g, ' ')
                     }
                   }
+                  // Payroll disbursements are one PV per person (26 a month);
+                  // the description's leading phrase ("Payroll disbursement
+                  // Aug 2026" / "Director salary Aug 2026") names the batch
+                  // they collapse under in VouchersTable.
+                  const batchKey =
+                    v.reference_type === 'payroll_disbursement'
+                      ? ((v.description as string | null) ?? 'Payroll disbursement').split(' — ')[0].trim()
+                      : undefined
                   return {
                     id: v.id,
                     voucher_no: v.voucher_no,
@@ -362,8 +370,12 @@ export default async function VoucherLedger({
                     poolLabel,
                     description: (v.description as string | null) ?? null,
                     paymentOrCreatedDate: (v.payment_date ?? v.created_at) as string,
+                    batchKey,
                   }
                 }), ...extraFiltered]}
+                // A text search must be able to land on one person's salary
+                // PV, so the batches stay flat while ?q= is set.
+                collapseBatches={!qFilter}
               />
             </div>
           )}
