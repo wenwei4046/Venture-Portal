@@ -15,6 +15,7 @@ import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
+import ReportViewToggle from '../_components/ReportViewToggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +74,8 @@ export default async function IncomeStatementPage({ searchParams }: Props) {
         </div>
         <ExportLinks basePath="/reports/income-statement/export" period={period} compare={compare} segment={segment} />
       </div>
+
+      <ReportViewToggle pair="pnl" active="single" period={period} segment={segment || undefined} />
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
         Built straight from the general ledger — the same journal lines the Trial Balance ties to.

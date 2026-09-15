@@ -12,6 +12,7 @@ import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
+import ReportViewToggle from '../_components/ReportViewToggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,6 +107,8 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
           </a>
         </div>
       </div>
+
+      <ReportViewToggle pair="cash-flow" active="monthly" period={period} segment={segment || undefined} />
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
         Direct-method cash movement, grouped under your own categories (edit the

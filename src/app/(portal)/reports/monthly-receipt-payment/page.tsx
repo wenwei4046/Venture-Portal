@@ -21,6 +21,7 @@ import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
+import ReportViewToggle from '../_components/ReportViewToggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -127,6 +128,8 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
           </a>
         </div>
       </div>
+
+      <ReportViewToggle pair="receipt-payment" active="monthly" period={period} segment={segment || undefined} />
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
         跟 Monthly Cash Flow 同一个格子:Accumulated + 每个月一栏。多出最下面一块:

@@ -24,6 +24,7 @@ import GlReportView from '../_components/GlReportView'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
+import ReportViewToggle from '../_components/ReportViewToggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,6 +116,8 @@ export default async function CashFlowPage({ searchParams }: Props) {
           <ExportLinks basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
         </div>
       </div>
+
+      <ReportViewToggle pair="cash-flow" active="single" period={period} segment={segment || undefined} />
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
         Direct method from the general ledger: every bank movement is allocated to its

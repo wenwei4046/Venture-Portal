@@ -60,6 +60,9 @@ export interface NavItem {
   // Never active on these path prefixes (a sibling entry owns them,
   // e.g. Payments must not light up on /payments/new — that's Receipt's).
   notPaths?: string[]
+  // Also active on these path prefixes — pages reached from this entry's
+  // in-page toggle (P&L ↔ Monthly P&L) rather than from the sidebar.
+  alsoPaths?: string[]
   visible: (viewer: NavViewer) => boolean
 }
 
@@ -74,7 +77,8 @@ export function itemActive(
   const pathMatch = item.exact
     ? pathname === path
     : pathname === path || pathname.startsWith(path + '/')
-  if (!pathMatch) return false
+  const aliasMatch = item.alsoPaths?.some((p) => pathname === p || pathname.startsWith(p + '/')) ?? false
+  if (!pathMatch && !aliasMatch) return false
   if (item.notPaths?.some((p) => pathname === p || pathname.startsWith(p + '/'))) return false
   if (item.tab !== undefined && tabParam !== item.tab) return false
   if (item.notTab && item.notTab.includes(tabParam ?? '')) return false
@@ -307,12 +311,12 @@ export function buildNavEntries(data: NavData): NavEntry[] {
       // Flow / Debtor Aging); the whole-company reports below stay principal/finance.
       visible: canAccessDeptReports,
       children: [
-        { href: '/reports/income-statement', label: 'P&L', visible: canAccessDeptReports },
-        { href: '/reports/monthly-pnl', label: 'Monthly P&L', visible: canAccessDeptReports },
-        { href: '/reports/cash-flow', label: 'Cash Flow', visible: canAccessDeptReports },
-        { href: '/reports/monthly-cash-flow', label: 'Monthly Cash Flow', visible: canAccessDeptReports },
-        { href: '/reports/receipt-payment', label: 'Receipt & Payment', visible: canAccessDeptReports },
-        { href: '/reports/monthly-receipt-payment', label: 'Monthly R&P', visible: canAccessDeptReports },
+        // Each statement page carries a 单月 ｜ 逐月 toggle to its monthly
+        // matrix twin (ReportViewToggle, 2026-09-15), so the Monthly * entries
+        // no longer need their own sidebar rows.
+        { href: '/reports/income-statement', label: 'P&L', alsoPaths: ['/reports/monthly-pnl'], visible: canAccessDeptReports },
+        { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: canAccessDeptReports },
+        { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: canAccessDeptReports },
         { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
         { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
         { href: '/reports/fund-summary', label: 'Fund Summary', visible: canAccessReports },

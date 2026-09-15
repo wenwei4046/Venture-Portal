@@ -31,6 +31,7 @@ import GlReportView from '../_components/GlReportView'
 import ExportLinks from '../_components/ExportLinks'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
+import ReportViewToggle from '../_components/ReportViewToggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -162,6 +163,8 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
         </div>
         <ExportLinks basePath="/reports/receipt-payment/export" period={period} compare={compare} segment={segment} />
       </div>
+
+      <ReportViewToggle pair="receipt-payment" active="single" period={period} segment={segment || undefined} />
 
       <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
         跟 Cash Flow 一样按科目分组:实收 (money in)、支出 (money out)、净变动与期初/期末现金,
