@@ -354,28 +354,22 @@ export async function fetchInterBillingCashFlow(
     // sides — their pool effect is already nulled by the void_in/void_out rows.
     // Pairing is SYMMETRIC (2026-08-20): a custody receipt only bridges when a
     // drain shares its ref too, so a park without a typed drain (the pre-
-    // custody Jun-2026 director rounds) is left alone.
-    // Director drains now match too (2026-09-11) — with ONE legacy carve-out:
-    // the Jul-2026 director round was custody on the pool side but its GL
-    // (staging + payouts, JE-202608-0441/0464..0467) is still director-
-    // tagged, so Director's cash-out for that month is already in the GL.
-    // Bridging it would double count. Re-tagging that month is a separate
-    // decision; until then it stays excluded here.
-    const LEGACY_DIRECTOR_GL_ROUNDS = new Set(['HV-PV-202608-0255'])
+    // custody Jun-2026 director rounds) is left alone. Director drains match
+    // since 2026-09-11; the Jul-2026 round's GL was re-tagged to hr on
+    // 2026-09-15 (mig 20260915050000), so no legacy carve-out remains —
+    // every custody round bridges the same way.
     const pvrefPv = (d: string | null): string | null => d?.match(PVREF_PV)?.[0] ?? null
     const custodyRefs = new Set([
       ...(custodyRows
         .map((r) => pvrefPv(r.description))
-        .filter((ref) => ref && !voided.has(ref) && !LEGACY_DIRECTOR_GL_ROUNDS.has(ref)) as string[]),
+        .filter((ref) => ref && !voided.has(ref)) as string[]),
       // RLS-proof pairing set (already excludes voided server-side).
-      ...(Array.isArray(flags.payroll_refs) ? flags.payroll_refs : []).filter(
-        (ref: string) => !LEGACY_DIRECTOR_GL_ROUNDS.has(ref),
-      ),
+      ...(Array.isArray(flags.payroll_refs) ? flags.payroll_refs : []),
     ])
     const drainRefs = new Set(
       fundRows
         .map((r) => pvrefPv(r.description))
-        .filter((ref) => ref && !voided.has(ref) && !LEGACY_DIRECTOR_GL_ROUNDS.has(ref)) as string[],
+        .filter((ref) => ref && !voided.has(ref)) as string[],
     )
     for (const r of fundRows) {
       const ref = pvrefPv(r.description)
