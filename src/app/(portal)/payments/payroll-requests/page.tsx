@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/utils'
 import { round2 } from '@/lib/payroll-funding'
 import GeneratePvForm, { type PoolBreakdownRow } from './_components/GeneratePvForm'
 import StatutorySection, { type StatutoryPeriod } from './_components/StatutorySection'
+import SendBackButton from './_components/SendBackButton'
 
 interface RequestRow {
   id: string
@@ -247,6 +248,16 @@ export default async function PayrollRequestsPage() {
                           ? `still to fund · ${formatMoney(committed)} of ${formatMoney(r.amount)} done`
                           : 'to fund'}
                       </div>
+                      {/* 打回 HR 重做 — staff runs only (director requests are
+                          run-less), and only while nothing has been funded. */}
+                      {!r.isDirector && committed <= 0.005 && r.period_month ? (
+                        <div className="mt-2">
+                          <SendBackButton
+                            period={r.period_month}
+                            periodLabel={dayjs(r.period_month).format('MMM YYYY')}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <GeneratePvForm

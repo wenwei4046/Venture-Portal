@@ -11,7 +11,6 @@ import CreatePeriodButton from '../_components/CreatePeriodButton'
 import SubmitToFinanceButton from '../_components/SubmitToFinanceButton'
 import SaveAllButton from '../_components/SaveAllButton'
 import { PayrollDraftProvider } from '../_components/PayrollDraftContext'
-import ReopenPayrollButton from '../_components/ReopenPayrollButton'
 import MoreActionsDropdown from '../_components/MoreActionsDropdown'
 import { deletePayrollPeriod } from '../actions'
 import PeriodPicker from '../_components/PeriodPicker'
@@ -734,12 +733,14 @@ function PhaseCta({
           totalAmount={totalAmount}
           state={requestState}
         />
-        {/* Reopen is valid until Finance acts. The funding request is now
-            auto-filed at submit (phase 'request-submitted'); reopen_payroll_run
-            auto-cancels a still-'submitted' request, and blocks once a PV is
-            generated. So allow reopen through 'request-submitted', not after. */}
+        {/* 防盗墙 (2026-09-15): reopening is Finance's call now
+            (reopen_payroll_run gate finance/principal). HR sees where to ask
+            instead of a button, for as long as the run is still reopenable
+            (no funding PV yet). */}
         {(phase === 'approved-no-request' || phase === 'request-submitted') && (
-          <ReopenPayrollButton period={period} />
+          <p className="font-serif italic text-graphite text-xs text-right max-w-xs">
+            要改数字？请 Finance 在 Payroll Requests 页「打回 HR 重做」— 打回后这里会回到 draft。
+          </p>
         )}
       </div>
     )

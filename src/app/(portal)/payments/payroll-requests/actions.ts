@@ -338,3 +338,31 @@ export async function financeCancelRequest(
 // Statutory voucher generation moved to HR (hr-costing/payment/actions.ts,
 // mig 20260721000000) — HR makes those payments in practice, one institution
 // per voucher with HR's own dates. This page's statutory section is read-only.
+
+/**
+ * 防盗墙 (user 2026-09-15 "把权限放在 finance 这边"): Finance sends a
+ * submitted STAFF payroll run back to HR for edits. Wraps reopen_payroll_run
+ * (role gate finance/principal since mig 20260915040000): the auto-filed
+ * funding request is cancelled, the period's staff accrual JVs are reversed,
+ * the run flips to 'rejected' and hr_monthly_payroll rows back to draft, so
+ * HR's re-submit posts fresh figures. Blocked once any funding PV exists.
+ * Director requests are run-less — nothing to reopen there.
+ */
+export async function sendBackPayrollRun(period: string): Promise<void> {
+  const user = await requirePermission('treasury')
+  const supabase = await createClient()
+  const p = dayjs(period).startOf('month').format('YYYY-MM-DD')
+
+  const { error } = await supabase.rpc('reopen_payroll_run', {
+    p_period: p,
+    p_user_id: user.id,
+  })
+  if (error) throw new Error(`打回失败：${error.message}`)
+
+  revalidatePath('/payments/payroll-requests')
+  revalidatePath('/payments')
+  revalidatePath('/hr-costing/payroll')
+  revalidatePath(`/hr-costing/payroll/${p}`)
+  revalidatePath('/billing')
+  revalidatePath('/dashboard')
+}
