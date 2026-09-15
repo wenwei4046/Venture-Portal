@@ -7754,6 +7754,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_voucher_attachment: {
+        Args: { p_attachment_id: string }
+        Returns: string
+      }
       void_issued_invoice: {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: number

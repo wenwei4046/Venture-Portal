@@ -1709,6 +1709,44 @@ export async function getAttachmentPreviewUrls(
     .filter((x) => x.url.length > 0)
 }
 
+// ─── Delete voucher attachment (Principal + Finance, 2026-09-15) ─────────────
+// Same window as upload: only while the PV is draft / pending_approval. The
+// RPC (SECURITY DEFINER — table RLS is pa_no_delete) removes the row and
+// returns the storage path; the object is then removed under the matching
+// storage DELETE policy. A failed object removal leaves an orphan file that
+// nothing can sign a URL for — logged, not fatal.
+
+export async function deleteVoucherAttachment(
+  attachmentId: string,
+): Promise<{ voucherId: string }> {
+  await requirePermission('treasury')
+  const supabase = await createClient()
+  if (!attachmentId) throw new Error('attachment id is required')
+
+  const { data: att } = await supabase
+    .from('payment_attachments')
+    .select('voucher_id')
+    .eq('id', attachmentId)
+    .maybeSingle()
+  if (!att) throw new Error('Attachment not found or access denied')
+
+  const { data: storagePath, error } = await supabase.rpc('delete_voucher_attachment', {
+    p_attachment_id: attachmentId,
+  })
+  if (error) throw new Error(`删除失败：${error.message}`)
+
+  if (storagePath) {
+    const { error: rmErr } = await supabase.storage
+      .from('payment-attachments')
+      .remove([storagePath as string])
+    if (rmErr) console.error('attachment object removal failed (orphan left):', storagePath, rmErr.message)
+  }
+
+  revalidatePath(`/payments/${att.voucher_id}`)
+  revalidatePath('/approvals')
+  return { voucherId: att.voucher_id as string }
+}
+
 // ─── Upload voucher attachment (Principal + Finance) ────────────────────────
 
 const ALLOWED_MIME = [

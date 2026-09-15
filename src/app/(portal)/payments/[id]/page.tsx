@@ -502,7 +502,10 @@ export default async function PaymentDetailPage({ params }: Props) {
           voucherStatus={voucher.status}
           canUpload={voucher.status === 'draft' || voucher.status === 'pending_approval'}
         />
-        <AttachmentList attachments={(attachments ?? []) as Parameters<typeof AttachmentList>[0]['attachments']} />
+        <AttachmentList
+          attachments={(attachments ?? []) as Parameters<typeof AttachmentList>[0]['attachments']}
+          canDelete={voucher.status === 'draft' || voucher.status === 'pending_approval'}
+        />
       </section> : null}
 
       {/* ── Actions ── */}

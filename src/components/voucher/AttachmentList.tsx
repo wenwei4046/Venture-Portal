@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import {
   getAttachmentSignedUrl,
   getAttachmentPreviewUrls,
+  deleteVoucherAttachment,
 } from '@/app/(portal)/payments/actions'
 
 export interface AttachmentListItem {
@@ -19,6 +21,9 @@ export interface AttachmentListItem {
 interface Props {
   attachments: AttachmentListItem[]
   emptyMessage?: string
+  /** Show a 删除 action per file. The caller decides (Finance/Principal on a
+   *  draft / pending_approval voucher); the RPC re-checks server-side. */
+  canDelete?: boolean
 }
 
 type PreviewKind = 'image' | 'pdf'
@@ -30,10 +35,38 @@ function previewKind(fileType: string): PreviewKind | null {
   return null
 }
 
-export default function AttachmentList({ attachments, emptyMessage }: Props) {
+export default function AttachmentList({ attachments, emptyMessage, canDelete = false }: Props) {
+  const router = useRouter()
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+  // Two-step delete: first click arms the row ("确定删除?"), second click
+  // deletes. Any other click / a few seconds disarms it.
+  const [armedId, setArmedId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!armedId) return
+    const t = setTimeout(() => setArmedId(null), 5000)
+    return () => clearTimeout(t)
+  }, [armedId])
+  const handleDelete = (id: string) => {
+    if (armedId !== id) {
+      setArmedId(id)
+      return
+    }
+    setArmedId(null)
+    setError(null)
+    setPendingId(id)
+    startTransition(async () => {
+      try {
+        await deleteVoucherAttachment(id)
+        router.refresh()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '删除失败')
+      } finally {
+        setPendingId(null)
+      }
+    })
+  }
 
   // id → signed URL, fetched once on mount so images/PDFs render inline and the
   // reviewer sees them without clicking Download on each one.
@@ -142,6 +175,21 @@ export default function AttachmentList({ attachments, emptyMessage }: Props) {
                   >
                     {pendingId === a.id ? 'Opening…' : 'Download'}
                   </button>
+                  {canDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(a.id)}
+                      disabled={pendingId === a.id}
+                      title="删除这个附件（只在 PV 还没批准时可以）"
+                      className={`text-xs font-serif italic disabled:opacity-50 ${
+                        armedId === a.id
+                          ? 'text-white bg-danger rounded px-2 py-0.5'
+                          : 'text-muted hover:text-danger'
+                      }`}
+                    >
+                      {pendingId === a.id ? '删除中…' : armedId === a.id ? '确定删除？' : '删除'}
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
