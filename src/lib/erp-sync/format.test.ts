@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAgo, keyHint } from './format'
+import { formatAgo, keyHint, matchOutcomeNote } from './format'
 
 const NOW = Date.parse('2026-09-05T10:00:00Z')
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString()
@@ -22,6 +22,30 @@ describe('formatAgo', () => {
 
   it('never goes negative on a clock ahead of the server', () => {
     expect(formatAgo(ago(-30), NOW)).toBe('just now')
+  })
+})
+
+describe('matchOutcomeNote', () => {
+  it('says how many orders moved', () => {
+    expect(matchOutcomeNote('Chea Huan', { matched: 207, locked: 0 })).toBe(
+      'Chea Huan: 207 orders now pay this salesperson.',
+    )
+    expect(matchOutcomeNote('Junie', { matched: 1, locked: 0 })).toBe(
+      'Junie: 1 order now pays this salesperson.',
+    )
+  })
+
+  it('names the orders an applied run kept, because they keep the name on the list', () => {
+    expect(matchOutcomeNote('Kingsley', { matched: 150, locked: 35 })).toBe(
+      "Kingsley: 150 orders now pay this salesperson. 35 orders stayed put: their month's " +
+        'commission run is applied. Reopen that run and press Match again.',
+    )
+  })
+
+  it('still confirms a match that had nothing to back-fill', () => {
+    expect(matchOutcomeNote('Yuny', { matched: 0, locked: 0 })).toBe(
+      'Yuny is remembered — no order was waiting on the answer.',
+    )
   })
 })
 

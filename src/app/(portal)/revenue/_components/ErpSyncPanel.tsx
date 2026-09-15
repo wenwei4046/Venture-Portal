@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
-import { formatAgo } from '@/lib/erp-sync/format'
+import { formatAgo, matchOutcomeNote } from '@/lib/erp-sync/format'
 import { ActionButton, Choice, Hidden, Hint, RowForm, SaveButton } from '@/components/RowForm'
 import LedgerRow from '@/components/LedgerRow'
-import { matchErpSalesperson, replayHeldErpEvents } from '../sync-actions'
+import { matchErpSalesperson, type MatchOutcome, replayHeldErpEvents } from '../sync-actions'
 import type { ErpSyncPanelData } from '../_lib/erp-sync-panel'
 
 /**
@@ -48,6 +48,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
   }, [])
 
   const [replayNote, setReplayNote] = useState<string | null>(null)
+  const [matchNote, setMatchNote] = useState<string | null>(null)
 
   return (
     <section className="mb-12">
@@ -76,6 +77,9 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
             These names arrived from the ERP and match nobody in the portal, so their orders pay no
             one until you say who they are. The match is remembered.
           </Hint>
+          {matchNote ? (
+            <p className="font-serif italic text-sm text-graphite mb-3">{matchNote}</p>
+          ) : null}
           <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
             <table className="ledger-table tight">
               <thead>
@@ -90,7 +94,11 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
               </thead>
               <tbody>
                 {data.unmatched.map(u => (
-                  <RowForm key={`${u.agentKey}|${u.erpSalespersonId ?? ''}`} action={matchErpSalesperson}>
+                  <RowForm
+                    key={`${u.agentKey}|${u.erpSalespersonId ?? ''}`}
+                    action={matchErpSalesperson}
+                    onDone={result => setMatchNote(matchOutcomeNote(u.agentName, result as MatchOutcome))}
+                  >
                     {({ pending }) => (
                       <LedgerRow>
                         <td>
