@@ -824,6 +824,10 @@ carrying `period` + `segment`. Sidebar: the three Monthly * rows removed;
 Routes, exports and `/layout` sub-routes untouched. Verified after the six
 insertions: 0014–0020 amend etc. unaffected; tsc/1892 tests/build pass.
 
+**Fund Summary + Claims Report removed from menu/index (commit 13039d1b)**: user
+"都没有什么用". Sidebar rows + /reports cards gone; routes kept, nothing else
+links them.
+
 **Open (user-decided, not built)**: Finance cannot invite users — `team_invite`
 is Principal-only by design (other session, "an account is access to the money
 pages"). User said leave it (除了第二).
