@@ -815,6 +815,15 @@ Cash Flow bridge. August Director cash flow now −65,309.67 (bridged drain,
 = pool) instead of −43,135.67 net pay. Director GL on bank accounts Aug/Sep
 is receipts-only now. TB active net 0.00.
 
+**Reports 单月｜逐月 toggle (commit 70835a6a)**: user "把一个月一个月的和
+monthly 的放在一起". `reports/_components/ReportViewToggle.tsx` (server, Links)
+mounted under the page-head of all six pages (income-statement ↔ monthly-pnl,
+cash-flow ↔ monthly-cash-flow, receipt-payment ↔ monthly-receipt-payment),
+carrying `period` + `segment`. Sidebar: the three Monthly * rows removed;
+`NavItem.alsoPaths` added so the single entry lights up on the monthly route.
+Routes, exports and `/layout` sub-routes untouched. Verified after the six
+insertions: 0014–0020 amend etc. unaffected; tsc/1892 tests/build pass.
+
 **Open (user-decided, not built)**: Finance cannot invite users — `team_invite`
 is Principal-only by design (other session, "an account is access to the money
 pages"). User said leave it (除了第二).
