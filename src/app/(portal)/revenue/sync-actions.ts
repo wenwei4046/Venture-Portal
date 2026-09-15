@@ -22,8 +22,18 @@ async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
 }
 
+export interface MatchOutcome {
+  /** Orders that now pay this person. */
+  matched: number
+  /**
+   * Orders left unplaced because their month's run is applied. They keep the
+   * name on the list, which otherwise reads like the match never happened.
+   */
+  locked: number
+}
+
 /** Row form on the Comm Cal page: agent_key + erp_salesperson_id → staff_id. */
-export async function matchErpSalesperson(fd: FormData): Promise<void> {
+export async function matchErpSalesperson(fd: FormData): Promise<MatchOutcome> {
   await requirePermission('revenue')
   const subDepartmentId = String(fd.get('sub_department_id') ?? '').trim()
   const agentKey = String(fd.get('agent_key') ?? '').trim()
@@ -34,7 +44,7 @@ export async function matchErpSalesperson(fd: FormData): Promise<void> {
 
   const supabase = await client()
   await assertErpSubDepartment(supabase, subDepartmentId)
-  const { error } = await supabase.rpc('match_erp_salesperson', {
+  const { data, error } = await supabase.rpc('match_erp_salesperson', {
     p_agent_key: agentKey,
     p_erp_salesperson_id: erpSalespersonId || null,
     p_staff_id: staffId,
@@ -42,6 +52,8 @@ export async function matchErpSalesperson(fd: FormData): Promise<void> {
   if (error) throw new Error(`Could not save the match: ${error.message}`)
 
   revalidatePath('/revenue', 'layout')
+  const r = (data ?? {}) as { ordersMatched?: number; ordersLocked?: number }
+  return { matched: Number(r.ordersMatched ?? 0), locked: Number(r.ordersLocked ?? 0) }
 }
 
 export interface ReplayResult {

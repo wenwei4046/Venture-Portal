@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { suggestStaffByName } from '@/lib/erp-sync/suggest-staff'
 
 /**
  * What the Comm Cal page shows about the ERP live feed. Read here, rendered
@@ -27,6 +28,8 @@ export interface UnmatchedAgentView {
   erpSalespersonId: string | null
   orders: number
   total: number
+  /** The one person on the list with this exact name, if there is exactly one. */
+  suggestedStaffId: string | null
 }
 
 export interface StaffOptionView {
@@ -50,7 +53,7 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
   const { data: feedSub, error } = await supabase.rpc('erp_sync_sub_department')
   if (error) throw new Error(`Could not identify the ERP programme: ${error.message}`)
   if (feedSub !== subDepartmentId) return null
-  const [{ data: eventRows }, { data: heldRows }, { data: orderRows }, { data: staffRows }] = await Promise.all([
+  const [{ data: eventRows }, { data: heldRows }, { data: agentRows }, { data: staffRows }] = await Promise.all([
     supabase
       .from('erp_sync_events')
       .select('id, doc_no, status, message, warnings, received_at, period_month')
@@ -63,13 +66,11 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
       .eq('sub_department_id', subDepartmentId)
       .eq('status', 'held')
       .is('replayed_at', null),
-    supabase
-      .from('sales_orders')
-      .select('agent_key, agent_name, erp_salesperson_id, order_total, sales_import_batches!inner (sub_department_id)')
-      .eq('sales_import_batches.sub_department_id', subDepartmentId)
-      .eq('source', 'erp_sync')
-      .eq('cancelled', false)
-      .is('staff_id', null),
+    // Counted in SQL, deliberately (2026-09-16). Read as rows and grouped
+    // here, this was capped at PostgREST's first 1,000 — so after the ERP
+    // back-fill delivered 2,889 unplaced orders the panel showed a third of
+    // them, under-counted every name and dropped some people entirely.
+    supabase.rpc('erp_sync_unmatched_agents'),
     supabase
       .from('hr_staff_costs')
       .select('id, employee_name, employee_code, departments!inner (payroll_source)')
@@ -105,30 +106,27 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
     .map(([period, count]) => ({ period, count }))
     .sort((a, b) => b.period.localeCompare(a.period))
 
-  const byAgent = new Map<string, UnmatchedAgentView>()
-  for (const o of (orderRows ?? []) as Array<{
-    agent_key: string
-    agent_name: string
-    erp_salesperson_id: string | null
-    order_total: number | string
-  }>) {
-    const key = o.erp_salesperson_id ? `${o.agent_key}|${o.erp_salesperson_id}` : o.agent_key
-    const e = byAgent.get(key) ?? {
-      agentKey: o.agent_key,
-      agentName: o.agent_name,
-      erpSalespersonId: o.erp_salesperson_id,
-      orders: 0,
-      total: 0,
-    }
-    e.orders++
-    e.total += Number(o.order_total)
-    byAgent.set(key, e)
-  }
-  const unmatched = [...byAgent.values()].sort((a, b) => b.total - a.total)
-
   const staff = ((staffRows ?? []) as Array<{ id: string; employee_name: string; employee_code: string | null }>).map(
     s => ({ id: s.id, name: s.employee_name, code: s.employee_code }),
   )
+
+  const unmatched = ((agentRows ?? []) as Array<{
+    agent_key: string
+    agent_name: string | null
+    erp_salesperson_id: string | null
+    orders: number | string
+    total: number | string
+  }>).map(a => {
+    const agentName = a.agent_name ?? a.agent_key
+    return {
+      agentKey: a.agent_key,
+      agentName,
+      erpSalespersonId: a.erp_salesperson_id,
+      orders: Number(a.orders),
+      total: Number(a.total),
+      suggestedStaffId: suggestStaffByName(agentName, staff),
+    }
+  })
 
   return {
     subDepartmentId,
