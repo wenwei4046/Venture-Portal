@@ -75,7 +75,9 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
           </h3>
           <Hint>
             These names arrived from the ERP and match nobody in the portal, so their orders pay no
-            one until you say who they are. The match is remembered.
+            one until you say who they are. The match is remembered. Where exactly one person on the
+            roster carries that name it is already chosen for you — read it before you press Match,
+            because the orders it moves cannot be moved back from here.
           </Hint>
           {matchNote ? (
             <p className="font-serif italic text-sm text-graphite mb-3">{matchNote}</p>
@@ -115,7 +117,13 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
                         <td className="num m-hide" data-label="Orders">{u.orders}</td>
                         <td className="num m-hide" data-label="Value">{formatMoney(u.total)}</td>
                         <td>
-                          <Choice name="staff_id" required ariaLabel={`Match ${u.agentName}`} width="w-52">
+                          <Choice
+                            name="staff_id"
+                            required
+                            defaultValue={u.suggestedStaffId}
+                            ariaLabel={`Match ${u.agentName}`}
+                            width="w-52"
+                          >
                             <option value="">Pick a salesperson…</option>
                             {data.staff.map(s => (
                               <option key={s.id} value={s.id}>

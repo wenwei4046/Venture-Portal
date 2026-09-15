@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { suggestStaffByName } from '@/lib/erp-sync/suggest-staff'
 
 /**
  * What the Comm Cal page shows about the ERP live feed. Read here, rendered
@@ -27,6 +28,8 @@ export interface UnmatchedAgentView {
   erpSalespersonId: string | null
   orders: number
   total: number
+  /** The one person on the list with this exact name, if there is exactly one. */
+  suggestedStaffId: string | null
 }
 
 export interface StaffOptionView {
@@ -103,23 +106,27 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
     .map(([period, count]) => ({ period, count }))
     .sort((a, b) => b.period.localeCompare(a.period))
 
+  const staff = ((staffRows ?? []) as Array<{ id: string; employee_name: string; employee_code: string | null }>).map(
+    s => ({ id: s.id, name: s.employee_name, code: s.employee_code }),
+  )
+
   const unmatched = ((agentRows ?? []) as Array<{
     agent_key: string
     agent_name: string | null
     erp_salesperson_id: string | null
     orders: number | string
     total: number | string
-  }>).map(a => ({
-    agentKey: a.agent_key,
-    agentName: a.agent_name ?? a.agent_key,
-    erpSalespersonId: a.erp_salesperson_id,
-    orders: Number(a.orders),
-    total: Number(a.total),
-  }))
-
-  const staff = ((staffRows ?? []) as Array<{ id: string; employee_name: string; employee_code: string | null }>).map(
-    s => ({ id: s.id, name: s.employee_name, code: s.employee_code }),
-  )
+  }>).map(a => {
+    const agentName = a.agent_name ?? a.agent_key
+    return {
+      agentKey: a.agent_key,
+      agentName,
+      erpSalespersonId: a.erp_salesperson_id,
+      orders: Number(a.orders),
+      total: Number(a.total),
+      suggestedStaffId: suggestStaffByName(agentName, staff),
+    }
+  })
 
   return {
     subDepartmentId,
