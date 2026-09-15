@@ -130,6 +130,8 @@ const orderSeeds: OrderSeed[] = [
 ];
 
 export const orders: InsightOrder[] = orderSeeds.map(makeOrder);
+/** Canonical brands present in the preview order facts, independent of product categories. */
+export const brands: readonly string[] = [...new Set(orders.map((order) => order.brand))].sort((a, b) => a.localeCompare(b));
 
 export function getPerson(id: string): InsightPerson | undefined {
   return [...people, ...venuePeers].find((person) => person.id === id);
@@ -144,6 +146,8 @@ export interface InsightOrderFilter {
   period?: InsightPeriod;
   fairId?: string;
   category?: string;
+  /** Exact canonical brand label; empty/all leaves the brand unrestricted. */
+  brand?: string;
   tier?: InsightTier | "all";
   /** Exact count of qualifying KPI items in one order; zero is a valid filter. */
   kpiQuantity?: number;
@@ -152,7 +156,7 @@ export interface InsightOrderFilter {
   query?: string;
 }
 
-export function selectOrders({ personId, period = "month", fairId, category, tier, kpiQuantity, kpiOnly, query }: InsightOrderFilter = {}): InsightOrder[] {
+export function selectOrders({ personId, period = "month", fairId, category, brand, tier, kpiQuantity, kpiOnly, query }: InsightOrderFilter = {}): InsightOrder[] {
   const search = query?.trim().toLowerCase();
   return orders.filter((order) => {
     const inPeriod = period === "last-week"
@@ -160,6 +164,7 @@ export function selectOrders({ personId, period = "month", fairId, category, tie
       : order.date >= "2026-09-01" && order.date <= "2026-09-30";
     if (!inPeriod || (personId && order.staffId !== personId) || (fairId && fairId !== "all" && order.fairId !== fairId)) return false;
     if (category && category.toLowerCase() !== "all" && order.category !== category) return false;
+    if (brand && brand.toLowerCase() !== "all" && order.brand !== brand) return false;
     if (tier && tier !== "all" && order.tier !== tier) return false;
     if (kpiQuantity !== undefined && order.kpi !== kpiQuantity) return false;
     if (kpiOnly && order.kpi <= 0) return false;
@@ -221,6 +226,25 @@ export function summarize(selectedOrders: readonly InsightOrder[]) {
     unknownMarginCount,
     lowSalesShare: sales > 0 ? lowSales / sales * 100 : 0,
   };
+}
+
+export type InsightBrandMargin = ReturnType<typeof summarize> & { brand: string; tier: InsightTier };
+
+/** Brand margins share the same sales-weighted facts as the destination order list. */
+export function summarizeBrandMargins(selectedOrders: readonly InsightOrder[]): InsightBrandMargin[] {
+  const grouped = new Map<string, InsightOrder[]>();
+  for (const order of selectedOrders) {
+    const group = grouped.get(order.brand) ?? [];
+    group.push(order);
+    grouped.set(order.brand, group);
+  }
+  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([brand, group]) => {
+    const totals = summarize(group);
+    // A partial known-order margin is useful to display, but cannot establish a tier.
+    const tier: InsightTier = totals.unknownMarginCount > 0 || totals.margin === null ? "unknown"
+      : totals.margin >= 43 ? "tier2" : totals.margin >= 36 ? "tier1" : totals.margin >= 33 ? "standard" : "low";
+    return { brand, ...totals, tier };
+  });
 }
 
 export function venueRanking(fairId: string, period: InsightPeriod = "month") {

@@ -1,6 +1,7 @@
 export type MemberPage =
   | "today"
   | "insight"
+  | "arena"
   | "income"
   | "quote"
   | "team"

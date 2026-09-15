@@ -1,0 +1,21 @@
+.simulator { display: grid; gap: 20px; }
+.intro { font-size: 12px; line-height: 1.75; color: rgb(var(--arena-muted)); }
+.controls, .result { border: 1px solid rgb(var(--arena-rule)); border-radius: 24px; padding: 20px; background: rgb(var(--arena-surface)); box-shadow: 0 5px 12px rgb(var(--arena-primary) / .05); }
+.controls { display: grid; gap: 22px; }
+.controls label { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; font-weight: 500; }
+.controls select { width: 100%; min-height: 48px; padding: 10px; border: 1px solid rgb(var(--arena-rule)); border-radius: 12px; background: rgb(var(--arena-paper)); color: rgb(var(--arena-ink)); font-size: 12px !important; }
+.controls input { width: 100%; min-height: 32px; accent-color: rgb(var(--arena-secondary)); }
+.controls p, .result p { font-size: 11px; line-height: 1.7; color: rgb(var(--arena-muted)); }
+.result { border-top: 4px solid rgb(var(--arena-secondary)); }
+.result > span { font-size: 12px; color: rgb(var(--arena-secondary)); font-weight: 600; }
+.result h2 { font-size: 23px !important; margin: 8px 0 22px !important; font-weight: 600 !important; }
+.player { margin: 20px 0; }
+.player > span { display: flex; justify-content: space-between; font-size: 13px; gap: 12px; }
+.player > div { height: 10px; margin: 10px 0 7px; border-radius: 6px; background: rgb(var(--arena-hue1-light)); overflow: hidden; }
+.player i { display: block; height: 100%; background: rgb(var(--arena-secondary)); border-radius: 6px; }
+.player[data-rival] i { background: rgb(var(--arena-primary)); }
+.player small { font-size: 10px; line-height: 1.6; color: rgb(var(--arena-muted)); }
+.comparison { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.comparison th, .comparison td { padding: 10px 3px; text-align: right; border-bottom: 1px solid rgb(var(--arena-rule)); }
+.comparison th:first-child, .comparison td:first-child { text-align: left; }
+@media (prefers-reduced-motion: no-preference) { .player i { transition: width 220ms ease-out; } }

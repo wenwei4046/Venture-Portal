@@ -1,0 +1,396 @@
+.region {
+  margin-bottom: 18px;
+}
+
+.card {
+  display: block;
+  width: 100%;
+  padding: 18px 12px 0;
+  overflow: hidden;
+  border: 1px solid rgb(var(--arena-medal-gold-mid) / .7);
+  border-radius: 22px;
+  background: rgb(var(--arena-surface));
+  color: rgb(var(--arena-ink));
+  box-shadow: inset 0 0 0 3px rgb(var(--arena-medal-gold-light) / .22), 0 4px 12px rgb(var(--arena-ink) / .055);
+  text-align: left;
+  animation: arrive 180ms ease-out both;
+}
+
+.link {
+  cursor: pointer;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.link:hover {
+  border-color: rgb(var(--arena-medal-gold-mid));
+  box-shadow: 0 6px 16px rgb(var(--arena-ink) / .085);
+}
+
+.link:active {
+  transform: translateY(1px);
+}
+
+.link:focus-visible {
+  outline: 2px solid rgb(var(--arena-secondary));
+  outline-offset: 4px;
+}
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 5px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.headingNote {
+  color: rgb(var(--arena-muted));
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 7px;
+  padding-top: 27px;
+}
+
+.lane {
+  --medal-light: var(--arena-medal-gold-light);
+  --medal-mid: var(--arena-medal-gold-mid);
+  --medal-deep: var(--arena-medal-gold-deep);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+}
+
+.lane[data-place="2"] {
+  --medal-light: var(--arena-medal-silver-light);
+  --medal-mid: var(--arena-medal-silver-mid);
+  --medal-deep: var(--arena-medal-silver-deep);
+}
+
+.lane[data-place="3"] {
+  --medal-light: var(--arena-medal-bronze-light);
+  --medal-mid: var(--arena-medal-bronze-mid);
+  --medal-deep: var(--arena-medal-bronze-deep);
+}
+
+.people {
+  display: grid;
+  gap: 17px;
+  padding: 0 1px 12px;
+}
+
+.person {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatarWrap {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  margin-bottom: 12px;
+  border: 1px solid rgb(var(--medal-mid));
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(var(--arena-surface)), rgb(var(--medal-mid)) 48%, rgb(var(--medal-light)) 66%, rgb(var(--medal-mid)));
+  box-shadow: 0 2px 5px rgb(var(--medal-deep) / .09);
+  animation: medalArrive 220ms ease-out both;
+}
+
+.avatar {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border: 2px solid rgb(var(--arena-surface));
+  border-radius: 50%;
+  background: rgb(var(--medal-light));
+  color: rgb(var(--medal-deep));
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.lane[data-place="1"] .avatar {
+  width: 48px;
+  height: 48px;
+  background: rgb(var(--arena-primary));
+  color: rgb(var(--arena-on-primary));
+}
+
+.laurel {
+  position: absolute;
+  width: 86px;
+  height: 70px;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgb(var(--medal-mid));
+  stroke: currentColor;
+  stroke-width: 1.2;
+  pointer-events: none;
+}
+
+.laurelLeaves {
+  fill: currentColor;
+  stroke: none;
+  opacity: .8;
+}
+
+.medalBadge {
+  position: absolute;
+  z-index: 1;
+  bottom: -7px;
+  right: -2px;
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border: 2px solid rgb(var(--arena-surface));
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(var(--medal-light)), rgb(var(--medal-mid)));
+  color: rgb(var(--medal-deep));
+  box-shadow: 0 0 0 1px rgb(var(--medal-mid));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lane[data-place="1"] .medalBadge {
+  width: 26px;
+  height: 26px;
+  right: -3px;
+}
+
+.lane[data-place="2"] .avatarWrap {
+  animation-delay: 35ms;
+}
+
+.lane[data-place="3"] .avatarWrap {
+  animation-delay: 65ms;
+}
+
+.name {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.you {
+  display: block;
+  margin-top: 2px;
+  color: rgb(var(--arena-secondary));
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.value {
+  display: block;
+  max-width: 100%;
+  margin-top: 5px;
+  color: rgb(var(--medal-deep));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.platform {
+  position: relative;
+  display: flex;
+  height: 86px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 9px;
+  border: 1px solid rgb(var(--medal-mid));
+  border-bottom: 0;
+  border-radius: 15px 15px 0 0;
+  background: linear-gradient(112deg, rgb(var(--medal-light)), rgb(var(--arena-surface) / .5) 34%, rgb(var(--medal-light)) 66%, rgb(var(--medal-mid) / .28));
+  color: rgb(var(--medal-deep));
+  box-shadow: inset 0 3px 0 rgb(var(--arena-surface) / .72), inset 3px 0 0 rgb(var(--arena-surface) / .35), inset -3px 0 0 rgb(var(--medal-mid) / .12);
+}
+
+.platform::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  bottom: 0;
+  left: 5px;
+  border: 1px solid rgb(var(--medal-mid) / .45);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  pointer-events: none;
+}
+
+.plate {
+  display: grid;
+  width: 37px;
+  height: 37px;
+  place-items: center;
+  border: 1px solid rgb(var(--medal-mid) / .75);
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgb(var(--arena-surface) / .65), rgb(var(--medal-mid) / .18));
+  box-shadow: inset 0 0 0 2px rgb(var(--medal-light));
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -.04em;
+  text-shadow: 0 1px rgb(var(--arena-surface) / .85);
+}
+
+.champion {
+  margin-top: 6px;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.lane[data-place="2"] .platform {
+  height: 62px;
+}
+
+.lane[data-place="3"] .platform {
+  height: 48px;
+  padding-top: 7px;
+}
+
+.lane[data-place="3"] .plate {
+  width: 31px;
+  height: 31px;
+  font-size: 22px;
+}
+
+.tiedStage {
+  align-items: stretch;
+  gap: 10px 7px;
+  padding-top: 20px;
+  padding-bottom: 12px;
+}
+
+.tiedStage[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tiedStage .lane {
+  padding: 12px 3px 0;
+  overflow: hidden;
+  border: 1px solid rgb(var(--medal-mid) / .6);
+  border-radius: 13px;
+  background: rgb(var(--medal-light) / .22);
+}
+
+.tiedStage .people {
+  flex: 1;
+  padding-bottom: 10px;
+}
+
+.tiedStage .person {
+  height: 100%;
+}
+
+.tiedStage .avatar {
+  width: 39px;
+  height: 39px;
+}
+
+.tiedStage .laurel {
+  width: 69px;
+  height: 57px;
+  top: -4px;
+}
+
+.jointPlace {
+  margin-bottom: 5px;
+  color: rgb(var(--medal-deep));
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tiedStage .value {
+  margin-top: auto;
+  padding-top: 5px;
+}
+
+.tiedStage .platform {
+  height: 48px;
+  margin: 0 -3px;
+  padding-top: 7px;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.tiedStage .platform::before {
+  border-radius: 0;
+}
+
+.tiedStage .plate {
+  width: 31px;
+  height: 31px;
+  font-size: 22px;
+}
+
+@media (max-width: 359px) {
+  .tiedStage[data-wrapped="true"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 45px;
+  margin: 0 -12px;
+  padding: 10px 17px;
+  border-top: 1px solid rgb(var(--arena-rule));
+  color: rgb(var(--arena-secondary));
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes arrive {
+  from { opacity: .65; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes medalArrive {
+  from { opacity: .55; transform: translateY(5px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .avatarWrap { animation: none; }
+  .link { transition: none; }
+  .link:active { transform: none; }
+}

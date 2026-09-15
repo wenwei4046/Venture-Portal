@@ -16,3 +16,7 @@
 @media (max-width: 360px) {
   .appHeader { padding-left: 20px; padding-right: 20px; }
 }
+
+.app[data-insight-design="c"] { background: rgb(var(--insight-surface)); }
+.app[data-insight-design="c"] h1 { color: rgb(var(--insight-primary)); font-weight: 650; }
+.app[data-insight-design="c"] h2 { color: rgb(var(--insight-primary)); font-weight: 650; }

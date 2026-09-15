@@ -748,6 +748,700 @@ mono address + Copy; Last delivery — `formatAgo`, ticking), and text actions
 (accent "Replace key", danger "Unlink"). No test button here: the ERP's own
 page proves the key. `src/app/(portal)/revenue/_components/ErpLinkPanel.tsx`.
 
+### Revenue member C release (2026-09-16)
+
+The authenticated `/member` workspace now uses the approved white, orange, brown
+and amber C direction. Mobile keeps Today / Insight / Quote / Arena / Profile;
+desktop uses a 224px sidebar, wider content and responsive two-column sections.
+Quote remains available only to eligible memberships. Native safe-area insets and
+a white browser theme colour join the header to the device chrome. Press and page
+motion respect reduced-motion preferences. Principal management remains separate.
+
+Today keeps income first, the bell-marked attention section next, then sales/KPI
+progress and brand margins. `member_kpi_summary` supplies the actual combined
+quantity, eligible product breakdown and first configured monthly threshold;
+preview quantities and the illustrative 10-item threshold never feed live accounts.
+Today and Insight share real cleared-order brand margins and brand-specific order
+entry. Incomplete cost/order coverage stays pending. Insight has Personal and Team
+views, month selection, brand-based order filters, order details and team facts.
+
+Live Arena uses `member_arena_snapshot` for Monthly / Quarterly / Annual sales,
+margin and KPI rankings, including brand filters and the approved medal podium.
+Brand weeks are saved through an authenticated own-membership RPC, choosing 4 or 5
+weeks and quantities for the four approved brands. List membership stays limited
+to self and descendants; Map still includes all authorised departments.
+
+The user explicitly deferred Fair event-source integration on 2026-09-16. Weekly
+finishes, historical Fair records and their Championship settlement remain pending
+until reliable event identity and complete score sources exist. No fictional
+points, inferred Fair boundaries or preview scoring policies run against live data.
+`/member/preview?design=live` provides the responsive layout with clearly labelled
+sample data behind the existing preview access gate; it is not an authenticated
+member snapshot.
+
+### Revenue Arena design comparison (2026-09-13, revised proposal)
+
+`/member/preview?design=compare` offers two interactive proposals, A and C, with C
+selected by default. Current and B were removed from the comparison controls.
+The comparison remains illustrative; the separate C release above governs the
+authenticated member workspace. Commission rules, ERP sync and payroll are
+untouched. The existing preview access gate remains in force. All comparison
+Arena facts are fictional as of 30 Sep 2026.
+
+- **A — Espresso & Clay:** espresso / burnt orange / olive / slate blue, warm sand
+  canvas, ivory cards and deep brown type. Four Light/Mid/Deep families live in
+  scoped globals tokens. Legacy B deep links remain compatible but are not offered.
+- **C — Orange & Brown (combined user selection):** keeps the continuous layout
+  from Warm Canvas, now on pure white (`#FFFFFF`) with espresso ink, vivid orange,
+  cocoa and amber accents. Headers, filters, own results, ranking lists, contribution
+  ledger and brand-week forms remain open sections. Large 56px rounded metric
+  tiles (48px on narrow phones) use solid orange, cocoa and amber with 28px glyphs.
+  Labels use 17px semibold type, supporting amounts 15px and ranks 34px bold,
+  with compact adjustments for narrow phones. The icon sits beside both text lines.
+  Orange Sales values and cocoa / amber Margin and KPI values enrich the page while
+  white remains dominant. The approved A podium is brought into C as a distinct
+  rounded gold-framed card. Silver uses warm neutral grey without a blue cast;
+  A/B retain their original treatments.
+- **Shared mobile tabs (2026-09-14):** Today / Insight / Quote / Arena / Profile
+  preserve the chosen design. Insight replaces Income in this navigation and
+  reuses the latest merged Insight implementation (PR #119), including personal
+  and team views, order filters, KPI quantities and monthly quick insights.
+  Both comparison entry points use the same A/C chooser
+  and device frame. Today, Quote and account pages reuse `MemberWorkspace` with
+  demo-only preview styling; income details, requests and quote calculations remain
+  available. Header, bottom navigation, warm accents and page motion match Arena.
+- **My team visibility (2026-09-16):** Member list includes only the signed-in
+  person's own membership nodes and their full reporting subtree (direct and
+  indirect reports). Search and member-detail entry points use that filtered list;
+  ancestors, siblings and unrelated branches are not list entries. Traversal uses
+  membership IDs within each scheme/department, so another membership belonging to
+  the same staff member does not inherit access. The fallback membership data is
+  filtered by the same rule. Map retains all departments and their public names,
+  titles and reporting lines. This list scope does not remove the wider map data
+  that members are already authorised to view.
+- **Today simplification (2026-09-15):** Remove the full “Your next great offer”
+  promotion, Quick quote button and cart caption from Today. The Quote navigation
+  destination remains available. The revised order (2026-09-16) is greeting,
+  orange income hero, “Needs your attention”, monthly progress, then brand Margin.
+  Attention retains its warm amber side rule in C and existing actions/count;
+  a warm orange bell tile beside the heading makes the section easier to spot.
+  Remove “View all progress”; detailed progress remains in Insight.
+- **One combined KPI threshold (2026-09-16):** The Today preview shows a single
+  combined quantity, shared threshold and attained/pending status, followed by
+  Pillow and Protector quantity-only breakdowns. No individual target, remaining
+  count or product progress bar. The explicit illustrative policy is 10 combined
+  Pillow/Protector units in any mix: 5+5 or 10+0 both hit; 18+9 displays 27 items.
+  Missing counts remain pending. Eligibility is explicitly configured for the
+  preview, never inferred from which rows happen to be visible. Production must
+  use the scheme's eligible KPI product codes and effective monthly threshold
+  ladder; `MemberKpi.target` represents the next unmet rung and cannot identify
+  a threshold already achieved. Payroll and live configuration are unchanged.
+- **Brand margin navigation (2026-09-15):** Today's “This month's margin” and
+  Insight's “Margin” use the same open brand rows: brand name, margin percentage,
+  tier or pending-cost status, and a chevron. Tap a brand to open the existing
+  Sales orders screen with that brand selected; there is no separate “View orders
+  and margins” action on Today. Preview Today and Insight use the same order-derived
+  brand margins so their figures agree. A partially costed brand is marked pending,
+  not as having qualified for a tier. Insight preserves the selected person, period
+  and fair when opening a brand. Order filtering and grouping use Brand / All brands
+  instead of Bedroom, Living and Dining categories; brand selection survives order
+  detail and back navigation. Existing sales and KPI detail flows remain available.
+- References: [brown/orange/off-white](https://uk.pinterest.com/pin/120682465013311762/),
+  [Sunset Dunes](https://in.pinterest.com/pin/sunset-dunes-colour-palette-in-orange-and-brown--609885974561005108/),
+  [mobile colour palette](https://ca.pinterest.com/pin/corona-mobile-app-design-ios-health-hex-colors--816699713665427298/).
+  Adapted palettes, not claims of a most-effective CRM palette.
+- In A/B, title, own performance and list are separate ivory cards with visible hairline
+  borders/shallow shadows. 22–24px main corners, 14–18px controls, pill selectors,
+  Inter type and spacious rows. A/C Arena and Insight page entry uses a240ms
+  slide/fade; Today, Quote and Profile use a220ms arrival. Shared header/navigation,
+  buttons, links, selects and disclosures have gentle140ms press feedback with
+  160ms colour transitions. Disabled controls stay still. Filter-result changes
+  use190ms transitions. Reduced motion disables these effects; navigation is never
+  delayed and form drafts remain intact.
+
+**Device preview.** The comparison offers iPhone (default), Android and Browser
+review modes. Simulated OS status/gesture bars sit outside the iframe and remain
+fixed while its content scrolls; their colours match the product header. Switching
+device mode preserves the current iframe page; switching design remounts it.
+The full handset uses a fixed tall aspect ratio: 390 × 844 at the default iPhone
+width, or 390 × 867 for the Android example. It is never shortened to fit the
+desktop panel. **Fit phone** scales the entire device uniformly into the remaining
+review space; **100%** keeps its original dimensions and lets the review scroll.
+Changing fit mode or width preserves the iframe document and active page. The
+dimension/scale caption describes the whole device including simulated OS bars.
+The actual product header remains sticky, includes `env()` safe-area padding and
+uses `viewport-fit=cover`. The preview route's `generateViewport` supplies a light
+colour scheme and matching theme colour for Arena designs: ivory for A, pure
+white for C and slightly warmer cream for B. The simulated device frame receives
+the selected palette too, so its status/gesture bars stay white in C. Other
+preview routes retain their inherited theme.
+Implementation references: [WebKit safe-area guidance](https://webkit.org/blog/7929/designing-websites-for-iphone-x/)
+and [Chrome themed browser guidance](https://developer.chrome.com/docs/lighthouse/pwa/themed-omnibox/).
+Actual OS/browser chrome remains browser-dependent; the simulated preview does
+not prove integration on a physical device.
+
+#### Confirmed architecture and record meaning
+
+**Arena → Sales / Margin / KPI + Championship (the accumulated total).**
+Championship is an additive points total, not a percentage or a 0–100 weighted
+average. There is no fourth independent Brand Ranking and no Area Ranking.
+
+**Ranking-first home (2026-09-13 user revision).** Arena has separate performance
+and Championship destinations, without a Rankings / Championship segmented bar
+on either page. The default shows the person's
+actual Total Sales rank and RM amount, Total Margin rank and percentage, and KPI
+rank and quantity together in a three-row ivory card. All three ranks update for
+the selected Monthly / Quarterly / Annual window. Clicking a row opens that
+metric's total board, even if a brand subview was previously selected. Homepage
+period selectors are a compact pair of dropdowns so the three ranks are immediately
+visible. A compact Championship entry below the three ranks opens the points
+overview. Championship keeps a static points hero and seven-contribution breakdown,
+including the monthly Highest Fair Record award.
+Only the Top3 section's “View full ranking” action opens the separate Championship
+standings page; the points hero is not clickable and the duplicate lower ranking
+action is removed. The full standings list is removed from the overview.
+Championship's back button returns to Arena;
+the standings page's back button returns to Championship. There is no points hero
+or point-gap banner on Rankings home. The former orange score-slot explanation
+remains removed beneath the breakdown; accounting rules stay inside collapsed
+supporting rules and reflect the seven contributions.
+
+**Podium presentation (2026-09-13 user revision).** Ranking details show a compact
+top-three podium immediately after their period / brand controls and before the
+person's own result card. Apply it to Total Sales, Sales by Brand, Total Margin,
+Margin by Brand, KPI, Championship overview and standings, and Highest Fair
+Record. Fair results uses the distinct finish-count presentation below, with no
+single-event RM podium. Highest Fair Record has no period controls. The homepage
+retains its three personal-rank rows, keeping those actual positions immediately
+visible.
+
+Use a2 /1 /3 arrangement in a rounded22px card with a thin gold frame, inset gold
+rim and shallow shadow in A/B/C. This podium is the deliberate framed feature
+within C's otherwise continuous white page. The champion stands higher in the centre with a trophy seal, laurel
+detail and muted gold; second uses silver/slate and third bronze/clay medal badges.
+Double metallic avatar rings and inset podium platforms add depth. Circular initials, full names and
+the actual formatted sales / margin / quantity / points accompany the ranks.
+Small semantic medal tokens complement the existing four-family palette. Avoid
+confetti, neon, continuous shimmer or cartoon decoration. Podium movement follows
+the destination/filter timings above and respects reduced motion. Performance pages retain their complete ranking
+below; list positions1–3 repeat the medal colours. Only Championship's Top3
+“View full ranking” action opens its separate full standings page.
+
+Podiums use the current board's actual competition ranks, never the first three
+array indices. Show every eligible positive finite result tied at positions1–3.
+An untied board keeps the2 /1 /3 steps. With ties, use equal-width individual
+medal lanes in rank order, labelled with the actual joint place; wrap additional
+winners into rows instead of stacking everyone inside one narrow podium column.
+A skipped rank does not receive an invented occupant.
+No sales / pending / unassigned results are not awarded podium places. Changing
+the period or brand updates the podium from the same facts as the full list;
+presentation does not alter scores, record semantics or tie accounting.
+
+Performance boards list actual rank and actual metric only. On the person's
+detail card, show a large `Rank 2` on the left and the sales amount (or margin /
+KPI quantity) on the right. Sales and Margin Brand cards contain no contribution
+formula and no “Edit my brand weeks” link. All performance pages, including KPI,
+show only actual metrics/ranks; their collapsed “About this ranking” content
+explains the metric and ranking, not points or incentive awards. All point detail
+belongs to Championship and the simulator. In those destinations, use `≈` for
+formulas affected by rounding or cent reconciliation and keep its explanation
+collapsed. Longer periods sum monthly contributions, never apply one quarterly
+percentage. The orange brand-share explanation and all-brands subtotal remain
+removed from performance cards.
+
+**My brand weeks — self-entry (user revision, 2026-09-13).** A separate entry
+below the homepage's three ranks opens a monthly form. There are no edit links
+on Brand performance cards. Salespeople manually select4 or5 weeks using mutually
+exclusive tick/radio controls, then use +/- whole-week counters for Akemi,
+Dunlopillo (the user's “dullpo”), Zanotti and Ergotex. The form defaults to an
+empty4-week draft, never a detected calendar or sales-order allocation. Show
+allocated / selected weeks and each brand's live percentage. Zero is allowed;
+negative/fractional values and totals other than exactly4/5 cannot be saved.
+Changing5 to4 preserves entered counts and asks the user to reduce an overage;
+it never silently removes a brand. Changes apply only on Save.
+
+This revision authorizes the salesperson's own reported brand weeks as the share
+source for the current design, replacing automatic detection or mandatory manager
+confirmation proposed earlier. Example1 Akemi +3 Zanotti in a4-week month yields
+25% /75% regardless of order counts. Both Brand Sales and Brand Margin, including
+Brand Margin incentives, use the same saved monthly shares. Raw metric values,
+rank positions, Venue results and KPI awards do not change from this entry.
+Quarter/Annual read the month-specific contributions; no cross-month overwrite.
+The current form uses whole-week totals; earlier mixed-fair half-day alternatives
+are future policy options, not an additional input requirement in this form.
+
+Preview implementation stores valid plans on this browser/device, scoped to demo
+employee Jia and YYYY-MM, shared across A/B/C designs. Saving updates the fictional
+score model and persists after refresh. Invalid input or failed browser storage
+does not replace an existing saved plan; error feedback keeps the draft editable.
+Unfilled months retain clearly fictional fixture shares in the demonstration.
+There are no live employee submissions or backend writes in this preview. A live
+release will require authenticated employee/month persistence and a declared
+edit/settlement policy; the user has not requested another approval step here.
+
+| Main destination | Subviews |
+|---|---|
+| Sales Ranking | Total Sales; By Brand (Akemi, Ergotex, Zanotti, Dunlopillo); Fair results |
+| Margin Ranking | Total Margin; By Brand (the same four brands); actual margin results |
+| KPI Ranking | All eligible KPI quantities together; actual quantity results |
+| Championship | Sales + Margin + KPI + Highest Fair Record contributions, including monthly Tier / threshold incentives; full standings through Top3 |
+| Highest Fair Record | Current all-time single-fair best per person; monthly closing rank awards recorded in Championship |
+
+The user's “Danopillow” appears to refer to existing **Dunlopillo / DUNLOP**;
+preview uses that canonical brand, rather than creating a fifth production brand.
+Brand Sales defaults to top 5 rank positions (including boundary ties), with an
+explicit all-sellers button and the current person's position even outside top 5.
+All assigned people are scored through last place. Unassigned / pending rows remain
+visible as such. Underlying weekly fair finishes compare actual sales within one
+exact event: venue ID + start/end dates, not a loose calendar week containing
+overlapping events.
+
+**Fair results replaces Sales By Venue (user revision, 2026-09-15).** The Sales
+subview summarises how often each person finishes first, second or third across
+their own completed weekly fairs in the selected Monthly / Quarterly / Annual
+window. It does not ask the user to pick one venue. Show the current person's
+gold / silver / bronze counts prominently, with an expandable list of actual
+weekly results: fair name, venue, start/end dates, achieved sales and actual finish.
+Normally each person has 4 or 5 eligible personal events per month; a quarter or
+year counts the person's completed events in that longer window, never every
+parallel company fair.
+
+Below the personal summary, include all 26 eligible sellers in a finish-count
+table, ordered by first-place count, then second-place count, then third-place
+count. Preserve a stable name order for equal counts; do not invent another
+overall rank from this sorting. Keep fourth-or-lower finishes separate from medal
+counts. Ties use each fair's actual competition positions: joint first counts as
+a first-place finish for both people, and a skipped second place stays skipped.
+Only positive, finite, eligible completed results can receive medals. Pending,
+unranked or zero results must not be promoted into a medal or an invented finish;
+show their actual status in the weekly detail. There is no venue picker or RM
+event podium in this subview.
+
+This is a presentation of real fair finishes, not a new points formula. The
+existing monthly venue contribution remains the mean of that person's eligible
+assigned fair-rank awards. All point amounts, formulas and accumulation detail
+remain in Championship; Fair results shows performance and finish counts only.
+
+**Confirmed cohort and concurrent events (user clarification).** 28 people include
+2 Revenue Directors who are excluded; the competitive cohort is26 salespeople.
+One salesperson may enter at most ONE fair per global calendar week: normally4
+personal events per month, or5 in a five-week month. The company's approximately30
+events are parallel capacity, never30 personal opportunities. Enforce a unique
+(salesperson, competition week) assignment across venues and exclude Directors
+from both rank positions and score denominators.
+
+If every event can hold at most6 sellers,26 simultaneous attendees need at least
+ceil(26/6)=5 events. Three or four events work only if some have larger capacities
+or not everyone attends. Model capacity from actual per-event rosters, not a fixed
+company event count. A weekly fair only has ranks1 through its actual participant
+count: a six-person fair ends at rank6 (16pts), not rank26's6.25-point floor.
+
+Fictional schedules use five concurrent venues with6/5/5/5/5 people, giving20
+company events in September and25 in August; these are demonstrative schedules,
+not claimed actual30-event history. Each seller has4/5 respectively. Actual
+Friday–Sunday dates are used; the Sunday end date is the unique competition week.
+31July–2August counts once in August, avoiding duplicate assignments at month
+boundaries. Q3 has13 personal weekends, not the company's65 sample events.
+Real event dates can differ; a production roster needs a stable shared week ID.
+
+**Highest Fair Record — current record board and monthly award (user revision,
+2026-09-15).** This revision supersedes the earlier no-points policy. For each
+person, select the largest positive net-sales amount from one completed fair
+(usually three days) across all known history. January RM100k still leads in
+August unless beaten. Never sum fairs, reset the personal best each month, or
+limit the record search to the current year. Show the record's actual venue and
+dates; label pending or incomplete history rather than silently replacing it with
+zero. Preview fixtures include Daniel's January 2026 RM100k and Sarah's
+December 2025 RM80k explicitly.
+
+The record board always shows the latest available all-time personal bests and
+refreshes as completed-fair results become available. It has no Monthly,
+Quarterly or Annual filters. The current prototype uses fictional history as of
+30 Sep 2026; this is not a live ERP connection or a claim that records are freshly
+synced. Individual rows and the podium show sales records and ranks; point
+details belong to Championship.
+
+At each monthly close, take an as-of snapshot of this board and award the same
+rank ladder as the other contributions: 25 / 22.5 / 20.5 / 18.75 and onward through
+all qualifying places. An untied first-place holder earns 25 for that month;
+remaining first next month earns 25 again. The historical sales amount itself is
+still counted only as one personal-best record. Ties split occupied rank-point
+slots under the common tie rule. A valid positive historical best can qualify
+without new fair sales that month if the salesperson remains in the eligible
+cohort; current-month zero activity does not erase that surviving record.
+
+The seventh Championship component is `fairRecord`, with a 25-point monthly base
+maximum and no Tier or KPI incentive. Quarter and Annual sum the already-posted
+monthly record awards alongside the other components. A new record after a
+month's cutoff can change the current board and later awards, but cannot rewrite
+an earlier closed month's snapshot. Production snapshot identity, rule versions,
+idempotent posting and explicit correction handling are specified below; the
+prototype makes no backend submissions or persisted settlement writes.
+
+#### Proposed rank ladder and additive accounting
+
+The earlier 100/70/50 ladder is superseded by this closer proposal:
+
+| Place | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Rank points | 25 | 22.5 | 20.5 | 18.75 | 17.25 | 16 | 15 | 14 | 13.25 | 12.5 |
+
+11–20: 12, 11.5, 11, 10.5, 10, 9.5, 9, 8.5, 8, 7.5. Qualified 21+: 6.25.
+The entire original ladder and all Arena incentives are scaled to one quarter:
+25% higher than the previous one-fifth preview scale, following the user's request
+for a modest increase. This is a change of point units,
+not a claim that a smaller numeral mathematically makes catching up easier.
+Small decimals are intentional; assignment shares already create fractional points.
+Known assigned zero activity is ranked at the bottom with 0 points; a valid
+positive result is needed for participation points. For `fairRecord`, that result
+is the positive historical personal best, not new activity in the closing month.
+No assignment is N/A for assignment-based contributions; missing
+facts are Pending. Do not turn missing data into 0 or remove it silently from a
+person's denominator. Equal results share competition rank and split occupied
+point slots: tied first gets (25+22.5)/2=23.75 each, next is third. Keep original
+metrics for qualification; tie precision is declared separately from display.
+
+**Seven fixed contributions, directly added:**
+
+| Contribution | Base maximum/month | Monthly extra maximum |
+|---|---:|---:|
+| Sales · Brand contribution | 25 | 0 |
+| Sales · Venue contribution | 25 | 0 |
+| Sales · Total sales | 25 | 0 |
+| Margin · Brand contribution | 25 | 12.5 |
+| Margin · Total margin | 25 | 12.5 |
+| KPI quantity | 25 | 5 |
+| Highest Fair Record (`fairRecord`) | 25 | 0 |
+| **Championship sum** | **175** | **30** |
+
+`Championship = SalesBrand + SalesVenue + SalesTotal + MarginBrand + MarginTotal + KPI + FairRecord`
+
+No overall percentage weighting or division by 100. The maximum in this proposed
+configuration is 205 per full month; quarter maximum 615; full-year maximum 2,460.
+The demo annual view is Jan–Sep, not a completed full year. Sales has 75 possible
+points, Margin 75 including both incentives, KPI 30 and Highest Fair Record 25.
+This deliberately
+keeps Sales and Margin influential; if the business wants different influence,
+change future score budgets openly rather than silently rescaling the total.
+
+A brand contribution combines all reported brands into ONE budget:
+
+`Brand contribution = Σ(reported weeks for brand / selected 4 or 5 weeks × that brand's rank points)`
+
+Brand margin incentive uses the same shares. Example: 3 weeks of Tier 2 (+12.5),
+1 week of Tier 1 (+5) → brand extra 10.63 after shared-budget rounding, not 17.5
+and not four full bonuses. Brand result screens show actual rank and amount;
+brand-week shares, point formulas and the all-brands combined contribution belong
+to Championship and the simulator. Quarterly brand
+contributions sum the monthly share-weighted results, never reweight all months
+using a single end-of-quarter share.
+
+Both Sales by Brand and Margin by Brand use this rule. Example: Akemi third
+(20.5) at75% + Zanotti eighth (14) at25% gives18.875 before rounding; the posted
+contributions are15.38+3.5=18.88, not the two full awards totaling34.5.
+A single-brand third contributes20.5 at100%. Equal third-place rank awards across
+any whole-week allocation mix still contribute exactly20.5. The same principle covers floor points
+and brand Tier incentives; a short second assignment cannot mint an extra budget.
+Round each month's weighted brand budget to two decimals, separately for base
+rank awards and incentives. Allocate those cents across brands by deterministic
+largest remainder: floor each exact brand share to cents, then assign the remaining
+cents to the largest fractional remainders, breaking equal remainders in a stable
+brand order. The posted brand amounts therefore sum exactly to the rounded budget
+and to Championship, without adding cents through independent brand rounding.
+For example, four equal Tier2 shares receive3.13,3.13,3.12,3.12 points, totaling
+exactly12.50. Keep the complete reconciliation explanation in collapsed rules.
+
+The current form requires reported brand weeks to sum to the selected4/5 weeks.
+If a later policy supports mixed-brand fairs with fractional hours/day shares,
+those shares must sum to physical working time; never claim three full days for
+EACH brand in one three-day fair.
+
+**Orders establish sales attribution; saved brand weeks establish current shares.** Do not
+substitute order count, revenue proportion, item quantity or presence of a brand
+in the orders for the salesperson's reported brand weeks. Three Zanotti orders and ten Akemi orders
+can coexist with three Zanotti weeks and one Akemi week: equal-length fairs still
+give Zanotti75% / Akemi25%. The API can suggest a mismatch for review but cannot
+infer that share from these sales facts.
+
+**Future mixed-fair policy option, outside the current whole-week form.**
+Each person's confirmed physical Fair has one working-time allowance. For an
+actually mixed-brand fair, confirm assigned days/hours or a declared responsibility
+split. A confirmed half/half fair contributes0.5 to each brand, never a full fair
+to each. Z / Z / A / mixed(A0.5,Z0.5) gives Z62.5%, A37.5%. Selling one incidental
+second-brand item does not automatically establish50% work. If duties cannot be
+separated, an agreed equal-share policy is a rule choice requiring confirmation,
+not a fact inferred by the API. A missing allocation is Pending; do not guess
+by order count or reweight remaining brands. A confirmed allocation must exist
+independently of sales, including zero-sale attendance, and be frozen before
+results except traceable corrections to genuine roster errors.
+
+A venue contribution is the mean of event-rank points across the month's eligible
+assigned events. Four events do not add four full 25-point budgets. Known attended
+zero sales / unapproved no-show count as zero with their scheduled denominator;
+approved leave or no assignment is excluded by a frozen pre-event rule. Missing
+venue data makes the slot Pending. This is one Sales contribution, not a separate
+Fair Championship league; `fairRecord` is a separate monthly award based on the
+historical-best board. Venue amounts always rank
+normally across brands, as requested. Field-size/duration differences still need
+comparable-event eligibility; winning a one-person event should not mint 25 points.
+
+Only the person's4/5 assigned events enter that mean. Four wins yield25 venue
+points; four second places yield22.5. Five wins still yield25, five seconds22.5.
+Do not divide by company30 events, pad unassigned parallel events with zeroes, or
+automatically divide a four-week month by5. Approved leave / no-show policy and
+minimum sample are fixed before results; schedule/cohort rotation must also avoid
+repeatedly giving some people much easier two-person fields than others' six-person
+fields. The scoring scheme reduces, but cannot erase, those opportunity differences.
+
+**Cross-discipline comeback example (monthly, no other incentives).**
+
+| Contribution | Seller A | Seller B |
+|---|---:|---:|
+| Sales brand | 25 | 22.5 |
+| Sales venue | 25 | 22.5 |
+| Total sales | 25 | 22.5 |
+| Margin brand | 18.75 | 20.5 |
+| Total margin | 18.75 | 20.5 |
+| KPI rank | 17.25 | 20.5 |
+| Highest Fair Record | 6.25 | 6.25 |
+| Base sum | 136 | 135.25 |
+| KPI threshold extra | 0 | 5 |
+| Championship | 136 | **140.25** |
+
+B has no Sales first places but passes A by4.25 through stronger other dimensions
+and one monthly KPI incentive. Both receive the same 6.25 record-floor award from
+positive historical results at qualifying places 21 or lower, so that contribution
+does not change their relative gap. Without the KPI incentive B trails by only
+0.75. These
+are hypothetical point results, not claims about future outcomes; the interactive
+study lets the reviewer toggle that threshold and switch4/5-week assignments.
+
+#### Brand assignment fairness and the size of the score
+
+The user explicitly removed **Fair points**, the target-attainment scoring mode.
+It is removed from the model, controls and simulator. All awards now follow actual
+sales / actual margin / quantity rank. There is no hidden alternate scoring rank,
+target multiplier or invented daily target. The interactive study now explains
+brand assignment shares and the cross-discipline comeback example.
+
+Recommended current proposal: retain one Sales Brand budget and one Margin Brand
+budget, allocating each by the salesperson's saved monthly brand weeks. This
+prevents extra-entry stacking without requiring a second ranking system. Count
+reported zero-sale weeks in the denominator; a zero-sale brand earns no award
+and its share is not redistributed. The preview permits the requested self-entry.
+A production settlement policy should address retrospective edits or omissions
+of weaker brands; the current UI does not claim to verify reported attendance.
+
+This does **not** remove raw performance ranking bias. A seller assigned Zanotti
+for one week still competes in its monthly sales board against a four-week seller.
+Smaller/weaker brand cohorts also offer easier high ranks. Total Sales favours
+higher-volume brands; blended margin and the existing all-brands Tier requirement
+retain brand-mix effects. KPI has no duplicate brand award issue but still depends
+on assignment opportunity. Fair rosters and comparable cohorts remain necessary.
+
+Simpler alternative for discussion: keep Sales/Margin Brand boards as honours
+with no Championship contribution or brand incentive. This removes brand-entry
+farming entirely but changes the seven-contribution architecture, leaves total
+sales/margin opportunity bias, and requires explicitly reconsidering category
+budgets. It is not silently applied to the preview. Best-brand-only, adding every
+brand's complete award, and post-result primary-brand choice are not recommended.
+
+The user referenced F1 to reduce discouraging total numbers. The official
+[F1 scoring guide](https://www.formula1.com/en/latest/article/the-beginners-guide-to-the-f1-drivers-championship.53MjXJzTDxQnfxfoCLnxNZ)
+awards25/18/15/12/10/8/6/4/2/1 for a full-points Grand Prix. That steep ladder
+gives eighth only4 versus the winner's25 and is unsuitable for the requested
+close competition. F1 also accumulates totals into hundreds across a season;
+compare per-event awards and the season length, not one event against our year.
+
+Arena instead scales its complete close ladder AND bonuses to one quarter: max25
+base per contribution, Tier5/12.5, KPI5. The latest revision raises every award
+by25% over the previous preview while preserving its relative gaps. The
+second-place gap is2.5 and eighth-place gap is11; a former100–200-point deficit
+becomes25–50. Scaling changes presentation, not relative comeback difficulty. With
+rounding at posting boundaries tiny ties can change; there is no strategic boost.
+UI should prioritise the gap to the next higher place and actual remaining
+threshold opportunities instead of presenting only the distance to champion.
+Do not promise a comeback when the available points cannot cover the deficit.
+Monthly is the default competition window. Quarterly/Annual still sum monthly
+ledgers and can grow to hundreds; they must not be divided or silently reset.
+No artificial catch-up bonus, hidden handicap, or reduced reward for the leader.
+
+The proposal UI is Fair-only. It does not apply these thresholds to IR;
+IR requires its own competition definition. Existing Current app access is unchanged.
+
+Pilot entry gates should be announced before assignments: at least5 comparable
+assigned sellers in each scoring brand cohort, and at least3 assigned selling
+days plus3 distinct usable orders for an individual's monthly brand-margin score.
+These are proposed pilot values, not configured production rules. Do not use a
+single RM10k minimum across very different brands. Low sample results can display
+as provisional, not automatically earn first-place25 plusTier12.5. If the planned
+roster cannot satisfy the common rules, fix the schedule/cohort design before the
+season or keep that cohort's Championship provisional; do not remove one brand
+and renormalize only the affected employee after seeing results. All margin data
+needed for a monthly incentive must be known, including audited manual margins.
+Real order-count/completeness gates are a backend requirement, not implemented
+against live orders by this fictional UI preview.
+
+#### Margin tiers and KPI incentives — checked against Fair code
+
+Reuse **qualification thresholds**, not cash payout amounts. The repository helpers
+are `src/lib/commission/engine.ts:155` (`kpiThresholdPct`) and `:317`
+(`marginIncentiveAcrossBrands`). Points remain a separate, versioned Arena policy.
+
+- By-brand Margin: calculate the month's goods margin for that brand, then test
+  its own configured incentive tiers. The total Margin incentive requires EVERY
+  sold brand to clear the corresponding tier in its own ladder, using common
+  `bandKey` intersection. A high total percentage cannot cover a weak brand.
+- Example: Akemi45% and Zanotti38%, with36%/43% ladders, yields total Tier1; Akemi45%
+  and Zanotti35% yields no total tier. Individual brand incentive remains possible.
+- Proposed Arena extras: Tier1 total+5; Tier2 total+12.5, highest eligible only.
+  Tier2 is not +5+12.5 unless the user selects that stacking variant. This option
+  was asked explicitly; until answered, preview labels highest-only as a proposal.
+  The cash commission rule DOES stack RM1,000 + RM1,500; it is not reused as points.
+- Current final repository seeds copy36%/43% to AKEMI/ERGOTEX/ZANOTTI/DUNLOP
+  (`20260903010000_dunlopillo_brand_and_akemi_ladder_copy.sql:37`). Live editable
+  values were not queried. The older Zanotti33% example is not the final seed.
+  If actual brands have different achievable margins but identical thresholds,
+  Tier incentives still favour high-margin brands; confirm/calibrate per-brand
+  tiers explicitly before claiming equal incentive opportunity.
+- KPI counts quantity of configured KPI items, no brand split. Current Fair code
+  includes eligible giveaway quantities; Arena preserves this definition. Missing
+  or returned/cancelled units need traceable adjustments. The repo seed is10 units
+  for a20% cash uplift; Arena separately proposes once-monthly +5 points at that
+  threshold. Do not calculate Arena points as `bonusPct ×100`, or count each
+  additional block of10 as another bonus.
+- Margin includes the real cost of gifted KPI goods and excludes transport/disposal.
+  Audited manual margin overrides derived cost and contributes implied cost to the
+  monthly blend. Missing costs/brand/tier ladder block incentive with a reason;
+  they are not a zero-percent margin. Qualification uses unrounded values with
+  the engine's boundary tolerance; rounding a displayed35.999% to36% cannot earn
+  a tier. Per-bill commission penalties do not become Arena point deductions.
+- Because+12.5 is substantial relative to the new rank gaps, explicitly show
+  “rank points + incentive = total.” A10th-place12.5 plusTier2 bonus12.5 can tie
+  first-place25 without incentive. This is a threshold-achievement reward as well
+  as a placement competition. Backtest that intended strength before prizes.
+
+#### Monthly / Quarterly / Annual accounting and record closure
+
+**Rank-award events occur monthly only**, after a published settlement window.
+For each person store seven component bases, monthly incentives, eligibility and
+rule/roster versions. The `fairRecord` component also references its monthly
+closing snapshot and the source completed-fair record. Championship Monthly sums
+that month's components;
+Quarterly sums its three monthly ledgers; Annual sums the year's monthly ledgers.
+Do not re-award rank points or Tier/KPI extras at quarter/year end. Raw performance
+views still aggregate their selected date range and rank those displayed metrics,
+except Fair results counts finishes and Highest Fair Record always shows the
+current all-time board without time filters. They show no point details.
+Championship and the simulator label period points
+as accumulated MONTHLY awards. No monthly
+margin percentages or monthly rank numbers are averaged to obtain raw period margin.
+
+Live current-month estimates can change with new orders; reaching a threshold does
+not irreversibly award a bonus mid-month. Final monthly results are idempotent by
+(staff, month, programme, rule version, score slot). Quarter/year read those same
+entries, not independent award jobs. Corrections append an auditable reversal /
+replacement linked to the original award and update dependent totals once.
+
+For `fairRecord`, a production closing snapshot must have a stable snapshot ID,
+cutoff time in Kuala Lumpur, eligible cohort, programme/rule version and source
+event/result identifiers. The closing award references that immutable snapshot;
+re-running the same close must not mint another record award. Quarter/Annual
+read the posted month ledger rather than re-ranking the latest record board for
+past months. A later, better fair result updates current history and future
+snapshots only. A correction to facts that were already in a closed snapshot is
+an explicit, auditable reversal/replacement linked to the original snapshot and
+award, not a silent historical overwrite. These are requirements for a future
+live implementation; the fictional preview calculates examples without a
+settlement service or production writes.
+
+Use Kuala Lumpur dates. Define a stable Arena recognition date for each eligible
+order; the current payroll statement pool includes previously deferred orders, so
+it is not automatically a calendar-month sales feed. Fair record/event ranking
+uses explicit event identity and completed event end date. Freeze ownership,
+returns/cancellations, attendance and roster before finalizing. Proposed review
+window is7 days after close with completed sync; late refunds/corrections create a
+visible revision and re-evaluate affected records and monthly bonuses. Historical
+records do not reset; corrections can invalidate a former record transparently.
+
+For new joiners or unequal season length, accumulated Championship intentionally
+rewards more eligible months. Show months counted and separate newcomer honours
+if desired; do not conceal this by renaming the total an average. Unknown source
+coverage remains pending. A departed person's valid historical record persists
+unless an explicitly published record-eligibility rule says otherwise.
+
+#### ERP readiness and prototype boundaries
+
+Individual order dates, brand, staff, quantities, costs and raw snapshots are
+supported by `src/lib/erp-sync/contract.ts:192,252`. Existing `sales_location` is
+branch (KL/PG/SRW/SBH); `event_date` is an Open Bill day, not a multi-day fair ID.
+No verified venue/event roster/brand-assignment feed was found. Therefore the
+prototype's rank points, historical records and incentive awards are examples,
+not production standings. All source fact/brand allocations in fixtures reconcile.
+
+**Read-only API crosscheck, 2026-09-13.** The documented integration is ERP PUSH
+(`docs/erp-sync/contract.md:49`): POST sales-orders receiver; GET on that route is405
+(`src/app/api/erp/v1/sales-orders/route.ts:105`), plus a GET health endpoint. No
+source ERP read/catalogue endpoint is configured in this workspace. A metadata-only
+GET of Portal's configured PostgREST OpenAPI returned200 and confirmed exposed
+`sales_orders` has location/order_date/event_date/brand_code/raw/erp_created_at,
+but no dedicated fair/venue ID or event start/end and no exposed Fair catalogue.
+No customer or order field values were read. This describes Portal's integration;
+it does not prove that Houzs ERP source lacks a Fair catalogue or unused event
+fields inside its raw header. The source catalogue endpoint/schema remains unverified.
+
+The user subsequently confirmed the ERP order-entry UI has a Venue dropdown:
+salespeople transcribe handwritten fair orders after the event, selecting the
+applicable venue (sometimes with a brand-specific option such as Zanotti).
+This confirms the source UI has selectable venue data. Its actual option ID,
+date fields, brand mapping and catalogue API shape have not yet been provided.
+The selected option reference is the integration fact to request; do not substitute
+ERP entry/creation date or assume that the displayed venue label is a unique event.
+
+Existing mapper reads `header.so_date` for order date (`contract.ts:252`),
+`header.sales_location` for branch description (`:283`), and `created_at` separately
+(`:287`). The latest ingest migration
+`20260911020000_commission_order_sub_departments.sql:533,648` still derives the
+commission period from so_date and initially defaults event_date to order_date.
+Do not claim current integration already attributes late orders to their Fair.
+
+Required Arena attribution contract: a physical venue ID plus canonical
+`fair_event_id`, event start/end and timezone, with a source-to-canonical event
+mapping. One location hosts repeated fairs; venue name alone is insufficient.
+Orders reference the chosen event, brands come from validated order lines. A
+Monday-created SO selecting the previous Friday–Sunday event belongs to that
+event's week and monthly event cutoff, regardless of its creation date. Preserve
+both timestamps for audit. A late order received after settlement corrects the
+original Arena month once via its ledger; it does not earn points in both months
+or silently change payroll recognition.
+
+Same event and employee may have multiple brands. Sum their net sales once for
+Venue, and allocate original lines to each Brand board. Two source venue IDs with
+matching dates do not prove one physical Fair or two brands: verify mapping of
+brand booths/aliases to their canonical event. Merge aliases for participation
+only after confirmation; genuine distinct events overlapping for one employee
+are a roster conflict to review, not two automatic weekly awards. Both brand
+identity and event identity require independent source evidence. A sales-only
+feed also misses unsold/scheduled fairs and zero-sale attendees; it cannot supply
+a complete Fair/roster catalogue by itself. UI fixtures remain illustrative.
+
+Before implementation: verify order→staff→event attribution, stable fair/venue ID,
+exact start/end, per-brand assignment days/hours, cancelled/returned units/value,
+cost completeness, source history and editable threshold values. Current margin
+bands lack an as-of filter, unlike the KPI threshold load; freeze an Arena rule
+snapshot for history. Existing monthly Insight uses current staff/hierarchy and
+commission carry-forward, so it cannot be blindly summed into historical awards.
+ERP changes to locked payroll months are held; Arena corrections must not reopen
+payroll implicitly. Preserve production brand identities and source composite IDs.
+
+Preview source: `src/components/member/design-preview/arena-model.ts`, separate
+UI routes inside the existing preview gate, and a toy brand contribution study.
+Pure tests cover close ladder/ties/zero-activity, uniform point-unit scaling, fixed score
+budgets, inclusive tier boundaries, cross-brand tier intersection, once-monthly
+KPI bonus, additive totals, monthly ledger rollup, four-brand reconciliation and
+historical records surviving months and years. No live awards, rules or data changed.
+
+
 ### Revenue hierarchy spaces (approved 2026-09-11)
 
 Staff Hierarchy's chart combines the active sub-departments of the same parent

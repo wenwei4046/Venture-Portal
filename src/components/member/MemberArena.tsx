@@ -1,0 +1,101 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { fetchMemberArena, saveMemberArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
+import { arenaRankings, validArenaBrandWeeks, ARENA_WEEK_BRANDS, type ArenaBrandWeeks, type ArenaMetric, type ArenaWindow, type MemberArenaSnapshot, type ArenaRankedPerson } from "@/lib/member/arena";
+import { Icon, initials } from "./MemberUI";
+import { ArenaPodium } from "./design-preview/ArenaPodium";
+import type { Standing } from "./design-preview/arena-model";
+import s from "./MemberArena.module.css";
+
+const metrics = [{ id: "sales", label: "Sales Ranking", icon: "chart", subtitle: "Total sales & by brand" },
+  { id: "margin", label: "Margin Ranking", icon: "target", subtitle: "Margin achieved & by brand" },
+  { id: "kpi", label: "KPI Ranking", icon: "receipt", subtitle: "KPI items sold" }] as const;
+const format = (metric: ArenaMetric, value: number | null) => value === null ? "—" : metric === "margin" ? `${value.toFixed(2)}%`
+  : metric === "sales" ? `RM ${new Intl.NumberFormat("en-MY", { maximumFractionDigits: 2 }).format(value)}` : `${new Intl.NumberFormat("en-MY", { maximumFractionDigits: 3 }).format(value)} items`;
+const currentMonth = () => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", timeZone: "Asia/Kuala_Lumpur" }).format(new Date()).slice(0, 7);
+
+function Leaders({ rows, metric, selfId, onOpen }: { rows: ArenaRankedPerson[]; metric: ArenaMetric; selfId: string; onOpen: () => void }) {
+  // Presentation adapter only: the shared podium reads names, values and places.
+  // These placeholders never award points or become a Championship contribution.
+  const presentation: Standing[] = rows.map(row => ({ id: row.id, name: row.name, value: row.value ?? 0,
+    position: row.position, eligible: row.value !== null && !row.pending, active: row.hasActivity,
+    scoringPosition: null, scoringValue: 0, basePoints: 0, incentivePoints: 0, points: 0 }));
+  return <ArenaPodium rows={presentation} selfId={selfId} format={value => format(metric, value)} onOpen={onOpen} />;
+}
+
+function BrandWeeks({ data, onSaved }: { data: MemberArenaSnapshot; onSaved: (value: ArenaBrandWeeks) => void }) {
+  const [draft, setDraft] = useState<ArenaBrandWeeks>(data.brandWeeks ?? { weeks: 4, counts: { AKEMI: 0, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 } });
+  const [busy, setBusy] = useState(false), [feedback, setFeedback] = useState("");
+  const allocated = Object.values(draft.counts).reduce((sum, value) => sum + value, 0);
+  return <form className={s.weeks} onSubmit={async event => {
+    event.preventDefault(); if (!validArenaBrandWeeks(draft) || busy) return;
+    setBusy(true); setFeedback("");
+    try { const result = await saveMemberArenaBrandWeeks(data.membershipId, data.period, draft);
+      if (result.ok) { onSaved(draft); setFeedback("Your brand weeks are saved."); } else setFeedback(result.error);
+    } catch { setFeedback("Your weeks could not be saved. Please try again."); } finally { setBusy(false); }
+  }}>
+    <fieldset disabled={busy}><legend>Weeks this month</legend><div className={s.segments}>{([4, 5] as const).map(weeks => <label key={weeks}><input type="radio" name="arena-weeks" checked={draft.weeks === weeks} onChange={() => { setDraft(value => ({ ...value, weeks })); setFeedback(""); }} />{weeks} weeks</label>)}</div></fieldset>
+    {ARENA_WEEK_BRANDS.map(({ code, name }) => <div className={s.weekRow} key={code}><span><strong>{name}</strong><small>{Math.round(draft.counts[code] / draft.weeks * 100)}%</small></span>
+      <div><button type="button" aria-label={`Remove one week from ${name}`} disabled={busy || draft.counts[code] === 0} onClick={() => { setDraft(value => ({ ...value, counts: { ...value.counts, [code]: value.counts[code] - 1 } })); setFeedback(""); }}>−</button>
+        <output aria-label={`${name} weeks`}>{draft.counts[code]}</output><button type="button" aria-label={`Add one week to ${name}`} disabled={busy || allocated >= draft.weeks} onClick={() => { setDraft(value => ({ ...value, counts: { ...value.counts, [code]: value.counts[code] + 1 } })); setFeedback(""); }}>+</button></div></div>)}
+    <p>{allocated} of {draft.weeks} weeks allocated{allocated > draft.weeks ? " · Remove extra weeks to save." : ""}</p>
+    <button className={s.primary} disabled={busy || !validArenaBrandWeeks(draft)}>{busy ? "Saving…" : "Save brand weeks"}</button>
+    {feedback && <p role="status" aria-label="Brand weeks save status">{feedback}</p>}
+  </form>;
+}
+
+export default function MemberArena({ membershipId }: { membershipId: string }) {
+  const [period, setPeriod] = useState(currentMonth), [window, setWindow] = useState<ArenaWindow>("monthly");
+  const [view, setView] = useState<"home" | ArenaMetric | "weeks" | "availability">("home");
+  const [brand, setBrand] = useState("");
+  const [data, setData] = useState<MemberArenaSnapshot | null>(null), [busy, setBusy] = useState(true), [error, setError] = useState("");
+  const [revision, setRevision] = useState(0), [showAll, setShowAll] = useState(false);
+  const request = useRef(0), table = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const sequence = ++request.current;
+    setBusy(true); setError(""); setData(null);
+    void fetchMemberArena(membershipId, period, window).then(result => {
+      if (request.current !== sequence) return;
+      if (result.ok) setData(result.data); else setError(result.error);
+    }).catch(() => { if (request.current === sequence) setError("Arena could not be loaded. Please try again."); })
+      .finally(() => { if (request.current === sequence) setBusy(false); });
+    return () => { request.current++; };
+  }, [membershipId, period, window, revision]);
+  useEffect(() => { setView("home"); setBrand(""); }, [membershipId]);
+  const selected = metrics.find(metric => metric.id === view);
+  const rankings = selected && data ? arenaRankings(data.people, selected.id, selected.id !== "kpi" && brand ? brand : undefined) : [];
+  const me = rankings.find(row => row.self);
+  const brands = data ? [...new Map([...data.people.flatMap(person => Object.keys(person.brands).map(code => ({ code, name: code === "UNCLASSIFIED" ? "Unclassified" : code }))), ...data.brands].map(item => [item.code, item])).values()] : [];
+  function go(next: typeof view) { setView(next); setBrand(""); setShowAll(false); }
+  const periodTitle = data ? `${data.from} – ${data.through}` : period;
+
+  return <div className={s.arena} data-arena-design="c">
+    <header className={s.heading}>{view !== "home" && <button className={s.back} onClick={() => go("home")}><Icon name="back" size={19} />Arena</button>}
+      <h1>{selected?.label ?? (view === "weeks" ? "My brand weeks" : view === "availability" ? "Championship & Fair results" : "Arena")}</h1>
+      <p>{view === "home" ? "Your performance. Your next milestone." : data?.department}</p>
+    </header>
+    <div className={s.controls}><div className={s.segments} role="group" aria-label="Ranking period">{(["monthly", "quarterly", "annual"] as const).map(value => <button key={value} aria-pressed={window === value} onClick={() => { setWindow(value); if (view === "weeks") setView("home"); }}>{value === "monthly" ? "Monthly" : value === "quarterly" ? "Quarterly" : "Annual"}</button>)}</div>
+      <label>Month<input type="month" value={period} max={currentMonth()} onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setPeriod(event.target.value); }} /></label>
+      {data && <p className={s.periodLabel}>{periodTitle}{data.live ? " · Live" : ""}</p>}
+      {data && <div className={s.refresh}><span>Updated {new Intl.DateTimeFormat("en-MY", { hour: "numeric", minute: "2-digit", day: "numeric", month: "short", timeZone: "Asia/Kuala_Lumpur" }).format(new Date(data.asOf))}</span><button className={s.back} onClick={() => setRevision(value => value + 1)} disabled={busy}><Icon name="refresh" size={16} />Refresh</button></div>}
+    </div>
+    {busy ? <p className={s.message} role="status">Loading your rankings…</p> : error ? <div className={s.message} role="alert"><p>{error}</p><button className={s.primary} onClick={() => setRevision(value => value + 1)}>Try again</button></div> : data && <div key={`${view}-${window}-${period}-${brand}`} className={s.page}>
+      {view === "home" && <><div className={s.overview}>{metrics.map(metric => {
+        const own = arenaRankings(data.people, metric.id).find(row => row.self);
+        return <button key={metric.id} className={s.metric} data-metric={metric.id} onClick={() => go(metric.id)}><span className={s.metricIcon}><Icon name={metric.icon} size={28} /></span><span><strong>{metric.label}</strong><small>{metric.subtitle}</small><b>{format(metric.id, own?.value ?? null)}</b></span><span className={s.ownRank}>{own?.position ? `#${own.position}` : "—"}<Icon name="arrow" size={17} /></span></button>;
+      })}</div><button className={s.feature} onClick={() => go("availability")}><span><strong>Championship & Fair results</strong><small>Scoreboard and fair history setup</small></span><Icon name="arrow" /></button>
+        {window === "monthly" && <button className={s.feature} onClick={() => go("weeks")}><span><strong>My brand weeks</strong><small>{data.brandWeeks ? `${data.brandWeeks.weeks} weeks saved` : "Choose 4 or 5 weeks"}</small></span><Icon name="arrow" /></button>}</>}
+      {selected && <>{selected.id !== "kpi" && <label className={s.brand}>Ranking by<select value={brand} onChange={event => setBrand(event.target.value)}><option value="">All brands · Total</option>{brands.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>}
+        <Leaders rows={rankings} metric={selected.id} selfId={data.selfId} onOpen={() => { setShowAll(true); requestAnimationFrame(() => table.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })); }} />
+        {me && <section className={s.personal}><span>Your result</span><div><strong>{me.position ? `Rank ${me.position}` : "Not ranked"}</strong><b>{format(selected.id, me.value)}</b></div>{me.pending && <p>Waiting for complete {selected.id === "margin" ? "cost" : "sales"} data.</p>}</section>}
+        <section className={s.standings} ref={table}><div className={s.sectionHead}><h2>{brand ? "Brand ranking" : "Full ranking"}</h2><span>{rankings.length} people</span></div>
+          <ol>{(showAll ? rankings : rankings.slice(0, 10)).map(row => <li key={row.id} data-self={row.self || undefined}><span data-place={row.position !== null && row.position <= 3 ? row.position : undefined}>{row.position ?? "—"}</span><span className={s.avatar}>{initials(row.name)}</span><span><strong>{row.name}</strong>{row.self && <small>You</small>}{row.pending && <small>Pending data</small>}</span><b>{format(selected.id, row.value)}</b></li>)}</ol>
+          {!rankings.length && <p>No people in this department yet.</p>}{!showAll && rankings.length > 10 && <button className={s.textLink} onClick={() => setShowAll(true)}>View all {rankings.length} people<Icon name="arrow" /></button>}
+        </section></>}
+      {view === "weeks" && <BrandWeeks key={`${membershipId}-${period}`} data={data} onSaved={value => setData(previous => previous ? { ...previous, brandWeeks: value } : previous)} />}
+      {view === "availability" && <section className={s.availability}><Icon name="trophy" size={32} /><h2>Fair history is not connected yet</h2><p>Weekly finishes and Highest Fair Record need each fair’s venue, start date and end date. Existing order dates and branch labels cannot reliably identify a completed fair.</p><h2>Championship</h2><p>Your brand weeks can be saved now. Championship totals will appear after all ranking sources and the scoring ledger are connected.</p><p>Sales, Margin and KPI rankings already use your department’s real data.</p></section>}
+      {view !== "weeks" && <details className={s.basis}><summary>How these rankings are measured</summary><p>Deposit-cleared commissionable sales and KPI items. Each order is counted once in its released commission month; unreleased orders are shown in the current open month. Quarterly and Annual aggregate those months.</p><p>Margin uses commissionable goods revenue and cost together. A salesperson with incomplete cost data stays pending for Margin Ranking. Directors are excluded. These are live performance figures, not a payroll statement.</p></details>}
+    </div>}
+  </div>;
+}

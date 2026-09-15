@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fairs, getFair, marginImpact, orders, people, selectOrders, summarize, summarizeKpi, venueRanking } from "./insight-model";
+import { brands, fairs, getFair, marginImpact, orders, people, selectOrders, summarize, summarizeBrandMargins, summarizeKpi, venueRanking } from "./insight-model";
 import type { InsightOrder } from "./insight-model";
 
 describe("Insight preview order facts", () => {
@@ -39,6 +39,67 @@ describe("Insight preview order facts", () => {
     expect(selectOrders({ personId: "marcus", tier: "all", category: "All", fairId: "all" })).toHaveLength(5);
     expect(selectOrders({ personId: "no-such-member" })).toEqual([]);
     expect(selectOrders({ query: "no-such-order" })).toEqual([]);
+  });
+
+  it("filters canonical brands independently from the compatible category filter", () => {
+    expect(brands).toEqual(["Akemi", "Zanotti"]);
+    const personal = selectOrders({ personId: "jia" });
+    const zanotti = selectOrders({ personId: "jia", brand: "Zanotti" });
+    expect(zanotti.map((order) => order.number)).toEqual(["SO-2609-006", "SO-2609-005", "SO-2609-003", "SO-2609-002"]);
+    expect(new Set(zanotti.map((order) => order.category))).toEqual(new Set(["Living", "Dining"]));
+    expect(selectOrders({ personId: "jia", category: "Living" })).toHaveLength(2);
+    expect(selectOrders({ personId: "jia", brand: "Zanotti", category: "Dining" }).map((order) => order.number)).toEqual(["SO-2609-006", "SO-2609-003"]);
+    expect(selectOrders({ personId: "jia", brand: "Bedroom" })).toEqual([]);
+    expect(selectOrders({ personId: "jia", brand: "akemi" })).toEqual([]);
+    for (const brand of [undefined, "", "all", "All"]) expect(selectOrders({ personId: "jia", brand })).toEqual(personal);
+  });
+
+  it("keeps brand selection intersected with member, period, fair, tier, KPI and search scope", () => {
+    const filters = { personId: "jia", period: "last-week" as const, fairId: "mv-mle-sep04", brand: "Zanotti", tier: "tier1" as const, kpiQuantity: 2, query: "SO-2609-003" };
+    expect(selectOrders(filters).map((order) => order.number)).toEqual(["SO-2609-003"]);
+    expect(selectOrders({ ...filters, personId: "marcus" })).toEqual([]);
+    expect(selectOrders({ ...filters, fairId: "mv-bighome-sep11" })).toEqual([]);
+    expect(selectOrders({ ...filters, brand: "Akemi" })).toEqual([]);
+    expect(selectOrders({ ...filters, tier: "low" })).toEqual([]);
+    expect(selectOrders({ personId: "jia", brand: "Akemi", fairId: "mv-bighome-sep11", period: "last-week" })).toEqual([]);
+    expect(selectOrders({ personId: "jia", brand: "Zanotti", kpiOnly: true }).map((order) => order.number)).toEqual(["SO-2609-005", "SO-2609-003"]);
+  });
+
+  it("groups by actual brand and uses each brand's weighted order totals", () => {
+    const selected = selectOrders({ personId: "jia" });
+    const rows = summarizeBrandMargins(selected);
+    expect(rows.map((row) => row.brand)).toEqual(["Akemi", "Zanotti"]);
+    expect(rows[0]).toMatchObject({ brand: "Akemi", sales: 26000, profit: 11200, orderCount: 2, tier: "tier2", unknownMarginCount: 0 });
+    expect(rows[0].margin).toBeCloseTo(11200 / 26000 * 100);
+    expect(rows[0].margin).not.toBe(43); // Unequal order sales: not the mean of42% and44%.
+    expect(rows[1]).toMatchObject({ brand: "Zanotti", sales: 24200, profit: 6540, orderCount: 4, tier: "unknown", unknownMarginCount: 1 });
+    expect(rows[1].margin).toBeCloseTo(6540 / 21000 * 100);
+    for (const row of rows) expect(row).toMatchObject(summarize(selectOrders({ personId: "jia", brand: row.brand })));
+    expect(summarizeBrandMargins([...selected].reverse())).toEqual(rows);
+  });
+
+  it("does not award a brand tier from incomplete margins and uses inclusive demo boundaries", () => {
+    const high: InsightOrder = { ...orders[0], sales: 100, margin: 45 };
+    const pending: InsightOrder = { ...orders[0], id: "pending", sales: 900, margin: null, tier: "unknown" };
+    expect(summarizeBrandMargins([high, pending])[0]).toMatchObject({ margin: 45, unknownMarginCount: 1, tier: "unknown" });
+    expect(summarizeBrandMargins([pending])[0]).toMatchObject({ margin: null, unknownMarginCount: 1, tier: "unknown" });
+    for (const [margin, tier] of [[43, "tier2"], [42.99, "tier1"], [36, "tier1"], [35.99, "standard"], [33, "standard"], [32.99, "low"], [0, "low"]] as const) {
+      expect(summarizeBrandMargins([{ ...high, margin }])[0]).toMatchObject({ margin, tier, unknownMarginCount: 0 });
+    }
+    expect(summarizeBrandMargins([{ ...high, sales: 0 }])[0]).toMatchObject({ margin: null, tier: "unknown" });
+    expect(summarizeBrandMargins([])).toEqual([]);
+  });
+
+  it("summarizes only the selected member and dated fair without adding absent brands", () => {
+    const first = summarizeBrandMargins(selectOrders({ personId: "jia", period: "last-week", fairId: "mv-mle-sep04" }));
+    expect(first[0]).toMatchObject({ brand: "Akemi", sales: 12000, margin: 42, tier: "tier1" });
+    expect(first[1]).toMatchObject({ brand: "Zanotti", sales: 14000, tier: "standard", unknownMarginCount: 0 });
+    expect(first[1].margin).toBeCloseTo(5000 / 14000 * 100);
+    const marcus = summarizeBrandMargins(selectOrders({ personId: "marcus", period: "last-week", brand: "Zanotti" }));
+    expect(marcus).toHaveLength(1);
+    expect(marcus[0]).toMatchObject({ brand: "Zanotti", sales: 34000, profit: 8120, tier: "low" });
+    expect(marcus[0].margin).toBeCloseTo(8120 / 34000 * 100);
+    expect(summarizeBrandMargins(selectOrders({ personId: "jia", fairId: "mv-bighome-sep11", period: "last-week" }))).toEqual([]);
   });
 
   it("reports KPI coverage and distinguishes averages over all orders from qualifying orders", () => {

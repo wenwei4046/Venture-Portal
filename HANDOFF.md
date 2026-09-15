@@ -1,4 +1,20 @@
-# HOUZS Venture Portal — Session Handoff (checkpoint 2026-09-12 · Director Line design A MERGED + PROD LIVE)
+# HOUZS Venture Portal — Session Handoff
+
+## Checkpoint 2026-09-16 — Revenue member C release
+
+User authorised the entire approved C (Orange & Brown) design and functionality for live mobile and PC. `/member` now uses the responsive white/orange/brown layout, with a desktop sidebar and wider content columns, mobile bottom navigation, safe areas and reduced-motion-aware transitions. The principal management view retains its existing layout. The latest other-session main changes through `dc619c5` were incorporated before release work.
+
+- Today: orange income first, bell attention section, real combined KPI quantity and the first configured threshold, and brand-specific margin links into Insight orders. No individual Pillow/Protector targets or duplicate progress/quote promotion.
+- Insight: real Personal/Team data, shared brand margin rows, brand/order filters and correct selected-month refresh. Missing cost or incomplete order coverage does not produce a false margin tier.
+- Arena: authenticated Sales/Margin/KPI leaderboards, monthly/quarterly/annual periods, brand filtering, the approved medal podium, self rank, refresh time, and self-only persisted 4/5 brand weeks. No-activity people remain unranked.
+- Member list: self and descendants only; Map retains all authorised department branches.
+- A/C design comparison remains available. Admin/development `design=live` is explicitly sample data for responsive layout review; it is not the live data route.
+
+**Explicitly deferred by the user:** Fair event identity/date integration, weekly finish counts, historical Fair record and the dependent Championship scoring ledger. The live UI says these are pending and does not publish preview points as real scores.
+
+**Validation and database release:** 2,019 unit/component tests passed (3 files skipped), 399 disposable SQL checks passed, independent RPC security/calculation review complete, full source TypeScript and an isolated production Next.js build passed. Mobile 390 × 844, desktop layout, brand navigation and returning to Insight were checked. Migrations `20260916030000_member_kpi_summary.sql` and `20260917010000_member_arena.sql` were applied atomically to linked project `gixpptmfuryskbwkmiwz`, with their exact source recorded in migration history. Hosted read-only smoke verified anonymous RPC denial, internal-helper denial, direct brand-weeks table denial, and RLS. Do not replay these or unrelated legacy migrations. Production auto-deploys from `origin/main` to Vercel at `https://venture-portal-chi.vercel.app`; do not use the Cloudflare deploy script for this release.
+
+**Hosted account readiness:** all 30 active, date-eligible Revenue staff currently have `user_id = NULL`. No eligible linked member exists for authenticated live RPC or logged-in member UI verification. This is an account-link gap, not a demonstrated permission failure. No accounts were provisioned or permissions changed during release. The read RPCs passed the disposable integration checks; successful hosted member reads still require an existing authorised user linked to their staff record. Follow up through the normal account onboarding workflow; never substitute a privileged session or preview data.
 
 ## ═══ CHECKPOINT 2026-09-12 (later) — design A is MERGED and LIVE; read this first ═══
 

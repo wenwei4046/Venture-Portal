@@ -26,6 +26,7 @@ import {
   pushMemberRoute,
 } from "@/lib/member/navigation";
 import { memberInsightDemo, memberOrgMapDemo } from "@/lib/member/demo-insight";
+import { selectOwnTeam } from "@/lib/member/team-directory";
 import type {
   MemberData,
   MemberInsight,
@@ -53,11 +54,34 @@ import {
   fmt,
   initials,
 } from "./MemberUI";
-import s from "./member.module.css";
+import memberStyles from "./member.module.css";
+import previewStyles from "./design-preview/RevenueWorkspacePreview.module.css";
+import { RevenuePreviewHeader, RevenuePreviewNav } from "./design-preview/RevenuePreviewChrome";
+import { BrandMarginList } from "./design-preview/BrandMarginList";
+import { selectOrders, summarizeBrandMargins } from "./design-preview/insight-model";
+import motion from "./design-preview/ArenaMotion.module.css";
+import TodayKpiSummary from "./design-preview/TodayKpiSummary";
+import { todayKpiSummary } from "./design-preview/today-kpi-model";
+import liveStyles from "./MemberLiveWorkspace.module.css";
+import { MemberLiveHeader, MemberLiveNav } from "./MemberLiveChrome";
+import { LiveBrandMarginList, hasCompleteLiveOrders } from "./LiveBrandMarginList";
+import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
+import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
+import MemberArena from "./MemberArena";
+
+const s = memberStyles;
+// Explicit module-class composition keeps preview refinements out of production.
+const previewClassNames = Object.fromEntries(
+  Object.entries(memberStyles).map(([name, className]) => [
+    name,
+    previewStyles[name] ? `${className} ${previewStyles[name]}` : className,
+  ]),
+);
 
 const labels: Record<MemberPage, string> = {
   today: "Today",
   insight: "Insight",
+  arena: "Arena",
   income: "My income",
   quote: "Quick quote",
   team: "My team",
@@ -227,9 +251,20 @@ function Modal({
 
 export default function MemberWorkspace({
   initialData,
+  previewDesign,
+  productionLayout = false,
 }: {
   initialData: MemberData;
+  previewDesign?: "a" | "c";
+  /** Admin/development preview of the responsive live layout, with explicit sample data. */
+  productionLayout?: boolean;
 }) {
+  const liveDesign = (!initialData.demo || productionLayout) && !initialData.principalView;
+  const isDesignPreview = initialData.demo && !!previewDesign;
+  const design = liveDesign ? "c" : initialData.demo ? previewDesign : undefined;
+  const s = liveDesign ? Object.fromEntries(Object.entries(previewClassNames).map(([name, className]) => [
+    name, liveStyles[name] ? `${className} ${liveStyles[name]}` : className,
+  ])) : design ? previewClassNames : memberStyles;
   const [data, setData] = useState(initialData),
     [page, setPage] = useState<MemberPage>("today"),
     [department, setDepartment] = useState(
@@ -265,6 +300,10 @@ export default function MemberWorkspace({
     [orgMap, setOrgMap] = useState<MemberOrgMapData | null>(null),
     [mapBusy, setMapBusy] = useState(false),
     [mapError, setMapError] = useState<string | null>(null);
+  const [insightEntry, setInsightEntry] = useState<{ screen: "overview" | "orders"; brand?: string }>({ screen: "overview" });
+  const insightSequence = useRef(0);
+  const [liveKpi, setLiveKpi] = useState<MemberKpiSummary | null>(null);
+  const [kpiError, setKpiError] = useState<string | null>(null);
   const membershipsRef = useRef(data.memberships);
   const principalView = data.principalView === true;
   membershipsRef.current = data.memberships;
@@ -314,13 +353,24 @@ export default function MemberWorkspace({
     toastTimeout.current = setTimeout(() => setToast(""), 4200);
   }, []);
   const navigate = useCallback((next: MemberPage) => {
+    if (isDesignPreview && next === "insight") {
+      window.location.assign(`/member/preview?design=${design}&view=insight`);
+      return;
+    }
     if (next !== "quote") setProductSelection(null);
+    setInsightEntry({ screen: "overview" });
     setPage(next);
     const url = new URL(window.location.href);
+    if (isDesignPreview && design) {
+      url.searchParams.set("design", design);
+      url.searchParams.delete("view");
+    }
     url.searchParams.set("page", next);
+    url.searchParams.delete("screen");
+    url.searchParams.delete("brand");
     pushMemberRoute(url);
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, []);
+  }, [design, isDesignPreview]);
   useEffect(() => {
     function updateBackTarget() {
       const current = new URL(window.location.href);
@@ -367,6 +417,7 @@ export default function MemberWorkspace({
         p && Object.hasOwn(labels, p) ? (p as MemberPage) : "today";
       if (next === "quote" && !selected?.calculator) next = "today";
       setPage(next);
+      setInsightEntry({ screen: url.searchParams.get("screen") === "orders" ? "orders" : "overview", brand: url.searchParams.get("brand") ?? undefined });
       setDepartment(selected?.id ?? "");
       if (p && p !== next) {
         url.searchParams.set("page", next);
@@ -484,21 +535,23 @@ export default function MemberWorkspace({
       setRefreshing(false);
     }
   }, [data.demo, notify]);
-  const loadInsight = useCallback(async () => {
+  const loadInsight = useCallback(async (selectedPeriod?: string) => {
     if (data.demo) {
       setInsight(memberInsightDemo());
       return;
     }
     setInsightBusy(true);
     setInsightError(null);
+    const sequence = ++insightSequence.current;
     try {
-      const result = await fetchMemberInsight();
+      const result = await fetchMemberInsight(selectedPeriod);
+      if (sequence !== insightSequence.current) return;
       if (result.ok) setInsight(result.data);
       else setInsightError(result.error);
     } catch {
-      setInsightError("Unable to connect. Check your connection and try again.");
+      if (sequence === insightSequence.current) setInsightError("Unable to connect. Check your connection and try again.");
     } finally {
-      setInsightBusy(false);
+      if (sequence === insightSequence.current) setInsightBusy(false);
     }
   }, [data.demo]);
   const loadOrgMap = useCallback(async () => {
@@ -522,7 +575,22 @@ export default function MemberWorkspace({
     if (principalView) return;
     if (page === "insight" && !insight && !insightBusy && !insightError) void loadInsight();
     if (page === "team" && !orgMap && !mapBusy && !mapError) void loadOrgMap();
-  }, [page, principalView, insight, insightBusy, insightError, orgMap, mapBusy, mapError, loadInsight, loadOrgMap]);
+  }, [page, principalView, liveDesign, insight, insightBusy, insightError, orgMap, mapBusy, mapError, loadInsight, loadOrgMap]);
+  useEffect(() => {
+    if (liveDesign && page === "today") void loadInsight();
+  }, [liveDesign, page, data.refreshedAt, loadInsight]);
+  useEffect(() => {
+    if (!liveDesign || data.demo || page !== "today" || !member?.calculator) return;
+    let active = true;
+    setLiveKpi(null);
+    setKpiError(null);
+    fetchMemberKpiSummary(member.schemeId).then(result => {
+      if (!active) return;
+      if (result.ok) setLiveKpi(result.data);
+      else setKpiError(result.error);
+    }).catch(() => { if (active) setKpiError("KPI quantities could not be loaded. Please refresh."); });
+    return () => { active = false; };
+  }, [liveDesign, data.demo, data.refreshedAt, page, member?.schemeId, member?.calculator]);
   useEffect(() => {
     if (data.demo) return;
     const timer = setInterval(() => {
@@ -895,6 +963,35 @@ export default function MemberWorkspace({
 
   function MarginBrands() {
     if (!member?.calculator) return null;
+    if (liveDesign && page === "today") {
+      const currentMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit" }).format(new Date());
+      if (insightBusy || !insight || insight.period !== currentMonth) return <section className={s.card} aria-label="This month's margin">
+        <h2>This month&apos;s margin</h2><p className={s.sub} role="status">{insightError ?? "Loading current brand margins…"}</p>
+        {insightError && <button className={s.link} onClick={() => void loadInsight()}>Try again</button>}
+      </section>;
+      const block = insight.blocks.find(item => item.membershipId === member.id);
+      return <LiveBrandMarginList title="This month's margin" orders={block?.orders ?? []} bands={data.bands}
+        privateMode={privateMode} complete={block ? hasCompleteLiveOrders(block) : false}
+        onBrand={brand => {
+          navigate("insight");
+          setInsightEntry({ screen: "orders", brand });
+          const url = new URL(window.location.href);
+          url.searchParams.set("screen", "orders");
+          url.searchParams.set("brand", brand);
+          history.replaceState(history.state, "", url);
+        }} />;
+    }
+    if (isDesignPreview && design && page === "today") {
+      return (
+        <BrandMarginList
+          title="This month's margin"
+          rows={summarizeBrandMargins(selectOrders({ personId: "jia", period: "month" }))}
+          hrefForBrand={(brand) => `/member/preview?${new URLSearchParams({
+            design, view: "insight-orders", brand,
+          })}`}
+        />
+      );
+    }
     return (
       <section className={s.card}>
         <div className={s.sectionHead}>
@@ -958,8 +1055,64 @@ export default function MemberWorkspace({
       </section>
     );
   }
+  function TodayAttention() {
+    return (
+      <section className={`${s.card} ${design ? previewStyles.todayAttention : ""}`} aria-label="Needs your attention">
+        <div className={s.sectionHead}>
+          {design && <span className={previewStyles.attentionIcon}><Icon name="bell" size={25} /></span>}
+          <h2>Needs your attention</h2>
+          {attentionCount > 0 && (
+            <Pill tone="warning">{attentionCount} items</Pill>
+          )}
+        </div>
+        {memos
+          .filter((m) => m.requiresAck && !m.acknowledgedAt)
+          .map((m) => (
+            <button
+              key={m.id}
+              className={`${s.listRow} ${s.listButton}`}
+              onClick={() => void readMemo(m)}
+            >
+              <div>
+                <h3>{m.title}</h3>
+                <p className={s.caption}>
+                  {m.sender} · Acknowledgement required
+                </p>
+              </div>
+              <Icon name="chevron" size={16} />
+            </button>
+          ))}
+        {data.requests
+          .filter((r) =>
+            ["returned", "needs_info", "reserved"].includes(r.status),
+          )
+          .map((r) => (
+            <button
+              key={r.id}
+              className={`${s.listRow} ${s.listButton}`}
+              onClick={() => setSelectedRequest(r.id)}
+            >
+              <div>
+                <h3>{r.title}</h3>
+                <p className={s.caption}>{statusLabels[r.status]}</p>
+              </div>
+              <Icon name="chevron" size={16} />
+            </button>
+          ))}
+        {actionCount === 0 &&
+          !data.requests.some((r) =>
+            ["returned", "needs_info", "reserved"].includes(r.status),
+          ) && <p className={s.sub}>You are all caught up.</p>}
+        <button className={s.link} onClick={() => navigate("memos")}>
+          View all notifications <Icon name="arrow" size={16} />
+        </button>
+      </section>
+    );
+  }
+
   function Today() {
-    const kpi = income?.kpis[0];
+    const visibleGoals = income?.kpis.slice(0, member?.calculator ? 3 : 2) ?? [];
+    const kpi = visibleGoals.find(item => item.unit === "RM");
     const percent = kpi?.target
       ? Math.round((kpi.current / kpi.target) * 100)
       : 0;
@@ -1035,6 +1188,7 @@ export default function MemberWorkspace({
                 </button>
               </div>
             </section>
+            {design && <TodayAttention />}
             <section className={s.card}>
               <div className={s.row}>
                 <div>
@@ -1079,53 +1233,42 @@ export default function MemberWorkspace({
                   </text>
                 </svg>
               </div>
-              {income?.kpis.length ? (
-                income.kpis
-                  .slice(0, member?.calculator ? 3 : 2)
-                  .map((k) => (
-                    <Progress
-                      key={k.label}
-                      label={k.label}
-                      value={k.current}
-                      target={k.target}
-                      unit={k.unit}
-                      privateMode={privateMode && k.unit === "RM"}
-                    />
-                  ))
+              {visibleGoals.length || liveDesign ? (
+                <>
+                  {visibleGoals.filter(item => item.unit === "RM").map(item => (
+                    <Progress key={item.label} label={item.label} value={item.current}
+                      target={item.target} unit={item.unit} privateMode={privateMode} />
+                  ))}
+                  {design && data.demo && member?.calculator ? (
+                    <TodayKpiSummary {...todayKpiSummary(income?.kpis ?? [])} />
+                  ) : liveDesign && member?.calculator ? (
+                    liveKpi?.enabled === false ? null : <>
+                      <TodayKpiSummary items={liveKpi?.items.map(item => ({ label: item.label, quantity: item.quantity })) ?? []}
+                        total={liveKpi?.total ?? null} threshold={liveKpi?.threshold ?? null} hit={liveKpi?.hit ?? null} />
+                      {kpiError && <p className={s.caption} role="status">{kpiError}</p>}
+                    </>
+                  ) : visibleGoals.some(item => item.unit !== "RM") && (
+                    <section className={design ? previewStyles.todayKpi : undefined} aria-label="KPI item progress">
+                      <div className={design ? previewStyles.kpiHeading : s.sectionHead}>
+                        {design && <span className={previewStyles.kpiIcon}><Icon name="receipt" size={25} /></span>}
+                        <div><h3>KPI items</h3><p className={s.caption}>Your item quantity targets</p></div>
+                      </div>
+                      {visibleGoals.filter(item => item.unit !== "RM").map(item => (
+                        <Progress key={item.label} label={item.label} value={item.current}
+                          target={item.target} unit={item.unit} />
+                      ))}
+                    </section>
+                  )}
+                </>
               ) : (
                 <Empty title="Targets coming soon">
                   Confirmed targets and progress will appear here.
                 </Empty>
               )}
-              <button className={s.link} onClick={() => navigate("income")}>
-                View all progress <Icon name="arrow" size={16} />
-              </button>
             </section>
           </div>
           <div className={s.stack}>
-            {member?.calculator ? (
-              <section className={s.card}>
-                <p className={s.eyebrow}>MADE FOR YOUR NEXT OFFER</p>
-                <h2>Your next great offer.</h2>
-                <p className={s.sub} style={{ marginBottom: 18 }}>
-                  Build your cart and enter a price. See your margin and gift
-                  suggestions instantly.
-                </p>
-                <button
-                  className={`${s.button} ${s.primary} ${s.full}`}
-                  onClick={() => navigate("quote")}
-                >
-                  <Icon name="calculator" />
-                  Quick quote
-                  <Icon name="arrow" size={17} />
-                </button>
-                <p className={s.caption} style={{ marginTop: 10 }}>
-                  {quoteInput.lines.length
-                    ? "Your cart is saved on this device"
-                    : "Products, gifts and margin in one place"}
-                </p>
-              </section>
-            ) : (
+            {!member?.calculator && (
               <section className={s.card}>
                 <h2>Your IR progress</h2>
                 <p className={s.sub}>
@@ -1137,55 +1280,7 @@ export default function MemberWorkspace({
                 </button>
               </section>
             )}
-            <section className={s.card}>
-              <div className={s.sectionHead}>
-                <h2>Needs your attention</h2>
-                {attentionCount > 0 && (
-                  <Pill tone="warning">{attentionCount} items</Pill>
-                )}
-              </div>
-              {memos
-                .filter((m) => m.requiresAck && !m.acknowledgedAt)
-                .map((m) => (
-                  <button
-                    key={m.id}
-                    className={`${s.listRow} ${s.listButton}`}
-                    onClick={() => void readMemo(m)}
-                  >
-                    <div>
-                      <h3>{m.title}</h3>
-                      <p className={s.caption}>
-                        {m.sender} · Acknowledgement required
-                      </p>
-                    </div>
-                    <Icon name="chevron" size={16} />
-                  </button>
-                ))}
-              {data.requests
-                .filter((r) =>
-                  ["returned", "needs_info", "reserved"].includes(r.status),
-                )
-                .map((r) => (
-                  <button
-                    key={r.id}
-                    className={`${s.listRow} ${s.listButton}`}
-                    onClick={() => setSelectedRequest(r.id)}
-                  >
-                    <div>
-                      <h3>{r.title}</h3>
-                      <p className={s.caption}>{statusLabels[r.status]}</p>
-                    </div>
-                    <Icon name="chevron" size={16} />
-                  </button>
-                ))}
-              {actionCount === 0 &&
-                !data.requests.some((r) =>
-                  ["returned", "needs_info", "reserved"].includes(r.status),
-                ) && <p className={s.sub}>You are all caught up.</p>}
-              <button className={s.link} onClick={() => navigate("memos")}>
-                View all notifications <Icon name="arrow" size={16} />
-              </button>
-            </section>
+            {!design && <TodayAttention />}
             <MarginBrands />
           </div>
         </div>
@@ -1463,24 +1558,25 @@ export default function MemberWorkspace({
     if (!member) return null;
     const self = member.people.find((p) => p.self),
       direct = member.people.filter((p) => p.parentId === self?.id);
-    // The map answers "who is where"; the list is the same people, searchable,
-    // and it now spans every sub-department rather than the caller's own
-    // branch — that is the point of the map beside it.
-    const everyone = orgMap?.people.length
-      ? orgMap.people.map((person) => ({
+    // The map spans departments; the list starts at each of the caller's
+    // memberships and follows only that membership's reporting descendants.
+    const teamPeople = orgMap ? selectOwnTeam(orgMap.people) : null;
+    const fallbackPeople = selectOwnTeam(member.people);
+    const ownTeam = teamPeople
+      ? teamPeople.map((person) => ({
           key: person.id,
           id: person.staffId,
           name: person.name,
           title: person.title,
           department:
-            orgMap.departments.find((d) => d.id === person.departmentId)?.name ??
+            orgMap?.departments.find((d) => d.id === person.departmentId)?.name ??
             person.departmentId,
           self: person.self,
-          upline: orgMap.people.find((p) => p.id === person.parentId)?.name ?? null,
-          reports: orgMap.people.filter((p) => p.parentId === person.id).length,
+          upline: orgMap?.people.find((p) => p.id === person.parentId)?.name ?? null,
+          reports: teamPeople.filter((p) => p.parentId === person.id).length,
           mine: person.mine,
         }))
-      : member.people.map((person) => ({
+      : fallbackPeople.map((person) => ({
           key: person.id,
           id: person.id,
           name: person.name,
@@ -1488,10 +1584,10 @@ export default function MemberWorkspace({
           department: member.name,
           self: person.self === true,
           upline: member.people.find((p) => p.id === person.parentId)?.name ?? null,
-          reports: member.people.filter((p) => p.parentId === person.id).length,
+          reports: fallbackPeople.filter((p) => p.parentId === person.id).length,
           mine: true,
         }));
-    const directory = everyone
+    const directory = ownTeam
       .filter((person) => person.name.toLowerCase().includes(teamSearch.toLowerCase()))
       .sort(
         (a, b) =>
@@ -1548,7 +1644,9 @@ export default function MemberWorkspace({
             <p className={s.eyebrow}>GROW TOGETHER</p>
             <h1>My team</h1>
             <p className={`${s.sub} ${s.intro}`}>
-              Every department, everybody in one, and who reports to whom
+              {treeMode
+                ? "Every department and how the teams connect."
+                : "You and the people in your own reporting tree."}
             </p>
           </div>
           <Pill tone="active">Direct reports: {direct.length} members</Pill>
@@ -1569,11 +1667,11 @@ export default function MemberWorkspace({
               </button>
             </div>
             <label className={s.field} style={{ marginBottom: 20 }}>
-              <span className={s.srOnly}>Search members by name</span>
+              <span className={s.srOnly}>{treeMode ? "Search members by name" : "Search your team by name"}</span>
               <input
                 type="search"
-                placeholder="Search members by name"
-                aria-label="Search members by name"
+                placeholder={treeMode ? "Search members by name" : "Search your team by name"}
+                aria-label={treeMode ? "Search members by name" : "Search your team by name"}
                 value={teamSearch}
                 onChange={(e) => setTeamSearch(e.target.value)}
               />
@@ -1594,8 +1692,8 @@ export default function MemberWorkspace({
             ) : directory.length ? (
               directory.map(directoryCard)
             ) : (
-              <Empty title="No member found">
-                Try a full name or clear the search.
+              <Empty title="No matching team members">
+                Only your own reporting tree appears here. Clear the search to see your team.
               </Empty>
             )}
           </section>
@@ -1894,6 +1992,18 @@ export default function MemberWorkspace({
             </section>
             <section className={s.card}>
               <h2>My work</h2>
+              {design && (
+                <>
+                  <button className={`${s.listRow} ${s.listButton}`} onClick={() => navigate("income")}>
+                    <div className={s.listIcon}><Icon name="wallet" /><strong>My income</strong></div>
+                    <Icon name="chevron" size={16} />
+                  </button>
+                  <Link className={`${s.listRow} ${s.listButton}`} href={isDesignPreview ? `/member/preview?design=${design}&view=badges` : "/member?page=arena"} onClick={liveDesign ? event => { event.preventDefault(); navigate("arena"); } : undefined}>
+                    <div className={s.listIcon}><Icon name="trophy" /><strong>My honours</strong></div>
+                    <Icon name="chevron" size={16} />
+                  </Link>
+                </>
+              )}
               {(
                 [
                   ...(principalView
@@ -1932,13 +2042,13 @@ export default function MemberWorkspace({
                 {privateMode ? "On" : "Off"}
               </Pill>
             </button>
-            <button className={s.listRow} onClick={theme}>
+            {!liveDesign && <button className={s.listRow} onClick={theme}>
               <div className={s.listIcon}>
                 <Icon name={dark ? "moon" : "sun"} />
                 <span>Appearance</span>
               </div>
               <Pill>{dark ? "Dark" : "Light"}</Pill>
-            </button>
+            </button>}
             <button
               className={s.listRow}
               onClick={() =>
@@ -1999,7 +2109,7 @@ export default function MemberWorkspace({
                         `member-cart-v1-${data.profile.userId}`,
                       );
                     } catch {}
-                    window.location.assign(window.location.pathname);
+                    window.location.assign(design ? `/member/preview?design=${design}&page=account` : window.location.pathname);
                   }}
                 >
                   Reset demo
@@ -2014,14 +2124,14 @@ export default function MemberWorkspace({
   const activeMemo = data.memos.find((m) => m.id === selectedMemo),
     activeRequest = data.requests.find((r) => r.id === selectedRequest);
   return (
-    <div className={s.workspace} lang="en-MY">
+    <div className={`${s.workspace} ${design ? motion.shell : ""} ${liveDesign ? liveStyles.workspace : ""}`} lang="en-MY" data-arena-design={design} data-revenue-design={design} data-revenue-preview={isDesignPreview ? design : undefined}>
       <div id="member-shell">
-        <aside className={s.sidebar}>
+        {!isDesignPreview && <aside className={`${s.sidebar} ${liveDesign ? liveStyles.sidebar : ""}`}>
           <div className={s.wordmark}>
             HOUZS VENTURE<small>REVENUE WORKSPACE</small>
           </div>
           <nav className={s.sideNav} aria-label="Desktop navigation">
-            {renderNav(true)}
+            {liveDesign ? <MemberLiveNav active={page} canQuote={!!member?.calculator} desktop onSelect={navigate} /> : renderNav(true)}
           </nav>
           <div className={s.sideFooter}>
             <div className={s.listIcon}>
@@ -2035,8 +2145,10 @@ export default function MemberWorkspace({
             </div>
             <p className={s.caption}>A little closer, every day.</p>
           </div>
-        </aside>
+        </aside>}
         <div className={s.shell}>
+          {isDesignPreview && design && <RevenuePreviewHeader design={design} onProfile={() => navigate("account")} departmentLabel={member?.name} profileInitials={initials(data.profile.name)} />}
+          {liveDesign && <MemberLiveHeader name={data.profile.name} department={member?.name} onProfile={() => navigate("account")} onHome={() => navigate("today")} />}
           <header className={`${s.topbar} ${principalView ? s.principalTopbar : ""}`}>
             {principalView && <div className={principalStyles.toolbar} role="group" aria-label="Workspace view and department">
               <PortalViewSwitcher value="revenue_member" />
@@ -2082,8 +2194,10 @@ export default function MemberWorkspace({
             </div>
           </header>
           <main
-            className={`${s.main} ${page === "quote" ? s.quoteMain : ""}`}
+            className={`${s.main} ${page === "quote" ? s.quoteMain : ""} ${design && page === "quote" ? previewStyles.quoteSurface : ""}`}
             ref={mainRef}
+            key={design ? page : undefined}
+            data-preview-page={design ? page : undefined}
           >
             {!online && (
               <div className={`${s.notice} ${s.noticeWarning}`} role="status">
@@ -2118,8 +2232,10 @@ export default function MemberWorkspace({
                   dark={dark} onTheme={theme}
                 />}
                 {!principalView && page === "today" && Today()}
+                {!principalView && page === "arena" && <MemberArena key={member.id} membershipId={member.id} />}
                 {!principalView && page === "insight" && (
                   <MemberInsightPanel
+                    key={`${member.id}-${insightEntry.screen}-${insightEntry.brand ?? "all"}`}
                     insight={insight}
                     membershipId={member?.id ?? ""}
                     bands={data.bands}
@@ -2129,9 +2245,18 @@ export default function MemberWorkspace({
                     onRefresh={() => {
                       setInsight(null);
                       setInsightError(null);
-                      void loadInsight();
+                      void loadInsight(insight?.period);
                     }}
                     onDialog={setDialog}
+                    initialScreen={insightEntry.screen}
+                    initialBrand={insightEntry.brand}
+                    onPeriodChange={selectedPeriod => void loadInsight(selectedPeriod)}
+                    onScreenChange={(screen, brand) => {
+                      const url = new URL(window.location.href);
+                      if (screen === "orders") url.searchParams.set("screen", "orders"); else url.searchParams.delete("screen");
+                      if (screen === "orders" && brand && brand !== "all") url.searchParams.set("brand", brand); else url.searchParams.delete("brand");
+                      history.replaceState(history.state, "", url);
+                    }}
                   />
                 )}
                 {!principalView && page === "income" && Income()}
@@ -2171,9 +2296,13 @@ export default function MemberWorkspace({
             </div>
           </main>
         </div>
-        <nav className={s.bottomNav} aria-label="Mobile navigation">
+        {liveDesign ? <MemberLiveNav active={page} canQuote={!!member?.calculator} onSelect={navigate} /> : design ? <RevenuePreviewNav
+          design={design}
+          active={page === "today" ? "today" : page === "quote" ? "quote" : page === "income" || page === "insight" ? "insight" : "profile"}
+          onSelect={{ today: () => navigate("today"), quote: () => navigate("quote"), profile: () => navigate("account") }}
+        /> : <nav className={s.bottomNav} aria-label="Mobile navigation">
           {renderNav()}
-        </nav>
+        </nav>}
       </div>
       {dialog && (
         <Modal title={dialog.title} onClose={closeDialog}>

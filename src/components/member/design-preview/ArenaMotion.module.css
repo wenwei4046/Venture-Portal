@@ -1,0 +1,30 @@
+.shell { overflow-x: clip; }
+.page { --page-enter-x: 12px; }
+.page[data-direction="back"] { --page-enter-x: -12px; }
+.shell :is(button, a, summary, select) { -webkit-tap-highlight-color: transparent; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .page { animation: pageEnter 240ms cubic-bezier(.2,.7,.2,1) both; }
+  .results { animation: resultsEnter 190ms ease-out both; }
+  .shell :is(button, a, summary, select, label:has(> input:is([type="checkbox"], [type="radio"]))) {
+    transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 140ms cubic-bezier(.2,.7,.2,1), box-shadow 160ms ease;
+  }
+  .shell :is(button:enabled, a[href], summary, select:enabled, label:has(> input:is([type="checkbox"], [type="radio"]):enabled)):not([aria-disabled="true"]):hover:not(:active) { transform: none; }
+  .shell :is(button:enabled, a[href], summary, select:enabled, label:has(> input:is([type="checkbox"], [type="radio"]):enabled)):not([aria-disabled="true"]):active { transform: scale(.985); }
+  .shell :is(button:disabled, select:disabled, [aria-disabled="true"]),
+  .shell :is(button:disabled, select:disabled, [aria-disabled="true"]):is(:hover, :active) { transition: none; transform: none; }
+  @keyframes pageEnter {
+    from { opacity: .35; transform: translateX(var(--page-enter-x)); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes resultsEnter {
+    from { opacity: .5; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page, .results { animation: none; }
+  .shell :is(button, a, summary, select, label) { transition: none !important; }
+  .shell :is(button, a, summary, select, label):is(:hover, :active) { transform: none !important; }
+}

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { ResolvingViewport, Viewport } from "next";
 import { getUser } from "@/lib/auth";
 import { memberDemo } from "@/lib/member/demo";
 import MemberWorkspace from "@/components/member/MemberWorkspace";
@@ -6,10 +7,25 @@ import MemberAdmin from "@/components/member/MemberAdmin";
 import MemberLoginScreen from "@/components/member/MemberLoginScreen";
 import InsightDesignPreview from "@/components/member/design-preview/InsightDesignPreview";
 import InsightDesignReview from "@/components/member/design-preview/InsightDesignReview";
+import ArenaDesignReview from "@/components/member/design-preview/ArenaDesignReview";
+import ArenaDesignPreview from "@/components/member/design-preview/ArenaDesignPreview";
 import type { AdminMemberData } from "@/lib/member/server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revenue · Mobile & Desktop Preview" };
+
+export async function generateViewport({ searchParams }: {
+  searchParams: Promise<{ design?: string; view?: string }>;
+}, parent: ResolvingViewport): Promise<Viewport> {
+  const params = await searchParams;
+  const arena = ["a", "b", "c", "live"].includes(params.design ?? "");
+  const inherited = await parent;
+  return {
+    width: "device-width", initialScale: 1, viewportFit: "cover",
+    themeColor: arena ? params.design === "c" || params.design === "live" ? "rgb(255 255 255)" : params.design === "b" ? "rgb(255 250 244)" : "rgb(255 252 247)" : inherited.themeColor,
+    ...(arena ? { colorScheme: "light" as const } : {}),
+  };
+}
 
 export default async function MemberPreview({
   searchParams,
@@ -30,11 +46,20 @@ export default async function MemberPreview({
     if (!user || !["principal", "hr"].includes(user.role)) notFound();
   }
   const params = await searchParams;
+  if (params.design === "live") return <MemberWorkspace initialData={memberDemo()} productionLayout />;
   if (params.view?.startsWith("insight")) {
     if (params.design === "compare") return <InsightDesignReview />;
-    if (params.design === "a" || params.design === "b") {
+    if (params.design === "a" || params.design === "b" || params.design === "c") {
       return <InsightDesignPreview design={params.design} />;
     }
+  }
+  if (params.design === "compare") return <ArenaDesignReview />;
+  if ((params.design === "a" || params.design === "c") && params.page &&
+      ["today", "income", "quote", "account", "team", "requests", "memos"].includes(params.page)) {
+    return <MemberWorkspace initialData={memberDemo()} previewDesign={params.design} />;
+  }
+  if (params.design === "a" || params.design === "b" || params.design === "c") {
+    return <ArenaDesignPreview design={params.design} initialView={params.view} />;
   }
   if (params.device === "phone") {
     const phoneWidth =

@@ -1,0 +1,110 @@
+.results {
+  color: rgb(var(--arena-ink));
+  font-variant-numeric: tabular-nums;
+}
+
+.personal {
+  padding: 20px 16px 0;
+  border: 1px solid rgb(var(--arena-medal-gold-mid) / .8);
+  border-radius: 22px;
+  background: rgb(var(--arena-surface));
+  box-shadow: inset 0 0 0 3px rgb(var(--arena-medal-gold-light) / .22), 0 4px 12px rgb(var(--arena-ink) / .04);
+}
+
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.results .heading h2 { font-size: 16px; font-weight: 600; }
+.heading > span { flex-shrink: 0; font-size: 11px; color: rgb(var(--arena-muted)); }
+.results .intro { margin-top: 5px; font-size: 12px; color: rgb(var(--arena-muted)); }
+.medals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 22px 0 18px; }
+.medal { text-align: center; }
+.medal + .medal { border-left: 1px solid rgb(var(--arena-rule)); }
+
+.results [data-place="1"] {
+  --medal-light: var(--arena-medal-gold-light);
+  --medal-mid: var(--arena-medal-gold-mid);
+  --medal-deep: var(--arena-medal-gold-deep);
+}
+.results [data-place="2"] {
+  --medal-light: var(--arena-medal-silver-light);
+  --medal-mid: var(--arena-medal-silver-mid);
+  --medal-deep: var(--arena-medal-silver-deep);
+}
+.results [data-place="3"] {
+  --medal-light: var(--arena-medal-bronze-light);
+  --medal-mid: var(--arena-medal-bronze-mid);
+  --medal-deep: var(--arena-medal-bronze-deep);
+}
+
+.medal dt { display: flex; flex-direction: column; align-items: center; gap: 12px; color: rgb(var(--medal-deep)); font-size: 12px; font-weight: 600; }
+.badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 3px double rgb(var(--medal-mid));
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(var(--arena-surface)), rgb(var(--medal-light)) 65%, rgb(var(--medal-mid) / .5));
+  box-shadow: 0 3px 7px rgb(var(--medal-deep) / .1);
+  font-size: 25px;
+  line-height: 1;
+}
+.badge svg { position: absolute; top: -10px; padding: 2px; box-sizing: content-box; background: rgb(var(--arena-surface)); }
+.badge b { font-weight: 600; }
+.medal dd { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 6px 0 0; }
+.medal dd strong { font-size: 34px; font-weight: 650; line-height: 1.2; letter-spacing: -.04em; }
+.medal dd > span { font-size: 11px; color: rgb(var(--arena-muted)); }
+.remainder { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 16px; padding: 12px 0; border-top: 1px solid rgb(var(--arena-rule)); font-size: 11px; color: rgb(var(--arena-muted)); }
+.remainder strong { margin-left: 5px; color: rgb(var(--arena-ink)); }
+.results .empty { padding: 0 0 14px; font-size: 12px; color: rgb(var(--arena-muted)); }
+.weekly { margin: 18px 0 28px; border-bottom: 1px solid rgb(var(--arena-rule)); }
+.weekly summary, .about summary { display: flex; align-items: center; justify-content: space-between; min-height: 48px; gap: 8px; list-style: none; cursor: pointer; }
+.weekly summary::-webkit-details-marker, .about summary::-webkit-details-marker { display: none; }
+.weekly summary { font-size: 14px; font-weight: 600; }
+.weekly summary svg { color: rgb(var(--arena-secondary)); transition: transform 180ms ease; }
+.weekly[open] summary svg { transform: rotate(90deg); }
+.weekly summary:focus-visible, .about summary:focus-visible { outline: 2px solid rgb(var(--arena-secondary)); outline-offset: 3px; }
+.weekly ol { padding: 0; margin: 0; list-style: none; }
+.weekly li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid rgb(var(--arena-rule) / .65); }
+.eventDate { min-width: 0; font-size: 13px; font-weight: 500; }
+.eventDate small { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; color: rgb(var(--arena-muted)); }
+.finish { flex-shrink: 0; min-width: 45px; padding: 6px 9px; border-radius: 10px; background: rgb(var(--arena-hue0-light)); color: rgb(var(--arena-muted)); text-align: center; font-size: 13px; font-weight: 600; }
+.finish[data-place] { background: rgb(var(--medal-light)); color: rgb(var(--medal-deep)); border: 1px solid rgb(var(--medal-mid) / .7); }
+.comparison { margin-top: 28px; }
+.results .tableNote { margin: 6px 0 17px; color: rgb(var(--arena-muted)); font-size: 11px; }
+.table { width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; }
+.table th:first-child { width: 55%; }
+.table thead th { padding: 9px 0 13px; border-bottom: 1px solid rgb(var(--arena-rule)); color: rgb(var(--arena-muted)); font-size: 11px; font-weight: 500; }
+.table thead th:not(:first-child) { text-align: center; }
+.table thead [data-place] { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgb(var(--medal-light)); color: rgb(var(--medal-deep)); border: 1px solid rgb(var(--medal-mid) / .6); font-weight: 600; }
+.table tbody tr { border-bottom: 1px solid rgb(var(--arena-rule) / .7); }
+.table tbody th { padding: 16px 8px 16px 0; font-size: 13px; font-weight: 500; }
+.table tbody th small { display: block; margin-top: 5px; color: rgb(var(--arena-muted)); font-size: 10px; font-weight: 400; line-height: 1.5; }
+.name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; }
+.name em { color: rgb(var(--arena-secondary)); font-size: 10px; font-weight: 500; font-style: normal; }
+.table td { text-align: center; font-size: 20px; font-weight: 600; color: rgb(var(--medal-deep)); }
+.table [data-self="true"] { background: rgb(var(--arena-hue1-light) / .6); }
+.table [data-self="true"] th { padding-left: 8px; }
+.about { margin-top: 20px; color: rgb(var(--arena-muted)); font-size: 12px; }
+.about summary { font-weight: 500; }
+.results .about p { margin: 0 0 12px; line-height: 1.65; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 350px) {
+  .personal { padding-left: 12px; padding-right: 12px; }
+  .results .heading h2 { font-size: 14px; }
+  .medal dd strong { font-size: 29px; }
+  .medal dd { gap: 3px; }
+  .medal dd > span { font-size: 10px; }
+  .table th:first-child { width: 54%; }
+  .table tbody th { font-size: 12px; }
+  .table td { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weekly summary svg { transition: none; }
+}

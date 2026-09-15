@@ -43,3 +43,25 @@
   --insight-hue3-mid: 213 188 129;
   --insight-hue3-deep: 128 99 46;
 }
+
+/* C shares the approved Revenue palette, including every in-page dialog. */
+.theme[data-insight-design="c"] {
+  --insight-paper: var(--arena-paper);
+  --insight-surface: var(--arena-surface);
+  --insight-ink: var(--arena-ink);
+  --insight-muted: var(--arena-muted);
+  --insight-rule: var(--arena-rule);
+  --insight-on-primary: var(--arena-on-primary);
+  --insight-hue0-light: var(--arena-hue0-light);
+  --insight-hue0-mid: var(--arena-hue0-mid);
+  --insight-hue0-deep: var(--arena-hue0-deep);
+  --insight-hue1-light: var(--arena-hue1-light);
+  --insight-hue1-mid: var(--arena-hue1-mid);
+  --insight-hue1-deep: var(--arena-hue1-deep);
+  --insight-hue2-light: var(--arena-hue2-light);
+  --insight-hue2-mid: var(--arena-hue2-mid);
+  --insight-hue2-deep: var(--arena-hue2-deep);
+  --insight-hue3-light: var(--arena-hue3-light);
+  --insight-hue3-mid: var(--arena-hue3-mid);
+  --insight-hue3-deep: var(--arena-hue3-deep);
+}

@@ -1,0 +1,63 @@
+.stage {
+  display: flex;
+  position: relative;
+  flex: 1 1 0;
+  min-height: 280px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 24px;
+}
+.stage[data-scale-mode="actual"] { flex: 0 0 auto; min-height: 0; overflow-x: auto; justify-content: safe center; }
+.scaledBounds { position: relative; flex: 0 0 auto; }
+.dimensions { position: absolute; bottom: 0; left: 0; right: 0; margin: 0; text-align: center; font-size: 11px; line-height: 20px; color: rgb(var(--arena-muted)); font-variant-numeric: tabular-nums; }
+.frame {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  overflow: hidden;
+  margin: 0;
+  border: 0;
+  border-radius: 34px;
+  background: rgb(var(--arena-surface));
+  color: rgb(var(--arena-ink));
+  box-shadow: 0 0 0 1px rgb(var(--arena-muted) / .2), 0 14px 35px rgb(var(--arena-ink) / .08);
+}
+
+.statusBar {
+  display: flex;
+  flex: 0 0 46px;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 0 24px;
+  background: inherit;
+  font-family: var(--font-sans), sans-serif;
+  user-select: none;
+}
+
+.time { min-width: 42px; font-size: 13px; font-weight: 650; letter-spacing: -.035em; }
+.statusIcons { display: flex; align-items: center; gap: 5px; }
+.camera { position: absolute; left: 50%; top: 9px; transform: translateX(-50%); width: 90px; height: 26px; border-radius: 999px; background: rgb(var(--arena-device-cutout)); }
+.viewport { display: block; flex: 1 1 auto; width: 100%; min-height: 0; border: 0; background: inherit; }
+.gestureArea { flex: 0 0 21px; display: grid; place-items: start center; padding-top: 6px; background: inherit; }
+.gestureArea span { display: block; width: 112px; height: 4px; border-radius: 999px; background: currentColor; }
+.frame[data-device="android"] { border-radius: 27px; }
+.frame[data-device="android"] .statusBar { flex-basis: 32px; padding: 0 20px; }
+.frame[data-device="android"] .time { font-size: 12px; letter-spacing: 0; }
+.frame[data-device="android"] .camera { width: 8px; height: 8px; top: 11px; }
+.frame[data-device="android"] .gestureArea { flex-basis: 18px; padding-top: 5px; }
+.frame[data-device="android"] .gestureArea span { width: 88px; height: 3px; opacity: .65; }
+.frame[data-device="browser"] { border-radius: 22px; }
+.frame[data-device="browser"] .statusBar,
+.frame[data-device="browser"] .gestureArea { display: none; }
+.frame[data-current] { background: rgb(var(--arena-device-current)); }
+
+@media (max-width: 360px) {
+  .statusBar { padding-inline: 17px; }
+  .camera { width: 78px; }
+}

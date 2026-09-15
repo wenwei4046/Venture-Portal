@@ -89,3 +89,6 @@ describe("Principal Revenue workspace", () => {
     expect(screen.queryByText("No member profile linked")).not.toBeInTheDocument();
   });
 });
+
+vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({ fetchMemberKpiSummary: vi.fn().mockResolvedValue({ ok: false, error: "KPI unavailable in this navigation test" }) }));
+vi.mock("@/app/(member)/member/arena-actions", () => ({ fetchMemberArena: vi.fn().mockResolvedValue({ ok: false, error: "Arena unavailable in this navigation test" }), saveMemberArenaBrandWeeks: vi.fn() }));

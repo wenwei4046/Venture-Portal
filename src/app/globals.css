@@ -80,6 +80,104 @@
   --chrome: 222 215 202;
 }
 
+/* Scoped, light-theme proposals for the synthetic Revenue mobile review.
+   Four accent hues per direction; the production palette above is unchanged. */
+[data-arena-design] {
+  color-scheme: light;
+  --arena-paper: 232 222 210;
+  --arena-surface: 255 252 247;
+  --arena-ink: 61 40 31;
+  --arena-muted: 115 93 80;
+  --arena-rule: 205 188 174;
+  --arena-on-primary: 255 252 247;
+  --arena-hue0-light: 239 228 217;
+  --arena-hue0-mid: 185 154 128;
+  --arena-hue0-deep: 75 48 36;
+  --arena-hue1-light: 249 231 216;
+  --arena-hue1-mid: 218 152 107;
+  --arena-hue1-deep: 163 78 37;
+  --arena-hue2-light: 238 240 226;
+  --arena-hue2-mid: 168 175 133;
+  --arena-hue2-deep: 88 98 68;
+  --arena-hue3-light: 230 237 241;
+  --arena-hue3-mid: 159 175 186;
+  --arena-hue3-deep: 78 101 116;
+  --arena-primary: var(--arena-hue0-deep);
+  --arena-secondary: var(--arena-hue1-deep);
+  --arena-tertiary: var(--arena-hue2-deep);
+  --arena-fourth: var(--arena-hue3-deep);
+  /* Podium metals are small award accents, shared by both Arena palettes. */
+  --arena-medal-gold-light: 246 237 213;
+  --arena-medal-gold-mid: 197 163 89;
+  --arena-medal-gold-deep: 125 91 32;
+  --arena-medal-silver-light: 234 239 241;
+  --arena-medal-silver-mid: 163 178 186;
+  --arena-medal-silver-deep: 78 101 116;
+  --arena-medal-bronze-light: 245 227 216;
+  --arena-medal-bronze-mid: 191 142 109;
+  --arena-medal-bronze-deep: 138 85 54;
+  --arena-device-cutout: 33 30 27;
+  --arena-device-current: 255 255 255;
+}
+[data-arena-design="b"] {
+  --arena-paper: 233 220 208;
+  --arena-surface: 255 250 244;
+  --arena-ink: 71 45 35;
+  --arena-muted: 116 91 77;
+  --arena-rule: 207 185 166;
+  --arena-on-primary: 255 250 244;
+  --arena-hue0-light: 240 226 213;
+  --arena-hue0-mid: 185 142 114;
+  --arena-hue0-deep: 87 56 40;
+  --arena-hue1-light: 251 232 214;
+  --arena-hue1-mid: 227 171 125;
+  --arena-hue1-deep: 161 77 38;
+  --arena-hue2-light: 245 232 229;
+  --arena-hue2-mid: 203 168 160;
+  --arena-hue2-deep: 139 90 85;
+  --arena-hue3-light: 245 237 216;
+  --arena-hue3-mid: 213 188 129;
+  --arena-hue3-deep: 128 99 46;
+}
+[data-arena-design="c"] {
+  --arena-paper: 255 255 255;
+  --arena-surface: 255 255 255;
+  --arena-ink: 63 43 34;
+  --arena-muted: 128 107 96;
+  --arena-rule: 235 221 210;
+  --arena-on-primary: 255 255 255;
+  --arena-hue0-light: 245 235 227;
+  --arena-hue0-mid: 174 132 104;
+  --arena-hue0-deep: 78 47 32;
+  --arena-hue1-light: 255 229 207;
+  --arena-hue1-mid: 239 133 63;
+  --arena-hue1-deep: 189 74 25;
+  --arena-hue2-light: 240 221 206;
+  --arena-hue2-mid: 186 133 93;
+  --arena-hue2-deep: 122 75 53;
+  --arena-hue3-light: 255 240 204;
+  --arena-hue3-mid: 225 176 79;
+  --arena-hue3-deep: 164 99 18;
+  /* Warm neutral silver keeps second place metallic without a blue cast. */
+  --arena-medal-silver-light: 242 240 235;
+  --arena-medal-silver-mid: 180 174 164;
+  --arena-medal-silver-deep: 107 100 90;
+}
+/* Real devices supply these insets; simulated device chrome lives outside the iframe. */
+[data-arena-design] > [data-arena-chrome] {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+html:has([data-arena-chrome]), body:has([data-arena-chrome]) { background: rgb(255 252 247); }
+html:has([data-arena-design="b"] [data-arena-chrome]), body:has([data-arena-design="b"] [data-arena-chrome]) { background: rgb(255 250 244); }
+html:has([data-arena-design="c"] [data-arena-chrome]), body:has([data-arena-design="c"] [data-arena-chrome]) { background: rgb(255 255 255); }
+/* Keep the development badge clear of the phone's bottom navigation. */
+body:has([data-arena-design]) nextjs-portal { display: none; }
+
 /* ─── Dark mode — warm charcoal, not cold ───
    Elevation ladder kept from 2026-08-29, re-tinted walnut: page darkest,
    sidebar one step ABOVE it (elevated-panel convention), cards above that. */

@@ -1,7 +1,6 @@
 .app { --insight-radius: 16px; }
 .app :is(button, a, input, select) { -webkit-tap-highlight-color: transparent; }
 .app button { border: 0; }
-.app button:active { transform: translateY(1px); }
 .app svg { flex-shrink: 0; }
 .app :is(input, select) { font-family: inherit; color: rgb(var(--insight-ink)); }
 .app :is(input, select):focus-visible { outline: 2px solid rgb(var(--insight-secondary)); outline-offset: 3px; }
@@ -43,6 +42,7 @@
 .salesHero .progress { background: rgb(var(--insight-on-primary) / .18); }
 .salesHero .progress span { background: rgb(var(--insight-hue1-mid)); }
 .metricGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 13px 0 24px; }
+.metricGrid.singleMetric { grid-template-columns: minmax(0, 1fr); }
 .metricCard { min-width: 0; text-align: left; padding: 15px 15px 13px; border-radius: 12px; background: rgb(var(--insight-surface)); color: rgb(var(--insight-secondary)); border: 1px solid rgb(var(--insight-rule)) !important; border-top: 3px solid rgb(var(--insight-hue1-mid)) !important; }
 .metricCard[data-color="olive"] { color: rgb(var(--insight-tertiary)); border-top-color: rgb(var(--insight-hue2-mid)) !important; }
 .metricCard > span { display: flex; justify-content: space-between; align-items: center; gap: 3px; font-size: 12px; }
@@ -267,4 +267,173 @@
   .app nav { max-width: 558px; margin: 0 auto; }
   .main { padding-top: 30px; }
 }
-@media (prefers-reduced-motion: reduce) { .app button:active { transform: none; } }
+
+/* C — the same open white Revenue canvas, with colour reserved for useful cues. */
+.app[data-insight-design="c"] { --insight-radius: 20px; }
+:global([data-insight-design="c"]) .main { max-width: 560px; padding: 20px 24px calc(105px + env(safe-area-inset-bottom)); }
+:global([data-insight-design="c"]) .main h1 { font-size: 32px; letter-spacing: -.045em; }
+:global([data-insight-design="c"]) .main[data-insight-home] h1 { font-size: 38px; font-weight: 700; }
+:global([data-insight-design="c"]) .main h2 { font-size: 17px; }
+:global([data-insight-design="c"]) .pageHeading p { font-size: 13px; }
+:global([data-insight-design="c"]) .pageHeading .eyebrow { font-size: 9px; letter-spacing: .11em; }
+:global([data-insight-design="c"]) .headingIcon,
+:global([data-insight-design="c"]) .quickInsightTrigger { width: 56px; height: 56px; border-radius: 16px; border-color: rgb(var(--insight-hue1-mid) / .55) !important; }
+:global([data-insight-design="c"]) .headingIcon svg,
+:global([data-insight-design="c"]) .quickInsightTrigger svg { width: 28px; height: 28px; }
+:global([data-insight-design="c"]) .scopeTabs { padding: 0; gap: 20px; border: 0; border-bottom: 1px solid rgb(var(--insight-rule)); border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .scopeTabs button { min-height: 48px; border-radius: 0; border-bottom: 2px solid transparent; background: transparent; font-size: 14px; }
+:global([data-insight-design="c"]) .scopeTabs button[aria-pressed="true"] { border-bottom-color: rgb(var(--insight-secondary)); background: transparent; color: rgb(var(--insight-secondary)); box-shadow: none; }
+:global([data-insight-design="c"]) .scopeTabs svg { width: 20px; height: 20px; }
+:global([data-insight-design="c"]) .periodRow { margin: 12px 0 23px; }
+:global([data-insight-design="c"]) .periodRow label { padding: 0; border: 0; border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .periodRow select { min-height: 44px; font-size: 14px; color: rgb(var(--insight-tertiary)); }
+:global([data-insight-design="c"]) .periodRow > span { font-size: 10px; }
+:global([data-insight-design="c"]) .overviewLabel { font-size: 10px; margin-bottom: 12px; }
+:global([data-insight-design="c"]) .salesHero { padding: 20px; border: 1px solid rgb(var(--insight-hue1-mid) / .4); border-radius: 20px; background: rgb(var(--insight-hue1-light)); color: rgb(var(--insight-primary)); }
+:global([data-insight-design="c"]) .salesLabel { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 600; }
+:global([data-insight-design="c"]) .heroIcon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 15px; background: rgb(var(--insight-hue1-mid) / .28); color: rgb(var(--insight-secondary)); }
+:global([data-insight-design="c"]) .salesHero .heroTop > span:last-child { padding: 0; border: 0; font-size: 11px; color: rgb(var(--insight-muted)); }
+:global([data-insight-design="c"]) .heroNumber { margin: 15px 0 14px; font-size: 44px; font-weight: 650; }
+:global([data-insight-design="c"]) .targetButton > span,
+:global([data-insight-design="c"]) .targetButton strong { font-size: 11px; }
+:global([data-insight-design="c"]) .salesHero .progress { background: rgb(var(--insight-hue1-mid) / .35); }
+:global([data-insight-design="c"]) .salesHero .progress span { background: rgb(var(--insight-secondary)); }
+:global([data-insight-design="c"]) .metricGrid { grid-template-columns: minmax(0, 1fr); gap: 0; margin: 6px 0 27px; }
+:global([data-insight-design="c"]) .metricCard { display: grid; grid-template-columns: 52px minmax(0, 1fr) 18px; grid-template-rows: auto auto auto; column-gap: 14px; row-gap: 2px; min-height: 118px; padding: 20px 0; border: 0 !important; border-bottom: 1px solid rgb(var(--insight-rule)) !important; border-radius: 0; background: transparent; color: rgb(var(--metric-accent)); }
+:global([data-insight-design="c"]) .metricCard[data-color="clay"] { --metric-accent: var(--insight-tertiary); --metric-fill: var(--insight-hue2-mid); }
+:global([data-insight-design="c"]) .metricCard[data-color="olive"] { --metric-accent: var(--insight-fourth); --metric-fill: var(--insight-hue3-mid); }
+:global([data-insight-design="c"]) .metricCard > span { display: contents; }
+:global([data-insight-design="c"]) .metricIcon { grid-column: 1; grid-row: 1 / 4; align-self: center; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 15px; color: rgb(var(--metric-accent)); background: rgb(var(--metric-fill) / .23); box-shadow: inset 0 0 0 1px rgb(var(--metric-fill) / .3); }
+:global([data-insight-design="c"]) .metricCaption { grid-column: 2; grid-row: 1; align-self: end; color: rgb(var(--insight-ink)); font-size: 17px; font-weight: 650; }
+:global([data-insight-design="c"]) .metricCard > span > svg { grid-column: 3; grid-row: 1 / 4; align-self: center; color: rgb(var(--insight-tertiary)); }
+:global([data-insight-design="c"]) .metricCard > strong { grid-column: 2; grid-row: 2; margin: 1px 0; font-size: 28px; font-weight: 650; }
+:global([data-insight-design="c"]) .metricCard > small { grid-column: 2; grid-row: 3; font-size: 12px; }
+:global([data-insight-design="c"]) .metricCard em { font-size: 12px; }
+:global([data-insight-design="c"]) .sectionHead { margin-bottom: 10px; }
+:global([data-insight-design="c"]) .sectionHead > span { font-size: 10px; }
+:global([data-insight-design="c"]) .entry { grid-template-columns: 52px minmax(0,1fr) 18px; gap: 14px; min-height: 94px; padding: 19px 0; border: 0 !important; border-bottom: 1px solid rgb(var(--insight-rule)) !important; border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .entryIcon { width: 52px; height: 52px; border-radius: 15px; }
+:global([data-insight-design="c"]) .entryIcon svg { width: 28px; height: 28px; }
+:global([data-insight-design="c"]) .entry > svg:first-child { width: 52px; height: 52px; padding: 12px; border-radius: 15px; background: rgb(var(--insight-hue1-light)); color: rgb(var(--insight-secondary)); }
+:global([data-insight-design="c"]) .entry strong { font-size: 16px; }
+:global([data-insight-design="c"]) .entry small { font-size: 12px; }
+:global([data-insight-design="c"]) .reviewNote { grid-template-columns: 40px minmax(0,1fr) 16px; gap: 12px; padding: 16px 12px; margin-top: 20px; border-radius: 14px; }
+:global([data-insight-design="c"]) .noteIcon { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 12px; background: rgb(var(--insight-hue1-mid) / .22); }
+:global([data-insight-design="c"]) .noteIcon svg { width: 23px; height: 23px; }
+:global([data-insight-design="c"]) .reviewNote strong { font-size: 14px; }
+:global([data-insight-design="c"]) .reviewNote span > span { font-size: 12px; }
+:global([data-insight-design="c"]) .back { font-size: 13px !important; margin-top: -8px; color: rgb(var(--insight-tertiary)); }
+:global([data-insight-design="c"]) .teamSummary { padding: 20px 0; border-radius: 0; border-bottom: 1px solid rgb(var(--insight-rule)); background: transparent; color: rgb(var(--insight-primary)); }
+:global([data-insight-design="c"]) .teamSummary strong { font-size: 20px; font-weight: 650; }
+:global([data-insight-design="c"]) .teamSummary small { color: rgb(var(--insight-muted)); font-size: 11px; }
+:global([data-insight-design="c"]) .teamInsightButton { grid-template-columns: 52px minmax(0, 1fr) 18px; padding: 16px 0; min-height: 90px; border: 0 !important; border-bottom: 1px solid rgb(var(--insight-rule)) !important; border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .teamInsightButton > svg:first-child { width: 52px; height: 52px; padding: 12px; border-radius: 15px; background: rgb(var(--insight-hue1-light)); }
+:global([data-insight-design="c"]) .teamInsightButton strong { font-size: 16px; }
+:global([data-insight-design="c"]) .teamInsightButton small { font-size: 12px; }
+:global([data-insight-design="c"]) .teamActions > span { font-size: 10px; }
+:global([data-insight-design="c"]) .teamActions button { font-size: 12px; }
+:global([data-insight-design="c"]) .selectField,
+:global([data-insight-design="c"]) .quantityField { font-size: 12px; }
+:global([data-insight-design="c"]) .selectField select { border-radius: 10px; font-size: 14px; }
+:global([data-insight-design="c"]) .memberList,
+:global([data-insight-design="c"]) .orderList,
+:global([data-insight-design="c"]) .fairList { gap: 0; }
+:global([data-insight-design="c"]) .memberCard,
+:global([data-insight-design="c"]) .orderCard,
+:global([data-insight-design="c"]) .fairCard { padding: 22px 0 18px; border: 0 !important; border-bottom: 1px solid rgb(var(--insight-rule)) !important; border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .avatar { width: 46px; height: 46px; font-size: 13px; }
+:global([data-insight-design="c"]) .memberTop strong { font-size: 17px; }
+:global([data-insight-design="c"]) .memberTop small { font-size: 11px; }
+:global([data-insight-design="c"]) .memberMetrics strong { font-size: 18px; }
+:global([data-insight-design="c"]) .memberMetrics small,
+:global([data-insight-design="c"]) .memberFoot { font-size: 10px; }
+:global([data-insight-design="c"]) .venueMeta { font-size: 11px; }
+:global([data-insight-design="c"]) .venueMeta small { font-size: 10px; }
+:global([data-insight-design="c"]) .contextStrip { padding: 10px 0 10px 12px; border: 0; border-left: 3px solid rgb(var(--insight-hue1-mid)); border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .contextStrip small { font-size: 11px; }
+:global([data-insight-design="c"]) .summaryStrip strong { font-size: 20px; }
+:global([data-insight-design="c"]) .summaryStrip small { font-size: 11px; }
+:global([data-insight-design="c"]) .search { background: rgb(var(--insight-hue0-light) / .6); border-color: transparent; border-radius: 12px; }
+:global([data-insight-design="c"]) .search input { font-size: 14px; min-height: 48px; }
+:global([data-insight-design="c"]) .resultCount,
+:global([data-insight-design="c"]) .selectedFairNote,
+:global([data-insight-design="c"]) .quantityHelp { font-size: 11px; }
+:global([data-insight-design="c"]) .orderTop > strong { font-size: 13px; }
+:global([data-insight-design="c"]) .badge { font-size: 10px; padding: 4px 8px; border-radius: 7px; }
+:global([data-insight-design="c"]) .orderCard > p { font-size: 11px; margin-top: 8px; }
+:global([data-insight-design="c"]) .orderMetrics small { font-size: 11px; }
+:global([data-insight-design="c"]) .orderMetrics strong { font-size: 15px; }
+:global([data-insight-design="c"]) .commissionLine,
+:global([data-insight-design="c"]) .commissionLine strong,
+:global([data-insight-design="c"]) .status { font-size: 11px; }
+:global([data-insight-design="c"]) .orderHero { padding: 20px 0; border: 0; border-bottom: 1px solid rgb(var(--insight-rule)); border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .orderHero > strong { font-size: 40px; font-weight: 650; color: rgb(var(--insight-primary)); }
+:global([data-insight-design="c"]) .orderHero > small,
+:global([data-insight-design="c"]) .orderHeroMetrics small { font-size: 12px; }
+:global([data-insight-design="c"]) .orderHeroMetrics strong { font-size: 20px; font-weight: 600; }
+:global([data-insight-design="c"]) .panel { padding: 18px 0 24px; margin-bottom: 16px; border: 0; border-bottom: 1px solid rgb(var(--insight-rule)); border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .commissionAmount { font-size: 29px; font-weight: 600; }
+:global([data-insight-design="c"]) .muted,
+:global([data-insight-design="c"]) .footnote { font-size: 12px; }
+:global([data-insight-design="c"]) .analysisPanel { padding: 20px; border-radius: 16px; }
+:global([data-insight-design="c"]) .analysisPanel p { font-size: 12px; }
+:global([data-insight-design="c"]) .analysisLabel { font-size: 9px; }
+:global([data-insight-design="c"]) .analysisFoot { font-size: 10px; }
+:global([data-insight-design="c"]) .itemRow { font-size: 14px; min-height: 54px; }
+:global([data-insight-design="c"]) .itemRow small { font-size: 11px; }
+:global([data-insight-design="c"]) .fairDate { font-size: 12px; }
+:global([data-insight-design="c"]) .fairCard h2 { font-size: 23px; }
+:global([data-insight-design="c"]) .fairCard > p { font-size: 13px; }
+:global([data-insight-design="c"]) .fairCard .summaryStrip strong { font-size: 19px; }
+:global([data-insight-design="c"]) .fairRank,
+:global([data-insight-design="c"]) .coverage { font-size: 11px; }
+:global([data-insight-design="c"]) .venueIcon { width: 56px; height: 56px; border-radius: 16px; }
+:global([data-insight-design="c"]) .venueIcon svg { width: 28px; height: 28px; }
+:global([data-insight-design="c"]) .venueBoard { border: 0; border-top: 1px solid rgb(var(--insight-rule)); border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .venueBoard li > :is(button, div) { padding: 20px 0; }
+:global([data-insight-design="c"]) .venueBoard li[data-self="true"] { border-left: 2px solid rgb(var(--insight-secondary)); padding-left: 8px; }
+:global([data-insight-design="c"]) .boardName strong { font-size: 14px; }
+:global([data-insight-design="c"]) .boardName small { font-size: 10px; }
+:global([data-insight-design="c"]) .boardAmount { font-size: 14px; font-weight: 600; }
+:global([data-insight-design="c"]) .targetAmount { font-size: 36px; font-weight: 650; }
+:global([data-insight-design="c"]) .targetGap { font-size: 12px; }
+:global([data-insight-design="c"]) .kpiCoverageHero { background: rgb(var(--insight-hue3-light)); color: rgb(var(--insight-fourth)); border: 1px solid rgb(var(--insight-hue3-mid) / .5); border-radius: 20px; }
+:global([data-insight-design="c"]) .coverageNumber { font-weight: 650; }
+:global([data-insight-design="c"]) .kpiHeroLabel > svg { width: 28px; height: 28px; }
+:global([data-insight-design="c"]) .coverageBar { background: rgb(var(--insight-hue3-mid) / .3); }
+:global([data-insight-design="c"]) .coverageBar > span { background: rgb(var(--insight-fourth)); }
+:global([data-insight-design="c"]) .coverageSplit button:last-child { border-color: rgb(var(--insight-hue3-mid)); }
+:global([data-insight-design="c"]) .coverageSplit span { font-size: 11px; }
+:global([data-insight-design="c"]) .kpiCoverageHero > p { color: rgb(var(--insight-muted)); font-size: 11px; }
+:global([data-insight-design="c"]) .kpiAverages { padding: 22px 0; }
+:global([data-insight-design="c"]) .kpiAverages strong { font-weight: 600; }
+:global([data-insight-design="c"]) .kpiAverages > p { font-size: 11px; }
+:global([data-insight-design="c"]) .kpiOrderPreview { padding: 16px 0; border: 0; border-top: 1px solid rgb(var(--insight-rule)); border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .kpiPreviewRow { min-height: 72px; }
+:global([data-insight-design="c"]) .kpiPreviewRow strong { font-size: 12px; }
+:global([data-insight-design="c"]) .kpiPreviewRow small { font-size: 11px; }
+:global([data-insight-design="c"]) .kpiCountBadge { font-size: 11px; }
+:global([data-insight-design="c"]) .primaryAction { min-height: 50px; border-radius: 12px; background: rgb(var(--insight-secondary)); font-size: 14px !important; }
+:global([data-insight-design="c"]) .monthlyKpiTarget > span { font-size: 12px; flex-wrap: wrap; }
+:global([data-insight-design="c"]) .monthlyKpiTarget strong { font-size: 12px; }
+:global([data-insight-design="c"]) .productDetails { font-size: 12px; }
+:global([data-insight-design="c"]) .productDetails summary { min-height: 50px; }
+:global([data-insight-design="c"]) .kpiListSummary { padding: 18px 0; border: 0; border-bottom: 1px solid rgb(var(--insight-rule)); border-radius: 0; background: transparent; }
+:global([data-insight-design="c"]) .kpiListSummary strong { font-weight: 600; }
+:global([data-insight-design="c"]) .previewNote { font-size: 10px; }
+@media (max-width: 360px) {
+  :global([data-insight-design="c"]) .main { padding-left: 20px; padding-right: 20px; }
+  :global([data-insight-design="c"]) .main h1 { font-size: 30px; }
+  :global([data-insight-design="c"]) .periodRow select { max-width: 195px; font-size: 12px; }
+  :global([data-insight-design="c"]) .heroNumber { font-size: 40px; }
+  :global([data-insight-design="c"]) .salesHero { padding: 17px 16px; }
+  :global([data-insight-design="c"]) .salesLabel { gap: 9px; font-size: 15px; }
+  :global([data-insight-design="c"]) .metricCaption { font-size: 16px; }
+  :global([data-insight-design="c"]) .teamSummary strong,
+  :global([data-insight-design="c"]) .summaryStrip strong,
+  :global([data-insight-design="c"]) .fairCard .summaryStrip strong { font-size: 17px; }
+  :global([data-insight-design="c"]) .memberMetrics strong { font-size: 16px; }
+  :global([data-insight-design="c"]) .orderMetrics strong { font-size: 14px; }
+  :global([data-insight-design="c"]) .boardAmount { font-size: 12px; }
+  :global([data-insight-design="c"]) .orderHeroMetrics strong { font-size: 17px; }
+}

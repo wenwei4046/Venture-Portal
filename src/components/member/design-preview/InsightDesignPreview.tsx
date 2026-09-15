@@ -2,16 +2,19 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon, initials } from "../MemberUI";
-import { fairs, people, getPerson, getFair, selectOrders, summarize, summarizeKpi, venueRanking, marginImpact, tierLabels, type InsightOrder, type InsightPeriod, type InsightTier } from "./insight-model";
+import { fairs, people, brands, getPerson, getFair, selectOrders, summarize, summarizeBrandMargins, summarizeKpi, venueRanking, marginImpact, tierLabels, type InsightOrder, type InsightPeriod, type InsightTier } from "./insight-model";
 import shell from "./InsightShell.module.css";
 import theme from "./InsightTheme.module.css";
 import s from "./InsightDesignPreview.module.css";
 import QuickInsightDialog from "./QuickInsightDialog";
+import { RevenuePreviewHeader, RevenuePreviewNav } from "./RevenuePreviewChrome";
+import motion from "./ArenaMotion.module.css";
+import { BrandMarginList } from "./BrandMarginList";
 
 type Screen = "insight" | "insight-member" | "insight-orders" | "insight-order" | "insight-fairs" | "insight-venue" | "insight-target" | "insight-kpi";
-type Route = { screen: Screen; scope: "personal" | "team"; person: string; period: InsightPeriod; fair: string; category: string; tier: InsightTier | "all"; query: string; order: string; lens: "sales" | "margin" | "kpi"; quantity: string };
+type Route = { screen: Screen; scope: "personal" | "team"; person: string; period: InsightPeriod; fair: string; brand: string; tier: InsightTier | "all"; query: string; order: string; lens: "sales" | "margin" | "kpi"; quantity: string };
 const screens: Screen[] = ["insight", "insight-member", "insight-orders", "insight-order", "insight-fairs", "insight-venue", "insight-target", "insight-kpi"];
-const defaults: Route = { screen: "insight", scope: "personal", person: "jia", period: "month", fair: "all", category: "all", tier: "all", query: "", order: "", lens: "margin", quantity: "any" };
+const defaults: Route = { screen: "insight", scope: "personal", person: "jia", period: "month", fair: "all", brand: "all", tier: "all", query: "", order: "", lens: "margin", quantity: "any" };
 const money = (value: number) => `RM ${new Intl.NumberFormat("en-MY", { maximumFractionDigits: 0 }).format(value)}`;
 const percent = (value: number | null) => value === null ? "—" : `${value.toFixed(1)}%`;
 const dateLabel = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -25,7 +28,7 @@ function readRoute(): Route {
   return { screen: screens.includes(p.get("view") as Screen) ? p.get("view") as Screen : "insight",
     scope: p.get("scope") === "team" ? "team" : "personal", person: people.some(person => person.id === p.get("person")) ? p.get("person")! : "jia",
     period: p.get("period") === "last-week" ? "last-week" : "month", fair: fairs.some(fair => fair.id === p.get("fair")) ? p.get("fair")! : "all",
-    category: ["Bedroom", "Living", "Dining"].includes(p.get("category") ?? "") ? p.get("category")! : "all",
+    brand: brands.includes(p.get("brand") ?? "") ? p.get("brand")! : "all",
     tier: tiers.includes(p.get("tier") as InsightTier) ? p.get("tier") as InsightTier : "all", query: p.get("query") ?? "", order: p.get("order") ?? "",
     lens: p.get("lens") === "kpi" ? "kpi" : p.get("lens") === "sales" ? "sales" : "margin", quantity: /^(0|[1-9]\d{0,2})$/.test(p.get("quantity") ?? "") ? p.get("quantity")! : "any" };
 }
@@ -43,7 +46,7 @@ function KpiQuantityFilter({ value, max, onChange }: { value: string; max: numbe
   return <div className={s.quantityField}><span>KPI quantity</span><div className={s.quantityStepper} role="group" aria-label="KPI quantity filter"><button aria-label="Decrease KPI quantity" disabled={value === "0"} onClick={() => onChange(value === "any" ? "0" : String(Number(value) - 1))}>−</button><span aria-label="KPI item quantity" aria-live="polite">{value === "any" ? "Any" : value}</span><button aria-label="Increase KPI quantity" disabled={value !== "any" && Number(value) >= max} onClick={() => onChange(value === "any" ? "1" : String(Number(value) + 1))}>+</button></div></div>;
 }
 
-export default function InsightDesignPreview({ design }: { design: "a" | "b" }) {
+export default function InsightDesignPreview({ design }: { design: "a" | "b" | "c" }) {
   const [route, setRoute] = useState<Route>(defaults);
   const [quickInsight, setQuickInsight] = useState<{ personId?: string } | null>(null);
   const heading = useRef<HTMLElement>(null);
@@ -58,7 +61,8 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
     const next = { ...route, ...change };
     const url = new URL(window.location.href);
     url.searchParams.set("view", next.screen);
-    for (const key of ["scope", "person", "period", "fair", "category", "tier", "query", "order", "lens", "quantity"] as const) {
+    url.searchParams.delete("category");
+    for (const key of ["scope", "person", "period", "fair", "brand", "tier", "query", "order", "lens", "quantity"] as const) {
       if (next[key] === defaults[key]) url.searchParams.delete(key); else url.searchParams.set(key, next[key]);
     }
     window.history[replace ? "replaceState" : "pushState"](window.history.state, "", url);
@@ -76,18 +80,18 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
   const currentFair = getFair(route.fair);
   const impact = marginImpact(baseOrders);
   const selectedOrder = baseOrders.find(order => order.id === route.order);
-  const openOrders = (change: Partial<Route> = {}) => go({ screen: "insight-orders", category: "all", tier: "all", query: "", order: "", lens: "margin", quantity: "any", ...change });
+  const openOrders = (change: Partial<Route> = {}) => go({ screen: "insight-orders", brand: "all", tier: "all", query: "", order: "", lens: "margin", quantity: "any", ...change });
   const openKpiOrders = (quantity = "any") => openOrders({ lens: "kpi", quantity });
-  const openMember = (id: string) => go({ screen: "insight-member", scope: "team", person: id, category: "all", tier: "all", query: "", lens: "margin", quantity: "any" });
+  const openMember = (id: string) => go({ screen: "insight-member", scope: "team", person: id, brand: "all", tier: "all", query: "", lens: "margin", quantity: "any" });
   const openOrder = (order: InsightOrder) => go({ screen: "insight-order", person: order.staffId, order: order.id });
   const home = () => go({ ...defaults, period: route.period, scope: route.scope });
   function back() {
     if (route.screen === "insight-order") go({ screen: "insight-orders", order: "" });
     else if (route.screen === "insight-venue") go({ screen: "insight-fairs", fair: "all" });
-    else if (route.screen === "insight-orders" && route.lens === "sales") go({ screen: "insight-target", category: "all", tier: "all", query: "", quantity: "any" });
-    else if (route.screen === "insight-orders" && route.lens === "kpi") go({ screen: "insight-kpi", category: "all", tier: "all", query: "", quantity: "any" });
+    else if (route.screen === "insight-orders" && route.lens === "sales") go({ screen: "insight-target", brand: "all", tier: "all", query: "", quantity: "any" });
+    else if (route.screen === "insight-orders" && route.lens === "kpi") go({ screen: "insight-kpi", brand: "all", tier: "all", query: "", quantity: "any" });
     else if (route.screen === "insight-target" && route.lens === "kpi") go({ screen: "insight-kpi" });
-    else if (["insight-orders", "insight-target", "insight-kpi"].includes(route.screen)) go({ screen: isTeam ? "insight-member" : "insight", category: "all", tier: "all", query: "", lens: "margin", quantity: "any" });
+    else if (["insight-orders", "insight-target", "insight-kpi"].includes(route.screen)) go({ screen: isTeam ? "insight-member" : "insight", brand: "all", tier: "all", query: "", lens: "margin", quantity: "any" });
     else home();
   }
   function FairSelect({ label = "Fair / venue" }: { label?: string }) {
@@ -104,16 +108,16 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
     return <>
       <div className={s.overviewLabel}><span>PERFORMANCE OVERVIEW</span><span>{currentFair ? "Selected fair" : "All venues"}</span></div>
       <section className={s.salesHero} aria-label={`${person.name} sales performance`}>
-        <div className={s.heroTop}><span>{isTeam ? `${person.name.split(" ")[0]}’s sales` : "Your sales"}</span><span>{total.orderCount} orders</span></div>
+        <div className={s.heroTop}><span className={s.salesLabel}>{design === "c" && <span className={s.heroIcon}><Icon name="chart" size={28} /></span>}{isTeam ? `${person.name.split(" ")[0]}’s sales` : "Your sales"}</span><span>{total.orderCount} orders</span></div>
         <div className={s.heroNumber}><span>RM</span>{new Intl.NumberFormat("en-MY").format(total.sales)}</div>
         <button className={s.targetButton} onClick={() => go({ screen: "insight-target", lens: "sales" })}>
           <span>{route.period === "month" ? `${Math.round(monthly.sales / person.target * 100)}% of monthly target` : `${money(monthly.sales)} this month`}<strong>{money(person.target)} <Icon name="chevron" size={13} /></strong></span>
           <Progress value={monthly.sales} target={person.target} label="Monthly sales target" />
         </button>
       </section>
-      <div className={s.metricGrid}>
-        <button className={s.metricCard} data-color="clay" onClick={() => openOrders()}><span>Blended margin <Icon name="arrow" size={17} /></span><strong>{percent(total.margin)}</strong><small>{total.unknownMarginCount ? `${total.unknownMarginCount} order awaiting margin` : "See orders by tier"}</small></button>
-        <button className={s.metricCard} data-color="olive" onClick={() => go({ screen: "insight-kpi", lens: "kpi", quantity: "any" })}><span>KPI items <Icon name="arrow" size={17} /></span><strong>{total.kpi}<em> sold</em></strong><small>Order coverage & averages</small></button>
+      <BrandMarginList rows={summarizeBrandMargins(baseOrders)} onSelectBrand={brand => openOrders({ brand })} />
+      <div className={`${s.metricGrid} ${s.singleMetric}`}>
+        <button className={s.metricCard} data-color="olive" onClick={() => go({ screen: "insight-kpi", lens: "kpi", quantity: "any" })}><span>{design === "c" && <span className={s.metricIcon}><Icon name="receipt" size={28} /></span>}<span className={s.metricCaption}>KPI items</span><Icon name="arrow" size={17} /></span><strong>{total.kpi}<em> sold</em></strong><small>Order coverage & averages</small></button>
       </div>
       <SectionHead title="Behind the numbers" />
       <button className={s.entry} onClick={() => go({ screen: "insight-fairs", fair: "all" })}><span className={s.entryIcon}><Icon name="map" /></span><span><strong>Performance by venue</strong><small>Fair, organizer & your place</small></span><Icon name="chevron" size={18} /></button>
@@ -158,23 +162,24 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
     const hasQuantity = kpiLens || salesLens;
     title = salesLens ? "All sales orders" : kpiLens ? "KPI sales orders" : "Sales orders";
     subtitle = `${person.name} · ${salesLens ? "Sales, margin & KPI in one view" : kpiLens ? "Every qualifying item, by order" : "Follow the margin"}`;
-    const filtered = selectOrders({ personId: person.id, period: route.period, fairId: route.fair === "all" ? undefined : route.fair, category: route.category, tier: kpiLens ? "all" : route.tier, query: route.query,
+    const filtered = selectOrders({ personId: person.id, period: route.period, fairId: route.fair === "all" ? undefined : route.fair, brand: route.brand, tier: kpiLens ? "all" : route.tier, query: route.query,
       kpiQuantity: hasQuantity && route.quantity !== "any" ? Number(route.quantity) : undefined, kpiOnly: kpiLens && route.quantity === "any" });
     const stats = summarize(filtered);
+    const summaryMargin = stats.margin === null ? "—" : route.brand === "all" ? percent(stats.margin) : `${stats.margin.toFixed(2)}%`;
     const kpiStats = summarizeKpi(filtered);
     const quantityMax = Math.max(3, ...baseOrders.map(order => order.kpi), route.quantity === "any" ? 0 : Number(route.quantity));
     content = <>
-      {kpiLens ? <section className={s.kpiListSummary} aria-label="Matching KPI orders"><span><small>Orders</small><strong>{kpiStats.orderCount}</strong></span><span><small>KPI items</small><strong>{kpiStats.items}</strong></span><span><small>Avg / match</small><strong>{average(kpiStats.averagePerOrder)}</strong></span></section> : <div className={s.summaryStrip}><span><small>Sales</small><strong>{money(stats.sales)}</strong></span><span><small>Margin</small><strong>{percent(stats.margin)}</strong></span><span><small>KPI items</small><strong>{stats.kpi}</strong></span></div>}
+      {kpiLens ? <section className={s.kpiListSummary} aria-label="Matching KPI orders"><span><small>Orders</small><strong>{kpiStats.orderCount}</strong></span><span><small>KPI items</small><strong>{kpiStats.items}</strong></span><span><small>Avg / match</small><strong>{average(kpiStats.averagePerOrder)}</strong></span></section> : <div className={s.summaryStrip}><span><small>Sales</small><strong>{money(stats.sales)}</strong></span><span><small>Margin</small><strong>{summaryMargin}</strong></span><span><small>KPI items</small><strong>{stats.kpi}</strong></span></div>}
       <label className={s.search}><Icon name="search" size={19} /><input aria-label="Search sales orders" placeholder="Search order number or brand" value={route.query} onChange={event => go({ query: event.target.value }, true)} />{route.query && <button aria-label="Clear search" onClick={() => go({ query: "" }, true)}><Icon name="close" size={16} /></button>}</label>
-      <div className={s.filters}><label className={s.selectField}><span>Category</span><select aria-label="Order category" value={route.category} onChange={event => go({ category: event.target.value }, true)}><option value="all">All categories</option>{["Bedroom", "Living", "Dining"].map(category => <option key={category}>{category}</option>)}</select></label>{kpiLens ? <KpiQuantityFilter value={route.quantity} max={quantityMax} onChange={quantity => go({ quantity }, true)} /> : <label className={s.selectField}><span>Margin tier</span><select aria-label="Margin tier" value={route.tier} onChange={event => go({ tier: event.target.value as Route["tier"] }, true)}>{tiers.map(tier => <option key={tier} value={tier}>{tier === "all" ? "All tiers" : tierLabels[tier]}</option>)}</select></label>}</div>
+      <div className={s.filters}><label className={s.selectField}><span>Brand</span><select aria-label="Order brand" value={route.brand} onChange={event => go({ brand: event.target.value }, true)}><option value="all">All brands</option>{brands.map(brand => <option key={brand}>{brand}</option>)}</select></label>{kpiLens ? <KpiQuantityFilter value={route.quantity} max={quantityMax} onChange={quantity => go({ quantity }, true)} /> : <label className={s.selectField}><span>Margin tier</span><select aria-label="Margin tier" value={route.tier} onChange={event => go({ tier: event.target.value as Route["tier"] }, true)}>{tiers.map(tier => <option key={tier} value={tier}>{tier === "all" ? "All tiers" : tierLabels[tier]}</option>)}</select></label>}</div>
       {salesLens && <div className={s.combinedQuantity}><KpiQuantityFilter value={route.quantity} max={quantityMax} onChange={quantity => go({ quantity }, true)} /></div>}
       {hasQuantity && <div className={s.quantityHelp}><span>{route.quantity === "any" ? salesLens ? "Any quantity includes orders without KPI" : "Any = at least 1 KPI item per order" : route.quantity === "0" ? "Orders without a KPI item" : `Exactly ${route.quantity} KPI ${route.quantity === "1" ? "item" : "items"} per order`}</span>{route.quantity !== "any" && <button onClick={() => go({ quantity: "any" }, true)}>Any quantity</button>}</div>}
       <FairSelect />
       {currentFair && <p className={s.selectedFairNote}>{currentFair.venue} · {currentFair.organizer} · {currentFair.label}</p>}
       <div className={s.resultCount} role="status">{filtered.length} {filtered.length === 1 ? "order" : "orders"}{kpiLens ? ` · ${route.quantity === "0" ? "without KPI" : "with KPI"}` : stats.unknownMarginCount > 0 ? ` · ${stats.unknownMarginCount} missing margin` : ""}</div>
-      {(["Bedroom", "Living", "Dining"] as const).filter(category => filtered.some(order => order.category === category)).map(category => {
-        const group = filtered.filter(order => order.category === category);
-        return <section className={s.orderGroup} key={category}><SectionHead title={category} aside={<span>{group.length} {group.length === 1 ? "order" : "orders"}</span>} /><div className={s.orderList}>{group.map(order => <button key={order.id} className={s.orderCard} onClick={() => openOrder(order)}>
+      {brands.filter(brand => filtered.some(order => order.brand === brand)).map(brand => {
+        const group = filtered.filter(order => order.brand === brand);
+        return <section className={s.orderGroup} key={brand}><SectionHead title={brand} aside={<span>{group.length} {group.length === 1 ? "order" : "orders"}</span>} /><div className={s.orderList}>{group.map(order => <button key={order.id} className={s.orderCard} onClick={() => openOrder(order)}>
           <div className={s.orderTop}><strong>{order.number}</strong>{kpiLens ? <span className={s.kpiCountBadge} data-zero={order.kpi === 0}>{order.kpi === 0 ? "No KPI" : `${order.kpi} KPI ${order.kpi === 1 ? "item" : "items"}`}</span> : <Badge tier={order.tier} />}</div>
           <p>{order.brand} · {dateLabel(order.date)}<Icon name="chevron" size={16} /></p>
           {kpiLens && <div className={s.qualifyingItems}>{order.kpi ? order.items.filter(item => item.kpi).map((item, index) => <div key={index}><Icon name="check" size={14} /><span>{item.name}</span><strong>×{item.qty}</strong></div>) : <span>No qualifying items on this order</span>}</div>}
@@ -182,7 +187,7 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
           <div className={s.commissionLine}><span className={s.status} data-status={order.commissionStatus}>{statusLabels[order.commissionStatus]}</span><span>Commission <strong>{order.commission === null ? "Pending calculation" : money(order.commission)}</strong></span></div>
         </button>)}</div></section>;
       })}
-      {!filtered.length && <Empty title="No matching orders">{salesLens ? "Try another category, margin tier, KPI quantity or venue." : kpiLens ? "Try another quantity, category or fair." : "Try another category, tier or fair."}<button onClick={() => go({ category: "all", tier: "all", query: "", fair: "all", quantity: "any" }, true)}>Clear filters</button></Empty>}
+      {!filtered.length && <Empty title="No matching orders">{salesLens ? "Try another brand, margin tier, KPI quantity or venue." : kpiLens ? "Try another quantity, brand or fair." : "Try another brand, tier or fair."}<button onClick={() => go({ brand: "all", tier: "all", query: "", fair: "all", quantity: "any" }, true)}>Clear filters</button></Empty>}
       <p className={s.footnote}>{kpiLens ? "Quantity counts qualifying KPI items on each order. Avg / match uses only the orders matching your filters." : "Margin is weighted by sales amount. Orders without margin data are excluded from the margin calculation."}</p>
     </>;
   } else if (route.screen === "insight-order") {
@@ -193,7 +198,7 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
       const comparisonOrders = selectOrders({ personId: person.id, period: route.period, fairId: route.fair === "all" ? undefined : route.fair });
       const all = summarize(comparisonOrders), without = summarize(comparisonOrders.filter(item => item.id !== order.id));
       content = <>
-        <section className={s.orderHero}><div className={s.heroTop}><span>{order.category} · {order.brand}</span><Badge tier={order.tier} /></div><small>Sales amount</small><strong>{money(order.sales)}</strong><div className={s.orderHeroMetrics}><span><small>Order margin</small><strong>{percent(order.margin)}</strong></span><span><small>KPI items</small><strong>{order.kpi}</strong></span><span><small>Order date</small><strong>{dateLabel(order.date)}</strong></span></div></section>
+        <section className={s.orderHero}><div className={s.heroTop}><span>{order.brand}</span><Badge tier={order.tier} /></div><small>Sales amount</small><strong>{money(order.sales)}</strong><div className={s.orderHeroMetrics}><span><small>Order margin</small><strong>{percent(order.margin)}</strong></span><span><small>KPI items</small><strong>{order.kpi}</strong></span><span><small>Order date</small><strong>{dateLabel(order.date)}</strong></span></div></section>
         <section className={s.panel}><SectionHead title="Commission" aside={<span className={s.status} data-status={order.commissionStatus}>{statusLabels[order.commissionStatus]}</span>} /><p className={s.commissionAmount}>{order.commission === null ? "Pending calculation" : money(order.commission)}</p><p className={s.muted}>{order.commissionNote ?? (order.commissionStatus === "paid" ? "Payment has been released for this order." : order.commissionStatus === "settled" ? "Settlement confirmed. Awaiting payment release." : order.commissionStatus === "pending" ? "Awaiting eligibility confirmation before commission is finalized." : "An estimate until eligibility and settlement are confirmed.")}</p></section>
         {order.tier === "low" && order.margin !== null && all.margin !== null && without.margin !== null && <section className={s.analysisPanel}>
           <div className={s.analysisLabel}><Icon name="search" size={18} />FOR YOUR SALES MEETING</div>
@@ -256,7 +261,7 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
         <p>With KPI = at least 1 qualifying item on an order.</p>
       </section>
       <section className={s.kpiAverages} aria-label="KPI order averages"><div><span><small>KPI items sold</small><strong>{kpi.items}</strong></span><span><small>Avg KPI / order</small><strong>{average(kpi.averagePerOrder)}</strong></span><span><small>Avg sale / order</small><strong>{kpi.averageSalesPerOrder === null ? "—" : money(kpi.averageSalesPerOrder)}</strong></span></div><p>Averages include all {kpi.orderCount} orders, including those without KPI.</p></section>
-      <section className={s.kpiOrderPreview} aria-label="Recent orders with KPI"><SectionHead title="Orders with KPI" aside={<span>Latest {Math.min(2, qualifying.length)} of {qualifying.length}</span>} />{qualifying.slice(0, 2).map(order => <button key={order.id} className={s.kpiPreviewRow} onClick={() => { go({ screen: "insight-order", lens: "kpi", quantity: "any", order: order.id, category: "all", tier: "all", query: "" }); }}><Icon name="receipt" size={18} /><span><strong>{order.number}</strong><small>{order.category} · {dateLabel(order.date)}</small></span><span className={s.kpiCountBadge}>{order.kpi} KPI {order.kpi === 1 ? "item" : "items"}</span><Icon name="chevron" size={14} /></button>)}{!qualifying.length && <p className={s.muted}>{kpi.orderCount ? "These orders have no KPI items yet." : "No orders in this period."}</p>}<button className={s.primaryAction} onClick={() => openKpiOrders()}>View sales orders <Icon name="arrow" size={18} /></button></section>
+      <section className={s.kpiOrderPreview} aria-label="Recent orders with KPI"><SectionHead title="Orders with KPI" aside={<span>Latest {Math.min(2, qualifying.length)} of {qualifying.length}</span>} />{qualifying.slice(0, 2).map(order => <button key={order.id} className={s.kpiPreviewRow} onClick={() => { go({ screen: "insight-order", lens: "kpi", quantity: "any", order: order.id, brand: "all", tier: "all", query: "" }); }}><Icon name="receipt" size={18} /><span><strong>{order.number}</strong><small>{order.brand} · {dateLabel(order.date)}</small></span><span className={s.kpiCountBadge}>{order.kpi} KPI {order.kpi === 1 ? "item" : "items"}</span><Icon name="chevron" size={14} /></button>)}{!qualifying.length && <p className={s.muted}>{kpi.orderCount ? "These orders have no KPI items yet." : "No orders in this period."}</p>}<button className={s.primaryAction} onClick={() => openKpiOrders()}>View sales orders <Icon name="arrow" size={18} /></button></section>
       <button className={s.monthlyKpiTarget} onClick={() => go({ screen: "insight-target", lens: "kpi" })}><Icon name="target" size={18} /><span>Monthly KPI target<strong>{monthly.kpi} / {person.kpiTarget} items</strong></span><Icon name="chevron" size={17} /></button>
       <details className={s.productDetails}><summary>Product breakdown<span>{items.size} {items.size === 1 ? "product" : "products"}</span></summary>{[...items].map(([name, qty]) => <div className={s.itemRow} key={name}><span>{name}</span><strong>{qty} sold</strong></div>)}{!items.size && <p>No KPI items sold in this view.</p>}</details>
     </>;
@@ -264,9 +269,9 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
   const showPeriod = !["insight-order", "insight-target", "insight-venue"].includes(route.screen);
   const backLabel = route.screen === "insight-order" ? route.lens === "kpi" ? "KPI sales orders" : route.lens === "sales" ? "All sales orders" : "Sales orders"
     : route.screen === "insight-venue" ? "Venues" : route.screen === "insight-orders" ? route.lens === "kpi" ? "KPI items" : route.lens === "sales" ? "Sales overview" : "Insight" : "Insight";
-  return <div className={`${theme.theme} ${shell.app} ${s.app}`} data-insight-design={design}>
-    <header className={shell.appHeader}><a className={shell.wordmark} href={`/member/preview?design=${design}&view=insight`} aria-label="Revenue Insight home">HOUZS<span>REVENUE</span></a><div className={s.headerMeta}><span>Fair</span><a className={s.headerAvatar} aria-label="Open profile" href="/member/preview?page=account">JE</a></div></header>
-    <main className={s.main} ref={heading} tabIndex={-1}>
+  return <div className={`${theme.theme} ${shell.app} ${s.app} ${motion.shell}`} data-insight-design={design} data-arena-design={design}>
+    <RevenuePreviewHeader design={design} />
+    <main key={`${route.screen}:${route.scope}:${route.person}:${route.order}`} className={`${s.main} ${motion.page}`} ref={heading} tabIndex={-1} data-insight-home={isHome || undefined}>
       {!isHome && <button className={s.back} onClick={back}><Icon name="back" size={18} />{backLabel}</button>}
       <div className={s.pageHeading}><div>{isHome && <p className={s.eyebrow}>SEE WHAT MOVES YOU FORWARD</p>}<h1>{title}</h1><p>{subtitle}</p></div>{(isHome && !isTeam || route.screen === "insight-member") ? <button className={s.quickInsightTrigger} aria-label={`Open ${person.name} quick insight`} title="Monthly quick insight" onClick={() => setQuickInsight({ personId: person.id })}><CommentIcon /><span>Insight</span></button> : isHome && <span className={s.headingIcon}><Icon name="chart" size={25} /></span>}</div>
       {isHome && <div className={s.scopeTabs} role="group" aria-label="Performance perspective"><button aria-pressed={!isTeam} onClick={() => go({ ...defaults, period: route.period, scope: "personal" })}><Icon name="user" size={17} />Personal</button><button aria-pressed={isTeam} onClick={() => go({ ...defaults, period: route.period, scope: "team" })}><Icon name="team" size={17} />Team</button></div>}
@@ -275,10 +280,10 @@ export default function InsightDesignPreview({ design }: { design: "a" | "b" }) 
       {content}
       <p className={s.previewNote}>Design preview · Illustrative performance data</p>
     </main>
-    <nav className={shell.bottomNav} aria-label="Mobile navigation"><a href="/member/preview?page=today"><Icon name="home" /><span>Today</span></a><button aria-current="page" onClick={home}><Icon name="chart" /><span>Insight</span></button><a href="/member/preview?page=quote"><Icon name="calculator" /><span>Quote</span></a><a href={`/member/preview?design=${design}&view=arena`}><Icon name="trophy" /><span>Arena</span></a><a href="/member/preview?page=account"><Icon name="user" /><span>Profile</span></a></nav>
+    <RevenuePreviewNav design={design} active="insight" onSelect={{ insight: home }} />
     {quickInsight && <QuickInsightDialog personId={quickInsight.personId} onClose={() => setQuickInsight(null)}
-      onOrder={order => go({ screen: "insight-order", person: order.staffId, scope: order.staffId === "jia" ? "personal" : "team", period: "month", fair: "all", lens: "margin", tier: "all", category: "all", quantity: "any", query: "", order: order.id })}
-      onMember={personId => go({ screen: "insight-member", person: personId, scope: personId === "jia" ? "personal" : "team", period: "month", fair: "all", lens: "margin", tier: "all", category: "all", quantity: "any", query: "", order: "" })}
+      onOrder={order => go({ screen: "insight-order", person: order.staffId, scope: order.staffId === "jia" ? "personal" : "team", period: "month", fair: "all", lens: "margin", tier: "all", brand: "all", quantity: "any", query: "", order: order.id })}
+      onMember={personId => go({ screen: "insight-member", person: personId, scope: personId === "jia" ? "personal" : "team", period: "month", fair: "all", lens: "margin", tier: "all", brand: "all", quantity: "any", query: "", order: "" })}
       onLowMargin={personId => openOrders({ person: personId, scope: personId === "jia" ? "personal" : "team", period: "month", fair: "all", tier: "low" })} />}
   </div>;
 }

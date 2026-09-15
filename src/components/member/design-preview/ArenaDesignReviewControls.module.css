@@ -1,0 +1,11 @@
+.options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; background: rgb(var(--arena-surface)); border: 1px solid rgb(var(--arena-rule)); border-radius: 18px; }
+.options button { min-height: 40px; padding: 9px 7px; border: 0; border-radius: 13px; background: transparent; color: rgb(var(--arena-muted)); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+.options button[aria-pressed="true"] { color: rgb(var(--arena-on-primary)); background: rgb(var(--arena-secondary)); }
+.deviceControl { display: flex; flex: 0 0 auto; justify-content: space-between; align-items: center; gap: 12px; width: 100%; max-width: 430px; margin: 0 auto 10px; font-size: 11px; color: rgb(var(--arena-muted)); }
+.deviceControl select { font: inherit; font-size: 12px; min-height: 40px; max-width: 180px; padding: 8px 11px; border: 1px solid rgb(var(--arena-rule)); border-radius: 12px; background: rgb(var(--arena-surface)); color: rgb(var(--arena-ink)); cursor: pointer; }
+.reviewLayout { display: flex; flex-direction: column; height: 100dvh; min-height: 640px; box-sizing: border-box; }
+.reviewLayout > header, .reviewLayout > footer { flex: 0 0 auto; }
+.reviewLayout[data-preview-scale="actual"] { height: auto; min-height: 100dvh; }
+.scaleControl { display: flex; gap: 3px; padding: 3px; border-radius: 13px; background: rgb(var(--arena-surface)); border: 1px solid rgb(var(--arena-rule)); }
+.scaleControl button { min-height: 32px; padding: 5px 11px; border-radius: 9px; color: rgb(var(--arena-muted)); font-size: 11px; font-weight: 500; }
+.scaleControl button[aria-pressed="true"] { background: rgb(var(--arena-hue0-light)); color: rgb(var(--arena-primary)); }

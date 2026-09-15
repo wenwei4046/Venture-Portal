@@ -51,3 +51,6 @@ describe("Workspace back navigation", () => {
     expect(screen.queryByRole("button", { name: /^Back/ })).not.toBeInTheDocument();
   });
 });
+
+vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({ fetchMemberKpiSummary: vi.fn().mockResolvedValue({ ok: false, error: "KPI unavailable in this navigation test" }) }));
+vi.mock("@/app/(member)/member/arena-actions", () => ({ fetchMemberArena: vi.fn().mockResolvedValue({ ok: false, error: "Arena unavailable in this navigation test" }), saveMemberArenaBrandWeeks: vi.fn() }));

@@ -3,15 +3,15 @@
 /**
  * Insight — how am I doing, right now.
  *
- * Three screens over one snapshot: MY SALES (own numbers against the gate
- * ahead), RANKING (the whole department, split by sub-department) and
- * DOWNLINE (each leg of the caller's own team). Everything it shows is read
+ * Personal and Team share one authorised snapshot. Own-order filters and the
+ * existing department board are drilldowns; the team's order-level facts are
+ * never invented from aggregate rows. Everything it shows is read
  * from committed orders rather than from the month's statement, so the
  * heading says "estimate" everywhere and never "commission": the run decides
  * pay, this page only says where the month stands.
  */
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   blendedMargin,
   daysSince,
@@ -35,14 +35,17 @@ import type {
   MemberScore,
 } from "@/lib/member/types";
 import { Empty, Icon, Pill, date, fmt, initials } from "./MemberUI";
-import s from "./member.module.css";
+import base from "./member.module.css";
+import live from "./MemberLiveInsight.module.css";
+import { LiveBrandMarginList, hasCompleteLiveOrders, summarizeLiveBrandMargins } from "./LiveBrandMarginList";
+
+const s = { ...base, ...live };
 
 type InsightView = "sales" | "ranking" | "downline";
 
 const views: { id: InsightView; icon: string; label: string }[] = [
-  { id: "sales", icon: "chart", label: "My sales" },
-  { id: "ranking", icon: "trophy", label: "Ranking" },
-  { id: "downline", icon: "branch", label: "Downline" },
+  { id: "sales", icon: "chart", label: "Personal" },
+  { id: "downline", icon: "branch", label: "Team" },
 ];
 
 const pct = (value: number | null) => (value === null ? "—" : `${value.toFixed(1)}%`);
@@ -58,6 +61,10 @@ export default function MemberInsightPanel({
   error,
   onRefresh,
   onDialog,
+  initialScreen = "overview",
+  initialBrand = "all",
+  onPeriodChange,
+  onScreenChange,
 }: {
   insight: MemberInsight | null;
   membershipId: string;
@@ -67,11 +74,22 @@ export default function MemberInsightPanel({
   error: string | null;
   onRefresh: () => void;
   onDialog: (dialog: { title: string; content: ReactNode }) => void;
+  initialScreen?: "overview" | "orders";
+  initialBrand?: string;
+  onPeriodChange?: (period: string) => void;
+  onScreenChange?: (screen: "overview" | "orders", brand?: string) => void;
 }) {
   const [view, setView] = useState<InsightView>("sales");
+  const [screen, setScreen] = useState(initialScreen);
+  const [brand, setBrand] = useState(initialBrand);
+  const [query, setQuery] = useState("");
+  const [deposit, setDeposit] = useState("all");
+  const [kpi, setKpi] = useState("all");
+  const [marginFilter, setMarginFilter] = useState("all");
+  const [groupBy, setGroupBy] = useState("brand");
   const [boardId, setBoardId] = useState("");
   const block: MemberInsightBlock | undefined =
-    insight?.blocks.find((b) => b.membershipId === membershipId) ?? insight?.blocks[0];
+    insight?.blocks.find((b) => b.membershipId === membershipId);
 
   const money = (value: number | null | undefined) =>
     privateMode ? "••••••" : value == null ? "—" : fmt(value);
@@ -81,29 +99,6 @@ export default function MemberInsightPanel({
       : `RM ${new Intl.NumberFormat("en-MY", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`;
 
   const me = block?.me;
-  const margin = me ? blendedMargin(me) : null;
-  const marginBandTone = useMemo(() => {
-    if (!block || margin === null) return "neutral";
-    const brand = block.orders[0]?.brand;
-    const level = marginLevels(
-      [
-        {
-          id: "blended",
-          number: "",
-          brand: brand ?? "",
-          revenue: me?.marginRevenue ?? 0,
-          margin,
-          date: "",
-          manual: false,
-          cleared: true,
-          kpiQty: 0,
-          carried: false,
-        },
-      ],
-      bands,
-    )[0];
-    return level?.tone ?? "neutral";
-  }, [block, margin, me, bands]);
 
   if (error)
     return (
@@ -144,6 +139,39 @@ export default function MemberInsightPanel({
   const branches = downlineBranches(block.downline);
   const teamTotal = totalScore(block.downline);
   const boardMedian = medianSales(board?.rows ?? []);
+  const completeOrders = hasCompleteLiveOrders(block);
+  const brands = [...new Set(block.orders.map((order) => order.brand))].sort((a, b) => a.localeCompare(b));
+  const selectedOrders = block.orders.filter((order) => {
+    if (brand !== "all" && order.brand !== brand) return false;
+    if (query.trim() && !`${order.number} ${order.brand}`.toLowerCase().includes(query.trim().toLowerCase())) return false;
+    if (deposit === "cleared" && !order.cleared || deposit === "held" && order.cleared) return false;
+    if (kpi === "with" && order.kpiQty <= 0 || kpi === "without" && order.kpiQty > 0) return false;
+    const band = marginLevels([order], bands)[0];
+    return marginFilter === "all" ||
+      marginFilter === "pending" && order.margin === null ||
+      marginFilter === "penalty" && band.multiplier < 1 ||
+      marginFilter === "threshold" && band.tone === "good";
+  });
+  const clearedSelection = selectedOrders.filter((order) => order.cleared);
+  const selectedSales = clearedSelection.reduce((total, order) => total + order.revenue, 0);
+  const selectedKpi = clearedSelection.reduce((total, order) => total + order.kpiQty, 0);
+  const selectedBrandMargin = brand === "all" ? null : summarizeLiveBrandMargins(selectedOrders, bands, completeOrders)[0];
+  const orderGroups = groupBy === "margin" ? marginLevels(selectedOrders, bands).map((level) => ({
+    label: level.label, orders: level.orders,
+  })) : [...new Set(selectedOrders.map((order) => order.brand))].sort((a, b) => a.localeCompare(b)).map((name) => ({
+    label: name, orders: selectedOrders.filter((order) => order.brand === name),
+  }));
+
+  function openOrders(selectedBrand = "all", kpiOnly = false) {
+    setBrand(selectedBrand);
+    setQuery("");
+    setDeposit("all");
+    setKpi(kpiOnly ? "with" : "all");
+    setMarginFilter("all");
+    setGroupBy("brand");
+    setScreen("orders");
+    onScreenChange?.("orders", selectedBrand === "all" ? undefined : selectedBrand);
+  }
 
   function orderDialog(order: MemberInsightOrder) {
     const band = marginLevels([order], bands)[0];
@@ -234,11 +262,17 @@ export default function MemberInsightPanel({
   );
 
   return (
-    <>
+    <div className={live.panel} data-member-insight>
+      {screen === "orders" && <button className={live.back} type="button" onClick={() => { setScreen("overview"); onScreenChange?.("overview"); }}>
+        <Icon name="back" size={18} /> Back to Insight
+      </button>}
+      {screen === "overview" && view === "ranking" && <button className={live.back} type="button" onClick={() => setView("downline")}>
+        <Icon name="back" size={18} /> Back to Team
+      </button>}
       <div className={s.titleRow}>
         <div>
-          <p className={s.eyebrow}>WHERE YOU STAND TODAY</p>
-          <h1>Insight</h1>
+          <p className={s.eyebrow}>{screen === "orders" ? "YOUR COMMITTED ORDERS" : "YOUR PERFORMANCE"}</p>
+          <h1>{screen === "orders" ? "Sales orders" : "Insight"}</h1>
           <p className={`${s.sub} ${s.intro}`}>
             {block.department} · {insight.period} · {block.title}
           </p>
@@ -253,21 +287,26 @@ export default function MemberInsightPanel({
         </button>
       </div>
 
-      <div className={`${s.tabs} ${s.tabsEven}`}>
+      {screen === "overview" && <div className={`${s.tabs} ${s.tabsEven}`}>
         {views.map((v) => (
-          <button key={v.id} aria-pressed={view === v.id} onClick={() => setView(v.id)}>
+          <button key={v.id} aria-pressed={view === v.id || v.id === "downline" && view === "ranking"} onClick={() => setView(v.id)}>
             <Icon name={v.icon} size={17} />
             {v.label}
           </button>
         ))}
-      </div>
+      </div>}
 
-      {view === "sales" && (
+      {onPeriodChange && <label className={live.period}>Month
+        <input type="month" aria-label="Insight month" value={insight.period} disabled={busy}
+          onChange={(event) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) onPeriodChange(event.target.value); }} />
+      </label>}
+
+      {screen === "overview" && view === "sales" && (
         <div className={s.grid}>
           <div className={s.stack}>
             <section className={s.hero}>
               <div className={s.row}>
-                <span className={s.sub}>Personal sales · {insight.period}</span>
+                <span className={live.heroLabel}><span className={live.heroIcon}><Icon name="chart" size={28} /></span>Personal sales</span>
                 {insight.live && <Pill tone="active">Live</Pill>}
               </div>
               <div className={s.heroValue}>
@@ -300,8 +339,19 @@ export default function MemberInsightPanel({
                   </span>
                 )}
               </div>
+              <button className={s.link} type="button" onClick={() => openOrders()}>View sales orders <Icon name="arrow" size={17} /></button>
             </section>
 
+            <LiveBrandMarginList orders={block.orders} bands={bands} privateMode={privateMode}
+              complete={completeOrders} onBrand={(selectedBrand) => openOrders(selectedBrand)} />
+            <button type="button" className={live.metricEntry} onClick={() => openOrders("all", true)}>
+              <span className={live.metricIcon}><Icon name="target" size={28} /></span>
+              <span><strong>KPI items</strong><b>{me?.kpiQty ?? 0} <small>units sold</small></b><small>View orders with KPI items</small></span>
+              <Icon name="chevron" size={18} />
+            </button>
+          </div>
+
+          <div className={s.stack}>
             <section className={s.card}>
               <div className={s.sectionHead}>
                 <h2>{block.target ? `Next: ${block.target.rank}` : "Your current rung"}</h2>
@@ -371,17 +421,6 @@ export default function MemberInsightPanel({
               <h2>This month at a glance</h2>
               <div className={s.statGrid}>
                 <div className={s.stat}>
-                  <span className={s.caption}>KPI units sold</span>
-                  <span className={s.statValue}>{me?.kpiQty ?? 0}</span>
-                </div>
-                <div className={s.stat}>
-                  <span className={s.caption}>Margin to date</span>
-                  <span className={s.statValue}>{pct(margin)}</span>
-                  <Pill tone={marginBandTone}>
-                    {margin === null ? "No costed order" : "Blended"}
-                  </Pill>
-                </div>
-                <div className={s.stat}>
                   <span className={s.caption}>Orders</span>
                   <span className={s.statValue}>{me?.orders ?? 0}</span>
                 </div>
@@ -395,65 +434,64 @@ export default function MemberInsightPanel({
               {!!me?.blindOrders && (
                 <p className={s.sub} style={{ marginTop: 14 }}>
                   {me.blindOrders} {me.blindOrders === 1 ? "order has" : "orders have"} no
-                  unit cost and no keyed-in margin, so the margin above is taken from the
-                  rest.
+                  unit cost and no keyed-in margin. Their brand margin remains pending
+                  until these costs are available.
                 </p>
               )}
               {freshness}
             </section>
-          </div>
-
-          <div className={s.stack}>
-            <section className={s.card}>
-              <div className={s.sectionHead}>
-                <h2>Orders by margin level</h2>
-                <span className={s.caption}>{block.orders.length} this month</span>
-              </div>
-              {block.orders.length ? (
-                marginLevels(block.orders, bands).map((level) => (
-                  <div key={level.label} className={s.level}>
-                    <div className={`${s.row} ${s.rowWrap}`}>
-                      <Pill tone={level.tone}>{level.label}</Pill>
-                      <span className={s.amount}>{money(level.revenue)}</span>
-                    </div>
-                    <p className={s.caption}>
-                      {level.orders.length}{" "}
-                      {level.orders.length === 1 ? "order" : "orders"}
-                      {level.multiplier < 1 && ` · commission × ${level.multiplier}`}
-                    </p>
-                    {level.orders.map((order) => (
-                      <button
-                        key={order.id}
-                        className={`${s.listRow} ${s.listButton}`}
-                        onClick={() => orderDialog(order)}
-                      >
-                        <div>
-                          <h3>{order.number}</h3>
-                          <p className={s.caption}>
-                            {order.brand} · {date(order.date)}
-                            {!order.cleared && " · awaiting deposit"}
-                            {order.carried && " · carried forward"}
-                          </p>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div className={s.amount}>{pct(order.margin)}</div>
-                          <span className={s.caption}>{money(order.revenue)}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ))
-              ) : (
-                <Empty title="No orders yet this month">
-                  Orders appear here once your department commits its sync.
-                </Empty>
-              )}
-            </section>
+            <button type="button" className={live.metricEntry} onClick={() => openOrders()}>
+              <span className={live.metricIcon} data-tone="brown"><Icon name="receipt" size={28} /></span>
+              <span><strong>Sales orders</strong><small>By brand, margin level or deposit status</small></span>
+              <Icon name="chevron" size={18} />
+            </button>
           </div>
         </div>
       )}
 
-      {view === "ranking" && (
+      {screen === "orders" && <div className={live.orderPage}>
+        <div className={live.orderSummary} aria-label="Selected order summary">
+          <div><small>Cleared sales</small><strong>{money(selectedSales)}</strong></div>
+          <div><small>KPI units</small><strong>{selectedKpi}</strong></div>
+          {selectedBrandMargin && <div><small>{selectedBrandMargin.unknownMarginCount ? "Known-order margin · partial" : "Cleared margin"}</small>
+            <strong>{privateMode ? "••••" : selectedBrandMargin.margin === null ? "—" : `${selectedBrandMargin.margin.toFixed(2)}%`}</strong></div>}
+        </div>
+        {!completeOrders && <p className={live.notice}>This list contains the available recent orders. Monthly totals on Insight include all cleared orders.</p>}
+        <div className={live.orderControls}>
+          <label className={live.search}><Icon name="search" size={20} /><input aria-label="Search sales orders" type="search" placeholder="Search order number or brand" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+          <label className={live.field}>Brand<select value={brand} onChange={(event) => { setBrand(event.target.value); onScreenChange?.("orders", event.target.value === "all" ? undefined : event.target.value); }}>
+            <option value="all">All brands</option>{!brands.includes(brand) && brand !== "all" && <option value={brand}>{brand}</option>}{brands.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select></label>
+          <details className={live.moreFilters}><summary>More filters <Icon name="chevron" size={16} /></summary>
+            <div className={live.filterGrid}>
+              <label className={live.field}>Deposit<select value={deposit} onChange={(event) => setDeposit(event.target.value)}><option value="all">All deposits</option><option value="cleared">Cleared</option><option value="held">Awaiting deposit</option></select></label>
+              <label className={live.field}>KPI items<select value={kpi} onChange={(event) => setKpi(event.target.value)}><option value="all">All orders</option><option value="with">With KPI items</option><option value="without">Without KPI items</option></select></label>
+              <label className={live.field}>Margin status<select value={marginFilter} onChange={(event) => setMarginFilter(event.target.value)}><option value="all">All margins</option><option value="pending">Cost pending</option><option value="penalty">Commission reduced</option><option value="threshold">Incentive threshold</option></select></label>
+              <label className={live.field}>Group orders by<select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="brand">Brand</option><option value="margin">Margin level</option></select></label>
+            </div>
+          </details>
+        </div>
+        <div className={s.sectionHead}><span className={s.caption}>{selectedOrders.length} {selectedOrders.length === 1 ? "order" : "orders"}</span>
+          <button type="button" className={s.link} onClick={() => openOrders()}>Reset filters</button></div>
+        <div className={live.orderGroups}>
+          {orderGroups.map((group) => <section className={live.orderGroup} key={group.label} aria-label={`${group.label} orders`}>
+            <div className={s.sectionHead}><h2>{group.label}</h2><span className={s.caption}>{group.orders.length} orders</span></div>
+            {group.orders.map((order) => {
+              const band = marginLevels([order], bands)[0];
+              return <button key={order.id} type="button" className={live.orderRow} onClick={() => orderDialog(order)} aria-label={`View order ${order.number}`}>
+                <span className={live.orderHeading}><strong>{order.number}</strong><Icon name="chevron" size={17} /></span>
+                <span className={s.caption}>{order.brand} · {date(order.date)}{order.carried && " · carried forward"}</span>
+                <span className={live.orderValues}><span><small>Sales</small><strong>{money(order.revenue)}</strong></span><span><small>Margin</small><strong>{privateMode ? "••••" : order.margin === null ? "—" : `${order.margin.toFixed(2)}%`}</strong></span><span><small>KPI</small><strong>{order.kpiQty}</strong></span></span>
+                <span className={live.orderStatus}><span>{order.cleared ? "Deposit cleared" : "Awaiting deposit · not counted"}</span><span>{privateMode ? "Margin hidden" : band.label}</span></span>
+              </button>;
+            })}
+          </section>)}
+        </div>
+        {!selectedOrders.length && <Empty title="No orders match these filters">Try another brand or reset your filters.</Empty>}
+        {freshness}
+      </div>}
+
+      {screen === "overview" && view === "ranking" && (
         <div className={s.stack}>
           {boards.length > 1 && (
             <div className={s.filters}>
@@ -538,8 +576,13 @@ export default function MemberInsightPanel({
         </div>
       )}
 
-      {view === "downline" && (
+      {screen === "overview" && view === "downline" && (
         <div className={s.stack}>
+          {boards.length > 0 && <button type="button" className={live.metricEntry} onClick={() => setView("ranking")}>
+            <span className={live.metricIcon} data-tone="brown"><Icon name="trophy" size={28} /></span>
+            <span><strong>Department ranking</strong><small>Compare the department&apos;s sales results</small></span>
+            <Icon name="chevron" size={18} />
+          </button>}
           {block.downline.length ? (
             <>
               <section className={s.hero}>
@@ -652,7 +695,7 @@ export default function MemberInsightPanel({
           {freshness}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
