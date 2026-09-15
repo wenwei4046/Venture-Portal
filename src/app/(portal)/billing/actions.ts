@@ -12,7 +12,7 @@ import { validateConsolidation, poolAttributions, segmentForBillingMode, lineAtt
 import { deptNameToSegment, fallbackRevenueGlCode, invoiceJeDate } from '@/lib/billing'
 import { payerExpenseSplits, type NatureSplit } from '@/lib/inter-billing-nature'
 import { INVOICE_BILLING_MODE_TO_POOL } from '@/lib/cfo-reports'
-import { primedModeToPool, primedModeToSegment } from '@/lib/dept-registry'
+import { primedModeToPool, primedModeToSegment, primeDeptRegistryFromDb } from '@/lib/dept-registry'
 import {
   buildConsolidatedInvoiceLines,
   periodShortLabel,
@@ -134,6 +134,24 @@ const CREATE_INVOICE_MODES = [
 
 export type CreateInvoiceMode = (typeof CREATE_INVOICE_MODES)[number]
 
+// A billing mode is valid if it is a built-in OR a provisioned department's
+// own '<segment>_attribution' (dept registry, 2026-08-24). The registry maps
+// live in a module store that page renders prime as a side effect — a server
+// action on a cold instance sees it EMPTY, so prime from the DB here before
+// consulting it (user 2026-09-15: editing a revenue_department_attribution
+// draft threw "Unsupported billing mode"; only createManualInvoice had the
+// registry fallback, and even that one relied on a warm instance).
+async function assertBillingModeSupported(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  mode: string,
+): Promise<void> {
+  if (CREATE_INVOICE_MODES.includes(mode as CreateInvoiceMode)) return
+  if (!(mode in primedModeToSegment())) await primeDeptRegistryFromDb(supabase)
+  if (!(mode in primedModeToSegment())) {
+    throw new Error(`Unsupported billing mode: ${mode}`)
+  }
+}
+
 export type BillableToKind = 'subsidiary' | 'director' | 'dept_pool' | 'freetext'
 
 export async function createManualInvoice(formData: FormData): Promise<void> {
@@ -173,11 +191,7 @@ export async function createManualInvoice(formData: FormData): Promise<void> {
     throw new Error('Billable party name is required')
   }
   if (!rawPeriod) throw new Error('Period is required')
-  // Dynamic full departments (2026-08-24): a provisioned dept's own
-  // '<segment>_attribution' mode is as valid as the built-ins.
-  if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode) && !(rawMode in primedModeToSegment())) {
-    throw new Error(`Unsupported billing mode: ${rawMode}`)
-  }
+  await assertBillingModeSupported(supabase, rawMode)
   const billingMode = rawMode as CreateInvoiceMode
 
   const amount = Number(rawAmount)
@@ -342,9 +356,7 @@ export async function createMultiLineInvoice(
   if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
     throw new Error(`Unsupported billable_to_type: ${payload.billableType}`)
   }
-  if (!CREATE_INVOICE_MODES.includes(payload.billingMode)) {
-    throw new Error(`Unsupported billing mode: ${payload.billingMode}`)
-  }
+  await assertBillingModeSupported(supabase, payload.billingMode)
   if (payload.billableType === 'subsidiary' && !payload.companyId) {
     throw new Error('Subsidiary is required')
   }
@@ -983,9 +995,7 @@ export async function updateDraftInvoice(formData: FormData): Promise<void> {
 
   const rawMode = String(formData.get('billing_mode') ?? '').trim()
   if (rawMode) {
-    if (!CREATE_INVOICE_MODES.includes(rawMode as CreateInvoiceMode)) {
-      throw new Error(`Unsupported billing mode: ${rawMode}`)
-    }
+    await assertBillingModeSupported(supabase, rawMode)
     updates.billing_mode = rawMode as CreateInvoiceMode
   }
 
@@ -1062,9 +1072,7 @@ export async function updateDraftInvoiceFull(payload: {
   if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
     throw new Error(`Unsupported billable_to_type: ${payload.billableType}`)
   }
-  if (!CREATE_INVOICE_MODES.includes(payload.billingMode)) {
-    throw new Error(`Unsupported billing mode: ${payload.billingMode}`)
-  }
+  await assertBillingModeSupported(supabase, payload.billingMode)
   if (payload.billableType === 'subsidiary' && !payload.companyId) throw new Error('Subsidiary is required')
   if (payload.billableType === 'dept_pool' && !payload.departmentId) throw new Error('Department is required')
   if (
