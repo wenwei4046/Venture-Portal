@@ -770,6 +770,19 @@ AttachmentList gets `canDelete` (two-click arm/confirm); only the PV detail
 page passes it. Tested as finance in a rolled-back tx: paid-PV refused,
 pending-PV deleted.
 
+**Registry billing modes on edit (commit 72689e52)**: saving the edit modal on
+HV-INV-202609-0028 (revenue_department_attribution, HC, 282,580.12, user's own
+draft) hit the Server Components error page. `updateDraftInvoiceFull`,
+`updateDraftInvoice`, `createMultiLineInvoice` validated billing_mode against
+the hardcoded CREATE_INVOICE_MODES only; `createManualInvoice` had the
+`primedModeToSegment()` fallback but that store is only primed by page
+renders — a cold server action sees it empty. New
+`assertBillingModeSupported(supabase, mode)`: built-ins → else
+`primeDeptRegistryFromDb` → else reject. All four paths use it. THIRD instance
+of the "hardcoded dept list misses a dynamic dept" disease (IT in submit RPC,
+IT in daily-bank totals, now registry modes in invoice edit) — when touching
+anything that enumerates departments/segments/modes, check the registry.
+
 ## SESSION 2026-09-10/11 — Venture Pool void filter · director payout segment → hr
 
 **Void pairs in Venture Pool gross (commit 824597a)**: /venture-pool, /dept-pool
