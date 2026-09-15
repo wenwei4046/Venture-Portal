@@ -795,10 +795,29 @@ route untouched (still one row per voucher). Forward-looking: HR Payment page
 already offers "Generate by Department" (one PV per dept, other session) — the
 user was told next month's volume drops there.
 
+**防盗墙 DECIDED → Finance owns the send-back (commit c8a51253, mig
+20260915040000)**: user "把权限放在 finance 这边". `reopen_payroll_run` role
+gate hr → finance/principal (body unchanged: cancels submitted request,
+reverses staff accruals via reverse_staff_payroll_accruals, blocks once a PV
+exists). Finance UI: `SendBackButton` ("打回 HR 重做", two-click) on each
+UNFUNDED staff request card in /payments/payroll-requests (director requests
+are run-less → no button); action `sendBackPayrollRun(period)` in
+payroll-requests/actions.ts. HR payroll page: Reopen button replaced by a
+notice pointing to Finance. `ReopenPayrollButton.tsx` + hr-costing
+`reopenPayroll` action left in place, unused (other session's files). Submit
+itself still lands 'approved' with no Principal gate (方案乙 NOT chosen).
+
+**Jul-2026 director round re-tagged (commit cb895a36, mig 20260915050000)**:
+user "这个不是做了吗?" — Sept was, Aug wasn't; now both. JE-202608-0441
+(same-bank staging) + 0464..0467 (payouts) director → hr, access_log
+`mig_20260915050000`; `LEGACY_DIRECTOR_GL_ROUNDS` carve-out removed from the
+Cash Flow bridge. August Director cash flow now −65,309.67 (bridged drain,
+= pool) instead of −43,135.67 net pay. Director GL on bank accounts Aug/Sep
+is receipts-only now. TB active net 0.00.
+
 **Open (user-decided, not built)**: Finance cannot invite users — `team_invite`
 is Principal-only by design (other session, "an account is access to the money
-pages"). A per-user override via `user_permissions` is possible but needs
-Principal's OK.
+pages"). User said leave it (除了第二).
 
 ## SESSION 2026-09-10/11 — Venture Pool void filter · director payout segment → hr
 
