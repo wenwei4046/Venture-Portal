@@ -64,7 +64,9 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     supabase
       .from('invoices')
       .select('id, invoice_no, company_id, billable_to_department_id, status, reference_no')
-      .like('reference_no', `${ref}%`),
+      .like('reference_no', `${ref}%`)
+      // Voided invoices (2026-09-15) neither lock the allocation nor count as live.
+      .neq('status', 'voided'),
     // READ-ONLY peek at HR's allocation months, for the one-click import.
     supabase.from('hr_staff_allocation').select('period_month').order('period_month', { ascending: false }),
     supabase.from('alloc_company_settings').select('company_id, enabled'),

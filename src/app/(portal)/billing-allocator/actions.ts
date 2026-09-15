@@ -667,6 +667,8 @@ async function assertTxnNotBilled(
     .from('invoices')
     .select('invoice_no, status')
     .eq('reference_no', billedRef)
+    // Voided invoices (2026-09-15) release the lock — the batch is re-billable.
+    .neq('status', 'voided')
     .limit(1)
   if (data && data.length > 0) {
     throw new Error(
@@ -705,7 +707,7 @@ async function generateAllocatorInvoicesInner(period: string): Promise<GenerateR
     supabase.from('companies').select('id, short_code, name').eq('is_active', true),
     supabase.from('departments').select('id, name'),
     supabase.from('alloc_categories').select('id, coa_code'),
-    supabase.from('invoices').select('reference_no').like('reference_no', `${baseRef}%`),
+    supabase.from('invoices').select('reference_no').like('reference_no', `${baseRef}%`).neq('status', 'voided'),
   ])
   if (tErr) throw new Error(tErr.message)
   if (cErr) throw new Error(cErr.message)

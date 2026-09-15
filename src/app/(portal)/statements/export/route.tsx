@@ -67,6 +67,7 @@ export async function GET(req: Request) {
       'id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, due_date',
     )
     .eq('period_month', periodStart)
+    .neq('status', 'voided')
     .order('invoice_no', { ascending: false })
 
   // Fetch companies for name/code mapping

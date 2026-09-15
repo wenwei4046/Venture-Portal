@@ -12,7 +12,7 @@ import CopyInvoiceButton from './CopyInvoiceButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable from '@/components/SortableTable'
 import type { AccountType } from '@/lib/coa'
-import { settleInvoicesConsolidated } from '../actions'
+import { settleInvoicesConsolidated, voidIssuedInvoices } from '../actions'
 import { payeeKey } from '@/lib/invoice-settlement'
 
 interface Invoice {
@@ -174,8 +174,46 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   function isBatchSettleable(inv: Invoice): boolean {
     return inv.status === 'issued' && inv.billable_to_type !== 'dept_pool'
   }
+  // 作废 (2026-09-15): an issued invoice nothing has touched yet — no receipt,
+  // no credit note. dept_pool invoices qualify too (the RPC reverses their
+  // inter-billing clear as well). The RPC re-checks everything server-side.
+  function isVoidable(inv: Invoice): boolean {
+    return (
+      inv.status === 'issued' &&
+      (paidByInvoice[inv.id] ?? 0) <= 0 &&
+      (cnByInvoice[inv.id] ?? 0) <= 0
+    )
+  }
+  const [showVoidModal, setShowVoidModal] = useState(false)
+  const [voidTargetIds, setVoidTargetIds] = useState<string[]>([])
+  const [voidReason, setVoidReason] = useState('')
+  const [voidError, setVoidError] = useState<string | null>(null)
+  const [voidResult, setVoidResult] = useState<string | null>(null)
+  function openVoidModal(ids: string[]) {
+    setVoidTargetIds(ids)
+    setVoidReason('')
+    setVoidError(null)
+    setShowVoidModal(true)
+  }
+  function handleVoid() {
+    setVoidError(null)
+    if (voidTargetIds.length === 0) return setVoidError('没有选到可作废的发票')
+    if (!voidReason.trim()) return setVoidError('作废要写原因')
+    startTransition(async () => {
+      try {
+        const res = await voidIssuedInvoices({ ids: voidTargetIds, reason: voidReason.trim() })
+        setShowVoidModal(false)
+        setSelectedIds(new Set())
+        setVoidResult(`已作废 ${res.voided.length} 张：${res.voided.join('、')}`)
+        router.refresh()
+      } catch (err) {
+        setVoidError(err instanceof Error ? err.message : '作废失败')
+      }
+    })
+  }
 
   const selectedInvoices = displayRows.filter((i) => selectedIds.has(i.id) && isBatchSettleable(i))
+  const selectedVoidable = displayRows.filter((i) => selectedIds.has(i.id) && isVoidable(i))
   // Batch settle collects the REMAINING balance of each invoice, not the
   // printed total (they differ once partial receipts exist).
   const selectedTotal = selectedInvoices.reduce((s, i) => s + remainingOf(i), 0)
@@ -340,7 +378,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               searchKeys={['invoice_no', 'company', 'billing_mode', 'description']}
               searchPlaceholder="Search invoice # / company / mode…"
               toolbarRight={
-                displayRows.some(isBatchSettleable) || extraOpenInvoices.length > 0 ? (
+                displayRows.some(isBatchSettleable) || displayRows.some(isVoidable) || extraOpenInvoices.length > 0 ? (
                   <>
                     {/* Selection summary + batch actions — inline in the toolbar
                         (between search and 全选), not a floating bar (user 2026-06-11). */}
@@ -375,6 +413,15 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                         >
                           {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => openVoidModal(selectedVoidable.map((i) => i.id))}
+                          disabled={selectedVoidable.length === 0 || isPending}
+                          title="作废所选：只对还没收钱、没 credit note 的 issued 发票"
+                          className="bg-surface hover:bg-danger/10 border border-hairline text-danger text-xs font-sans px-3 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          作废所选 {selectedVoidable.length} 张
+                        </button>
                       </div>
                     ) : null}
                     {extraOpenInvoices.length > 0 ? (
@@ -408,14 +455,15 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   sortable: false,
                   render: (inv) => {
                     const settleable = isBatchSettleable(inv)
+                    const selectable = settleable || isVoidable(inv)
                     return (
                       <input
                         type="checkbox"
-                        disabled={!settleable || isPending}
+                        disabled={!selectable || isPending}
                         checked={selectedIds.has(inv.id)}
                         onChange={() => toggle(inv.id)}
                         className="accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
-                        aria-label={settleable ? `Select ${inv.invoice_no ?? 'invoice'}` : 'Not settleable in batch'}
+                        aria-label={selectable ? `Select ${inv.invoice_no ?? 'invoice'}` : 'Not selectable'}
                       />
                     )
                   },
@@ -595,7 +643,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                             Refund →
                           </Link>
                         ) : null}
-                        {inv.status !== 'draft' ? (
+                        {inv.status !== 'draft' && inv.status !== 'voided' ? (
                           <>
                             <CreateCreditNoteButton
                               invoiceId={inv.id}
@@ -612,6 +660,17 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                               categories={categories.map((c) => ({ code: c.code, label: c.label }))}
                             />
                           </>
+                        ) : null}
+                        {isVoidable(inv) ? (
+                          <button
+                            type="button"
+                            onClick={() => openVoidModal([inv.id])}
+                            disabled={isPending}
+                            className="text-xs text-muted hover:text-danger font-serif italic disabled:opacity-50"
+                            title="作废：冲掉开票的账，单号保留，状态变 voided"
+                          >
+                            作废
+                          </button>
                         ) : null}
                       </div>
                     )
@@ -743,6 +802,88 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           </div>
         </div>
       ) : null}
+
+      {/* ── 作废已开发票 (2026-09-15) ── */}
+      {voidResult && !showVoidModal ? (
+        <div className="mt-4 bg-surface border border-hairline rounded-md px-3 py-2 text-sm font-sans flex items-center justify-between">
+          <span>{voidResult}</span>
+          <button type="button" onClick={() => setVoidResult(null)} className="text-xs text-muted hover:text-ink">关闭</button>
+        </div>
+      ) : null}
+      {showVoidModal ? (
+        <div
+          className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => !isPending && setShowVoidModal(false)}
+        >
+          <div
+            className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg my-12"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline">
+              <div>
+                <h2 className="font-serif text-2xl text-ink">作废发票</h2>
+                <p className="font-serif italic text-graphite text-xs mt-1">
+                  开票的账会冲掉（报表自动不算），单号保留、状态变 voided。只能作废还没收钱、没 credit note 的 issued 发票。
+                </p>
+              </div>
+              <button
+                onClick={() => !isPending && setShowVoidModal(false)}
+                disabled={isPending}
+                className="text-muted hover:text-ink text-2xl leading-none pt-1 disabled:opacity-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <ul className="text-sm font-mono divide-y divide-hairline border border-hairline rounded-md max-h-48 overflow-y-auto">
+                {displayRows
+                  .filter((i) => voidTargetIds.includes(i.id))
+                  .map((inv) => (
+                    <li key={inv.id} className="px-3 py-1.5 flex items-center justify-between">
+                      <span>{inv.invoice_no ?? inv.id.slice(0, 8)}</span>
+                      <span className="tabular">RM {Number(inv.total_amount).toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+                    </li>
+                  ))}
+              </ul>
+              <label className="block">
+                <div className="text-xs font-sans font-medium text-graphite mb-1">
+                  原因 <span className="text-danger">*</span>
+                </div>
+                <input
+                  type="text"
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  disabled={isPending}
+                  placeholder="例：开错金额，重开"
+                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border disabled:opacity-50"
+                />
+              </label>
+              {voidError ? (
+                <div className="bg-danger/10 border border-danger/30 text-danger rounded-md px-3 py-2 text-sm font-sans">
+                  {voidError}
+                </div>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-hairline bg-surface">
+              <button
+                onClick={() => !isPending && setShowVoidModal(false)}
+                disabled={isPending}
+                className="text-sm font-sans text-muted hover:text-ink disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleVoid}
+                disabled={isPending || voidTargetIds.length === 0 || !voidReason.trim()}
+                className="bg-danger hover:opacity-90 text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPending ? '作废中…' : `作废 ${voidTargetIds.length} 张`}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -753,5 +894,7 @@ function InvoiceStatus({ status }: { status: string }) {
   if (status === 'paid') return <em className="font-serif text-ledger text-sm">paid</em>
   if (status === 'paid_via_netting')
     return <em className="font-serif text-ledger text-sm">paid via netting</em>
+  if (status === 'voided')
+    return <em className="font-serif text-muted text-sm line-through">voided</em>
   return <em className="font-serif text-muted text-sm">{status}</em>
 }

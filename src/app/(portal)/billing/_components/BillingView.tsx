@@ -165,7 +165,10 @@ export default async function BillingView({ searchParams }: Props) {
   ).length
 
   const invoiceList = invoices ?? []
-  const invoiceTotal = invoiceList.reduce((acc, i) => acc + Number(i.total_amount), 0)
+  // Voided invoices stay in the list (struck through) but not in the total.
+  const invoiceTotal = invoiceList
+    .filter((i) => i.status !== 'voided')
+    .reduce((acc, i) => acc + Number(i.total_amount), 0)
 
   // 跨月合并结算 (2026-08-20): a payer often clears several months' invoices
   // with ONE transfer, but this page is period-scoped — fetch OTHER periods'

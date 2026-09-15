@@ -813,6 +813,63 @@ export async function createCreditNote(formData: FormData) {
   return data.id
 }
 
+// ─── 作废已开发票 · Void ISSUED invoices (Finance, 2026-09-15) ────────────────
+// An issued invoice that nothing has attached to (no receipt, no batch
+// settlement, no credit note) can be voided in place: the RPC reverses its
+// journal entries with is_reversed mirror pairs and flips status → 'voided'.
+// The number stays (audit trail; mint_invoice_no keeps counting it), and the
+// billing allocator no longer treats the batch as live, so the underlying
+// allocation can be edited and re-billed. All checks live in the RPC.
+
+export async function voidIssuedInvoices(payload: {
+  ids: string[]
+  reason: string
+}): Promise<{ voided: string[] }> {
+  await requirePermission('billing')
+  const supabase = await createClient()
+
+  const ids = [...new Set((payload.ids ?? []).map((s) => s.trim()).filter(Boolean))]
+  const reason = (payload.reason ?? '').trim()
+  if (ids.length === 0) throw new Error('没有选到发票')
+  if (!reason) throw new Error('作废要写原因')
+
+  const { data: rows, error } = await supabase
+    .from('invoices')
+    .select('id, invoice_no, status')
+    .in('id', ids)
+  if (error) throw new Error(`Failed to load invoices: ${error.message}`)
+  const notIssued = (rows ?? []).filter((r) => r.status !== 'issued')
+  if (notIssued.length > 0) {
+    throw new Error(
+      `只有 issued 的发票可以作废：${notIssued.map((r) => `${r.invoice_no} (${r.status})`).join('、')}`,
+    )
+  }
+
+  // Sequential and fail-loud: the RPC refuses any invoice with a receipt / CN
+  // / batch settlement, and we stop at the first refusal so the user sees
+  // exactly which one blocked (earlier ones in the list are already voided —
+  // each RPC call is its own transaction).
+  const voided: string[] = []
+  for (const r of rows ?? []) {
+    const { error: rpcErr } = await supabase.rpc('void_issued_invoice', {
+      p_invoice_id: r.id,
+      p_reason: reason,
+    })
+    if (rpcErr) {
+      throw new Error(
+        `${r.invoice_no} 作废失败：${rpcErr.message}${voided.length ? `（已作废：${voided.join('、')}）` : ''}`,
+      )
+    }
+    voided.push(r.invoice_no as string)
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  revalidatePath('/billing-allocator')
+  revalidatePath('/reports/debtor-aging')
+  return { voided }
+}
+
 // ─── Delete draft invoice (Finance — soft to recover from mistakes) ───────
 
 export async function deleteDraftInvoice(formData: FormData): Promise<void> {

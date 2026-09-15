@@ -7754,6 +7754,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      void_issued_invoice: {
+        Args: { p_invoice_id: string; p_reason: string }
+        Returns: number
+      }
       void_loan_repayment: { Args: { p_repayment_id: string }; Returns: Json }
       voucher_party_refs: { Args: never; Returns: Json }
       withdraw_pending_fund_source: {
@@ -7892,7 +7896,7 @@ export type Database = {
         | "fund_out"
         | "loan_repayment_in"
       invoice_pool_txn_type: "accumulate" | "release"
-      invoice_status: "draft" | "issued" | "paid" | "paid_via_netting"
+      invoice_status: "draft" | "issued" | "paid" | "paid_via_netting" | "voided"
       invoice_submission_request_status:
         | "pending"
         | "generated"
@@ -8209,7 +8213,7 @@ export const Constants = {
         "loan_repayment_in",
       ],
       invoice_pool_txn_type: ["accumulate", "release"],
-      invoice_status: ["draft", "issued", "paid", "paid_via_netting"],
+      invoice_status: ["draft", "issued", "paid", "paid_via_netting", "voided"],
       invoice_submission_request_status: [
         "pending",
         "generated",

@@ -23,7 +23,8 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       .from('invoices')
       .select('total_amount')
       .eq('period_month', period)
-      .eq('billing_mode', 'marketing_project'),
+      .eq('billing_mode', 'marketing_project')
+      .neq('status', 'voided'),
     supabase
       .from('dept_pools')
       .select('amount')
@@ -74,7 +75,8 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       .select('total_amount, period_month')
       .gte('period_month', trendStart)
       .lte('period_month', period)
-      .eq('billing_mode', 'marketing_project'),
+      .eq('billing_mode', 'marketing_project')
+      .neq('status', 'voided'),
     supabase
       .from('dept_pools')
       .select('amount, created_at')
