@@ -718,6 +718,45 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-14/15 — cancel-loan overload fix · 作废已开发票 · water RM36→39 amend
+
+**Cancel pending loan crashed (commit ca40c0bb, mig 20260914010000)**: TWO
+overloads of `cancel_loan_and_approval` — mig 17 `(uuid, text DEFAULT NULL)`,
+mig 107 `(uuid)` (meant to extend, declared a sibling). The app's one-arg call
+was ambiguous (42725) → error boundary. Merged into ONE `(uuid, text DEFAULT
+NULL)` with mig 107's paired-PV void + reason + fail-loud check + a guard
+that raises if >1 overload ever exists. User had two duplicate Carres 30,000
+pending loans from the failed attempt — left for them to cancel.
+
+**作废已开发票 · void issued invoice (commit 2dd0b8cf, migs 20260915010000 +
+020000)**: new `invoice_status` value `voided`; RPC `void_issued_invoice(id,
+reason)` reverses the invoice's active JEs (mirror + is_reversed pairs — same
+mechanism as void PV, so every report drops them), status → voided, NUMBER
+KEPT (mint_invoice_no keeps counting it — no reuse). Refuses: non-issued, any
+non-voided receipt, settlement_voucher_id set, any non-voided CN, locked
+period. Writes access_log 'void'. UI in InvoicesList: per-row 作废 link +
+bulk 作废所选 on the existing checkboxes (checkbox now also enables for
+voidable dept_pool rows), reason modal, struck-through pill. Voided excluded
+from: BillingView period total, statements export, MarketingPnlView sums,
+allocator live-batch checks (assertTxnNotBilled + generate + page → the
+allocation UNLOCKS). Types patched by hand (enum + RPC) — a full regen flips
+nullable RPC args the other session's hr-costing/payment code passes as null.
+
+**Data ops (user: water was keyed RM36, should be RM39)**:
+- HV-INV-202609-0021..0027 (RM3 top-ups, ALC-202609-005) VOIDED via the RPC
+  as finance; ALC-005 + details deleted.
+- HV-INV-202609-0014..0020 AMENDED IN PLACE (user chose to keep numbers,
+  PDFs not sent): water line recomputed on the allocator's own rule
+  round2(39 × fte/48) — 2990 1.53 / CAR 7.56 / DC 6.11 / HK 0.24 / HC 6.13 /
+  CONTS 6.92 / Marketing 9.75 (Σ38.24, own 0.76); line text RM 36.00→39.00;
+  base/total bumped; ONE supplementary JE per invoice (Dr 3030 / Cr 9091
+  delta, corporate; Marketing also gets the inter-billing mirror Dr 9091 /
+  Cr 3030, marketing) — originals untouched. ALC-202609-003 header 36→39 and
+  details recomputed. Verified: TB active net 0.00; each subsidiary invoice
+  total = its active 3030 debits; totals = Σ lines.
+- RowForm.test.tsx flaked once under parallel load (other session's
+  component), 4/4 in isolation and 1892/1892 on rerun.
+
 ## SESSION 2026-09-10/11 — Venture Pool void filter · director payout segment → hr
 
 **Void pairs in Venture Pool gross (commit 824597a)**: /venture-pool, /dept-pool
