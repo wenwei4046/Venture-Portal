@@ -757,6 +757,19 @@ nullable RPC args the other session's hr-costing/payment code passes as null.
 - RowForm.test.tsx flaked once under parallel load (other session's
   component), 4/4 in isolation and 1892/1892 on rerun.
 
+**Delete PV attachment (commit fcfbfedb, mig 20260915030000)**: user asked
+whether attachment photos could be "withdraw 回下来" — download existed,
+delete did not. Now Finance/Principal can delete while the voucher is
+draft/pending_approval (same window as upload; approved/paid = evidence,
+locked). `delete_voucher_attachment(id)` RPC (SECURITY DEFINER — table RLS is
+pa_no_delete) deletes the row + access_log, returns storage_path; new
+storage.objects DELETE policy "Finance can delete draft-voucher attachments"
+(bucket payment-attachments, has_scope treasury, no row references the path,
+folder[1] = a draft/pending voucher id) lets the client `.remove()` the object.
+AttachmentList gets `canDelete` (two-click arm/confirm); only the PV detail
+page passes it. Tested as finance in a rolled-back tx: paid-PV refused,
+pending-PV deleted.
+
 ## SESSION 2026-09-10/11 — Venture Pool void filter · director payout segment → hr
 
 **Void pairs in Venture Pool gross (commit 824597a)**: /venture-pool, /dept-pool
