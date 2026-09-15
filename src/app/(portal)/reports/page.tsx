@@ -27,20 +27,12 @@ const reports = [
     title: 'General Ledger',
     description: 'Per-account journal lines with running balance over a period.',
   },
-  {
-    href: '/reports/fund-summary',
-    title: 'Fund Summary',
-    description: 'Paid capital, free capital, allocated, free cash.',
-  },
+  // Fund Summary + Claims Summary removed from the index (user 2026-09-15);
+  // /reports/fund-summary and /reports/claims still resolve by URL.
   {
     href: '/reports/base-rate',
     title: 'Base Rate History',
     description: 'Quarterly weighted cost + margin = base rate over time.',
-  },
-  {
-    href: '/reports/claims',
-    title: 'Claims Summary',
-    description: 'Benefit and pool claims by status and amount.',
   },
   {
     href: '/reports/debtor-aging',

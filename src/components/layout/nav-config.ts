@@ -319,8 +319,8 @@ export function buildNavEntries(data: NavData): NavEntry[] {
         { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: canAccessDeptReports },
         { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },
         { href: '/reports/trial-balance', label: 'Trial Balance', visible: canAccessReports },
-        { href: '/reports/fund-summary', label: 'Fund Summary', visible: canAccessReports },
-        { href: '/reports/claims', label: 'Claims Report', visible: canAccessReports },
+        // Fund Summary + Claims Report dropped from the menu (user 2026-09-15
+        // "remove 掉"); routes still exist for direct links.
         { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessDeptReports },
         { href: '/reports/loan-aging', label: 'Loan Monitor', visible: canAccessReports },
         { href: '/reports/company-statement', label: 'Company Statement', visible: canAccessReports },
