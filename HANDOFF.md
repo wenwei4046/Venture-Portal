@@ -783,6 +783,23 @@ of the "hardcoded dept list misses a dynamic dept" disease (IT in submit RPC,
 IT in daily-bank totals, now registry modes in invoice edit) — when touching
 anything that enumerates departments/segments/modes, check the registry.
 
+**Payroll PVs collapsed in /payments (commit 2dbdb916)**: user "hr 的 payroll
+voucher 我不想要显示这么多" → option B (fold, not hide). VoucherLedger tags
+reference_type='payroll_disbursement' rows with `batchKey` = description lead
+phrase before " — " ("Payroll disbursement Aug 2026" / "Director salary Aug
+2026"); VouchersTable groups them into one line per batch ABOVE the main
+table (count · status breakdown · total · latest date, ▸/▾ expand → nested
+VouchersTable of members). Filters still apply per voucher server-side;
+`collapseBatches={!qFilter}` keeps rows flat during a text search. Export
+route untouched (still one row per voucher). Forward-looking: HR Payment page
+already offers "Generate by Department" (one PV per dept, other session) — the
+user was told next month's volume drops there.
+
+**Open (user-decided, not built)**: Finance cannot invite users — `team_invite`
+is Principal-only by design (other session, "an account is access to the money
+pages"). A per-user override via `user_permissions` is possible but needs
+Principal's OK.
+
 ## SESSION 2026-09-10/11 — Venture Pool void filter · director payout segment → hr
 
 **Void pairs in Venture Pool gross (commit 824597a)**: /venture-pool, /dept-pool
