@@ -3,6 +3,7 @@
 **Status:** design, nothing built. Written 2026-09-16.
 **Owner:** Principal. **Reads:** HR, Finance.
 **Prerequisite for:** the monthly payroll report set (§8).
+**Order set 2026-09-16:** unblock the close first, the CEO's share last (§9).
 
 Every figure marked **MEASURED** was read off the live database on 2026-09-16
 and is reproducible from the queries named beside it. Everything else is a
@@ -328,11 +329,14 @@ finally be computed** without disturbing the August salaries already paid.
 **Phase B — make the cycle visible.** `payroll_calendar`, the month overview
 page (§7), the blocking list, track filters on the existing reports.
 
-**Phase C — the CEO's revenue share.** `comm_revenue_shares`, the computation
-at close, the line on the pay board.
+**Phase C — the reports.** Variance first (§8 report 5 — it is how a payroll
+error gets caught before payment, and it does not exist), then the imported and
+director pay registers, then the statutory dimension.
 
-**Phase D — the reports.** Variance first, then the imported and director pay
-registers, then the statutory dimension.
+**Phase D — the CEO's revenue share.** `comm_revenue_shares`, the computation
+at close, the line on the pay board. **Deliberately last (user, 2026-09-16):**
+the basis is settled and the arithmetic is trivial, but it pays one person and
+blocks nothing, while Phases A–C unblock 31.
 
 Phase A is a migration and one function; B–D are additive.
 
