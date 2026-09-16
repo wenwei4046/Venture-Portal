@@ -57,6 +57,46 @@ export async function linkErpKey(fd: FormData): Promise<void> {
   revalidatePath('/revenue', 'layout')
 }
 
+/**
+ * The feed window: the earliest order date the portal will keep.
+ *
+ * The ERP back-fills its whole history when a feed is switched on and keeps
+ * pushing edits to documents from years the portal has no use for. Its own
+ * `vp.since` is meant to stop that; this is the portal's half, so a month that
+ * was deleted here stays deleted whatever the ERP is configured to send.
+ * Deliveries from before it are answered 200 `skipped` — a successful delivery
+ * the portal declined to keep, so the ERP's outbox never wedges.
+ *
+ * erp_feed_settings postdates database.types.ts — untyped-client convention.
+ */
+export async function setErpFeedWindow(fd: FormData): Promise<void> {
+  const user = await requirePermission('revenue')
+  const subDepartmentId = String(fd.get('sub_department_id') ?? '').trim()
+  if (!subDepartmentId) throw new Error('No sub-department')
+
+  const raw = String(fd.get('min_order_date') ?? '').trim()
+  if (raw !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    throw new Error('Give the date as YYYY-MM-DD, or leave it empty to accept everything')
+  }
+
+  const supabase = await client()
+  await assertErpSubDepartment(supabase, subDepartmentId)
+
+  const { error } = await supabase.from('erp_feed_settings').upsert(
+    {
+      sub_department_id: subDepartmentId,
+      min_order_date: raw === '' ? null : raw,
+      updated_at: new Date().toISOString(),
+      updated_by: user.id,
+      updated_by_name: user.name,
+    },
+    { onConflict: 'sub_department_id' },
+  )
+  if (error) throw new Error(`Could not save the feed window: ${error.message}`)
+
+  revalidatePath('/revenue', 'layout')
+}
+
 /** Forget the key. The ERP's deliveries answer 401 from here on; nothing already received changes. */
 export async function unlinkErpKey(subDepartmentId: string): Promise<void> {
   await requirePermission('revenue')

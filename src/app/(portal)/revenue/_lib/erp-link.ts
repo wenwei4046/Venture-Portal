@@ -21,16 +21,37 @@ export interface ErpLinkView {
   receiverUrl: string
   /** ERP_SYNC_SECRET is also set on the server — a second accepted key. */
   envSecretSet: boolean
+  /**
+   * The earliest order date the portal keeps. Deliveries dated before it are
+   * answered 200 `skipped`. Null accepts whatever the ERP sends — including
+   * the years of history it back-fills the first time a feed is switched on.
+   */
+  minOrderDate: string | null
+  windowSetByName: string | null
+  windowSetAt: string | null
 }
 
 export async function loadErpLinkView(supabase: SupabaseClient, subDepartmentId: string, receiverUrl: string): Promise<ErpLinkView> {
-  const { data, error } = await supabase
-    .from('erp_links')
-    .select('key_hint, linked_at, linked_by_name')
-    .eq('sub_department_id', subDepartmentId)
-    .maybeSingle()
+  const [{ data, error }, { data: windowData, error: windowError }] = await Promise.all([
+    supabase
+      .from('erp_links')
+      .select('key_hint, linked_at, linked_by_name')
+      .eq('sub_department_id', subDepartmentId)
+      .maybeSingle(),
+    supabase
+      .from('erp_feed_settings')
+      .select('min_order_date, updated_at, updated_by_name')
+      .eq('sub_department_id', subDepartmentId)
+      .maybeSingle(),
+  ])
   if (error) throw new Error(`Could not read the ERP link: ${error.message}`)
+  if (windowError) throw new Error(`Could not read the feed window: ${windowError.message}`)
   const row = (data ?? null) as { key_hint: string; linked_at: string | null; linked_by_name: string | null } | null
+  const win = (windowData ?? null) as {
+    min_order_date: string | null
+    updated_at: string | null
+    updated_by_name: string | null
+  } | null
   return {
     subDepartmentId,
     linked: row !== null,
@@ -39,6 +60,9 @@ export async function loadErpLinkView(supabase: SupabaseClient, subDepartmentId:
     linkedByName: row?.linked_by_name ?? null,
     receiverUrl,
     envSecretSet: secretConfigured(process.env.ERP_SYNC_SECRET),
+    minOrderDate: win?.min_order_date ?? null,
+    windowSetByName: win?.updated_by_name ?? null,
+    windowSetAt: win?.updated_at ?? null,
   }
 }
 

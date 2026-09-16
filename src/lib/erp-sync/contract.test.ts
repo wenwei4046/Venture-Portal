@@ -135,6 +135,23 @@ describe('toCanonicalOrder', () => {
     expect(o.lines[1]).toMatchObject({ lineNo: 2, itemCode: 'PIL-001', amount: 0, brand: null, cost: 0 })
   })
 
+  it('keeps the venue apart from the warehouse, with its spaces tidied', () => {
+    const r = toCanonicalOrder(
+      delivery({ header: header({ venue: '  SPICE   ARENA ', sales_location: 'PG WAREHOUSE' }) }),
+    )
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.order.venue).toBe('SPICE ARENA')
+    expect(r.order.location).toBe('PG WAREHOUSE')
+  })
+
+  it('has no venue when the ERP sent none', () => {
+    const r = toCanonicalOrder(delivery({ header: header({ venue: '   ' }) }))
+    expect(r.ok && r.order.venue).toBeNull()
+    const absent = toCanonicalOrder(delivery())
+    expect(absent.ok && absent.order.venue).toBeNull()
+  })
+
   it('prefers the live balance from the view and falls back to the stored one', () => {
     const live = toCanonicalOrder(delivery({ header: header({ balance_sen_live: 50000, balance_sen: 200000 }) }))
     const stored = toCanonicalOrder(delivery({ header: header({ balance_sen_live: undefined, balance_sen: 200000 }) }))

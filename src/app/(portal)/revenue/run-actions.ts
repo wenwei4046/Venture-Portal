@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { computeCommissionRun as runEngine, monthsBefore } from '@/lib/commission/engine'
 import { toEngineInput, toRunPayload } from '@/lib/commission/run-payload'
+import { fetchByKeys } from '@/lib/paginate'
 import type {
   HierarchyRow,
   ItemGroupRow,
@@ -198,15 +199,18 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
       .or(`effective_to.is.null,effective_to.gte.${asAt}`),
   ])
 
-  // Open Bill picks only for the orders actually in this run.
+  // Open Bill picks only for the orders actually in this run — CHUNKED.
+  //
+  // The run's orders are this month's PLUS everything carried forward, which
+  // is hundreds of ids, and PostgREST takes its filters in the query string.
+  // Asked for 507 of them at once the request fails outright (`TypeError:
+  // fetch failed`), and this used not to read the error: the run then paid no
+  // Open Bill bonus to anybody and said nothing about it. September 2026 lost
+  // RM 18,677 that way before it was caught.
   const orderIds = orderRows.map(o => o.id)
-  const { data: tagRows } =
-    orderIds.length > 0
-      ? await supabase
-          .from('sales_order_open_bill_tags')
-          .select('order_id, bill_rank')
-          .in('order_id', orderIds)
-      : { data: [] }
+  const tagRows = await fetchByKeys<OpenBillTagRow, string>(orderIds, chunk =>
+    supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank').in('order_id', chunk),
+  )
 
   // ── The months before, for the streak gates ────────────────────────────
   // A rung with `personal_sales_threshold` × N months looks back N − 1 months
@@ -235,7 +239,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     kpiItems: rows<KpiItemRow>(kpiItems.data),
     kpiThresholds: rows<KpiThresholdRow>(kpiThresholds.data),
     openBillRules: rows<OpenBillRuleRow>(openBillRules.data),
-    openBillTags: rows<OpenBillTagRow>(tagRows),
+    openBillTags: tagRows,
     marginBands: rows<MarginBandRow>(marginBands.data),
     hierarchy: rows<HierarchyRow>(hierarchy.data),
     orders: orderRows,

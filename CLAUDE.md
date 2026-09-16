@@ -223,6 +223,54 @@ src/
 │   │   │                              `lib/erp-sync/feed-key.ts`,
 │   │   │                              `revenue/link-actions.ts`,
 │   │   │                              `_components/ErpLinkPanel.tsx`.
+│   │   │                              **THE MONTH, UNDERNEATH (2026-09-16):**
+│   │   │                              `[period]/orders` is every bill of the
+│   │   │                              month, filterable by person or venue
+│   │   │                              through the URL, and `orders/[orderId]`
+│   │   │                              is one bill line by line — what each
+│   │   │                              line COUNTS AS (commissionable / KPI /
+│   │   │                              not / group-not-classified) and what it
+│   │   │                              cost. `revenue_month_orders` feeds both
+│   │   │                              and reads a bill the way the ENGINE
+│   │   │                              does: margin over the commissionable
+│   │   │                              base, NULL the moment one of its lines
+│   │   │                              has no cost. An RPC because a month's
+│   │   │                              ~1,700 lines run past PostgREST's
+│   │   │                              1,000-row page.
+│   │   │                              **VENUE + ORGANISER:** `header.venue`
+│   │   │                              (the fair) was always arriving and
+│   │   │                              always dropped — now a column on
+│   │   │                              `sales_orders`, grouped as *Sales by
+│   │   │                              venue*. The ERP sends NOTHING about who
+│   │   │                              ran the event, so `comm_venues` keeps
+│   │   │                              the organiser, typed on that table
+│   │   │                              (`venue-actions.ts`, `lib/venues.ts`).
+│   │   │                              **THE FEED WINDOW:**
+│   │   │                              `erp_feed_settings.min_order_date`
+│   │   │                              (Fair 2026-08-01, edited on the ERP link
+│   │   │                              card) — an order dated before it is
+│   │   │                              answered 200 `skipped` and never becomes
+│   │   │                              a month. The ERP back-filled to 2023 and
+│   │   │                              kept editing those documents; `vp.since`
+│   │   │                              is its half, this is the portal's.
+│   │   │                              **WHAT THE MONTH PAYS:** `[period]/pay`
+│   │   │                              is the salary board — commission by
+│   │   │                              component, employer and employee
+│   │   │                              statutory, tax, net — and
+│   │   │                              `pay/[staffId]` the payslip behind it,
+│   │   │                              Open Bill bill by bill with the rule
+│   │   │                              that paid it. `revenue_pay_preview`
+│   │   │                              returns the INPUTS (pro-rata window,
+│   │   │                              schedule lookups, the payroll row if
+│   │   │                              there is one); the arithmetic is
+│   │   │                              `lib/revenue-pay.ts`, the twin of
+│   │   │                              `compute_hr_monthly_payroll` for
+│   │   │                              `source='commission'` — employer EPF /
+│   │   │                              SOCSO / EIS come OUT of the commission,
+│   │   │                              PCB is read on the basic alone. It is a
+│   │   │                              PREVIEW until the run is synced, and
+│   │   │                              says so when payroll disagrees.
+│   │   │                              Migs `20260917020000` / `030000`.
 │   │   │                              IR rules: commission spec §15; two layers,
 │   │   │                              repeated own sales per group, monthly
 │   │   │                              packages and a 4% fallback. SDL retains

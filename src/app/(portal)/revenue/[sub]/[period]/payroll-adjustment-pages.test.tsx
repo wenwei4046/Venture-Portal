@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), requireSubDepartment: vi.fn() }))
+vi.mock('server-only', () => ({}))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/app/(portal)/revenue/_lib/sub-departments', () => ({ requireSubDepartment: mocks.requireSubDepartment }))
@@ -27,8 +28,13 @@ function database() {
     }
     return query
   })
-  const rpc = vi.fn().mockResolvedValue({ data:[{ staff_id:'staff',commission_synced_amount:13000,commission_adjustment_amount:-500,
-    commission_adjustment_reason:'DN from cancelled sale',commission_amount:12500,status:'draft',source_run_count:2 }], error:null })
+  // The month page reads its orders through revenue_month_orders; only the
+  // adjustments RPC is what these assertions are about.
+  const rpc = vi.fn((name: string) =>
+    name === 'revenue_month_orders'
+      ? Promise.resolve({ data:[], error:null })
+      : Promise.resolve({ data:[{ staff_id:'staff',commission_synced_amount:13000,commission_adjustment_amount:-500,
+          commission_adjustment_reason:'DN from cancelled sale',commission_amount:12500,status:'draft',source_run_count:2 }], error:null }))
   mocks.createClient.mockResolvedValue({ from,rpc })
   return { from,rpc }
 }
@@ -45,7 +51,8 @@ describe('Revenue pages preserve source commission while reading monthly payroll
     expect(container.querySelector('.hero-walnut')).not.toHaveTextContent('RM 12,500.00')
     expect(screen.getByRole('table', { name:'Monthly payroll adjustments by salesperson' })).toHaveTextContent('RM 12,500.00')
     expect(screen.getByText('DN from cancelled sale')).toBeVisible()
-    expect(rpc).toHaveBeenCalledExactlyOnceWith('revenue_payroll_adjustments',{p_sub_department_id:'sub-id',p_period:'2026-09-01',p_staff_id:null})
+    expect(rpc).toHaveBeenCalledWith('revenue_payroll_adjustments',{p_sub_department_id:'sub-id',p_period:'2026-09-01',p_staff_id:null})
+    // The point of the RPC: payroll is never read row by row from this page.
     expect(from).not.toHaveBeenCalledWith('hr_monthly_payroll')
     expect(mocks.requirePermission).toHaveBeenCalledWith('revenue')
   })

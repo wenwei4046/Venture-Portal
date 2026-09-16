@@ -28,6 +28,12 @@
  *     name without a second lookup; `agent` is the fallback.
  *   - Lines: `line_cost_sen` is the cost the commission margin was waiting for.
  *     Cancelled lines (`cancelled = true`) are not lines.
+ *   - Where it was sold: `sales_location` is the WAREHOUSE (KL / PG / SRW) and
+ *     becomes the portal's `location`; `venue` is the fair itself — "SUNWAY
+ *     PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB" — free text the ERP
+ *     types (its `venue_id` is never populated) and its own column here. The
+ *     ERP sends nothing about who ORGANISED the event; `comm_venues` on the
+ *     portal carries that.
  *
  * PII is dropped before anything is stored: the header carries the customer's
  * addresses, phone, email and emergency contacts, and `customer_po_image_b64`
@@ -104,6 +110,8 @@ export interface CanonicalOrder {
   customerName: string | null
   debtorCode: string | null
   location: string | null
+  /** Where the fair was held (`header.venue`). Not `location`, which is the warehouse. */
+  venue: string | null
   brand: string | null
   total: number
   balance: number | null
@@ -158,6 +166,19 @@ function isoTimestamp(v: unknown): string | null {
   if (!s) return null
   const d = new Date(s)
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/**
+ * A venue name with its whitespace tidied — "SPICE  ARENA " → "SPICE ARENA".
+ *
+ * The ERP types the venue by hand (its own `venue_id` is never populated), so
+ * the same place arrives with stray spaces. Squeezing them here means the
+ * portal's column, its grouping and `venue_key()` in SQL all agree, and the
+ * ERP is never asked to be tidy.
+ */
+export function normaliseVenue(v: unknown): string | null {
+  const s = text(v)
+  return s === null ? null : s.replace(/\s+/g, ' ')
 }
 
 /** The ERP's status label in the portal's spelling: upper-case, underscores. */
@@ -236,6 +257,7 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
         customerName: null,
         debtorCode: null,
         location: null,
+        venue: null,
         brand: null,
         total: 0,
         balance: null,
@@ -281,6 +303,7 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
       customerName: text(header.debtor_name),
       debtorCode: text(header.debtor_code),
       location: text(header.sales_location),
+      venue: normaliseVenue(header.venue),
       brand: text(header.branding),
       total,
       balance,

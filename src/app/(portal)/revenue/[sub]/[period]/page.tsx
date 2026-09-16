@@ -6,9 +6,13 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
 import { ratePct } from '@/lib/commission/ranks'
+import { salesByVenue, venueKey } from '@/lib/venues'
+import { agentKeyOf } from '@/lib/erp-sync/contract'
 import RunControls from './_components/RunControls'
+import VenueSection from './_components/VenueSection'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
+import { loadMonthOrders } from '../../_lib/month-orders'
 import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
 
@@ -121,39 +125,17 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     unmatched_agent_count: number
   } | null
 
-  const { data: orderRows } = batchRow
-    ? await supabase
-        .from('sales_orders')
-        .select('id, order_no, agent_name, agent_key, staff_id, brand_code, order_total, paid_amount, manual_margin_pct, sequence_in_day, hr_staff_costs (employee_name)')
-        .eq('batch_id', batchRow.id)
-        // A live month carries its excluded orders (cancelled, held, draft) so
-        // the feed can bring them back; the money below is the live ones'.
-        .eq('cancelled', false)
-    : { data: null }
+  // One RPC for the whole month rather than a select per fact. The LINES in
+  // particular cannot be read from the page: a Fair month has ~1,700 of them
+  // and PostgREST hands back the first thousand without saying so, which is
+  // how "lines without a cost" used to under-report by a third.
+  const monthOrders = batchRow ? await loadMonthOrders(supabase, subDept.id, period) : []
+  // A live month carries its excluded orders (cancelled, held, draft) so the
+  // feed can bring them back; the money below is the live ones'.
+  const orders = monthOrders.filter(o => !o.cancelled)
 
-  const orders = ((orderRows ?? []) as unknown as Array<{
-    id: string
-    order_no: string
-    agent_name: string
-    agent_key: string
-    staff_id: string | null
-    brand_code: string | null
-    order_total: number | string
-    paid_amount: number | string | null
-    manual_margin_pct: number | string | null
-    hr_staff_costs: { employee_name: string } | null
-  }>)
-
-  const { data: costRows } = batchRow
-    ? await supabase
-        .from('sales_order_lines')
-        .select('cost_amount, brand_code, sales_orders!inner (batch_id)')
-        .eq('sales_orders.batch_id', batchRow.id)
-    : { data: null }
-
-  const lines = ((costRows ?? []) as unknown as Array<{ cost_amount: number | null; brand_code: string | null }>)
-  const linesWithoutCost = lines.filter(l => l.cost_amount === null).length
-  const linesWithoutBrand = lines.filter(l => !l.brand_code).length
+  const linesWithoutCost = orders.reduce((a, o) => a + o.linesWithoutCost, 0)
+  const linesWithoutBrand = orders.reduce((a, o) => a + o.linesWithoutBrand, 0)
 
   // The deposit gate is a scheme setting, so it is THIS sub-department's.
   const { data: scheme } = subDept.schemeId
@@ -220,23 +202,36 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
 
   // Before a run exists the deposit gate is shown from live orders; once it
   // does, from the run's own snapshot of what it held back.
-  const belowDeposit =
-    threshold === null
-      ? []
-      : orders.filter(o => Number(o.paid_amount ?? 0) + 0.005 < Number(o.order_total) * threshold)
+  const belowDeposit = threshold === null ? [] : orders.filter(o => !o.depositMet)
 
-  const unmatched = orders.filter(o => !o.staff_id)
-  const total = orders.reduce((a, o) => a + Number(o.order_total), 0)
+  const unmatched = orders.filter(o => !o.staffId)
+  const total = orders.reduce((a, o) => a + o.orderTotal, 0)
 
-  const bySalesperson = new Map<string, { name: string; orders: number; total: number }>()
+  // Sales by person and by venue, from the same rows, so the two sections can
+  // never disagree about what the month contains.
+  const bySalesperson = new Map<
+    string,
+    { key: string; staffId: string | null; name: string; orders: number; total: number; held: number }
+  >()
   for (const o of orders) {
-    const name = o.hr_staff_costs?.employee_name ?? `${o.agent_name} (unmatched)`
-    const e = bySalesperson.get(name) ?? { name, orders: 0, total: 0 }
+    const key = o.staffId ?? `agent:${o.agentName}`
+    const name = o.employeeName ?? `${o.agentName} (unmatched)`
+    const e = bySalesperson.get(key) ?? { key, staffId: o.staffId, name, orders: 0, total: 0, held: 0 }
     e.orders++
-    e.total += Number(o.order_total)
-    bySalesperson.set(name, e)
+    e.total += o.orderTotal
+    if (!o.depositMet) e.held += o.orderTotal
+    bySalesperson.set(key, e)
   }
   const people = [...bySalesperson.values()].sort((a, b) => b.total - a.total)
+
+  const venueRows = salesByVenue(
+    orders.map(o => ({ venue: o.venue, staffKey: o.staffId ?? o.agentName, amount: o.orderTotal })),
+    new Map(
+      orders
+        .filter(o => venueKey(o.venue))
+        .map(o => [venueKey(o.venue)!, { displayName: o.venue ?? '', organizer: o.organizer }]),
+    ),
+  )
 
   return (
     <div>
@@ -247,13 +242,29 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           </div>
           <h1 className="page-title">{label(period)}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href={revenuePath(subDept.slug)}
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
           >
             ← All months
           </Link>
+          {batchRow ? (
+            <Link
+              href={revenuePath(subDept.slug, period, 'orders')}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            >
+              All bills
+            </Link>
+          ) : null}
+          {run ? (
+            <Link
+              href={revenuePath(subDept.slug, period, 'pay')}
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            >
+              What this pays
+            </Link>
+          ) : null}
           {batchRow?.source === 'erp_sync' ? (
             <span className="font-mono text-[11px] uppercase tracking-[0.02em] text-ledger border border-hairline bg-surface px-3 py-2 rounded-control">
               Live from ERP
@@ -284,7 +295,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               <Tile label="Orders" value={String(orders.length)} />
               <Tile
                 label="Unmatched agents"
-                value={String(new Set(unmatched.map(o => o.agent_key)).size)}
+                value={String(new Set(unmatched.map(o => agentKeyOf(o.agentName))).size)}
                 warn={unmatched.length > 0}
               />
               <Tile
@@ -558,12 +569,19 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                           </LedgerRow>
                         ))
                       : belowDeposit.slice(0, 40).map(o => (
-                          <LedgerRow key={o.id}>
-                            <td className="font-mono text-xs">{o.order_no}</td>
-                            <td className="m-hide" data-label="Salesperson">{o.hr_staff_costs?.employee_name ?? o.agent_name}</td>
-                            <td className="num m-hide" data-label="Order total">{formatMoney(Number(o.order_total))}</td>
-                            <td className="num m-hide" data-label="Paid">{formatMoney(Number(o.paid_amount ?? 0))}</td>
-                            <td className="num">{formatMoney(Number(o.order_total) * threshold)}</td>
+                          <LedgerRow key={o.orderId}>
+                            <td className="font-mono text-xs">
+                              <Link
+                                href={revenuePath(subDept.slug, period, 'orders', o.orderId)}
+                                className="text-ink hover:text-accent"
+                              >
+                                {o.orderNo}
+                              </Link>
+                            </td>
+                            <td className="m-hide" data-label="Salesperson">{o.employeeName ?? o.agentName}</td>
+                            <td className="num m-hide" data-label="Order total">{formatMoney(o.orderTotal)}</td>
+                            <td className="num m-hide" data-label="Paid">{formatMoney(o.paidAmount)}</td>
+                            <td className="num">{formatMoney(o.depositRequired ?? o.orderTotal * threshold)}</td>
                           </LedgerRow>
                         ))}
                   </tbody>
@@ -571,6 +589,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               </div>
             </section>
           ) : null}
+
+          <VenueSection rows={venueRows} ordersPath={revenuePath(subDept.slug, period, 'orders')} />
 
           <section>
             <div className="sect-head">
@@ -583,17 +603,29 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                 <thead>
                   <tr>
                     <th>Salesperson</th>
-                    <th className="right">Orders</th>
+                    <th className="right">Bills</th>
+                    <th className="right m-hide">Waiting on a deposit</th>
                     <th className="right">Sales value</th>
+                    <th className="lt-toggle" aria-hidden />
                   </tr>
                 </thead>
                 <tbody>
                   {people.map(p => (
-                    <tr key={p.name}>
-                      <td>{p.name}</td>
+                    <LedgerRow key={p.key}>
+                      <td>
+                        <Link
+                          href={`${revenuePath(subDept.slug, period, 'orders')}?staff=${p.staffId ?? 'unmatched'}`}
+                          className={p.staffId ? 'text-ink hover:text-accent' : 'text-danger hover:underline'}
+                        >
+                          {p.name}
+                        </Link>
+                      </td>
                       <td className="num">{p.orders}</td>
+                      <td className="num m-hide" data-label="Waiting on a deposit">
+                        {p.held === 0 ? '—' : <span className="neg">{formatMoney(p.held)}</span>}
+                      </td>
                       <td className="num">{formatMoney(p.total)}</td>
-                    </tr>
+                    </LedgerRow>
                   ))}
                 </tbody>
               </table>

@@ -126,7 +126,8 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | salesperson identity | `salesperson.id` ?? `header.salesperson_id` | matched to a portal staff row once, remembered (`comm_agent_aliases.erp_salesperson_id`) |
 | salesperson name | `salesperson.name` ?? `header.agent` | display, and the fallback match on spelling |
 | customer | `header.debtor_name`, `header.debtor_code` | |
-| branch | `header.sales_location` | descriptive only |
+| branch | `header.sales_location` | the WAREHOUSE the goods ship from (KL / PG / SRW). Stored as `location`; descriptive only |
+| **venue** | `header.venue` | **the fair itself** — "SUNWAY PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB". Free text the ERP types (`venue_id` is present but never populated). Its own column since 2026-09-16, with sales grouped by it on the month page |
 | brand | `header.branding` | matched to `comm_brands` by code or name, case-insensitive; else from the lines' `branding`; else Item Code prefixes; else none (warning) |
 | sales value | `header.local_total_sen` / 100 | the list's "Amount" (`subtotal_sen` as fallback) |
 | balance | `header.balance_sen_live` / 100 (else `balance_sen`) | what the deposit gate measures |
@@ -134,6 +135,33 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | company | `header.company_id` | stored; Houzs = 1 |
 | lines | `items[]` where `cancelled = false`, by `line_no` | `item_group`, `item_code`, `description`, `qty`, `unit_price_sen`, `total_sen`, `branding` |
 | **line cost** | `items[].line_cost_sen` / 100 | **the cost source the margin layer was waiting for.** 0 on a priced line = unknown → Product List fallback → warning |
+
+
+### What it does NOT send — the organiser
+
+Nothing in the delivery says who ORGANISED an event. `venue` names the place;
+`sales_location` names the warehouse; there is no promoter, host or organiser
+field anywhere in the header, the items or the payments (checked against every
+delivery the portal holds, 2026-09-16). The portal keeps that fact itself, in
+`comm_venues` — one row per venue spelling the ERP sends, with an `organizer`
+typed on Revenue → the month → *Sales by venue*. If the ERP ever gains the
+column, the portal can read it instead; until then nobody should expect the
+feed to carry it.
+
+### The feed window — orders the portal will not keep
+
+`erp_feed_settings.min_order_date` (Fair: **2026-08-01**) is the earliest order
+date the portal stores. A delivery dated before it is answered **200
+`skipped`** — "dated before the feed window" — and no month is created for it.
+An order whose date is EDITED backwards out of the window is removed and
+answered `applied` ("removed: re-dated before the feed window").
+
+It exists because the ERP back-filled its whole history the first time the feed
+was switched on (2,960 orders across 35 months, back to 2023-08) and kept
+pushing edits to those documents afterwards. `vp.since` is meant to stop that on
+the ERP's side; this is the portal's half, so a month deleted here stays
+deleted whatever the ERP is configured to send. It is edited on the *Houzs ERP
+link* card, beside the key.
 
 ---
 
@@ -147,7 +175,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
 | `held` | the month's commission run is **applied/locked**, or the month was **file-imported** | no — payload kept; HR replays after reopening the run |
-| `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw | no |
+| `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window | no |
 
 **Commission rule, mirrored from the ERP** (`scm/shared/hr-commission.ts`,
 `COMMISSION_EXCLUDED_STATUSES`): `CANCELLED`, `DRAFT`, the retired `ON_HOLD`
