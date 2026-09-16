@@ -7,6 +7,8 @@ import { insightChecks } from './insight-checks.mjs'
 import { arenaChecks } from './arena-checks.mjs'
 import { kpiSummaryChecks } from './kpi-summary-checks.mjs'
 import { principalParityChecks } from './principal-parity-checks.mjs'
+import { insightGroupChecks } from './insight-group-checks.mjs'
+import { performanceFactsChecks } from './performance-facts-checks.mjs'
 const migrations = new URL('../../supabase/migrations/', import.meta.url)
 const db=new PGlite({extensions:{btree_gist}})
 const principal='10000000-0000-4000-8000-000000000001',dept='10000000-0000-4000-8000-000000000002'
@@ -222,5 +224,7 @@ try{
  await arenaChecks({db,q,one,check,reject,migrate,asUser,principal,first,second,dept,fair,ir,scheme,staff1,staff2,product,run,batch,period,today});
  await kpiSummaryChecks({db,q,one,check,reject,migrate,asUser,principal,first,second,dept,fair,ir,scheme,staff1,staff2,product,run,batch,period,today});
  await principalParityChecks({db,q,one,check,reject,migrate,asUser,principal,first,second,dept,fair,ir,scheme,staff1,staff2,product,run,batch,period,today});
+ await insightGroupChecks({db,q,one,check,reject,migrate,asUser,principal,first,second,dept,fair,ir,scheme,staff1,staff2,product,run,batch,period,today});
+ await performanceFactsChecks({db,q,one,check,reject,migrate,asUser,principal,first,second,dept,fair,ir,scheme,staff1,staff2,product,run,batch,period,today});
  console.log(`PASS: ${checks} member SQL checks. Disposable synthetic auth/payroll/Storage; real Revenue and member migrations. No live database connection.`)
 }catch(error){console.error(JSON.stringify({message:error.message,code:error.code,where:error.where,detail:error.detail,query:error.query,stack:error.name==='AssertionError'?error.stack:undefined},null,2));process.exitCode=1}finally{await db.close()}

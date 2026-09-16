@@ -67,7 +67,7 @@ import TodayKpiSummary from "./design-preview/TodayKpiSummary";
 import { todayKpiSummary } from "./design-preview/today-kpi-model";
 import liveStyles from "./MemberLiveWorkspace.module.css";
 import { MemberLiveHeader, MemberLiveNav } from "./MemberLiveChrome";
-import { LiveBrandMarginList, hasCompleteLiveOrders } from "./LiveBrandMarginList";
+import { LiveBrandMarginList, hasCompleteLiveOrders, hasNoGoodsMargin } from "./LiveBrandMarginList";
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import MemberArena from "./MemberArena";
@@ -1367,14 +1367,14 @@ export default function MemberWorkspace({
           ["IR group reward", income?.group],
         ];
     const allOrders = member?.calculator ? data.orders : [];
+    const orderBand = (order: (typeof allOrders)[number]) => hasNoGoodsMargin(order)
+      ? { label: "No goods margin", tone: "neutral" as const, multiplier: 1 }
+      : bandFor(order.margin, data.bands.filter(band => band.brand === order.brand));
     const orders = allOrders.filter((o) => {
-      const band = bandFor(
-        o.margin,
-        data.bands.filter((b) => b.brand === o.brand),
-      );
+      const band = orderBand(o);
       return (
         orderFilter === "All" ||
-        (orderFilter === "Pending data" && o.margin === null) ||
+        (orderFilter === "Pending data" && o.margin === null && !hasNoGoodsMargin(o)) ||
         (orderFilter === "With deductions" && band.multiplier < 1) ||
         band.label.startsWith(orderFilter)
       );
@@ -1545,10 +1545,7 @@ export default function MemberWorkspace({
             </div>
             {orders.length ? (
               orders.map((o) => {
-                const b = bandFor(
-                  o.margin,
-                  data.bands.filter((x) => x.brand === o.brand),
-                );
+                const b = orderBand(o);
                 return (
                   <button
                     key={o.id}
@@ -1560,7 +1557,7 @@ export default function MemberWorkspace({
                           <div className={s.stack}>
                             <div className={s.row}>
                               <span className={s.quoteValue}>
-                                {o.margin === null
+                                {hasNoGoodsMargin(o) || o.margin === null
                                   ? "—"
                                   : o.margin.toFixed(2) + "%"}
                               </span>
@@ -1571,17 +1568,17 @@ export default function MemberWorkspace({
                               <dd>{o.brand}</dd>
                               <dt>Order date</dt>
                               <dd>{o.date}</dd>
-                              <dt>Product amount</dt>
+                              <dt>Commissionable amount</dt>
                               <dd>{money(o.revenue)}</dd>
                               <dt>Margin source</dt>
                               <dd>
-                                {o.manual
+                                {hasNoGoodsMargin(o) ? "Not applicable" : o.manual
                                   ? "Manual adjustment"
                                   : "Product and gift costs"}
                               </dd>
                             </dl>
                             <p className={s.sub}>
-                              {o.margin === null
+                              {hasNoGoodsMargin(o) ? "This order has no positive goods revenue as a margin basis. Its sales and KPI quantities remain in their totals; no goods margin applies." : o.margin === null
                                 ? "Cost data is incomplete. Margin cannot be assessed yet."
                                 : b.multiplier < 1
                                   ? `Product commission, Open Bill and upline override for this order use ×${b.multiplier}. Fixed KPI allowances are unaffected.`
@@ -1600,7 +1597,7 @@ export default function MemberWorkspace({
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div className={s.amount}>
-                        {o.margin === null
+                        {hasNoGoodsMargin(o) ? "Not applicable" : o.margin === null
                           ? "Awaiting cost"
                           : o.margin.toFixed(2) + "%"}
                       </div>

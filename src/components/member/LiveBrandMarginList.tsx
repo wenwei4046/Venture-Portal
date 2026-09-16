@@ -21,7 +21,16 @@ export function hasCompleteLiveOrders(block: MemberInsightBlock): boolean {
     block.orders.filter((order) => order.cleared).length === block.me.orders;
 }
 
-/** Own deposit-cleared revenue, weighted by amount; a missing cost is never zero margin. */
+/** Goods-only margin basis; legacy snapshots used revenue for the same basis. */
+const marginRevenue = (order: MemberInsightOrder) => order.marginRevenue ?? order.revenue;
+
+/** Finite nonpositive goods revenue is inapplicable, rather than a missing cost. */
+export function hasNoGoodsMargin(order: { marginRevenue?: number; revenue: number }): boolean {
+  const basis = order.marginRevenue ?? order.revenue;
+  return Number.isFinite(basis) && basis <= 0;
+}
+
+/** Deposit-cleared goods margin, weighted by goods revenue, excluding non-goods KPI sales. */
 export function summarizeLiveBrandMargins(
   orders: readonly MemberInsightOrder[],
   bands: readonly MemberBand[],
@@ -31,12 +40,16 @@ export function summarizeLiveBrandMargins(
   return brands.map((brand) => {
     const selected = orders.filter((order) => order.brand === brand);
     const cleared = selected.filter((order) => order.cleared);
-    const costed = cleared.filter((order) => order.margin !== null && Number.isFinite(order.margin));
-    const revenue = costed.reduce((total, order) => total + order.revenue, 0);
+    // KPI-only orders and nonpositive goods returns have no applicable margin.
+    // Malformed bases remain pending instead of silently qualifying a brand.
+    const marginOrders = cleared.filter((order) => marginRevenue(order) > 0 || !Number.isFinite(marginRevenue(order)));
+    const costed = marginOrders.filter((order) => order.margin !== null && Number.isFinite(order.margin)
+      && Number.isFinite(marginRevenue(order)) && marginRevenue(order) > 0);
+    const revenue = costed.reduce((total, order) => total + marginRevenue(order), 0);
     const margin = revenue > 0
-      ? costed.reduce((total, order) => total + order.revenue * order.margin!, 0) / revenue
+      ? costed.reduce((total, order) => total + marginRevenue(order) * order.margin!, 0) / revenue
       : null;
-    const unknownMarginCount = cleared.length - costed.length;
+    const unknownMarginCount = marginOrders.length - costed.length;
     const brandBands = bands.filter((band) => band.brand === brand && band.kind === "incentive");
     const attained = margin === null ? undefined : brandBands
       .filter((band) => margin + 1e-10 >= band.threshold)

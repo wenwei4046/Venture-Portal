@@ -6,6 +6,7 @@ import type { MemberData, MemberMembership, MemberPage, MemberPerson, MemberRequ
 import base from "./member.module.css";
 import preview from "./design-preview/RevenueWorkspacePreview.module.css";
 import { Icon, initials } from "./MemberUI";
+import { hasNoGoodsMargin } from "./LiveBrandMarginList";
 import p from "./PrincipalRevenuePanels.module.css";
 
 // Principal keeps its authorised department data while sharing the approved C UI.
@@ -134,7 +135,7 @@ export default function PrincipalRevenuePanels({ data, member, page, navigate, o
           <section className={s.card}><SectionHeading icon="file" tone="amber">Commission rules</SectionHeading><p className={s.sub}>Each member follows their own title, rank and scheme. Review the department rules in Principal view.</p><RevenueManagementButton destination="/revenue">Revenue configuration</RevenueManagementButton></section>
         </div>
       </div>
-      {member.calculator && <section className={`${s.card} ${p.section}`}><h2>Team orders · margin</h2><p className={s.caption}>Recent Fair product orders. Additional charges are excluded from margin.</p>{orders.length ? orders.map(order => <div key={order.id} className={s.listRow}><div><h3>{order.number}</h3><p className={s.caption}>{order.brand} · {order.date}</p></div><div className={p.orderAmount}><strong>{money(order.revenue)}</strong><p className={s.caption}>{order.margin == null ? "Cost data needed" : `${order.margin.toFixed(2)}% margin`}</p></div></div>) : <p className={s.sub}>No recorded orders for this department.</p>}</section>}
+      {member.calculator && <section className={`${s.card} ${p.section}`}><h2>Team orders · margin</h2><p className={s.caption}>Recent Fair product orders. Additional charges are excluded from margin.</p>{orders.length ? orders.map(order => <div key={order.id} className={s.listRow}><div><h3>{order.number}</h3><p className={s.caption}>{order.brand} · {order.date}</p></div><div className={p.orderAmount}><strong>{money(order.revenue)}</strong><p className={s.caption}>{hasNoGoodsMargin(order) ? "No positive goods margin basis" : order.margin == null ? "Cost data needed" : `${order.margin.toFixed(2)}% margin`}</p></div></div>) : <p className={s.sub}>No recorded orders for this department.</p>}</section>}
     </>}
 
     {page === "team" && <div className={s.grid}>

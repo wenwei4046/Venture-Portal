@@ -24,6 +24,18 @@ function panel(page: MemberPage) {
 }
 
 describe("Principal C Revenue panels", () => {
+  it("distinguishes KPI-only and negative goods orders from missing costs", () => {
+    const data = principalData();
+    data.orders = [
+      { id: "kpi", number: "KPI-only", brand: "Akemi", revenue: 900, marginRevenue: 0, margin: null, date: "2026-09-16" },
+      { id: "return", number: "Return", brand: "Akemi", revenue: -100, marginRevenue: -100, margin: 90, date: "2026-09-16", manual: true },
+      { id: "blind", number: "Blind goods", brand: "Akemi", revenue: 100, marginRevenue: 100, margin: null, date: "2026-09-16" },
+    ];
+    render(<PrincipalRevenuePanels data={data} member={data.memberships[0]} page="income" dark={false} navigate={vi.fn()} onRequest={vi.fn()} onMemo={vi.fn()} onTheme={vi.fn()} />);
+    expect(screen.getAllByText("No positive goods margin basis")).toHaveLength(2);
+    expect(screen.getAllByText("Cost data needed")).toHaveLength(1);
+    expect(screen.queryByText("90.00% margin")).not.toBeInTheDocument();
+  });
   it("retains department income and period selection while using the shared design classes", () => {
     const { container } = panel("income");
     expect(container.querySelector('[data-principal-page="income"]')).toBeInTheDocument();

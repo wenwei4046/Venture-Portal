@@ -28,10 +28,48 @@ and eligible membership. Shared calculation helpers deny direct authenticated/an
 execution; employee identity and write functions are unchanged. Hosted grants and
 source hash verified. Unrelated `17020000`/`17030000` migrations were not applied.
 
-Validation: 2,080 unit/component tests pass (3 files skipped), 582 disposable SQL
-checks pass, source TypeScript and the first isolated production build pass.
-Final production build/release and actual logged-in mobile/PC verification are
-being completed in this session; do not treat this paragraph as deployment proof.
+The functional release `551f9636d3bbf2303c4d73737e78bd7b5bf82207` is deployed to
+production, with Vercel success and GitHub CI run `35081388110` passing both jobs.
+Actual logged-in Principal checks covered PC (1440px) and phone (390px): complete
+navigation, real member switching, Personal/Team Insight, Arena ranking/brand/
+quarterly filters, Profile management links, full Map and selected-branch List,
+empty IR map access, Quote catalogue and read-only brand weeks. No console errors
+or mobile horizontal overflow were observed. The signed-in identity stayed Principal.
+
+Live verification revealed older performance reads matching uppercase configured
+item groups against lowercase ERP groups, producing false zero Insight/Income
+sales while Arena was correct. Follow-up migrations `20260917050000` and
+`20260917060000` now use normalized matching and one private `member_order_facts`
+calculation across Insight, Arena and recent Income orders. Latest committed
+documents resolve before owner/cancel/date filters; recognition follows the
+department's release month, otherwise the current open month. KPI uses its
+enabled switch and recognition month-end, deposits round to cents, and only
+positive goods revenue weights margin. KPI-only and nonpositive goods orders
+are not missing-cost orders. Recent Income retains the source-month window;
+the 200-order detail cap never truncates aggregate performance. No orders,
+commission statements, payroll or payments were written by these corrections.
+
+Both follow-up migrations were applied atomically with absence guards, an
+advisory lock, exact-source history and schema reload; private helper grants
+remain closed. Hosted source hashes were verified:
+`17050000` = `abd3a3f63240a3da57aa58ec1ca66ce7` (26,052 bytes);
+`17060000` = `d2ddf3a887a70fe7411c2d2ec38841d7` (28,707 bytes).
+Do not replay any of these migrations. The original `17040000` is unchanged.
+
+Post-correction live checks: ANTHONY September Insight and Arena both show
+RM104,700 cleared sales (27 orders), with RM56,918 held; August has zero recognized
+sales instead of repeating unreleased carry-over. Returning from August Insight
+to Today restores September progress. Principal Income recent orders now show
+actual sales/margins. Missing real costs remain pending. SQL regression coverage
+is 801 passing checks, including unchanged Arena JSON over all windows, shared
+performance totals, historical recognition, scope, duplicate documents, KPI,
+margin, detail caps and denial of direct private-helper access.
+
+Final follow-up validation: 2,087 unit/component tests pass (182 test files,
+3 skipped), 801 disposable SQL checks pass, and the isolated production build
+passes. Independent SQL authorization/calculation and UI margin reviews found no
+release blockers. The Vercel production deployment is driven by this branch's
+fast-forward push to `origin/main`; never publish a different worktree's changes.
 
 Fair event identity/date integration, weekly finishes, historical Fair records and
 dependent Championship scoring remain explicitly deferred by the user. All other

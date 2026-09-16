@@ -781,6 +781,17 @@ Today and Insight share real cleared-order brand margins and brand-specific orde
 entry. Incomplete cost/order coverage stays pending. Insight has Personal and Team
 views, month selection, brand-based order filters, order details and team facts.
 
+Insight, Arena and recent Income orders share the private `member_order_facts`
+calculation. It resolves the latest committed document before ownership,
+cancellation and date filters, then recognizes the department's released month
+or the current open month. Historical views never repeat unreleased carry-over.
+Item groups and KPI codes match without case or surrounding-space differences;
+enabled KPI rules use recognition month-end. Deposit thresholds round to cents.
+Only positive commissionable goods revenue weights margin; KPI-only revenue and
+nonpositive goods returns are not missing-cost orders. Recent Income retains its
+source-month window, and the 200-order detail cap never truncates aggregate totals.
+These are performance reads; commission statements and payment records are unchanged.
+
 Live Arena uses `member_arena_snapshot` for Monthly / Quarterly / Annual sales,
 margin and KPI rankings, including brand filters and the approved medal podium.
 Brand weeks are saved through an authenticated own-membership RPC, choosing 4 or 5

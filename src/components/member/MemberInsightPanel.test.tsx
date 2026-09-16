@@ -54,6 +54,36 @@ describe("Live brand margins", () => {
     expect(rows[1]).toMatchObject({ brand: "Zanotti", margin: 40, tier: "Below tier", threshold: null });
   });
 
+  it("weights goods-only margins without letting non-goods KPI sales inflate a brand's tier", () => {
+    const mixed = [
+      order("mixed", { revenue: 1000, marginRevenue: 100, margin: 50 }),
+      order("goods", { revenue: 100, marginRevenue: 100, margin: 0 }),
+    ];
+    expect(summarizeLiveBrandMargins(mixed, bands, true)[0]).toMatchObject({ margin: 25, tier: "Below tier", unknownMarginCount: 0 });
+    expect(mixed.map(item => item.revenue)).toEqual([1000, 100]);
+  });
+
+  it("does not treat cleared KPI-only orders as missing goods costs", () => {
+    const mixed = [
+      order("goods", { revenue: 100, marginRevenue: 100, margin: 50 }),
+      order("kpi-only", { revenue: 900, marginRevenue: 0, margin: null }),
+      order("held-goods", { revenue: 100, marginRevenue: 100, margin: null, cleared: false }),
+    ];
+    expect(summarizeLiveBrandMargins(mixed, bands, true)[0]).toMatchObject({ margin: 50, tier: "Tier 1 threshold", unknownMarginCount: 0, clearedOrders: 2, pendingOrders: 1 });
+    expect(summarizeLiveBrandMargins([mixed[1]], bands, true)[0]).toMatchObject({ margin: null, unknownMarginCount: 0 });
+    expect(summarizeLiveBrandMargins([...mixed, order("blind-goods", { marginRevenue: 100, margin: null })], bands, true)[0]).toMatchObject({ unknownMarginCount: 1, tier: "Pending" });
+  });
+
+  it("excludes nonpositive goods returns even when a manual margin was entered", () => {
+    const returns = [
+      order("manual-return", { revenue: -100, marginRevenue: -100, margin: 90, manual: true }),
+      order("uncosted-return", { revenue: -200, marginRevenue: -200, margin: null }),
+    ];
+    expect(summarizeLiveBrandMargins([order("goods", { revenue: 100, marginRevenue: 100, margin: 50 }), ...returns], bands, true)[0])
+      .toMatchObject({ margin: 50, unknownMarginCount: 0, tier: "Tier 1 threshold", clearedOrders: 3 });
+    expect(summarizeLiveBrandMargins(returns, bands, true)[0]).toMatchObject({ margin: null, unknownMarginCount: 0 });
+  });
+
   it("shows partial margins as pending without awarding a tier from known orders", () => {
     const rows = summarizeLiveBrandMargins(orders, bands, true);
     expect(rows[1]).toMatchObject({ margin: 40, unknownMarginCount: 1, tier: "Pending", tone: "pending" });
@@ -86,6 +116,39 @@ describe("Live brand margins", () => {
 });
 
 describe("Production Insight navigation", () => {
+  it("separates inapplicable goods margin from missing costs in filters, groups and details", () => {
+    const value = snapshot();
+    value.blocks[0].orders = [
+      order("kpi-only", { revenue: 900, marginRevenue: 0, margin: null }),
+      order("return", { revenue: -100, marginRevenue: -100, margin: 90, manual: true }),
+      order("blind-goods", { revenue: 100, marginRevenue: 100, margin: null }),
+    ];
+    value.blocks[0].me.orders = 3;
+    render(<Harness insight={value} initialScreen="orders" />);
+    fireEvent.change(screen.getByLabelText("Margin status"), { target: { value: "pending" } });
+    expect(screen.getAllByRole("button", { name: /View order SO-/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "View order SO-blind-goods" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Margin status"), { target: { value: "threshold" } });
+    expect(screen.queryByRole("button", { name: "View order SO-return" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Margin status"), { target: { value: "all" } });
+    fireEvent.change(screen.getByLabelText("Group orders by"), { target: { value: "margin" } });
+    expect(within(screen.getByRole("region", { name: "No goods margin orders" })).getAllByRole("button", { name: /View order SO-/ })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "View order SO-return" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("no positive goods revenue as a margin basis");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Not applicable");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent("No unit cost");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent("90.0%");
+  });
+  it("keeps order sales totals intact while showing the goods-weighted brand margin", () => {
+    const value = snapshot();
+    value.blocks[0].orders = [order("mixed", { revenue: 1000, marginRevenue: 100, margin: 50 }), order("goods", { revenue: 100, marginRevenue: 100, margin: 0 })];
+    value.blocks[0].me.orders = 2;
+    render(<Harness insight={value} initialScreen="orders" initialBrand="Akemi" />);
+    expect(screen.getByLabelText("Selected order summary")).toHaveTextContent("25.00%");
+    expect(screen.getByLabelText("Selected order summary")).toHaveTextContent("1,100");
+    fireEvent.click(screen.getByRole("button", { name: "View order SO-mixed" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("1,000");
+  });
   it("opens real brand orders, preserves brand after order detail, and goes back to Personal", () => {
     render(<Harness />);
     expect(screen.getByRole("button", { name: "Personal" })).toHaveAttribute("aria-pressed", "true");

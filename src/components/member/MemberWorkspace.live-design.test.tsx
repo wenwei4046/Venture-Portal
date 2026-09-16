@@ -58,6 +58,33 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); localStor
 function mobileNav() { return within(screen.getByRole("navigation", { name: "Mobile navigation" })); }
 
 describe("Live C Revenue workspace integration", () => {
+  it("keeps employee Income filters and order details consistent for KPI-only and returned goods", async () => {
+    const data = liveData();
+    data.orders = [
+      { id: "kpi-only", number: "KPI-only", brand: "Akemi", revenue: 900, marginRevenue: 0, margin: null, date: "2026-09-16" },
+      { id: "return", number: "Manual return", brand: "Akemi", revenue: -100, marginRevenue: -100, margin: 90, manual: true, date: "2026-09-16" },
+      { id: "blind", number: "Blind goods", brand: "Akemi", revenue: 100, marginRevenue: 100, margin: null, date: "2026-09-16" },
+    ];
+    window.history.replaceState({}, "", "/member?page=income&department=fair");
+    render(<MemberWorkspace initialData={data} />);
+    await screen.findByRole("heading", { name: "My income" });
+    const orders = screen.getByRole("heading", { name: "My orders · margin" }).closest("section")!;
+    expect(within(orders).getAllByText("No goods margin")).toHaveLength(2);
+    expect(within(orders).getAllByText("Awaiting cost")).toHaveLength(1);
+    fireEvent.click(within(orders).getByRole("button", { name: "Pending data", exact: true }));
+    expect(within(orders).getByRole("heading", { name: "Blind goods" })).toBeInTheDocument();
+    expect(within(orders).queryByRole("heading", { name: "KPI-only" })).not.toBeInTheDocument();
+    fireEvent.click(within(orders).getByRole("button", { name: "Tier 1", exact: true }));
+    expect(within(orders).queryByRole("heading", { name: "Manual return" })).not.toBeInTheDocument();
+    fireEvent.click(within(orders).getByRole("button", { name: "All", exact: true }));
+    fireEvent.click(within(orders).getByRole("button", { name: /Manual return/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("No goods margin");
+    expect(dialog).toHaveTextContent("Not applicable");
+    expect(dialog).toHaveTextContent("no positive goods revenue as a margin basis");
+    expect(dialog).not.toHaveTextContent("90.00%");
+    expect(dialog).not.toHaveTextContent("Cost data is incomplete");
+  });
   it("opens the exact live brand orders from Today without going to a preview fixture route", async () => {
     const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
     const { container } = render(<MemberWorkspace initialData={liveData()} />);

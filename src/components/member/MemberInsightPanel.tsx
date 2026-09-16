@@ -37,7 +37,7 @@ import type {
 import { Empty, Icon, Pill, date, fmt, initials } from "./MemberUI";
 import base from "./member.module.css";
 import live from "./MemberLiveInsight.module.css";
-import { LiveBrandMarginList, hasCompleteLiveOrders, summarizeLiveBrandMargins } from "./LiveBrandMarginList";
+import { LiveBrandMarginList, hasCompleteLiveOrders, hasNoGoodsMargin, summarizeLiveBrandMargins } from "./LiveBrandMarginList";
 
 const s = { ...base, ...live };
 
@@ -51,6 +51,12 @@ const views: { id: InsightView; icon: string; label: string }[] = [
 const pct = (value: number | null) => (value === null ? "—" : `${value.toFixed(1)}%`);
 const place = (n: number) =>
   `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+
+function orderMarginLevels(orders: readonly MemberInsightOrder[], bands: readonly MemberBand[]) {
+  const noGoods = orders.filter(hasNoGoodsMargin);
+  return [...marginLevels(orders.filter(order => !hasNoGoodsMargin(order)), bands),
+    ...(noGoods.length ? [{ label: "No goods margin", tone: "neutral" as const, multiplier: 1, orders: noGoods, revenue: noGoods.reduce((total, order) => total + order.revenue, 0) }] : [])];
+}
 
 export default function MemberInsightPanel({
   insight,
@@ -150,9 +156,9 @@ export default function MemberInsightPanel({
     if (query.trim() && !`${order.number} ${order.brand}`.toLowerCase().includes(query.trim().toLowerCase())) return false;
     if (deposit === "cleared" && !order.cleared || deposit === "held" && order.cleared) return false;
     if (kpi === "with" && order.kpiQty <= 0 || kpi === "without" && order.kpiQty > 0) return false;
-    const band = marginLevels([order], bands)[0];
+    const band = orderMarginLevels([order], bands)[0];
     return marginFilter === "all" ||
-      marginFilter === "pending" && order.margin === null ||
+      marginFilter === "pending" && order.margin === null && !hasNoGoodsMargin(order) ||
       marginFilter === "penalty" && band.multiplier < 1 ||
       marginFilter === "threshold" && band.tone === "good";
   });
@@ -160,7 +166,7 @@ export default function MemberInsightPanel({
   const selectedSales = clearedSelection.reduce((total, order) => total + order.revenue, 0);
   const selectedKpi = clearedSelection.reduce((total, order) => total + order.kpiQty, 0);
   const selectedBrandMargin = brand === "all" ? null : summarizeLiveBrandMargins(selectedOrders, bands, completeOrders)[0];
-  const orderGroups = groupBy === "margin" ? marginLevels(selectedOrders, bands).map((level) => ({
+  const orderGroups = groupBy === "margin" ? orderMarginLevels(selectedOrders, bands).map((level) => ({
     label: level.label, orders: level.orders,
   })) : [...new Set(selectedOrders.map((order) => order.brand))].sort((a, b) => a.localeCompare(b)).map((name) => ({
     label: name, orders: selectedOrders.filter((order) => order.brand === name),
@@ -178,13 +184,13 @@ export default function MemberInsightPanel({
   }
 
   function orderDialog(order: MemberInsightOrder) {
-    const band = marginLevels([order], bands)[0];
+    const band = orderMarginLevels([order], bands)[0];
     onDialog({
       title: order.number,
       content: (
         <div className={s.stack}>
           <div className={s.row}>
-            <span className={s.quoteValue}>{pct(order.margin)}</span>
+            <span className={s.quoteValue}>{hasNoGoodsMargin(order) ? "—" : pct(order.margin)}</span>
             <Pill tone={band.tone}>{band.label}</Pill>
           </div>
           <dl className={s.dl}>
@@ -197,12 +203,13 @@ export default function MemberInsightPanel({
             <dt>KPI units</dt>
             <dd>{order.kpiQty || "None"}</dd>
             <dt>Margin source</dt>
-            <dd>{order.manual ? "Keyed in by hand" : "Product and gift costs"}</dd>
+            <dd>{hasNoGoodsMargin(order) ? "Not applicable" : order.manual ? "Keyed in by hand" : "Product and gift costs"}</dd>
             <dt>Deposit</dt>
             <dd>{order.cleared ? "Cleared — counted this month" : "Not yet cleared"}</dd>
           </dl>
           <p className={s.sub}>
-            {order.margin === null
+            {hasNoGoodsMargin(order) ? "This order has no positive goods revenue as a margin basis. Its sales and KPI quantities remain in their totals; no goods margin applies."
+              : order.margin === null
               ? "No unit cost and no keyed-in margin, so this order counts toward sales but has no margin result."
               : band.multiplier < 1
                 ? `Product commission, Open Bill and the upline's override on this bill are multiplied by ${band.multiplier}. Fixed KPI allowances are not affected.`
@@ -481,11 +488,11 @@ export default function MemberInsightPanel({
           {orderGroups.map((group) => <section className={live.orderGroup} key={group.label} aria-label={`${group.label} orders`}>
             <div className={s.sectionHead}><h2>{group.label}</h2><span className={s.caption}>{group.orders.length} orders</span></div>
             {group.orders.map((order) => {
-              const band = marginLevels([order], bands)[0];
+              const band = orderMarginLevels([order], bands)[0];
               return <button key={order.id} type="button" className={live.orderRow} onClick={() => orderDialog(order)} aria-label={`View order ${order.number}`}>
                 <span className={live.orderHeading}><strong>{order.number}</strong><Icon name="chevron" size={17} /></span>
                 <span className={s.caption}>{order.brand} · {date(order.date)}{order.carried && " · carried forward"}</span>
-                <span className={live.orderValues}><span><small>Sales</small><strong>{money(order.revenue)}</strong></span><span><small>Margin</small><strong>{privateMode ? "••••" : order.margin === null ? "—" : `${order.margin.toFixed(2)}%`}</strong></span><span><small>KPI</small><strong>{order.kpiQty}</strong></span></span>
+                <span className={live.orderValues}><span><small>Sales</small><strong>{money(order.revenue)}</strong></span><span><small>Margin</small><strong>{privateMode ? "••••" : hasNoGoodsMargin(order) || order.margin === null ? "—" : `${order.margin.toFixed(2)}%`}</strong></span><span><small>KPI</small><strong>{order.kpiQty}</strong></span></span>
                 <span className={live.orderStatus}><span>{order.cleared ? "Deposit cleared" : "Awaiting deposit · not counted"}</span><span>{privateMode ? "Margin hidden" : band.label}</span></span>
               </button>;
             })}

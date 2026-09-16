@@ -72,6 +72,8 @@ export interface MemberOrder {
   number: string;
   brand: string;
   revenue: number;
+  /** Goods revenue used by margin; excludes non-goods KPI amounts. */
+  marginRevenue?: number;
   margin: number | null;
   date: string;
   manual?: boolean;
@@ -246,6 +248,8 @@ export interface MemberInsightOrder {
   number: string;
   brand: string;
   revenue: number;
+  /** Margin-eligible goods revenue; zero for KPI-only orders. Older snapshots omit this. */
+  marginRevenue?: number;
   margin: number | null;
   date: string;
   manual: boolean;
