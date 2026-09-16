@@ -256,6 +256,13 @@ export async function updateScheme(formData: FormData) {
     throw new Error('Give the deposit gate a threshold, or switch it off')
   }
 
+  // Revenue Team cost = unit cost ÷ divisor (user 2026-09-12: Fair 0.7). Both
+  // the member calculator and the monthly run judge margin on that cost.
+  const costDivisor = num(formData, 'revenue_cost_divisor')
+  if (costDivisor !== null && (!(costDivisor > 0) || costDivisor > 10)) {
+    throw new Error('The cost divisor must be above 0 and at most 10 (1 keeps the cost as keyed)')
+  }
+
   const basis = text(formData, 'open_bill_basis')
   if (basis && !['uplift_on_commission', 'pct_of_revenue'].includes(basis)) {
     throw new Error('Unknown Open Bill basis')
@@ -284,6 +291,7 @@ export async function updateScheme(formData: FormData) {
           open_bill_basis: basis || 'uplift_on_commission',
           default_rate_mode: rateMode || 'variable',
           deposit_threshold_pct: depositOn ? depositPct : null,
+          revenue_cost_divisor: costDivisor ?? 1,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)

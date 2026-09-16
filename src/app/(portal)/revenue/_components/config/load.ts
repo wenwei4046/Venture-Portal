@@ -340,7 +340,13 @@ export async function loadProducts(): Promise<ProductRow[]> {
   const supabase = await untyped()
   const { data } = await supabase
     .from('comm_products')
-    .select('id, item_code, erp_item_code, product_name, brand_code, item_group, unit_cost, is_active, updated_at')
+    .select(
+      'id, item_code, erp_item_code, product_name, brand_code, item_group, unit_cost, cost_grid, is_active, updated_at',
+    )
     .order('item_code')
-  return rows<ProductRow>(data).map(p => ({ ...p, unit_cost: p.unit_cost === null ? null : Number(p.unit_cost) }))
+  return rows<ProductRow>(data).map(p => ({
+    ...p,
+    unit_cost: p.unit_cost === null ? null : Number(p.unit_cost),
+    cost_grid: Array.isArray(p.cost_grid) ? p.cost_grid : null,
+  }))
 }

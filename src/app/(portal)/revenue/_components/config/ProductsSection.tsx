@@ -166,6 +166,16 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
                           defaultValue={p.unit_cost ?? ''}
                           placeholder="—"
                         />
+                        {p.cost_grid && p.cost_grid.length > 0 ? (
+                          <div
+                            className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mt-1 text-right"
+                            title={p.cost_grid
+                              .map(c => `${c.height} · ${c.tier} · ${c.cost}`)
+                              .join('\n')}
+                          >
+                            grid · {p.cost_grid.length} cells
+                          </div>
+                        ) : null}
                       </td>
                       <td><Tick name="is_active" defaultChecked={p.is_active} ariaLabel={`${p.item_code} active`} /></td>
                       <td className="flex items-center gap-3">

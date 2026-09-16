@@ -39,6 +39,7 @@ describe('orderSchemeRules', () => {
       'margin_penalty',
       'margin_incentive',
       'deposit_gate',
+      'cost_divisor',
       'default_rate_mode',
     ])
   })
@@ -54,6 +55,7 @@ describe('orderSchemeRules', () => {
       'margin_incentive',
       'deposit_gate',
       'group_incentive',
+      'cost_divisor',
       'default_rate_mode',
     ])
   })
@@ -70,6 +72,7 @@ describe('orderSchemeRules', () => {
       'group_incentive',
       'margin_incentive',
       'deposit_gate',
+      'cost_divisor',
       'default_rate_mode',
     ])
   })
@@ -84,6 +87,8 @@ describe('orderSchemeRules', () => {
   it('every row appears exactly once', () => {
     const rows = orderSchemeRules(ir)
     expect(new Set(rows).size).toBe(rows.length)
-    expect(rows).toHaveLength(12)
+    expect(rows).toHaveLength(13)
+    // The cost basis is neither a switch nor IR's: it sits with Default rate mode at the foot.
+    expect(rows.slice(-2)).toEqual(['cost_divisor', 'default_rate_mode'])
   })
 })

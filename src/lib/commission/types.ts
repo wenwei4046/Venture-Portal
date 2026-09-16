@@ -286,6 +286,14 @@ export interface CommissionScheme {
   depositThresholdPct: number | null
   /** Applied to a salesperson who has no explicit rateMode of their own. */
   defaultRateMode: RateMode
+  /**
+   * Revenue Team cost = a line's cost ÷ this (user 2026-09-12: "cost / 0.7 =
+   * revenue fair department team cost"). Every margin the engine judges —
+   * per-bill penalty, monthly incentive, the statement's brand margins — is
+   * taken on that cost, the same basis the member calculator shows. Absent
+   * or 1 keeps the cost as imported.
+   */
+  costDivisor?: number
 }
 
 export interface EngineInput {

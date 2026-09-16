@@ -303,6 +303,27 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
         </td>
       </tr>
     ),
+    cost_divisor: (
+      <tr key="cost_divisor">
+        <td>Revenue Team cost basis</td>
+        <td className="text-muted font-serif italic text-xs">—</td>
+        <td className="font-sans text-xs text-graphite">
+          <span className="mr-2">unit cost ÷</span>
+          <Field
+            name="revenue_cost_divisor"
+            type="number"
+            step="0.01"
+            width="w-20"
+            defaultValue={scheme.revenue_cost_divisor ?? 1}
+            ariaLabel="Revenue cost divisor"
+          />
+          <span className="ml-2">
+            the cost every margin rule judges, in the member calculator and the monthly run alike.
+            0.7 turns a RM 1,000 cost into RM 1,428.57; 1 keeps the cost as keyed.
+          </span>
+        </td>
+      </tr>
+    ),
     default_rate_mode: (
       <tr key="default_rate_mode">
         <td>Default rate mode</td>

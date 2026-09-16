@@ -81,7 +81,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
   const { data: schemeRows, error: schemeError } = await supabase
     .from('comm_schemes')
     .select(
-      'id, sub_department_id, open_bill_basis, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_open_bill, enable_override, enable_margin_penalty, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth',
+      'id, sub_department_id, open_bill_basis, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_open_bill, enable_override, enable_margin_penalty, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth, revenue_cost_divisor',
     )
     .eq('is_active', true)
     .is('effective_to', null)

@@ -1003,3 +1003,234 @@ describe("catalogue display compatibility", () => {
     },
   );
 });
+
+// ─── 2026-09-12 rules: riders, the Revenue Team cost basis, sofa grids ──────
+
+const frame = demoProducts.find((product) => product.id === "frame-q-w")!;
+/** A bed frame with no brand — the rider shape the seed writes. */
+const riderFrame: MemberProduct = { ...frame, id: "rider-frame-q", brand: null, cost: 700 };
+const riderPillow: MemberProduct = {
+  ...demoProducts.find((product) => product.id === "pillow")!,
+  id: "rider-pillow",
+  brand: null,
+  cost: 35,
+};
+const zanottiSofaModule = (id: string, size: string, grid: MemberProduct["costGrid"]): MemberProduct => ({
+  ...demoProducts.find((product) => product.id === "sofa-2-o")!,
+  id,
+  name: "9028",
+  brand: "Zanotti",
+  size,
+  color: "",
+  cost: null,
+  costGrid: grid,
+  options: (grid ?? []).map(({ height, tier }) => ({ height, tier })),
+});
+const oneSeater = zanottiSofaModule("9028-1s", "1S", [
+  { height: "24", tier: "PRICE_1", cost: 805 },
+  { height: "24", tier: "PRICE_2", cost: 851 },
+  { height: "26", tier: "PRICE_1", cost: 874 },
+  { height: "26", tier: "PRICE_2", cost: 920 },
+]);
+const corner = zanottiSofaModule("9028-cnr", "CNR", [
+  { height: "24", tier: "PRICE_1", cost: 900 },
+  { height: "26", tier: "PRICE_1", cost: 950 },
+]);
+const zanottiBands = demoBands.filter((band) => band.brand === "Zanotti");
+
+describe("riders — bed frames and accessories carry no brand", () => {
+  it("lets a rider join an Akemi cart and counts its cost in the one margin", () => {
+    const result = calculateQuote(
+      quote({
+        price: "4000",
+        lines: [
+          { productId: "cloud-q", quantity: 1, gift: false },
+          { productId: "rider-frame-q", quantity: 1, gift: false },
+        ],
+      }),
+      [...demoProducts, riderFrame],
+      demoBands,
+    );
+    // (4,000 − 2,000 − 700) ÷ 4,000 — judged by Akemi's ladder.
+    expect(result.valid).toBe(true);
+    expect(result.margin).toBeCloseTo(32.5, 10);
+    expect(result.label).toBe("Low range");
+  });
+
+  it("still refuses two brands in one cart", () => {
+    const products = [
+      ...demoProducts,
+      { ...baseProduct, id: "zanotti-bed", brand: "Zanotti" },
+    ];
+    const result = calculateQuote(
+      quote({
+        lines: [
+          { productId: "cloud-q", quantity: 1, gift: false },
+          { productId: "zanotti-bed", quantity: 1, gift: false },
+        ],
+      }),
+      products,
+      demoBands,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("same brand");
+    expect(() =>
+      addCartLines(
+        [{ productId: "cloud-q", quantity: 1, gift: false }],
+        [{ productId: "zanotti-bed", quantity: 1, gift: false }],
+        products,
+      ),
+    ).toThrow("same brand");
+  });
+
+  it("adds a rider through the cart without tripping the brand rule", () => {
+    const lines = addCartLines(
+      [{ productId: "cloud-q", quantity: 1, gift: false }],
+      [{ productId: "rider-frame-q", quantity: 1, gift: false }],
+      [...demoProducts, riderFrame],
+    );
+    expect(lines).toHaveLength(2);
+  });
+
+  it("shows a margin with no ladder for a rider-only cart", () => {
+    const result = calculateQuote(
+      quote({ price: "1000", lines: [{ productId: "rider-frame-q", quantity: 1, gift: false }] }),
+      [...demoProducts, riderFrame],
+      demoBands,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.margin).toBeCloseTo(30, 10);
+    expect(result.label).toBe("No brand rules");
+    expect(result.tone).toBe("neutral");
+    expect(result.nextPrice).toBeNull();
+  });
+
+  it("lets a brand-less pillow ride any brand as a gift and suggests it", () => {
+    expect(isCompatibleGift(riderPillow, [baseProduct])).toBe(true);
+    const result = calculateQuote(
+      quote({
+        price: "3999",
+        lines: [
+          { productId: "cloud-q", quantity: 1, gift: false },
+          { productId: "rider-pillow", quantity: 1, gift: true },
+        ],
+      }),
+      [...demoProducts, riderPillow],
+      demoBands,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.margin).toBeCloseTo(((3999 - 2035) / 3999) * 100, 10);
+    expect(result.suggestions.some((item) => item.productId === "rider-pillow")).toBe(true);
+  });
+});
+
+describe("the Revenue Team cost basis (cost ÷ divisor)", () => {
+  it("judges margin on cost ÷ 0.7, so RM2,000 is read as RM2,857.14", () => {
+    const result = calculateQuote(
+      quote({ price: "5000" }),
+      singleProduct(2000),
+      demoBands,
+      { costDivisor: 0.7 },
+    );
+    expect(result.valid).toBe(true);
+    expect(result.margin).toBeCloseTo(((5000 - 2857.14) / 5000) * 100, 6);
+    // Without the rule the same cart is a 60% margin.
+    expect(calculateQuote(quote({ price: "5000" }), singleProduct(2000), demoBands).margin).toBe(60);
+  });
+
+  it("prices the next tier as team cost ÷ (1 − threshold), never cost × (1 + threshold)", () => {
+    const result = calculateQuote(
+      quote({ price: "3000" }),
+      singleProduct(1400),
+      demoBands,
+      { costDivisor: 0.7 },
+    );
+    // Team cost 2,000. Tier 1 is 36%: 2,000 ÷ 0.64 = 3,125.
+    expect(result.valid).toBe(true);
+    expect(result.margin).toBeCloseTo(33.33333333, 6);
+    expect(result.nextThreshold).toBe(36);
+    expect(result.nextPrice).toBe(3125);
+  });
+
+  it("refuses a divisor that is zero, negative or not a number", () => {
+    for (const costDivisor of [0, -0.7, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const result = calculateQuote(quote(), singleProduct(50), demoBands, { costDivisor });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("cost rule");
+    }
+  });
+});
+
+describe("sofa grids — per module, per seat height and fabric tier, the ERP way", () => {
+  const products = [...demoProducts, oneSeater, corner];
+  const sofaCart = (build?: QuoteInput["build"], price = "5000"): QuoteInput =>
+    quote({
+      price,
+      build,
+      lines: [
+        { productId: "9028-1s", quantity: 2, gift: false },
+        { productId: "9028-cnr", quantity: 1, gift: false },
+      ],
+    });
+
+  it("asks for the build before costing a sofa module", () => {
+    const result = calculateQuote(sofaCart(), products, zanottiBands);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("seat height");
+  });
+
+  it("sums every module at the chosen height and tier", () => {
+    const result = calculateQuote(sofaCart({ height: "24", tier: "PRICE_1" }), products, zanottiBands);
+    // 2 × 805 + 900 = 2,510 → (5,000 − 2,510) ÷ 5,000
+    expect(result.valid).toBe(true);
+    expect(result.margin).toBeCloseTo(49.8, 10);
+    const tier2 = calculateQuote(sofaCart({ height: "24", tier: "PRICE_2" }), products, zanottiBands);
+    // The corner has no PRICE_2 cell at 24 → PRICE_2 fallback is itself absent → any cell at that height (900).
+    expect(tier2.margin).toBeCloseTo(((5000 - (2 * 851 + 900)) / 5000) * 100, 10);
+  });
+
+  it("refuses a seat height a module in the cart does not come in", () => {
+    const tall = zanottiSofaModule("9028-tall", "3S", [{ height: "30", tier: "PRICE_1", cost: 1200 }]);
+    const result = calculateQuote(
+      quote({
+        price: "5000",
+        build: { height: "24", tier: "PRICE_1" },
+        lines: [
+          { productId: "9028-1s", quantity: 1, gift: false },
+          { productId: "9028-tall", quantity: 1, gift: false },
+        ],
+      }),
+      [...products, tall],
+      zanottiBands,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("seat height");
+  });
+
+  it("binds the confirmed quote to the build and prints it for the customer", () => {
+    const input = sofaCart({ height: "26", tier: "PRICE_2" });
+    const result = calculateQuote(input, products, zanottiBands);
+    expect(result.valid).toBe(true);
+    const text = customerQuote(input, products, result);
+    expect(text).toContain("Sofa build: seat height 26 · Tier 2 fabric");
+    expect(text).toContain("Zanotti 9028 / 1S × 2");
+    expect(() =>
+      customerQuote({ ...input, build: { height: "24", tier: "PRICE_2" } }, products, result),
+    ).toThrow("changed");
+  });
+
+  it("applies the divisor to grid cells too", () => {
+    const result = calculateQuote(
+      sofaCart({ height: "24", tier: "PRICE_1" }),
+      products,
+      zanottiBands,
+      { costDivisor: 0.5 },
+    );
+    // 2,510 ÷ 0.5 = 5,020 > 5,000 → a negative margin, which the most severe
+    // penalty rung catches first.
+    expect(result.valid).toBe(true);
+    expect(result.margin).toBeCloseTo(-0.4, 10);
+    expect(result.tone).toBe("danger");
+    expect(result.multiplier).toBe(0);
+  });
+});

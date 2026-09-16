@@ -1013,6 +1013,35 @@ describe('margin base', () => {
     ])
     expect(marginBase(o.lines, kpiIndex, groupIndex).brandCode).toBe('AKEMI')
   })
+
+  // Revenue Team cost = cost ÷ divisor (user 2026-09-12: "cost / 0.7 = revenue
+  // fair department team cost"). A bill at 30% on the keyed cost is judged at
+  // 0% once the RM7,000 is read as RM10,000 — the same figure the member
+  // calculator shows for that cart.
+  it('judges margin on the Revenue Team cost — every line cost ÷ the scheme divisor', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 10_000, 7_000],
+      ['ACC', 'AK-CS AIRLOFT COMFY PIL', 2, 0, 70],
+    ])
+    const base = marginBase(o.lines, kpiIndex, groupIndex, 0.7)
+    expect(base.revenue).toBe(10_000)
+    expect(base.cost).toBe(10_100)
+    expect(marginPctOf(base)).toBeCloseTo(-0.01, 10)
+    expect(marginBase(o.lines, kpiIndex, groupIndex, 1).cost).toBe(7_070)
+    // A nonsense divisor never silently zeroes or inflates the cost.
+    expect(marginBase(o.lines, kpiIndex, groupIndex, 0).cost).toBe(7_070)
+  })
+
+  it('a rider line with no brand counts in the cost but never decides the ladder', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 6_000, 3_000, 'AKEMI'],
+      ['BEDFRAME', 'NB-KHJ50 (K)', 1, 9_000, 4_000],
+    ])
+    const base = marginBase(o.lines, kpiIndex, groupIndex)
+    expect(base.brandCode).toBe('AKEMI')
+    expect(base.mixedBrand).toBe(false)
+    expect(base.cost).toBe(7_000)
+  })
 })
 
 describe('penaltyBandFor — the most severe match wins', () => {

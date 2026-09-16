@@ -1,4 +1,4 @@
-import type { MemberProduct, QuoteLine } from "./types";
+import type { MemberProduct, QuoteBuild, QuoteLine } from "./types";
 
 export type ProductCategory =
   | "mattress"
@@ -20,6 +20,7 @@ export function categoryKey(raw: string): ProductCategory {
       "赠品床架",
       "bed frame",
       "bed frames",
+      "bedframe",
       "frame",
       "frames",
       "gift frame",
@@ -69,6 +70,56 @@ export function isAccessoryProduct(
   );
 }
 
+/**
+ * A rider carries no brand: bed frames and accessories (user 2026-09-12). It
+ * joins any cart, its cost counts in the one margin, and the mattress or
+ * sofa in the cart decides which brand's rules judge that margin.
+ */
+export function isRider(product: Pick<MemberProduct, "brand">): boolean {
+  return !product.brand;
+}
+
+/** The ERP's fabric tiers, cheapest first. */
+export const TIERS = ["PRICE_1", "PRICE_2", "PRICE_3"] as const;
+
+export function tierLabel(tier: string): string {
+  const index = (TIERS as readonly string[]).indexOf(tier);
+  return index >= 0 ? `Tier ${index + 1}` : tier;
+}
+
+/** Seat heights sort numerically (24, 26 … or 60cm, 75cm), so "26" never follows "60cm". */
+export function compareHeights(a: string, b: string): number {
+  const x = parseFloat(a),
+    y = parseFloat(b);
+  if (Number.isFinite(x) && Number.isFinite(y) && x !== y) return x - y;
+  return a.localeCompare(b);
+}
+
+/**
+ * The cost of one unit for the cart's build. Mirrors the ERP's
+ * `resolveSeatHeightSen` (mfg-pricing.ts): the exact (height, tier) cell,
+ * else the PRICE_2 cell at that height, else any cell at that height. A
+ * product with no grid is its flat unit cost. A grid product whose grid does
+ * not know the chosen height resolves to nothing — the caller says so
+ * rather than silently costing another height.
+ */
+export function resolveUnitCost(
+  product: Pick<MemberProduct, "cost" | "costGrid">,
+  build?: QuoteBuild | null,
+): { cost: number | null; height: string | null; tier: string | null } {
+  const grid = product.costGrid ?? [];
+  if (!grid.length) return { cost: product.cost ?? null, height: null, tier: null };
+  const height = build?.height ?? null;
+  if (!height || !grid.some((cell) => cell.height === height))
+    return { cost: null, height: null, tier: null };
+  const want = build?.tier ?? "PRICE_2";
+  const cell =
+    grid.find((c) => c.height === height && c.tier === want) ??
+    grid.find((c) => c.height === height && c.tier === "PRICE_2") ??
+    grid.find((c) => c.height === height)!;
+  return { cost: cell.cost, height, tier: cell.tier };
+}
+
 /** Only public web images or same-origin file paths may enter the image element. */
 export function productImageUrl(raw: unknown): string | null {
   if (typeof raw !== "string" || raw.length > 2048) return null;
@@ -92,20 +143,24 @@ function sizeKey(size: string): string {
     .replace(/[\s_-]+/g, " ");
 }
 
-/** A multi-product cart may contain several sizes; a fitted gift needs one match. */
+/**
+ * A multi-product cart may contain several sizes; a fitted gift needs one
+ * match. A branded gift must ride a paid product of its own brand; a rider
+ * gift (no brand) may ride any paid product.
+ */
 export function isCompatibleGift(
   gift: MemberProduct,
   paidProducts: MemberProduct[],
 ): boolean {
   if (!gift.gift) return false;
-  const sameBrand = paidProducts.filter(
-    (product) => product.brand === gift.brand,
-  );
-  if (!sameBrand.length) return false;
+  const pool = gift.brand
+    ? paidProducts.filter((product) => product.brand === gift.brand)
+    : paidProducts;
+  if (!pool.length) return false;
   const size = sizeKey(gift.size);
   return (
     ["", "standard", "universal", "one size"].includes(size) ||
-    sameBrand.some((product) => sizeKey(product.size) === size)
+    pool.some((product) => sizeKey(product.size) === size)
   );
 }
 
@@ -139,7 +194,8 @@ export function addCartLines(
       line.quantity > 100
     )
       throw new Error("Choose a quantity from 1 to 100.");
-    brands.add(product.brand);
+    // Riders (bed frames, accessories) carry no brand and join any cart.
+    if (product.brand) brands.add(product.brand);
     if (brands.size > 1)
       throw new Error("Use products from the same brand in each quote.");
     const totalQuantity = (quantities.get(line.productId) ?? 0) + line.quantity;

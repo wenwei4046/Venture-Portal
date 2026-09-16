@@ -14,11 +14,31 @@ export interface MemberReadContext {
   staffId: string;
   subDepartmentId: string;
 }
+/**
+ * One cell of a sofa module's cost grid — the ERP's `seat_height_prices`
+ * shape: a cost per (seat height, fabric tier). Tiers are the ERP's names
+ * PRICE_1 / PRICE_2 / PRICE_3; the member UI shows them as Tier 1 / 2 / 3.
+ */
+export interface CostCell {
+  height: string;
+  tier: string;
+  cost: number;
+}
+/** A grid cell without its cost: the choices a member may pick from. */
+export interface CostOption {
+  height: string;
+  tier: string;
+}
 export interface MemberProduct {
   id: string;
   code: string;
   name: string;
-  brand: string;
+  /**
+   * Brand code (AKEMI / DUNLOP / ERGOTEX / ZANOTTI). `null` marks a RIDER:
+   * bed frames and accessories carry no brand of their own, join any cart and
+   * follow the mattress or sofa's margin rules (user 2026-09-12).
+   */
+  brand: string | null;
   category: string;
   size: string;
   color: string;
@@ -28,6 +48,10 @@ export interface MemberProduct {
   /** Optional Principal-managed photo. Costs never travel with a live catalogue. */
   imageUrl?: string | null;
   cost?: number | null;
+  /** Sofa modules: the seat height × fabric tier choices. Never carries a cost. */
+  options?: CostOption[];
+  /** Server-only: the priced grid behind `options`. Never enters an RPC response. */
+  costGrid?: CostCell[] | null;
   version: string;
 }
 export interface MemberBand {
@@ -159,11 +183,26 @@ export interface QuoteLine {
   /** The role selected for this line, independently of the product's eligibility. */
   gift: boolean;
 }
+/** The sofa build for every sofa module in the cart: one seat height, one fabric tier. */
+export interface QuoteBuild {
+  height?: string;
+  tier?: string;
+}
 export interface QuoteInput {
   schemeId: string;
   lines: QuoteLine[];
   price: string;
   delivery: string;
+  build?: QuoteBuild;
+}
+/** Department rules the engine applies on top of the catalogue's costs. */
+export interface QuoteRules {
+  /**
+   * Revenue Team cost = unit cost ÷ divisor (user 2026-09-12: "cost / 0.7 =
+   * revenue fair department team cost"). The margin bands judge THAT cost, in
+   * the calculator and in the commission run alike. 1 = the cost as keyed.
+   */
+  costDivisor: number;
 }
 export interface QuoteResult {
   valid: boolean;

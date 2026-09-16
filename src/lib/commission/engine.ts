@@ -185,17 +185,20 @@ export function marginBase(
   lines: SalesLine[],
   kpiIndex: Map<string, number>,
   groupIndex: Map<string, boolean>,
+  /** Revenue Team basis: each line's cost ÷ this (`CommissionScheme.costDivisor`). */
+  costDivisor = 1,
 ): MarginBase {
   let revenue = 0
   let cost = 0
   let complete = true
   const byBrand = new Map<string, number>()
+  const divisor = Number.isFinite(costDivisor) && costDivisor > 0 ? costDivisor : 1
 
   for (const line of lines) {
     if (!inGoodsScope(line, kpiIndex, groupIndex)) continue
     revenue = round2(revenue + line.lineAmount)
     if (line.costAmount === undefined || line.costAmount === null) complete = false
-    else cost = round2(cost + line.costAmount)
+    else cost = round2(cost + line.costAmount / divisor)
     if (line.brandCode) {
       byBrand.set(line.brandCode, round2((byBrand.get(line.brandCode) ?? 0) + line.lineAmount))
     }
@@ -875,7 +878,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
       // A sales order never crosses brands (user 2026-08-31); if one does, the
       // import has a problem and the margin ladder becomes ambiguous.
-      const base = marginBase(order.lines, kpiIndex, groupIndex)
+      const base = marginBase(order.lines, kpiIndex, groupIndex, scheme.costDivisor ?? 1)
       if (base.mixedBrand) {
         warnings.push(
           `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
