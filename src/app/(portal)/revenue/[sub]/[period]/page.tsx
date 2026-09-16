@@ -8,11 +8,16 @@ import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
 import { ratePct } from '@/lib/commission/ranks'
 import { salesByVenue, venueKey } from '@/lib/venues'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
+import { summariseOpenBill } from '@/lib/commission/open-bill-summary'
 import RunControls from './_components/RunControls'
 import VenueSection from './_components/VenueSection'
+import PersonSection from './_components/PersonSection'
+import OpenBillSection from './_components/OpenBillSection'
+import MonthBreakdownTabs from './_components/MonthBreakdownTabs'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
 import { loadMonthOrders } from '../../_lib/month-orders'
+import { loadOpenBillPaid } from '../../_lib/open-bill'
 import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
 
@@ -98,6 +103,10 @@ interface StatementRow {
  * read from the RUN, not recomputed from sales_orders: re-importing a month
  * replaces every order row, and a page that recomputed its own history would
  * quietly disagree with the money already in payroll.
+ *
+ * It ENDS IN A RAIL (2026-09-17): Sales by venue, Sales by person and Open
+ * Bill are three questions about the same bills and only one is ever being
+ * asked, so they are tabs rather than three sections stacked down the page.
  */
 export default async function CommissionPeriodPage({ params }: PageProps) {
   await requirePermission('revenue')
@@ -244,6 +253,34 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     ),
   )
 
+  // ── Open Bill ──────────────────────────────────────────────────────────
+  // The picks come from the same orders as everything above; what they PAID
+  // comes from the run's own lines, because a run also pays Open Bill on the
+  // bills it carried in from earlier months.
+  const openBillOn = Boolean((scheme as { enable_open_bill?: boolean } | null)?.enable_open_bill)
+  const [openBillRuleRes, openBillPaid] = await Promise.all([
+    openBillOn && subDept.schemeId
+      ? supabase
+          .from('comm_open_bill_rules')
+          .select('bill_rank, pct')
+          .eq('scheme_id', subDept.schemeId)
+          .is('effective_to', null)
+      : Promise.resolve({ data: null }),
+    openBillOn && run ? loadOpenBillPaid(supabase, run.id) : Promise.resolve(new Map<string, number>()),
+  ])
+  const openBill = openBillOn
+    ? summariseOpenBill(orders, {
+        paidByOrder: openBillPaid,
+        rates: new Map(
+          ((openBillRuleRes.data ?? []) as Array<{ bill_rank: number; pct: number | string }>).map(
+            r => [r.bill_rank, Number(r.pct)],
+          ),
+        ),
+      })
+    : null
+
+  const ordersPath = revenuePath(subDept.slug, period, 'orders')
+
   return (
     <div>
       <div className="page-head">
@@ -262,7 +299,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           </Link>
           {batchRow ? (
             <Link
-              href={revenuePath(subDept.slug, period, 'orders')}
+              href={ordersPath}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
             >
               All bills
@@ -601,59 +638,28 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
             </section>
           ) : null}
 
-          <VenueSection rows={venueRows} ordersPath={revenuePath(subDept.slug, period, 'orders')} />
-
-          <section>
-            <div className="sect-head">
-              <h2>Sales by person</h2>
-              <span className="rule" aria-hidden />
-              <span className="count">{people.length} PEOPLE</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Salesperson</th>
-                    <th className="right">Bills</th>
-                    <th className="right m-hide">Waiting on a deposit</th>
-                    <th className="right">Sales value</th>
-                    <th className="lt-toggle" aria-hidden />
-                  </tr>
-                </thead>
-                <tbody>
-                  {people.map(p => (
-                    <LedgerRow key={p.key}>
-                      <td>
-                        <Link
-                          href={`${revenuePath(subDept.slug, period, 'orders')}?staff=${p.staffId ?? 'unmatched'}`}
-                          className={p.staffId ? 'text-ink hover:text-accent' : 'text-danger hover:underline'}
-                        >
-                          {p.name}
-                        </Link>
-                      </td>
-                      <td className="num">{p.orders}</td>
-                      <td className="num m-hide" data-label="Waiting on a deposit">
-                        {p.held === 0 ? '—' : <span className="neg">{formatMoney(p.held)}</span>}
-                      </td>
-                      <td className="num">{formatMoney(p.total)}</td>
-                    </LedgerRow>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
-              This is raw sales value, not the commission base — transport and disposal come out,
-              KPI items move to their own allowance, and the deposit gate holds anything under the
-              threshold.{' '}
-              {(scheme as { enable_open_bill?: boolean } | null)?.enable_open_bill ? <><Link href={revenuePath(subDept.slug, period, 'open-bill')} className="text-accent hover:underline">
-                Review the Open Bill picks
-              </Link>{' '}
-              before computing:{' '}
-              {batchRow?.source === 'erp_sync'
-                ? 'the ERP feed suggests them from each order’s real creation time and re-suggests as orders arrive; a pick you make yourself is never touched.'
-                : 'they are seeded from the document number, not from a real timestamp.'}</> : null}
-            </p>
-          </section>
+          {/* Three cuts of the same bills, one at a time — the rail is their
+              heading, so each panel opens on its own explanation. */}
+          <MonthBreakdownTabs
+            counts={{
+              venue: venueRows.length,
+              person: people.length,
+              openBill: openBill?.totals.bills ?? 0,
+            }}
+            venue={<VenueSection rows={venueRows} ordersPath={ordersPath} />}
+            person={<PersonSection rows={people} ordersPath={ordersPath} />}
+            openBill={
+              openBill ? (
+                <OpenBillSection
+                  summary={openBill}
+                  ordersPath={ordersPath}
+                  queuePath={revenuePath(subDept.slug, period, 'open-bill')}
+                  runStatus={run?.status ?? null}
+                  fromFeed={batchRow?.source === 'erp_sync'}
+                />
+              ) : null
+            }
+          />
         </>
       )}
     </div>

@@ -389,7 +389,14 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               An Open Bill pick in a <span className="text-alert">dashed outline</span> is still the
               importer&apos;s guess from the document number; click it to agree, click another to move
               it, click a solid one to clear it. Ranks are held per salesperson per event day, so
-              claiming a taken rank moves it off the bill that held it.
+              claiming a taken rank moves it off the bill that held it.{' '}
+              <Link
+                href={`${revenuePath(subDept.slug, period)}?tab=open-bill`}
+                className="text-accent hover:underline"
+              >
+                What the picks add up to
+              </Link>{' '}
+              — how many of each, whose, and the uplift they paid — is on the month.
               {runLocked ? ' This month has paid — reopen the run to change a pick.' : ''}
             </>
           ) : null}
