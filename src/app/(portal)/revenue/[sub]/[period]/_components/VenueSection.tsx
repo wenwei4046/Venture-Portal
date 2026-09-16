@@ -37,6 +37,9 @@ import type { FairOrganiser } from '../../../_lib/venue-register'
  * says so once, and every month that names either spelling reads as one fair
  * from then on. The spellings stay visible under the name, each with the ✕
  * that takes it back.
+ *
+ * Its heading is the rail above it (`MonthBreakdownTabs`, 2026-09-17), so the
+ * section opens on its own explanation rather than titling itself twice.
  */
 export default function VenueSection({
   rows,
@@ -60,12 +63,7 @@ export default function VenueSection({
   const merged = rows.filter(r => r.spellings.length > 1)
 
   return (
-    <section className="mb-10">
-      <div className="sect-head">
-        <h2>Sales by venue</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">{rows.length} VENUES</span>
-      </div>
+    <section>
       <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
         The venue travels on every order from the ERP. The organiser does not — nothing in the feed
         carries it — so it is picked here for this month, from the register on{' '}
