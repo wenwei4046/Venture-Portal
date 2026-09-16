@@ -126,7 +126,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
         ? supabase.from('comm_kpi_items').select('product_code, kpi_amount').eq('scheme_id', subDept.schemeId)
         : Promise.resolve({ data: null }),
       supabase.from('sales_order_open_bill_tags').select('bill_rank, auto_suggested').eq('order_id', orderId).maybeSingle(),
-      supabase.from('comm_venues').select('organizer, notes').eq('venue_key', venueKey(order.venue) ?? '').maybeSingle(),
+      // The organiser is a fact about THIS MONTH's fair at this venue, not
+      // about the hall: the same place has a different organiser from month to
+      // month (comm_venue_events, 2026-09-17). One SQL function owns the
+      // lookup, so this page and revenue_month_orders cannot drift apart.
+      supabase.rpc('venue_event_organiser', { p_venue: order.venue, p_period: period }),
       subDept.schemeId
         ? supabase
             .from('comm_schemes')
@@ -150,7 +154,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
     ]),
   )
   const tag = tagData as { bill_rank: number; auto_suggested: boolean } | null
-  const venueRow = venueData as { organizer: string | null; notes: string | null } | null
+  const organiser = (venueData as string | null) || null
   const scheme = schemeData as {
     deposit_threshold_pct: number | string | null
     revenue_cost_divisor: number | string | null
@@ -299,7 +303,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
             )}
           </Fact>
           <Fact label="Organiser">
-            {venueRow?.organizer ?? <span className="text-muted">not recorded</span>}
+            {organiser ?? <span className="text-muted">not recorded</span>}
           </Fact>
           <Fact label="Warehouse">{order.location ?? '—'}</Fact>
           <Fact label="Brand">{order.brand_code ?? <span className="text-danger">none resolved</span>}</Fact>

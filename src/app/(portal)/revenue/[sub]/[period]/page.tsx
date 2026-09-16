@@ -10,6 +10,7 @@ import { salesByVenue, venueKey } from '@/lib/venues'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import { summariseOpenBill } from '@/lib/commission/open-bill-summary'
 import RunControls from './_components/RunControls'
+import { loadFairsForMonth, loadOrganisers } from '../../_lib/venue-register'
 import VenueSection from './_components/VenueSection'
 import PersonSection from './_components/PersonSection'
 import OpenBillSection from './_components/OpenBillSection'
@@ -232,6 +233,14 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     bySalesperson.set(key, e)
   }
   const people = [...bySalesperson.values()].sort((a, b) => b.total - a.total)
+
+  // Who ran each of this month's fairs, and the register to pick from. The
+  // RPC above already carries the organiser's NAME on every order; these are
+  // the ids behind it, which is what a dropdown needs to show its own value.
+  const [organisers, fairs] = await Promise.all([
+    loadOrganisers(supabase),
+    loadFairsForMonth(supabase, period),
+  ])
 
   // Grouped by the PLACE the database resolved, not by the ERP's spelling —
   // one fair is one row however many ways the counter typed its name.
@@ -646,7 +655,15 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               person: people.length,
               openBill: openBill?.totals.bills ?? 0,
             }}
-            venue={<VenueSection rows={venueRows} ordersPath={ordersPath} />}
+            venue={
+              <VenueSection
+                rows={venueRows}
+                ordersPath={ordersPath}
+                period={period}
+                organisers={organisers}
+                fairs={fairs}
+              />
+            }
             person={<PersonSection rows={people} ordersPath={ordersPath} />}
             openBill={
               openBill ? (
