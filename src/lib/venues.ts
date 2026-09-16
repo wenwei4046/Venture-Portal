@@ -17,13 +17,21 @@ export interface VenueRegistryRow {
   displayName: string
   organizer: string | null
   notes: string | null
+  /** The venue this spelling really is. Null when this row is itself a place. */
+  canonicalKey: string | null
 }
 
 export interface VenueSales {
+  /** The PLACE's key — the canonical one when the spelling has been merged. */
   venueKey: string
   /** The spelling the orders carry; the register's name when the month has none. */
   displayName: string
   organizer: string | null
+  /**
+   * Every ERP spelling that rolled into this place, tidy and alphabetical.
+   * One entry is the ordinary case; more than one means somebody merged them.
+   */
+  spellings: string[]
   orders: number
   /** People with at least one order at this venue. */
   people: number
@@ -45,41 +53,70 @@ export function venueName(venue: string | null | undefined): string | null {
 }
 
 export interface VenueOrderInput {
+  /** The spelling on the document. */
   venue: string | null
+  /**
+   * The place that spelling belongs to, as the database resolved it
+   * (`venue_group_key`). Left out, the spelling is its own place — which is
+   * what an unmerged venue is anyway.
+   */
+  groupKey?: string | null
+  /** The place's tidy name, when the register knows it. */
+  groupName?: string | null
   staffKey: string | null
   amount: number
 }
 
 /**
- * A month's orders grouped by venue, biggest first, with the register's
- * organiser attached. Orders with no venue are collected under one unnamed
- * row rather than dropped — a venue the ERP forgot is a gap HR should see.
+ * A month's orders grouped by PLACE, biggest first, with the organiser
+ * attached.
+ *
+ * The ERP's venue is free text typed at the fair, so one place arrives under
+ * several spellings; `canonical_key` in the register is where somebody records
+ * that they are the same place, and `venue_group_key` on each order is that
+ * answer applied. Grouping on it here — rather than on the raw spelling —
+ * is what makes an event one row and one organiser rather than three.
+ *
+ * Orders with no venue are collected under one unnamed row rather than
+ * dropped: a venue the ERP forgot is a gap HR should see.
  */
 export function salesByVenue(
   orders: VenueOrderInput[],
   register: Map<string, { displayName: string; organizer: string | null }>,
 ): VenueSales[] {
-  const byKey = new Map<string, VenueSales & { staff: Set<string> }>()
+  const byKey = new Map<string, VenueSales & { staff: Set<string>; seen: Set<string> }>()
   for (const o of orders) {
-    const key = venueKey(o.venue) ?? ''
+    const key = (o.groupKey ?? undefined) || venueKey(o.venue) || ''
     const row =
       byKey.get(key) ??
       {
         venueKey: key,
-        displayName: venueName(o.venue) ?? register.get(key)?.displayName ?? '(no venue)',
+        displayName:
+          o.groupName ??
+          register.get(key)?.displayName ??
+          venueName(o.venue) ??
+          '(no venue)',
         organizer: register.get(key)?.organizer ?? null,
+        spellings: [],
         orders: 0,
         people: 0,
         total: 0,
         staff: new Set<string>(),
+        seen: new Set<string>(),
       }
     row.orders += 1
     row.total = round2(row.total + o.amount)
     if (o.staffKey) row.staff.add(o.staffKey)
+    const spelling = venueName(o.venue)
+    if (spelling) row.seen.add(spelling)
     byKey.set(key, row)
   }
   return [...byKey.values()]
-    .map(({ staff, ...rest }) => ({ ...rest, people: staff.size }))
+    .map(({ staff, seen, ...rest }) => ({
+      ...rest,
+      people: staff.size,
+      spellings: [...seen].sort((a, b) => a.localeCompare(b)),
+    }))
     .sort((a, b) => b.total - a.total || a.displayName.localeCompare(b.displayName))
 }
 

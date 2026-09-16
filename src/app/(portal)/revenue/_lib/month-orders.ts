@@ -24,7 +24,12 @@ export interface MonthOrder {
   eventDate: string
   customerName: string | null
   debtorCode: string | null
+  /** The spelling the ERP put on the document. */
   venue: string | null
+  /** The PLACE that spelling belongs to, once merged. Null when the bill names no venue. */
+  venueGroupKey: string | null
+  /** The place's tidy name, when the venue register knows it. */
+  venueGroupName: string | null
   organizer: string | null
   location: string | null
   brandCode: string | null
@@ -64,6 +69,8 @@ interface Row {
   customer_name: string | null
   debtor_code: string | null
   venue: string | null
+  venue_group_key: string | null
+  venue_group_name: string | null
   organizer: string | null
   location: string | null
   brand_code: string | null
@@ -111,6 +118,8 @@ export async function loadMonthOrders(
     customerName: r.customer_name,
     debtorCode: r.debtor_code,
     venue: r.venue,
+    venueGroupKey: r.venue_group_key,
+    venueGroupName: r.venue_group_name,
     organizer: r.organizer,
     location: r.location,
     brandCode: r.brand_code,
@@ -138,6 +147,65 @@ export async function loadMonthOrders(
     openBillAuto: r.open_bill_auto,
     depositRequired: r.deposit_required === null ? null : Number(r.deposit_required),
     depositMet: r.deposit_met,
+  }))
+}
+
+/**
+ * An ERP product code a month still has no cost for.
+ *
+ * `listItemCode` is the Product List row that answers to this code — by the
+ * ERP code somebody typed, or by its own item code. Null means the list has
+ * never heard of the product; present with `listHasCost` false means it has,
+ * and nobody has keyed what it costs.
+ */
+export interface UncostedProduct {
+  productCode: string
+  productName: string | null
+  itemGroup: string | null
+  /** False when the group earns no commission — its cost never reached a margin. */
+  commissionable: boolean
+  lines: number
+  qty: number
+  amount: number
+  orders: number
+  listItemCode: string | null
+  listHasCost: boolean
+}
+
+export async function loadUncostedProducts(
+  supabase: SupabaseClient,
+  subDepartmentId: string,
+  period: string,
+): Promise<UncostedProduct[]> {
+  const { data, error } = await supabase.rpc('revenue_uncosted_products', {
+    p_sub_department_id: subDepartmentId,
+    p_period: period,
+  })
+  if (error) throw new Error(`Could not read the month's costs: ${error.message}`)
+  return (
+    (data ?? []) as Array<{
+      product_code: string
+      product_name: string | null
+      item_group: string | null
+      commissionable: boolean
+      lines: number
+      qty: number | string
+      amount: number | string
+      orders: number
+      list_item_code: string | null
+      list_has_cost: boolean | null
+    }>
+  ).map(r => ({
+    productCode: r.product_code,
+    productName: r.product_name,
+    itemGroup: r.item_group,
+    commissionable: r.commissionable,
+    lines: r.lines,
+    qty: Number(r.qty),
+    amount: Number(r.amount),
+    orders: r.orders,
+    listItemCode: r.list_item_code,
+    listHasCost: r.list_has_cost === true,
   }))
 }
 

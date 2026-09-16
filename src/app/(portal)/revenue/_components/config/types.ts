@@ -233,6 +233,8 @@ export interface TeamData {
 export interface ProductRow {
   id: string
   item_code: string
+  /** What the ERP calls this product on a sales-order line. The bridge to cost. */
+  erp_item_code: string | null
   product_name: string | null
   brand_code: string | null
   item_group: string | null

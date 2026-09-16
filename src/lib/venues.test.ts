@@ -50,8 +50,70 @@ describe('salesByVenue', () => {
   it('shows the orders the ERP sent without a venue rather than dropping them', () => {
     const rows = salesByVenue([{ venue: null, staffKey: 'a', amount: 900 }], register)
     expect(rows).toEqual([
-      { venueKey: '', displayName: '(no venue)', organizer: null, orders: 1, people: 1, total: 900 },
+      {
+        venueKey: '',
+        displayName: '(no venue)',
+        organizer: null,
+        spellings: [],
+        orders: 1,
+        people: 1,
+        total: 900,
+      },
     ])
+  })
+
+  it('rolls every spelling of a merged place into one row', () => {
+    const merged = new Map([
+      ['PISA SPICE ARENA', { displayName: 'PISA SPICE ARENA', organizer: 'Homedec' }],
+    ])
+    const rows = salesByVenue(
+      [
+        {
+          venue: 'PISA SPICE ARENA',
+          groupKey: 'PISA SPICE ARENA',
+          groupName: 'PISA SPICE ARENA',
+          staffKey: 'a',
+          amount: 1_000,
+        },
+        {
+          venue: 'PISA SPICE ARENA CONVENTION CENTRE',
+          groupKey: 'PISA SPICE ARENA',
+          groupName: 'PISA SPICE ARENA',
+          staffKey: 'b',
+          amount: 500,
+        },
+      ],
+      merged,
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      venueKey: 'PISA SPICE ARENA',
+      displayName: 'PISA SPICE ARENA',
+      organizer: 'Homedec',
+      orders: 2,
+      people: 2,
+      total: 1_500,
+    })
+    expect(rows[0].spellings).toEqual([
+      'PISA SPICE ARENA',
+      'PISA SPICE ARENA CONVENTION CENTRE',
+    ])
+  })
+
+  it('keeps two places apart when nobody has said they are the same', () => {
+    const rows = salesByVenue(
+      [
+        { venue: 'SPICE ARENA', groupKey: 'SPICE ARENA', staffKey: 'a', amount: 100 },
+        {
+          venue: 'SETIA SPICE CONVENTION CENTRE',
+          groupKey: 'SETIA SPICE CONVENTION CENTRE',
+          staffKey: 'a',
+          amount: 100,
+        },
+      ],
+      register,
+    )
+    expect(rows).toHaveLength(2)
   })
 
   it('counts a person once per venue however many bills they wrote', () => {
