@@ -142,11 +142,43 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 Nothing in the delivery says who ORGANISED an event. `venue` names the place;
 `sales_location` names the warehouse; there is no promoter, host or organiser
 field anywhere in the header, the items or the payments (checked against every
-delivery the portal holds, 2026-09-16). The portal keeps that fact itself, in
-`comm_venues` — one row per venue spelling the ERP sends, with an `organizer`
-typed on Revenue → the month → *Sales by venue*. If the ERP ever gains the
-column, the portal can read it instead; until then nobody should expect the
-feed to carry it.
+delivery the portal holds, 2026-09-16).
+
+The portal keeps that fact itself, per **(venue, month)** — the same hall has a
+different organiser from one month to the next — in `comm_venue_events`, with
+the names in a register, `comm_organisers`. Both are maintained on **Revenue →
+Venues** (every venue, every month, one screen) and on the month page's *Sales
+by venue* (2026-09-17). `comm_venues.organizer` is superseded and no longer
+read.
+
+#### If the ERP starts sending it
+
+**The receiver is already ready, and nothing needs to change on the portal
+side.** The delivery is stored verbatim in `sales_orders.raw`, and a trigger
+(`sales_orders_register_organiser`) reads the organiser out of `raw.header`
+under any of these names, in this order:
+
+```
+organiser · organizer · event_organiser · event_organizer
+venue_organiser · venue_organizer · organiser_name · organizer_name
+```
+
+Put a plain string there — the organiser's name, spelled the same way every
+time. `header.venue_id` is the other half of the same problem and is still
+never populated; if the ERP ever fills it, say so and the portal will match on
+the id instead of the name.
+
+What the portal does with it:
+
+| The name the delivery carries | What happens |
+|---|---|
+| matches an organiser in the register (case- and space-insensitive) | the month's fair is named, `source = 'erp'` |
+| matches nothing | kept verbatim in `erp_organiser_text` and shown on the register page as *ERP: … — not registered*, so a human can add the name once and the next delivery matches |
+| anything, where a HUMAN has already picked an organiser for that month | **the human's pick stands.** The raw text is still recorded, so the disagreement is visible |
+
+The portal never invents an organiser from a delivery: a typo would otherwise
+become a real organiser with real sales against it. That is the one thing the
+feed may not do on its own.
 
 ### The feed window — orders the portal will not keep
 
