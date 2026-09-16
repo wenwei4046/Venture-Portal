@@ -1,30 +1,56 @@
 import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
+import { formatDate } from '@/lib/utils'
 import ProductsSection from '../_components/config/ProductsSection'
 import { loadProducts } from '../_components/config/load'
 import { listSubDepartments } from '../_lib/sub-departments'
+import { loadSkuMaster, loadMirrorState, loadCostingGaps } from './load'
+import SkuMasterSection from './_components/SkuMasterSection'
+import CostingGapsSection from './_components/CostingGapsSection'
 
 /**
- * Item code → unit cost + brand.
+ * Revenue → Product List — the ERP's SKU master, and the exceptions beside it.
  *
- * The ERP sales-order export carries no cost column, so without a row here a
- * line has no cost, its bill has no margin, and both the below-margin penalty
- * and the monthly incentive are skipped with a warning rather than quietly
- * paying full commission on a bad-margin bill.
+ * WHAT CHANGED, 2026-09-17. This page used to BE the cost master: a list typed
+ * by hand, 599 of whose rows had no cost, described in its own words as "the
+ * only source of cost in the portal". It never was. The ERP has carried a cost
+ * per SKU the whole time, and for a sofa it carries the only cost that exists —
+ * the SKU rows of a sectional are largely unpriced, and the money lives in
+ * Combo Pricing, whose every row holds a cost grid and a selling grid together.
  *
- * It sits at DEPARTMENT level, beside the sub-departments rather than inside
- * one: `comm_products` carries no `scheme_id` — there is one cost master for
- * the whole Revenue Department, and showing the same list on every
- * sub-department's tab rail would suggest otherwise.
+ * So the page is now three things, in the order they answer a question about a
+ * margin:
  *
- * **Principal only.** HR configures the commission rules but not what a
- * product costs (user 2026-08-31) — the import stamps `qty × unit_cost` onto
- * each line once, so this list is what a run's margin is judged against.
+ *   1. **SKU master** — the mirror. Read-only; the ERP owns it.
+ *   2. **Costing gaps** — what was sold and could not be costed, worth-first.
+ *      This is the work list, and it says which side each row belongs to.
+ *   3. **Overrides** — the old `comm_products`, demoted to what it should
+ *      always have been: a row only for what the ERP genuinely cannot cost.
+ *
+ * **Principal only** (`product_list`). HR configures the commission rules but
+ * not what a product costs (user 2026-08-31), and cost is director-only on the
+ * ERP side too.
  */
+
+// The portal keeps Fair from 2026-08-01 (`erp_feed_settings.min_order_date`),
+// so a gap older than that is not one anybody can act on.
+const GAP_WINDOW_FROM = '2026-08-01'
+
 export default async function ProductListPage() {
   await requirePermission('product_list')
-  const [products, subDepts] = await Promise.all([loadProducts(), listSubDepartments()])
+
+  const gapTo = new Date()
+  gapTo.setUTCMonth(gapTo.getUTCMonth() + 1, 1)
+  const gapToIso = gapTo.toISOString().slice(0, 10)
+
+  const skus = await loadSkuMaster()
+  const [state, gaps, overrides, subDepts] = await Promise.all([
+    loadMirrorState(skus),
+    loadCostingGaps(GAP_WINDOW_FROM, gapToIso),
+    loadProducts(),
+    listSubDepartments(),
+  ])
 
   return (
     <div>
@@ -35,8 +61,12 @@ export default async function ProductListPage() {
           </div>
           <h1 className="page-title">Product List</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            Unit cost and brand per item code, for the whole Revenue Department.{' '}
-            <em>The only source of cost in the portal.</em>
+            The Houzs ERP&apos;s SKU master, mirrored — and what it still cannot cost.{' '}
+            {state.lastSyncedAt ? (
+              <>Last delivery {formatDate(state.lastSyncedAt)}.</>
+            ) : (
+              <>No delivery yet.</>
+            )}
           </p>
         </div>
         {subDepts.length > 0 ? (
@@ -49,7 +79,11 @@ export default async function ProductListPage() {
         ) : null}
       </div>
 
-      <ProductsSection products={products} />
+      <div className="space-y-12">
+        <SkuMasterSection skus={skus} state={state} />
+        <CostingGapsSection gaps={gaps} from={GAP_WINDOW_FROM} to={gapToIso} />
+        <ProductsSection products={overrides} />
+      </div>
     </div>
   )
 }

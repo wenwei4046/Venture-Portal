@@ -153,7 +153,17 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
                 <td className="num m-hide">{r.orders}</td>
                 <td className="num">{formatMoney(r.amount)}</td>
                 <td>
-                  {r.listItemCode === null ? (
+                  {/* The ERP's own SKU master is asked FIRST, so when it holds
+                      the code the empty cost is ITS gap — and no amount of
+                      typing in the override list is the right answer to it. */}
+                  {r.inSkuMaster ? (
+                    <>
+                      <span className="font-mono text-[11px] text-graphite">{r.productCode}</span>
+                      <div className="font-serif italic text-alert text-xs">
+                        in the ERP, with no cost there
+                      </div>
+                    </>
+                  ) : r.listItemCode === null ? (
                     <span className="font-serif italic text-danger text-sm">not on the list</span>
                   ) : r.listHasCost ? (
                     <span className="font-mono text-[11px] text-ink">{r.listItemCode}</span>

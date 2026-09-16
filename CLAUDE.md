@@ -106,6 +106,37 @@ src/
 │   │   │                              as…*. Department-level because neither table
 │   │   │                              carries a scheme; `?month=` narrows both
 │   │   │                              tables client-side.
+│   │   │                              **THE SKU MASTER, BOUND (2026-09-17):**
+│   │   │                              `products/` is no longer a hand-keyed cost
+│   │   │                              list — it is the ERP's own SKU master,
+│   │   │                              mirrored into `erp_products`, with
+│   │   │                              `erp_sofa_combos` beside it and
+│   │   │                              `comm_products` demoted to OVERRIDES. The
+│   │   │                              ERP pushes both to
+│   │   │                              `POST /api/erp/v1/products` on the same
+│   │   │                              key as the sales-order feed (contract §9).
+│   │   │                              ONE function decides a cost —
+│   │   │                              `erp_resolve_unit_cost()`: the ERP's own
+│   │   │                              `line_cost_sen` on the sale → the SKU
+│   │   │                              master's `cost_price` → a sofa module's
+│   │   │                              seat-height cost grid → `base_price`
+│   │   │                              ("PRICE 2") → `price_1` → the override
+│   │   │                              table → NULL. **`sell_price` is NEVER in
+│   │   │                              that chain** (it would read as 0% margin).
+│   │   │                              `sales_order_lines.cost_source` records
+│   │   │                              which one answered, and *Costing gaps* is
+│   │   │                              what nothing could cost, worth-first.
+│   │   │                              **WHY IT MATTERS:** a sofa COMBO build
+│   │   │                              lands as N lines with the whole price on
+│   │   │                              the FIRST and 0 on the rest, and the
+│   │   │                              ingest treated `cost 0 + amount 0` as a
+│   │   │                              real zero — 1,720 lines, and 177 of
+│   │   │                              August's 186 bills with a margin
+│   │   │                              (RM 1.28M) were judged on one. It always
+│   │   │                              errs one way: cost too low → margin too
+│   │   │                              high → the penalty never fires and the
+│   │   │                              incentive is paid unearned. Mig
+│   │   │                              `20260919010000`.
 │   │   │                              Inside a view, sections get their own nav
 │   │   │                              (2026-09-05): rules = 9 sections (`?tab=`)
 │   │   │                              in a VERTICAL sidebar since 2026-09-07 —
@@ -443,9 +474,11 @@ src/
 │   │                                  `lib/member/org-map-layout.ts`, on
 │   │                                  `member_org_map()`. Names, titles and
 │   │                                  reporting lines only.
-│   └── api/erp/v1/                 ← the ONE machine endpoint: the Houzs ERP live
-│                                      feed's receiver (sales-orders POST + health
-│                                      GET). The only POST route handler in the app —
+│   └── api/erp/v1/                 ← the ONLY machine endpoints: the Houzs ERP's two
+│                                      receivers — `sales-orders` (POST, live per-save)
+│                                      and `products` (POST, the SKU master + Combo
+│                                      Pricing catalogue, 2026-09-17), plus `health`
+│                                      (GET). The only POST route handlers in the app —
 │                                      see the machine-ingest exception under Coding
 │                                      Conventions. Everything else stays Server Actions.
 ├── components/
@@ -459,7 +492,7 @@ src/
 │   │   │                              callers: the ERP receiver, team/people invites, and
 │   │   │                              `lib/erp-sync/feed-key.ts` (the ERP's feed key in and
 │   │   │                              out of Vault — four service-role-only RPCs, nothing
-│   │   │                              else; 2026-09-13). A fourth is a decision, not a
+│   │   │                              else; 2026-09-13). A FIFTH is a decision, not a
 │   │   │                              detail.
 │   │   └── database.types.ts       ← Generated from Supabase
 │   ├── auth.ts                     ← requireAuth / requireRole helpers
@@ -618,8 +651,8 @@ TypeScript strict mode — no `any`
 Server Components by default — Client Components only when needed (forms, interactive widgets)
 Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
 Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5).
-Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
-Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly three callers: `app/api/erp/v1/sales-orders/route.ts` (which uses it for one thing — calling the ingest RPC), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
+Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. TWO of them exist, both the Houzs ERP's: `sales-orders` and, since 2026-09-17, `products` (the SKU master + Combo Pricing mirror). A second endpoint of an existing feed is not a second exception — a second SYSTEM would be. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
+Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly FOUR callers: `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second was added 2026-09-17 for the SKU master + Combo Pricing mirror and is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
 Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases.

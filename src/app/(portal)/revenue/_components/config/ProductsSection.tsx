@@ -50,8 +50,8 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
     <div className="space-y-8">
       <section>
         <SectionHead
-          title="Product list"
-          count={`${products.length} PRODUCTS`}
+          title="Overrides"
+          count={`${products.length} ROWS`}
           action={
             <button
               type="button"
@@ -63,11 +63,11 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
           }
         />
         <Hint>
-          Cost is the only thing the ERP sales-order export does not carry, so it is keyed here. A
-          product left without a cost has no margin, and the commission run will skip the
-          below-margin penalty on every bill containing it rather than guess. While this list is
-          being filled, a margin can be typed straight onto a sales order instead — that always
-          wins over anything derived here.
+          The exceptions: a row here only for what the ERP genuinely cannot cost. It is read LAST —
+          the ERP&apos;s own stamp on the sale wins, then the SKU master above, then this. A code
+          the SKU master already carries does not belong here, and a row typed against one the ERP
+          later costs is simply ignored. While a gap is open, a margin can be typed straight onto
+          the sales order instead — that always wins over anything derived here.
           <br />
           <strong className="font-sans not-italic">ERP code</strong> is the same product&apos;s name
           in the ERP: it writes <span className="font-mono text-xs">AKEMI ULTIMATE MATT (K)</span>{' '}

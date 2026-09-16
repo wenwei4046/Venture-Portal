@@ -68,7 +68,7 @@ export const ERP_HEADER_PII_KEYS = [
   'remark4',
 ] as const
 
-type Row = Record<string, unknown>
+export type Row = Record<string, unknown>
 
 /** One document as the ERP's drain POSTs it. */
 export interface ErpDelivery {
@@ -129,17 +129,17 @@ export type ParseResult = ParseSuccess | ParseFailure
 
 // ─── Cell helpers ───────────────────────────────────────────────────────────
 
-function isRow(v: unknown): v is Row {
+export function isRow(v: unknown): v is Row {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-function text(v: unknown): string | null {
+export function text(v: unknown): string | null {
   if (v === null || v === undefined) return null
   const s = String(v).trim()
   return s === '' ? null : s
 }
 
-function num(v: unknown): number | null {
+export function num(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null
   const n = typeof v === 'number' ? v : Number(String(v).replace(/,/g, ''))
   return Number.isFinite(n) ? n : null
@@ -163,7 +163,7 @@ export function isoDate(v: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : m[1]
 }
 
-function isoTimestamp(v: unknown): string | null {
+export function isoTimestamp(v: unknown): string | null {
   const s = text(v)
   if (!s) return null
   const d = new Date(s)
