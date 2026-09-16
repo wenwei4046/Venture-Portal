@@ -1,25 +1,17 @@
 /**
- * Fair venues — the place an event was held, and who ran it.
+ * Fair venues — the place an event was held.
  *
- * The ERP names the venue on every sales order and says nothing about the
- * ORGANISER, so the two facts live apart: the venue travels on the order
- * (`sales_orders.venue`), the organiser is the portal's own register
- * (`comm_venues`, keyed by the matching key below). Nothing here reaches the
- * ERP — an organiser typed on the month page stays typed however many times
- * that venue is delivered again.
+ * The ERP names the venue on every sales order and says nothing about who
+ * ORGANISED the event, so the two facts live apart: the venue travels on the
+ * order (`sales_orders.venue`), the organiser is the portal's own — and since
+ * 2026-09-17 it hangs off the FAIR, not the place, because the same hall has a
+ * different organiser from month to month (`comm_venue_events`, shaped by
+ * `lib/venue-register.ts`). `comm_venues` is the register of places and of
+ * which spellings are one place (`canonical_key`).
  *
  * The matching key must agree with SQL's `venue_key()`: upper case, single
  * spaces, empty becomes nothing.
  */
-
-export interface VenueRegistryRow {
-  venueKey: string
-  displayName: string
-  organizer: string | null
-  notes: string | null
-  /** The venue this spelling really is. Null when this row is itself a place. */
-  canonicalKey: string | null
-}
 
 export interface VenueSales {
   /** The PLACE's key — the canonical one when the spelling has been merged. */

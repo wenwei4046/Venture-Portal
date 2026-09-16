@@ -8,7 +8,7 @@
 
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
-import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
+import { PRODUCT_LIST_PATH, VENUE_REGISTER_PATH, revenuePath } from '@/lib/revenue'
 import {
   canAccessAuditLog,
   canAccessCategories,
@@ -242,8 +242,11 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // in the sidebar. Fair itself stays a link, so one click still lands on
     // Commission Calculation the way it did before.
     //
-    // The Product List is the one department-wide child: `comm_products` has no
-    // scheme, and what a product costs stays with the Principal.
+    // The Product List and Venues are the two department-wide children:
+    // `comm_products`, `comm_venues` and `comm_organisers` carry no scheme, so
+    // one of each serves every sub-department. What a product costs stays with
+    // the Principal; the venue register is HR's, because naming the organiser
+    // of a fair is part of reading the month.
     {
       label: 'Revenue',
       section: 'Departments',
@@ -274,6 +277,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
           ],
         })),
         { href: PRODUCT_LIST_PATH, label: 'Product List', visible: canAccessProductList },
+        { href: VENUE_REGISTER_PATH, label: 'Venues', visible: canAccessRevenue },
       ],
     },
     { href: '/claims', label: 'Claims', section: 'Departments', visible: canAccessClaims },

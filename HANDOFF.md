@@ -1,5 +1,171 @@
 # HOUZS Venture Portal — Session Handoff
 
+## ACTIVE CHECKPOINT 2026-09-17 — The venue register, and who ran each fair
+
+Branch `feat/venue-organiser-register`, worktree
+`.claude/worktrees/venue-organiser-register`, from `cda4f27`. Migration is
+**APPLIED LIVE**; the code is a PR awaiting merge.
+
+Closes open item 3 of the checkpoint below ("44 venues, 1 organiser named …
+The user asked for a Venue register page; offered, not yet built").
+
+### The decision that shaped it
+
+The organiser was one free-text column on `comm_venues` — one answer per
+place, for ever. Asked whether that was right, the user settled it in five
+words: **"same venue will have different organiser"**. So the organiser is a
+fact about the FAIR, not about the hall:
+
+| | |
+|---|---|
+| `comm_organisers` | the register of names. Typed once, picked from a dropdown everywhere else, unique on `organiser_key(name)` so HOMEDEC / Homedec / Home Dec cannot become three organisers with a third of the sales each |
+| `comm_venue_events` | **(canonical venue × month) → organiser.** Surrogate id + `UNIQUE (venue_key, period_month)`, so the day the ERP can identify a dated event this becomes a date range and the constraint is what drops |
+| `comm_venues.organizer` | **SUPERSEDED.** Migrated (SPICE ARENA = HOMEDEC became both its months), commented, no longer read or written. Not dropped — dropping a column ahead of its readers has broken this database before |
+
+Month, not a date range, because the ERP sends no event dates and `fair_events`
+is a design the user has explicitly deferred. The one case it cannot express is
+two organisers at one venue inside one month.
+
+### Revenue › Venues (`/revenue/venues`)
+
+Department-level, beside the Product List, because neither table carries a
+scheme. Two tables, both narrowing together on `?month=` (pushState, no round
+trip — every row is already on the client):
+
+- **Organisers** — add / rename / retire, with each one's fairs, bills and
+  sales value counted from the venue rows on screen so the two can never
+  disagree. Remove is refused by the database once a fair is recorded against
+  it, and says so ("untick Active instead").
+- **Venues** — one row per FAIR, venue name printed once over its group with a
+  `↳` on the continuations, an organiser dropdown that saves on pick, the
+  month linked to its own bills, and *same place as…* which now offers every
+  venue instead of one month's.
+
+`FairOrganiserPicker` is shared with the month page's *Sales by venue*, whose
+organiser cell is now the same dropdown for that month. No form, deliberately:
+a bare `<select>` inside a `RowForm` is never submitted, so it calls the action
+directly; `setFairOrganiser` still throws when the `organiser` field is absent
+rather than blank, so a future caller that gets it wrong fails loudly instead
+of silently unnaming a fair.
+
+Clearing a fair DELETES its row rather than storing a null: no row means
+nobody has said, which is the state the feed may fill in. A null with
+`source = 'manual'` would mean "a human says nobody ran it" and would lock the
+feed out for ever.
+
+### The ERP's organiser — ready, dormant, and it needs nothing from us
+
+The user's reason for the whole exercise: *"以后 ERP 那边 send 过来的时候，应该
+就是 venue 跟着 organizer 一起带过来的… 现在只是作为预防措施；下次如果 detect
+失败，at least 还可以 manually 去改"*.
+
+`sales_orders_register_organiser` (trigger on `sales_orders`) reads the
+organiser out of `sales_orders.raw -> header` under eight plausible names
+(`organiser`, `organizer`, `event_organiser`, … ). It works because
+`stripHeaderPii` is a BLOCKLIST, so a field the ERP adds survives into `raw`
+untouched, and because it is a trigger: `ingest_erp_sales_order` is 318 lines
+and was not touched at all.
+
+- matches the register → the month is named, `source = 'erp'`
+- matches nothing → kept verbatim in `erp_organiser_text`, shown as *ERP: … —
+  not registered*, and the register page counts them. It never INVENTS an
+  organiser: a typo would otherwise become a real organiser with real sales.
+- a human's pick always wins, and the raw text still records the disagreement
+
+Dormant today — no delivery carries the field, so the trigger costs one JSONB
+probe per order. Proven live anyway, in rolled-back transactions through the
+real `ingest_erp_sales_order`: a brand-new venue INSERTs fine (the trigger
+registers the place itself, because the ingest registers venues AFTER writing
+the order and the FK would otherwise fail the whole delivery), an unmatched
+name is kept, a re-delivery matches it case-insensitively once registered, and
+a human's pick survives re-delivery.
+
+`docs/erp-sync/contract.md` now tells the ERP team the field names to use.
+
+### The migration
+
+`supabase/migrations/20260918040000_venue_organisers.sql`, **applied live** to
+`gixpptmfuryskbwkmiwz` (recorded in `supabase_migrations` as version
+`20260916182245`, name `venue_organisers` — the MCP stamps its own clock, same
+as `month_orders_cost_divisor` = `20260916160038`). Additive; its header
+carries the reversal.
+
+It also re-creates `revenue_month_orders` to take the organiser from
+`venue_event_organiser(o.venue, p_period)` instead of `comm_venues.organizer`.
+**Proven behaviour-identical before applying**: the whole function's output
+for Fair 2026-08 hashes to `d5644f694a33b7bd2b146aa124a59251` on both the old
+and the new body (319 rows, 62 organiser-bearing), and September's named count
+is 3 either way.
+
+New in SQL: `organiser_key()`, `venue_event_organiser()` (the ONE resolution
+rule — `revenue_month_orders` and the order page both read it, rather than
+joining it two different ways), `erp_header_organiser()`,
+`revenue_venue_register()`, `comm_venue_events_canonical` (an event always
+belongs to the place, never to a spelling) and `comm_venues_merge_events`
+(merging a spelling moves its named months onto the place, so an organiser
+typed before the merge is not orphaned).
+
+### Live database state, unchanged by the testing
+
+1 organiser (HOMEDEC), 2 fairs named: SPICE ARENA 2026-08 and 2026-09. 44
+venues, 60 fairs on record. Everything created during the E2E walk
+(MLE Modern Home Living, two picks) was removed again through the UI.
+
+### Verified
+
+2,137 unit tests (185 files, 3 skipped; +24 for `lib/organisers.ts` and
+`lib/venue-register.ts`), `tsc --noEmit` clean apart from the five
+pre-existing `ByRoleOptions`/`exact` errors in the MemberWorkspace test files,
+`next lint` with no new warnings, and a production build with
+`/revenue/venues` in the route list.
+
+Live Playwright walk as Principal at 1440px against the production database:
+add an organiser, pick it on the register, pick a different one on the month
+page, confirm the other month at the same venue stayed unnamed, clear a pick,
+watch Remove refused for an organiser with fairs and accepted for one without,
+see the duplicate-name refusal, and read the organiser on a bill's detail page.
+390px has no horizontal page overflow (both tables scroll inside their own
+wrappers).
+
+### Still open — inherited, none of it touched by this branch
+
+1. **September's run is doubly stale** (computed before the recost and before
+   the cost divisor), and **August has never had a run at all**. The user has
+   been shown this and has not said to recompute.
+2. **`member_order_facts` is still on the RAW cost**, so member Insight, Arena
+   and Income show a higher margin than the engine pays on. A decision for the
+   user, not a follow-through.
+3. **Which spellings are one place.** DECIDED: `SPICE ARENA` and `SETIA SPICE
+   CONVENTION CENTRE` are two venues, do not combine. Still undecided, biggest
+   first: PISA SPICE ARENA / … CONVENTION CENTRE · BUKIT JALIL STADIUM /
+   STADIUM BUKIT JALIL · MIDVALLEY EXHIBITION CENTRE / MID VALLEY · MIDVALLEY
+   SOUTHKEY JB / MVEC SOUTHKEY · PAVILLION / PAVILION BUKIT JALIL · IOI
+   PUTRAJAYA / IOI MALL PUTRAJAYA / IOIGECC · SETIA CITY CONVENTION CENTRE /
+   SCCC SHAH ALAM / SCCC · MITC MELAKA / MELAKA INTERNATIONAL TRADE CENTRE ·
+   ZANOTTI LIVING(KELANA JAYA) with and without the space. Nothing was merged
+   here — the eight `… SOLO` names are a single-brand roadshow marker, not
+   aliases.
+4. **RM 690k of sales still has no cost** (28 sofa codes, 3 DUNLOPILLO, 5
+   AKEMI (SK)/(SP), 7 ERGOTEX). `revenue_uncosted_products()` names them.
+5. `_recost_backup_20260916` is still a temp table in `public`. Drop it once
+   the recost is settled.
+
+### Traps this session hit
+
+- **The venue note was write-only.** `comm_venues.notes` was typed beside the
+  organiser on the month page and displayed nowhere — selected on the order
+  page and never rendered. It went with the organiser rather than getting a
+  column on the new page; nothing visible was lost.
+- **A `<select>` needs `key={value}`.** React rewrites an input's
+  `defaultValue` on re-render but never a select's selected option, so a saved
+  pick would show the old organiser until a reload. `Choice` already carries
+  one; the new picker does too.
+- In a worktree-isolated session the Bash tool refuses a compound command whose
+  text contains a `(portal)` path, and refuses some heredocs on sight. Write
+  the edit script to the scratchpad and run `python <abs path>` as one plain
+  command.
+
+
 ## ACTIVE CHECKPOINT 2026-09-17 — The margin story, end to end
 
 Supersedes the checkpoint this session wrote earlier (it was dated 2026-09-18

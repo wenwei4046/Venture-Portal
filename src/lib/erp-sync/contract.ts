@@ -32,8 +32,10 @@
  *     becomes the portal's `location`; `venue` is the fair itself — "SUNWAY
  *     PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB" — free text the ERP
  *     types (its `venue_id` is never populated) and its own column here. The
- *     ERP sends nothing about who ORGANISED the event; `comm_venues` on the
- *     portal carries that.
+ *     ERP sends nothing about who ORGANISED the event; the portal carries
+ *     that itself, per (venue × month), in `comm_venue_events`. If a
+ *     delivery ever does name one, `erp_header_organiser()` in SQL reads it
+ *     straight out of the stored `raw.header` — see erp-sync/contract.md.
  *
  * PII is dropped before anything is stored: the header carries the customer's
  * addresses, phone, email and emergency contacts, and `customer_po_image_b64`

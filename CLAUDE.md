@@ -98,7 +98,14 @@ src/
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
-│   │   │                              [sub]/[period]/ runs and products/ (Principal).
+│   │   │                              [sub]/[period]/ runs, products/ (Principal) and
+│   │   │                              **venues/** — the VENUE REGISTER (2026-09-17):
+│   │   │                              every venue on one screen, one row per
+│   │   │                              (venue, month) with an organiser dropdown, the
+│   │   │                              organiser register above it, and *same place
+│   │   │                              as…*. Department-level because neither table
+│   │   │                              carries a scheme; `?month=` narrows both
+│   │   │                              tables client-side.
 │   │   │                              **THE SKU MASTER, BOUND (2026-09-17):**
 │   │   │                              `products/` is no longer a hand-keyed cost
 │   │   │                              list — it is the ERP's own SKU master,
@@ -285,10 +292,23 @@ src/
 │   │   │                              (the fair) was always arriving and
 │   │   │                              always dropped — now a column on
 │   │   │                              `sales_orders`, grouped as *Sales by
-│   │   │                              venue*. The ERP sends NOTHING about who
-│   │   │                              ran the event, so `comm_venues` keeps
-│   │   │                              the organiser, typed on that table
-│   │   │                              (`venue-actions.ts`, `lib/venues.ts`).
+│   │   │                              venue*. `comm_venues` is the register of
+│   │   │                              PLACES; `canonical_key` folds two
+│   │   │                              spellings into one (`venue-actions.ts`,
+│   │   │                              `lib/venues.ts`). The ERP sends NOTHING
+│   │   │                              about who ran the event, and
+│   │   │                              **the same venue has a different
+│   │   │                              organiser month to month** (user
+│   │   │                              2026-09-17), so the organiser is a
+│   │   │                              (venue × month) row —
+│   │   │                              `comm_venue_events` — naming an
+│   │   │                              organiser from the register
+│   │   │                              `comm_organisers`. One lookup,
+│   │   │                              `venue_event_organiser()`, is what
+│   │   │                              `revenue_month_orders` and the order page
+│   │   │                              both read. `comm_venues.organizer` is
+│   │   │                              SUPERSEDED (migrated, unread, not dropped).
+│   │   │                              Mig `20260918040000`.
 │   │   │                              `location` is NOT the fair — it is the
 │   │   │                              ERP's sales_location, the warehouse
 │   │   │                              (KL / PG / SRW).
