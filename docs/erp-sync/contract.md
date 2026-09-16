@@ -364,6 +364,16 @@ Product List fallback:
 | BEDFRAME | 53 | 1 | 1 |
 | ACCESSORY | 31 | 31 | 30 |
 
+> **SUPERSEDED 2026-09-17 by §9.** The advice below — "do not mirror the ERP's
+> catalogue" — was right about the attempt it describes (1,553 rows seeded into
+> `comm_products`, matched by a code system that does not line up) and wrong
+> about the conclusion. What that attempt copied was a *list of codes*. What the
+> portal needed was the ERP's *cost*, which `scm.mfg_products` has carried all
+> along and `comm_products` never could. §9 mirrors the SKU master itself, keyed
+> by the ERP's own code, and keeps `comm_products` as the exception table the
+> last two bullets below ask for. Read §9 first; the rest of this section is
+> kept because the measurements in it are still the ones that matter.
+
 **Proposed.** Do not mirror the ERP's catalogue in `comm_products` — that was
 tried (1,553 rows seeded) and the code systems do not line up. Instead:
 
@@ -393,3 +403,199 @@ only 21 of August's 319 bills (RM 100,382 of RM 2.0M) carry a complete cost.
 | Which companies feed commission | **assumed** Houzs (1) only — `vp.companies` |
 | Sub-department scoping | The existing endpoint always targets Fair. Batches, releases, held deliveries and run locks are scoped to Fair; IR uses a separate feed and may reuse document numbers. No ERP payload change is needed. |
 | Salesperson self-service page in the portal | separate feature, not part of this contract |
+
+
+---
+
+## 9. The SKU master + Combo Pricing feed (2026-09-17)
+
+**Built on the portal side. The ERP side is one query and one POST.**
+
+### 9.1 Why, in one paragraph
+
+The portal's margin was being computed against costs it had guessed. The ERP
+stamps `line_cost_sen` on a minority of lines — **457 of 1,050 in September, 56
+of 1,706 in August** — and `ingest_erp_sales_order` only treated a zero as
+"unknown" when the line also carried revenue. A sofa combo build arrives as N
+lines with the whole price on the first and **0 on the rest**, so every
+companion module took the other branch and was recorded as costing exactly
+RM 0.00. **1,720 lines** were written that way, and **177 of August's 186 bills
+that carry a margin — RM 1,279,941 — contain at least one.** `HC-SO-013377`
+reads **89.1%** margin off fifteen assumed zeros and one real RM 2,600.
+
+The error is one-directional: cost too low, margin too high. So the below-margin
+penalty (<=27% x0.5, <=25% x0.25, <=24% x0) never fires, and the monthly
+incentive (>=36% RM 1,000, >=43% RM 1,500 per brand) is paid on a margin nobody
+earned.
+
+**A zero on a companion line is a GAP, not a design.** Cost travels with the
+module's own SKU — `line_cost_sen = unit_cost_sen x qty` — independently of
+where a combo put the revenue. Among zero-revenue lines the portal holds, **416
+carry a real cost (RM 140,666)** and 1,720 carry none, and the *same* product
+code appears in both shapes: `AK-CS AIRLOFT COMFY PIL` 39 times at up to RM 600
+and 140 times at 0. If the zero were deliberate, the RM 600 could not exist.
+
+### 9.2 What the portal now holds
+
+| table | mirrors | notes |
+|---|---|---|
+| `erp_products` | `scm.mfg_products` | one row per product code; money in ringgit |
+| `erp_sofa_combos` | `scm.sofa_combo_pricing` | one row per effective-dated combo row |
+
+`sales_order_lines.cost_source` records which of them answered — `erp_line` /
+`sku_master` / `product_list` / `NULL` — so a margin can be argued with rather
+than believed. This is §7.2's "show the cost's PROVENANCE" bullet, built.
+
+**Cost precedence**, one function (`erp_resolve_unit_cost`), so the ingest, a
+re-cost and every report give the same answer:
+
+1. the ERP's own `line_cost_sen` on the sale, when above zero
+2. `erp_products.cost_price` (`cost_price_sen`)
+3. a sofa module's `seat_height_costs` at the build's height and tier
+4. `erp_products.base_price` ("PRICE 2"), then `price_1` ("PRICE 1")
+5. `comm_products.unit_cost` — the exception table
+6. nothing -> `NULL`, and the bill has no margin, which is what the engine was
+   designed to do
+
+`sell_price` is never in that chain. Costing a line at its own selling price
+reads as a 0% margin — a different wrong answer, and a more convincing one.
+
+### 9.3 Why the combos matter more than the SKUs, for sofas
+
+Two facts read out of the ERP's own source, not assumed:
+
+- **A matched combo always wins.** `scm/shared/sofa-build.ts` `groupPrice`: when
+  a SUBSET of the build's cells covers a combo's slots and that seat height is
+  priced above zero, the combo price REPLACES that subset's a-la-carte sum and
+  overrides the bundle path; cells outside the subset stay at full price. The
+  "only if it is cheaper" guard was **removed** (Chairman 2026-05-30) — a
+  matched combo is the price even when it is dearer than adding up. There is no
+  path in which the sum of the compartments overrides the combo.
+- **Every combo row carries both sides.** `prices_by_height` is the **COST**
+  grid and `selling_prices_by_height` the **SELLING** grid;
+  `comboChargedPrices(selling, cost)` lays one over the other to get what is
+  charged. For a sofa this is the only place the money lives, because the SKU
+  rows of a sectional are largely unpriced — PRICE 1 and PRICE 2 both blank on
+  the ERP's own SKU Master screen.
+
+### 9.4 The endpoint
+
+| | |
+|---|---|
+| Receiver | `POST https://<portal-host>/api/erp/v1/products` |
+| Auth | identical to the sales-order feed — `x-sync-secret`, the same key |
+| Body | `{ snapshotAt, full, products: [...], combos: [...] }` |
+| Cap | 2,000 rows per delivery; page a full catalogue (~2,300 SKUs + ~300 combos) |
+| Cadence | whenever the catalogue changes, or nightly. It is not a per-second feed |
+
+`full: true` means "this is the whole catalogue": anything it does not mention
+is **deactivated, never deleted** — a retired SKU is still the cost of a bill
+sold last month, and deleting it would silently un-cost history. Omit `full`
+(the default) for a partial delivery, which touches only what it carries.
+
+Every field is optional except `itemCode` (products) and `erpId` + `baseModel`
+(combos). A row the portal cannot read is skipped, not fatal, and the count of
+skipped rows comes back in `unreadable` — one nameless SKU must not cost the
+other 1,999 their costs.
+
+**Products** — the ERP's own column names are accepted verbatim, so the query
+below needs no aliasing:
+
+| portal field | ERP column | notes |
+|---|---|---|
+| `itemCode` | `code` | required |
+| `erpId` | `id` | |
+| `description` | `name` | the DESCRIPTION column on the SKU Master screen |
+| `category` | `category` | SOFA / BEDFRAME / ACCESSORY / MATTRESS / ... |
+| `size` | `size_label`, else `size_code` | |
+| `brand` | `branding` | |
+| `baseModel` / `moduleCode` | `base_model` / `size_code` | falls back to splitting the code at its first dash |
+| `costPrice` | **`cost_price_sen`** | sen. The one that matters |
+| `basePrice` / `price1` / `sellPrice` | `base_price_sen` / `price1_sen` / `sell_price_sen` | sen |
+| `seatHeightCosts` | `seat_height_prices` | `[{height, tier, priceSen}]`; the ERP's own comment says `priceSen` here is COST |
+| `unitM3` | `unit_m3_milli` | / 1000 |
+| `active` | `status` | anything but `INACTIVE` / `RETIRED` / `DISABLED` / `FALSE` is active |
+
+**Combos** — likewise:
+
+| portal field | ERP column |
+|---|---|
+| `erpId` | `id` (required — the ROW, not the logical combo) |
+| `baseModel` | `base_model` (required) |
+| `modules` | `modules` — slots, or the legacy flat form |
+| `tier` | `tier` |
+| `customerId` / `supplierId` | `customer_id` / `supplier_id` (NULL = the sales-side master row) |
+| `costByHeight` | **`prices_by_height`** (sen) |
+| `sellingByHeight` | **`selling_prices_by_height`** (sen) |
+| `effectiveFrom` | `effective_from` |
+| `deletedAt` | `deleted_at` |
+
+A delivered `slotsKey` is ignored: Postgres renders jsonb with spaces and
+`JSON.stringify` does not, so trusting whichever arrived would give one combo
+two keys. The portal computes its own.
+
+**`cost_price_sen` is confidential on the ERP side** (`canViewScmProductCost` —
+director + Purchasing). It is equally confidential here: both mirror tables are
+RLS-gated to the `product_list` permission, which in the portal is Principal
+only. If sending it is not acceptable, say so and the portal falls back to
+`base_price_sen` / `price1_sen`, which the ERP already prints to every caller —
+the chain in §9.2 is ordered for exactly that.
+
+### 9.5 What the ERP has to do
+
+One query and one POST, on whatever schedule suits — this is not the
+seconds-level feed. There is no outbox and no trigger: a catalogue is small
+enough to send whole.
+
+```sql
+-- Products. Page it: `LIMIT 1500 OFFSET n`, one POST per page, `full` only on
+-- the LAST page of a complete run (or send it whole if 2,300 rows fit).
+SELECT jsonb_build_object(
+    'snapshotAt', now(),
+    'full', false,
+    'products', COALESCE(jsonb_agg(to_jsonb(p)), '[]'::jsonb))
+  FROM (
+    SELECT code, id, name, category, size_label, size_code, base_model, branding,
+           barcode, uom, unit_m3_milli, status,
+           cost_price_sen, base_price_sen, price1_sen, sell_price_sen,
+           seat_height_prices
+      FROM scm.mfg_products
+     WHERE company_id = 1
+  ) p;
+
+-- Combos. Both grids, and the soft-deleted rows too, so a combo retired over
+-- there stops being read over here.
+SELECT jsonb_build_object(
+    'snapshotAt', now(),
+    'full', true,
+    'combos', COALESCE(jsonb_agg(to_jsonb(c)), '[]'::jsonb))
+  FROM (
+    SELECT id, base_model, modules, tier, customer_id, supplier_id,
+           prices_by_height, selling_prices_by_height,
+           effective_from, deleted_at, label
+      FROM scm.sofa_combo_pricing
+     WHERE company_id = 1
+  ) c;
+```
+
+POST each object to `/api/erp/v1/products` with the `x-sync-secret` header.
+The reply is `{ ok, outcome: "applied", products, combos, retiredProducts,
+retiredCombos, unreadable }`.
+
+### 9.6 What is still the ERP's to fix, and it is the bigger half
+
+Mirroring makes the ERP's costing VISIBLE. It does not fill it. Measured on the
+portal's own two months, the codes that were sold and that nothing can cost:
+
+| group | lines | codes | revenue with no cost |
+|---|---:|---:|---:|
+| sofa | 294 | 75 | **RM 468,411** |
+| mattress | 560 | 63 | RM 178,105 |
+| service | 144 | 7 | RM 53,465 |
+| bedframe | 455 | 55 | RM 39,511 |
+
+`8030-1A(LHF)` alone carries RM 131,271 across 28 bills with no cost anywhere.
+The portal's **Costing gaps** table (Revenue -> Product List) is that list,
+sorted by what it is worth, and it names which side each row belongs to. A row
+marked *in SKU master* is the ERP's gap: its cost field is empty over there, and
+filling it there fixes it for every system at once.
