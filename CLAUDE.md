@@ -230,6 +230,37 @@ src/
 │   │   │                              `lib/erp-sync/feed-key.ts`,
 │   │   │                              `revenue/link-actions.ts`,
 │   │   │                              `_components/ErpLinkPanel.tsx`.
+│   │   │                              **THE MONTH ENDS IN A RAIL (2026-09-17):**
+│   │   │                              `[period]` itself closes on three cuts of
+│   │   │                              the same bills, one `SlidingTabs` rail
+│   │   │                              (`?tab=`, `MonthBreakdownTabs`): Sales by
+│   │   │                              venue / Sales by person / **Open Bill**.
+│   │   │                              Only one is ever being read, and stacked
+│   │   │                              they meant scrolling past every venue to
+│   │   │                              reach a person. THE RAIL IS THE HEADING —
+│   │   │                              its labels are those sections' old
+│   │   │                              `.sect-head` titles — and every panel is
+│   │   │                              server-rendered and handed over as a node,
+│   │   │                              so switching is a `pushState` and a
+│   │   │                              re-render, never a round trip.
+│   │   │                              **Open Bill** is what the picks COST: by
+│   │   │                              rank, by salesperson, and every picked bill
+│   │   │                              (`lib/commission/open-bill-summary.ts`).
+│   │   │                              The money is read from the RUN's own lines
+│   │   │                              (`comm_statement_lines`, component
+│   │   │                              `open_bill`, `_lib/open-bill.ts`), never
+│   │   │                              recomputed, so a month nobody has computed
+│   │   │                              shows its picks and says plainly that
+│   │   │                              nothing has been paid. A run ALSO pays Open
+│   │   │                              Bill on bills carried in from earlier
+│   │   │                              months — the deposit gate releases a bill
+│   │   │                              with its pick — so that money is reported
+│   │   │                              on its own line rather than credited to
+│   │   │                              this month's picks. A bill the run paid
+│   │   │                              nothing on says WHY: Held / Nobody to pay /
+│   │   │                              No base / **Not in this run**, the last
+│   │   │                              being a bill that arrived after the run was
+│   │   │                              computed.
 │   │   │                              **THE MONTH, UNDERNEATH (2026-09-16):**
 │   │   │                              `[period]/orders` is every bill of the
 │   │   │                              month, filterable by person or venue
