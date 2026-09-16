@@ -4,12 +4,16 @@ import { memberDemo } from "@/lib/member/demo";
 import type { MemberData } from "@/lib/member/types";
 import MemberWorkspace from "./MemberWorkspace";
 
-const mocks = vi.hoisted(() => ({ acknowledge: vi.fn(), submit: vi.fn(), view: vi.fn() }));
+const mocks = vi.hoisted(() => ({ acknowledge: vi.fn(), submit: vi.fn(), view: vi.fn(),
+  insight: vi.fn(), orgMap: vi.fn(), kpi: vi.fn(), arena: vi.fn(), saveWeeks: vi.fn() }));
 vi.mock("@/components/layout/view-as-actions", () => ({ setViewAs: mocks.view }));
 vi.mock("@/app/(member)/member/actions", () => ({
   acknowledgeMemberMemo: mocks.acknowledge, submitMemberRequest: mocks.submit,
+  fetchMemberInsight: mocks.insight, fetchMemberOrgMap: mocks.orgMap,
   refreshMemberData: vi.fn(), calculateMemberQuote: vi.fn(),
 }));
+vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({ fetchMemberKpiSummary: mocks.kpi }));
+vi.mock("@/app/(member)/member/arena-actions", () => ({ fetchMemberArena: mocks.arena, saveMemberArenaBrandWeeks: mocks.saveWeeks }));
 
 function data(): MemberData {
   const value = memberDemo();
@@ -26,12 +30,73 @@ function data(): MemberData {
 
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear();
+  for (const fetch of [mocks.insight, mocks.orgMap, mocks.kpi, mocks.arena]) fetch.mockResolvedValue({ ok: false, error: "Member data is not available in Principal view" });
+  mocks.view.mockResolvedValue(undefined);
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   window.history.replaceState({}, "", "/member?page=today&department=fair");
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); localStorage.clear(); });
 
 describe("Principal Revenue workspace", () => {
+  it.each(["insight", "arena"])("returns unsupported Principal %s links to Today without invoking member services", async page => {
+    window.history.replaceState({}, "", `/member?page=${page}&department=fair`);
+    render(<MemberWorkspace initialData={data()} />);
+    await screen.findByRole("heading", { name: "Revenue overview", level: 1 });
+    expect(new URL(window.location.href).searchParams.get("page")).toBe("today");
+    expect(within(screen.getByRole("navigation", { name: "Mobile navigation" })).getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+    for (const fetch of [mocks.insight, mocks.orgMap, mocks.kpi, mocks.arena]) expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("uses the live C header and both role-appropriate navigation bars without member-only fetches", () => {
+    const { container } = render(<MemberWorkspace initialData={data()} />);
+    expect(container.querySelector('[data-revenue-design="c"]')).toBeInTheDocument();
+    expect(container.querySelector("[data-revenue-preview]")).toBeNull();
+    expect(container.querySelector('a[href*="/member/preview"]')).toBeNull();
+    expect(screen.getByRole("button", { name: "Revenue home" }).closest("header")).toHaveAttribute("data-arena-chrome");
+    expect(screen.getByRole("button", { name: "Open profile" })).toHaveTextContent("P");
+    for (const name of ["Desktop navigation", "Mobile navigation"]) {
+      const nav = within(screen.getByRole("navigation", { name }));
+      for (const label of ["Today", "Income", "Quote", "Team", "Profile"]) expect(nav.getByRole("button", { name: label })).toBeInTheDocument();
+      expect(nav.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+      expect(nav.queryByRole("button", { name: "Insight" })).not.toBeInTheDocument();
+      expect(nav.queryByRole("button", { name: "Arena" })).not.toBeInTheDocument();
+    }
+    for (const fetch of [mocks.insight, mocks.orgMap, mocks.kpi, mocks.arena]) expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("navigates the Principal mobile destinations and shared header without opening member self-service", async () => {
+    render(<MemberWorkspace initialData={data()} />);
+    for (const [label, page, heading] of [
+      ["Income", "income", "Team income"], ["Quote", "quote", "Build your offer"],
+      ["Team", "team", "Team hierarchy"], ["Profile", "account", "Principal account"],
+      ["Today", "today", "Revenue overview"],
+    ]) {
+      fireEvent.click(within(screen.getByRole("navigation", { name: "Mobile navigation" })).getByRole("button", { name: label }));
+      await screen.findByRole("heading", { name: heading, level: 1 });
+      expect(new URL(window.location.href).searchParams.get("page")).toBe(page);
+      for (const name of ["Desktop navigation", "Mobile navigation"]) {
+        expect(within(screen.getByRole("navigation", { name })).getByRole("button", { name: label })).toHaveAttribute("aria-current", "page");
+      }
+      expect(screen.getByRole("combobox", { name: "Revenue department" })).toHaveValue("fair");
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Open profile" }));
+    expect(screen.getByRole("heading", { name: "Principal account", level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Edit personal details|Submit Claim|Request resignation|Save brand weeks/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Revenue home" }));
+    expect(screen.getByRole("heading", { name: "Revenue overview", level: 1 })).toBeInTheDocument();
+    for (const action of [mocks.insight, mocks.orgMap, mocks.kpi, mocks.arena, mocks.saveWeeks, mocks.acknowledge, mocks.submit]) expect(action).not.toHaveBeenCalled();
+  });
+
+  it("preserves the Principal role switcher as a working form in the C toolbar", async () => {
+    render(<MemberWorkspace initialData={data()} />);
+    const switcher = within(screen.getByRole("group", { name: "Workspace view and department" })).getByRole("combobox", { name: "View portal as role" });
+    fireEvent.change(switcher, { target: { value: "principal" } });
+    await waitFor(() => expect(mocks.view).toHaveBeenCalledTimes(1));
+    const submitted = mocks.view.mock.calls[0][0] as FormData;
+    expect(submitted.get("role")).toBe("principal");
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+
   it("opens a real team overview without an employee profile or fabricated salary", () => {
     render(<MemberWorkspace initialData={data()} />);
     expect(screen.getByRole("heading", { name: "Revenue overview" })).toBeInTheDocument();
@@ -49,6 +114,16 @@ describe("Principal Revenue workspace", () => {
     expect(screen.getByRole("heading", { name: "Revenue overview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "IR workspace" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Quote" })).not.toBeInTheDocument();
+    expect(new URL(window.location.href).searchParams.get("department")).toBe("ir");
+    expect(screen.getByRole("combobox", { name: "View portal as role" })).toHaveValue("revenue_member");
+    for (const name of ["Desktop navigation", "Mobile navigation"]) {
+      const nav = within(screen.getByRole("navigation", { name }));
+      expect(nav.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+      expect(nav.getByRole("button", { name: "Income" })).toBeInTheDocument();
+      expect(nav.getByRole("button", { name: "Team" })).toBeInTheDocument();
+    }
+    fireEvent.change(screen.getByRole("combobox", { name: "Revenue department" }), { target: { value: "fair" } });
+    expect(within(screen.getByRole("navigation", { name: "Mobile navigation" })).getByRole("button", { name: "Quote" })).toBeInTheDocument();
   });
 
   it("renders the full hierarchy with no self member and supports search", () => {
@@ -89,6 +164,3 @@ describe("Principal Revenue workspace", () => {
     expect(screen.queryByText("No member profile linked")).not.toBeInTheDocument();
   });
 });
-
-vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({ fetchMemberKpiSummary: vi.fn().mockResolvedValue({ ok: false, error: "KPI unavailable in this navigation test" }) }));
-vi.mock("@/app/(member)/member/arena-actions", () => ({ fetchMemberArena: vi.fn().mockResolvedValue({ ok: false, error: "Arena unavailable in this navigation test" }), saveMemberArenaBrandWeeks: vi.fn() }));

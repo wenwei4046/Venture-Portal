@@ -1,8 +1,14 @@
 # HOUZS Venture Portal — Session Handoff
 
+## Checkpoint 2026-09-16 — Principal Revenue C correction
+
+The first C release excluded `principalView`, leaving the signed-in Principal's Revenue View on the old design. The user reported this on `/member?page=income`. C presentation now applies to every authenticated Revenue workspace, including Principal, and `PrincipalRevenuePanels` composes the same C typography/open-section styles rather than raw legacy cards. Principal retains real team-level data and its valid Today / Income / Quote / Team / Profile navigation, department and workspace switchers, and management forms. Member-only Insight/KPI/Arena/OrgMap requests and self-service actions remain excluded from Principal; this changes presentation, not identity or permissions. The gated `design=live&role=principal` sample reproduces the Principal layout for mobile/desktop QA.
+
+Validation: 2,027 tests passed, full source TypeScript and isolated production build passed, and Principal Income/Today were visually checked at desktop width and 390 × 844. Principal navigation and department-switch regressions explicitly assert that no employee-only RPCs or self-service writes occur. No database migration is required for this correction.
+
 ## Checkpoint 2026-09-16 — Revenue member C release
 
-User authorised the entire approved C (Orange & Brown) design and functionality for live mobile and PC. `/member` now uses the responsive white/orange/brown layout, with a desktop sidebar and wider content columns, mobile bottom navigation, safe areas and reduced-motion-aware transitions. The principal management view retains its existing layout. The latest other-session main changes through `dc619c5` were incorporated before release work.
+User authorised the entire approved C (Orange & Brown) design and functionality for live mobile and PC. `/member` now uses the responsive white/orange/brown layout, with a desktop sidebar and wider content columns, mobile bottom navigation, safe areas and reduced-motion-aware transitions. Principal's presentation is corrected by the checkpoint above. The latest other-session main changes through `dc619c5` were incorporated before release work.
 
 - Today: orange income first, bell attention section, real combined KPI quantity and the first configured threshold, and brand-specific margin links into Insight orders. No individual Pillow/Protector targets or duplicate progress/quote promotion.
 - Insight: real Personal/Team data, shared brand margin rows, brand/order filters and correct selected-month refresh. Missing cost or incomplete order coverage does not produce a false margin tier.

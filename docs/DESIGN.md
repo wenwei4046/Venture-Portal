@@ -755,7 +755,9 @@ and amber C direction. Mobile keeps Today / Insight / Quote / Arena / Profile;
 desktop uses a 224px sidebar, wider content and responsive two-column sections.
 Quote remains available only to eligible memberships. Native safe-area insets and
 a white browser theme colour join the header to the device chrome. Press and page
-motion respect reduced-motion preferences. Principal management remains separate.
+motion respect reduced-motion preferences. Principal Revenue View shares the same
+C presentation while retaining its team-level data, management controls and
+role-appropriate navigation. It does not call employee-only performance RPCs.
 
 Today keeps income first, the bell-marked attention section next, then sales/KPI
 progress and brand margins. `member_kpi_summary` supplies the actual combined

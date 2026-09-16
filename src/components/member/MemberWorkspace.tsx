@@ -70,7 +70,7 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import MemberArena from "./MemberArena";
 
 const s = memberStyles;
-// Explicit module-class composition keeps preview refinements out of production.
+// Shared presentation classes keep the approved C design consistent across roles.
 const previewClassNames = Object.fromEntries(
   Object.entries(memberStyles).map(([name, className]) => [
     name,
@@ -259,7 +259,7 @@ export default function MemberWorkspace({
   /** Admin/development preview of the responsive live layout, with explicit sample data. */
   productionLayout?: boolean;
 }) {
-  const liveDesign = (!initialData.demo || productionLayout) && !initialData.principalView;
+  const liveDesign = !initialData.demo || productionLayout;
   const isDesignPreview = initialData.demo && !!previewDesign;
   const design = liveDesign ? "c" : initialData.demo ? previewDesign : undefined;
   const s = liveDesign ? Object.fromEntries(Object.entries(previewClassNames).map(([name, className]) => [
@@ -415,6 +415,7 @@ export default function MemberWorkspace({
         membershipsRef.current[0];
       let next: MemberPage =
         p && Object.hasOwn(labels, p) ? (p as MemberPage) : "today";
+      if (initialData.principalView && (next === "insight" || next === "arena")) next = "today";
       if (next === "quote" && !selected?.calculator) next = "today";
       setPage(next);
       setInsightEntry({ screen: url.searchParams.get("screen") === "orders" ? "orders" : "overview", brand: url.searchParams.get("brand") ?? undefined });
@@ -577,10 +578,10 @@ export default function MemberWorkspace({
     if (page === "team" && !orgMap && !mapBusy && !mapError) void loadOrgMap();
   }, [page, principalView, liveDesign, insight, insightBusy, insightError, orgMap, mapBusy, mapError, loadInsight, loadOrgMap]);
   useEffect(() => {
-    if (liveDesign && page === "today") void loadInsight();
-  }, [liveDesign, page, data.refreshedAt, loadInsight]);
+    if (liveDesign && !principalView && page === "today") void loadInsight();
+  }, [liveDesign, principalView, page, data.refreshedAt, loadInsight]);
   useEffect(() => {
-    if (!liveDesign || data.demo || page !== "today" || !member?.calculator) return;
+    if (!liveDesign || principalView || data.demo || page !== "today" || !member?.calculator) return;
     let active = true;
     setLiveKpi(null);
     setKpiError(null);
@@ -590,7 +591,7 @@ export default function MemberWorkspace({
       else setKpiError(result.error);
     }).catch(() => { if (active) setKpiError("KPI quantities could not be loaded. Please refresh."); });
     return () => { active = false; };
-  }, [liveDesign, data.demo, data.refreshedAt, page, member?.schemeId, member?.calculator]);
+  }, [liveDesign, principalView, data.demo, data.refreshedAt, page, member?.schemeId, member?.calculator]);
   useEffect(() => {
     if (data.demo) return;
     const timer = setInterval(() => {
@@ -2131,7 +2132,7 @@ export default function MemberWorkspace({
             HOUZS VENTURE<small>REVENUE WORKSPACE</small>
           </div>
           <nav className={s.sideNav} aria-label="Desktop navigation">
-            {liveDesign ? <MemberLiveNav active={page} canQuote={!!member?.calculator} desktop onSelect={navigate} /> : renderNav(true)}
+            {liveDesign ? <MemberLiveNav active={page} canQuote={!!member?.calculator} principalView={principalView} desktop onSelect={navigate} /> : renderNav(true)}
           </nav>
           <div className={s.sideFooter}>
             <div className={s.listIcon}>
@@ -2296,7 +2297,7 @@ export default function MemberWorkspace({
             </div>
           </main>
         </div>
-        {liveDesign ? <MemberLiveNav active={page} canQuote={!!member?.calculator} onSelect={navigate} /> : design ? <RevenuePreviewNav
+        {liveDesign ? <MemberLiveNav active={page} canQuote={!!member?.calculator} principalView={principalView} onSelect={navigate} /> : design ? <RevenuePreviewNav
           design={design}
           active={page === "today" ? "today" : page === "quote" ? "quote" : page === "income" || page === "insight" ? "insight" : "profile"}
           onSelect={{ today: () => navigate("today"), quote: () => navigate("quote"), profile: () => navigate("account") }}

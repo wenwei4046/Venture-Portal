@@ -39,6 +39,7 @@ export default async function MemberPreview({
     quoteView?: string;
     design?: string;
     view?: string;
+    role?: string;
   }>;
 }) {
   if (process.env.NODE_ENV !== "development") {
@@ -46,7 +47,19 @@ export default async function MemberPreview({
     if (!user || !["principal", "hr"].includes(user.role)) notFound();
   }
   const params = await searchParams;
-  if (params.design === "live") return <MemberWorkspace initialData={memberDemo()} productionLayout />;
+  if (params.design === "live") {
+    const preview = memberDemo();
+    if (params.role === "principal") {
+      preview.principalView = true;
+      preview.profile = { ...preview.profile, name: "Principal", salary: null };
+      preview.incomes = [];
+      preview.memberships = preview.memberships.map(membership => ({ ...membership,
+        title: "Principal", rank: "All members", rate: 0,
+        people: membership.people.map(person => ({ ...person, self: false })),
+      }));
+    }
+    return <MemberWorkspace initialData={preview} productionLayout />;
+  }
   if (params.view?.startsWith("insight")) {
     if (params.design === "compare") return <InsightDesignReview />;
     if (params.design === "a" || params.design === "b" || params.design === "c") {
