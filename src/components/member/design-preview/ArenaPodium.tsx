@@ -5,12 +5,13 @@ import s from "./ArenaPodium.module.css";
 type Place = 1 | 2 | 3;
 const places: readonly Place[] = [2, 1, 3];
 
-export function ArenaPodium({ rows, format, onOpen, heading = "Top 3", selfId = "jia" }: {
+export function ArenaPodium({ rows, format, onOpen, heading = "Top 3", selfId = "jia", selfLabel = "You" }: {
   rows: readonly Standing[];
   format: (value: number) => string;
   onOpen?: () => void;
   heading?: string;
   selfId?: string;
+  selfLabel?: string;
 }) {
   // Competition ranks can skip a place after a tie. Keep the supplied positions
   // and every tied person, rather than assigning medals by array index.
@@ -47,7 +48,7 @@ export function ArenaPodium({ rows, format, onOpen, heading = "Top 3", selfId = 
                 <span className={s.medalBadge} aria-hidden="true">{place === 1 ? <Icon name="trophy" size={13} /> : place}</span>
               </span>
               {hasTies && <span className={s.jointPlace}>{joint ? "Joint" : "Rank"} #{place}</span>}
-              <span className={s.name}>{person.name}{person.id === selfId && <span className={s.you}>You</span>}</span>
+              <span className={s.name}>{person.name}{person.id === selfId && <span className={s.you}>{selfLabel}</span>}</span>
               <span className={s.value}>{format(person.value)}</span>
             </span>)}
           </span>

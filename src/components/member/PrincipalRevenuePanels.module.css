@@ -49,6 +49,14 @@
 .toolbar select:disabled { cursor: wait; }
 .toolbar select option { color: var(--m-text); background: var(--m-card); }
 .period { max-width:260px; margin-bottom:20px; }
+.readContext { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 18px; padding: 20px 0; margin-bottom: 28px; border-bottom: 1px solid rgb(var(--arena-rule)); color: rgb(var(--arena-ink)); }
+.readContext > div { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.contextIcon { display: grid; place-items: center; flex: 0 0 48px; height: 48px; border-radius: 14px; background: rgb(var(--arena-hue2-light)); color: rgb(var(--arena-tertiary)); }
+.readContext strong { font-size: 16px; }
+.readContext p { margin-top: 5px; font-size: 12px; color: rgb(var(--arena-muted)); }
+.readContext label { display: grid; gap: 6px; min-width: 0; flex: 1 1 220px; max-width: 420px; font-size: 12px; color: rgb(var(--arena-muted)); }
+.readContext select { min-height: 48px; width: 100%; max-width: 100%; border: 1px solid rgb(var(--arena-rule)); border-radius: 12px; padding: 10px 12px; background: rgb(var(--arena-paper)); color: rgb(var(--arena-ink)); font-size: 14px; }
+.readContext select:focus-visible { outline: 2px solid rgb(var(--arena-secondary)); outline-offset: 3px; }
 .section { margin-top:24px; margin-bottom:24px; }
 .tree { margin-top:20px; }
 .person { margin-bottom:12px; overflow-wrap:anywhere; }

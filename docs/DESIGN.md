@@ -755,9 +755,23 @@ and amber C direction. Mobile keeps Today / Insight / Quote / Arena / Profile;
 desktop uses a 224px sidebar, wider content and responsive two-column sections.
 Quote remains available only to eligible memberships. Native safe-area insets and
 a white browser theme colour join the header to the device chrome. Press and page
-motion respect reduced-motion preferences. Principal Revenue View shares the same
-C presentation while retaining its team-level data, management controls and
-role-appropriate navigation. It does not call employee-only performance RPCs.
+motion respect reduced-motion preferences. Principal Revenue View uses the same
+Today / Insight / Quote / Arena / Profile navigation and an explicit department
+and member selector for performance reads. Its signed-in name, profile and audit
+identity remain Principal. The context names the selected member and stays
+read-only; employee self-service writes never inherit it. Today labels department
+commission separately from that member's sales, KPI and brand margins. Profile
+keeps Team income, Team map/list, Requests, Memos and management access available
+on phones as well as PC.
+
+Principal performance calls use separate authenticated read RPCs, which require
+the stored active Principal role and an eligible current membership. Calculation
+helpers are shared with the unchanged employee self-scoped entry points. Arena
+highlights the selected member by name instead of “You”; saved brand weeks can be
+viewed but only the member can save them. Team List follows the selected member's
+branch; Map retains every authorized department branch and centres on the selected
+membership. A department without members can still open the map and management
+pages. Department/member changes clear prior results and discard late responses.
 
 Today keeps income first, the bell-marked attention section next, then sales/KPI
 progress and brand margins. `member_kpi_summary` supplies the actual combined

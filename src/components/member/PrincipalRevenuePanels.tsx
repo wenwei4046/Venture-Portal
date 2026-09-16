@@ -13,7 +13,6 @@ const s = Object.fromEntries(Object.entries(base).map(([name, className]) => [
   name, [className, preview[name], p[name]].filter(Boolean).join(" "),
 ]));
 
-const money = (amount: number) => new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(amount);
 const status = (value: string) => value.replaceAll("_", " ");
 
 export function RevenueManagementButton({ children = "Member Services", destination = "/member-admin" }: {
@@ -31,7 +30,7 @@ function SectionHeading({ children, icon, tone = "orange" }: { children: React.R
   return <div className={p.sectionHeading}><span className={p.sectionIcon} data-tone={tone}><Icon name={icon} size={27} /></span><h2>{children}</h2></div>;
 }
 
-export default function PrincipalRevenuePanels({ data, member, page, navigate, onRequest, onMemo }: {
+export default function PrincipalRevenuePanels({ data, member, page, navigate, onRequest, onMemo, privateMode = false, onPrivateMode }: {
   data: MemberData;
   member: MemberMembership;
   page: MemberPage;
@@ -40,7 +39,10 @@ export default function PrincipalRevenuePanels({ data, member, page, navigate, o
   onMemo: (id: string) => void;
   dark: boolean;
   onTheme: () => void;
+  privateMode?: boolean;
+  onPrivateMode?: () => void;
 }) {
+  const money = (amount: number) => privateMode ? "••••••" : new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(amount);
   const [period, setPeriod] = useState("");
   const [search, setSearch] = useState("");
   const [listView, setListView] = useState(false);
@@ -151,6 +153,26 @@ export default function PrincipalRevenuePanels({ data, member, page, navigate, o
 
     {page === "memos" && <div className={s.grid}><section className={s.card}><h2>Published memos</h2>{memos.length ? memos.map(memo => <button key={memo.id} className={`${s.listRow} ${s.listButton} ${p.actionRow}`} onClick={() => onMemo(memo.id)}><span className={p.rowIcon} data-tone="amber"><Icon name="bell" size={24} /></span><span className={p.rowCopy}><h3>{memo.title}</h3><span className={s.caption}>{memo.sender} · {memo.effectiveAt}</span><span className={`${s.pill} ${s.neutral}`}>{memo.requiresAck ? "Acknowledgement requested" : "Information"}</span></span><Icon name="chevron" size={18} /></button>) : <p className={s.sub}>No memos for this department yet.</p>}</section><section className={s.card}><SectionHeading icon="bell" tone="amber">Keep the team informed</SectionHeading><p className={s.sub}>Publish and manage memos in Member Services. Opening a memo here does not acknowledge it for employees.</p><RevenueManagementButton>Manage memos</RevenueManagementButton></section></div>}
 
-    {page === "account" && <div className={s.grid}><section className={s.card}><SectionHeading icon="user" tone="brown">{data.profile.name}</SectionHeading><p className={s.sub}>{data.profile.email}</p><dl className={s.dl}><dt>Account</dt><dd>Principal</dd><dt>Current view</dt><dd>Revenue View</dd><dt>Department</dt><dd>{member.name}</dd><dt>Access</dt><dd>All Revenue members</dd></dl><p className={s.sub}>Use the view selector above to return to Principal, Finance or HR.</p></section><div className={s.stack}><section className={s.card}><SectionHeading icon="gift">Products & costs</SectionHeading><p className={s.sub}>Maintain current products and costs in Principal view.</p><RevenueManagementButton destination="/revenue/products">Manage products & costs</RevenueManagementButton></section><form action="/member/signout" method="post"><button type="submit" className={`${s.button} ${s.full} ${p.signOut}`}><Icon name="logout" size={22} /> Sign out</button></form></div></div>}
+    {page === "account" && <div className={s.grid}>
+      <div className={s.stack}>
+        <section className={s.card}><SectionHeading icon="user" tone="brown">{data.profile.name}</SectionHeading><p className={s.sub}>{data.profile.email}</p><dl className={s.dl}><dt>Account</dt><dd>Principal</dd><dt>Current view</dt><dd>Revenue View</dd><dt>Department</dt><dd>{member.name}</dd><dt>Access</dt><dd>All Revenue members</dd></dl><p className={s.sub}>Use the view selector above to return to Principal, Finance or HR.</p></section>
+        <section className={s.card}><SectionHeading icon="chart">Your workspace</SectionHeading>
+          {([
+            ["insight", "chart", "Insight", "Member sales, margins and team progress"],
+            ["arena", "trophy", "Arena", "Rankings, brand weeks and Fair status"],
+            ["income", "wallet", "Team income", "Department commission and calculation periods"],
+            ["team", "team", "Team", "Department map and the selected reporting tree"],
+            ["requests", "receipt", "Requests", "Review claims, team changes and waiting lists"],
+            ["memos", "bell", "Memos & notifications", "Read published team updates"],
+          ] as const).map(([destination, icon, label, description]) => <button key={destination} className={`${s.listRow} ${s.listButton} ${p.actionRow}`} onClick={() => navigate(destination)}><span className={p.rowIcon}><Icon name={icon} size={24} /></span><span className={p.rowCopy}><h3>{label}</h3><span className={s.caption}>{description}</span></span><Icon name="chevron" size={18} /></button>)}
+        </section>
+      </div>
+      <div className={s.stack}>
+        {onPrivateMode && <section className={s.card}><SectionHeading icon="eye" tone="brown">Privacy</SectionHeading><button className={`${s.button} ${s.full}`} aria-pressed={privateMode} onClick={onPrivateMode}>{privateMode ? "Show income amounts" : "Hide income amounts"}<Icon name={privateMode ? "eyeOff" : "eye"} size={22} /></button></section>}
+        <section className={s.card}><SectionHeading icon="team" tone="amber">Manage Revenue</SectionHeading><p className={s.sub}>Review staff requests, department capacity, memos and commission configuration with your Principal access.</p><RevenueManagementButton /><RevenueManagementButton destination="/revenue">Revenue configuration</RevenueManagementButton></section>
+        <section className={s.card}><SectionHeading icon="gift">Products & costs</SectionHeading><p className={s.sub}>Maintain current products and costs in Principal view.</p><RevenueManagementButton destination="/revenue/products">Manage products & costs</RevenueManagementButton></section>
+        <form action="/member/signout" method="post"><button type="submit" className={`${s.button} ${s.full} ${p.signOut}`}><Icon name="logout" size={22} /> Sign out</button></form>
+      </div>
+    </div>}
   </div>;
 }

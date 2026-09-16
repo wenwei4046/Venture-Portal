@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { calculateQuote, cents, customerQuote } from "./calculator";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
+import { principalReadContext } from "./read-access";
 import type {
   MemberBand,
   MemberData,
@@ -16,6 +17,7 @@ import type {
   MemberOrgMap,
   MemberProduct,
   MemberRequest,
+  MemberReadContext,
   QuoteInput,
   QuoteResult,
 } from "./types";
@@ -277,11 +279,16 @@ export async function loadMemberData(): Promise<MemberData> {
  */
 export async function loadMemberInsight(
   period?: string,
+  context?: MemberReadContext,
 ): Promise<MemberOutcome<MemberInsight>> {
   return outcome(async () => {
-    const client = await session("member_insight");
-    const data = await rpc<MemberInsight>(client, "member_insight_snapshot", {
+    const user = await getUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    const principal = principalReadContext(user, context);
+    const client = await session("member_insight", principal);
+    const data = await rpc<MemberInsight>(client, principal ? "member_principal_insight_snapshot" : "member_insight_snapshot", {
       p_period: /^\d{4}-\d{2}$/.test(period ?? "") ? period : null,
+      ...(principal ? { p_staff: context!.staffId, p_sub_department: context!.subDepartmentId } : {}),
     });
     if (!data || !Array.isArray(data.blocks))
       throw new Error("Performance information is temporarily unavailable.");
@@ -312,10 +319,14 @@ export async function loadMemberInsight(
 }
 
 /** The mapping map behind My team. Names, titles and reporting lines; no pay. */
-export async function loadMemberOrgMap(): Promise<MemberOutcome<MemberOrgMap>> {
+export async function loadMemberOrgMap(context?: Pick<MemberReadContext, "subDepartmentId">): Promise<MemberOutcome<MemberOrgMap>> {
   return outcome(async () => {
-    const client = await session("member_portal");
-    const data = await rpc<MemberOrgMap>(client, "member_org_map");
+    const user = await getUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    const principal = principalReadContext(user, context, true);
+    const client = await session("member_portal", principal);
+    const data = await rpc<MemberOrgMap>(client, principal ? "member_principal_org_map" : "member_org_map",
+      principal ? { p_sub_department: context!.subDepartmentId } : undefined);
     if (!data || !Array.isArray(data.people))
       throw new Error("The team map is temporarily unavailable.");
     return {

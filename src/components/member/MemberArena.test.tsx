@@ -14,6 +14,32 @@ const snapshot: MemberArenaSnapshot={membershipId,department:"Fair",selfId:"real
 beforeEach(()=>{actions.fetch.mockReset().mockResolvedValue({ok:true,data:structuredClone(snapshot)});actions.save.mockReset().mockResolvedValue({ok:true});});
 afterEach(cleanup);
 describe("Live Member Arena",()=>{
+  it("shows selected Principal results and saved weeks without impersonation or write controls",async()=>{
+    const context={staffId:"real-employee",subDepartmentId:membershipId};
+    actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),principalView:true,selfId:"",viewedStaffId:context.staffId,
+      people:snapshot.people.map(person=>({...person,self:false})),brandWeeks:{weeks:4,counts:{AKEMI:3,ERGOTEX:0,ZANOTTI:1,DUNLOP:0}}}});
+    render(<MemberArena membershipId={membershipId} context={context}/>);
+    fireEvent.click(await screen.findByRole("button",{name:/Sales Ranking/}));
+    expect(actions.fetch).toHaveBeenCalledWith(membershipId,expect.any(String),"monthly",context);
+    expect(screen.getByText("Actual Employee · Result")).toBeInTheDocument();
+    expect(screen.queryByText("You")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Arena"}));
+    fireEvent.click(screen.getByRole("button",{name:/Member brand weeks/}));
+    expect(screen.getByText("Only the member can save brand weeks from their own account.")).toBeInTheDocument();
+    expect(screen.getByText("3 weeks")).toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Save brand weeks"})).not.toBeInTheDocument();
+    expect(actions.save).not.toHaveBeenCalled();
+  });
+
+  it("discards an old member response after the Principal selects another member",async()=>{
+    let first!:(value:unknown)=>void;
+    actions.fetch.mockReturnValueOnce(new Promise(resolve=>{first=resolve;}));
+    const {rerender}=render(<MemberArena membershipId={membershipId} context={{staffId:"real-employee",subDepartmentId:membershipId}}/>);
+    rerender(<MemberArena membershipId={membershipId} context={{staffId:"colleague",subDepartmentId:membershipId}}/>);
+    expect(await screen.findByRole("button",{name:/Sales Ranking/})).toHaveTextContent("#1");
+    first({ok:true,data:{...snapshot,people:[]}});
+    await waitFor(()=>expect(screen.getByRole("button",{name:/Sales Ranking/})).toHaveTextContent("#1"));
+  });
   it("shows real own ranks and uses the selected period without demo people or score totals",async()=>{
     render(<MemberArena membershipId={membershipId}/>);
     await screen.findByRole("button",{name:/Sales Ranking/});

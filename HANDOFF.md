@@ -1,5 +1,118 @@
 # HOUZS Venture Portal — Session Handoff
 
+## ACTIVE CHECKPOINT 2026-09-16 — Principal C function parity release
+
+This checkpoint supersedes the paused design-only checkpoint below. Work is in
+`C:\Users\wenwe\venture-portal-c-parity`, branch `codex/principal-c-parity`, created
+from `ac7a6bf` so the other session's Revenue/payroll release is preserved.
+
+Implemented shared Today / Insight / Quote / Arena / Profile navigation for mobile
+and PC. Principal explicitly selects a real department/member for performance
+reads; the profile/auth identity remains Principal. Today separates department
+commission from selected member goals, combined configured KPI and brand margins.
+Insight includes Personal/Team, month and brand/order filters. Arena includes
+Sales/Margin/KPI ranking, periods, brand filters, podium and selected member results.
+Saved brand weeks are readable; employee self-service submissions, acknowledgements
+and brand-week writes never use the Principal viewing context. Profile links reach
+Team income, full authorized Map, selected reporting-branch List, Requests, Memos
+and management tools on phones too. Empty rosters retain map/management access.
+Late responses are discarded, and Today cannot display historical Insight as the
+current month. No account linking, fabricated staff identity or production fixtures.
+
+Migration `20260917040000_member_principal_function_parity.sql` is already applied
+atomically to `gixpptmfuryskbwkmiwz`, with version absence guard, advisory lock,
+exact-source history and schema reload. Source MD5:
+`2f6a36192549c9a6383c2cc9ebb34e7e` (26,056 bytes). Do not replay it or broad db push.
+Four authenticated Principal read RPCs independently check actual active Principal
+and eligible membership. Shared calculation helpers deny direct authenticated/anon
+execution; employee identity and write functions are unchanged. Hosted grants and
+source hash verified. Unrelated `17020000`/`17030000` migrations were not applied.
+
+Validation: 2,080 unit/component tests pass (3 files skipped), 582 disposable SQL
+checks pass, source TypeScript and the first isolated production build pass.
+Final production build/release and actual logged-in mobile/PC verification are
+being completed in this session; do not treat this paragraph as deployment proof.
+
+Fair event identity/date integration, weekly finishes, historical Fair records and
+dependent Championship scoring remain explicitly deferred by the user. All other
+implemented functions use actual authorized data. Deployment remains Vercel via
+`origin/main`, never the Cloudflare deploy command or `vercel --prod`.
+
+## ACTIVE CHECKPOINT 2026-09-16 — Principal function parity; paused for session switch
+
+**Read this checkpoint first. The user rejected the design-only Principal correction below. The requested function parity is NOT implemented yet.**
+
+### Latest user request and pause
+
+The user is signed in as Principal, using Revenue View at `https://venture-portal-chi.vercel.app/member?page=income`. They reported: **"but why the fucniton is not same, it just design, please make it all same, like insight, arena , all dont have"**. They want the approved C app's functions and navigation, including Insight and Arena, in this actual live view on mobile and PC. Merely restyling the old Principal Today / Income / Quote / Team / Profile panels does not satisfy the request.
+
+The assistant acknowledged that the last release only changed Principal presentation and said it would connect the full functions with an appropriate way for Principal to view member data. Before implementation, the user instructed: **"wait , do it as a checkpoint, i want sitwch session , and continue the job"**. Work is paused at the user's request. Resume in the new session; no further implementation or deployment should occur in this session.
+
+**Progress at pause:** only read-only initial code investigation for the latest function-parity request. No feature edits, new migrations, tests, builds, or deployment have been started for it. Subagents are idle/completed. This checkpoint is the only new tracked-file change. Existing `.next-member-preview/` is an untracked cache; do not stage or indiscriminately delete it.
+
+### Authorization and scope
+
+- The user already authorized **"整套 C 设计和功能，手机与 PC 一起上线"**. Implement, validate and deploy the full C functions; do not ask the same deployment/scope question again.
+- User explicitly deferred missing Fair source integration: **"you can try check later , build other first"**. Weekly placement counts, accurate historical Fair records, and dependent Championship points remain pending until event IDs/start/end dates are available. Do not block other work on this or publish preview scores as live data.
+- Preserve white/orange/brown/cocoa/amber C design (no blue), gold podium, large warm icons, responsive PC/mobile layout, motion and reduced-motion support, combined KPI threshold, brand-specific margins/orders, and own-team-only member list with the authorized department map.
+- Principal must use authenticated, explicitly authorized real data access. Do not change auth identity, fabricate a self member, link staff accounts, use preview fixtures in production, or weaken ordinary employee scope to make the UI work.
+
+### Confirmed deployed state
+
+- Checkout: `C:\Users\wenwe\Venture Portal`, branch `main`, HEAD **`a5e56cc869eb64add8de9c58b0a65034b235aac1`**, "Apply C design to the Principal Revenue workspace".
+- Earlier C member functionality release: `a2e8b30`; ERP timeout fix merged at `e8af665`.
+- Remote: `https://github.com/wenwei4046/Venture-Portal.git`.
+- Production: **https://venture-portal-chi.vercel.app**, Vercel auto-deploys from `origin/main`. Last deployment of a5e56cc was ready, CI run **35061200158** passed. Do not use Cloudflare deploy scripts or `vercel --prod` for this app.
+- Last release validation: **2,027 tests**, source TypeScript, isolated production build, and actual logged-in Principal mobile/desktop visual checks passed. This confirms the previous visual release, not the outstanding parity feature.
+- Actual Principal still has Today / Income / Quote / Team / Profile rather than Insight / Arena. This is the defect to correct.
+
+### Code findings and likely implementation approach
+
+The architecture needs a genuine Principal data context, not another CSS change. An explicit department/member selector with authorized read access is a likely approach, **not yet a finalized or user-approved detailed design**. Inspect the existing SQL and permission model before choosing. Retain the Principal workspace/department switchers and relevant management access. Do not silently omit entire features under the name of role-specific navigation again. Handle employee-specific writes explicitly rather than allowing Principal to acknowledge memos or submit staff requests as somebody else.
+
+- `src/components/member/MemberWorkspace.tsx`: C presentation already applies to all live roles, but nearly all functional rendering is gated by `!principalView`. Principal renders `PrincipalRevenuePanels` for every page except Quote. Today Insight/KPI fetches and general Insight/OrgMap effects skip Principal. Principal `page=insight` / `page=arena` links normalize to Today. These gates are central to the missing functions.
+- `src/components/member/MemberLiveChrome.tsx`: Principal navigation deliberately swaps Insight for Income and Arena for Team. Update navigation with functional routes, not dead entries.
+- `src/components/member/PrincipalRevenuePanels.tsx` and its CSS: C-styled aggregate Principal Today/Income/Team/Requests/Memos/Account, with management links; no Insight or Arena. Keep useful management capability while integrating the full member functions.
+- `src/lib/member/types.ts`: `MemberData.principalView` denotes actual Principal, never impersonated staff. `MemberPerson.self`, membership hierarchy and selected context require careful treatment. Existing Principal snapshot marks all people `self:false`.
+- `src/lib/member/server.ts`: `loadMemberData()` chooses authenticated `member_principal_snapshot()` for actual Principal, otherwise `member_data_snapshot()`. `loadMemberInsight(period)` calls own-member `member_insight_snapshot(text)`; `loadMemberOrgMap()` calls `member_org_map()`. Inspect `session()` and actual role checks. Product projection strips private costs. Quote already supports authenticated `member_principal_quote_context(uuid)`; preserve this.
+- `src/app/(member)/member/arena-actions.ts`: requires active user with `member_insight`; calls `member_arena_snapshot(uuid,text,text)` and self-only `member_arena_save_brand_weeks(uuid,text,integer,jsonb)`. Existing SQL resolves own staff and cannot serve unlinked Principal. Add properly authorized context rather than only removing UI guards.
+- `src/lib/member/kpi-summary-server.ts`: active `member_portal` user, authenticated `member_kpi_summary(uuid)` RPC with own-scheme authorization.
+- `src/components/member/MemberArena.tsx`: actual leaderboard data, periods, brands, approved podium, 4/5 brand-week save, truthful pending Championship/Fair features. Pass a safe Principal viewing context through data actions if reusing it.
+- Shared Insight panel and `LiveBrandMarginList` already handle selected month/brand navigation and incomplete margin data. Preserve response-sequence protection against stale fetches and correct Today current-month handling.
+- Member list uses `selectOwnTeam` in `src/lib/member/team-directory.ts`; employee own-tree restriction must remain intact.
+
+Relevant SQL to inspect before implementation:
+
+- `supabase/migrations/20260912020000_member_self_service.sql`: `member_staff_id()` resolves authenticated active, date-eligible linked staff with member permission; `member_has_membership`. Do not casually weaken the global self-identity helper.
+- `supabase/migrations/20260912090000_member_principal_view.sql`: active actual `public.users.role='principal'` checks; Principal aggregate snapshot and quote context. Snapshot returns current Revenue departments/rosters, principal profile with salary null, published products and authorized bands, team statement totals and recent orders. It does not select a staff member.
+- `supabase/migrations/20260916010000_member_insight.sql`: own-member Insight and OrgMap plus private helpers. Consider authorized shared private read helpers rather than duplicating formulas or changing auth identity.
+- `supabase/migrations/20260916030000_member_kpi_summary.sql`: combined configured KPI quantities and first threshold, own-member scope, latest committed order resolution.
+- `supabase/migrations/20260917010000_member_arena.sql`: own-member scope and private scheme helper, authenticated roster, latest committed duplicate-order resolution before filtering, release-month recognition, deposit handling, KPI switches and private brand-week table. Preserve these calculation/security semantics.
+
+**Tests that currently encode the rejected behavior:** `MemberWorkspace.principal.test.tsx` has 11 tests asserting old Principal navigation, no Insight/Arena, deep-link normalization and no member fetches. Revise them for safe functional Principal access, while retaining no unauthorized self-service writes and employee scope coverage. `PrincipalRevenuePanels.test.tsx` tests the existing aggregate/management panels. Do not mistake passing the old role gates for completion.
+
+### Database, tooling and validation notes
+
+- Linked Supabase project: `gixpptmfuryskbwkmiwz` (Venture-Portal). CLI: `C:\Users\wenwe\.local\bin\supabase.exe`; GitHub CLI: `C:\Program Files\GitHub CLI\gh.exe`. Both authenticated.
+- `.env.local` has sensitive credentials. Never print values or expose them in tool output.
+- Prior hosted read-only check found **30 active eligible Revenue staff, all `user_id = NULL`**. This explains why Principal cannot use the employee self lookup. Do not create/link accounts as an unrequested workaround. Explicit Principal read authorization should not require impersonating a linked employee.
+- KPI migration `20260916030000` and Arena migration `20260917010000` are already applied and recorded with exact source. **Do not replay `tmp/apply-member-live.sql`, these migrations, or run broad `supabase db push`**; older migration history has mismatches/duplicate prefixes.
+- If new SQL is needed, review and test it, then apply only the new migration atomically using authenticated linked `db query -f`, version-absence guard, advisory lock, exact-source migration-history entry, schema reload notification, and transaction. Independently verify Principal authorization, normal employee cross-staff denial, membership validation and public/helper grants.
+- SQL test harness: `npm test --prefix tests/member-sql` (last 399 checks). Unit/component suite: `npm run test:ci`. Source TypeScript: `npx tsc --noEmit --project tmp/arena-typecheck.json`; plain root tsc traverses nested tmp checkouts.
+- Production builds belong in isolated checkout **`tmp/member-live-release`**, currently detached at `b349980` (same source as deployed a5e56cc except documentation), with a node_modules junction. After committing, checkout the new commit there. Copy `.env.local` quietly only for the build and remove it afterward. Do not clobber root `.next`, used by local dev.
+- Local dev was started as a hidden Node/Next process on `127.0.0.1:3001` (PID 43148 then; recheck before reuse), logs in `tmp/principal-c-preview*.log`. `?design=live&role=principal&page=income` is a gated sample layout, not production proof.
+- Browser: Codex in-app browser previously ID `1`, user production tab ID `1`, Principal signed in; re-discover IDs/state. After context compaction use `cua.rewriteDocumentation()` before continuing existing computer-use work. Actual live verification must open Insight/Arena and exercise real member/department/period/brand context on mobile and PC, not merely confirm colors or login.
+- Existing agents `arena_native_frame`, `arena_open_canvas`, `arena_points_raise` have relevant context (Arena, Insight, SQL/security respectively). Trigger idle agents with `followup_task` and assign non-overlapping ownership. No agents are currently implementing parity.
+- Refresh remote status before release to preserve other sessions' changes. Update this checkpoint and `docs/DESIGN.md` when parity is actually complete; older notes below describe historical releases, not the current requested outcome.
+
+### Resume checklist
+
+1. Read current code/auth/SQL and choose a safe Principal data-viewing context for the same app functions.
+2. Implement actual Insight, Arena, and remaining C function parity with responsive navigation; keep employee access limits and honest unavailable data.
+3. Validate authorization, calculations, interactions and desktop/mobile layout. Review any migration independently.
+4. Apply only required new SQL, commit and push authorized release, confirm CI and Vercel ready.
+5. Verify the actual signed-in production Principal can use the functions the user reported missing. Clearly report any previously agreed Fair-source deferral; do not claim complete parity from design-only checks.
+
 ## Checkpoint 2026-09-16 — Principal Revenue C correction
 
 The first C release excluded `principalView`, leaving the signed-in Principal's Revenue View on the old design. The user reported this on `/member?page=income`. C presentation now applies to every authenticated Revenue workspace, including Principal, and `PrincipalRevenuePanels` composes the same C typography/open-section styles rather than raw legacy cards. Principal retains real team-level data and its valid Today / Income / Quote / Team / Profile navigation, department and workspace switchers, and management forms. Member-only Insight/KPI/Arena/OrgMap requests and self-service actions remain excluded from Principal; this changes presentation, not identity or permissions. The gated `design=live&role=principal` sample reproduces the Principal layout for mobile/desktop QA.

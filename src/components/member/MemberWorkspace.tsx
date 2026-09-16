@@ -5,6 +5,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/member/navigation";
 import { memberInsightDemo, memberOrgMapDemo } from "@/lib/member/demo-insight";
 import { selectOwnTeam } from "@/lib/member/team-directory";
+import { selectViewedBranch } from "@/lib/member/principal-context";
 import type {
   MemberData,
   MemberInsight,
@@ -35,6 +37,7 @@ import type {
   MemberOrgMap as MemberOrgMapData,
   MemberPage,
   MemberRequest,
+  MemberReadContext,
   QuoteInput,
   RequestKind,
 } from "@/lib/member/types";
@@ -300,8 +303,10 @@ export default function MemberWorkspace({
     [orgMap, setOrgMap] = useState<MemberOrgMapData | null>(null),
     [mapBusy, setMapBusy] = useState(false),
     [mapError, setMapError] = useState<string | null>(null);
+  const [viewedStaffId, setViewedStaffId] = useState("");
   const [insightEntry, setInsightEntry] = useState<{ screen: "overview" | "orders"; brand?: string }>({ screen: "overview" });
   const insightSequence = useRef(0);
+  const mapSequence = useRef(0);
   const [liveKpi, setLiveKpi] = useState<MemberKpiSummary | null>(null);
   const [kpiError, setKpiError] = useState<string | null>(null);
   const membershipsRef = useRef(data.memberships);
@@ -309,6 +314,13 @@ export default function MemberWorkspace({
   membershipsRef.current = data.memberships;
   const member =
     data.memberships.find((m) => m.id === department) ?? data.memberships[0];
+  const viewedPerson = principalView ? member?.people.find(person => person.id === viewedStaffId) ?? member?.people[0] : undefined;
+  const selectedStaffId = viewedPerson?.id;
+  const departmentId = member?.id;
+  const readContext = useMemo<MemberReadContext | undefined>(() => principalView && selectedStaffId && departmentId
+    ? { staffId: selectedStaffId, subDepartmentId: departmentId } : undefined, [principalView, selectedStaffId, departmentId]);
+  const contextKey = principalView ? `${member?.id ?? ""}:${viewedPerson?.id ?? ""}` : "self";
+  const canReadPerformance = !principalView || !!readContext;
   const currentIncomes = data.incomes
     .filter((i) => i.schemeId === member?.schemeId)
     .sort((a, b) => b.period.localeCompare(a.period));
@@ -415,11 +427,11 @@ export default function MemberWorkspace({
         membershipsRef.current[0];
       let next: MemberPage =
         p && Object.hasOwn(labels, p) ? (p as MemberPage) : "today";
-      if (initialData.principalView && (next === "insight" || next === "arena")) next = "today";
       if (next === "quote" && !selected?.calculator) next = "today";
       setPage(next);
       setInsightEntry({ screen: url.searchParams.get("screen") === "orders" ? "orders" : "overview", brand: url.searchParams.get("brand") ?? undefined });
       setDepartment(selected?.id ?? "");
+      setViewedStaffId(initialData.principalView ? selected?.people.find(person => person.id === url.searchParams.get("staff"))?.id ?? selected?.people[0]?.id ?? "" : "");
       if (p && p !== next) {
         url.searchParams.set("page", next);
         history.replaceState(history.state, "", url);
@@ -520,6 +532,19 @@ export default function MemberWorkspace({
       } catch {}
     }
   }, [data]);
+  useEffect(() => {
+    ++insightSequence.current;
+    ++mapSequence.current;
+    setInsight(null);
+    setInsightBusy(false);
+    setInsightError(null);
+    setOrgMap(null);
+    setMapBusy(false);
+    setMapError(null);
+    setLiveKpi(null);
+    setKpiError(null);
+    setTeamSearch("");
+  }, [contextKey]);
   const refresh = useCallback(async () => {
     if (data.demo) {
       notify("Demo data retained. Live accounts refresh the latest data.");
@@ -537,6 +562,7 @@ export default function MemberWorkspace({
     }
   }, [data.demo, notify]);
   const loadInsight = useCallback(async (selectedPeriod?: string) => {
+    if (principalView && !readContext) return;
     if (data.demo) {
       setInsight(memberInsightDemo());
       return;
@@ -545,7 +571,7 @@ export default function MemberWorkspace({
     setInsightError(null);
     const sequence = ++insightSequence.current;
     try {
-      const result = await fetchMemberInsight(selectedPeriod);
+      const result = await (readContext ? fetchMemberInsight(selectedPeriod, readContext) : fetchMemberInsight(selectedPeriod));
       if (sequence !== insightSequence.current) return;
       if (result.ok) setInsight(result.data);
       else setInsightError(result.error);
@@ -554,44 +580,46 @@ export default function MemberWorkspace({
     } finally {
       if (sequence === insightSequence.current) setInsightBusy(false);
     }
-  }, [data.demo]);
+  }, [data.demo, principalView, readContext]);
   const loadOrgMap = useCallback(async () => {
+    if (principalView && !departmentId) return;
     if (data.demo) {
       setOrgMap(memberOrgMapDemo());
       return;
     }
     setMapBusy(true);
     setMapError(null);
+    const sequence = ++mapSequence.current;
     try {
-      const result = await fetchMemberOrgMap();
+      const result = await (principalView ? fetchMemberOrgMap({ subDepartmentId: departmentId! }) : fetchMemberOrgMap());
+      if (sequence !== mapSequence.current) return;
       if (result.ok) setOrgMap(result.data);
       else setMapError(result.error);
     } catch {
-      setMapError("Unable to connect. Check your connection and try again.");
+      if (sequence === mapSequence.current) setMapError("Unable to connect. Check your connection and try again.");
     } finally {
-      setMapBusy(false);
+      if (sequence === mapSequence.current) setMapBusy(false);
     }
-  }, [data.demo]);
+  }, [data.demo, principalView, departmentId]);
   useEffect(() => {
-    if (principalView) return;
-    if (page === "insight" && !insight && !insightBusy && !insightError) void loadInsight();
+    if (canReadPerformance && page === "insight" && !insight && !insightBusy && !insightError) void loadInsight();
     if (page === "team" && !orgMap && !mapBusy && !mapError) void loadOrgMap();
-  }, [page, principalView, liveDesign, insight, insightBusy, insightError, orgMap, mapBusy, mapError, loadInsight, loadOrgMap]);
+  }, [page, canReadPerformance, liveDesign, insight, insightBusy, insightError, orgMap, mapBusy, mapError, loadInsight, loadOrgMap]);
   useEffect(() => {
-    if (liveDesign && !principalView && page === "today") void loadInsight();
-  }, [liveDesign, principalView, page, data.refreshedAt, loadInsight]);
+    if (liveDesign && canReadPerformance && page === "today") void loadInsight();
+  }, [liveDesign, canReadPerformance, page, data.refreshedAt, loadInsight]);
   useEffect(() => {
-    if (!liveDesign || principalView || data.demo || page !== "today" || !member?.calculator) return;
+    if (!liveDesign || !canReadPerformance || data.demo || page !== "today" || !member?.calculator) return;
     let active = true;
     setLiveKpi(null);
     setKpiError(null);
-    fetchMemberKpiSummary(member.schemeId).then(result => {
+    (readContext ? fetchMemberKpiSummary(member.schemeId, readContext) : fetchMemberKpiSummary(member.schemeId)).then(result => {
       if (!active) return;
       if (result.ok) setLiveKpi(result.data);
       else setKpiError(result.error);
     }).catch(() => { if (active) setKpiError("KPI quantities could not be loaded. Please refresh."); });
     return () => { active = false; };
-  }, [liveDesign, principalView, data.demo, data.refreshedAt, page, member?.schemeId, member?.calculator]);
+  }, [liveDesign, canReadPerformance, readContext, data.demo, data.refreshedAt, page, member?.schemeId, member?.calculator]);
   useEffect(() => {
     if (data.demo) return;
     const timer = setInterval(() => {
@@ -609,6 +637,20 @@ export default function MemberWorkspace({
     setTeamSearch("");
     const url = new URL(window.location.href);
     url.searchParams.set("department", value);
+    if (principalView) {
+      ++insightSequence.current;
+      ++mapSequence.current;
+      setInsight(null);
+      setOrgMap(null);
+      setLiveKpi(null);
+      setInsightEntry({ screen: "overview" });
+      const staffId = data.memberships.find(membership => membership.id === value)?.people[0]?.id ?? "";
+      setViewedStaffId(staffId);
+      if (staffId) url.searchParams.set("staff", staffId); else url.searchParams.delete("staff");
+      url.searchParams.delete("screen");
+      url.searchParams.delete("brand");
+      closeDialog();
+    }
     if (
       page === "quote" &&
       !data.memberships.find((m) => m.id === value)?.calculator
@@ -618,6 +660,22 @@ export default function MemberWorkspace({
     }
     history.replaceState(history.state, "", url);
     window.dispatchEvent(new Event(MEMBER_ROUTE_CHANGE));
+  }
+  function changeViewedStaff(value: string) {
+    if (!member?.people.some(person => person.id === value)) return;
+    ++insightSequence.current;
+    ++mapSequence.current;
+    setInsight(null);
+    setOrgMap(null);
+    setLiveKpi(null);
+    setViewedStaffId(value);
+    setInsightEntry({ screen: "overview" });
+    closeDialog();
+    const url = new URL(window.location.href);
+    url.searchParams.set("staff", value);
+    url.searchParams.delete("screen");
+    url.searchParams.delete("brand");
+    history.replaceState(history.state, "", url);
   }
   function theme() {
     const next = !dark;
@@ -654,9 +712,7 @@ export default function MemberWorkspace({
             },
           ]
         : []),
-      ...(principalView
-        ? []
-        : [
+      ...[
             {
               id: "insight",
               label: "Insight",
@@ -665,7 +721,8 @@ export default function MemberWorkspace({
               group: "Quick links",
               action: () => navigate("insight"),
             },
-          ]),
+          ],
+      { id: "arena", label: "Arena", description: "Sales, margin and KPI rankings", keywords: "leaderboard brand weeks championship", group: "Quick links", action: () => navigate("arena") },
       {
         id: "income",
         label: principalView ? "Team income" : "My income",
@@ -737,7 +794,7 @@ export default function MemberWorkspace({
               },
             }))
         : []),
-      ...(member?.people ?? []).map((person) => ({
+      ...(principalView ? selectViewedBranch(member?.people ?? [], viewedPerson?.id ?? "") : selectOwnTeam(member?.people ?? [])).map((person) => ({
         id: `person:${person.id}`,
         label: person.name,
         description: person.title,
@@ -964,6 +1021,7 @@ export default function MemberWorkspace({
 
   function MarginBrands() {
     if (!member?.calculator) return null;
+    if (!canReadPerformance) return null;
     if (liveDesign && page === "today") {
       const currentMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit" }).format(new Date());
       if (insightBusy || !insight || insight.period !== currentMonth) return <section className={s.card} aria-label="This month's margin">
@@ -1072,12 +1130,12 @@ export default function MemberWorkspace({
             <button
               key={m.id}
               className={`${s.listRow} ${s.listButton}`}
-              onClick={() => void readMemo(m)}
+              onClick={() => principalView ? setSelectedMemo(m.id) : void readMemo(m)}
             >
               <div>
                 <h3>{m.title}</h3>
                 <p className={s.caption}>
-                  {m.sender} · Acknowledgement required
+                  {m.sender} · {principalView ? "Team acknowledgement requested" : "Acknowledgement required"}
                 </p>
               </div>
               <Icon name="chevron" size={16} />
@@ -1085,7 +1143,7 @@ export default function MemberWorkspace({
           ))}
         {data.requests
           .filter((r) =>
-            ["returned", "needs_info", "reserved"].includes(r.status),
+            ["returned", "needs_info", "reserved"].includes(r.status) && (!principalView || !r.detail.subDepartmentId || r.detail.subDepartmentId === member?.id),
           )
           .map((r) => (
             <button
@@ -1112,7 +1170,12 @@ export default function MemberWorkspace({
   }
 
   function Today() {
-    const visibleGoals = income?.kpis.slice(0, member?.calculator ? 3 : 2) ?? [];
+    const currentMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit" }).format(new Date());
+    const block = insight?.period === currentMonth && !insightBusy && !insightError ? insight.blocks.find(item => item.membershipId === member?.id) : undefined;
+    const visibleGoals = principalView ? block ? [
+      { label: "Personal sales", current: block.me.sales, target: block.target?.personal ?? null, unit: "RM" },
+      { label: "Team sales", current: block.me.sales + block.downline.reduce((sum, person) => sum + person.sales, 0), target: block.target?.group ?? null, unit: "RM" },
+    ] : [] : income?.kpis.slice(0, member?.calculator ? 3 : 2) ?? [];
     const kpi = visibleGoals.find(item => item.unit === "RM");
     const percent = kpi?.target
       ? Math.round((kpi.current / kpi.target) * 100)
@@ -1121,10 +1184,10 @@ export default function MemberWorkspace({
       <>
         <div className={s.titleRow}>
           <div>
-            <p className={s.eyebrow}>YOUR DAY, YOUR PROGRESS</p>
+            <p className={s.eyebrow}>{principalView ? "PRINCIPAL · REVENUE TODAY" : "YOUR DAY, YOUR PROGRESS"}</p>
             <h1>Hello, {data.profile.name.split(" ")[0]}</h1>
             <p className={`${s.sub} ${s.intro}`}>
-              {member?.name} · Make every effort count.
+              {member?.name} · {principalView ? "Team income and member progress." : "Make every effort count."}
             </p>
           </div>
           <div className={s.avatar + " " + s.avatarLarge}>
@@ -1137,7 +1200,7 @@ export default function MemberWorkspace({
               <div className={s.row}>
                 <span className={s.sub}>
                   {income?.period ?? "This month"} ·{" "}
-                  {income?.status === "applied"
+                  {principalView ? "Team commission" : income?.status === "applied"
                     ? "Settled commission"
                     : "Estimated income"}
                 </span>
@@ -1172,20 +1235,20 @@ export default function MemberWorkspace({
                 )}
               </div>
               <p className={s.caption}>
-                {income?.status === "applied"
+                {principalView ? "Combined commission for this department, excluding fixed salaries." : income?.status === "applied"
                   ? "Commission is settled. Check salary and payment status separately."
                   : "Fixed salary plus estimated commission for this department. Final amounts follow your statement."}
               </p>
               <hr className={s.divider} />
               <div className={`${s.row} ${s.rowWrap}`}>
-                <span className={s.sub}>
+                {!principalView && <span className={s.sub}>
                   Fixed salary{" "}
                   <strong style={{ color: "inherit" }}>
                     {money(data.profile.salary)}
                   </strong>
-                </span>
+                </span>}
                 <button className={s.link} onClick={() => navigate("income")}>
-                  Income details <Icon name="arrow" size={16} />
+                  {principalView ? "View team income" : "Income details"} <Icon name="arrow" size={16} />
                 </button>
               </div>
             </section>
@@ -1194,7 +1257,7 @@ export default function MemberWorkspace({
               <div className={s.row}>
                 <div>
                   <p className={s.eyebrow}>THIS MONTH</p>
-                  <h2>Closer to your goal</h2>
+                  <h2>{principalView ? viewedPerson ? `${viewedPerson.name} · progress` : "Member progress" : "Closer to your goal"}</h2>
                 </div>
                 <svg
                   className={s.ring}
@@ -1234,8 +1297,9 @@ export default function MemberWorkspace({
                   </text>
                 </svg>
               </div>
-              {visibleGoals.length || liveDesign ? (
+              {principalView && !canReadPerformance ? <Empty title="No active members">Member progress becomes available when this department has an eligible member.</Empty> : visibleGoals.length || liveDesign ? (
                 <>
+                  {principalView && !block && <div><p className={s.sub} role="status">{insightError ?? "Loading member progress…"}</p>{insightError && <button className={s.link} onClick={() => void loadInsight()}>Retry member progress</button>}</div>}
                   {visibleGoals.filter(item => item.unit === "RM").map(item => (
                     <Progress key={item.label} label={item.label} value={item.current}
                       target={item.target} unit={item.unit} privateMode={privateMode} />
@@ -1271,7 +1335,7 @@ export default function MemberWorkspace({
           <div className={s.stack}>
             {!member?.calculator && (
               <section className={s.card}>
-                <h2>Your IR progress</h2>
+                <h2>{principalView ? "IR progress" : "Your IR progress"}</h2>
                 <p className={s.sub}>
                   Team sales, personal commission and group rewards follow
                   IR&apos;s own rules.
@@ -1557,12 +1621,13 @@ export default function MemberWorkspace({
   }
   function Team() {
     if (!member) return null;
-    const self = member.people.find((p) => p.self),
+    const self = principalView ? viewedPerson : member.people.find((p) => p.self),
       direct = member.people.filter((p) => p.parentId === self?.id);
     // The map spans departments; the list starts at each of the caller's
     // memberships and follows only that membership's reporting descendants.
-    const teamPeople = orgMap ? selectOwnTeam(orgMap.people) : null;
-    const fallbackPeople = selectOwnTeam(member.people);
+    const viewedRoot = orgMap?.people.find(person => person.staffId === viewedPerson?.id && person.departmentId === member.id);
+    const teamPeople = orgMap ? principalView ? selectViewedBranch(orgMap.people, viewedRoot?.id ?? "") : selectOwnTeam(orgMap.people) : null;
+    const fallbackPeople = principalView ? selectViewedBranch(member.people, viewedPerson?.id ?? "") : selectOwnTeam(member.people);
     const ownTeam = teamPeople
       ? teamPeople.map((person) => ({
           key: person.id,
@@ -1643,11 +1708,11 @@ export default function MemberWorkspace({
         <div className={s.titleRow}>
           <div>
             <p className={s.eyebrow}>GROW TOGETHER</p>
-            <h1>My team</h1>
+            <h1>{principalView ? "Team" : "My team"}</h1>
             <p className={`${s.sub} ${s.intro}`}>
               {treeMode
                 ? "Every department and how the teams connect."
-                : "You and the people in your own reporting tree."}
+                : principalView ? `${viewedPerson?.name ?? "The selected member"} and their reporting tree.` : "You and the people in your own reporting tree."}
             </p>
           </div>
           <Pill tone="active">Direct reports: {direct.length} members</Pill>
@@ -1679,7 +1744,9 @@ export default function MemberWorkspace({
             </label>
             {treeMode ? (
               <MemberOrgMap
+                key={contextKey}
                 map={orgMap}
+                viewedMembershipId={principalView ? viewedRoot?.id : undefined}
                 busy={mapBusy}
                 error={mapError}
                 search={teamSearch}
@@ -1694,7 +1761,7 @@ export default function MemberWorkspace({
               directory.map(directoryCard)
             ) : (
               <Empty title="No matching team members">
-                Only your own reporting tree appears here. Clear the search to see your team.
+                {principalView ? "The selected member and their reporting tree appear here." : "Only your own reporting tree appears here. Clear the search to see your team."}
               </Empty>
             )}
           </section>
@@ -1725,12 +1792,12 @@ export default function MemberWorkspace({
                 available positions. Department and direct-report capacities are
                 checked separately.
               </p>
-              <button
+              {principalView ? <RevenueManagementButton>Manage capacity & waiting list</RevenueManagementButton> : <button
                 className={s.link}
                 onClick={() => setRequestKind("waiting")}
               >
                 Submit Waiting List <Icon name="arrow" size={16} />
-              </button>
+              </button>}
             </section>
             <section className={s.card}>
               <h2>Team changes</h2>
@@ -1738,13 +1805,13 @@ export default function MemberWorkspace({
                 Submit member replacements, department exits, transfers or
                 company exits for HR review.
               </p>
-              <button
+              {principalView ? <RevenueManagementButton>Manage team requests</RevenueManagementButton> : <button
                 className={`${s.button} ${s.full}`}
                 onClick={() => setRequestKind("replacement")}
               >
                 <Icon name="replace" />
                 Submit Replacement
-              </button>
+              </button>}
             </section>
           </div>
         </div>
@@ -2209,6 +2276,13 @@ export default function MemberWorkspace({
                 </span>
               </div>
             )}
+            {principalView && member && ["today", "insight", "arena", "team"].includes(page) && <section className={principalStyles.readContext} aria-label="Member viewing context">
+              <div><span className={principalStyles.contextIcon}><Icon name="user" size={25} /></span><div><strong>Member performance</strong><p>Read-only · Signed in as {data.profile.name}</p></div></div>
+              <label><span>Viewing member</span><select aria-label="Viewing member" value={viewedPerson?.id ?? ""} onChange={event => changeViewedStaff(event.target.value)} disabled={!member.people.length}>
+                {!member.people.length && <option value="">No active members</option>}
+                {member.people.map(person => <option key={person.id} value={person.id}>{person.name} · {person.title}</option>)}
+              </select></label>
+            </section>}
             {!data.configured || !member ? (
               <>
                 <div className={s.titleRow}>
@@ -2227,18 +2301,19 @@ export default function MemberWorkspace({
               </>
             ) : (
               <>
-                {principalView && page !== "quote" && <PrincipalRevenuePanels
+                {principalView && ["income", "requests", "memos", "account"].includes(page) && <PrincipalRevenuePanels
                   key={`${member.id}-${page}`} data={data} member={member} page={page}
                   navigate={navigate} onRequest={setSelectedRequest} onMemo={setSelectedMemo}
-                  dark={dark} onTheme={theme}
+                  dark={dark} onTheme={theme} privateMode={privateMode} onPrivateMode={() => setPrivateMode(value => !value)}
                 />}
-                {!principalView && page === "today" && Today()}
-                {!principalView && page === "arena" && <MemberArena key={member.id} membershipId={member.id} />}
-                {!principalView && page === "insight" && (
+                {page === "today" && Today()}
+                {page === "arena" && canReadPerformance && <MemberArena key={`${member.id}-${contextKey}`} membershipId={member.id} context={readContext} />}
+                {page === "insight" && canReadPerformance && (
                   <MemberInsightPanel
-                    key={`${member.id}-${insightEntry.screen}-${insightEntry.brand ?? "all"}`}
+                    key={`${member.id}-${contextKey}-${insightEntry.screen}-${insightEntry.brand ?? "all"}`}
                     insight={insight}
                     membershipId={member?.id ?? ""}
+                    viewedStaffId={readContext?.staffId}
                     bands={data.bands}
                     privateMode={privateMode}
                     busy={insightBusy}
@@ -2260,6 +2335,9 @@ export default function MemberWorkspace({
                     }}
                   />
                 )}
+                {principalView && !canReadPerformance && ["insight", "arena"].includes(page) && <section className={s.card}>
+                  <h1>{labels[page]}</h1><Empty title="No active members in this department">Choose another Revenue department to view member performance, or manage this department in Member Services.</Empty><RevenueManagementButton />
+                </section>}
                 {!principalView && page === "income" && Income()}
                 {page === "quote" && member.calculator && (
                   <MemberQuoteBuilder
@@ -2273,7 +2351,7 @@ export default function MemberWorkspace({
                     productSelection={productSelection}
                   />
                 )}{" "}
-                {!principalView && page === "team" && Team()}
+                {page === "team" && Team()}
                 {!principalView && page === "requests" && Requests()}
                 {!principalView && page === "memos" && Memos()}
                 {!principalView && page === "account" && Account()}

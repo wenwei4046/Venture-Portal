@@ -9,6 +9,11 @@ export type MemberPage =
   | "memos"
   | "account";
 export type RequestKind = "claim" | "replacement" | "waiting";
+/** An explicit read-only Principal context; never replaces the signed-in profile. */
+export interface MemberReadContext {
+  staffId: string;
+  subDepartmentId: string;
+}
 export interface MemberProduct {
   id: string;
   code: string;

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberData } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberData, loadMemberInsight, loadMemberOrgMap } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminFrom: vi.fn(),
@@ -47,6 +47,42 @@ beforeEach(() => {
 })
 
 describe('Principal Revenue View server boundary', () => {
+  const context = { staffId: productId, subDepartmentId: schemeId }
+  it.each([
+    { role: 'principal' as const },
+    { role: 'revenue_member' as const, actualRole: 'principal' as const },
+  ])('reads Insight and map through explicit authenticated Principal context for $role', async identity => {
+    mocks.getUser.mockResolvedValue(user(identity))
+    mocks.rpc.mockResolvedValueOnce({ data: { blocks: [] }, error: null })
+    expect((await loadMemberInsight('2026-08', context)).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_insight_snapshot', {
+      p_staff: productId, p_sub_department: schemeId, p_period: '2026-08',
+    })
+    mocks.rpc.mockResolvedValueOnce({ data: { people: [] }, error: null })
+    expect((await loadMemberOrgMap({ subDepartmentId: schemeId })).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_org_map', { p_sub_department: schemeId })
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('rejects forged cross-member context and missing or invalid Principal selections before RPC', async () => {
+    expect((await loadMemberInsight()).ok).toBe(false)
+    expect((await loadMemberOrgMap({ subDepartmentId: 'bad' })).ok).toBe(false)
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_insight'] }))
+    expect((await loadMemberInsight('2026-09', context)).ok).toBe(false)
+    expect((await loadMemberOrgMap(context)).ok).toBe(false)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  it('preserves own-member Insight and map calls without staff IDs', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_insight'] }))
+    mocks.rpc.mockResolvedValueOnce({ data: { blocks: [] }, error: null })
+    expect((await loadMemberInsight('2026-09')).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_insight_snapshot', { p_period: '2026-09' })
+    mocks.rpc.mockResolvedValueOnce({ data: { people: [] }, error: null })
+    expect((await loadMemberOrgMap()).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_org_map', undefined)
+  })
+
   it.each([
     { role: 'principal' as const },
     { role: 'revenue_member' as const, actualRole: 'principal' as const },

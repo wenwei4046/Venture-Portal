@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { QuoteInput } from "@/lib/member/types";
+import type { MemberReadContext, QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
   loadMemberData,
@@ -24,11 +24,11 @@ export async function refreshMemberData() {
           data.message ?? "Your member profile has not been configured yet.",
       };
 }
-export async function fetchMemberInsight(period?: string) {
-  return loadMemberInsight(period);
+export async function fetchMemberInsight(period?: string, context?: MemberReadContext) {
+  return loadMemberInsight(period, context);
 }
-export async function fetchMemberOrgMap() {
-  return loadMemberOrgMap();
+export async function fetchMemberOrgMap(context?: Pick<MemberReadContext, "subDepartmentId">) {
+  return loadMemberOrgMap(context);
 }
 export async function calculateMemberQuote(input: QuoteInput) {
   return calculate(input);

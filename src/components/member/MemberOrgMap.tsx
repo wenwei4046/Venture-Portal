@@ -37,6 +37,7 @@ export default function MemberOrgMap({
   busy,
   error,
   search,
+  viewedMembershipId,
   onRefresh,
   onDialog,
 }: {
@@ -44,6 +45,8 @@ export default function MemberOrgMap({
   busy: boolean;
   error: string | null;
   search: string;
+  /** Principal's selected membership is a viewing target, never the caller. */
+  viewedMembershipId?: string;
   onRefresh: () => void;
   onDialog: (dialog: { title: string; content: ReactNode }) => void;
 }) {
@@ -54,6 +57,10 @@ export default function MemberOrgMap({
   const panned = useRef(false);
 
   const placed = useMemo(() => (map ? placeMap(map) : null), [map]);
+  const focusCard = placed?.cards.find((card) => viewedMembershipId
+    ? card.person?.id === viewedMembershipId
+    : card.person?.self);
+  const initialCard = focusCard ?? placed?.cards[0];
   const query = search.trim().toLowerCase();
   const matches = useMemo(
     () =>
@@ -82,14 +89,13 @@ export default function MemberOrgMap({
     [placed, scale],
   );
 
-  // Open on the caller, so the map answers "where am I" before anything else.
+  // Open on the caller or the explicitly selected membership. The viewing
+  // target does not change any card's authenticated self identity.
   // The viewport's height comes from CSS, so this waits for a painted frame
   // rather than measuring a box that is still zero and parking them off-screen.
-  const settled = useRef(false);
+  const settled = useRef<string | null>(null);
   useEffect(() => {
-    if (settled.current || !placed) return;
-    const me = placed.cards.find((c) => c.person?.self) ?? placed.cards[0];
-    if (!me) return;
+    if (!initialCard || settled.current === initialCard.key) return;
     let frame = 0;
     const attempt = (tries: number) => {
       const box = viewport.current?.getBoundingClientRect();
@@ -97,12 +103,12 @@ export default function MemberOrgMap({
         if (tries > 0) frame = requestAnimationFrame(() => attempt(tries - 1));
         return;
       }
-      settled.current = true;
-      centreOn(me.key);
+      settled.current = initialCard.key;
+      centreOn(initialCard.key);
     };
     frame = requestAnimationFrame(() => attempt(10));
     return () => cancelAnimationFrame(frame);
-  }, [placed, centreOn]);
+  }, [initialCard, centreOn]);
 
   useEffect(() => {
     if (!matches?.size || !placed) return;
@@ -282,16 +288,13 @@ export default function MemberOrgMap({
           >
             <Icon name="zoomIn" size={18} />
           </button>
-          <button
+          {focusCard && <button
             className={s.iconButton}
-            onClick={() => {
-              const me = placed.cards.find((c) => c.person?.self);
-              if (me) centreOn(me.key);
-            }}
-            aria-label="Centre on me"
+            onClick={() => centreOn(focusCard.key)}
+            aria-label={viewedMembershipId ? "Centre on selected member" : "Centre on me"}
           >
             <Icon name="locate" size={18} />
-          </button>
+          </button>}
         </div>
       </div>
       <div

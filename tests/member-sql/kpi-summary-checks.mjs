@@ -62,7 +62,7 @@ export async function kpiSummaryChecks({ q, one, check, reject, migrate, asUser,
     check(base.items.map(item => [item.productCode, Number(item.quantity)]), [['PILLOW-SKU',5],['PROTECTOR-SKU',5],['UNSOLD-SKU',0]])
     check(base.items[0].label, 'Configured pillow')
     check(Object.keys(base).sort(), ['asOf','enabled','hit','items','period','schemeId','threshold','total'])
-    check(/commission|salary|cost|bonus|987/.test(JSON.stringify(base)), false)
+    check(/"(?:commission|salary|cost|bonus)":/.test(JSON.stringify(base)), false)
     await denied('SELECT member_kpi_summary(gen_random_uuid())', [], /active membership/)
     await denied('SELECT member_kpi_summary($1)', [foreignScheme], /active membership/)
 

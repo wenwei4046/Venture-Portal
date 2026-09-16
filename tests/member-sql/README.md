@@ -14,7 +14,7 @@ The lockfile pins PGlite 0.5.8. Dependency installation requires the npm registr
 Expected final output:
 
 ```text
-PASS: 268 member SQL checks. Disposable synthetic auth/payroll/Storage; real Revenue and member migrations. No live database connection.
+PASS: 582 member SQL checks. Disposable synthetic auth/payroll/Storage; real Revenue and member migrations. No live database connection.
 ```
 
 The process exits nonzero on a failed assertion or SQL error. The same two commands can be used in CI; no database service, credentials or browser is required. Keep this package's `node_modules` and any `.env` files untracked.
@@ -52,5 +52,18 @@ unassigned staff, cancelled/uncommitted orders and Fair-only scheme association.
 Requests exclude drafts; Principal memo receipts remain separate from members.
 No salary is inferred, no collective target/rate is invented, and overlapping
 statement brand summaries are deliberately not reported as team brand margins.
+
+The Principal function parity checks in `principal-parity-checks.mjs` verify
+explicit read contexts for Insight, KPI, Arena and OrgMap. Shared calculations
+preserve employee results across the refactor, including historical Insight and
+monthly, quarterly and annual Arena totals. Selected staff reads require the
+stored active Principal role, an active Revenue department and scheme, and a
+current, date-eligible staff membership. Tests reject forged role claims,
+unrelated or missing membership, department heads and inactive or expired
+contexts; unlinked eligible staff remain viewable. Principal identity stays
+unchanged, all Principal self flags remain false, and the map retains sibling
+branches. Internal helpers deny direct execution, employee permission revocation
+still works, and the staff identity and self-service write functions remain
+unchanged. Principal reads cannot submit member requests or save their brand weeks.
 
 Auth/users, payroll and Storage scaffolding are synthetic. Selected existing Revenue migrations and every new member migration execute from repository files. This is not a full replay of the entire production migration history, a hosted Storage integration test or a multi-connection concurrency test. See [the verification handoff](../../docs/member-verification.md#sql-verification-record) for the numbered assertions, boundaries and remaining deployment checks.

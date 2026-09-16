@@ -13,6 +13,7 @@ export interface ArenaBrandWeeks {
   counts: { AKEMI: number; ERGOTEX: number; ZANOTTI: number; DUNLOP: number };
 }
 export interface MemberArenaSnapshot {
+  principalView?: boolean; viewedStaffId?: string;
   membershipId: string; department: string; selfId: string;
   period: string; window: ArenaWindow; from: string; through: string; asOf: string; live: boolean;
   people: ArenaPerson[]; brands: { code: string; name: string }[];

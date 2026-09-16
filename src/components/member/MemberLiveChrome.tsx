@@ -20,22 +20,18 @@ export function MemberLiveNav({ active, canQuote, principalView = false, desktop
 }) {
   const entries: { page: MemberPage; icon: string; label: string }[] = [
     { page: "today", icon: "home", label: "Today" },
-    principalView ? { page: "income", icon: "wallet", label: "Income" } : { page: "insight", icon: "chart", label: "Insight" },
+    { page: "insight", icon: "chart", label: "Insight" },
     ...(canQuote ? [{ page: "quote" as const, icon: "calculator", label: "Quote" }] : []),
-    principalView ? { page: "team", icon: "team", label: "Team" } : { page: "arena", icon: "trophy", label: "Arena" },
+    { page: "arena", icon: "trophy", label: "Arena" },
     ...(desktop ? [
-      ...(!principalView ? [
-        { page: "income" as const, icon: "wallet", label: "Income" },
-        { page: "team" as const, icon: "team", label: "My team" },
-      ] : []),
+      { page: "income" as const, icon: "wallet", label: principalView ? "Team income" : "Income" },
+      { page: "team" as const, icon: "team", label: principalView ? "Team" : "My team" },
       { page: "requests" as const, icon: "receipt", label: "Requests" },
       { page: "memos" as const, icon: "bell", label: "Notifications" },
     ] : []),
     { page: "account", icon: "user", label: "Profile" },
   ];
-  const selected = desktop ? active : principalView
-    ? ["requests", "memos"].includes(active) ? "account" : active
-    : ["team", "requests", "memos"].includes(active) ? "account" : active === "income" ? "insight" : active;
+  const selected = desktop ? active : ["team", "requests", "memos"].includes(active) ? "account" : active === "income" ? "insight" : active;
   const content = entries.map(entry => <button key={entry.page} aria-current={selected === entry.page ? "page" : undefined} onClick={() => onSelect(entry.page)}>
     <span className={s.navIcon}><Icon name={entry.icon} size={desktop ? 23 : 25} /></span><span>{entry.label}</span>
   </button>);

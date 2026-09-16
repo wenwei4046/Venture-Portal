@@ -65,6 +65,7 @@ export default function MemberInsightPanel({
   initialBrand = "all",
   onPeriodChange,
   onScreenChange,
+  viewedStaffId,
 }: {
   insight: MemberInsight | null;
   membershipId: string;
@@ -78,6 +79,8 @@ export default function MemberInsightPanel({
   initialBrand?: string;
   onPeriodChange?: (period: string) => void;
   onScreenChange?: (screen: "overview" | "orders", brand?: string) => void;
+  /** Explicit Principal read context; does not alter any employee identity flag. */
+  viewedStaffId?: string;
 }) {
   const [view, setView] = useState<InsightView>("sales");
   const [screen, setScreen] = useState(initialScreen);
@@ -99,6 +102,7 @@ export default function MemberInsightPanel({
       : `RM ${new Intl.NumberFormat("en-MY", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`;
 
   const me = block?.me;
+  const principalView = !!viewedStaffId;
 
   if (error)
     return (
@@ -114,12 +118,12 @@ export default function MemberInsightPanel({
     return (
       <section className={s.card}>
         {busy ? (
-          <Empty title="Loading your numbers">
+          <Empty title={principalView ? "Loading member performance" : "Loading your numbers"}>
             Reading this month&apos;s committed orders.
           </Empty>
         ) : (
           <Empty title="No performance data yet">
-            Insight appears once your department has committed orders for this month.
+            Insight appears once the department has committed orders for this month.
           </Empty>
         )}
       </section>
@@ -135,7 +139,7 @@ export default function MemberInsightPanel({
   const boards = block.boards ?? [];
   const board = boards.find((b) => b.departmentId === boardId) ?? boards[0];
   const ranked = board ? rankBoard(board.rows) : [];
-  const mine = ranked.find((r) => r.self);
+  const mine = ranked.find((r) => principalView ? r.staffId === viewedStaffId : r.self);
   const branches = downlineBranches(block.downline);
   const teamTotal = totalScore(block.downline);
   const boardMedian = medianSales(board?.rows ?? []);
@@ -199,9 +203,9 @@ export default function MemberInsightPanel({
           </dl>
           <p className={s.sub}>
             {order.margin === null
-              ? "No unit cost and no keyed-in margin, so this order is in your sales but not in your margin."
+              ? "No unit cost and no keyed-in margin, so this order counts toward sales but has no margin result."
               : band.multiplier < 1
-                ? `Product commission, Open Bill and your upline's override on this bill are multiplied by ${band.multiplier}. Fixed KPI allowances are not affected.`
+                ? `Product commission, Open Bill and the upline's override on this bill are multiplied by ${band.multiplier}. Fixed KPI allowances are not affected.`
                 : "This band reflects this order's own margin. Monthly incentives need every brand to qualify."}
             {order.carried &&
               " Written last month and carried into this one because its deposit cleared here."}
@@ -271,10 +275,10 @@ export default function MemberInsightPanel({
       </button>}
       <div className={s.titleRow}>
         <div>
-          <p className={s.eyebrow}>{screen === "orders" ? "YOUR COMMITTED ORDERS" : "YOUR PERFORMANCE"}</p>
+          <p className={s.eyebrow}>{screen === "orders" ? principalView ? "MEMBER COMMITTED ORDERS" : "YOUR COMMITTED ORDERS" : principalView ? "MEMBER PERFORMANCE" : "YOUR PERFORMANCE"}</p>
           <h1>{screen === "orders" ? "Sales orders" : "Insight"}</h1>
           <p className={`${s.sub} ${s.intro}`}>
-            {block.department} · {insight.period} · {block.title}
+            {principalView && `${me?.name} · `}{block.department} · {insight.period} · {block.title}
           </p>
         </div>
         <button
@@ -324,7 +328,7 @@ export default function MemberInsightPanel({
               <p className={s.caption}>
                 Deposit-cleared commissionable sales across {me?.orders ?? 0}{" "}
                 {me?.orders === 1 ? "order" : "orders"}. An estimate from committed
-                orders — your statement is what pays.
+                orders — the commission statement determines payment.
               </p>
               <hr className={s.divider} />
               <div className={`${s.row} ${s.rowWrap}`}>
@@ -354,7 +358,7 @@ export default function MemberInsightPanel({
           <div className={s.stack}>
             <section className={s.card}>
               <div className={s.sectionHead}>
-                <h2>{block.target ? `Next: ${block.target.rank}` : "Your current rung"}</h2>
+                <h2>{block.target ? `Next: ${block.target.rank}` : principalView ? "Current rung" : "Your current rung"}</h2>
                 {personal?.met || group?.met ? <Pill tone="good">Cleared</Pill> : null}
               </div>
               {personal ? (
@@ -406,12 +410,12 @@ export default function MemberInsightPanel({
                   <p className={s.sub} style={{ marginTop: 10 }}>
                     {group.met
                       ? `Group sales are clear of ${money(group.target)} this month.`
-                      : `${money(group.gap)} to go, counting you and your whole downline.`}
+                      : `${money(group.gap)} to go, counting ${principalView ? me?.name : "you"} and the whole downline.`}
                   </p>
                 </>
               ) : (
                 <p className={s.sub}>
-                  No sales gate is configured above {block.rank}. Your title and rank
+                  No sales gate is configured above {block.rank}. The title and rank
                   changes come from HR.
                 </p>
               )}
@@ -503,7 +507,7 @@ export default function MemberInsightPanel({
                   onClick={() => setBoardId(b.departmentId)}
                 >
                   {b.department}
-                  {b.own && " · mine"}
+                  {b.own && (principalView ? " · selected" : " · mine")}
                 </button>
               ))}
             </div>
@@ -511,7 +515,7 @@ export default function MemberInsightPanel({
           {mine && (
             <section className={s.hero}>
               <span className={s.sub}>
-                Your place in {board?.department} · {insight.period}
+                {principalView ? `${me?.name}'s place` : "Your place"} in {board?.department} · {insight.period}
               </span>
               <div className={s.heroValue}>
                 {place(mine.position)}
@@ -521,7 +525,7 @@ export default function MemberInsightPanel({
               </div>
               <p className={s.caption}>
                 {mine.chasing === null
-                  ? "Top of the board. The rest of the department is chasing you."
+                  ? principalView ? "Top of the department board." : "Top of the board. The rest of the department is chasing you."
                   : `${money(mine.chasing - mine.sales)} behind ${place(
                       Math.max(1, mine.position - 1),
                     )} place.`}
@@ -537,7 +541,7 @@ export default function MemberInsightPanel({
               ranked.map((row) => (
                 <button
                   key={row.staffId}
-                  className={`${s.listRow} ${s.listButton} ${row.self ? s.rankSelf : ""}`}
+                  className={`${s.listRow} ${s.listButton} ${(principalView ? row.staffId === viewedStaffId : row.self) ? s.rankSelf : ""}`}
                   onClick={() => personDialog(row, board?.department ?? "")}
                 >
                   <span
@@ -549,7 +553,7 @@ export default function MemberInsightPanel({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className={`${s.row} ${s.rowWrap}`}>
                       <h3>{row.name}</h3>
-                      {row.self && <Pill tone="active">You</Pill>}
+                      {(principalView ? row.staffId === viewedStaffId : row.self) && <Pill tone="active">{principalView ? "Viewing" : "You"}</Pill>}
                     </div>
                     <p className={s.caption}>
                       {row.title} · {row.orders}{" "}
@@ -568,7 +572,7 @@ export default function MemberInsightPanel({
             )}
             <p className={s.sub} style={{ marginTop: 16 }}>
               Sales and margin only — nobody&apos;s commission, rate or salary is
-              shown here, including yours. Everyone is listed, whether or not they
+              shown here. Everyone is listed, whether or not they
               have sold yet.
             </p>
             {freshness}
@@ -586,7 +590,7 @@ export default function MemberInsightPanel({
           {block.downline.length ? (
             <>
               <section className={s.hero}>
-                <span className={s.sub}>Your team&apos;s sales · {insight.period}</span>
+                <span className={s.sub}>{principalView ? `${me?.name}'s team sales` : "Your team's sales"} · {insight.period}</span>
                 <div className={s.heroValue}>
                   {privateMode ? (
                     "••••••"
@@ -600,9 +604,9 @@ export default function MemberInsightPanel({
                   )}
                 </div>
                 <p className={s.caption}>
-                  You and {block.downline.length}{" "}
-                  {block.downline.length === 1 ? "person" : "people"} below you.
-                  Your own {money(me?.sales ?? 0)} is included, as group sales
+                  {principalView ? me?.name : "You"} and {block.downline.length}{" "}
+                  {block.downline.length === 1 ? "person" : "people"} in the reporting tree.
+                  Personal sales of {money(me?.sales ?? 0)} are included, as group sales
                   counts it.
                 </p>
               </section>
@@ -670,7 +674,7 @@ export default function MemberInsightPanel({
                     <button
                       className={s.link}
                       onClick={() =>
-                        personDialog(branch.leader, `Reports to you · ${block.department}`)
+                        personDialog(branch.leader, `Reports to ${principalView ? me?.name : "you"} · ${block.department}`)
                       }
                     >
                       Open {branch.leader.name.split(" ")[0]}&apos;s numbers{" "}
@@ -686,8 +690,8 @@ export default function MemberInsightPanel({
             </>
           ) : (
             <section className={s.card}>
-              <Empty title="You have no downline yet">
-                Once members report to you in {block.department}, each of their legs
+              <Empty title={principalView ? `${me?.name} has no downline yet` : "You have no downline yet"}>
+                Once members report to {principalView ? me?.name : "you"} in {block.department}, each of their legs
                 appears here with its sales and margin.
               </Empty>
             </section>

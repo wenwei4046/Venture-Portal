@@ -21,6 +21,19 @@ beforeEach(() => {
 });
 
 describe("authenticated KPI summary boundary", () => {
+  const context = { staffId: "10000000-0000-4000-8000-000000000002", subDepartmentId: "10000000-0000-4000-8000-000000000003" };
+  it("uses a separate authenticated Principal RPC for an explicitly selected member", async () => {
+    mocks.getUser.mockResolvedValue({ role: "revenue_member", actualRole: "principal", is_active: true, permissions: [] });
+    expect(await loadMemberKpiSummary(schemeId, context)).toEqual({ ok: true, data: summary });
+    expect(mocks.rpc).toHaveBeenCalledWith("member_principal_kpi_summary", { p_staff: context.staffId, p_scheme: schemeId });
+  });
+  it("rejects employee cross-member requests and Principal reads without a valid selection", async () => {
+    expect((await loadMemberKpiSummary(schemeId, context)).ok).toBe(false);
+    mocks.getUser.mockResolvedValue({ role: "principal", is_active: true, permissions: [] });
+    expect((await loadMemberKpiSummary(schemeId)).ok).toBe(false);
+    expect((await loadMemberKpiSummary(schemeId, { ...context, staffId: "bad" })).ok).toBe(false);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("uses the session RPC with only a scheme and projects away unrequested private fields", async () => {
     mocks.rpc.mockResolvedValue({ data: { ...summary, commission: 999, salary: 777, items: summary.items.map((item) => ({ ...item, unitCost: 80 })) }, error: null });
     expect(await loadMemberKpiSummary(schemeId)).toEqual({ ok: true, data: summary });
