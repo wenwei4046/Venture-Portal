@@ -128,7 +128,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
       supabase.from('sales_order_open_bill_tags').select('bill_rank, auto_suggested').eq('order_id', orderId).maybeSingle(),
       supabase.from('comm_venues').select('organizer, notes').eq('venue_key', venueKey(order.venue) ?? '').maybeSingle(),
       subDept.schemeId
-        ? supabase.from('comm_schemes').select('deposit_threshold_pct').eq('id', subDept.schemeId).maybeSingle()
+        ? supabase
+            .from('comm_schemes')
+            .select('deposit_threshold_pct, revenue_cost_divisor')
+            .eq('id', subDept.schemeId)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
     ])
 
@@ -147,8 +151,18 @@ export default async function OrderDetailPage({ params }: PageProps) {
   )
   const tag = tagData as { bill_rank: number; auto_suggested: boolean } | null
   const venueRow = venueData as { organizer: string | null; notes: string | null } | null
-  const threshold = (schemeData as { deposit_threshold_pct: number | string | null } | null)?.deposit_threshold_pct
+  const scheme = schemeData as {
+    deposit_threshold_pct: number | string | null
+    revenue_cost_divisor: number | string | null
+  } | null
+  const threshold = scheme?.deposit_threshold_pct
   const depositPct = threshold === null || threshold === undefined ? null : Number(threshold)
+  // The Revenue Team's cost basis — `marginBase()` divides every line's cost by
+  // it, so this page has to as well or it would explain the engine with a
+  // number the engine never used.
+  const rawDivisor = scheme?.revenue_cost_divisor
+  const costDivisor =
+    rawDivisor === null || rawDivisor === undefined || Number(rawDivisor) <= 0 ? 1 : Number(rawDivisor)
 
   const classed = lines.map(l => ({
     line: l,
@@ -186,7 +200,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
   )
   const baseRevenue = marginBase.reduce((a, c) => a + Number(c.line.line_amount), 0)
   const baseMissing = marginBase.filter(c => c.line.cost_amount === null).length
-  const cost = marginBase.reduce((a, c) => a + Number(c.line.cost_amount ?? 0), 0)
+  const cost = marginBase.reduce((a, c) => a + Number(c.line.cost_amount ?? 0) / costDivisor, 0)
   const manualMargin = order.manual_margin_pct === null ? null : Number(order.manual_margin_pct)
   const margin =
     manualMargin !== null
