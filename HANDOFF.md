@@ -1,73 +1,133 @@
 # HOUZS Venture Portal — Session Handoff
 
-## ACTIVE CHECKPOINT 2026-09-18 — Margin, the tick, the place and the cost
+## ACTIVE CHECKPOINT 2026-09-17 — The margin story, end to end
 
-Worktree `.claude/worktrees/order-margin-board`, branch
-`worktree-order-margin-board`, cut from `origin/main` at `9100505`.
+Supersedes the checkpoint this session wrote earlier (it was dated 2026-09-18
+after its migration numbers, and by the end of the session half of it was out
+of date — the recost it said nobody had pressed has been pressed).
 
-The ask was one screen: every order's margin, with the Open Bill tick on it,
-and the venue / revenue / organiser beside it, so the Revenue team's Arena has
-data worth ranking. Three decisions the user made first:
+Everything below is **MERGED and LIVE on production**, verified as the
+signed-in Principal at `venture-portal-chi.vercel.app`. `main` = `8e72297`.
 
-1. **The tick moved to the Sales orders page**, not the other way round. The
-   `/orders` ledger already carried margin, venue, organiser, amount and paid;
-   only the pick was a page away. `OpenBillPicker` puts it in the row. Three
-   clicks, three meanings — claim / confirm-the-suggestion / clear — because a
-   plain toggle makes agreeing with the importer harder than disagreeing, and
-   139 of September's 140 picks are still the importer's guess.
-   `open-bill/` stays as the narrow "only what is unreviewed" queue.
-2. **Venues merge by hand.** `comm_venues.canonical_key`, one level deep by
-   trigger (23VEN), *same place as…* on Sales by venue, ✕ to take it back.
-   `venue_group_key()` resolves; `revenue_month_orders` returns
-   `venue_group_key` / `venue_group_name` beside the spelling on the document.
-   **Nothing is merged automatically** — `SPICE ARENA` and `SETIA SPICE
-   CONVENTION CENTRE` are two halls of one Penang complex, `MID VALLEY` and
-   `MIDVALLEY SOUTHKEY JB` are 300km apart. 32 places, 0 merged so far.
-3. **The Product List gained the ERP's code.** The margin blackout was one
-   hyphen: the ERP writes `AKEMI ULTIMATE MATT (K)`, the list writes
-   `AK-ULTIMATE MATT (K)`, and the ingest's fallback matched `item_code` only.
-   `comm_products.erp_item_code` bridges it (37 seeded by the `AKEMI `→`AK-`
-   rule; nothing ambiguous written), `comm_product_unit_cost()` is the one
-   lookup, trigger `sales_order_lines_fill_cost` costs every line that arrives
-   without one, and `recost_sales_order_lines` does the months already landed.
+### What shipped
 
-**Migrations `20260918010000` and `20260918020000` are APPLIED LIVE** to
-`gixpptmfuryskbwkmiwz`. Both are additive and both carry their reversal in the
-header. Live state after this session is exactly as it was found: 37 products
-mapped, **268 lines still awaiting a recost nobody has pressed**, 0 venues
-merged, August 21/319 and September 77/199 bills with a margin.
+| PR | | |
+|----|---|---|
+| **#123** `cd1223d` | Open Bill tick on the Sales orders page · venue merging · the Product List's ERP code · recost | mine |
+| **#122** `ce5ef5b` | Three payrolls, three closing dates — design only, nothing built | rebased, docs |
+| **#114** `8e72297` | Member catalogue: riders, sofa cost grids, **Revenue Team cost basis** | rebased from 5 days stale |
 
-**THE BUTTON IS THE USER'S TO PRESS.** Recosting moves money — a cost changes
-the margin, the margin the band, the band the commission — so it was verified
-end to end and then reverted line by line. What it would do, measured:
+**The tick moved to the ledger.** Which of a day's bills came first is argued
+from the margin, the venue and the customer, and those were a page away from
+the Open Bill board. `OpenBillPicker` puts the pick in the row that carries
+them. Three clicks, three meanings — claim / confirm-the-suggestion / clear —
+because a plain toggle makes agreeing with the importer harder than
+disagreeing, and 139 of September's 140 picks are still its guess.
+`open-bill/` stays as the narrow unreviewed queue.
 
-| month | bills with a margin | after a recost | lines costed |
-|-------|--------------------|----------------|--------------|
-| Aug 2026 | 21 of 319 | **214** | 195 |
-| Sep 2026 | 77 of 199 | **150** | 73 |
+**One place, one row.** `comm_venues.canonical_key`, one level deep by trigger
+(23VEN), *same place as…* on Sales by venue, ✕ to take it back. Nothing is
+merged automatically and nothing is merged yet — see below.
 
-September's run (RM 251,425.26) is computed, not paid, so the RPC will allow
-it — but the run has to be computed again afterwards, and the panel says so.
-What recosting will NOT fix: 28 sofa codes (the ERP's `8030-1A(LHF)` against
-the list's `SVI-00830 SOFA`, and those rows carry no unit cost anyway),
-DUNLOPILLO and ERGOTEX mattresses (listed or missing, no cost keyed either
-way). `revenue_uncosted_products()` names all of them on the page.
+**The cost the ERP does not send.** The margin blackout was one hyphen: the
+ERP writes `AKEMI ULTIMATE MATT (K)`, the Product List writes `AK-ULTIMATE
+MATT (K)`, and the ingest's fallback matched `item_code` only.
+`comm_products.erp_item_code` bridges it (37 seeded by the `AKEMI `→`AK-`
+rule), `comm_product_unit_cost()` is the one lookup, trigger
+`sales_order_lines_fill_cost` costs every line that arrives without one
+whichever path wrote it, and `recost_sales_order_lines()` did the months
+already landed.
 
-Also fixed in passing: `setVenueCanonical` was silently no-opping because a raw
-`<select>` inside a `RowForm` is never submitted — the form is portalled out of
-the table and only its own controls claim it by id. Now `Choice`, and the
-action refuses a FormData with no `canonical` key at all rather than reading it
-as an unmerge.
+### THE COST BASIS MOVED — read this before touching any margin
 
-Verified: 2096 unit tests (183 files, 3 skipped), production build, and a live
-Playwright walkthrough as Principal at 1440px and 390px — tick confirm (DB
-round-trip checked and reverted), venue merge and unmerge, the recost button
-(reverted), the ERP code column. No console errors, no horizontal overflow.
+`comm_schemes.revenue_cost_divisor` came in with #114: **Fair = 0.7**, IR =
+1.0. The engine divides every line's cost by it, so every margin the engine
+judges — the per-bill penalty, the monthly incentive, the statement's brand
+margins — is on that basis, the same one the member calculator quotes on.
 
-Pre-existing and NOT from this branch: five TS errors in
-`MemberWorkspace.live-design.test.tsx` and `MemberWorkspace.principal.test.tsx`
-(`exact` is not a `ByRoleOptions` key). They are in test files, so neither
-`next build` nor vitest fails on them.
+Fair's blended margin, after the recost and then after the divisor:
+
+| | before recost | after recost | after ÷ 0.7 (now) |
+|---|---|---|---|
+| Aug 2026 | 21 of 319 bills had one | 214 · 77.40% | **67.71%** |
+| Sep 2026 | 77 of 199 | 150 · 67.55% | **53.62%** |
+
+`revenue_month_orders` and `orders/[orderId]` were taught to divide too
+(migration `20260918030000`), because a drill-down that disagrees with the
+engine it exists to explain is worse than none.
+
+**STILL ON THE RAW COST, and therefore disagreeing with the engine:**
+`member_order_facts`, and the member **Insight, Arena and Income** reads built
+on it. Members see a higher margin than the engine pays on. It is a live
+SECURITY DEFINER function from another branch with its source hash recorded
+below; moving it changes every member's margin figure, so it is a decision for
+the user, not a follow-through. **#114's own comment says the member
+calculator already quotes on ÷0.7**, which argues they should be unified.
+
+### Open, in the order they matter
+
+1. **September's run is doubly stale.** `comm_runs` says RM 251,425.26,
+   status `computed` (never paid, so nothing is locked). It was computed
+   before the recost and before the divisor. Recomputing will move it — the
+   margin band's penalty and incentive only bite now that margins exist.
+   The user has been shown this and has not yet said to recompute.
+   **August has never had a run at all.**
+2. **Should the member side divide by 0.7 too?** See above.
+3. **45 venues, 1 organiser named.** SPICE ARENA = HOMEDEC is the only one.
+   The ERP sends no organiser; it is typed on the month page's *Sales by
+   venue*, which only lists venues that month has bills at — 13 are August
+   only, 15 September only, so it takes both pages. **The user asked for a
+   Venue register page** (all venues on one screen, organiser + merge
+   together); offered, not yet built.
+4. **Which spellings are one place.** DECIDED: `SPICE ARENA` and `SETIA SPICE
+   CONVENTION CENTRE` are **two venues, do not combine** (two halls of one
+   Penang complex). Still undecided, listed biggest first: PISA SPICE ARENA /
+   PISA SPICE ARENA CONVENTION CENTRE · BUKIT JALIL STADIUM / STADIUM BUKIT
+   JALIL · MIDVALLEY EXHIBITION CENTRE / MID VALLEY · MIDVALLEY SOUTHKEY JB /
+   MVEC SOUTHKEY · PAVILLION / PAVILION BUKIT JALIL · IOI PUTRAJAYA / IOI MALL
+   PUTRAJAYA / IOIGECC · SETIA CITY CONVENTION CENTRE / SCCC SHAH ALAM / SCCC ·
+   MITC MELAKA / MELAKA INTERNATIONAL TRADE CENTRE · ZANOTTI LIVING(KELANA
+   JAYA) with and without the space. The eight `… SOLO` names are a
+   single-brand roadshow marker, not aliases.
+5. **RM 690k of sales still has no cost**, so 49 September and 105 August
+   bills still have no margin: 28 sofa codes the Product List has never heard
+   of (`8030-1A(LHF)` against its `SVI-00830 SOFA`, and those rows carry no
+   unit cost either), 3 DUNLOPILLO listed with no cost keyed, 5 AKEMI (SK)/(SP)
+   sizes and 7 ERGOTEX missing entirely. `revenue_uncosted_products()` names
+   every one on *Why those bills have no margin*.
+
+### Live database facts a new session should not have to rediscover
+
+- Migrations applied live this session: `20260918010000` (ERP code, the cost
+  trigger, recost, the gap report), `20260918020000` (venue aliases),
+  `20260918030000` (the drill-down's cost basis). All additive, each carries
+  its reversal in its header.
+- `_recost_backup_20260916` is a **temporary table in `public`** holding the
+  268 `sales_order_lines` ids the recost filled. RLS on, no policies, so only
+  the service role can read it. Undo is
+  `UPDATE sales_order_lines SET cost_amount = NULL WHERE id IN (SELECT id FROM
+  _recost_backup_20260916)`. **Drop it once the recost is settled.**
+- The ERP feed is live and the cost trigger works on it: September went 199 →
+  203 bills during the session and every new bill arrived already costed.
+- `sales_orders.location` is the ERP's `sales_location` — the **warehouse**
+  (KL / PG / SRW), three values. The fair is `venue`. They are not the same
+  fact and the user asked about this specifically.
+
+### Traps this session actually hit
+
+- **A raw `<select>` inside a `RowForm` is never submitted.** The form is
+  portalled out of the table and only its own controls claim it by id. The
+  venue merge looked like it saved and wrote nothing. Use `Choice`. The
+  durable half of the fix is on the action side: `if (!fd.has('canonical'))
+  throw` — when blank and absent mean different things, make absent loud.
+- Five pre-existing TS errors in `MemberWorkspace.live-design.test.tsx` and
+  `MemberWorkspace.principal.test.tsx` (`exact` is not a `ByRoleOptions` key).
+  Test files, so neither `next build` nor vitest fails on them. Not from any
+  branch merged today.
+
+Verified before each merge: 2113 unit tests (183 files, 3 skipped), production
+build, and both CI jobs green on every PR. Live Playwright walkthrough as
+Principal at 1440px and 390px; no console errors, no horizontal overflow.
 
 ## ACTIVE CHECKPOINT 2026-09-16 — Principal C function parity release
 
