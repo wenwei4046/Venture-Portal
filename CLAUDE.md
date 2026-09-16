@@ -458,6 +458,13 @@ access-matrix.md — 4 roles × 9 modules, RLS patterns, data visibility
 module-spec-phase1.md — Dashboard, Fund IN, Fund OUT, Overdue & Netting
 module-spec-phase2.md — Dept Pool, Service Billing (5 modes)
 module-spec-phase3.md — Director Salary Engine, HR Costing, Reports
+module-spec-payroll-cycles.md — THE THREE PAYROLLS (design, 2026-09-16, nothing
+  built). Imported (Marketing/HR/Finance/IT/Director Office, 7th), Director
+  (board, 7th) and Revenue (commission, 15th) close on different days, but
+  `submit_payroll_to_principal` closes the whole MONTH at once — which is why
+  August 2026's Revenue commission can never be computed. Proposes cycle =
+  (month × track), the CEO's 1%-of-committed-sales share, the statutory-filing
+  timing risk and the six reports. Read it before touching payroll closing.
 module-spec-revenue-commission.md — Revenue Department commission payroll: the
   second payroll TYPE (ERP sales orders → commission engine → the one
   `hr_monthly_payroll.commission_amount` field). Sub-departments, the tier
