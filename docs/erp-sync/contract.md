@@ -304,7 +304,87 @@ A window of 401s between the two only delays deliveries — the outbox retries.
 
 ---
 
-## 7. Open points
+## 7. Keeping up with the ERP's catalogue
+
+Two things drift between the ERP and the portal, and they drift for different
+reasons. Both were measured on 2026-09-16 over the 509 orders / 2,720 lines the
+portal then held.
+
+### 7.1 Item groups — a small closed set the portal should LEARN, not type
+
+`comm_item_groups` is typed by hand in Rules. The ERP's spellings have moved on:
+
+| The ERP sends | Lines | Value | In Rules? |
+|---|---:|---:|---|
+| `MATTRESS` / `SOFA` / `BEDFRAME` / `DINING` | 1,268 | RM 3.09M | yes |
+| `SERVICE` | 140 | **RM 51,124** | no |
+| `ACCESSORY` | 1,161 | RM 1,359 | no — Rules has `ACC` |
+| `FABRIC_ACCESSORY` | 88 | RM 490 | no |
+| `OTHERS` | 4 | RM 0 | no — Rules has `OTHER` |
+
+Rules also carries `ACC`, `OTHER` and `TRANS`, which the feed has never sent.
+An unclassified group is treated as **not commissionable** and warns, so the
+month cannot sync — but it also means a new ERP product line silently earns
+nothing until somebody notices.
+
+**Proposed.** Register groups from the feed, the way venues are registered now:
+
+1. `comm_item_groups.commissionable` becomes **nullable** — a third state,
+   *not yet decided*, distinct from *decided: does not earn*. Today the two are
+   the same value and that is what makes silence dangerous.
+2. `ingest_erp_sales_order` inserts any unseen `item_group` for the scheme with
+   `commissionable = NULL` (ON CONFLICT DO NOTHING), exactly as it now does for
+   `comm_venues`.
+3. Rules → Item groups lists **every group the feed has ever sent**, with this
+   month's line count and value beside it, undecided ones pinned to the top.
+   The run keeps refusing to sync while any of them is undecided — but now the
+   page says which, and what it is worth.
+
+Nobody types a group name again, and a new ERP product line appears on the page
+the day its first bill lands.
+
+### 7.2 Line cost — the ERP is the source, the Product List is the exception
+
+`items[].line_cost_sen` is always present, and often zero:
+
+| | Lines | Value |
+|---|---:|---:|
+| Real cost (`> 0`) | 481 | RM 543,383 |
+| **Priced but costed 0** | **510** | **RM 2,659,212** |
+| Null | 0 | — |
+
+So the gap is on the ERP's side: its own costing is not filled for most
+mattresses and sofas. Per group, distinct item codes against the portal's
+Product List fallback:
+
+| Group | Distinct codes | In Product List | With a unit cost |
+|---|---:|---:|---:|
+| MATTRESS | 62 | 8 | 4 |
+| SOFA | 74 | 3 | **0** |
+| BEDFRAME | 53 | 1 | 1 |
+| ACCESSORY | 31 | 31 | 30 |
+
+**Proposed.** Do not mirror the ERP's catalogue in `comm_products` — that was
+tried (1,553 rows seeded) and the code systems do not line up. Instead:
+
+- keep the existing precedence — **ERP line cost first, Product List second,
+  nothing third** (already how `ingest_erp_sales_order` works);
+- add a **Costing gaps** view: item codes the ERP priced but costed 0, grouped
+  and sorted by value, with line counts. That turns "230 codes" into a work
+  list of roughly 40 codes covering RM 2.66M, most of which belong back in the
+  ERP;
+- show the cost's PROVENANCE on the order-line drill-down (ERP / Product List /
+  none), so a margin can be argued with;
+- treat `comm_products` as an exception table: a row only for what the ERP
+  genuinely cannot cost.
+
+A bill with any uncosted commissionable line has **no** margin — the engine
+refuses to judge it, and since 2026-09-16 so do the drill-downs. **MEASURED:**
+only 21 of August's 319 bills (RM 100,382 of RM 2.0M) carry a complete cost.
+
+---
+
+## 8. Open points
 
 | | Status |
 |---|---|
