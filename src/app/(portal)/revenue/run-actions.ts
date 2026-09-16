@@ -422,3 +422,51 @@ async function assertRunOpen(supabase: SupabaseClient, periodMonth: string, subD
     )
   }
 }
+
+// ─── Costs ──────────────────────────────────────────────────────────────────
+
+export interface RecostResult {
+  linesCosted: number
+  linesStillBlind: number
+  ordersFullyCosted: number
+}
+
+/**
+ * Fill a month's missing line costs from the Product List.
+ *
+ * The ERP's delivery carries a cost per line only sometimes; when it does not,
+ * the Product List is the fallback — and until 2026-09-18 that fallback matched
+ * on the list's own item code alone, so every product the ERP spells
+ * differently (`AKEMI ULTIMATE MATT (K)` against `AK-ULTIMATE MATT (K)`) missed
+ * by one hyphen and its bill lost its margin.
+ *
+ * New deliveries are costed on arrival by a database trigger. This is for the
+ * months that already landed: the same lookup, applied to rows already there.
+ * It never overwrites a cost, and the RPC refuses a month whose run has paid.
+ *
+ * A COST CHANGES WHAT THE MONTH PAYS — it moves the margin, the margin moves
+ * the band, and the band moves the commission — so the run has to be computed
+ * again afterwards. The page that calls this says so; it does not recompute on
+ * anybody's behalf.
+ */
+export async function recostMonth(subDepartmentId: string, period: string): Promise<RecostResult> {
+  await requirePermission('revenue')
+  const supabase = await client()
+
+  const { data, error } = await supabase.rpc('recost_sales_order_lines', {
+    p_sub_department_id: subDepartmentId,
+    p_period: period,
+  })
+  if (error) throw new Error(`Could not refill the costs: ${error.message}`)
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { lines_costed: number; lines_still_blind: number; orders_with_cost: number }
+    | undefined
+
+  revalidatePath('/revenue', 'layout')
+  return {
+    linesCosted: row?.lines_costed ?? 0,
+    linesStillBlind: row?.lines_still_blind ?? 0,
+    ordersFullyCosted: row?.orders_with_cost ?? 0,
+  }
+}

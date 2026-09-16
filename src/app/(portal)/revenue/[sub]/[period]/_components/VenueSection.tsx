@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { Field, Hidden, RowForm, SaveButton } from '@/components/RowForm'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { Choice, Field, Hidden, RowForm, SaveButton } from '@/components/RowForm'
 import { formatMoney } from '@/lib/utils'
-import type { VenueSales } from '@/lib/venues'
-import { setVenueOrganizer } from '../../../venue-actions'
+import { venueKey, type VenueSales } from '@/lib/venues'
+import { setVenueCanonical, setVenueOrganizer } from '../../../venue-actions'
 
 /**
  * Where the month was sold, and who ran each event.
@@ -15,13 +16,24 @@ import { setVenueOrganizer } from '../../../venue-actions'
  * That is the one fact here nobody can derive, so it is typed in place,
  * against the sales it explains, and remembered for every month that names the
  * same venue.
+ *
+ * IT ALSO SPELLS THE SAME PLACE SEVERAL WAYS (2026-09-18), because the venue
+ * is free text typed at the fair: `PISA SPICE ARENA`, `PISA SPICE ARENA
+ * CONVENTION CENTRE` and `SPICE ARENA` are three rows of what may be one or
+ * two events. No rule can tell — `SPICE ARENA` and `SETIA SPICE CONVENTION
+ * CENTRE` are two halls of one complex, `MID VALLEY` and `MIDVALLEY SOUTHKEY
+ * JB` are 300km apart — so *same place as…* is where somebody who was there
+ * says so once, and every month that names either spelling reads as one fair
+ * from then on. The spellings stay visible under the name, each with the ✕
+ * that takes it back.
  */
 export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[]; ordersPath: string }) {
   // A string, not a callback: a Server Component may hand a Client Component
   // data, never a function.
   const hrefFor = (key: string) => `${ordersPath}?venue=${encodeURIComponent(key)}`
-  const [editing, setEditing] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{ key: string; mode: 'organizer' | 'merge' } | null>(null)
   const named = rows.filter(r => r.organizer)
+  const merged = rows.filter(r => r.spellings.length > 1)
 
   return (
     <section className="mb-10">
@@ -34,6 +46,9 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
         The venue travels on every order from the ERP. The organiser does not — nothing in the feed
         carries it — so it is typed here once per venue and every month that names that venue shows it.
         {rows.length > 0 ? ` ${named.length} of ${rows.length} named so far.` : ''}
+        {' '}It is typed at the fair, so one place can arrive under several spellings;{' '}
+        <em>same place as…</em> folds them into one event.
+        {merged.length > 0 ? ` ${merged.length} folded so far.` : ''}
       </p>
       <div className="overflow-x-auto">
         <table className="ledger-table">
@@ -49,7 +64,7 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
           </thead>
           <tbody>
             {rows.map(v =>
-              editing === v.venueKey ? (
+              editing?.key === v.venueKey && editing.mode === 'organizer' ? (
                 <RowForm key={v.venueKey} action={setVenueOrganizer} onDone={() => setEditing(null)}>
                   {({ pending }) => (
                     <tr>
@@ -81,6 +96,49 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
                     </tr>
                   )}
                 </RowForm>
+              ) : editing?.key === v.venueKey && editing.mode === 'merge' ? (
+                <RowForm key={v.venueKey} action={setVenueCanonical} onDone={() => setEditing(null)}>
+                  {({ pending }) => (
+                    <tr>
+                      <td>
+                        <Hidden name="venue" value={v.venueKey} />
+                        <span className="font-serif text-[14px] text-ink">{v.displayName}</span>
+                        <div className="font-serif italic text-muted text-xs mt-0.5">is the same place as</div>
+                      </td>
+                      <td colSpan={3}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Choice, not a bare <select>: RowForm's form is
+                              portalled out of the table, and only its own
+                              controls claim it by id. A raw one submits
+                              nothing at all. */}
+                          <Choice
+                            name="canonical"
+                            ariaLabel={`Merge ${v.displayName} into`}
+                            width="w-72"
+                          >
+                            <option value="">— nothing, keep it on its own —</option>
+                            {rows
+                              .filter(o => o.venueKey && o.venueKey !== v.venueKey)
+                              .map(o => (
+                                <option key={o.venueKey} value={o.venueKey}>
+                                  {o.displayName}
+                                </option>
+                              ))}
+                          </Choice>
+                          <SaveButton pending={pending} label="Merge" />
+                          <button
+                            type="button"
+                            onClick={() => setEditing(null)}
+                            className="text-xs font-sans text-graphite hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </td>
+                      <td className="num">{formatMoney(v.total)}</td>
+                    </tr>
+                  )}
+                </RowForm>
               ) : (
                 <tr key={v.venueKey}>
                   <td>
@@ -93,12 +151,19 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
                         {v.displayName}
                       </Link>
                     )}
+                    {v.venueKey ? (
+                      <MergeLine
+                        venueKey={v.venueKey}
+                        spellings={v.spellings}
+                        onMerge={() => setEditing({ key: v.venueKey, mode: 'merge' })}
+                      />
+                    ) : null}
                   </td>
                   <td>
                     {v.venueKey ? (
                       <button
                         type="button"
-                        onClick={() => setEditing(v.venueKey)}
+                        onClick={() => setEditing({ key: v.venueKey, mode: 'organizer' })}
                         className={
                           v.organizer
                             ? 'font-serif text-[14px] text-ink hover:text-accent'
@@ -123,5 +188,70 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
         </table>
       </div>
     </section>
+  )
+}
+
+/**
+ * The spellings folded into this place, and the way back out.
+ *
+ * Only the spellings that are NOT the place's own key are listed: the row
+ * already carries that one as its name, and repeating it would read as a merge
+ * that never happened.
+ */
+function MergeLine({
+  venueKey: key,
+  spellings,
+  onMerge,
+}: {
+  venueKey: string
+  spellings: string[]
+  onMerge: () => void
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const aliases = spellings.filter(s => venueKey(s) !== key)
+
+  function unmerge(spelling: string) {
+    setError(null)
+    startTransition(async () => {
+      try {
+        const fd = new FormData()
+        fd.set('venue', spelling)
+        fd.set('canonical', '')
+        await setVenueCanonical(fd)
+        router.refresh()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'That did not save'
+        if (!message.includes('NEXT_REDIRECT')) setError(message)
+      }
+    })
+  }
+
+  return (
+    <div className="mt-0.5">
+      {aliases.map(s => (
+        <span key={s} className="font-mono text-[10.5px] text-muted mr-2 whitespace-nowrap">
+          + {s}
+          <button
+            type="button"
+            onClick={() => unmerge(s)}
+            disabled={pending}
+            title={`Stop treating ${s} as the same place`}
+            className="ml-1 text-graphite hover:text-danger disabled:opacity-40"
+          >
+            ✕
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={onMerge}
+        className="font-serif italic text-[11px] text-graphite hover:text-accent"
+      >
+        same place as…
+      </button>
+      {error ? <div className="font-serif italic text-danger text-[11px]">{error}</div> : null}
+    </div>
   )
 }

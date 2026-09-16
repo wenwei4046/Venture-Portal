@@ -1,5 +1,74 @@
 # HOUZS Venture Portal — Session Handoff
 
+## ACTIVE CHECKPOINT 2026-09-18 — Margin, the tick, the place and the cost
+
+Worktree `.claude/worktrees/order-margin-board`, branch
+`worktree-order-margin-board`, cut from `origin/main` at `9100505`.
+
+The ask was one screen: every order's margin, with the Open Bill tick on it,
+and the venue / revenue / organiser beside it, so the Revenue team's Arena has
+data worth ranking. Three decisions the user made first:
+
+1. **The tick moved to the Sales orders page**, not the other way round. The
+   `/orders` ledger already carried margin, venue, organiser, amount and paid;
+   only the pick was a page away. `OpenBillPicker` puts it in the row. Three
+   clicks, three meanings — claim / confirm-the-suggestion / clear — because a
+   plain toggle makes agreeing with the importer harder than disagreeing, and
+   139 of September's 140 picks are still the importer's guess.
+   `open-bill/` stays as the narrow "only what is unreviewed" queue.
+2. **Venues merge by hand.** `comm_venues.canonical_key`, one level deep by
+   trigger (23VEN), *same place as…* on Sales by venue, ✕ to take it back.
+   `venue_group_key()` resolves; `revenue_month_orders` returns
+   `venue_group_key` / `venue_group_name` beside the spelling on the document.
+   **Nothing is merged automatically** — `SPICE ARENA` and `SETIA SPICE
+   CONVENTION CENTRE` are two halls of one Penang complex, `MID VALLEY` and
+   `MIDVALLEY SOUTHKEY JB` are 300km apart. 32 places, 0 merged so far.
+3. **The Product List gained the ERP's code.** The margin blackout was one
+   hyphen: the ERP writes `AKEMI ULTIMATE MATT (K)`, the list writes
+   `AK-ULTIMATE MATT (K)`, and the ingest's fallback matched `item_code` only.
+   `comm_products.erp_item_code` bridges it (37 seeded by the `AKEMI `→`AK-`
+   rule; nothing ambiguous written), `comm_product_unit_cost()` is the one
+   lookup, trigger `sales_order_lines_fill_cost` costs every line that arrives
+   without one, and `recost_sales_order_lines` does the months already landed.
+
+**Migrations `20260918010000` and `20260918020000` are APPLIED LIVE** to
+`gixpptmfuryskbwkmiwz`. Both are additive and both carry their reversal in the
+header. Live state after this session is exactly as it was found: 37 products
+mapped, **268 lines still awaiting a recost nobody has pressed**, 0 venues
+merged, August 21/319 and September 77/199 bills with a margin.
+
+**THE BUTTON IS THE USER'S TO PRESS.** Recosting moves money — a cost changes
+the margin, the margin the band, the band the commission — so it was verified
+end to end and then reverted line by line. What it would do, measured:
+
+| month | bills with a margin | after a recost | lines costed |
+|-------|--------------------|----------------|--------------|
+| Aug 2026 | 21 of 319 | **214** | 195 |
+| Sep 2026 | 77 of 199 | **150** | 73 |
+
+September's run (RM 251,425.26) is computed, not paid, so the RPC will allow
+it — but the run has to be computed again afterwards, and the panel says so.
+What recosting will NOT fix: 28 sofa codes (the ERP's `8030-1A(LHF)` against
+the list's `SVI-00830 SOFA`, and those rows carry no unit cost anyway),
+DUNLOPILLO and ERGOTEX mattresses (listed or missing, no cost keyed either
+way). `revenue_uncosted_products()` names all of them on the page.
+
+Also fixed in passing: `setVenueCanonical` was silently no-opping because a raw
+`<select>` inside a `RowForm` is never submitted — the form is portalled out of
+the table and only its own controls claim it by id. Now `Choice`, and the
+action refuses a FormData with no `canonical` key at all rather than reading it
+as an unmerge.
+
+Verified: 2096 unit tests (183 files, 3 skipped), production build, and a live
+Playwright walkthrough as Principal at 1440px and 390px — tick confirm (DB
+round-trip checked and reverted), venue merge and unmerge, the recost button
+(reverted), the ERP code column. No console errors, no horizontal overflow.
+
+Pre-existing and NOT from this branch: five TS errors in
+`MemberWorkspace.live-design.test.tsx` and `MemberWorkspace.principal.test.tsx`
+(`exact` is not a `ByRoleOptions` key). They are in test files, so neither
+`next build` nor vitest fails on them.
+
 ## ACTIVE CHECKPOINT 2026-09-16 — Principal C function parity release
 
 This checkpoint supersedes the paused design-only checkpoint below. Work is in

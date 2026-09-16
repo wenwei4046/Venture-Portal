@@ -224,12 +224,23 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   }
   const people = [...bySalesperson.values()].sort((a, b) => b.total - a.total)
 
+  // Grouped by the PLACE the database resolved, not by the ERP's spelling —
+  // one fair is one row however many ways the counter typed its name.
   const venueRows = salesByVenue(
-    orders.map(o => ({ venue: o.venue, staffKey: o.staffId ?? o.agentName, amount: o.orderTotal })),
+    orders.map(o => ({
+      venue: o.venue,
+      groupKey: o.venueGroupKey,
+      groupName: o.venueGroupName,
+      staffKey: o.staffId ?? o.agentName,
+      amount: o.orderTotal,
+    })),
     new Map(
       orders
-        .filter(o => venueKey(o.venue))
-        .map(o => [venueKey(o.venue)!, { displayName: o.venue ?? '', organizer: o.organizer }]),
+        .filter(o => o.venueGroupKey ?? venueKey(o.venue))
+        .map(o => [
+          (o.venueGroupKey ?? venueKey(o.venue))!,
+          { displayName: o.venueGroupName ?? o.venue ?? '', organizer: o.organizer },
+        ]),
     ),
   )
 

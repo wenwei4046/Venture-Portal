@@ -8,7 +8,14 @@ import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
-import { exclusionReason, loadMonthOrders, type MonthOrder } from '../../../_lib/month-orders'
+import {
+  exclusionReason,
+  loadMonthOrders,
+  loadUncostedProducts,
+  type MonthOrder,
+} from '../../../_lib/month-orders'
+import OpenBillPicker from './_components/OpenBillPicker'
+import CostGapPanel from './_components/CostGapPanel'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
@@ -40,6 +47,13 @@ function pct(v: number | null): string {
  *
  * Filters are links, not state: a person's bills are a URL somebody can send
  * to the person whose bills they are.
+ *
+ * IT IS ALSO WHERE THE OPEN BILL PICK IS MADE (2026-09-16). The pick used to
+ * live on its own board, which showed the order number and the value and
+ * nothing else — but which of a day's bills came first is argued from the
+ * margin, the venue and the customer, and those were one page away. So the
+ * decision moved to the row that carries its evidence. The board stays as the
+ * narrow queue: only the days still resting on a suggestion.
  */
 export default async function MonthOrdersPage({ params, searchParams }: PageProps) {
   await requirePermission('revenue')
@@ -49,14 +63,33 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
 
   const subDept = await requireSubDepartment(sub)
   const supabase = (await createClient()) as unknown as SupabaseClient
-  const all = await loadMonthOrders(supabase, subDept.id, period)
+  const [all, uncosted] = await Promise.all([
+    loadMonthOrders(supabase, subDept.id, period),
+    loadUncostedProducts(supabase, subDept.id, period),
+  ])
+
+  // The Open Bill pick belongs on the row, but only where the scheme pays one
+  // and only while the run it would change is still open.
+  const [{ data: scheme }, { data: locked, error: lockError }] = await Promise.all([
+    subDept.schemeId
+      ? supabase.from('comm_schemes').select('enable_open_bill').eq('id', subDept.schemeId).single()
+      : Promise.resolve({ data: null }),
+    supabase.rpc('commission_order_period_locked', {
+      p_sub_department_id: subDept.id,
+      p_period: period,
+    }),
+  ])
+  if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
+  const openBillPaid = Boolean((scheme as { enable_open_bill: boolean } | null)?.enable_open_bill)
+  const runLocked = Boolean(locked)
 
   const includeExcluded = show === 'all'
   const rows = all.filter(o => {
     if (!includeExcluded && o.cancelled) return false
     if (staffFilter === 'unmatched' && o.staffId) return false
     if (staffFilter && staffFilter !== 'unmatched' && o.staffId !== staffFilter) return false
-    if (venueFilter !== undefined && (venueKey(o.venue) ?? '') !== venueFilter) return false
+    // The filter is a PLACE, not a spelling: merged venues answer as one.
+    if (venueFilter !== undefined && (o.venueGroupKey ?? '') !== venueFilter) return false
     return true
   })
 
@@ -64,7 +97,10 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     ? all.find(o => o.staffId === staffFilter)
     : undefined
   const venueName = venueFilter !== undefined
-    ? (all.find(o => (venueKey(o.venue) ?? '') === venueFilter)?.venue ?? '(no venue)')
+    ? (() => {
+        const hit = all.find(o => (o.venueGroupKey ?? '') === venueFilter)
+        return hit?.venueGroupName ?? hit?.venue ?? '(no venue)'
+      })()
     : null
 
   const total = rows.reduce((a, o) => a + o.orderTotal, 0)
@@ -72,6 +108,15 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   const heldValue = held.reduce((a, o) => a + o.orderTotal, 0)
   const noCost = rows.reduce((a, o) => a + o.linesWithoutCost, 0)
   const excludedCount = all.filter(o => o.cancelled).length
+
+  // A bill with no margin is the figure worth counting, not the lines behind
+  // it: one uncosted line blinds the whole bill, so ten lines can be one
+  // question or ten.
+  const live = rows.filter(o => !o.cancelled)
+  const blind = live.filter(o => o.marginPct === null)
+  const blindValue = blind.reduce((a, o) => a + o.orderTotal, 0)
+  const tagged = live.filter(o => o.openBillRank !== null)
+  const stillSuggested = tagged.filter(o => o.openBillAuto).length
 
   const filtered = Boolean(staffFilter) || venueFilter !== undefined
   const base = revenuePath(subDept.slug, period, 'orders')
@@ -129,7 +174,16 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
             note={held.length > 0 ? `${held.length} bill${held.length === 1 ? '' : 's'}` : undefined}
             warn={held.length > 0}
           />
-          <Tile label="Lines without a cost" value={String(noCost)} warn={noCost > 0} />
+          <Tile
+            label="Bills with no margin"
+            value={String(blind.length)}
+            note={
+              blind.length > 0
+                ? `${formatMoney(blindValue)} · ${noCost} line${noCost === 1 ? '' : 's'} without a cost`
+                : undefined
+            }
+            warn={blind.length > 0}
+          />
         </div>
       </section>
 
@@ -141,6 +195,18 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         </div>
         <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
           In the order the day wrote them — the running number is what the Open Bill bonus reads.
+          {openBillPaid ? (
+            <>
+              {' '}
+              {tagged.length} of {live.length} carry a pick
+              {stillSuggested > 0 ? (
+                <>
+                  , <span className="text-alert">{stillSuggested} still the importer&apos;s guess</span>
+                </>
+              ) : null}
+              .
+            </>
+          ) : null}
           {excludedCount > 0 ? (
             <>
               {' '}
@@ -183,6 +249,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                   <th className="right m-hide">Amount</th>
                   <th className="right m-hide">Paid</th>
                   <th className="right m-hide">Margin</th>
+                  {openBillPaid ? <th className="m-hide">Open Bill</th> : null}
                   <th className="right">Counts as</th>
                   <th className="lt-toggle" aria-hidden />
                 </tr>
@@ -197,10 +264,9 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                       >
                         {o.orderNo}
                       </Link>
-                      {o.openBillRank ? (
+                      {!openBillPaid && o.openBillRank ? (
                         <div className="font-mono text-[10.5px] text-accent mt-0.5">
                           OPEN BILL {o.openBillRank}
-                          {o.openBillAuto === false ? ' · SET BY HAND' : ''}
                         </div>
                       ) : null}
                     </td>
@@ -216,7 +282,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                     <td className="m-hide" data-label="Venue">
                       {o.venue ? (
                         <Link
-                          href={keep({ venue: venueKey(o.venue) ?? '', staff: undefined })}
+                          href={keep({ venue: o.venueGroupKey ?? '', staff: undefined })}
                           className="font-serif text-[13px] text-graphite hover:text-accent"
                         >
                           {o.venue}
@@ -224,6 +290,12 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                       ) : (
                         <span className="text-muted">—</span>
                       )}
+                      {/* Only when the document's spelling is not the place's own. */}
+                      {o.venueGroupName && venueKey(o.venue) !== o.venueGroupKey ? (
+                        <div className="font-serif italic text-[11px] text-muted mt-0.5">
+                          at {o.venueGroupName}
+                        </div>
+                      ) : null}
                       {o.organizer ? (
                         <div className="font-mono text-[10.5px] text-muted mt-0.5">{o.organizer}</div>
                       ) : null}
@@ -266,6 +338,29 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                         </>
                       )}
                     </td>
+                    {openBillPaid ? (
+                      <td className="m-hide" data-label="Open Bill">
+                        <OpenBillPicker
+                          orderId={o.orderId}
+                          staffName={o.employeeName}
+                          eventDate={o.eventDate}
+                          rank={
+                            o.openBillRank === 1 || o.openBillRank === 2 || o.openBillRank === 3
+                              ? o.openBillRank
+                              : null
+                          }
+                          suggested={o.openBillAuto === true}
+                          disabled={runLocked || o.cancelled || !o.staffId}
+                          disabledReason={
+                            runLocked
+                              ? 'The run for this month has paid — reopen it before changing the picks'
+                              : o.cancelled
+                                ? 'A cancelled bill earns no Open Bill bonus'
+                                : 'This bill has no matched salesperson yet'
+                          }
+                        />
+                      </td>
+                    ) : null}
                     <td className="num">
                       {o.cancelled ? (
                         <span className="font-serif italic text-muted text-sm">
@@ -288,8 +383,27 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           &quot;Counts as&quot; is the bill&apos;s SALES value, not its commission: transport and disposal
           lines leave the base, KPI items move to their own allowance, and a held bill pays in the
           month its deposit clears. Open the bill to see it line by line.
+          {openBillPaid ? (
+            <>
+              {' '}
+              An Open Bill pick in a <span className="text-alert">dashed outline</span> is still the
+              importer&apos;s guess from the document number; click it to agree, click another to move
+              it, click a solid one to clear it. Ranks are held per salesperson per event day, so
+              claiming a taken rank moves it off the bill that held it.
+              {runLocked ? ' This month has paid — reopen the run to change a pick.' : ''}
+            </>
+          ) : null}
         </p>
       </section>
+
+      {/* The gap is about the month, not about this filter — a code nobody can
+          cost blinds whoever's bill it lands on. */}
+      <CostGapPanel
+        subDepartmentId={subDept.id}
+        period={period}
+        rows={uncosted}
+        runLocked={runLocked}
+      />
     </div>
   )
 }

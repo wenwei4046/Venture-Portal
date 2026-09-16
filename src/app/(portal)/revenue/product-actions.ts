@@ -42,8 +42,14 @@ export async function upsertProduct(formData: FormData) {
     if (!Number.isFinite(unitCost) || unitCost < 0) throw new Error('Unit cost must be zero or more')
   }
 
+  // The ERP spells the same product differently — AKEMI ULTIMATE MATT (K)
+  // against this list's AK-ULTIMATE MATT (K) — and a line is costed by
+  // matching one of the two. Blank means "the ERP uses our own code".
+  const erpItemCode = ((formData.get('erp_item_code') as string) ?? '').trim()
+
   const row = {
     item_code: itemCode,
+    erp_item_code: erpItemCode || null,
     product_name: ((formData.get('product_name') as string) ?? '').trim() || null,
     brand_code: (((formData.get('brand_code') as string) ?? '').trim() || null)?.toUpperCase() ?? null,
     item_group: (((formData.get('item_group') as string) ?? '').trim() || null)?.toUpperCase() ?? null,
@@ -58,7 +64,13 @@ export async function upsertProduct(formData: FormData) {
     ? await supabase.from('comm_products').update(row).eq('id', id)
     : await supabase.from('comm_products').insert(row)
 
-  if (error) throw new Error(`Could not save the product: ${error.message}`)
+  if (error) {
+    // One ERP code names one product — otherwise a line would have two costs.
+    if (error.code === '23505' && error.message.includes('erp_item_code')) {
+      throw new Error(`Another product already answers to the ERP code ${erpItemCode}`)
+    }
+    throw new Error(`Could not save the product: ${error.message}`)
+  }
   refresh()
 }
 

@@ -226,7 +226,20 @@ src/
 │   │   │                              **THE MONTH, UNDERNEATH (2026-09-16):**
 │   │   │                              `[period]/orders` is every bill of the
 │   │   │                              month, filterable by person or venue
-│   │   │                              through the URL, and `orders/[orderId]`
+│   │   │                              through the URL — and since 2026-09-18
+│   │   │                              it is ALSO where the Open Bill pick is
+│   │   │                              made (`OpenBillPicker`): which of a day's
+│   │   │                              bills came first is argued from the
+│   │   │                              margin, the venue and the customer, and
+│   │   │                              those were a page away on the old board.
+│   │   │                              THREE CLICKS: an unheld rank claims it, a
+│   │   │                              rank held only as the importer's
+│   │   │                              SUGGESTION (dashed) confirms on the same
+│   │   │                              click, a rank a human already confirmed
+│   │   │                              (solid) clears. Without the middle one,
+│   │   │                              agreeing is harder than disagreeing.
+│   │   │                              `open-bill/` stays as the narrow queue.
+│   │   │                              `orders/[orderId]`
 │   │   │                              is one bill line by line — what each
 │   │   │                              line COUNTS AS (commissionable / KPI /
 │   │   │                              not / group-not-classified) and what it
@@ -245,6 +258,56 @@ src/
 │   │   │                              ran the event, so `comm_venues` keeps
 │   │   │                              the organiser, typed on that table
 │   │   │                              (`venue-actions.ts`, `lib/venues.ts`).
+│   │   │                              `location` is NOT the fair — it is the
+│   │   │                              ERP's sales_location, the warehouse
+│   │   │                              (KL / PG / SRW).
+│   │   │                              **ONE PLACE, ONE ROW (2026-09-18):** the
+│   │   │                              venue is free text typed at the fair, so
+│   │   │                              thirty-odd places arrive under sixty
+│   │   │                              spellings (`PISA SPICE ARENA` /
+│   │   │                              `PISA SPICE ARENA CONVENTION CENTRE`).
+│   │   │                              No rule can tell which are one place —
+│   │   │                              `SPICE ARENA` and `SETIA SPICE
+│   │   │                              CONVENTION CENTRE` are two halls of one
+│   │   │                              complex — so a human says so once:
+│   │   │                              `comm_venues.canonical_key` (mig
+│   │   │                              `20260918020000`, *same place as…* on
+│   │   │                              Sales by venue). ONE LEVEL, by trigger
+│   │   │                              (23VEN): no alias of an alias.
+│   │   │                              `venue_group_key()` resolves it and
+│   │   │                              `revenue_month_orders` returns
+│   │   │                              `venue_group_key` / `venue_group_name`
+│   │   │                              beside the order's own spelling — the
+│   │   │                              spelling stays on the row (it is what
+│   │   │                              the document says), the PLACE is what
+│   │   │                              groups, filters and carries the
+│   │   │                              organiser. Nothing is merged
+│   │   │                              automatically, ever.
+│   │   │                              **THE COST THE ERP DOES NOT SEND
+│   │   │                              (2026-09-18):** a bill has a margin only
+│   │   │                              when EVERY commissionable line has a
+│   │   │                              cost, and the Product List fallback
+│   │   │                              matched `item_code` alone — so the ERP's
+│   │   │                              `AKEMI ULTIMATE MATT (K)` never found
+│   │   │                              the list's `AK-ULTIMATE MATT (K)` and
+│   │   │                              268 mattress lines (RM 1.87M) blinded
+│   │   │                              their bills. `comm_products.erp_item_code`
+│   │   │                              is the bridge (ERP code column on the
+│   │   │                              Product List; 37 seeded by the
+│   │   │                              `AKEMI `→`AK-` rule, nothing ambiguous).
+│   │   │                              `comm_product_unit_cost()` is the ONE
+│   │   │                              lookup; trigger
+│   │   │                              `sales_order_lines_fill_cost` costs every
+│   │   │                              line that arrives without one, whichever
+│   │   │                              path wrote it; `recost_sales_order_lines`
+│   │   │                              does the months already landed and
+│   │   │                              REFUSES a paid run (23RUN) — a cost moves
+│   │   │                              the margin, the margin moves the band,
+│   │   │                              the band moves the commission, so the run
+│   │   │                              must be computed again.
+│   │   │                              `revenue_uncosted_products()` is what is
+│   │   │                              left, on *Why those bills have no
+│   │   │                              margin*. Mig `20260918010000`.
 │   │   │                              **THE FEED WINDOW:**
 │   │   │                              `erp_feed_settings.min_order_date`
 │   │   │                              (Fair 2026-08-01, edited on the ERP link

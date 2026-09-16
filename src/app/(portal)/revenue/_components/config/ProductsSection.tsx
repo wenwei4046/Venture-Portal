@@ -39,6 +39,7 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
       .filter(p =>
         !q ||
         p.item_code.toLowerCase().includes(q) ||
+        (p.erp_item_code ?? '').toLowerCase().includes(q) ||
         (p.product_name ?? '').toLowerCase().includes(q) ||
         (p.brand_code ?? '').toLowerCase().includes(q),
       )
@@ -67,6 +68,12 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
           below-margin penalty on every bill containing it rather than guess. While this list is
           being filled, a margin can be typed straight onto a sales order instead — that always
           wins over anything derived here.
+          <br />
+          <strong className="font-sans not-italic">ERP code</strong> is the same product&apos;s name
+          in the ERP: it writes <span className="font-mono text-xs">AKEMI ULTIMATE MATT (K)</span>{' '}
+          where this list writes <span className="font-mono text-xs">AK-ULTIMATE MATT (K)</span>, and
+          a line is costed by matching either one. Leave it blank when the ERP uses our own code —
+          it is only needed where the two spellings differ.
         </Hint>
 
         <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -105,6 +112,7 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
             <thead>
               <tr>
                 <th>Item code</th>
+                <th>ERP code</th>
                 <th>Product</th>
                 <th className="w-28">Brand</th>
                 <th className="w-32">Item group</th>
@@ -117,7 +125,8 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
               <RowForm action={upsertProduct}>
                 {({ pending }) => (
                   <tr className="bg-surface-2/40">
-                    <td><Field name="item_code" placeholder="ERP item code" width="w-56" required /></td>
+                    <td><Field name="item_code" placeholder="our item code" width="w-56" required /></td>
+                    <td><Field name="erp_item_code" placeholder="the ERP's code" width="w-56" /></td>
                     <td><Field name="product_name" placeholder="name" /></td>
                     <td><Field name="brand_code" placeholder="AKEMI" width="w-24" /></td>
                     <td><Field name="item_group" placeholder="MATTRESS" width="w-28" /></td>
@@ -136,6 +145,14 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
                         <Hidden name="id" value={p.id} />
                         <Hidden name="item_code" value={p.item_code} />
                         {p.item_code}
+                      </td>
+                      <td>
+                        <Field
+                          name="erp_item_code"
+                          defaultValue={p.erp_item_code ?? ''}
+                          width="w-56"
+                          placeholder="same as ours"
+                        />
                       </td>
                       <td><Field name="product_name" defaultValue={p.product_name} /></td>
                       <td><Field name="brand_code" defaultValue={p.brand_code} width="w-24" /></td>
@@ -167,7 +184,7 @@ export default function ProductsSection({ products }: { products: ProductRow[] }
 
               {shown.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-muted font-serif italic">
+                  <td colSpan={8} className="text-muted font-serif italic">
                     {products.length === 0
                       ? 'No products yet — paste a cost list to begin.'
                       : 'Nothing matches that filter.'}
