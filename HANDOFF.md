@@ -220,6 +220,115 @@ Relevant SQL to inspect before implementation:
 4. Apply only required new SQL, commit and push authorized release, confirm CI and Vercel ready.
 5. Verify the actual signed-in production Principal can use the functions the user reported missing. Clearly report any previously agreed Fair-source deferral; do not claim complete parity from design-only checks.
 
+## Checkpoint 2026-09-16 — Fair month drill-down, the feed window, and the payroll-cycle design
+
+### Shipped (PR #121, MERGED `ac7a6bf`; both migrations APPLIED LIVE)
+
+- **Venue is a column.** `header.venue` (the fair itself — not `sales_location`,
+  which is the warehouse) was always arriving and always being dropped into
+  `raw`. It is now `sales_orders.venue`, back-filled, and the month page has
+  *Sales by venue*. **Organizer is not in the ERP payload at all** (header,
+  items and payments all checked), so `comm_venues` keeps it on the portal,
+  typed in place on that table. SPICE ARENA → HOMEDEC is already set as a live
+  example.
+- **The feed window.** `erp_feed_settings.min_order_date` = 2026-08-01 for Fair,
+  edited on the *Houzs ERP link* card. Deliveries dated before it answer 200
+  `skipped`; an order re-dated backwards out of the window is removed. Needed
+  because the ERP was still pushing 2023–2026-07 edits at 11:00 on 16 Sep.
+- **History deleted, as instructed.** 33 months: 2,451 orders, 12,964 lines,
+  1,543 Open Bill tags, 3,652 delivery-log rows. Two periods remain —
+  August (317 orders) and September (190).
+- **The drill-down.** `/revenue/[sub]/[period]/orders` (every bill, filterable
+  by `?staff=` / `?venue=` through the URL) and `orders/[orderId]` (one bill
+  line by line, each line classed commissionable / KPI / not / *group not
+  classified*). `revenue_month_orders` feeds both and reads margin the way the
+  engine does — over the commissionable base, NULL the moment one of its lines
+  has no cost.
+- **What the month pays.** `/revenue/[sub]/[period]/pay` (salary board) and
+  `pay/[staffId]` (payslip preview, Open Bill bill by bill beside the rule that
+  paid it). `revenue_pay_preview` returns the inputs; `lib/revenue-pay.ts` is
+  the twin of `compute_hr_monthly_payroll` for `source='commission'`.
+- **A month-page bug fixed on the way past:** it read `sales_order_lines`
+  through PostgREST and so saw the first 1,000 of ~1,700, under-reporting
+  "lines without a cost" by a third.
+
+### The bug this found — Open Bill was silently paying zero
+
+`run-actions.ts` gathered Open Bill picks with one `.in('order_id', …)` over
+every order in the run, carried-forward months included. At 507 ids the URL is
+too long, the request fails outright (`TypeError: fetch failed`), and **the
+error was never read** — so the run paid no Open Bill bonus to anybody and said
+nothing about it. September 2026 recomputed **RM 202,581 → RM 251,425**: 275
+lines, **RM 48,844** that would have gone missing from payroll. Fixed with
+`fetchByKeys` in `lib/paginate.ts` (chunks the keys, throws on failure), beside
+`fetchAllRows` — the same family of PostgREST trap.
+
+**Worth a sweep in a later session:** other large `.in()` calls elsewhere in
+the app have not been audited.
+
+### Open, design only (PR #122, `docs/payroll-cycles`, no code)
+
+`docs/module-spec-payroll-cycles.md` + `docs/erp-sync/contract.md` §7.
+Plain-language version with diagrams: <https://claude.ai/artifact/4RSKj4aiFnyFsBWKZfu9Ux>
+
+**The finding.** The portal closes a *month*, not a *payroll*.
+`submit_payroll_to_principal(period)` refuses if any row of the month is
+already submitted, requires every Revenue commission run to be applied, sets
+**every** row of the month to `submitted`, and writes one run plus one funding
+request for the whole company. August 2026 was submitted on **4 September**, so
+August's Revenue commission has been uncomputable ever since, and
+`payroll_runs.revenue_opex_total` is **0.00 in all five runs ever created**.
+
+**The proposal.** A cycle is `(period_month × track)`, track ∈
+`imported | director | revenue` as a property of the department. The `director`
+track is already physically separate (`director_monthly_payroll`) and the
+payment layer is already scoped (`create_payroll_disbursement_vouchers`,
+`create_payroll_statutory_batch` both take a department, a row set and their own
+payment date). **Only the close is month-wide.** Phase A is one migration and
+one function.
+
+Order set by the user on 16 Sep: A unblock the close → B make the cycle visible
+→ C reports (variance first) → **D the CEO's 1% last** (basis settled: every
+committed order of the month; August RM 1,995,705 → RM 19,957.05).
+
+### What the next session is waiting on — the user's own words: "I continue with other session for these questions"
+
+1. **Revenue's closing date** — keep the 15th (statutory filing is due the same
+   day, zero buffer) or move to the 10th–12th. *This one shapes the calendar;
+   everything else waits on nothing.*
+2. **Does KWSP / PERKESO accept two submissions in one month?** — for the
+   agent. If yes, filing each cycle separately becomes available.
+3. **Is the CEO's 1% subject to EPF / SOCSO / EIS?** Today's model says no.
+4. **Are the 29 full-commission salespeople employees or agents?** They are set
+   to `tax_mode = 'pcb'` with zero statutory; the schema also carries the 2%
+   withholding path.
+5. **Which salespeople take a basic, and how much** — data entry, not a build.
+6. **Delete the `testing` staff record** in Revenue (basic 5,000, no employee
+   code) before the first Revenue payroll.
+
+### Two things for the Revenue month itself, not for the code
+
+- **Item groups do not match.** The ERP sends `SERVICE` (140 lines, RM 51,124),
+  `ACCESSORY` (1,161 lines), `FABRIC_ACCESSORY` and `OTHERS`, none of which are
+  classified in Rules — which carries `ACC`, `OTHER` and `TRANS`, none of which
+  the feed has ever sent. Every run warns and refuses to sync until somebody
+  says whether `SERVICE` earns. The proposed fix (learn groups from the feed,
+  with a third *not yet decided* state) is contract.md §7.1.
+- **August has never been run**, so all 317 of its orders sit inside
+  September's run as carry-forward. To pay them to August, August must be run
+  first — but August's payroll is already submitted, so that needs Phase A (or
+  a payroll reopen, which was deliberately not done).
+
+### State left behind
+
+- `main` is at `ac7a6bf`. Branch `docs/payroll-cycles` is pushed (PR #122, two
+  commits) and unmerged.
+- A **computed** (not applied, not synced) commission run exists for
+  **September 2026** — 23 statements, RM 251,425.26, 29 warnings. It was created
+  to verify the new pages end to end and is safe to recompute or leave.
+- Worktree `.claude/worktrees/erp-months-and-payslip` still exists; a dev server
+  may still be running on port 3100.
+
 ## Checkpoint 2026-09-16 — Principal Revenue C correction
 
 The first C release excluded `principalView`, leaving the signed-in Principal's Revenue View on the old design. The user reported this on `/member?page=income`. C presentation now applies to every authenticated Revenue workspace, including Principal, and `PrincipalRevenuePanels` composes the same C typography/open-section styles rather than raw legacy cards. Principal retains real team-level data and its valid Today / Income / Quote / Team / Profile navigation, department and workspace switchers, and management forms. Member-only Insight/KPI/Arena/OrgMap requests and self-service actions remain excluded from Principal; this changes presentation, not identity or permissions. The gated `design=live&role=principal` sample reproduces the Principal layout for mobile/desktop QA.
