@@ -234,12 +234,26 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               : ' · top of a tree'}
           </p>
         </div>
-        <Link
-          href={revenuePath(subDept.slug, period)}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
-        >
-          ← The run
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={`${revenuePath(subDept.slug, period, 'orders')}?staff=${staffId}`}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+          >
+            Their bills
+          </Link>
+          <Link
+            href={revenuePath(subDept.slug, period, 'pay', staffId)}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+          >
+            What this pays
+          </Link>
+          <Link
+            href={revenuePath(subDept.slug, period)}
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+          >
+            ← The run
+          </Link>
+        </div>
       </div>
 
       {/* The page's one dark object — .hero-walnut in globals.css. */}

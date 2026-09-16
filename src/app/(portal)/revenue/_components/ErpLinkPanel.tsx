@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ActionButton, ActionForm, Field, Hidden, Hint, SaveButton } from '@/components/RowForm'
 import { formatAgo } from '@/lib/erp-sync/format'
 import { formatDate } from '@/lib/utils'
-import { linkErpKey, unlinkErpKey } from '../link-actions'
+import { linkErpKey, setErpFeedWindow, unlinkErpKey } from '../link-actions'
 import type { ErpLinkView } from '../_lib/erp-link'
 
 /**
@@ -85,6 +85,78 @@ function KeyForm({ view, onDone, onCancel }: { view: ErpLinkView; onDone: () => 
   )
 }
 
+/**
+ * The window, editable in place.
+ *
+ * It is on this card rather than in Settings because it is a fact about THIS
+ * feed, and because the question it answers — "why is 2023 in my month list?"
+ * — is asked while looking at the feed. The ERP has the same setting
+ * (`vp.since`); this one does not trust it.
+ */
+function FeedWindow({ view }: { view: ErpLinkView }) {
+  const [editing, setEditing] = useState(false)
+
+  if (!editing) {
+    return (
+      <div className="mt-4 pt-4 border-t border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="font-mono text-xs text-muted uppercase tracking-wide">Ignore orders before</span>
+        <span className="text-sm text-ink">
+          {view.minOrderDate ? (
+            formatDate(view.minOrderDate)
+          ) : (
+            <span className="text-danger">nothing — every year the ERP holds will arrive</span>
+          )}
+        </span>
+        <button type="button" onClick={() => setEditing(true)} className="text-xs font-sans text-accent hover:underline">
+          Change
+        </button>
+        {view.windowSetByName ? (
+          <span className="font-mono text-[11px] text-muted">
+            set by {view.windowSetByName}
+            {view.windowSetAt ? ` on ${formatDate(view.windowSetAt)}` : ''}
+          </span>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-hairline">
+      <ActionForm action={setErpFeedWindow} onDone={() => setEditing(false)}>
+        {({ pending }) => (
+          <>
+            <Hidden name="sub_department_id" value={view.subDepartmentId} />
+            <div className="flex flex-wrap items-end gap-4">
+              <label className="block">
+                <span className="font-mono text-xs text-muted uppercase tracking-wide mb-1 block">
+                  Ignore orders before
+                </span>
+                <Field
+                  name="min_order_date"
+                  type="date"
+                  width="w-44"
+                  defaultValue={view.minOrderDate ?? ''}
+                  ariaLabel="Ignore orders before"
+                />
+              </label>
+              <SaveButton pending={pending} />
+              <button type="button" onClick={() => setEditing(false)} className="text-xs font-sans text-graphite hover:underline">
+                Cancel
+              </button>
+            </div>
+            <p className="font-serif italic text-muted text-xs mt-3 max-w-2xl">
+              An order dated before this is accepted and thrown away — the ERP is told the delivery
+              succeeded, so its queue never backs up, and no month is created for it. Leave it empty to
+              keep everything the ERP sends, including the years of history it back-fills when a feed is
+              first switched on.
+            </p>
+          </>
+        )}
+      </ActionForm>
+    </div>
+  )
+}
+
 function LinkedCard({ view, lastEventAt, onReplace }: { view: ErpLinkView; lastEventAt: string | null; onReplace: () => void }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -130,6 +202,8 @@ function LinkedCard({ view, lastEventAt, onReplace }: { view: ErpLinkView; lastE
           A server secret (ERP_SYNC_SECRET) is set as well; the receiver accepts either.
         </p>
       ) : null}
+
+      <FeedWindow view={view} />
 
       <div className="flex flex-wrap items-center gap-4 mt-4">
         <button type="button" onClick={onReplace} className="text-xs font-sans text-accent hover:underline">
