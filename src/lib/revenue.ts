@@ -20,7 +20,7 @@
  * named "Products" would be unreachable rather than broken — silent, and
  * discovered only by whoever created it. `createSubDepartment` rejects these.
  */
-export const RESERVED_SUB_DEPT_SLUGS: readonly string[] = ['products']
+export const RESERVED_SUB_DEPT_SLUGS: readonly string[] = ['products', 'venues']
 
 export function subDeptSlug(name: string): string {
   return name
@@ -37,6 +37,15 @@ export function revenuePath(slug: string, ...segments: Array<string | number>): 
 
 /** Item code → unit cost + brand. Department-wide, so it sits outside a slug. */
 export const PRODUCT_LIST_PATH = '/revenue/products'
+
+/**
+ * Every fair venue, and who organised each month's event there.
+ *
+ * Department-wide for the same reason as the product list: `comm_venues` and
+ * `comm_organisers` carry no scheme. One venue register serves whichever
+ * sub-department sells at the place.
+ */
+export const VENUE_REGISTER_PATH = '/revenue/venues'
 
 /** What `pickHomeSubDepartments` needs to know about a sub-department. */
 export interface HomeCandidate {

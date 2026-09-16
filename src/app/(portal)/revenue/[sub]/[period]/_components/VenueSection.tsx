@@ -3,19 +3,30 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Choice, Field, Hidden, RowForm, SaveButton } from '@/components/RowForm'
+import { Choice, Hidden, RowForm, SaveButton } from '@/components/RowForm'
 import { formatMoney } from '@/lib/utils'
+import { VENUE_REGISTER_PATH } from '@/lib/revenue'
+import type { Organiser } from '@/lib/organisers'
 import { venueKey, type VenueSales } from '@/lib/venues'
-import { setVenueCanonical, setVenueOrganizer } from '../../../venue-actions'
+import { setVenueCanonical } from '../../../venue-actions'
+import FairOrganiserPicker from '../../../_components/FairOrganiserPicker'
+import type { FairOrganiser } from '../../../_lib/venue-register'
 
 /**
  * Where the month was sold, and who ran each event.
  *
  * The ERP names the venue on every sales order — it is the fair itself, not
  * the warehouse the goods ship from — and says nothing about the ORGANISER.
- * That is the one fact here nobody can derive, so it is typed in place,
- * against the sales it explains, and remembered for every month that names the
- * same venue.
+ * That is the one fact here nobody can derive, so it is picked in place,
+ * against the sales it explains.
+ *
+ * PICKED FOR THIS MONTH (2026-09-17), not for the venue. The organiser used to
+ * be one free-text value per venue, which meant the same hall showed the same
+ * name in every month it ever sold at, and correcting it rewrote all of them.
+ * The user settled it: "same venue will have different organiser". So the fact
+ * is a (venue, month) row — `comm_venue_events` — and the names come from a
+ * register typed once on Revenue › Venues, which is also where every venue can
+ * be named in one pass rather than a month at a time.
  *
  * IT ALSO SPELLS THE SAME PLACE SEVERAL WAYS (2026-09-18), because the venue
  * is free text typed at the fair: `PISA SPICE ARENA`, `PISA SPICE ARENA
@@ -27,11 +38,24 @@ import { setVenueCanonical, setVenueOrganizer } from '../../../venue-actions'
  * from then on. The spellings stay visible under the name, each with the ✕
  * that takes it back.
  */
-export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[]; ordersPath: string }) {
+export default function VenueSection({
+  rows,
+  ordersPath,
+  period,
+  organisers,
+  fairs,
+}: {
+  rows: VenueSales[]
+  ordersPath: string
+  period: string
+  organisers: Organiser[]
+  /** venue key → this month's organiser, as the register holds it. */
+  fairs: Record<string, FairOrganiser>
+}) {
   // A string, not a callback: a Server Component may hand a Client Component
   // data, never a function.
   const hrefFor = (key: string) => `${ordersPath}?venue=${encodeURIComponent(key)}`
-  const [editing, setEditing] = useState<{ key: string; mode: 'organizer' | 'merge' } | null>(null)
+  const [merging, setMerging] = useState<string | null>(null)
   const named = rows.filter(r => r.organizer)
   const merged = rows.filter(r => r.spellings.length > 1)
 
@@ -44,9 +68,13 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
       </div>
       <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
         The venue travels on every order from the ERP. The organiser does not — nothing in the feed
-        carries it — so it is typed here once per venue and every month that names that venue shows it.
-        {rows.length > 0 ? ` ${named.length} of ${rows.length} named so far.` : ''}
-        {' '}It is typed at the fair, so one place can arrive under several spellings;{' '}
+        carries it — so it is picked here for this month, from the register on{' '}
+        <Link href={VENUE_REGISTER_PATH} className="text-accent hover:underline not-italic">
+          Revenue › Venues
+        </Link>
+        , where every venue and every month can be named in one pass.
+        {rows.length > 0 ? ` ${named.length} of ${rows.length} named this month.` : ''}
+        {' '}The venue is typed at the fair, so one place can arrive under several spellings;{' '}
         <em>same place as…</em> folds them into one event.
         {merged.length > 0 ? ` ${merged.length} folded so far.` : ''}
       </p>
@@ -64,40 +92,8 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
           </thead>
           <tbody>
             {rows.map(v =>
-              editing?.key === v.venueKey && editing.mode === 'organizer' ? (
-                <RowForm key={v.venueKey} action={setVenueOrganizer} onDone={() => setEditing(null)}>
-                  {({ pending }) => (
-                    <tr>
-                      <td>
-                        <Hidden name="venue" value={v.displayName} />
-                        <span className="font-serif text-[14px] text-ink">{v.displayName}</span>
-                      </td>
-                      <td colSpan={3}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Field
-                            name="organizer"
-                            defaultValue={v.organizer ?? ''}
-                            placeholder="Who ran this event"
-                            width="w-56"
-                            ariaLabel={`Organiser for ${v.displayName}`}
-                          />
-                          <Field name="notes" placeholder="Note (optional)" width="w-48" ariaLabel="Note" />
-                          <SaveButton pending={pending} />
-                          <button
-                            type="button"
-                            onClick={() => setEditing(null)}
-                            className="text-xs font-sans text-graphite hover:underline"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </td>
-                      <td className="num">{formatMoney(v.total)}</td>
-                    </tr>
-                  )}
-                </RowForm>
-              ) : editing?.key === v.venueKey && editing.mode === 'merge' ? (
-                <RowForm key={v.venueKey} action={setVenueCanonical} onDone={() => setEditing(null)}>
+              merging === v.venueKey ? (
+                <RowForm key={v.venueKey} action={setVenueCanonical} onDone={() => setMerging(null)}>
                   {({ pending }) => (
                     <tr>
                       <td>
@@ -128,7 +124,7 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
                           <SaveButton pending={pending} label="Merge" />
                           <button
                             type="button"
-                            onClick={() => setEditing(null)}
+                            onClick={() => setMerging(null)}
                             className="text-xs font-sans text-graphite hover:underline"
                           >
                             Cancel
@@ -155,23 +151,20 @@ export default function VenueSection({ rows, ordersPath }: { rows: VenueSales[];
                       <MergeLine
                         venueKey={v.venueKey}
                         spellings={v.spellings}
-                        onMerge={() => setEditing({ key: v.venueKey, mode: 'merge' })}
+                        onMerge={() => setMerging(v.venueKey)}
                       />
                     ) : null}
                   </td>
                   <td>
                     {v.venueKey ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditing({ key: v.venueKey, mode: 'organizer' })}
-                        className={
-                          v.organizer
-                            ? 'font-serif text-[14px] text-ink hover:text-accent'
-                            : 'font-serif italic text-[14px] text-muted hover:text-accent'
-                        }
-                      >
-                        {v.organizer ?? 'name the organiser'}
-                      </button>
+                      <FairOrganiserPicker
+                        venueKey={v.venueKey}
+                        period={period}
+                        organiserId={fairs[v.venueKey]?.organiserId ?? null}
+                        organisers={organisers}
+                        venueName={v.displayName}
+                        erpOrganiserText={fairs[v.venueKey]?.erpOrganiserText ?? null}
+                      />
                     ) : (
                       <span className="font-serif italic text-[14px] text-muted">
                         the ERP sent no venue for these
