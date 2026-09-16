@@ -170,6 +170,9 @@ export interface UncostedProduct {
   orders: number
   listItemCode: string | null
   listHasCost: boolean
+  /** The ERP's own SKU master carries this code — so the empty cost is ITS
+   *  gap, and filling it there fixes every system at once. */
+  inSkuMaster: boolean
 }
 
 export async function loadUncostedProducts(
@@ -194,6 +197,7 @@ export async function loadUncostedProducts(
       orders: number
       list_item_code: string | null
       list_has_cost: boolean | null
+      in_sku_master: boolean | null
     }>
   ).map(r => ({
     productCode: r.product_code,
@@ -206,6 +210,7 @@ export async function loadUncostedProducts(
     orders: r.orders,
     listItemCode: r.list_item_code,
     listHasCost: r.list_has_cost === true,
+    inSkuMaster: r.in_sku_master === true,
   }))
 }
 
