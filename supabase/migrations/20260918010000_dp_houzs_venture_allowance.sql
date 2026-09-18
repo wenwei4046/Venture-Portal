@@ -17,15 +17,18 @@
 -- behaviour to the cent.
 -- ============================================================================
 
+-- Idempotent throughout: this ran against the project before it reached the
+-- repo, so a deploy that replays migrations must be a no-op rather than an
+-- "column already exists" failure.
 ALTER TABLE dp_companies
-    ADD COLUMN exclude_from_pay BOOLEAN NOT NULL DEFAULT FALSE;
+    ADD COLUMN IF NOT EXISTS exclude_from_pay BOOLEAN NOT NULL DEFAULT FALSE;
 
 COMMENT ON COLUMN dp_companies.exclude_from_pay IS
     'Allowance is transferred separately, after the main payout — pooled and '
     'split as usual but held out of Total Pay / Vr KPI / advance.';
 
 ALTER TABLE dp_months
-    ADD COLUMN allow_excl_full_payout BOOLEAN NOT NULL DEFAULT FALSE;
+    ADD COLUMN IF NOT EXISTS allow_excl_full_payout BOOLEAN NOT NULL DEFAULT FALSE;
 
 COMMENT ON COLUMN dp_months.allow_excl_full_payout IS
     'The separately-transferred allowance pays out 100% of its balance this '
