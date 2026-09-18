@@ -39,3 +39,33 @@ describe('salary voucher editor', () => {
     expect(Object.fromEntries((mocks.updatePaymentVoucher.mock.calls[0][0] as FormData).entries())).toEqual({ id: 'salary-pv', payment_date: '2026-09-18', notes: 'Confirmed salary payment date' })
   })
 })
+
+describe('fund-source repayment draft editor', () => {
+  const GL = [
+    { code: '4054', name: 'Amount Due to - Lim Wei Siang', type: 'liability' as const, parent_code: '4200' },
+    { code: '6000', name: 'Interest Expense - Fund Sources', type: 'cost' as const, parent_code: null },
+    { code: '5027', name: 'Loan Interest', type: 'revenue' as const, parent_code: '5031' },
+    { code: '1010', name: 'HV Operating Fund', type: 'equity' as const, parent_code: '1000' },
+  ]
+  const voucher = { id: 'rp', voucher_no: 'HV-PV-1', voucher_type: 'expense', direction: 'debit' as const, amount: 1950, payee_name: 'Director', payee_company_id: null, bank_account_id: 'bank', description: 'Loan Installment', notes: null, payment_method: 'bank_transfer', payment_date: '2026-09-08', target_pool: null, fund_source_id: 'fs-1', loan_id: null, repayment_breakdown: { principal: 1500, interest: 450, penalty: 0 } }
+  const banks = [{ id: 'bank', bank_name: 'HLB', account_number: '1', current_balance: 0 }]
+
+  it('rebuilds a lump saved row into principal + interest rows on the default accounts', () => {
+    render(<EditPaymentForm voucher={voucher} initialSources={[{ pool: 'venture_pool', amount: '1950.00', account_code: '1010' }]} fundSourceAccount="4054" initialCreditAccountCode={null} companies={[]} bankAccounts={banks} glAccounts={GL} />)
+    expect(screen.getByText(/本金 principal · 账户自动带出/)).toBeVisible()
+    expect(screen.getByText(/利息 interest · 账户自动带出/)).toBeVisible()
+    const amounts = screen.getAllByRole('spinbutton').map((el) => (el as HTMLInputElement).value)
+    expect(amounts).toEqual(expect.arrayContaining(['1500.00', '450.00']))
+    expect(screen.getAllByDisplayValue(/4054/).length).toBeGreaterThan(0)
+    expect(screen.getAllByDisplayValue(/6000/).length).toBeGreaterThan(0)
+  })
+
+  it('keeps a saved account that differs from the default, and 按拆分重带账户 puts it back', () => {
+    render(<EditPaymentForm voucher={voucher} initialSources={[{ pool: 'venture_pool', amount: '1500.00', account_code: '4054' }, { pool: 'venture_pool', amount: '450.00', account_code: '5027' }]} fundSourceAccount="4054" initialCreditAccountCode={null} companies={[]} bankAccounts={banks} glAccounts={GL} />)
+    expect(screen.getAllByDisplayValue(/5027/).length).toBeGreaterThan(0)
+    expect(screen.getByText('利息 interest')).toBeVisible() // no "自动带出" — it was a saved pick
+    fireEvent.click(screen.getByRole('button', { name: '按拆分重带账户' }))
+    expect(screen.queryAllByDisplayValue(/5027/)).toHaveLength(0)
+    expect(screen.getAllByDisplayValue(/6000/).length).toBeGreaterThan(0)
+  })
+})

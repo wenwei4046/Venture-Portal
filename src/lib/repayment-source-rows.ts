@@ -35,20 +35,58 @@ export interface RepaymentSourceRow {
 
 const ROLES: RepaymentRole[] = ['principal', 'interest', 'penalty']
 
+const r2 = (n: number) => Math.round(n * 100) / 100
+
+/** Default account for a component: principal on the lender's own account,
+ *  interest on 6000, penalty on 9096 — blank when the code isn't an active
+ *  COA account, so the picker shows empty instead of a dead code. */
+export function defaultRepaymentAccount(
+  role: RepaymentRole,
+  fundSourceAccount: string | null | undefined,
+  hasAccount: (code: string) => boolean,
+): string {
+  const code =
+    role === 'principal' ? fundSourceAccount ?? '' : role === 'interest' ? INTEREST_EXPENSE_ACCOUNT : PENALTY_EXPENSE_ACCOUNT
+  return code && hasAccount(code) ? code : ''
+}
+
+/** Give SAVED draft rows (no roles yet — the edit form) their roles by matching
+ *  each split component to a row of the same amount, keeping that row's pool
+ *  and account (flagged auto when it already equals the default). If the saved
+ *  rows don't line up with the split — one lump row, a stale amount — they
+ *  are rebuilt from the split with the default accounts. */
+export function seedRepaymentSourceRows(
+  saved: readonly { pool: string; amount: string; account_code: string }[],
+  split: RepaymentSplit,
+  fundSourceAccount: string | null | undefined,
+  hasAccount: (code: string) => boolean,
+): RepaymentSourceRow[] {
+  const unmatched = saved.map((s) => ({ ...s, amt: r2(parseFloat(s.amount) || 0) }))
+  const rows: RepaymentSourceRow[] = []
+  for (const role of ROLES) {
+    const amount = r2(split[role] || 0)
+    if (amount < 0.005) continue
+    const i = unmatched.findIndex((s) => Math.abs(s.amt - amount) < 0.005)
+    if (i < 0) return buildRepaymentSourceRows([], split, fundSourceAccount, hasAccount)
+    const [s] = unmatched.splice(i, 1)
+    const def = defaultRepaymentAccount(role, fundSourceAccount, hasAccount)
+    const code = s.account_code || def
+    rows.push({ role, pool: s.pool || DEFAULT_REPAYMENT_POOL, amount: amount.toFixed(2), account_code: code, autoAccount: code === def })
+  }
+  // Anything left over means the draft was split some other way — rebuild.
+  if (unmatched.length > 0) return buildRepaymentSourceRows([], split, fundSourceAccount, hasAccount)
+  return rows
+}
+
 export function buildRepaymentSourceRows(
   prev: readonly Partial<RepaymentSourceRow>[],
   split: RepaymentSplit,
   fundSourceAccount: string | null | undefined,
   hasAccount: (code: string) => boolean,
 ): RepaymentSourceRow[] {
-  const defaultFor = (role: RepaymentRole): string => {
-    const code =
-      role === 'principal' ? fundSourceAccount ?? '' : role === 'interest' ? INTEREST_EXPENSE_ACCOUNT : PENALTY_EXPENSE_ACCOUNT
-    return code && hasAccount(code) ? code : ''
-  }
   const rows: RepaymentSourceRow[] = []
   for (const role of ROLES) {
-    const amount = Math.round((split[role] || 0) * 100) / 100
+    const amount = r2(split[role] || 0)
     if (amount < 0.005) continue
     const existing = prev.find((r) => r.role === role)
     const keepManual = !!existing && existing.autoAccount === false && !!existing.account_code
@@ -56,7 +94,7 @@ export function buildRepaymentSourceRows(
       role,
       pool: existing?.pool || DEFAULT_REPAYMENT_POOL,
       amount: amount.toFixed(2),
-      account_code: keepManual ? existing!.account_code! : defaultFor(role),
+      account_code: keepManual ? existing!.account_code! : defaultRepaymentAccount(role, fundSourceAccount, hasAccount),
       autoAccount: !keepManual,
     })
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildRepaymentSourceRows, type RepaymentSourceRow } from './repayment-source-rows'
+import { buildRepaymentSourceRows, seedRepaymentSourceRows, type RepaymentSourceRow } from './repayment-source-rows'
 
 const COA = new Set(['4054', '4058', '6000', '9096', '1010'])
 const has = (c: string) => COA.has(c)
@@ -38,5 +38,38 @@ describe('buildRepaymentSourceRows', () => {
     const rows = buildRepaymentSourceRows([{ pool: 'venture_pool', amount: '5.00', account_code: '9000' }], { principal: 10, interest: 0, penalty: 0 }, '4054', has)
     expect(rows).toHaveLength(1)
     expect(rows[0].role).toBe('principal')
+  })
+})
+
+// ─── seedRepaymentSourceRows (edit form: saved rows get roles) ───────────────
+
+describe('seedRepaymentSourceRows', () => {
+  const split = { principal: 1500, interest: 450, penalty: 0 }
+
+  it('matches saved rows to components by amount and keeps their pool + account', () => {
+    const rows = seedRepaymentSourceRows(
+      [{ pool: 'venture_pool', amount: '450.00', account_code: '5027' }, { pool: 'dept_pool_finance', amount: '1500.00', account_code: '4054' }],
+      split, '4054', has,
+    )
+    expect(rows).toEqual([
+      { role: 'principal', pool: 'dept_pool_finance', amount: '1500.00', account_code: '4054', autoAccount: true }, // = default
+      { role: 'interest', pool: 'venture_pool', amount: '450.00', account_code: '5027', autoAccount: false }, // kept, flagged manual
+    ])
+  })
+
+  it('fills a blank saved account with the default', () => {
+    const rows = seedRepaymentSourceRows([{ pool: 'venture_pool', amount: '1500.00', account_code: '' }, { pool: '', amount: '450.00', account_code: '' }], split, '4054', has)
+    expect(rows.map((r) => [r.account_code, r.pool, r.autoAccount])).toEqual([['4054', 'venture_pool', true], ['6000', 'venture_pool', true]])
+  })
+
+  it('rebuilds from the split when the saved rows are one lump or leave leftovers', () => {
+    const lump = seedRepaymentSourceRows([{ pool: 'venture_pool', amount: '1950.00', account_code: '1010' }], split, '4054', has)
+    expect(lump.map((r) => [r.role, r.account_code])).toEqual([['principal', '4054'], ['interest', '6000']])
+    const extra = seedRepaymentSourceRows(
+      [{ pool: 'venture_pool', amount: '1500.00', account_code: '4054' }, { pool: 'venture_pool', amount: '450.00', account_code: '6000' }, { pool: 'venture_pool', amount: '5.00', account_code: '9000' }],
+      split, '4054', has,
+    )
+    expect(extra).toHaveLength(2)
+    expect(extra.every((r) => r.autoAccount)).toBe(true)
   })
 })

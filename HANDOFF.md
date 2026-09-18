@@ -1436,7 +1436,15 @@ the source. `listPayableFundSources` now returns `account_code`;
 picker marks a manual pick, rows show 本金 / 利息 / 罚金 + "账户自动带出".
 The form always submits voucher_type `expense`, so the approval RPC honours
 the row accounts (the `loan_repayment` type would force '4000' — unused).
-Tests `repayment-source-rows.test.ts` (5). EditPaymentForm untouched.
+Tests `repayment-source-rows.test.ts`.
+Edit form too (user: "编辑草稿的表单也做一样的"): `seedRepaymentSourceRows`
+gives a repayment draft's SAVED rows their roles by matching amounts to the
+(locked) breakdown — a saved account is kept and flagged manual unless it
+already equals the default; a lump / mismatched row set is rebuilt with the
+defaults. `payments/[id]/edit/page.tsx` passes `fundSourceAccount`
+(fund_sources.account_code); the form shows the role labels and a
+**按拆分重带账户** button that forces every row back to its default.
+Tests in `EditPaymentForm.test.tsx` (+2).
 
 **Open / not done**: month columns stay Accumulated + latest-first (mock-up
 drew them chronological; user never raised it).
