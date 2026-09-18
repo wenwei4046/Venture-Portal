@@ -1416,6 +1416,16 @@ once, on payment (Feb → Apr). Both JEs carry a "[GL reassigned …]" note. 405
 now holds only PI-000001 (3/29 office rental Cr 3,000) with no payment against
 it — told the user, not touched.
 
+**Director-interest legs re-pointed (data fix, user: "改，两张都换去 6000")**:
+HV-PV-202609-0339 (Lim Wei Siang, interest 450) and HV-PV-202609-0340 (Lim
+Wei Liang, interest 300), both 2026-09-08, had their interest source row keyed
+to 5027 Loan Interest (an INCOME account) — the Cash Flow showed 750 of money
+out under "Interest Income - Loans". `reassign_voucher_gl_account(pv, '5027',
+'6000', …)` on both (JE-202609-0642 / 0644 now Dr 6000, sources synced). Same
+root cause as the Kingsley one: the repayment form's source-row account is
+free-typed, nothing steers principal → the fund source's account_code and
+interest → 6000. Worth auto-filling if the user agrees.
+
 **Open / not done**: month columns stay Accumulated + latest-first (mock-up
 drew them chronological; user never raised it).
 
