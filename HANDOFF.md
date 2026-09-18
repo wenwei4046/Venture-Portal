@@ -1422,9 +1422,21 @@ Wei Liang, interest 300), both 2026-09-08, had their interest source row keyed
 to 5027 Loan Interest (an INCOME account) — the Cash Flow showed 750 of money
 out under "Interest Income - Loans". `reassign_voucher_gl_account(pv, '5027',
 '6000', …)` on both (JE-202609-0642 / 0644 now Dr 6000, sources synced). Same
-root cause as the Kingsley one: the repayment form's source-row account is
-free-typed, nothing steers principal → the fund source's account_code and
-interest → 6000. Worth auto-filling if the user agrees.
+root cause as the Kingsley one: the repayment form's source-row account was
+free-typed.
+
+**Repayment PV source rows now follow the split (user: "做，自动带出账户")**:
+`lib/repayment-source-rows.ts` `buildRepaymentSourceRows(prev, split,
+fundSourceAccount, hasAccount)` — one row per non-zero component: principal →
+the fund source's `account_code` (4054 / 4058 …), interest → 6000, penalty →
+9096; pool defaults venture_pool; a row whose account Finance picked by hand
+(`autoAccount: false`) keeps it through later split edits, auto ones follow
+the source. `listPayableFundSources` now returns `account_code`;
+`NewPaymentForm` rebuilds the rows on fund-source / split change, the account
+picker marks a manual pick, rows show 本金 / 利息 / 罚金 + "账户自动带出".
+The form always submits voucher_type `expense`, so the approval RPC honours
+the row accounts (the `loan_repayment` type would force '4000' — unused).
+Tests `repayment-source-rows.test.ts` (5). EditPaymentForm untouched.
 
 **Open / not done**: month columns stay Accumulated + latest-first (mock-up
 drew them chronological; user never raised it).
