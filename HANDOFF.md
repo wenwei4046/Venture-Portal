@@ -1369,10 +1369,39 @@ gold only as accent**; zero rows: "没有 amount 的就直接别显示" (no togg
 cash-flow-custom (+5, first tests for `buildSideMatrixRows`); full vitest
 1908 green; `next build` green.
 
-**Open / not done**: cf skin only on the two Cash Flow views (user asked for
-that report; other reports keep the old look — extend by passing
-`skin`/`variant`); month columns stay Accumulated + latest-first (mock-up drew
-them chronological; user never raised it).
+**Skin across all Reports (second commit, same day)**: user "report 那边的颜色
+等等弄到和 cash flow 的一样". `reports/layout.tsx` wraps the section in
+`.cf-scope` (tokens live on `.cf-report, .cf-scope`); globals.css restyles
+every `ledger-table` under it (navy header + gold rule, flat white rows, no
+zebra, navy ink) and the Company Statement's plain table opts in with
+`cf-plain`. `GlReportView` `skin` now defaults to 'cf' ('ledger' = old look);
+folds to L1 only when a headed (layout) section exists, so P&L / BS / R&P still
+open fully; unheaded section eyebrows (`row-sect`) get the pale band + gold
+rule. `MonthlyMatrix` `variant` defaults to 'cf' with `nowKey` from all three
+monthly pages; opens at L1 only when category rows exist; the RM / % header
+sub-row stays (navy) when a % column is shown (Monthly P&L), with the gold rule
+under the last header row only.
+
+**Kingsley 100,000 under Equity (data fix, same day)**: user asked what the
+100,000 in "Equity & Internal Funds → HV Operating Fund" was. PV
+HV-PV-202608-0309 (2026-08-07, HLB → Kingsley, "Return to Kingsley Through
+Houzs") was a fund-source repayment (fund_source_id set, breakdown principal
+100,000, fund_source_repayments row written, source marked repaid) but its
+voucher_type was `expense` and the source row's account was 1010 HV Operating
+Fund, so the debit leg hit equity instead of 4058. Per user ("直接改我做的 PV
+挂 Kingsley 那边") ran `reassign_voucher_gl_account(pv, '1010', '4058', …)` as
+the Finance user (set_config jwt claims) — JE-202608-0540 now Dr 4058 / Cr
+3000, note appended, payment_voucher_sources synced; 4058 nets to 0. Note for
+later: the `loan_repayment` voucher type forces the debit to '4000' (the
+PARENT), not the fund source's own `account_code` — worth fixing if the user
+asks; also offered to auto-fill the source row's account from the fund source
+when the repay box is ticked.
+
+**Open / not done**: month columns stay Accumulated + latest-first (mock-up
+drew them chronological; user never raised it); money-out 其他 still holds
+1900 / 2000 / 4050 / 4062 / 4075 / 6000 / 9000 / 9089 / 9092 / 9095 / 9096 /
+9097 because the 2026-07-30 layout only listed seven expense leaves — user was
+asked whether to file them (General Expense / Salary & Statutory / Interest).
 
 ## SESSION 2026-09-14/15 — cancel-loan overload fix · 作废已开发票 · water RM36→39 amend
 

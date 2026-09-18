@@ -15,25 +15,27 @@ export default function MonthlyMatrix({
   columns,
   rows,
   pctBaseByColumn,
-  variant = 'default',
+  variant = 'cf',
   nowKey,
 }: {
   columns: MonthlyMatrixData['columns']
   rows: MonthlyMatrixData['rows']
   /** Per-column base for the % cell. Omit to hide the % column entirely. */
   pctBaseByColumn?: number[]
-  /** 'cf' = the Cash Flow skin (user 2026-09-18 "蓝为主"): navy header and
+  /** 'cf' (default) = the navy / gold report skin (user 2026-09-18 "蓝为主",
+   *  then "report 那边的颜色等等弄到和 cash flow 的一样"): navy header and
    *  headline bands, category rows on a pale-navy band with a gold edge, flat
    *  white detail rows (no zebra — "一行一个 colour 看了会 misleading"), zero as
-   *  a dash, opens at L1. */
+   *  a dash. 'default' = the portal's plain ledger look. */
   variant?: 'default' | 'cf'
   /** Column key to wash as "this month" (cf skin). */
   nowKey?: string
 }) {
   const cf = variant === 'cf'
   // L1 = subtotals / categories only · L2 = + top accounts & parent roll-ups ·
-  // L3 = every level. The cf skin opens folded (approved mock-up).
-  const [level, setLevel] = useState<1 | 2 | 3>(cf ? 1 : 3)
+  // L3 = every level. A matrix with layout category rows (Cash Flow) opens
+  // folded to them, as in the approved mock-up; the others open fully.
+  const [level, setLevel] = useState<1 | 2 | 3>(() => (rows.some((r) => r.kind === 'category') ? 1 : 3))
   // Explicit user overrides of the level default, both directions: `collapsed`
   // closes something the level would show, `expanded` opens something the level
   // would hide. Without the second set, clicking ▶ at L2 did nothing — the
@@ -196,17 +198,24 @@ export default function MonthlyMatrix({
               ))}
             </tr>
             {/* cf: the unit lives in the page subtitle ("all amounts RM") — one
-                header row, as in the approved mock-up. */}
-            {cf ? null : (
-              <tr className="border-b border-hairline">
-                <th className="sticky left-0 z-10 bg-surface px-4 py-1.5" />
+                header row, as in the approved mock-up. The sub-row stays when
+                a % column needs its label (Monthly P&L). */}
+            {cf && !showPct ? null : (
+              <tr className={cf ? '' : 'border-b border-hairline'}>
+                <th className={`sticky left-0 z-10 px-4 py-1.5 ${cf ? 'cf-th cf-th-sub' : 'bg-surface'}`} />
                 {columns.map((c) => (
                   <Fragment key={c.key}>
-                    <th className="text-right font-mono text-[10px] uppercase text-muted px-4 py-1.5 border-l border-hairline">
+                    <th
+                      className={`text-right font-mono text-[10px] uppercase px-4 py-1.5 ${
+                        cf ? `cf-th cf-th-sub ${c.key === nowKey ? 'cf-th-now' : ''}` : 'text-muted border-l border-hairline'
+                      }`}
+                    >
                       RM
                     </th>
                     {showPct ? (
-                      <th className="text-right font-mono text-[10px] uppercase text-muted pr-4 py-1.5">%</th>
+                      <th className={`text-right font-mono text-[10px] uppercase pr-4 py-1.5 ${cf ? `cf-th cf-th-sub ${c.key === nowKey ? 'cf-th-now' : ''}` : 'text-muted'}`}>
+                        %
+                      </th>
                     ) : null}
                   </Fragment>
                 ))}

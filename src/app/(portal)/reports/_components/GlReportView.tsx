@@ -29,9 +29,10 @@ export interface GlReportViewProps {
   /** Column header labels, e.g. "Jun 2026" / "May 2026" or "As at 30 Jun". */
   currentLabel: string
   compareLabel: string
-  /** 'cf' = the Cash Flow skin (navy structure, gold accents, flat detail rows —
-   *  user 2026-09-18 "蓝为主"). Everything else keeps the portal's ledger look. */
-  skin?: 'cf'
+  /** 'cf' (default) = the navy / gold report skin (user 2026-09-18 "蓝为主",
+   *  then "report 那边的颜色等等弄到和 cash flow 的一样"); 'ledger' = the
+   *  portal's plain ledger look. */
+  skin?: 'cf' | 'ledger'
 }
 
 /** Collapse key for a headed section that is NOT a merged root (its own row
@@ -94,14 +95,16 @@ export default function GlReportView({
   pctBase,
   currentLabel,
   compareLabel,
-  skin,
+  skin = 'cf',
 }: GlReportViewProps) {
   const router = useRouter()
-  // The Cash Flow skin opens folded to its category rows — L1, as in the
-  // approved mock-up (2026-09-18); the rail's L2 / L3 open it up. Everything
-  // else opens fully, as before.
+  // A statement with layout (headed) sections opens folded to its category
+  // rows — L1, as in the approved Cash Flow mock-up (2026-09-18); the rail's
+  // L2 / L3 open it up. The plain statements (P&L, BS, R&P) open fully.
   const [collapsed, setCollapsed] = useState<Set<string>>(() =>
-    skin === 'cf' ? new Set(collectFoldKeys(blocks).groups) : new Set(),
+    blocks.some((b) => b.kind === 'section' && b.section.headed)
+      ? new Set(collectFoldKeys(blocks).groups)
+      : new Set(),
   )
   const [openTxns, setOpenTxns] = useState<Set<string>>(new Set())
 

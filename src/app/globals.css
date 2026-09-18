@@ -748,7 +748,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
      pale gold the "this month" column (matrix only)
    Detail rows have NO zebra — "一行一个 colour 看了会 misleading" — and zero
    renders as a dash so the few real figures stand out. */
-.cf-report {
+.cf-report, .cf-scope {
   --cf-navy: 27 42 68;        /* #1B2A44 */
   --cf-navy-2: 42 59 92;      /* #2A3B5C — "now" cell on a navy band */
   --cf-navy-ink: 246 241 228; /* cream text on navy */
@@ -764,7 +764,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   --cf-graphite: 75 86 112;
   --cf-muted: 139 147 166;
 }
-[data-theme="dark"] .cf-report {
+[data-theme="dark"] .cf-report, [data-theme="dark"] .cf-scope {
   --cf-navy: 38 54 90;
   --cf-navy-2: 47 66 112;
   --cf-navy-ink: 243 238 224;
@@ -781,7 +781,7 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   --cf-muted: 114 122 141;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .cf-report {
+  :root:not([data-theme="light"]) .cf-report, :root:not([data-theme="light"]) .cf-scope {
     --cf-navy: 38 54 90;
     --cf-navy-2: 47 66 112;
     --cf-navy-ink: 243 238 224;
@@ -799,11 +799,49 @@ table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb
   }
 }
 
+/* Every ledger table under /reports (the `.cf-scope` wrapper in
+   reports/layout.tsx): navy header, flat white rows, no zebra. The GL
+   statements and month matrices add their own row bands below. */
+.cf-scope table.ledger-table {
+  background: rgb(var(--cf-surface));
+  border-color: rgb(var(--cf-hairline));
+}
+.cf-scope table.ledger-table thead th {
+  background: rgb(var(--cf-navy));
+  color: rgb(var(--cf-navy-ink));
+  border-bottom: 2px solid rgb(var(--cf-gold-deep));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+}
+.cf-scope table.ledger-table tbody tr { border-bottom: 1px solid rgb(var(--cf-hairline)); }
+.cf-scope table.ledger-table tbody tr:nth-child(even) { background: transparent; }
+.cf-scope table.ledger-table tbody tr:hover { background: rgb(var(--cf-band) / 0.55); }
+.cf-scope table.ledger-table td { color: rgb(var(--cf-ink)); }
+.cf-scope table.ledger-table .text-ink { color: rgb(var(--cf-ink)); }
+.cf-scope table.ledger-table .text-num-ink { color: rgb(var(--cf-ink)); }
+.cf-scope table.ledger-table .text-graphite { color: rgb(var(--cf-graphite)); }
+.cf-scope table.ledger-table .text-muted { color: rgb(var(--cf-muted)); }
+/* A plain <table> that opts in (Company Statement's lending table): same
+   header band, so a page doesn't mix two header styles. */
+.cf-scope table.cf-plain thead th {
+  background: rgb(var(--cf-navy));
+  color: rgb(var(--cf-navy-ink));
+  border-bottom: 2px solid rgb(var(--cf-gold-deep));
+}
+.cf-scope table.cf-plain tbody tr:hover { background: rgb(var(--cf-band) / 0.55); }
+
 /* Statement (GlReportView) */
 table.ledger-table.cf-report {
   background: rgb(var(--cf-surface));
   border-color: rgb(var(--cf-hairline));
 }
+/* Unheaded section eyebrows (P&L / Balance Sheet / R&P) sit on the pale band
+   with the gold rule, same as a headed category row. */
+table.ledger-table.cf-report tbody tr.row-sect { background: rgb(var(--cf-band)); }
+table.ledger-table.cf-report tbody tr.row-sect > td { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
+table.ledger-table.cf-report tbody tr.row-sect .text-accent { color: rgb(var(--cf-gold-deep)); }
 table.ledger-table.cf-report thead th {
   background: rgb(var(--cf-navy));
   color: rgb(var(--cf-navy-ink));
@@ -845,6 +883,9 @@ table.ledger-table.cf-report tbody tr.search-row-active:hover { background: rgb(
   border-bottom: 2px solid rgb(var(--cf-gold-deep));
 }
 .cf-matrix .cf-th-now { background: rgb(var(--cf-navy-2)); }
+/* Two-row header (P&L: RM / %): the gold rule sits under the LAST row only. */
+.cf-matrix thead tr:not(:last-child) th.cf-th { border-bottom: 0; }
+.cf-matrix .cf-th-sub { color: rgb(var(--cf-navy-ink) / 0.75); font-weight: 400; }
 .cf-matrix .cf-hairline-row { border-color: rgb(var(--cf-hairline)); }
 .cf-matrix .cf-row { background: rgb(var(--cf-surface)); }
 .cf-matrix .cf-sub { background: rgb(var(--cf-surface)); }
