@@ -16,12 +16,15 @@ import {
   calcAll,
   r2,
   showAllowStat,
+  hrPayout,
+  hrPayoutTotal,
   billingAccum,
   savingAccum,
   billingDeductAdjustment,
   contraOffset,
   type MonthResult,
   type DirectorMonthResult,
+  type AllowanceSlice,
 } from '@/lib/director-pool-engine'
 
 interface Props {
@@ -35,6 +38,37 @@ const fmt = (v: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+
+/** One allowance slice's gross → saving → balance → split chain. */
+function AllowChain({
+  a,
+  full,
+  sv,
+  gb,
+  bi,
+}: {
+  a: AllowanceSlice
+  full: boolean
+  sv: number
+  gb: number
+  bi: number
+}) {
+  return (
+    <>
+      <div className="row"><span>Allowance Gross (Pool × Weight)</span><span className="amt">RM {fmt(a.gross)}</span></div>
+      <div className="row"><span>Less: Saving ({sv}%)</span><span className="amt">- RM {fmt(a.saving)}</span></div>
+      <div className="row b"><span>= Allowance Balance ({r2(100 - sv)}%)</span><span className="amt">RM {fmt(a.balance)}</span></div>
+      {full ? (
+        <div className="row"><span>💯 Full Payout (100%)</span><span className="amt">RM {fmt(a.gb)}</span></div>
+      ) : (
+        <>
+          <div className="row"><span>{gb}% → Gross Balance</span><span className="amt">RM {fmt(a.gb)}</span></div>
+          <div className="row"><span>{bi}% → Billing Invoice</span><span className="amt">RM {fmt(a.billInv)}</span></div>
+        </>
+      )}
+    </>
+  )
+}
 
 export default async function DirectorPoolPrintPage({ searchParams }: Props) {
   await requirePermission('director_pool')
@@ -61,6 +95,8 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
   const bi = r2(100 - gb)
   const sv = data.settings.savingPct
   const generated = new Date().toLocaleString('en-MY', { dateStyle: 'long', timeStyle: 'short' })
+  // The company that transfers its allowance separately, for labelling.
+  const exclName = data.companies.find((c) => c.excludeFromPay)?.name ?? 'Houzs Venture'
 
   return (
     <div className="dp-print">
@@ -127,9 +163,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
           const statAlVal = m.fullPayout || !sas ? 0 : (inp.allowBillingStat ?? 0)
           const billingVal = r2(statSalVal + statAlVal)
           const total25 = m.fullPayout ? 0 : r2(d.salKpiBillInv + statSalVal + d.allowBillInv + statAlVal)
-          // Payout: Vr KPI offset repays old debt, statFromSurplus pays this
-          // month's keyed statutory (user ruling 2026-07-31) — both come off.
-          const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset - d.statFromSurplus)
+          const totalHRPayout = hrPayout(d)
           const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
           // Net exceed reaching the payout (after offset + surplus-paid statutory).
           const netExceed = r2(d.vrKpi - d.advanceOffset - d.statFromSurplus)
@@ -182,7 +216,9 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                         Billing Invoice and Total Advance, matching the stream
                         totals (user ruling 2026-07-31, supersedes 07-26). */}
                     <div className="box"><div className="l">{bi}% Billing Invoice</div><div className="v warn">RM {fmt(total25)}</div></div>
-                    <div className="box"><div className="l">{gb}% Gross Balance</div><div className="v">RM {fmt(r2(d.salKpiGB + d.allowGB))}</div></div>
+                    {/* First transfer only — the 15th's allowance has its own
+                        box below (user request 2026-09-18). */}
+                    <div className="box"><div className="l">{gb}% Gross Balance (Sal+KPI+Allow)</div><div className="v">RM {fmt(d.totalPay)}</div></div>
                   </>
                 )}
                 {d.advanceOffset > 0 ? (
@@ -192,7 +228,21 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                 ) : d.vrKpi > 0 && netExceed > 0 ? (
                   <div className="box"><div className="l">Exceed (KPI)</div><div className="v pos">+ RM {fmt(netExceed)}</div></div>
                 ) : null}
-                <div className="box hl"><div className="l">HR Payout Before Deduct Statutory</div><div className="v">RM {fmt(totalHRPayout)}</div></div>
+              </div>
+
+              {/* The two transfers, as an equation — a month with no 15th
+                  transfer keeps the single box it always had. */}
+              <div className="chain">
+                <div className="box hl">
+                  <div className="l">HR Payout Before Deduct Statutory{d.allowExcl.gb > 0 ? ' (月头)' : ''}</div>
+                  <div className="v">RM {fmt(totalHRPayout)}</div>
+                </div>
+                {d.allowExcl.gb > 0 && (
+                  <>
+                    <div className="box"><div className="l">＋ {exclName} Allowance (15号)</div><div className="v">RM {fmt(d.allowExcl.gb)}</div></div>
+                    <div className="box hl"><div className="l">＝ 实际到手合计</div><div className="v">RM {fmt(hrPayoutTotal(d))}</div></div>
+                  </>
+                )}
               </div>
 
               {/* Accumulated ledger cards */}
@@ -253,16 +303,27 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
                 <div className="stream">
                   <div className="hd">🎁 Allowance Stream</div>
                   {d.allowGross > 0 ? (
+                    /* Same sectioned layout as the Flow view — with a separate
+                       15th transfer the two chains are listed apart plus a
+                       total, so a "75% →" row really is 75%. */
                     <>
-                      <div className="row"><span>Allowance Gross (Pool × Weight)</span><span className="amt">RM {fmt(d.allowGross)}</span></div>
-                      <div className="row"><span>Less: Saving ({sv}%)</span><span className="amt">- RM {fmt(d.allowSaving)}</span></div>
-                      <div className="row b"><span>= Allowance Balance ({r2(100 - sv)}%)</span><span className="amt">RM {fmt(d.allowBalance)}</span></div>
-                      {m.fullPayout ? (
-                        <div className="row"><span>💯 Full Payout (100%)</span><span className="amt">RM {fmt(d.allowGB)}</span></div>
-                      ) : (
+                      {d.allowExcl.gross > 0 && <div className="row sec">── 月头那笔 · 其他公司 ──</div>}
+                      <AllowChain a={d.allowInPay} full={m.fullPayout} sv={sv} gb={gb} bi={bi} />
+                      {d.allowExcl.gross > 0 && (
                         <>
-                          <div className="row"><span>{gb}% → Gross Balance</span><span className="amt">RM {fmt(d.allowGB)}</span></div>
-                          <div className="row"><span>{bi}% → Billing Invoice</span><span className="amt">RM {fmt(d.allowBillInv)}</span></div>
+                          <div className="row sec">── 15号那笔 · {exclName} ──</div>
+                          <AllowChain
+                            a={d.allowExcl}
+                            full={m.fullPayout || m.allowExclFullPayout}
+                            sv={sv}
+                            gb={gb}
+                            bi={bi}
+                          />
+                          <div className="row sec">── 合计 ──</div>
+                          <div className="row"><span>Allowance Gross 合计</span><span className="amt">RM {fmt(d.allowGross)}</span></div>
+                          <div className="row"><span>Saving ({sv}%) 合计</span><span className="amt">- RM {fmt(d.allowSaving)}</span></div>
+                          <div className="row b"><span>过给 Director 合计</span><span className="amt">RM {fmt(d.allowGB)}</span></div>
+                          <div className="row"><span>{bi}% Billing Invoice 合计</span><span className="amt">RM {fmt(d.allowBillInv)}</span></div>
                         </>
                       )}
                     </>

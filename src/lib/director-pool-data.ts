@@ -16,6 +16,9 @@ export interface DpCompany {
   id: string
   name: string
   sort: number
+  /** Allowance is transferred on its own, after the main payout (Houzs Venture
+   *  pays on the 15th — see DpCompanyInput.excludeFromPay). */
+  excludeFromPay: boolean
 }
 
 export interface DirectorPoolData {
@@ -63,6 +66,7 @@ export async function loadDirectorPoolData(): Promise<DirectorPoolData> {
     id: c.id,
     name: c.name,
     sort: c.sort,
+    excludeFromPay: c.exclude_from_pay,
   }))
 
   const directors: DpDirector[] = (directorRows ?? []).map((d) => ({
@@ -93,9 +97,16 @@ export async function loadDirectorPoolData(): Promise<DirectorPoolData> {
     fullPayout: m.full_payout,
     includeBilling: m.include_billing,
     billingDeductAdv: m.billing_deduct_adv,
+    allowExclFullPayout: m.allow_excl_full_payout,
     cos: companies.map((c) => {
       const v = inputsByMonth.get(m.id)?.get(c.id)
-      return { companyId: c.id, salary: v?.salary ?? 0, kpi: v?.kpi ?? 0, allowance: v?.allowance ?? 0 }
+      return {
+        companyId: c.id,
+        salary: v?.salary ?? 0,
+        kpi: v?.kpi ?? 0,
+        allowance: v?.allowance ?? 0,
+        excludeFromPay: c.excludeFromPay,
+      }
     }),
   }))
 

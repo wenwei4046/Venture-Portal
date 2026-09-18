@@ -11,6 +11,7 @@ import {
   r2,
   showAllowStat,
   allowStatTopUpBase,
+  billingRow,
   type DpMonth,
   type DirectorInputMap,
   type DpContraEvent,
@@ -234,6 +235,8 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
     setContra(data.contra)
   }, [data])
 
+  const companies = data.companies
+
   const sortedMonths = useMemo(
     () => [...months].sort((a, b) => a.month.localeCompare(b.month)),
     [months],
@@ -317,7 +320,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
   }
   const handleFlag = (
     monthId: string,
-    flag: 'fullPayout' | 'includeBilling' | 'billingDeductAdv',
+    flag: 'fullPayout' | 'includeBilling' | 'billingDeductAdv' | 'allowExclFullPayout',
     value: boolean,
   ) => {
     setMonths((ms) =>
@@ -336,7 +339,9 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
         ? { full_payout: value }
         : flag === 'includeBilling'
           ? { include_billing: value }
-          : { billing_deduct_adv: value }
+          : flag === 'allowExclFullPayout'
+            ? { allow_excl_full_payout: value }
+            : { billing_deduct_adv: value }
     queue(`flag:${monthId}:${flag}`, () => updateDpMonth(monthId, patch))
   }
   const handleDeleteMonth = (monthId: string) => {
@@ -470,10 +475,16 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
       kSave += d.totalSaving
       kAllow += d.allowGB
       kAdvMonth += d.advThisMonth
-      kBI += d.statutoryInput
+      // The WHOLE 25% invoice (system 25% + keyed statutory), matching the
+      // table's "Total 25% Bill Inv" column — it used to show only the keyed
+      // statutory. Includes the separately-transferred allowance's 25%: only
+      // the 75% payout is split across two transfers, the invoice is one
+      // monthly document (user ruling 2026-09-18).
+      kBI += billingRow(m, d, dirInputs, settings).total
     })
   })
   kAdvMonth = r2(kAdvMonth)
+  kBI = r2(kBI)
 
   const visibleResults = showAllKpi ? results : results.filter((m) => m.id === resultMonth)
   const activeMonth = sortedMonths.find((m) => m.id === activeMonthId) ?? null
@@ -525,7 +536,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
           settings={settings}
           directors={directors}
           months={sortedMonths.map((m) => ({ ...m, name: monthName(m.month, multiYear) }))}
-          companies={data.companies}
+          companies={companies}
           dirInputs={dirInputs}
           results={results}
           totalWeight={totalWeight}
@@ -551,7 +562,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
         <DashboardViews
           results={results}
           directors={directors}
-          companies={data.companies}
+          companies={companies}
           dirInputs={dirInputs}
           contra={contra}
           settings={engineSettings}
@@ -588,7 +599,11 @@ interface CalcProps {
   onWeight: (id: string, w: number) => void
   onAddMonth: () => void
   onMonthDate: (id: string, iso: string) => void
-  onFlag: (id: string, flag: 'fullPayout' | 'includeBilling' | 'billingDeductAdv', v: boolean) => void
+  onFlag: (
+    id: string,
+    flag: 'fullPayout' | 'includeBilling' | 'billingDeductAdv' | 'allowExclFullPayout',
+    v: boolean,
+  ) => void
   onDeleteMonth: (id: string) => void
   onClearMonth: (id: string) => void
   onCo: (monthId: string, companyId: string, field: 'salary' | 'kpi' | 'allowance', v: number | null) => void
@@ -847,8 +862,11 @@ function CalculatorTab(p: CalcProps) {
               [
                 [`Total Pool (${p.kpi.kpiLabel})`, p.kpi.kTotal, 'Salary + KPI + Allowance'],
                 ['Sal+KPI Gross Balance', p.kpi.kGB, `${gb}% of ${r2(100 - p.settings.savingPct)}% Sal+KPI`],
-                ['Gross Allowance', p.kpi.kAllow, 'Allowance × weight'],
-                [`Billing Invoice (${p.kpi.kpiLabel})`, p.kpi.kBI, 'Sum of keyed statutory'],
+                // Was mislabelled "Gross Allowance / Allowance × weight" — the
+                // figure has always been the paid-out slice, same shape as the
+                // Sal+KPI card next to it (user-spotted 2026-09-18).
+                [`${gb}% Allowance`, p.kpi.kAllow, `${gb}% of ${r2(100 - p.settings.savingPct)}% Allowance`],
+                [`Billing Invoice (${p.kpi.kpiLabel})`, p.kpi.kBI, `${r2(100 - gb)}% invoice + 手填 statutory`],
                 [`Saving (${p.settings.savingPct}%)`, p.kpi.kSave, 'Sal+KPI + Allowance saving'],
                 [`Advance (${p.kpi.kpiLabel})`, p.kpi.kAdvMonth, 'This month only'],
               ] as const
@@ -1053,8 +1071,152 @@ function CalculatorTab(p: CalcProps) {
             两条流都切。 ★ Full Payout Month：100% Balance 直接给 Director，无 Billing Invoice。 ★ Advance：Total Pay
             &lt; Fixed Salary → 差额累计；盈余先抵消累计 Advance；Adv Statutory 与 75% Allow Statutory 也加入欠款。
           </p>
+
+          <HvPayoutSection
+            month={m}
+            result={p.results.find((x) => x.id === m?.id) ?? null}
+            settings={p.settings}
+            company={p.companies.find((c) => c.excludeFromPay) ?? null}
+            onFlag={p.onFlag}
+          />
         </>
       )}
     </div>
+  )
+}
+
+// ── Mid-month allowance payout ──────────────────────────────────────────────
+// The month's main transfer (Sal+KPI + every other company's allowance) goes
+// out before the 15th. Houzs Venture's allowance lands on the 15th and is paid
+// out on its own, so this panel isolates its slice — the pooled "75%
+// Allowance" column mixes all companies and would over-pay.
+
+function HvPayoutSection({
+  month,
+  result,
+  settings,
+  company,
+  onFlag,
+}: {
+  month: DpMonth | null
+  result: MonthResult | null
+  settings: CalcProps['settings']
+  company: CalcProps['companies'][number] | null
+  onFlag: CalcProps['onFlag']
+}) {
+  const hvAmount = company
+    ? (month?.cos.find((c) => c.companyId === company.id)?.allowance ?? 0)
+    : 0
+  // Read the engine's own slice rather than recomputing: allowExcl is the
+  // REMAINDER of each pooled column, so 月头过的 + 15号过的 tallies to the cent
+  // against NO. 03's "75% Allowance" row.
+  const rows = result?.dirRes ?? []
+
+  // No month picked, or nobody transfers separately — nothing to show.
+  if (!month || !company) return null
+
+  const totalPayout = r2(rows.reduce((s, d) => s + d.allowExcl.gb, 0))
+  const totalGross = r2(rows.reduce((s, d) => s + d.allowExcl.gross, 0))
+  const totalSaving = r2(rows.reduce((s, d) => s + d.allowExcl.saving, 0))
+  const totalBalance = r2(rows.reduce((s, d) => s + d.allowExcl.balance, 0))
+  const totalBill = r2(rows.reduce((s, d) => s + d.allowExcl.billInv, 0))
+  const gb = settings.gbPct
+  const hvFull = month.fullPayout || month.allowExclFullPayout === true
+
+  return (
+    <>
+      <SectHead n="NO. 04" title={`${company.name} Allowance · 15号过账`} />
+      <p className="font-mono text-xs text-graphite mb-3 leading-relaxed">
+        月头那笔（Sal+KPI ＋ 其他公司 allowance）已经过了 —— 这里只算 <span className="text-ink">{company.name}</span> 15
+        号进来的那笔，每个 director 要另外过多少。照常扣 {settings.savingPct}% saving，默认走 {gb}/{r2(100 - gb)} split。
+      </p>
+
+      {/* HV's own Full Payout — independent of the month's flag (2026-09-18) */}
+      <label
+        className={`inline-flex items-center gap-2 px-3 py-2 mb-4 rounded-md border text-xs font-medium select-none ${
+          month.fullPayout
+            ? 'border-hairline text-graphite bg-surface opacity-60 cursor-not-allowed'
+            : 'border-hairline text-ink bg-surface cursor-pointer hover:border-accent'
+        }`}
+      >
+        <input
+          type="checkbox"
+          className="accent-current"
+          disabled={month.fullPayout}
+          checked={month.fullPayout || month.allowExclFullPayout === true}
+          onChange={(e) => onFlag(month.id, 'allowExclFullPayout', e.target.checked)}
+        />
+        💯 Full Payout（100% — {r2(100 - gb)}% Billing 扣回出来）
+        {month.fullPayout && <span className="text-graphite">· 整个月已经是 Full Payout</span>}
+      </label>
+
+      {hvAmount <= 0 ? (
+        <p className="font-serif italic text-sm text-graphite border border-dashed border-hairline rounded-md p-4">
+          这个月还没 key {company.name} 的 allowance —— 填进上面 NO. 02 那行，这里就会算出来。
+        </p>
+      ) : (
+        <>
+          <div className="overflow-x-auto border border-hairline rounded-md">
+            <table className="ledger-table text-[12px]">
+              <thead>
+                <tr>
+                  <th>Director</th>
+                  <th className="m-hide">Weight</th>
+                  <th className="right m-hide">Allow Gross</th>
+                  <th className="right m-hide">Saving ({settings.savingPct}%)</th>
+                  <th className="right m-hide">Balance ({r2(100 - settings.savingPct)}%)</th>
+                  <th className="right">{hvFull ? '要过的钱 (100%)' : `要过的钱 (${gb}%)`}</th>
+                  <th className="right m-hide">{r2(100 - gb)}% Bill Inv</th>
+                  <th className="lt-toggle" aria-hidden />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((d) => (
+                  <LedgerRow key={d.id}>
+                    <td className="whitespace-nowrap">
+                      <Dot color={d.color} />
+                      <span className="font-mono text-sm text-ink">{d.code}</span>
+                    </td>
+                    <td className="font-mono text-xs text-graphite m-hide" data-label="Weight">{d.weight}%</td>
+                    <td className="num m-hide" data-label="Allow Gross">{fmt(d.allowExcl.gross)}</td>
+                    <td className="num m-hide" data-label="Saving">{fmt(d.allowExcl.saving)}</td>
+                    <td className="num m-hide" data-label="Balance">{fmt(d.allowExcl.balance)}</td>
+                    <td className="num font-semibold text-num-ink" data-label="要过的钱">{fmt(d.allowExcl.gb)}</td>
+                    <td className="num m-hide" data-label="Bill Inv">
+                      {d.allowExcl.billInv > 0 ? fmt(d.allowExcl.billInv) : '—'}
+                    </td>
+                  </LedgerRow>
+                ))}
+                <tr className="border-t border-hairline">
+                  <td colSpan={2} className="font-serif italic text-ink">Total</td>
+                  <td className="num font-medium m-hide">{fmt(totalGross)}</td>
+                  <td className="num m-hide">{fmt(totalSaving)}</td>
+                  <td className="num m-hide">{fmt(totalBalance)}</td>
+                  <td className="num font-semibold text-num-ink">{fmt(totalPayout)}</td>
+                  <td className="num m-hide">{totalBill > 0 ? fmt(totalBill) : '—'}</td>
+                  <td className="lt-toggle" />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="font-serif italic text-xs text-graphite mt-3 leading-relaxed">
+            ★ 这笔不进 Director Salary —— Director Salary 只记 Sal+KPI（2026-09-18 定）。 ★ 这笔<span className="text-ink">不进
+            Total Pay</span>，所以 NO. 03 的 Vr KPI / Adv This Month / Accum. Advance 完全不受它影响 —— 跟没有这笔时一模一样。
+            ★ 但它有算进 NO. 03 的「{gb}% Allowance」和 Saving：月头过的 ＋ 这里 15 号过的 ＝ 那一栏的总数。
+            {hvFull ? (
+              <>
+                ★ <span className="text-ink">💯 Full Payout 开着</span> —— 这笔 {r2(100 - gb)}% Billing
+                已经扣回出来，director 实收整条 {r2(100 - settings.savingPct)}% Balance，上面 Billing Invoice 那张卡也不含它。
+              </>
+            ) : (
+              <>
+                ★ 右上角的「{r2(100 - gb)}% Bill Inv」<span className="text-ink">已经算进</span> Billing Invoice 那张卡 ——
+                过钱分两次，invoice 还是一个月一张。
+              </>
+            )}
+          </p>
+        </>
+      )}
+    </>
   )
 }
