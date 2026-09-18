@@ -715,6 +715,7 @@ table.ledger-table tbody tr:hover { background: rgb(var(--accent-bg)); }
    get their own band so the hierarchy reads at a glance (user 2026-06-11). */
 table.ledger-table.gl-report tbody tr:nth-child(even) { background: transparent; }
 table.ledger-table.gl-report tbody tr.row-sect { background: rgb(var(--surface-2) / 0.7); }
+table.ledger-table.gl-report tbody tr.row-cat { background: rgb(var(--surface-2) / 0.7); } /* headed layout section — its own totals */
 table.ledger-table.gl-report tbody tr.row-group { background: rgb(var(--surface)); }
 table.ledger-table.gl-report tbody tr.row-leaf { background: transparent; }
 table.ledger-table.gl-report tbody tr.row-txn { background: rgb(var(--info-bg) / 0.45); }
@@ -736,6 +737,132 @@ table.ledger-table.gl-report tbody tr.row-summary-strong td {
 /* Keep the wash on hover instead of swapping to the (identical) hover tint. */
 table.ledger-table.gl-report tbody tr:hover { background: rgb(var(--accent-bg)); }
 table.ledger-table.gl-report tbody tr.row-summary-strong:hover { background: rgb(var(--accent-bg)); }
+
+/* ── Cash Flow skin (user 2026-09-18: "以蓝色为主的不错" — navy structure, gold
+   accents, flat detail rows) ──────────────────────────────────────────────
+   Scoped to `.cf-report`, which the Cash Flow statement (GlReportView) and the
+   Monthly Cash Flow matrix (MonthlyMatrix) opt into; every other report keeps
+   Walnut / Harbour. Three bands, each with one job, on flat white:
+     navy      header row + headline totals (流入/流出合计, net change, closing)
+     pale navy a layout category's own row, with a gold rule on its left edge
+     pale gold the "this month" column (matrix only)
+   Detail rows have NO zebra — "一行一个 colour 看了会 misleading" — and zero
+   renders as a dash so the few real figures stand out. */
+.cf-report {
+  --cf-navy: 27 42 68;        /* #1B2A44 */
+  --cf-navy-2: 42 59 92;      /* #2A3B5C — "now" cell on a navy band */
+  --cf-navy-ink: 246 241 228; /* cream text on navy */
+  --cf-gold: 201 162 75;      /* #C9A24B */
+  --cf-gold-deep: 158 126 51; /* #9E7E33 — rules */
+  --cf-gold-ink: 227 195 106; /* #E3C36A — gold figures on navy */
+  --cf-band: 231 236 244;     /* #E7ECF4 — category row */
+  --cf-band-now: 217 225 238; /* #D9E1EE */
+  --cf-now: 251 243 221;      /* #FBF3DD — this-month column */
+  --cf-surface: 255 255 255;
+  --cf-hairline: 221 225 233; /* #DDE1E9 */
+  --cf-ink: 27 42 68;
+  --cf-graphite: 75 86 112;
+  --cf-muted: 139 147 166;
+}
+[data-theme="dark"] .cf-report {
+  --cf-navy: 38 54 90;
+  --cf-navy-2: 47 66 112;
+  --cf-navy-ink: 243 238 224;
+  --cf-gold: 212 174 88;
+  --cf-gold-deep: 227 195 106;
+  --cf-gold-ink: 227 195 106;
+  --cf-band: 31 42 64;
+  --cf-band-now: 38 51 77;
+  --cf-now: 42 39 22;
+  --cf-surface: 26 30 39;
+  --cf-hairline: 50 58 75;
+  --cf-ink: 237 231 216;
+  --cf-graphite: 176 182 197;
+  --cf-muted: 114 122 141;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .cf-report {
+    --cf-navy: 38 54 90;
+    --cf-navy-2: 47 66 112;
+    --cf-navy-ink: 243 238 224;
+    --cf-gold: 212 174 88;
+    --cf-gold-deep: 227 195 106;
+    --cf-gold-ink: 227 195 106;
+    --cf-band: 31 42 64;
+    --cf-band-now: 38 51 77;
+    --cf-now: 42 39 22;
+    --cf-surface: 26 30 39;
+    --cf-hairline: 50 58 75;
+    --cf-ink: 237 231 216;
+    --cf-graphite: 176 182 197;
+    --cf-muted: 114 122 141;
+  }
+}
+
+/* Statement (GlReportView) */
+table.ledger-table.cf-report {
+  background: rgb(var(--cf-surface));
+  border-color: rgb(var(--cf-hairline));
+}
+table.ledger-table.cf-report thead th {
+  background: rgb(var(--cf-navy));
+  color: rgb(var(--cf-navy-ink));
+  border-bottom: 2px solid rgb(var(--cf-gold-deep));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+}
+table.ledger-table.cf-report tbody tr { border-bottom: 1px solid rgb(var(--cf-hairline)); }
+table.ledger-table.cf-report tbody tr.row-group,
+table.ledger-table.cf-report tbody tr.row-leaf,
+table.ledger-table.cf-report tbody tr.row-summary { background: rgb(var(--cf-surface)); }
+table.ledger-table.cf-report td { color: rgb(var(--cf-ink)); }
+table.ledger-table.cf-report tbody tr.row-cat { background: rgb(var(--cf-band)); }
+table.ledger-table.cf-report tbody tr.row-cat > td:first-child { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
+table.ledger-table.cf-report tbody tr.row-summary-strong {
+  background: rgb(var(--cf-navy));
+  border-top: 2px solid rgb(var(--cf-gold-deep));
+  border-bottom: 2px solid rgb(var(--cf-gold-deep));
+}
+table.ledger-table.cf-report tbody tr.row-summary-strong td,
+table.ledger-table.cf-report tbody tr.row-summary-strong td.num,
+table.ledger-table.cf-report tbody tr.row-summary-strong .text-ledger,
+table.ledger-table.cf-report tbody tr.row-summary-strong .text-danger { color: rgb(var(--cf-gold-ink)); }
+table.ledger-table.cf-report tbody tr.row-summary-strong .neg { color: rgb(var(--cf-navy-ink)); }
+table.ledger-table.cf-report tbody tr:hover { background: rgb(var(--cf-band) / 0.55); }
+table.ledger-table.cf-report tbody tr.row-cat:hover { background: rgb(var(--cf-band-now)); }
+table.ledger-table.cf-report tbody tr.row-summary-strong:hover { background: rgb(var(--cf-navy-2)); }
+table.ledger-table.cf-report tbody tr.search-row-hit,
+table.ledger-table.cf-report tbody tr.search-row-active,
+table.ledger-table.cf-report tbody tr.search-row-active:hover { background: rgb(var(--cf-now)); }
+
+/* Month matrix (MonthlyMatrix) — utility-style classes the component switches in. */
+.cf-matrix { border-color: rgb(var(--cf-hairline)); background: rgb(var(--cf-surface)); }
+.cf-matrix .cf-th {
+  background: rgb(var(--cf-navy));
+  color: rgb(var(--cf-navy-ink));
+  border-bottom: 2px solid rgb(var(--cf-gold-deep));
+}
+.cf-matrix .cf-th-now { background: rgb(var(--cf-navy-2)); }
+.cf-matrix .cf-hairline-row { border-color: rgb(var(--cf-hairline)); }
+.cf-matrix .cf-row { background: rgb(var(--cf-surface)); }
+.cf-matrix .cf-sub { background: rgb(var(--cf-surface)); }
+.cf-matrix .cf-cat { background: rgb(var(--cf-band)); }
+.cf-matrix .cf-cat-label { box-shadow: inset 3px 0 0 rgb(var(--cf-gold)); }
+.cf-matrix .cf-cat.cf-now { background: rgb(var(--cf-band-now)); }
+.cf-matrix .cf-row.cf-now, .cf-matrix .cf-sub.cf-now { background: rgb(var(--cf-now)); }
+.cf-matrix .cf-strong { background: rgb(var(--cf-navy)); color: rgb(var(--cf-gold-ink)) !important; }
+.cf-matrix .cf-strong.cf-now { background: rgb(var(--cf-navy-2)); }
+.cf-matrix .cf-strong .neg { color: rgb(var(--cf-navy-ink)); }
+.cf-matrix .cf-strong-row { border-top: 2px solid rgb(var(--cf-gold-deep)); border-bottom: 2px solid rgb(var(--cf-gold-deep)); }
+.cf-matrix .cf-arrow { color: rgb(var(--cf-gold-deep)); }
+.cf-matrix .cf-dash { color: rgb(var(--cf-muted)); }
+.cf-matrix .cf-strong .cf-dash { color: rgb(var(--cf-gold-ink)); opacity: 0.55; }
+.cf-matrix td.text-ink, .cf-matrix td .text-ink { color: rgb(var(--cf-ink)); }
+.cf-matrix td.text-graphite { color: rgb(var(--cf-graphite)); }
+.cf-matrix tr.search-row-hit > td, .cf-matrix tr.search-row-active > td { background: rgb(var(--cf-now)); }
+.cf-pill-on { background: rgb(var(--cf-navy)); color: rgb(var(--cf-navy-ink)); border-color: rgb(var(--cf-navy)); }
 table.ledger-table td {
   padding: 13px 12px;
   vertical-align: baseline;

@@ -136,6 +136,7 @@ export default async function CashFlowPage({ searchParams }: Props) {
         blocks={blocks}
         currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
         compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
+        skin="cf"
       />
     </div>
   )

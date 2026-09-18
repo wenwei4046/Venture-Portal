@@ -1295,6 +1295,85 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-18 — Cash Flow report rework: parent-code layouts · category rows · navy/gold skin
+
+**Why**: user "那个 cash flow report 我想要优化，我发现分到太散了。你看 fund sources
+payable 分两边, loan receivable 也是, 然后这个 report 整体的颜色或 ui 我想优化".
+Root cause: `report_layouts` cash_flow_in / cash_flow_out listed only the LEAVES
+dragged on 2026-07-30 (3053/3054 · 4202/4051/4052 …); every other debtor / fund
+source fell into 其他, so the same COA parent printed twice. Mock-up went four
+rounds (Artifact https://claude.ai/artifact/67cus1g9tr1YoQ1vCq6sYb): v2 no
+小计 rows ("L1 会看到两个 total 看了会很乱"), v3 gold/navy ("类似这个黄蓝…黄色为
+主"), v3.1 no zebra ("一行一个 colour 看了会 misleading"), v3.2 pinned light
+("整体太暗了") → user: "黄色的颜色不是很好看" then "以蓝色为主的不错" = **navy-led,
+gold only as accent**; zero rows: "没有 amount 的就直接别显示" (no toggle).
+
+**Engine**
+- `lib/report-layouts.ts`: `placeLeavesInLayout(leafCodes, categories,
+  ancestorsNearestFirst)` + `ancestorChain`. A category may list COA PARENT
+  codes: explicit leaf wins → nearest listed ancestor → 其他; first category to
+  list a code owns it. Tests `report-layouts.test.ts`.
+- `lib/cash-flow-sections.ts` (statement): placement as above; leaves with no
+  amount in current AND previous are dropped; every layout section is
+  `headed` (new `ReportSection.headed`) — the section row carries the totals;
+  a section that is exactly ONE COA root named like it (`sameName`) gets
+  `root` = that node and `nodes` = root.children so the name isn't printed
+  twice; a lone leaf merges the same way (its txns stay reachable). No-layout
+  fallback unchanged (unheaded). `defaultSideLayout` now seeds the PARENT code
+  per top-level root.
+- `lib/cash-flow-custom.ts` (matrix): `buildSideMatrixRows` same rules; emits
+  `kind: 'category'` rows (new `MatrixRow` kind: depth 0, `isParent`, totals,
+  sits ABOVE its accounts) and no "— 小计" rows; merged root → the category row
+  carries `code`; all-zero accounts dropped, categories left empty vanish;
+  side-total row unchanged. `categoryRows()` helper.
+- `lib/gl-report-blocks.ts`: `cashFlowBlocks` adds no 小计 summary for headed
+  sections (legacy unheaded still get one); `flattenGlReport` (xlsx/pdf)
+  prints a headed section as ONE totals row (`code label` when merged) with
+  its accounts indented a step — screen and file keep the same shape.
+- DB mig `20260918010000_cash_flow_layout_parent_codes`: cash_flow_in/out
+  `grp-3020` → `["3020"]`, `grp-4000` → `["4000"]`; other categories untouched
+  (Salary & Statutory keeps its explicit 4070–4074 — 4075 Accrual-Others was
+  never in it, not my call to add). Applied live BEFORE the deploy, so for a
+  few minutes the old code saw an unknown leaf code and showed those under
+  其他 — resolved by the deploy.
+
+**Views**
+- `GlReportView` gains `skin?: 'cf'` (cash-flow/page passes it). Headed
+  sections render as `row-cat` band rows: a merged root is the node row itself
+  (its own group/txn toggles), a plain headed section is label + totals + a
+  fold toggle keyed `sect:<section.key>`; accounts sit at depth 1. L1 folds
+  sections too (`collectFoldKeys`), search force-opens through the `sect:`
+  key, and the cf skin opens folded (L1) by default.
+- `MonthlyMatrix` gains `variant?: 'cf'` + `nowKey` (monthly-cash-flow/page
+  passes `period`): category rows always visible + collapsible, opens at L1,
+  ONE navy header row (no RM sub-row — unit is in the page subtitle), zero →
+  dash, "now" column wash, flat rows (no zebra). Search treats categories as
+  ancestors only. Default variant (Monthly P&L / R&P) unchanged apart from the
+  widened `kind` union.
+- `globals.css`: `.cf-report` token set (light + dark): navy header and
+  headline bands (流入/流出合计, net change, closing) with gold figures,
+  pale-navy category rows with a gold inset rule (`row-cat` / `cf-cat`),
+  pale-gold `cf-now` column, `.cf-pill-on`. Scoped — the rest of the portal
+  keeps Walnut / Harbour (DESIGN.md's "one signal colour" rule is deliberately
+  bent here, at the user's request, for this report only). A default
+  `gl-report tr.row-cat` band exists so headed sections never render unstyled.
+- Layout editor (`ReportLayoutEditor` + cash-flow/layout/page): **▣ 整组** group
+  chips — every COA parent present on the side (with its leaf count) in its
+  own palette; dropping one lists the PARENT code; leaves a category holds
+  through a group show as dashed ghost chips (draggable → explicit override).
+  Saved codes with no movement this month are now KEPT on save (they were
+  silently dropped — the editor only lists this month's active accounts).
+  monthly-pnl layout page passes no groups → behaves as before.
+
+**Gates**: `report-layouts.test.ts` (6 new), cash-flow-sections (+5),
+cash-flow-custom (+5, first tests for `buildSideMatrixRows`); full vitest
+1908 green; `next build` green.
+
+**Open / not done**: cf skin only on the two Cash Flow views (user asked for
+that report; other reports keep the old look — extend by passing
+`skin`/`variant`); month columns stay Accumulated + latest-first (mock-up drew
+them chronological; user never raised it).
+
 ## SESSION 2026-09-14/15 — cancel-loan overload fix · 作废已开发票 · water RM36→39 amend
 
 **Cancel pending loan crashed (commit ca40c0bb, mig 20260914010000)**: TWO

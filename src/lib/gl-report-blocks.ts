@@ -160,19 +160,26 @@ export function cashFlowBlocks(
    *  omitted each side renders as one section, exactly as before. */
   custom?: { inflow?: ReportSection[]; outflow?: ReportSection[] },
 ): ReportBlock[] {
-  // Each custom section carries its own subtotal (user 2026-07-30: "general
-  // expense 少掉一个 total"). Skipped when a side has a single section — the
-  // side total right below would just repeat it.
+  // Each custom section carries its own total (user 2026-07-30: "general
+  // expense 少掉一个 total") — on the section row itself for a `headed`
+  // section (2026-09-18: the trailing "— 小计" doubled the COA parent right
+  // above it at L1), or as a trailing summary for a legacy unheaded one.
+  // Skipped when a side has a single section — the side total right below
+  // would just repeat it.
   const sideBlocks = (sections: ReportSection[] | undefined, fallback: ReportSection): ReportBlock[] => {
     if (!sections || sections.length === 0) return [{ kind: 'section', section: fallback }]
     if (sections.length === 1) return [{ kind: 'section', section: sections[0] }]
-    return sections.flatMap((s) => [
-      { kind: 'section', section: s } as ReportBlock,
-      {
-        kind: 'summary',
-        row: { label: `${s.label} — 小计`, current: s.current, previous: s.previous, tone: 'auto' },
-      } as ReportBlock,
-    ])
+    return sections.flatMap((s) =>
+      s.headed
+        ? [{ kind: 'section', section: s } as ReportBlock]
+        : [
+            { kind: 'section', section: s } as ReportBlock,
+            {
+              kind: 'summary',
+              row: { label: `${s.label} — 小计`, current: s.current, previous: s.previous, tone: 'auto' },
+            } as ReportBlock,
+          ],
+    )
   }
 
   return [
@@ -262,7 +269,13 @@ export function flattenGlReport(
   }
 
   for (const b of blocks) {
-    if (b.kind === 'section') {
+    if (b.kind === 'section' && b.section.headed) {
+      // Headed section: the title row carries the totals (a merged root shows
+      // its code), and its accounts sit one step in — same shape as on screen.
+      const s = b.section
+      rows.push(cells(s.root ? `${s.root.code} ${s.label}` : s.label, s.current, s.previous))
+      for (const n of s.nodes) pushNode(n, 1)
+    } else if (b.kind === 'section') {
       sectionBreaks.push({ afterRow: rows.length, title: b.section.label })
       for (const n of b.section.nodes) pushNode(n, 0)
     } else {

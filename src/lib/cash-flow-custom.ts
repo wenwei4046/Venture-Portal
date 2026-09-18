@@ -14,6 +14,8 @@ import {
   monthColumns,
   r2,
 } from './monthly-matrix'
+import { placeLeavesInLayout } from './report-layouts'
+import { sameName } from './cash-flow-sections'
 
 export type CashFlowDefaultCategory = 'operating' | 'investing' | 'financing'
 
@@ -190,9 +192,20 @@ export function buildMonthlyCashFlowSides(
   }
 }
 
-/** Rows for one side: the layout's ordered sections (COA tree inside each) with
- *  a subtotal per section, then the side total. Unlisted accounts sweep into
- *  其他 so a side total can never silently drop one. */
+/** Rows for one side: the layout's ordered sections (COA tree inside each),
+ *  then the side total. Unlisted accounts sweep into 其他 so a side total can
+ *  never silently drop one.
+ *
+ *  2026-09-18 (user: "分到太散了" / "两个 total 看了会很乱"):
+ *  · a category may list COA PARENT codes — every leaf beneath follows it
+ *    unless listed explicitly elsewhere (placeLeavesInLayout), so 3020 alone
+ *    keeps all the loan debtors in one place instead of half in 其他;
+ *  · the category row ITSELF carries the totals (kind 'category', collapsible)
+ *    and there is no trailing "— 小计" row; when the category is exactly one
+ *    COA root named like it, that root becomes the category row so the name
+ *    is not printed twice;
+ *  · accounts with no amount in any column are left out, and a parent /
+ *    category with nothing live beneath it goes with them. */
 export function buildSideMatrixRows(
   side: SideAccount[],
   layout: { categories: { id: string; name: string; accounts: string[] }[] } | null,
@@ -203,42 +216,48 @@ export function buildSideMatrixRows(
 ): MatrixRow[] {
   const rows: MatrixRow[] = []
   const cats = layout?.categories?.filter((c) => c && typeof c.id === 'string') ?? []
-  const byCode = new Map(side.map((a) => [a.code, a]))
-  const placed = new Set<string>()
+  const live = side.filter((a) => a.values.some((v) => Math.abs(v) >= 0.005))
+  const byCode = new Map(live.map((a) => [a.code, a]))
 
   if (cats.length === 0) {
-    rows.push(...buildHierarchyRows(side, sideKey, 1))
+    rows.push(...buildHierarchyRows(live, sideKey, 1))
   } else {
+    // ancestry is stored top → down; the placement wants nearest first.
+    const placed = placeLeavesInLayout([...byCode.keys()], cats, (code) =>
+      (byCode.get(code)?.ancestry ?? []).map((a) => a.code).reverse(),
+    )
     for (const c of cats) {
-      const accs = (c.accounts ?? []).map((code) => byCode.get(code)).filter((a): a is SideAccount => !!a)
-      accs.forEach((a) => placed.add(a.code))
+      const accs = (placed.byCategory.get(c.id) ?? []).map((code) => byCode.get(code)!)
       if (accs.length === 0) continue
-      rows.push(...buildHierarchyRows(accs, `${sideKey}:${c.id}`, 1))
-      rows.push({
-        key: `${sideKey}:${c.id}:sub`,
-        label: `${c.name || 'Untitled'} — 小计`,
-        depth: 0,
-        kind: 'subtotal',
-        tone: 'auto',
-        values: colSum(accs.map((a) => a.values), nCols),
-      })
+      rows.push(...categoryRows(`${sideKey}:${c.id}`, c.name || 'Untitled', accs, nCols))
     }
-    const leftovers = side.filter((a) => !placed.has(a.code))
-    if (leftovers.length > 0) {
-      rows.push(...buildHierarchyRows(leftovers, `${sideKey}:other`, 1))
-      rows.push({
-        key: `${sideKey}:other:sub`,
-        label: '其他 · Other — 小计',
-        depth: 0,
-        kind: 'subtotal',
-        tone: 'auto',
-        values: colSum(leftovers.map((a) => a.values), nCols),
-      })
+    if (placed.leftovers.length > 0) {
+      const leftovers = placed.leftovers.map((code) => byCode.get(code)!)
+      rows.push(...categoryRows(`${sideKey}:other`, '其他 · Other', leftovers, nCols))
     }
   }
 
   rows.push({ key: `${sideKey}:total`, label: sideLabel, depth: 0, kind: 'subtotal', tone: 'auto', emphasis: 'strong', values: sideTotal })
   return rows
+}
+
+/** One category: its header row (totals on the row) + the COA tree beneath at
+ *  depth 1. A single root named like the category IS the header row, its
+ *  subtree lifted one level; a lone leaf likewise (nothing to expand). */
+function categoryRows(key: string, name: string, accs: SideAccount[], nCols: number): MatrixRow[] {
+  const tree = buildHierarchyRows(accs, key, 1)
+  const roots = tree.filter((r) => r.depth === 1)
+  if (roots.length === 1 && sameName(roots[0].label, name)) {
+    const [root, ...rest] = tree
+    return [
+      { key, code: root.code, label: name, depth: 0, kind: 'category', isParent: rest.length > 0, values: root.values },
+      ...rest.map((r) => ({ ...r, depth: r.depth - 1 })),
+    ]
+  }
+  return [
+    { key, label: name, depth: 0, kind: 'category', isParent: true, values: colSum(accs.map((a) => a.values), nCols) },
+    ...tree,
+  ]
 }
 
 /** Default layout when nothing is saved: the three standard activity buckets. */

@@ -14,8 +14,8 @@ import { requirePermission } from '@/lib/auth'
 import { buildCashFlow, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
 import { defaultSideLayout } from '@/lib/cash-flow-sections'
-import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
-import ReportLayoutEditor from '../../_components/ReportLayoutEditor'
+import { ancestorChain, readReportLayout, type ReportLayout } from '@/lib/report-layouts'
+import ReportLayoutEditor, { type GroupMeta } from '../../_components/ReportLayoutEditor'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,8 +50,26 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
   )
 
   const nameOf = new Map(coa.map((a) => [a.code, a.name]))
-  const metaFor = (leaves: { code: string }[]) =>
-    leaves.map((l) => ({ code: l.code, name: nameOf.get(l.code) ?? l.code }))
+  const parentOf = new Map(coa.map((a) => [a.code, a.parent_code]))
+  // Leaves carry their COA parents (nearest first) and every parent present on
+  // the side is offered as a ▣ 整组 chip — listing it files the whole subtree
+  // (lib/report-layouts placeLeavesInLayout), so e.g. one 3020 chip keeps all
+  // the loan debtors together and catches the next new one (2026-09-18).
+  const metaFor = (leaves: { code: string }[]) => {
+    const accounts = leaves.map((l) => ({
+      code: l.code,
+      name: nameOf.get(l.code) ?? l.code,
+      ancestors: ancestorChain(l.code, (c) => parentOf.get(c)),
+    }))
+    const size = new Map<string, number>()
+    for (const a of accounts) for (const anc of a.ancestors) size.set(anc, (size.get(anc) ?? 0) + 1)
+    const groups: GroupMeta[] = [...size.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+      .map(([code, n]) => ({ code, name: nameOf.get(code) ?? code, size: n }))
+    return { accounts, groups }
+  }
+  const inMeta = metaFor(cf.inflowLeaves)
+  const outMeta = metaFor(cf.outflowLeaves)
 
   const initialFor = (saved: unknown, leaves: Parameters<typeof defaultSideLayout>[0]) => {
     const s = (saved ?? null) as ReportLayout | null
@@ -77,6 +95,7 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
           <h1 className="page-title">Cash Flow 版面</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
             收、出两边各自分组 —— 建 section(例如「借贷与还款」「日常开销」)、把账目拖进去、用 ↑↓ 排顺序。
+            拖「▣ 整组」= 整个父账号连底下的全部账目一起归位,以后新开的子账目也自动跟着。
             没拖的账目会落在「其他」,不会漏掉。每个 section 里面照旧按 COA 父子收拢。
           </p>
         </div>
@@ -90,7 +109,8 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
         </div>
         <ReportLayoutEditor
           reportKey="cash_flow_in"
-          accounts={metaFor(cf.inflowLeaves)}
+          accounts={inMeta.accounts}
+          groups={inMeta.groups}
           initial={initialFor(inSaved, cf.inflowLeaves)}
         />
       </section>
@@ -103,7 +123,8 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
         </div>
         <ReportLayoutEditor
           reportKey="cash_flow_out"
-          accounts={metaFor(cf.outflowLeaves)}
+          accounts={outMeta.accounts}
+          groups={outMeta.groups}
           initial={initialFor(outSaved, cf.outflowLeaves)}
         />
       </section>
