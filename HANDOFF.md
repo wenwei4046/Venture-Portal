@@ -1397,11 +1397,17 @@ PARENT), not the fund source's own `account_code` — worth fixing if the user
 asks; also offered to auto-fill the source row's account from the fund source
 when the repay box is ticked.
 
+**Money-out 其他 filed (mig 20260918020000)**: the 2026-07-30 layout only
+listed seven expense leaves, so a dozen accounts sat in 其他. User: "费用类没
+问题 / Computer-equipment 算 Capex / Account payable 是啥？/ 其他的你跟着排".
+Now: General Expense + 9088 (group) 9089 9092 9096 9097 9000 4050 (4050 = the
+imported supplier-bill payments YSL 2,250.60 + Feb electricity 828.40 via
+HOUZS Century — told the user, filed under General Expense, easy to move);
+Salary & Statutory + 4075; NEW Interest Expense = 6000 + 4060 (group); NEW
+Capex = 2000; 1900 Opening Balance Clearing stays in 其他.
+
 **Open / not done**: month columns stay Accumulated + latest-first (mock-up
-drew them chronological; user never raised it); money-out 其他 still holds
-1900 / 2000 / 4050 / 4062 / 4075 / 6000 / 9000 / 9089 / 9092 / 9095 / 9096 /
-9097 because the 2026-07-30 layout only listed seven expense leaves — user was
-asked whether to file them (General Expense / Salary & Statutory / Interest).
+drew them chronological; user never raised it).
 
 ## SESSION 2026-09-14/15 — cancel-loan overload fix · 作废已开发票 · water RM36→39 amend
 
