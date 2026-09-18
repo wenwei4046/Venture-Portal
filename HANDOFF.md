@@ -1406,6 +1406,16 @@ HOUZS Century — told the user, filed under General Expense, easy to move);
 Salary & Statutory + 4075; NEW Interest Expense = 6000 + 4060 (group); NEW
 Capex = 2000; 1900 Opening Balance Clearing stays in 其他.
 
+**4050 payments re-pointed (data fix, user: "ysl 的是 secretary fees, KL
+gateway 的就是电费, 就挂去相对应的费用")**: manual_jv PV-000005 (3/6, YSL
+2,250.60) Dr 4050 → 9097 — no PI ever booked it, so the expense was missing
+from the P&L until now; PV-000038 (4/14, KL Gateway Feb electricity via
+HOUZS Century, 828.40) Dr 4050 → 9091 and the Feb accrual PI-000004 (Dr 9091
+/ Cr 4050) DELETED via delete_manual_journal_voucher, so the expense is booked
+once, on payment (Feb → Apr). Both JEs carry a "[GL reassigned …]" note. 4050
+now holds only PI-000001 (3/29 office rental Cr 3,000) with no payment against
+it — told the user, not touched.
+
 **Open / not done**: month columns stay Accumulated + latest-first (mock-up
 drew them chronological; user never raised it).
 
