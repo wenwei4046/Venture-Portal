@@ -18,6 +18,8 @@ import {
   r2,
   showAllowStat,
   billingRow,
+  hrPayout,
+  hrPayoutTotal,
   billingAccum,
   savingAccum,
   allowStatAccum,
@@ -25,6 +27,7 @@ import {
   contraOffset,
   type MonthResult,
   type DirectorMonthResult,
+  type AllowanceSlice,
   type DirectorInputMap,
   type DpContraEvent,
   type DpDirector,
@@ -897,6 +900,54 @@ function FlowBox({ label, value }: { label: string; value: string; tone?: 'ink' 
 
 type FlowRow = [string, string, boolean?, ('danger' | 'ledger' | 'alert' | 'muted')?]
 
+/** The gross → saving → balance → split chain for one allowance slice. */
+function allowanceChain(
+  a: AllowanceSlice,
+  full: boolean,
+  settings: Pick<DpSettings, 'savingPct' | 'gbPct'>,
+): FlowRow[] {
+  return [
+    ['Allowance Gross (Pool × Weight)', fmtRM(a.gross)],
+    [`Less: Saving (${settings.savingPct}%)`, `- RM ${fmt(a.saving)}`],
+    [`= Allowance Balance (${r2(100 - settings.savingPct)}%)`, fmtRM(a.balance), true],
+    ...(full
+      ? ([['💯 Full Payout → 100% Balance to Director', fmtRM(a.gb), true]] as FlowRow[])
+      : ([
+          [`${settings.gbPct}% → Gross Balance (Director Pay)`, fmtRM(a.gb), true],
+          [`${r2(100 - settings.gbPct)}% → Billing Invoice`, fmtRM(a.billInv)],
+        ] as FlowRow[])),
+  ]
+}
+
+/**
+ * The Allowance Stream. With a separately-transferred slice it lists the two
+ * transfers as their own sections plus a total, so a "75% →" row really is 75%
+ * — the merged chain used to hide HV's 100% slice inside it (user question
+ * 2026-09-18). Without one it is the single chain it has always been.
+ */
+export function allowanceStreamRows(
+  d: Pick<
+    DirectorMonthResult,
+    'allowInPay' | 'allowExcl' | 'allowGross' | 'allowSaving' | 'allowGB' | 'allowBillInv'
+  >,
+  m: Pick<MonthResult, 'fullPayout' | 'allowExclFullPayout'>,
+  settings: Pick<DpSettings, 'savingPct' | 'gbPct'>,
+  exclName: string,
+): FlowRow[] {
+  if (d.allowExcl.gross <= 0) return allowanceChain(d.allowInPay, m.fullPayout, settings)
+  return [
+    ['── 月头那笔 · 其他公司 ──', '', false, 'muted'],
+    ...allowanceChain(d.allowInPay, m.fullPayout, settings),
+    [`── 15号那笔 · ${exclName} ──`, '', false, 'muted'],
+    ...allowanceChain(d.allowExcl, m.fullPayout || m.allowExclFullPayout, settings),
+    ['── 合计 ──', '', false, 'muted'],
+    ['Allowance Gross 合计', fmtRM(d.allowGross)],
+    [`Saving (${settings.savingPct}%) 合计`, `- RM ${fmt(d.allowSaving)}`],
+    ['过给 Director 合计', fmtRM(d.allowGB), true],
+    [`${r2(100 - settings.gbPct)}% Billing Invoice 合计`, fmtRM(d.allowBillInv)],
+  ]
+}
+
 function FlowStream({ title, rows }: { title: string; rows: FlowRow[] }) {
   // Plain ink except the muted section separators — synced with the PDF
   const toneCls = { danger: 'text-ink', ledger: 'text-ink', alert: 'text-ink', muted: 'text-graphite' }
@@ -926,6 +977,8 @@ function FlowStream({ title, rows }: { title: string; rows: FlowRow[] }) {
 
 function FlowView(p: DashProps) {
   const { results, directors, dirInputs, contra, settings } = p
+  // The company that transfers its allowance separately, for labelling.
+  const exclName = p.companies.find((c) => c.excludeFromPay)?.name ?? 'Houzs Venture'
   const [monthId, setMonthId] = useState(results[results.length - 1].id)
   const [dirId, setDirId] = useState(directors[0]?.id ?? '')
   const m = results.find((x) => x.id === monthId) ?? results[results.length - 1]
@@ -938,9 +991,7 @@ function FlowView(p: DashProps) {
   const statSalVal = m.fullPayout ? 0 : (inp.billingStat ?? 0)
   const statAlVal = m.fullPayout || !sas ? 0 : (inp.allowBillingStat ?? 0)
   const total25 = m.fullPayout ? 0 : r2(d.salKpiBillInv + statSalVal + d.allowBillInv + statAlVal)
-  // Payout: Vr KPI offset repays old debt, statFromSurplus pays this month's
-  // keyed statutory (user ruling 2026-07-31) — both come off the payout.
-  const totalHRPayout = r2(d.totalPay + Math.abs(d.advThisMonth) - d.advanceOffset - d.statFromSurplus)
+  const totalHRPayout = hrPayout(d)
   // Advance added this month: statutory covered by the Vr KPI surplus never
   // becomes debt.
   const totalAdvBox = r2(Math.abs(d.advThisMonth) + d.advStatAmount + d.allowStatAmount - d.statFromSurplus)
@@ -1039,7 +1090,14 @@ function FlowView(p: DashProps) {
                 the stream totals (user ruling 2026-07-31, supersedes 07-26).
                 Synced with the PDF report. */}
             <FlowBox label="25% Billing Invoice" value={fmtRM(total25)} tone="alert" />
-            <FlowBox label="75% Gross Balance" value={fmtRM(r2(d.salKpiGB + d.allowGB))} tone="info" />
+            {/* The chain covers the FIRST transfer only — the 15th's allowance
+                gets its own box below, so every figure on this row belongs to
+                the same payment (user request 2026-09-18). */}
+            <FlowBox
+              label={`75% Gross Balance (Sal+KPI+Allow)`}
+              value={fmtRM(d.totalPay)}
+              tone="info"
+            />
           </>
         )}
         {d.advanceOffset > 0 ? (
@@ -1049,7 +1107,21 @@ function FlowView(p: DashProps) {
         ) : d.vrKpi > 0 && netExceed > 0 ? (
           <FlowBox label="Exceed (KPI)" value={`+ ${fmtRM(netExceed)}`} tone="ledger" />
         ) : null}
-        <FlowBox label="HR Payout Before Deduct Statutory" value={fmtRM(totalHRPayout)} />
+      </div>
+
+      {/* The two transfers, as an equation. Without a 15th transfer this stays
+          a single full-width box, exactly as before. */}
+      <div className="flex flex-wrap items-stretch gap-2 mb-5">
+        <FlowBox
+          label={d.allowExcl.gb > 0 ? 'HR Payout Before Deduct Statutory (月头)' : 'HR Payout Before Deduct Statutory'}
+          value={fmtRM(totalHRPayout)}
+        />
+        {d.allowExcl.gb > 0 && (
+          <>
+            <FlowBox label={`＋ ${exclName} Allowance (15号)`} value={fmtRM(d.allowExcl.gb)} />
+            <FlowBox label="＝ 实际到手合计" value={fmtRM(hrPayoutTotal(d))} />
+          </>
+        )}
       </div>
 
       {/* Accumulated ledgers */}
@@ -1122,26 +1194,20 @@ function FlowView(p: DashProps) {
         ]}
       />
       {d.allowGross > 0 && (
-        <FlowStream
-          title="🎁 Allowance Stream"
-          rows={[
-            ['Allowance Gross (Pool × Weight)', fmtRM(d.allowGross)],
-            [`Less: Saving (${settings.savingPct}%)`, `- RM ${fmt(d.allowSaving)}`],
-            [`= Allowance Balance (${r2(100 - settings.savingPct)}%)`, fmtRM(d.allowBalance), true],
-            ...(m.fullPayout
-              ? ([['💯 Full Payout → 100% Balance to Director', fmtRM(d.allowGB), true]] as [string, string, boolean?][])
-              : ([
-                  [`${settings.gbPct}% → Gross Balance (Director Pay)`, fmtRM(d.allowGB), true],
-                  [`${r2(100 - settings.gbPct)}% → Billing Invoice`, fmtRM(d.allowBillInv)],
-                ] as [string, string, boolean?][])),
-          ]}
-        />
+        <FlowStream title="🎁 Allowance Stream" rows={allowanceStreamRows(d, m, settings, exclName)} />
       )}
       {/* Stream 3: Advance Tracking — ported verbatim from the HTML flow view */}
       <FlowStream
         title="⚠️ Advance Tracking 预支追踪"
         rows={[
-          [m.fullPayout ? 'Balance (100% after Saving)' : `Total Pay (${settings.gbPct}% Gross Balance)`, fmtRM(d.totalPay)],
+          [
+            m.fullPayout
+              ? 'Balance (100% after Saving)'
+              : d.allowExcl.gb > 0
+                ? `Total Pay (${settings.gbPct}% Gross Balance) · 月头那笔`
+                : `Total Pay (${settings.gbPct}% Gross Balance)`,
+            fmtRM(d.totalPay),
+          ],
           ['Fixed Salary', fmtRM(d.dirFixed)],
           [
             m.fullPayout

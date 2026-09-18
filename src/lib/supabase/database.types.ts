@@ -3319,18 +3319,21 @@ export type Database = {
       }
       dp_companies: {
         Row: {
+          exclude_from_pay: boolean
           id: string
           is_active: boolean
           name: string
           sort: number
         }
         Insert: {
+          exclude_from_pay?: boolean
           id?: string
           is_active?: boolean
           name: string
           sort?: number
         }
         Update: {
+          exclude_from_pay?: boolean
           id?: string
           is_active?: boolean
           name?: string
@@ -3534,6 +3537,7 @@ export type Database = {
       }
       dp_months: {
         Row: {
+          allow_excl_full_payout: boolean
           billing_deduct_adv: boolean
           created_at: string
           full_payout: boolean
@@ -3542,6 +3546,7 @@ export type Database = {
           month: string
         }
         Insert: {
+          allow_excl_full_payout?: boolean
           billing_deduct_adv?: boolean
           created_at?: string
           full_payout?: boolean
@@ -3550,6 +3555,7 @@ export type Database = {
           month: string
         }
         Update: {
+          allow_excl_full_payout?: boolean
           billing_deduct_adv?: boolean
           created_at?: string
           full_payout?: boolean
