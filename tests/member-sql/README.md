@@ -20,6 +20,14 @@ no director memberships or overrides, and cycles through every assigned home
 director. Run only these checks with
 `npm run test:director-reporting --prefix tests/member-sql`.
 
+The default command also includes 37 checks in
+`validate-ir-specialist-downlines.mjs`. They verify IR Specialists can lead
+same-title peers while Fair permissions, rates, scheme limits and existing
+memberships stay unchanged. Real membership triggers reject IR cycles and a
+fourth direct line, including people with simultaneous Fair/IR positions;
+opposite reporting lines in separate schemes remain valid. Run only these
+checks with `npm run test:ir-specialist-downlines --prefix tests/member-sql`.
+
 Expected final output:
 
 ```text

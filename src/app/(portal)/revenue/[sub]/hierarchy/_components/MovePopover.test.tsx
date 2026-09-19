@@ -102,3 +102,67 @@ describe('MovePopover', () => {
     expect(props.onClose).toHaveBeenCalled()
   })
 })
+
+describe('Revenue Specialist recruiting follows the sub-department configuration', () => {
+  function setupSpecialists(canRecruit: boolean, existingDirects: number) {
+    const specialist = { ...rs, canRecruit, directLineLimit: 3 }
+    const mover = person({ staffId: 'mover', name: 'MOVER', ...specialist, directLineCount: 1 })
+    const roster = [
+      mover,
+      person({ staffId: 'peer', name: 'PEER', ...specialist, directLineCount: existingDirects }),
+      person({ staffId: 'child', name: 'CHILD', ...specialist, uplineStaffId: 'mover', directLineCount: 1 }),
+      person({ staffId: 'grandchild', name: 'GRANDCHILD', ...specialist, uplineStaffId: 'child', directLineCount: 0 }),
+      ...Array.from({ length: existingDirects }, (_, index) => person({
+        staffId: `existing-${index}`, name: `EXISTING ${index + 1}`, ...specialist, uplineStaffId: 'peer', directLineCount: 0,
+      })),
+    ]
+    const graph = roster.map(person => ({ id: person.staffId, parentId: person.uplineStaffId, label: person.name }))
+    const onPick = vi.fn()
+    render(<MovePopover mover={mover} people={roster} graph={graph} anchor={anchor} onPick={onPick} onClose={vi.fn()} />)
+    return { onPick }
+  }
+
+  it('offers an IR specialist peer with an open third slot while retaining self and descendant refusals', () => {
+    const { onPick } = setupSpecialists(true, 2)
+    const peer = screen.getByRole('option', { name: /^PEER/ })
+    expect(peer).toBeEnabled()
+    expect(peer).toHaveTextContent('Revenue Specialist')
+    expect(peer).toHaveTextContent('2/3 directs')
+    fireEvent.click(peer)
+    expect(onPick).toHaveBeenCalledWith('peer')
+
+    const self = screen.getByRole('option', { name: /^MOVER/ })
+    const child = screen.getByRole('option', { name: /^CHILD/ })
+    const grandchild = screen.getByRole('option', { name: /^GRANDCHILD/ })
+    expect(self).toBeDisabled()
+    expect(self).toHaveTextContent('that is them')
+    for (const descendant of [child, grandchild]) {
+      expect(descendant).toBeDisabled()
+      expect(descendant).toHaveTextContent('their downline')
+    }
+    fireEvent.click(self)
+    fireEvent.click(child)
+    fireEvent.click(grandchild)
+    expect(onPick).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a fourth direct under an IR specialist even though the title may recruit', () => {
+    const { onPick } = setupSpecialists(true, 3)
+    const peer = screen.getByRole('option', { name: /^PEER/ })
+    expect(peer).toBeDisabled()
+    expect(peer).toHaveTextContent('3/3 directs')
+    expect(peer).toHaveTextContent('direct lines full')
+    fireEvent.click(peer)
+    expect(onPick).not.toHaveBeenCalled()
+  })
+
+  it('continues refusing the same specialist title when Fair supplies canRecruit=false', () => {
+    const { onPick } = setupSpecialists(false, 0)
+    const peer = screen.getByRole('option', { name: /^PEER/ })
+    expect(peer).toBeDisabled()
+    expect(peer).toHaveTextContent('Revenue Specialist')
+    expect(peer).toHaveTextContent('no downlines')
+    fireEvent.click(peer)
+    expect(onPick).not.toHaveBeenCalled()
+  })
+})

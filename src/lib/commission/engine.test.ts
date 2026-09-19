@@ -582,6 +582,21 @@ describe('title ratchet — previewed on the statement', () => {
 })
 
 describe('can recruit — the title decides, not the month\'s rank', () => {
+  it('accepts IR Specialist peers without inventing an override between equal 3% rates', () => {
+    const specialist: Rank = { ...RANKS[0], rankKey: 'rs_3', label: 'Rank C', productRate: 0.03, canRecruit: true }
+    const result = run({
+      scheme: { ...SCHEME, enableKpi: false, enableOpenBill: false,
+        enableMarginPenalty: false, enableMarginIncentive: false, overrideDepth: 2 },
+      ranks: [specialist],
+      hierarchy: [node('boss', null, 'rs_3', 'fixed', T_RS), node('peer', 'boss', 'rs_3', 'fixed', T_RS)],
+      orders: [order('ir-peer', 'peer', [['MATTRESS', 'M', 1, 10_000, 6_000]])],
+    })
+    expect(result.warnings).toEqual([])
+    expect(find(result.statements, 'peer').productCommission).toBe(300)
+    expect(find(result.statements, 'boss').overrideCommission).toBe(0)
+    expect(result.totalCommission).toBe(300)
+  })
+
   it('a Team Assistant in a month below target keeps their downline without a warning', () => {
     // Placed at 5% long ago; the title says Team Assistant, so the earned
     // floor is 6% and the placed rank no longer matters for recruiting either.
