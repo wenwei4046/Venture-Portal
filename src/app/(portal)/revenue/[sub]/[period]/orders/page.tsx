@@ -212,7 +212,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               {' '}
               {includeExcluded ? (
                 <>
-                  Cancelled, drafted and held bills are shown, greyed;{' '}
+                  Cancelled, drafted, held and ignored bills are shown, greyed;{' '}
                   <Link href={keep({ show: undefined })} className="text-accent hover:underline">
                     hide them
                   </Link>
@@ -220,7 +220,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                 </>
               ) : (
                 <>
-                  {excludedCount} cancelled or held bill{excludedCount === 1 ? ' is' : 's are'} not shown;{' '}
+                  {excludedCount} excluded bill{excludedCount === 1 ? ' is' : 's are'} not shown;{' '}
                   <Link href={keep({ show: 'all' })} className="text-accent hover:underline">
                     show them
                   </Link>
@@ -309,8 +309,16 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                           {o.employeeName}
                         </Link>
                       ) : (
-                        <span className="text-danger font-serif text-[14px]">
-                          {o.agentName} · unmatched
+                        <span
+                          className={
+                            o.excludedReason === 'ignored_agent'
+                              ? 'text-muted font-serif text-[14px]'
+                              : 'text-danger font-serif text-[14px]'
+                          }
+                        >
+                          {/* Red means "answer this". An ignored name HAS been
+                              answered, so it stops asking. */}
+                          {o.agentName} · {o.excludedReason === 'ignored_agent' ? 'not ours' : 'unmatched'}
                         </span>
                       )}
                     </td>
@@ -355,7 +363,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                             runLocked
                               ? 'The run for this month has paid — reopen it before changing the picks'
                               : o.cancelled
-                                ? 'A cancelled bill earns no Open Bill bonus'
+                                ? `${exclusionReason(o)} — no Open Bill bonus`
                                 : 'This bill has no matched salesperson yet'
                           }
                         />
