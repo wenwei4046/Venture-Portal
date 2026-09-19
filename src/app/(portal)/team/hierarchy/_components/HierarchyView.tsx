@@ -50,12 +50,15 @@ export function hierarchyTab(param: string | null | undefined): HierarchyTab {
  */
 export default function HierarchyView({
   people,
+  chartPeople = people,
   commissionHref,
   rungs,
   titles,
   breaks,
 }: {
   people: ChartPerson[]
+  /** Includes extra scheme-specific roles; Table and Levels keep the roster. */
+  chartPeople?: ChartPerson[]
   commissionHref: string | null
   rungs: Rung[]
   titles: BoardTitle[]
@@ -108,10 +111,9 @@ export default function HierarchyView({
               </>
             ) : (
               <>
-                Explore departments and teams from left to right. Drag the canvas to browse,
-                move group headings or borders freely, and use Tidy to restore the horizontal layout. Move a person
-                onto their manager or draw a reporting line to change who they report to.
-                Search a name to find where somebody sits.
+                Directors sit above department zones. Expand a department or team to explore its reporting lines,
+                and search a name to find every role they hold. People in several Revenue sub-departments appear
+                in each role; edit additional roles on their own sub-department hierarchy.
               </>
             )}
           </p>
@@ -143,7 +145,7 @@ export default function HierarchyView({
                 <span className="count">{people.length} PEOPLE · REPORTS TO</span>
               </div>
               <TeamOrgChart
-                people={people}
+                people={chartPeople}
                 commissionHref={commissionHref}
                 focused={focused}
                 onFocus={setFocused}

@@ -23,7 +23,6 @@ import '@xyflow/react/dist/style.css'
 import {
   descendantsOf,
   wouldCycle,
-  NODE_HEIGHT,
   NODE_WIDTH,
   type OrgNodeInput,
 } from '@/lib/org-layout'
@@ -34,9 +33,16 @@ import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import { boundsOf, rectanglePoints } from '@/lib/hierarchy-spaces'
 import { hierarchyTitleAppearance } from '@/lib/hierarchy-title-appearance'
 import { useCompanyHierarchySpaces } from './CompanyHierarchySpaces'
+import { COMPANY_CARD_HEIGHT, companyChartStructure, companyStaffId, companyZoneId } from '@/lib/company-chart-structure'
 
 export interface ChartPerson {
   id: string
+  /** A staff identity may hold several independently titled scheme roles. */
+  staffId?: string
+  subDepartment?: string
+  schemeId?: string
+  membershipHref?: string
+  secondaryRole?: boolean
   name: string
   code: string | null
   title: string | null
@@ -67,13 +73,29 @@ interface CardData extends Record<string, unknown> {
   selected: boolean
   tone: number
   managerName: string | null
+  roleCount: number
+  teamSize: number
+  expanded: boolean
+  toggleTeam: () => void
 }
+
+interface SummaryData extends Record<string, unknown> {
+  name: string
+  people: number
+  roles: number
+  teams: number
+  expand: () => void
+}
+type CompanyNode = Node<CardData> | Node<SummaryData>
+const summaryId = (zoneId: string) => `summary:${zoneId}`
 
 /** No department chosen — the whole company. Exported because the page owns
  *  the choice now: the rail beside this canvas has to answer the same filter. */
 export const ALL_DEPARTMENTS = '__all__'
 const NO_DEPARTMENT = '__unassigned__'
 const departmentKey = (name: string | null) => name ?? NO_DEPARTMENT
+const scopedZoneIds = (people: ChartPerson[], department: string) => people
+  .filter(person => departmentKey(person.department) === department).map(companyZoneId)
 
 /**
  * The company org canvas.
@@ -146,6 +168,10 @@ function Chart({
   const [flowReady, setFlowReady] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [arrangementVersion, setArrangementVersion] = useState(0)
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(() => new Set())
+  const [expandedZones, setExpandedZones] = useState<Set<string>>(() => new Set())
+  const [teamToFocus, setTeamToFocus] = useState<string | null>(null)
+  const [zoneToFocus, setZoneToFocus] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -183,6 +209,7 @@ function Chart({
   const selected = focused
 
   const byId = useMemo(() => new Map(people.map(p => [p.id, p])), [people])
+  const structure = useMemo(() => companyChartStructure(people), [people])
 
   const matches = useMemo(() => {
     const q = find.trim().toLowerCase()
@@ -196,7 +223,7 @@ function Chart({
     const byCode = people.filter(
       p => !p.name.toLowerCase().includes(q) && (p.code ?? '').toLowerCase().includes(q),
     )
-    return [...byName, ...byCode].slice(0, 8)
+    return [...byName, ...byCode]
   }, [people, find])
 
   const departments = useMemo(() => {
@@ -204,22 +231,79 @@ function Chart({
     for (const p of people) if (p.department) set.add(p.department)
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [people])
-  const departmentDefinitions = useMemo(() => [
+  const departmentFilters = useMemo(() => [
     ...departments.map(name => ({ id: departmentKey(name), name })),
     ...(people.some(person => !person.department) ? [{ id: NO_DEPARTMENT, name: 'No department' }] : []),
   ], [departments, people])
-  const members = useMemo(() => people.map(person => ({
+  const scoped = useMemo(() => focusDept === ALL_DEPARTMENTS ? people : people.filter(person =>
+    departmentKey(person.department) === focusDept), [people, focusDept])
+  const visibleDepartmentIds = useMemo(() => focusDept === ALL_DEPARTMENTS ? null
+    : [...new Set(scoped.filter(person => !structure.leaderIds.has(person.id)).map(companyZoneId))],
+  [scoped, focusDept, structure])
+  const scopeIds = useMemo(() => {
+    const ids = new Set(scoped.map(person => person.id))
+    // Keep real supervisors visible above a focused department.
+    for (const id of ids) {
+      const person = byId.get(id)
+      if (!person) continue
+      for (const parentId of [person.reportsTo, ...person.leadIds]) {
+        if (parentId && structure.leaderIds.has(parentId)) ids.add(parentId)
+      }
+    }
+    return ids
+  }, [scoped, byId, structure])
+  const shown = useMemo(() => people.filter(person => {
+    if (structure.leaderIds.has(person.id)) return true
+    if (!expandedZones.has(companyZoneId(person))) return false
+    const team = structure.teamByPerson.get(person.id)
+    return !team || team.leaderId === person.id || expandedTeams.has(team.id)
+  }), [people, structure, expandedTeams, expandedZones])
+  const visible = useMemo(() => shown.filter(person => scopeIds.has(person.id)), [shown, scopeIds])
+  const members = useMemo(() => [...shown.filter(person => !structure.leaderIds.has(person.id)).map(person => ({
     id: person.id,
-    departmentId: departmentKey(person.department),
-    // Directors remain separate staff cards. Their derived lines do not merge
-    // every Revenue team into a single frame.
-    parentId: person.reportsTo,
+    departmentId: companyZoneId(person),
+    parentId: layoutParent(person),
     name: person.name,
     width: NODE_WIDTH,
-    height: NODE_HEIGHT,
-  })), [people])
-  const spaces = useCompanyHierarchySpaces(members, departmentDefinitions,
-    focusDept === ALL_DEPARTMENTS ? null : focusDept)
+    height: COMPANY_CARD_HEIGHT,
+  })), ...structure.departments.filter(department => !expandedZones.has(department.id)).map(department => {
+    const roles = people.filter(person => !structure.leaderIds.has(person.id) && companyZoneId(person) === department.id)
+    const firstParent = roles.map(layoutParent).find(id => id && structure.leaderIds.has(id))
+    return { id: summaryId(department.id), departmentId: department.id, parentId: firstParent ?? null,
+      name: 'Department overview', width: NODE_WIDTH, height: COMPANY_CARD_HEIGHT }
+  })], [shown, structure, expandedZones, people])
+  const leaders = useMemo(() => shown.filter(person => structure.leaderIds.has(person.id)).map(person => ({
+    id: person.id, departmentId: companyZoneId(person), parentId: layoutParent(person),
+    name: person.name, width: NODE_WIDTH, height: COMPANY_CARD_HEIGHT,
+    relatedDepartmentIds: [...new Set(people.filter(role => role.reportsTo === person.id || role.leadIds.includes(person.id))
+      .map(companyZoneId))],
+  })), [shown, structure, people])
+  const departmentDefinitions = structure.departments
+  const spaces = useCompanyHierarchySpaces(members, departmentDefinitions, { leaders, visibleDepartmentIds })
+  const toggleTeam = useCallback((teamId: string) => {
+    onFocus(null)
+    setExpandedTeams(previous => {
+      const next = new Set(previous)
+      if (next.has(teamId)) next.delete(teamId)
+      else next.add(teamId)
+      return next
+    })
+    setTeamToFocus(teamId)
+  }, [onFocus])
+  const expandZone = useCallback((id: string) => {
+    onFocus(null)
+    setExpandedZones(previous => new Set([...previous, id]))
+    setZoneToFocus(id)
+  }, [onFocus])
+  const chooseDepartment = (id: string) => {
+    onFocus(null)
+    if (id !== ALL_DEPARTMENTS) {
+      setExpandedZones(previous => new Set([...previous, ...scopedZoneIds(people, id)]))
+      setExpandedTeams(previous => new Set([...previous, ...structure.teams.filter(team =>
+        people.some(person => person.id === team.leaderId && departmentKey(person.department) === id)).map(team => team.id)]))
+    }
+    onFocusDept(id)
+  }
 
   // Focusing a department now REMOVES the rest rather than fading them (user,
   // 2026-09-08: nobody reports across a department boundary today, so a dimmed
@@ -230,10 +314,6 @@ function Chart({
   // refuses a loop in the database whether or not the chart could see it, and
   // a line that leaves the department is counted below rather than drawn as a
   // person who reports to nobody.
-  const visible = useMemo(
-    () => (focusDept === ALL_DEPARTMENTS ? people : people.filter(p => departmentKey(p.department) === focusDept)),
-    [people, focusDept],
-  )
   const visibleIds = useMemo(() => new Set(visible.map(p => p.id)), [visible])
 
   // Sorted by department then name, so unattached people cluster with their
@@ -264,6 +344,7 @@ function Chart({
     const mover = byId.get(dragging)
     if (mover) {
       for (const p of visible) {
+        if (mover.secondaryRole || p.secondaryRole) out.add(p.id)
         if (mover.levelRank !== null && !ladderAllows(mover.levelRank, p.levelRank)) out.add(p.id)
         if (lineRefusal(mover, p)) out.add(p.id)
       }
@@ -271,57 +352,101 @@ function Chart({
     return out
   }, [dragging, graph, byId, visible])
 
-  const [nodes, setNodes] = useState<Node<CardData>[]>([])
+  const [nodes, setNodes] = useState<CompanyNode[]>([])
   useEffect(() => {
-    setNodes(visible.flatMap(p => {
+    const personNodes: Node<CardData>[] = visible.flatMap(p => {
         const pos = spaces.positions.get(p.id)
         if (!pos) return []
         return {
           id: p.id,
           type: 'person',
           deletable: false,
+          draggable: p.secondaryRole ? false : undefined,
+          connectable: p.secondaryRole ? false : undefined,
           selected: selected === p.id,
           position: { x: pos.x, y: pos.y },
           data: {
             person: p,
             invalidTarget: forbidden.has(p.id),
             selected: selected === p.id,
-            tone: departmentDefinitions.findIndex(department => department.id === departmentKey(p.department)) % 3,
+            tone: Math.max(0, departmentDefinitions.findIndex(department => department.id === companyZoneId(p))) % 3,
             managerName: p.reportsTo ? byId.get(p.reportsTo)?.name ?? 'Outside this chart'
               : headsLabel(p.leadIds.map(id => byId.get(id)?.name).filter((name): name is string => !!name)) || null,
+            roleCount: structure.rolesByStaff.get(companyStaffId(p))?.length ?? 1,
+            teamSize: structure.teamByPerson.get(p.id)?.leaderId === p.id
+              ? (structure.teamByPerson.get(p.id)!.memberIds.length - 1) : 0,
+            expanded: expandedTeams.has(structure.teamByPerson.get(p.id)?.id ?? ''),
+            toggleTeam: () => toggleTeam(structure.teamByPerson.get(p.id)!.id),
           },
         }
-      }))
-  }, [visible, spaces.positions, forbidden, selected, departmentDefinitions, byId])
+      })
+    const summaries: Node<SummaryData>[] = departmentDefinitions.filter(department =>
+      !expandedZones.has(department.id) && (visibleDepartmentIds === null || visibleDepartmentIds.includes(department.id))).flatMap(department => {
+      const position = spaces.positions.get(summaryId(department.id))
+      if (!position) return []
+      const roles = scoped.filter(person => !structure.leaderIds.has(person.id) && companyZoneId(person) === department.id)
+      return [{ id: summaryId(department.id), type: 'summary', position, draggable: false, connectable: false,
+        deletable: false, selectable: false, data: {
+          name: department.name, people: new Set(roles.map(companyStaffId)).size, roles: roles.length,
+          teams: structure.teams.filter(team => team.departmentId === department.id).length,
+          expand: () => expandZone(department.id),
+        } }]
+    })
+    setNodes([...personNodes, ...summaries])
+  }, [visible, spaces.positions, forbidden, selected, departmentDefinitions, byId, structure, expandedTeams, toggleTeam,
+    expandedZones, visibleDepartmentIds, scoped, expandZone])
 
+  const visibleBounds = useCallback(() => {
+    const frames = spaces.geometry.departments.filter(department => visibleDepartmentIds === null || visibleDepartmentIds.includes(department.id))
+    const points = frames.flatMap(frame => rectanglePoints(frame.bounds))
+    for (const leader of leaders.filter(person => scopeIds.has(person.id))) {
+      const point = spaces.positions.get(leader.id)
+      if (point) points.push(...rectanglePoints({ ...point, width: NODE_WIDTH, height: COMPANY_CARD_HEIGHT }))
+    }
+    return points.length ? boundsOf(points) : null
+  }, [spaces.geometry, spaces.positions, visibleDepartmentIds, leaders, scopeIds])
   const fitCompany = useCallback(() => {
-    const frames = spaces.geometry.departments.filter(department => focusDept === ALL_DEPARTMENTS || department.id === focusDept)
-    if (frames.length) void fitBounds(boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds))), {
+    const bounds = visibleBounds()
+    if (bounds) void fitBounds(bounds, {
       padding: 0.12, duration: 320,
     })
-  }, [spaces.geometry, focusDept, fitBounds])
-  const showHorizontal = useCallback(() => {
-    const frames = spaces.geometry.departments.filter(department => focusDept === ALL_DEPARTMENTS || department.id === focusDept)
-    if (!frames.length) return
-    const bounds = boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds)))
+  }, [visibleBounds, fitBounds])
+  const showOverview = useCallback(() => {
+    const bounds = visibleBounds()
+    if (!bounds) return
     const width = canvasRef.current?.clientWidth || 1100
     const height = canvasRef.current?.clientHeight || 740
-    // Start at the left of the horizontal canvas at a readable size. Fitting
-    // all seven departments would reduce every card to a tiny thumbnail.
-    const zoom = Math.min(0.7, Math.max(0.45, (height - 64) / bounds.height))
+    const zoom = Math.min(0.85, Math.max(0.45, Math.min((height - 80) / bounds.height, (width - 64) / bounds.width)))
     void setViewport({
       x: Math.max(32, (width - bounds.width * zoom) / 2) - bounds.x * zoom,
       y: 32 - bounds.y * zoom,
       zoom,
     }, { duration: 320 })
-  }, [spaces.geometry, focusDept, setViewport])
+  }, [visibleBounds, setViewport])
   const fittedDepartment = useRef<string | null>(null)
   useEffect(() => {
     const viewKey = `${focusDept}:${arrangementVersion}`
-    if (!spaces.loaded || !flowReady || fittedDepartment.current === viewKey) return
+    if (!spaces.ready || !flowReady || fittedDepartment.current === viewKey
+      || ![...members, ...leaders].every(person => spaces.positions.has(person.id))) return
     fittedDepartment.current = viewKey
-    showHorizontal()
-  }, [spaces.loaded, flowReady, focusDept, arrangementVersion, showHorizontal])
+    showOverview()
+  }, [spaces.ready, spaces.positions, flowReady, focusDept, arrangementVersion, showOverview, members, leaders])
+  useEffect(() => {
+    if (!spaces.ready || !zoneToFocus || spaces.positions.has(summaryId(zoneToFocus))) return
+    const frame = spaces.geometry.departments.find(department => department.id === zoneToFocus)
+    if (!frame) return
+    setZoneToFocus(null)
+    void fitBounds(frame.bounds, { padding: 0.2, duration: 320 })
+  }, [zoneToFocus, spaces.ready, spaces.positions, spaces.geometry, fitBounds])
+  useEffect(() => {
+    if (!spaces.ready || !teamToFocus) return
+    const team = structure.teams.find(team => team.id === teamToFocus)
+    if (expandedTeams.has(teamToFocus) && team?.memberIds.some(id => !spaces.positions.has(id))) return
+    const frame = spaces.geometry.teams.find(team => team.id === teamToFocus)
+    if (!frame) return
+    setTeamToFocus(null)
+    void fitBounds(frame.bounds, { padding: 0.25, duration: 320 })
+  }, [teamToFocus, spaces.ready, spaces.positions, spaces.geometry, fitBounds, structure, expandedTeams])
 
   const edges: Edge[] = useMemo(() => {
     // A line the ladder would refuse today — drawn after the ladder changed
@@ -331,7 +456,7 @@ function Chart({
       .filter(p => p.reportsTo && visibleIds.has(p.reportsTo))
       .map(p => {
         const manager = byId.get(p.reportsTo!)!
-        const broken = !ladderAllows(p.levelRank, manager.levelRank)
+        const broken = !p.secondaryRole && !ladderAllows(p.levelRank, manager.levelRank)
         return {
           id: `r:${p.reportsTo}->${p.id}`,
           source: p.reportsTo!,
@@ -354,13 +479,38 @@ function Chart({
         type: 'smoothstep',
         style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5, strokeDasharray: '5 4' },
       }))
-    return [...reporting, ...directing]
-  }, [visible, visibleIds, byId])
+    // A collapsed department stands in for its real roles. Aggregate only
+    // actual reporting/directorship relationships, never a fabricated CEO.
+    const summaryEdges = new Map<string, Edge>()
+    const summaryCounts = new Map<string, number>()
+    for (const person of scoped) {
+      if (expandedZones.has(companyZoneId(person)) || structure.leaderIds.has(person.id)) continue
+      const parents = person.reportsTo ? [person.reportsTo] : person.leadIds
+      for (const parent of parents) {
+        if (!visibleIds.has(parent)) continue
+        const target = summaryId(companyZoneId(person))
+        const id = `summary:${parent}->${target}`
+        summaryCounts.set(id, (summaryCounts.get(id) ?? 0) + 1)
+        summaryEdges.set(id, { id, source: parent, target, type: 'smoothstep',
+          style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5,
+            ...(person.reportsTo ? {} : { strokeDasharray: '5 4' }) } })
+      }
+    }
+    return [...reporting, ...directing, ...[...summaryEdges.values()].map(edge => ({
+      ...edge, label: `${summaryCounts.get(edge.id)} reporting ${summaryCounts.get(edge.id) === 1 ? 'role' : 'roles'}`,
+      labelStyle: { fontSize: 11, fill: 'rgb(var(--cv-graphite))' },
+      labelBgStyle: { fill: 'rgb(var(--cv-card))' }, labelBgPadding: [6, 4] as [number, number],
+    }))]
+  }, [visible, visibleIds, byId, scoped, expandedZones, structure])
 
   const move = useCallback(
     (childId: string, parentId: string | null) => {
       const child = byId.get(childId)
       if (!child || pending) return
+      if (child.secondaryRole || (parentId && byId.get(parentId)?.secondaryRole)) {
+        setError('Edit this role in its Revenue sub-department to change its reporting line.')
+        return
+      }
       if (child.reportsTo === parentId) return
 
       if (parentId) {
@@ -435,16 +585,16 @@ function Chart({
     [byId, graph, router, pending],
   )
 
-  const onNodeDragStop: OnNodeDrag<Node<CardData>> = useCallback(
+  const onNodeDragStop: OnNodeDrag<CompanyNode> = useCallback(
     (_event, node) => {
       draggedPerson.current = null
       setDragging(null)
       setNodes(current => current.map(item => ({ ...item, position: spaces.positions.get(item.id) ?? item.position })))
-      const hits = getIntersectingNodes(node).filter(n => n.id !== node.id && !forbidden.has(n.id))
+      const hits = getIntersectingNodes(node).filter(n => byId.has(n.id) && n.id !== node.id && !forbidden.has(n.id))
       const target = hits[0]
       if (target) move(node.id, target.id)
     },
-    [forbidden, getIntersectingNodes, move, spaces.positions],
+    [forbidden, getIntersectingNodes, move, spaces.positions, byId],
   )
 
   const onConnect = useCallback(
@@ -461,16 +611,29 @@ function Chart({
   // focus — re-centring on every render would fight the reader's own panning.
   const centred = useRef<string | null>(null)
   useEffect(() => {
+    const person = focused ? byId.get(focused) : null
+    if (!person) return
+    const zone = companyZoneId(person)
+    setExpandedZones(previous => previous.has(zone) ? previous : new Set([...previous, zone]))
+    const team = structure.teamByPerson.get(person.id)
+    if (team) setExpandedTeams(previous => previous.has(team.id) ? previous : new Set([...previous, team.id]))
+  }, [focused, byId, structure])
+  useEffect(() => {
     if (!focused) { centred.current = null; return }
-    if (!flowReady || focused === centred.current || !spaces.loaded) return
+    if (!flowReady || focused === centred.current || !spaces.ready) return
+    const person = byId.get(focused)
+    const team = structure.teamByPerson.get(focused)
+    if (!person || !visibleIds.has(focused)
+      || (!structure.leaderIds.has(focused) && !expandedZones.has(companyZoneId(person)))
+      || (team && !expandedTeams.has(team.id))) return
     const pos = spaces.positions.get(focused)
     if (!pos) return
     centred.current = focused
-    void setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT / 2, {
+    void setCenter(pos.x + NODE_WIDTH / 2, pos.y + COMPANY_CARD_HEIGHT / 2, {
       zoom: 1,
       duration: 320,
     })
-  }, [focused, spaces.positions, spaces.loaded, setCenter, revealAt, flowReady])
+  }, [focused, spaces.positions, spaces.ready, setCenter, revealAt, flowReady, byId, structure, expandedTeams, expandedZones, visibleIds])
 
   /**
    * Show me where this person is.
@@ -497,24 +660,27 @@ function Chart({
     [byId, focusDept, onFocusDept, onFocus],
   )
 
-  const nodeTypes = useMemo(() => ({ person: PersonCard }), [])
+  const nodeTypes = useMemo(() => ({ person: PersonCard, summary: DepartmentSummary }), [])
 
   // Every count describes the canvas, not the company — a line that says
   // "9 people" over a chart showing 3 is worse than no line at all. The top
   // of a Revenue tree reports to its director, not to nobody.
-  const unplaced = visible.filter(p => !p.reportsTo && !reportsToHeads(p)).length
-  const directed = visible.filter(p => reportsToHeads(p) && p.leadIds.some(id => visibleIds.has(id))).length
-  const broken = visible.filter(
+  const unplaced = scoped.filter(p => !p.reportsTo && !reportsToHeads(p)).length
+  const directed = scoped.filter(p => reportsToHeads(p) && p.leadIds.some(id => scopeIds.has(id))).length
+  const broken = scoped.filter(
     p =>
+      !p.secondaryRole &&
       p.reportsTo &&
       byId.has(p.reportsTo) &&
       !ladderAllows(p.levelRank, byId.get(p.reportsTo)!.levelRank),
   ).length
-  const hidden = people.length - visible.length
+  const hidden = people.length - scoped.length
   // Reports to somebody outside the focused department. None today, which is
   // why filtering is safe at all — but drawn as a root and left uncounted it
   // would read as "reports to nobody", which is a different fact.
-  const outside = visible.filter(p => p.reportsTo && !visibleIds.has(p.reportsTo)).length
+  const outside = scoped.filter(p => p.reportsTo && !scopeIds.has(p.reportsTo)).length
+  const selectedPerson = selected ? byId.get(selected) : null
+  const selectedRoles = selectedPerson ? structure.rolesByStaff.get(companyStaffId(selectedPerson)) ?? [] : []
 
   return (
     <div>
@@ -565,12 +731,17 @@ function Chart({
       <div className="space-toolbar">
         <div className="space-jumps" aria-label="Filter by department">
           <button type="button" onClick={() => {
-            if (focusDept === ALL_DEPARTMENTS) showHorizontal()
-            else onFocusDept(ALL_DEPARTMENTS)
+            onFocus(null)
+            setExpandedTeams(new Set())
+            setExpandedZones(new Set())
+            setTeamToFocus(null)
+            setZoneToFocus(null)
+            onFocusDept(ALL_DEPARTMENTS)
+            setArrangementVersion(version => version + 1)
           }} aria-pressed={focusDept === ALL_DEPARTMENTS}>Whole company</button>
-          {departmentDefinitions.map(department => <button
+          {departmentFilters.map(department => <button
             key={department.id} type="button"
-            onClick={() => onFocusDept(focusDept === department.id ? ALL_DEPARTMENTS : department.id)}
+            onClick={() => chooseDepartment(focusDept === department.id ? ALL_DEPARTMENTS : department.id)}
             aria-pressed={focusDept === department.id}
           >{department.name}</button>)}
         </div>
@@ -607,7 +778,7 @@ function Chart({
                 >
                   <span className="block font-serif text-sm text-ink truncate">{m.name}</span>
                   <span className="block font-mono text-[0.58rem] uppercase tracking-wide text-muted truncate">
-                    {m.title ?? 'no title'} · {m.department ?? 'no department'}
+                    {m.title ?? 'no title'} · {m.subDepartment ?? m.department ?? 'no department'}
                   </span>
                 </button>
               ))
@@ -617,9 +788,14 @@ function Chart({
       </div>
 
           <button type="button" className="space-tidy" onClick={() => {
+            setExpandedZones(new Set(departmentDefinitions.map(department => department.id)))
+            setExpandedTeams(new Set(structure.teams.map(team => team.id)))
+            setArrangementVersion(version => version + 1)
+          }}>Expand all</button>
+          <button type="button" className="space-tidy" onClick={() => {
             spaces.tidy()
             setArrangementVersion(version => version + 1)
-          }} title="Arrange all departments and teams horizontally">Tidy</button>
+          }} title="Restore the top-down hierarchy within department zones">Tidy</button>
           <div className="org-zoom">
             <button type="button" onClick={() => void zoomOut({ duration: 250 })} aria-label="Zoom out">−</button>
             <button type="button" className="lv" onClick={fitCompany} aria-label="Fit visible departments"><ZoomReadout /></button>
@@ -630,8 +806,9 @@ function Chart({
 
       <div className="space-overview">
         <p className="font-serif italic text-muted text-xs">
-          {visible.length} people · {spaces.geometry.departments.filter(department => focusDept === ALL_DEPARTMENTS || department.id === focusDept).length} departments
-          {' · '}{spaces.teams.filter(team => focusDept === ALL_DEPARTMENTS || team.departmentId === focusDept).length} teams · {unplaced} reporting to nobody
+          {new Set(scoped.map(companyStaffId)).size} people · {scoped.length} roles
+          {' · '}{new Set(scoped.map(person => departmentKey(person.department))).size} departments
+          {' · '}{structure.teams.filter(team => visibleDepartmentIds === null || visibleDepartmentIds.includes(team.departmentId)).length} teams · {unplaced} reporting to nobody
           {directed > 0 ? ` · ${directed} at the top of a tree under a director` : ''}
           {outside > 0 ? (
             <span className="text-alert">
@@ -639,7 +816,7 @@ function Chart({
               · {outside} {outside === 1 ? 'reports' : 'report'} outside {focusDept}
             </span>
           ) : null}
-          {hidden > 0 ? ` · ${hidden} in other departments` : ''}
+          {hidden > 0 ? ` · ${hidden} roles in other departments` : ''}
           {broken > 0 ? (
             <span className="text-danger">
               {' '}
@@ -648,10 +825,18 @@ function Chart({
           ) : null}
           {pending ? ' · saving…' : ''}
         </p>
-        <span>{pending ? 'Saving reporting line…' : 'Horizontal layout · Drag the canvas to explore'}</span>
+        <span>{pending ? 'Saving reporting line…' : 'Top-down hierarchy · Expand departments to explore'}</span>
       </div>
 
-      <div ref={canvasRef} className={`org-canvas space-canvas${spaces.moving ? ' space-dragging' : ''}`}>
+      {selectedPerson && selectedRoles.length > 1 ? <div className="company-role-switcher" aria-label={`Roles held by ${selectedPerson.name}`}>
+        <strong>{selectedPerson.name} · {selectedRoles.length} roles</strong>
+        <div className="space-memberships">{selectedRoles.map(role => <button type="button" key={role.id}
+          aria-pressed={selected === role.id} onClick={() => reveal(role.id)}>
+          {role.subDepartment ?? role.department ?? 'No department'} · {role.title ?? 'No title'}
+        </button>)}</div>
+      </div> : null}
+
+      <div ref={canvasRef} className={`org-canvas space-canvas company-canvas${spaces.moving ? ' space-dragging' : ''}`}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -672,7 +857,7 @@ function Chart({
             setDragging(node.id)
           }}
           onNodeDragStop={onNodeDragStop}
-          onNodeClick={(_e, node) => onFocus(focused === node.id ? null : node.id)}
+          onNodeClick={(_e, node) => { if (byId.has(node.id)) onFocus(focused === node.id ? null : node.id) }}
           onConnect={onConnect}
           minZoom={0.02}
           deleteKeyCode={null}
@@ -689,8 +874,12 @@ function Chart({
       </div>
 
       <div className="space-footer">
-        <span className="text-xs text-muted">Drag a team or department heading or border to arrange the canvas.</span>
-        {selected && visibleIds.has(selected) ? (
+        <span className="text-xs text-muted">Expand a department, then a team. Drag headings to adjust their position.</span>
+        {selectedPerson?.secondaryRole && selectedPerson.membershipHref ? (
+          <Link href={selectedPerson.membershipHref} className="text-xs text-accent hover:underline">
+            Edit {selectedPerson.name}&rsquo;s {selectedPerson.subDepartment} role on Revenue →
+          </Link>
+        ) : selected && visibleIds.has(selected) ? (
           <button
             type="button"
             disabled={pending}
@@ -749,17 +938,10 @@ function Chart({
       </div>
 
       <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
-        A greyed card cannot take the person being dragged — it is one of their
-        own reports, the ladder ranks its title below theirs, they stand on the
-        other side of a commission department&rsquo;s edge, or their title cannot
-        hold downlines there. A red line is one the ladder would refuse today:
-        move the line, or change the ladder from the Levels tab. Inside Revenue
-        this line is also who earns the override on their sales, so a move here
-        is the whole move — except the dashed line up to the Revenue Director,
-        which every team leader and standalone member has by being at the top
-        of a tree: it is set per sub-department on Revenue, and no override
-        climbs it. Dropping somebody on a director puts them at the top of a
-        tree.
+        Each card represents one role. A person with appointments in multiple sub-departments
+        appears in each, with that role&rsquo;s title and reporting line. Select a card to
+        switch between their roles. Primary reporting lines can be changed by dragging to a
+        manager; additional Revenue roles are edited in their own sub-department.
       </p>
     </div>
   )
@@ -770,16 +952,16 @@ function ZoomReadout() {
   return <>{Math.round(zoom * 100)}%</>
 }
 
-function PersonCard({ data }: NodeProps<Node<CardData>>) {
-  const { person, invalidTarget, selected, tone, managerName } = data
+function PersonCard({ data, isConnectable }: NodeProps<Node<CardData>>) {
+  const { person, invalidTarget, selected, tone, managerName, roleCount, teamSize, expanded, toggleTeam } = data
   const title = hierarchyTitleAppearance(person.title)
   return (
     <div
-      style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
+      style={{ width: NODE_WIDTH, minHeight: COMPANY_CARD_HEIGHT }}
       data-space-tone={tone}
       className={`org-card space-person${selected ? ' sel' : ''}${invalidTarget ? ' forbid' : ''}`}
     >
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Top} isConnectable={isConnectable && !person.secondaryRole} />
       <div className="oc-top">
         <div className="oc-nm" title={`${person.name} · ${person.department ?? 'No department'}`}>{person.name}</div>
         {person.levelRank !== null ? <span className="oc-rank" title={`Level ${person.levelRank} · ${person.levelName ?? ''}`}>
@@ -793,14 +975,29 @@ function PersonCard({ data }: NodeProps<Node<CardData>>) {
         </span>
       </div>
       <div className="px-[11px] pb-1 font-mono text-[9px] text-[rgb(var(--cv-muted))] truncate"
-        title={`${person.code ?? 'No employee code'} · ${person.department ?? 'No department'}`}>
-        {person.code ?? '—'} · {person.department ?? 'No department'}
+        title={`${person.code ?? 'No employee code'} · ${person.department ?? 'No department'}${person.subDepartment ? ` · ${person.subDepartment}` : ''}`}>
+        {person.code ?? '—'} · {person.subDepartment ?? person.department ?? 'No department'}
       </div>
+      {roleCount > 1 ? <div className="company-role-badge">{roleCount} roles · {person.subDepartment ?? 'Primary role'}</div> : null}
       <div className="oc-up" title={managerName ?? 'Reports to nobody'}>
         <span className="k">Reports to</span>
         <span className={`v${managerName ? '' : ' top'}`}>{managerName ?? 'Nobody'}</span>
       </div>
-      <Handle type="source" position={Position.Bottom} />
+      {teamSize > 0 ? <button type="button" className="company-team-toggle nodrag nopan"
+        aria-expanded={expanded} onClick={event => { event.stopPropagation(); toggleTeam() }}>
+        {expanded ? 'Collapse' : 'Expand'} {teamSize} {teamSize === 1 ? 'member' : 'members'} <span aria-hidden>{expanded ? '−' : '+'}</span>
+      </button> : null}
+      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable && !person.secondaryRole} />
     </div>
   )
+}
+
+function DepartmentSummary({ data }: NodeProps<Node<SummaryData>>) {
+  return <div className="company-department-summary" style={{ width: NODE_WIDTH, minHeight: COMPANY_CARD_HEIGHT }}>
+    <Handle type="target" position={Position.Top} isConnectable={false} />
+    <div className="company-summary-count"><strong>{data.people}</strong><span>people</span></div>
+    <p>{data.teams} {data.teams === 1 ? 'team' : 'teams'} · {data.roles} {data.roles === 1 ? 'role' : 'roles'}</p>
+    <button type="button" className="nodrag nopan" onClick={event => { event.stopPropagation(); data.expand() }}
+      aria-label={`Explore ${data.name}`}>Explore teams <span aria-hidden>↓</span></button>
+  </div>
 }
