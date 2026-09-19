@@ -2193,6 +2193,39 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .space-footer > div > span { color: rgb(var(--graphite)); margin-top: 3px; }
 .space-memberships { display: flex; flex-wrap: wrap; gap: 6px; }
 .space-memberships button { font-weight: 400; font-size: 11px; }
+.company-canvas .space-team-heading { background: transparent; border: 0; border-radius: 0; }
+.company-canvas { height: clamp(480px, calc(100dvh - 260px), 740px); }
+.company-canvas .space-department { fill: rgb(var(--space-tone) / .045); stroke: rgb(var(--space-tone) / .35); }
+.company-canvas .space-department-heading { gap: 8px; padding: 0 14px; }
+.company-canvas .space-department-heading strong { font-size: 13px; }
+.company-canvas .space-department-heading > span { font-size: 10px; }
+.company-canvas .space-person { display: flex; flex-direction: column; }
+.company-canvas .space-person .oc-up { margin-top: auto; }
+.company-department-summary {
+  padding: 16px; border: 1px solid rgb(var(--cv-border)); border-radius: 10px;
+  background: rgb(var(--cv-card)); color: rgb(var(--cv-ink));
+  font: 400 12px/1.5 var(--font-sans), sans-serif;
+  box-shadow: 0 3px 12px rgb(var(--cv-lift) / .04);
+}
+.company-summary-count { display: flex; align-items: baseline; gap: 8px; }
+.company-summary-count strong { font: 400 32px/1.2 var(--font-display, Georgia, serif); }
+.company-summary-count span, .company-department-summary p { color: rgb(var(--cv-graphite)); }
+.company-department-summary p { margin: 5px 0 14px; }
+.company-department-summary button {
+  display: flex; justify-content: space-between; width: 100%; padding: 8px 0 0;
+  border-top: 1px solid rgb(var(--cv-border)); color: rgb(var(--accent)); text-align: left;
+}
+.company-department-summary button:hover { text-decoration: underline; }
+.company-department-summary button:focus-visible, .company-team-toggle:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
+.company-role-badge { padding: 1px 11px 5px; font: 500 9px/1.5 var(--font-sans), sans-serif; color: rgb(var(--accent)); }
+.company-team-toggle {
+  display: flex; justify-content: space-between; width: 100%; padding: 7px 11px;
+  border-top: 1px solid rgb(var(--cv-border)); background: rgb(var(--cv-chip) / .4);
+  color: rgb(var(--accent)); font: 500 10px/1.4 var(--font-sans), sans-serif;
+}
+.company-role-switcher { padding: 12px 14px; margin-bottom: 12px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface)); }
+.company-role-switcher > strong { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 500; }
+.company-role-switcher button[aria-pressed="true"] { background: rgb(var(--accent-bg)); border-color: rgb(var(--accent-border)); color: rgb(var(--accent)); }
 @media (max-width: 700px) {
   .space-canvas { height: 590px; }
   .space-actions { width: 100%; }

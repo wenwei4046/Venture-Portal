@@ -2,16 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
 import { useReactFlow } from '@xyflow/react'
-import { readManualLayout, writeManualLayout, type ManualLayout } from '@/lib/commission/chart-layout-store'
+import { layoutKey, readManualLayout, writeManualLayout, type ManualLayout } from '@/lib/commission/chart-layout-store'
 import { type Bounds } from '@/lib/hierarchy-spaces'
+import { companyLeadershipBounds, initialCompanyHierarchyPositions, resolveCompanyHierarchyPositions, type CompanyHierarchyLeader } from '@/lib/company-hierarchy-layout'
 import {
-  alignSpaceTeams, buildSpaceTeams, departmentPositionKey, geometryForSpaces, initialSpacePositions,
-  resolveSpaceOverlaps, SPACE_DEPARTMENT_HEADER, SPACE_DEPARTMENT_PADDING, SPACE_TEAM_HEADER,
+  buildSpaceTeams, departmentPositionKey, geometryForSpaces,
+  SPACE_DEPARTMENT_HEADER, SPACE_DEPARTMENT_PADDING, SPACE_TEAM_HEADER,
   type SpaceAnchor, type SpaceDepartment, type SpaceMember,
 } from '@/lib/hierarchy-space-layout'
 
-// The previous two-column layout must not override the new horizontal default.
-const STORAGE_NAMESPACE = 'company.spaces.v2.horizontal'
+const STORAGE_NAMESPACE = 'company.spaces.v3.structure'
+const STRUCTURE_KEY = `${layoutKey(STORAGE_NAMESPACE)}.structure`
 const layoutStorage = () => { try { return window.localStorage } catch { return null } }
 type Dimensions = { id: string; width: number; height: number }
 type GroupDrag = {
@@ -26,6 +27,11 @@ type GroupDrag = {
   element: HTMLButtonElement
 }
 
+export interface CompanyHierarchySpaceOptions {
+  leaders?: CompanyHierarchyLeader[]
+  visibleDepartmentIds?: readonly string[] | null
+}
+
 /**
  * Company-wide reading layout, independent of department filters and reporting
  * writes. The caller supplies every member and renders frames in ViewportPortal.
@@ -33,27 +39,33 @@ type GroupDrag = {
 export function useCompanyHierarchySpaces(
   members: SpaceMember[],
   departments: SpaceDepartment[],
-  visibleDepartmentId: string | null = null,
+  { leaders = [], visibleDepartmentIds = null }: CompanyHierarchySpaceOptions = {},
 ) {
   const { getZoom, fitBounds } = useReactFlow()
   const [positions, setPositions] = useState<ManualLayout>(new Map())
   const positionsRef = useRef(positions)
   const [loaded, setLoaded] = useState(false)
+  const [loadedModel, setLoadedModel] = useState<string | null>(null)
   const [movingAnchor, setMovingAnchor] = useState<SpaceAnchor | null>(null)
   const [, setMeasurementVersion] = useState(0)
   const dimensions = useRef(new Map<string, Omit<Dimensions, 'id'>>())
   const teams = useMemo(() => buildSpaceTeams(members), [members])
-  const model = useRef({ members, departments, teams })
-  model.current = { members, departments, teams }
+  const model = useRef({ members, departments, teams, leaders })
+  model.current = { members, departments, teams, leaders }
   const initializedModel = useRef<string | null>(null)
   const groupDrag = useRef<GroupDrag | null>(null)
   const suppressClick = useRef(0)
 
-  // A server refresh may recreate equal arrays. Only an actual model change
-  // realigns members, and storage is read only on the first initialization.
-  const modelKey = JSON.stringify({ members, departments })
+  // Collapse and expand change the model and repack its zones. Department focus
+  // only changes visibility, so it retains the reader's current arrangement.
+  const modelKey = JSON.stringify({ members, departments, leaders })
+  const modelKeyRef = useRef(modelKey)
+  modelKeyRef.current = modelKey
   const measuredMembers = useCallback(() => model.current.members.map(member => ({
     ...member, ...dimensions.current.get(member.id),
+  })), [])
+  const measuredLeaders = useCallback(() => model.current.leaders.map(leader => ({
+    ...leader, ...dimensions.current.get(leader.id),
   })), [])
   const publish = useCallback((next: ManualLayout, persist = false) => {
     const previous = positionsRef.current
@@ -65,7 +77,11 @@ export function useCompanyHierarchySpaces(
       positionsRef.current = next
       setPositions(next)
     }
-    if (persist) writeManualLayout(layoutStorage(), STORAGE_NAMESPACE, next)
+    if (persist) {
+      const storage = layoutStorage()
+      writeManualLayout(storage, STORAGE_NAMESPACE, next)
+      try { storage?.setItem(STRUCTURE_KEY, modelKeyRef.current) } catch { /* Layout still works without storage. */ }
+    }
   }, [])
   const cancelGroup = useCallback((pointerId?: number) => {
     const drag = groupDrag.current
@@ -81,18 +97,24 @@ export function useCompanyHierarchySpaces(
     if (initializedModel.current === modelKey) return
     cancelGroup()
     const value = model.current
-    const currentIds = new Set(value.members.map(member => member.id))
+    const currentIds = new Set([...value.members, ...value.leaders].map(member => member.id))
     for (const id of dimensions.current.keys()) if (!currentIds.has(id)) dimensions.current.delete(id)
     const measured = measuredMembers()
-    const next = initialSpacePositions(value.departments, measured, value.teams, 'horizontal')
-    const remembered = initializedModel.current === null
-      ? readManualLayout(layoutStorage(), STORAGE_NAMESPACE) : positionsRef.current
-    for (const [id, point] of remembered) if (next.has(id)) next.set(id, point)
+    const management = measuredLeaders()
+    const next = initialCompanyHierarchyPositions(value.departments, measured, management)
+    if (initializedModel.current === null) {
+      const storage = layoutStorage()
+      let sameStructure = false
+      try { sameStructure = storage?.getItem(STRUCTURE_KEY) === modelKey } catch { /* Use the default arrangement. */ }
+      if (sameStructure) for (const [id, point] of readManualLayout(storage, STORAGE_NAMESPACE)) {
+        if (next.has(id)) next.set(id, point)
+      }
+    }
     initializedModel.current = modelKey
-    const aligned = alignSpaceTeams(measured, value.teams, next)
-    publish(resolveSpaceOverlaps(value.departments, measured, value.teams, aligned), true)
+    publish(resolveCompanyHierarchyPositions(value.departments, measured, management, next, {}, true), true)
     setLoaded(true)
-  }, [modelKey, measuredMembers, publish, cancelGroup])
+    setLoadedModel(modelKey)
+  }, [modelKey, measuredMembers, measuredLeaders, publish, cancelGroup])
 
   useEffect(() => {
     const escape = (event: globalThis.KeyboardEvent) => {
@@ -112,21 +134,20 @@ export function useCompanyHierarchySpaces(
 
   const arrange = useCallback((anchor?: SpaceAnchor, align = false) => {
     const value = model.current
-    const measured = measuredMembers()
-    const next = align ? alignSpaceTeams(measured, value.teams, positionsRef.current) : positionsRef.current
-    publish(resolveSpaceOverlaps(value.departments, measured, value.teams, next, anchor), true)
-  }, [measuredMembers, publish])
+    publish(resolveCompanyHierarchyPositions(value.departments, measuredMembers(), measuredLeaders(), positionsRef.current, anchor, align), true)
+  }, [measuredMembers, measuredLeaders, publish])
   const tidy = useCallback(() => {
     cancelGroup()
     const value = model.current
-    publish(initialSpacePositions(value.departments, measuredMembers(), value.teams, 'horizontal'), true)
-  }, [cancelGroup, measuredMembers, publish])
+    publish(initialCompanyHierarchyPositions(value.departments, measuredMembers(), measuredLeaders()), true)
+  }, [cancelGroup, measuredMembers, measuredLeaders, publish])
   const updateDimensions = useCallback((updates: Dimensions[]) => {
-    const ids = new Set(model.current.members.map(member => member.id))
+    const people = [...model.current.members, ...model.current.leaders]
+    const ids = new Set(people.map(member => member.id))
     let changed = false
     for (const { id, width, height } of updates) {
       if (!ids.has(id) || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) continue
-      const before = dimensions.current.get(id) ?? model.current.members.find(member => member.id === id)
+      const before = dimensions.current.get(id) ?? people.find(member => member.id === id)
       if (before?.width === width && before?.height === height) continue
       dimensions.current.set(id, { width, height })
       changed = true
@@ -136,8 +157,9 @@ export function useCompanyHierarchySpaces(
     if (initializedModel.current !== null && !groupDrag.current) arrange(undefined, true)
   }, [arrange])
   const geometry = geometryForSpaces(departments, measuredMembers(), teams, positions)
-  const visibleDepartments = geometry.departments.filter(department => visibleDepartmentId === null || department.id === visibleDepartmentId)
-  const visibleTeams = geometry.teams.filter(team => visibleDepartmentId === null || team.departmentId === visibleDepartmentId)
+  const leadershipBounds = companyLeadershipBounds(measuredLeaders(), positions)
+  const visibleDepartments = geometry.departments.filter(department => visibleDepartmentIds === null || visibleDepartmentIds.includes(department.id))
+  const visibleTeams = geometry.teams.filter(team => visibleDepartmentIds === null || visibleDepartmentIds.includes(team.departmentId))
   const tone = (departmentId: string) => Math.max(0, departments.findIndex(department => department.id === departmentId)) % 3
 
   const keysForGroup = (anchor: SpaceAnchor) => anchor.teamId
@@ -225,34 +247,34 @@ export function useCompanyHierarchySpaces(
     <svg className="space-boundaries" width="1" height="1" aria-hidden>
       {visibleDepartments.map(department => <rect key={department.id} data-department-id={department.id}
         {...department.bounds} rx="18" data-space-tone={tone(department.id)}
-        className={`space-department${visibleDepartmentId === department.id ? ' active' : ''}${movingAnchor?.departmentId === department.id && !movingAnchor.teamId ? ' moving' : ''}`} />)}
-      {visibleTeams.map(team => <rect key={team.id} data-team-id={team.id} {...team.bounds} rx="20"
-        data-space-tone={tone(team.departmentId)} className={`space-team${movingAnchor?.teamId === team.id ? ' moving' : ''}`} />)}
+        className={`space-department company-department-zone${visibleDepartmentIds?.includes(department.id) ? ' active' : ''}${movingAnchor?.departmentId === department.id && !movingAnchor.teamId ? ' moving' : ''}`} />)}
     </svg>
+    {leadershipBounds && visibleDepartmentIds === null ? <div className="space-rail-label"
+      style={{ left: leadershipBounds.x, top: leadershipBounds.y - 30 }}>Management</div> : null}
     {visibleDepartments.flatMap(department => frameBorders(department.bounds, { departmentId: department.id }, department.name, 'department'))}
-    {visibleTeams.flatMap(team => frameBorders(team.bounds, { departmentId: team.departmentId, teamId: team.id }, team.label, 'team'))}
     {visibleDepartments.map(department => <button type="button" key={department.id}
       className="space-department-heading nodrag nopan" data-space-tone={tone(department.id)}
       style={{ left: department.bounds.x + 1, top: department.bounds.y + 1, width: department.bounds.width - 2, height: SPACE_DEPARTMENT_HEADER - 1 }}
       aria-label={`${department.name}: drag to move department, click to focus`} aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
       {...gestures({ departmentId: department.id })} onClick={() => focus(department.bounds)}>
       <strong>{department.name}</strong>
-      <span>{teams.filter(team => team.departmentId === department.id).length} teams · {members.filter(member => member.departmentId === department.id).length} members</span>
+      <span>{members.some(member => member.departmentId === department.id && member.id.startsWith('summary:')) ? 'Overview'
+        : `${teams.filter(team => team.departmentId === department.id).length} teams · ${members.filter(member => member.departmentId === department.id).length} shown`}</span>
       <span className="space-grip" aria-hidden>⠿</span>
     </button>)}
-    {visibleTeams.map(team => <button type="button" key={team.id} className="space-team-heading nodrag nopan"
+    {visibleTeams.filter(team => !team.leaderId.startsWith('summary:')).map(team => <button type="button" key={team.id} className="space-team-heading company-team-heading nodrag nopan"
       data-space-tone={tone(team.departmentId)}
       style={{ left: team.bounds.x + 1, top: team.bounds.y + 1, width: team.bounds.width - 2, height: SPACE_TEAM_HEADER - 1 }}
       aria-label={`${team.label}: drag to move team, click to focus`} aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight"
       {...gestures({ departmentId: team.departmentId, teamId: team.id })} onClick={() => focus(team.bounds)}>
-      <strong>{team.label}</strong><span>{team.memberIds.length} members</span><span className="space-grip" aria-hidden>⠿</span>
+      <strong>{team.label}</strong><span>{team.memberIds.length} shown</span><span className="space-grip" aria-hidden>⠿</span>
     </button>)}
     {visibleDepartments.filter(department => !members.some(member => member.departmentId === department.id)).map(department =>
       <div key={`empty:${department.id}`} className="space-empty"
         style={{ left: department.bounds.x + SPACE_DEPARTMENT_PADDING, top: department.bounds.y + SPACE_DEPARTMENT_HEADER + SPACE_DEPARTMENT_PADDING + 18 }}>No members yet</div>)}
   </>
 
-  return { positions, geometry, teams, loaded, moving: movingAnchor !== null, tidy, frames, updateDimensions }
+  return { positions, geometry, leadershipBounds, teams, loaded, ready: loadedModel === modelKey, moving: movingAnchor !== null, tidy, frames, updateDimensions }
 }
 
 /** The heading is the keyboard handle; these narrow strips leave cards free. */

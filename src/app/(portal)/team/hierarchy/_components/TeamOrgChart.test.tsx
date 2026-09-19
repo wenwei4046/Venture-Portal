@@ -1,13 +1,16 @@
-import { useState, type ComponentType, type ReactNode } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useState, type ComponentProps, type ComponentType, type ReactNode } from 'react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Connection, Node, ReactFlowInstance, ReactFlowProps } from '@xyflow/react'
 import { layoutKey, readManualLayout, writeManualLayout } from '@/lib/commission/chart-layout-store'
-import { NODE_HEIGHT, NODE_WIDTH } from '@/lib/org-layout'
+import { NODE_WIDTH } from '@/lib/org-layout'
+import { COMPANY_CARD_HEIGHT, companyZoneId } from '@/lib/company-chart-structure'
 import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 
 type PersonNode = Node<{ person: ChartPerson; invalidTarget: boolean; selected: boolean }>
-type FlowProps = ReactFlowProps<PersonNode>
+type CanvasNode = Node<Record<string, unknown>>
+type FlowProps = ReactFlowProps<CanvasNode>
+const STORAGE_NAMESPACE = 'company.spaces.v3.structure'
 const adapters = vi.hoisted(() => ({
   flow: null as FlowProps | null,
   setReportsTo: vi.fn(),
@@ -41,12 +44,13 @@ vi.mock('@xyflow/react', async importOriginal => {
     // search, layout gestures and undo still run through the real component.
     ReactFlow: (props: FlowProps) => {
       adapters.flow = props
-      const Card = props.nodeTypes!.person as ComponentType<{ data: PersonNode['data'] }>
       return <div>
-        {props.nodes?.map(node => <div key={node.id} data-testid={`node:${node.id}`}
+        {props.nodes?.map(node => {
+          const Card = props.nodeTypes![node.type!] as ComponentType<{ data: CanvasNode['data'] }>
+          return <div key={node.id} data-testid={`node:${node.id}`}
           onClick={event => props.onNodeClick?.(event, node)}>
           <Card data={node.data} />
-        </div>)}
+        </div>})}
         {props.children}
       </div>
     },
@@ -73,6 +77,21 @@ function people(): ChartPerson[] {
   ]
 }
 
+function multipleRoles(): ChartPerson[] {
+  const revenue = { department: 'Revenue', commissionDept: true, leadIds: ['peter'] }
+  return [
+    person('peter', 'Peter', { ...revenue, leadIds: [], isDepartmentHead: true, title: 'Revenue Director', levelRank: null, canRecruit: true }),
+    person('rachael', 'Rachael', { ...revenue, staffId: 'rachael', title: 'Team Leader', canRecruit: true,
+      subDepartment: 'Fair', schemeId: 'fair', membershipHref: '/revenue/fair/hierarchy' }),
+    person('chea', 'Chea Huan', { ...revenue, staffId: 'chea', title: 'Revenue Specialist', levelRank: 2,
+      reportsTo: 'rachael', subDepartment: 'Fair', schemeId: 'fair', membershipHref: '/revenue/fair/hierarchy' }),
+    person('ir:rachael', 'Rachael', { ...revenue, staffId: 'rachael', title: 'Head of IR', levelRank: 6, canRecruit: true,
+      subDepartment: 'IR', schemeId: 'ir', secondaryRole: true, membershipHref: '/revenue/ir/hierarchy' }),
+    person('ir:chea', 'Chea Huan', { ...revenue, staffId: 'chea', title: 'Relationship Specialist', levelRank: 2,
+      reportsTo: 'ir:rachael', subDepartment: 'IR', schemeId: 'ir', secondaryRole: true, membershipHref: '/revenue/ir/hierarchy' }),
+  ]
+}
+
 function Chart({ roster = people(), initialDepartment = ALL_DEPARTMENTS, initialFocused = null }: {
   roster?: ChartPerson[]; initialDepartment?: string; initialFocused?: string | null
 }) {
@@ -80,6 +99,12 @@ function Chart({ roster = people(), initialDepartment = ALL_DEPARTMENTS, initial
   const [department, setDepartment] = useState(initialDepartment)
   return <TeamOrgChart people={roster} commissionHref="/revenue/fair/hierarchy"
     focused={focused} onFocus={setFocused} focusDept={department} onFocusDept={setDepartment} />
+}
+
+function renderChart({ overview = false, ...props }: ComponentProps<typeof Chart> & { overview?: boolean } = {}) {
+  const view = render(<Chart {...props} />)
+  if (!overview) fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
+  return view
 }
 
 function flow(): FlowProps {
@@ -90,7 +115,7 @@ function flow(): FlowProps {
 function node(id: string): PersonNode {
   const result = flow().nodes?.find(candidate => candidate.id === id)
   expect(result, `node ${id}`).toBeDefined()
-  return result!
+  return result as PersonNode
 }
 
 function connect(source: string, target: string) {
@@ -99,12 +124,14 @@ function connect(source: string, target: string) {
 }
 
 function initializeFlow() {
-  act(() => flow().onInit?.(adapters.viewport as unknown as ReactFlowInstance<PersonNode>))
+  act(() => flow().onInit?.(adapters.viewport as unknown as ReactFlowInstance<CanvasNode>))
 }
 
-function frame(kind: 'department' | 'team', id: string) {
-  const element = document.querySelector<SVGRectElement>(`.space-${kind}[data-${kind}-id="${id}"]`)
-  expect(element, `${kind} frame ${id}`).not.toBeNull()
+function frame(department: string, subDepartment: string | null = null) {
+  const id = JSON.stringify([department, subDepartment])
+  const element = [...document.querySelectorAll<SVGRectElement>('.space-department')]
+    .find(candidate => candidate.getAttribute('data-department-id') === id)
+  expect(element, `department frame ${id}`).toBeDefined()
   return {
     x: Number(element!.getAttribute('x')), y: Number(element!.getAttribute('y')),
     width: Number(element!.getAttribute('width')), height: Number(element!.getAttribute('height')),
@@ -139,10 +166,12 @@ afterEach(() => {
 
 describe('company hierarchy reporting rules', () => {
   it('writes a valid connector and retains the previous reporting line for Undo', async () => {
-    render(<Chart />)
+    renderChart()
     connect('cara', 'ben')
     await waitFor(() => expect(adapters.setReportsTo).toHaveBeenCalledWith('ben', 'cara'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    const undo = await screen.findByRole('button', { name: 'Undo' })
+    await waitFor(() => expect(undo).toBeEnabled())
+    fireEvent.click(undo)
     await waitFor(() => expect(adapters.undoHierarchyMove).toHaveBeenCalledWith({
       staffId: 'ben', reportsTo: 'alice', movedTo: 'cara',
     }))
@@ -154,7 +183,7 @@ describe('company hierarchy reporting rules', () => {
     { label: 'a lower ladder rank', source: 'ben', target: 'cara', reason: /stands above/i },
     { label: 'the commission department boundary', source: 'alice', target: 'yuny', reason: /commission upline/i },
   ])('refuses $label before writing', ({ source, target, reason }) => {
-    render(<Chart />)
+    renderChart()
     connect(source, target)
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toMatch(reason)
@@ -165,21 +194,21 @@ describe('company hierarchy reporting rules', () => {
       department: 'Revenue', commissionDept: true, canRecruit: false,
       title: 'Revenue Specialist', levelRank: 2,
     }))
-    render(<Chart roster={roster} />)
+    renderChart({ roster })
     connect('other', 'yuny')
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toMatch(/cannot hold downlines/i)
   })
 
   it('still permits reporting across ordinary departments', async () => {
-    render(<Chart />)
+    renderChart()
     connect('hannah', 'ben')
     await waitFor(() => expect(adapters.setReportsTo).toHaveBeenCalledWith('ben', 'hannah'))
   })
 
   it('does not announce a successful move or offer Undo when the server refuses it', async () => {
     adapters.setReportsTo.mockResolvedValue({ ok: false, reason: 'You do not have permission to move staff.' })
-    render(<Chart />)
+    renderChart()
     connect('cara', 'ben')
     expect(await screen.findByRole('alert')).toHaveTextContent('You do not have permission to move staff.')
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
@@ -187,7 +216,7 @@ describe('company hierarchy reporting rules', () => {
   })
 
   it('never writes a reporting change when a person is dropped on blank canvas', () => {
-    render(<Chart />)
+    renderChart()
     const before = node('ben')
     const reporting = JSON.stringify(flow().edges)
     act(() => flow().onNodeDragStart?.(new MouseEvent('mousedown'), before, [before]))
@@ -198,7 +227,7 @@ describe('company hierarchy reporting rules', () => {
   })
 
   it('keeps staff on their assigned slots when renderer changes request deletion or a keyboard move', () => {
-    render(<Chart />)
+    renderChart()
     const original = { ...node('ben').position }
     expect(flow().deleteKeyCode).toBeNull()
     expect(node('ben').deletable).toBe(false)
@@ -213,10 +242,10 @@ describe('company hierarchy reporting rules', () => {
 })
 
 describe('company hierarchy grouped canvas', () => {
-  it('opens a wide horizontal company at a readable zoom from its left edge', () => {
+  it('opens a wide company overview at a readable zoom from its left edge', () => {
     const roster = people().concat(Array.from({ length: 8 }, (_, index) =>
       person(`branch-${index}`, `Branch manager ${index}`, { department: `Branch ${index}` })))
-    render(<Chart roster={roster} />)
+    renderChart({ roster })
     const canvas = document.querySelector('.space-canvas')!
     Object.defineProperty(canvas, 'clientWidth', { value: 900, configurable: true })
     Object.defineProperty(canvas, 'clientHeight', { value: 700, configurable: true })
@@ -227,60 +256,55 @@ describe('company hierarchy grouped canvas', () => {
     const left = Math.min(...departments.map(element => Number(element.getAttribute('x'))))
     const right = Math.max(...departments.map(element => Number(element.getAttribute('x')) + Number(element.getAttribute('width'))))
     expect(viewport.zoom).toBeGreaterThanOrEqual(0.45)
-    expect(viewport.zoom).toBeLessThanOrEqual(0.7)
+    expect(viewport.zoom).toBeLessThanOrEqual(0.85)
     expect(viewport.x + left * viewport.zoom).toBeCloseTo(32)
     expect(viewport.x + right * viewport.zoom).toBeGreaterThan(900)
   })
 
-  it('centers an initially selected far-right person after initializing the default company view', () => {
+  it('expands and centers an initially selected person after initializing the default company view', () => {
     const roster = people().concat(Array.from({ length: 8 }, (_, index) =>
       person(`branch-${index}`, `Branch manager ${index}`, { department: `Branch ${index}` })))
-    render(<Chart roster={roster} initialFocused="yuny" />)
+    renderChart({ roster, initialFocused: 'yuny', overview: true })
     expect(adapters.viewport.setCenter).not.toHaveBeenCalled()
     initializeFlow()
     const selected = node('yuny')
-    expect(selected.position.x).toBeGreaterThan(3000)
+    expect(selected.data.selected).toBe(true)
+    expect(screen.getByTestId('node:anthony')).toBeTruthy()
+    expect(screen.queryByTestId(`node:summary:${companyZoneId(selected.data.person)}`)).toBeNull()
     expect(adapters.viewport.setViewport).toHaveBeenCalled()
     expect(adapters.viewport.setCenter).toHaveBeenLastCalledWith(
       selected.position.x + NODE_WIDTH / 2,
-      selected.position.y + NODE_HEIGHT / 2,
+      selected.position.y + COMPANY_CARD_HEIGHT / 2,
       expect.objectContaining({ zoom: 1 }),
     )
     expect(adapters.viewport.setCenter.mock.invocationCallOrder.at(-1))
       .toBeGreaterThan(adapters.viewport.setViewport.mock.invocationCallOrder.at(-1)!)
   })
 
-  it('starts every department and its teams side by side on one top-aligned row', () => {
-    render(<Chart roster={people().concat(person('daniel', 'Daniel'), person('elise', 'Elise'))} />)
-    const departments = ['Finance', 'HR', 'Revenue'].map(id => frame('department', id))
-    for (let index = 1; index < departments.length; index++) {
-      expect(departments[index].y).toBe(departments[0].y)
-      expect(departments[index].x).toBeGreaterThan(departments[index - 1].x + departments[index - 1].width)
-    }
-    const teams = ['alice', 'cara', 'daniel', 'elise'].map(id => frame('team', `team:Finance:${id}`))
-    for (let index = 1; index < teams.length; index++) {
-      expect(teams[index].y).toBe(teams[0].y)
-      expect(teams[index].x).toBeGreaterThan(teams[index - 1].x + teams[index - 1].width)
-    }
+  it('places real directors above department zones and reports below their managers', () => {
+    const roster = people().map(member => member.department === 'Revenue' ? { ...member, leadIds: ['director'] } : member)
+    roster.push(person('director', 'Director', { department: 'Revenue', isDepartmentHead: true, levelRank: null }))
+    renderChart({ roster })
+    expect(node('director').position.y + COMPANY_CARD_HEIGHT).toBeLessThan(frame('Revenue').y)
+    expect(node('ben').position.y).toBeGreaterThan(node('alice').position.y + COMPANY_CARD_HEIGHT)
+    expect(node('yuny').position.y).toBeGreaterThan(node('anthony').position.y + COMPANY_CARD_HEIGHT)
+    expect(document.querySelectorAll('.space-team')).toHaveLength(0)
   })
 
-  it('ignores saved vertical layouts from v1 and stores the fresh horizontal arrangement in v2', () => {
+  it('ignores legacy layouts and stores the new hierarchy with a structural fingerprint', () => {
     writeManualLayout(window.localStorage, 'company.spaces.v1', new Map(people().map((member, index) => [
       member.id, { x: 7000, y: 5000 + index * 500 },
     ])))
-    render(<Chart />)
-    const top = frame('department', 'Finance').y
-    expect(frame('department', 'HR').y).toBe(top)
-    expect(frame('department', 'Revenue').y).toBe(top)
+    renderChart()
     expect(node('alice').position.x).toBeLessThan(7000)
     expect(node('alice').position.y).toBeLessThan(5000)
-    expect(window.localStorage.getItem(layoutKey('company.spaces.v2.horizontal'))).not.toBeNull()
-    expect(readManualLayout(window.localStorage, 'company.spaces.v2.horizontal').get('alice'))
+    expect(window.localStorage.getItem(`${layoutKey(STORAGE_NAMESPACE)}.structure`)).not.toBeNull()
+    expect(readManualLayout(window.localStorage, STORAGE_NAMESPACE).get('alice'))
       .toEqual(node('alice').position)
   })
 
-  it('Tidy restores the horizontal arrangement after departments and teams are dragged vertically', () => {
-    render(<Chart />)
+  it('Tidy restores the top-down arrangement after departments and teams are dragged vertically', () => {
+    renderChart()
     const defaults = new Map(flow().nodes!.map(item => [item.id, { ...item.position }]))
     const edges = JSON.stringify(flow().edges)
     dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), 0, 200)
@@ -288,32 +312,32 @@ describe('company hierarchy grouped canvas', () => {
     expect(node('alice').position.y).toBeGreaterThan(defaults.get('alice')!.y)
     fireEvent.click(screen.getByRole('button', { name: 'Tidy' }))
     for (const [id, point] of defaults) expect(node(id).position).toEqual(point)
-    expect(frame('department', 'Revenue').y).toBe(frame('department', 'Finance').y)
     expect(JSON.stringify(flow().edges)).toBe(edges)
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
-    expect(readManualLayout(window.localStorage, 'company.spaces.v2.horizontal').get('alice'))
+    expect(readManualLayout(window.localStorage, 'company.spaces.v3.structure').get('alice'))
       .toEqual(defaults.get('alice'))
   })
 
   it('measured card heights preserve a manually moved group while reserving room for its reports', () => {
-    render(<Chart />)
+    renderChart()
     dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), 0, 200)
     const leader = { ...node('alice').position }
-    const teamTop = frame('team', 'team:Finance:alice').y
+    const teamHeading = screen.getByRole('button', { name: /Alice team: drag to move team/i })
+    const teamTop = teamHeading.style.top
     const childBefore = { ...node('ben').position }
-    const measuredHeight = NODE_HEIGHT + 80
+    const measuredHeight = COMPANY_CARD_HEIGHT + 80
     act(() => flow().onNodesChange?.([{
       type: 'dimensions', id: 'alice', dimensions: { width: NODE_WIDTH, height: measuredHeight },
     }]))
     expect(node('alice').position).toEqual(leader)
-    expect(frame('team', 'team:Finance:alice').y).toBe(teamTop)
+    expect(teamHeading.style.top).toBe(teamTop)
     expect(node('ben').position.y).toBeGreaterThan(childBefore.y)
     expect(node('ben').position.y).toBeGreaterThan(leader.y + measuredHeight)
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
   })
 
   it('finds a person outside the focused department and reveals their card', async () => {
-    render(<Chart initialDepartment="Finance" />)
+    renderChart({ initialDepartment: 'Finance' })
     initializeFlow()
     expect(screen.queryByTestId('node:yuny')).toBeNull()
     const search = screen.getByRole('searchbox')
@@ -324,10 +348,11 @@ describe('company hierarchy grouped canvas', () => {
     expect(node('yuny').data.selected).toBe(true)
   })
 
-  it('encloses departments and independent reporting teams in separate frames', () => {
-    render(<Chart />)
+  it('encloses departments in zones and gives independent reporting teams movable headings', () => {
+    renderChart()
     expect(document.querySelectorAll('.space-department')).toHaveLength(3)
-    expect(document.querySelectorAll('.space-team')).toHaveLength(4)
+    expect(document.querySelectorAll('.space-team')).toHaveLength(0)
+    expect(document.querySelectorAll('.company-team-heading')).toHaveLength(4)
     expect(screen.getByRole('button', { name: /Alice team: drag to move team/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Cara team: drag to move team/i })).toBeTruthy()
     expect(flow().edges?.find(edge => edge.source === 'alice' && edge.target === 'ben')).toBeTruthy()
@@ -342,7 +367,7 @@ describe('company hierarchy grouped canvas', () => {
       person('chea', 'Chea Huan', { department: 'Revenue', commissionDept: true,
         canRecruit: true, leadIds: ['director'] }),
     ]
-    render(<Chart roster={roster} />)
+    renderChart({ roster })
     expect(screen.getByRole('button', { name: /Anthony team: drag to move team/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Chea Huan team: drag to move team/i })).toBeTruthy()
     for (const target of ['anthony', 'chea']) {
@@ -353,7 +378,7 @@ describe('company hierarchy grouped canvas', () => {
   })
 
   it('moves a team as a rigid group without changing reporting lines', () => {
-    render(<Chart />)
+    renderChart()
     const alice = { ...node('alice').position }, ben = { ...node('ben').position }
     const edges = JSON.stringify(flow().edges)
     const heading = screen.getByRole('button', { name: /Alice team: drag to move team/i })
@@ -367,8 +392,8 @@ describe('company hierarchy grouped canvas', () => {
     expect(window.localStorage.length).toBeGreaterThan(0)
   })
 
-  it('retains the arranged layout across department filters and a page remount', () => {
-    const view = render(<Chart />)
+  it('retains the arranged layout across department filters and selected-card changes', () => {
+    renderChart()
     fireEvent.keyDown(screen.getByRole('button', { name: /Alice team: drag to move team/i }), { key: 'ArrowLeft' })
     const arranged = { ...node('alice').position }
     fireEvent.click(screen.getByTestId('node:alice'))
@@ -376,16 +401,34 @@ describe('company hierarchy grouped canvas', () => {
     expect(node('alice').position).toEqual(arranged)
     fireEvent.click(screen.getByRole('button', { name: 'Revenue' }))
     expect(screen.queryByTestId('node:alice')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Whole company' }))
-    expect(node('alice').position).toEqual(arranged)
-    view.unmount()
-    render(<Chart />)
+    fireEvent.click(screen.getByRole('button', { name: 'Finance' }))
     expect(node('alice').position).toEqual(arranged)
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
   })
 
+  it('restores an overview arrangement on remount when its structural fingerprint matches', () => {
+    const view = renderChart({ overview: true })
+    const id = `summary:${JSON.stringify(['Finance', null])}`
+    fireEvent.keyDown(screen.getByRole('button', { name: /Finance: drag to move department/i }), { key: 'ArrowLeft' })
+    const arranged = { ...flow().nodes!.find(item => item.id === id)!.position }
+    view.unmount()
+    renderChart({ overview: true })
+    expect(flow().nodes!.find(item => item.id === id)!.position).toEqual(arranged)
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
+  it('ignores saved positions when the structural fingerprint belongs to a different expansion state', () => {
+    const view = renderChart({ overview: true })
+    const summary = flow().nodes!.find(item => item.type === 'summary')!
+    writeManualLayout(window.localStorage, STORAGE_NAMESPACE, new Map([[summary.id, { x: 9999, y: 9999 }]]))
+    window.localStorage.setItem(`${layoutKey(STORAGE_NAMESPACE)}.structure`, 'another structure')
+    view.unmount()
+    renderChart({ overview: true })
+    expect(flow().nodes!.find(item => item.id === summary.id)!.position).not.toEqual({ x: 9999, y: 9999 })
+  })
+
   it.each(['Escape', 'pointer cancellation'])('restores a group drag on %s without saving a reporting change', method => {
-    render(<Chart />)
+    renderChart()
     const before = new Map(flow().nodes!.map(item => [item.id, { ...item.position }]))
     const heading = screen.getByRole('button', { name: /Finance: drag to move department/i })
     const pointer = { pointerId: 9, pointerType: 'mouse', button: 0, clientX: 400, clientY: 300 }
@@ -396,5 +439,151 @@ describe('company hierarchy grouped canvas', () => {
     else fireEvent.pointerCancel(heading, { pointerId: 9 })
     for (const [id, point] of before) expect(node(id).position).toEqual(point)
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+})
+
+describe('company hierarchy overview and independent roles', () => {
+  it('centers a selected team leader on the new position after expanding their hidden reports', () => {
+    const roster = [person('leader', 'Leader'), ...Array.from({ length: 4 }, (_, index) =>
+      person(`report-${index}`, `Report ${index}`, { reportsTo: 'leader', levelRank: 2 }))]
+    renderChart({ roster, overview: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Explore Finance' }))
+    const collapsed = { ...node('leader').position }
+    expect(screen.queryByTestId('node:report-0')).toBeNull()
+    initializeFlow()
+    fireEvent.click(screen.getByTestId('node:leader'))
+    const expanded = node('leader').position
+    expect(screen.getByTestId('node:report-3')).toBeTruthy()
+    expect(expanded.x).not.toBe(collapsed.x)
+    expect(adapters.viewport.setCenter).toHaveBeenLastCalledWith(
+      expanded.x + NODE_WIDTH / 2,
+      expanded.y + COMPANY_CARD_HEIGHT / 2,
+      expect.objectContaining({ zoom: 1 }),
+    )
+  })
+
+  it('starts with real directors and noneditable summaries, then expands a department and its actual team', () => {
+    renderChart({ roster: multipleRoles(), overview: true })
+    expect(screen.getByTestId('node:peter')).toBeTruthy()
+    expect(screen.queryByTestId('node:rachael')).toBeNull()
+    const summaries = flow().nodes!.filter(item => item.type === 'summary')
+    expect(summaries).toHaveLength(2)
+    for (const summary of summaries) {
+      expect(summary).toMatchObject({ draggable: false, connectable: false, deletable: false, selectable: false })
+      expect(summary.data).toMatchObject({ people: 2, roles: 2, teams: 1 })
+      expect(flow().edges?.find(edge => edge.source === 'peter' && edge.target === summary.id)).toBeTruthy()
+    }
+    connect(summaries[0].id, 'rachael')
+    connect('peter', summaries[0].id)
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Explore Revenue · Fair' }))
+    expect(screen.getByTestId('node:rachael')).toBeTruthy()
+    expect(screen.queryByTestId('node:chea')).toBeNull()
+    fireEvent.click(within(screen.getByTestId('node:rachael')).getByRole('button', { name: /Expand 1 member/ }))
+    expect(screen.getByTestId('node:chea')).toBeTruthy()
+    expect(flow().edges?.find(edge => edge.source === 'rachael' && edge.target === 'chea')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Whole company' }))
+    expect(screen.queryByTestId('node:rachael')).toBeNull()
+    expect(screen.getByTestId('node:peter')).toBeTruthy()
+    expect(flow().nodes!.filter(item => item.type === 'summary')).toHaveLength(2)
+  })
+
+  it('shows each role with its own title and manager while counting actual people once', () => {
+    renderChart({ roster: multipleRoles() })
+    expect(document.querySelector('.space-overview p')).toHaveTextContent('3 people · 5 roles · 1 departments')
+    expect(within(screen.getByTestId('node:rachael')).getByText('Team Leader')).toBeTruthy()
+    expect(within(screen.getByTestId('node:ir:rachael')).getByText('Head of IR')).toBeTruthy()
+    expect(node('rachael').data.person.staffId).toBe(node('ir:rachael').data.person.staffId)
+    expect(flow().edges?.find(edge => edge.source === 'rachael' && edge.target === 'chea')).toBeTruthy()
+    expect(flow().edges?.find(edge => edge.source === 'ir:rachael' && edge.target === 'ir:chea')).toBeTruthy()
+    expect(flow().edges?.find(edge => edge.source === 'rachael' && edge.target === 'ir:chea')).toBeUndefined()
+    expect(frame('Revenue', 'Fair').width).toBeGreaterThan(0)
+    expect(frame('Revenue', 'IR').width).toBeGreaterThan(0)
+  })
+
+  it('searches across collapsed roles and switches to the selected role without losing its identity', () => {
+    renderChart({ roster: multipleRoles(), overview: true })
+    initializeFlow()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Rachael' } })
+    expect(screen.getByRole('button', { name: 'Rachael Team Leader · Fair' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Rachael Head of IR · IR' }))
+    expect(node('ir:rachael').data.selected).toBe(true)
+    const choices = screen.getByLabelText('Roles held by Rachael')
+    expect(within(choices).getAllByRole('button')).toHaveLength(2)
+    fireEvent.click(within(choices).getByRole('button', { name: 'Fair · Team Leader' }))
+    expect(node('rachael').data.selected).toBe(true)
+    expect(node('ir:rachael').data.selected).toBe(false)
+    expect(adapters.viewport.setCenter).toHaveBeenLastCalledWith(
+      node('rachael').position.x + NODE_WIDTH / 2,
+      node('rachael').position.y + COMPANY_CARD_HEIGHT / 2,
+      expect.objectContaining({ zoom: 1 }),
+    )
+  })
+
+  it('lists every matching role instead of limiting a person to the first eight results', () => {
+    const roster = multipleRoles().filter(role => role.id === 'peter' || role.id === 'rachael')
+    roster.push(...Array.from({ length: 9 }, (_, index) => person(`scheme-${index}:rachael`, 'Rachael', {
+      ...roster[1], id: `scheme-${index}:rachael`, title: `Role ${index}`, subDepartment: `Branch ${index}`,
+      schemeId: `scheme-${index}`, secondaryRole: true,
+    })))
+    renderChart({ roster, overview: true })
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Rachael' } })
+    expect(screen.getAllByRole('button', { name: /^Rachael / })).toHaveLength(10)
+    fireEvent.click(screen.getByRole('button', { name: 'Rachael Role 8 · Branch 8' }))
+    expect(within(screen.getByLabelText('Roles held by Rachael')).getAllByRole('button')).toHaveLength(10)
+  })
+
+  it.each([
+    { source: 'ir:rachael', target: 'chea' },
+    { source: 'rachael', target: 'ir:chea' },
+  ])('refuses a connector involving additional role $source → $target', ({ source, target }) => {
+    renderChart({ roster: multipleRoles() })
+    connect(source, target)
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Edit this role in its Revenue sub-department')
+  })
+
+  it.each([
+    { mover: 'ir:chea', target: 'rachael' },
+    { mover: 'chea', target: 'ir:rachael' },
+  ])('prevents drag transfers involving additional role $mover → $target', ({ mover, target }) => {
+    renderChart({ roster: multipleRoles() })
+    expect(node('ir:chea')).toMatchObject({ draggable: false, connectable: false })
+    const origin = { ...node(mover).position }
+    adapters.viewport.getIntersectingNodes.mockReturnValue([node(target)])
+    act(() => flow().onNodeDragStart?.(new MouseEvent('mousedown'), node(mover), [node(mover)]))
+    act(() => flow().onNodeDragStop?.(new MouseEvent('mouseup'), node(mover), [node(mover)]))
+    expect(node(mover).position).toEqual(origin)
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
+  it('offers the exact Revenue edit link instead of Detach for an additional role', () => {
+    renderChart({ roster: multipleRoles() })
+    fireEvent.click(screen.getByTestId('node:ir:chea'))
+    expect(screen.queryByRole('button', { name: /Detach Chea Huan/ })).toBeNull()
+    expect(screen.getByRole('link', { name: /Edit Chea Huan’s IR role on Revenue/ })).toHaveAttribute('href', '/revenue/ir/hierarchy')
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
+  it('applies company ladder warnings only to the primary roster line', () => {
+    const roster = multipleRoles().map(role => role.id === 'chea' ? { ...role, levelRank: 5 }
+      : role.id === 'ir:chea' ? { ...role, levelRank: 8 } : role)
+    renderChart({ roster })
+    expect(document.querySelector('.space-overview p')).toHaveTextContent('1 line breaks the ladder')
+    expect(flow().edges?.find(edge => edge.target === 'chea')?.style?.stroke).toBe('rgb(var(--danger))')
+    expect(flow().edges?.find(edge => edge.target === 'ir:chea')?.style?.stroke).not.toBe('rgb(var(--danger))')
+  })
+
+  it('automatically expands the department and team for a focused additional role', () => {
+    renderChart({ roster: multipleRoles(), overview: true, initialFocused: 'ir:chea' })
+    initializeFlow()
+    expect(node('ir:chea').data.selected).toBe(true)
+    expect(screen.getByTestId('node:ir:rachael')).toBeTruthy()
+    expect(screen.queryByTestId('node:chea')).toBeNull()
+    expect(adapters.viewport.setCenter).toHaveBeenLastCalledWith(
+      node('ir:chea').position.x + NODE_WIDTH / 2,
+      node('ir:chea').position.y + COMPANY_CARD_HEIGHT / 2,
+      expect.objectContaining({ zoom: 1 }),
+    )
   })
 })

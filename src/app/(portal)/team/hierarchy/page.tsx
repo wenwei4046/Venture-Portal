@@ -1,51 +1,30 @@
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { revenuePath } from '@/lib/revenue'
+import { pickHomeSubDepartments, revenuePath, subDeptSlug } from '@/lib/revenue'
 import { ladderBreaks, type Rung } from '@/lib/ladder'
-import { listSubDepartments } from '../../revenue/_lib/sub-departments'
+import { companyHierarchyRoles, type CompanyChartMembership, type CompanyChartSubDepartment } from '@/lib/company-hierarchy-roles'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import HierarchyView from './_components/HierarchyView'
 import type { ChartPerson } from './_components/TeamOrgChart'
 import type { BoardTitle } from './_components/LevelsBoard'
 
 /**
- * Hierarchy: the company org chart, and everything that governs it, on one
- * screen.
+ * The roster is authoritative for company titles, reporting lines, Table and
+ * Levels. The chart also includes each person's open memberships in additional
+ * Revenue sub-departments, with the title and upline held in that scheme.
+ * These independent roles are edited on their own Revenue hierarchy; their
+ * synthetic card IDs must never be sent to the company reporting writer.
  *
- * The chart is the page (user, 2026-09-07: "graph UI takes priority").
- *
- * ONE LINE is drawn on the canvas: `hr_staff_costs.reports_to`, who somebody
- * reports to. Current state, no history. Since 2026-09-10 it is also the only
- * line there is: inside a commission department who somebody reports to IS
- * who earns the override on their sales, and the commission position the
- * engine reads is derived from this column by the database. There is nothing
- * to mirror, offer, or say about a second line any more — a move here is the
- * move.
- *
- * What the commission side still adds is not drawn here on purpose (user,
- * 2026-09-08): the rank a position carries is NOT what a month pays — a
- * salesperson who misses their monthly quota earns at a different rate — so
- * a caption reading "Rank B · 8%" would state as a fact something only true
- * in the months quota was hit. The rank is read and set on
- * `/revenue/[sub]/hierarchy`, where a period is in scope.
- *
- * THE LADDER is one scale for the whole company, every title pinned to a rung.
- * The chart obeys it — nobody can be dropped under somebody whose title stands
- * lower — and a promotion climbs it. Inside a commission department a second
- * rule joins it: you may only report to a title that may hold downlines.
- *
- * REVENUE DIRECTOR (user, 2026-09-11). A title may HEAD its department; the
- * line to its holder is not a column but a fact of the sub-department they
- * direct (`comm_sub_department_directors`), so everybody at the top of a
- * tree in Revenue is drawn under the home sub-department's director(s) —
- * dashed: a reporting line that carries no override — and `leadIds` says
- * who. Dropping somebody on a director writes null (`moveReportingLine`).
+ * Department heads stay real staff cards. Each role's derived director lines
+ * come from its particular sub-department and carry no commission override.
+ * Pay rates stay on Revenue, where the relevant period is in scope.
  */
 export default async function TeamHierarchyPage() {
   await requirePermission('team')
   const supabase = await createClient()
   const untyped = supabase as unknown as import('@supabase/supabase-js').SupabaseClient
 
-  const [{ data: staffRows }, { data: levels }, { data: titles }, { data: rungRows }, subDepts, { data: directorRows }] =
+  const [staffResult, levelsResult, titlesResult, ranksResult, subsResult, schemesResult, directorsResult, memberships] =
     await Promise.all([
       supabase
         .from('hr_staff_costs')
@@ -67,34 +46,49 @@ export default async function TeamHierarchyPage() {
       // database.types.ts, hence the cast.
       untyped
         .from('comm_ranks')
-        .select('title_id, can_recruit, comm_schemes!inner (sub_department_id, comm_sub_departments!inner (department_id))'),
-      listSubDepartments(),
-      // Who each sub-department reports to (2026-09-11). Only the HOME
-      // sub-department's directors matter here: this is the company chart,
-      // and the home tree is the one `reports_to` draws.
+        .select('scheme_id, title_id, can_recruit'),
+      // Checked here because a failed sub-department or scheme query must
+      // not silently turn a person with several roles into a single card.
+      untyped.from('comm_sub_departments').select('id, name, department_id, created_at')
+        .eq('is_active', true).order('name'),
+      untyped.from('comm_schemes').select('id, sub_department_id')
+        .eq('is_active', true).is('effective_to', null),
       untyped.from('comm_sub_department_directors').select('staff_id, sub_department_id'),
+      loadOpenMemberships(untyped),
     ])
+
+  for (const [label, result] of [
+    ['staff roster', staffResult], ['title levels', levelsResult], ['titles', titlesResult],
+    ['commission title rules', ranksResult], ['Revenue sub-departments', subsResult],
+    ['Revenue schemes', schemesResult], ['sub-department directors', directorsResult],
+  ] as const) {
+    if (result.error) throw new Error(`Could not load ${label} for the company hierarchy: ${result.error.message}`)
+  }
+  const staffRows = staffResult.data
+  const levels = levelsResult.data
+  const titles = titlesResult.data
+  const rungRows = (ranksResult.data ?? []) as Array<{ scheme_id: string; title_id: string | null; can_recruit: boolean }>
+  const directorRows = (directorsResult.data ?? []) as Array<{ staff_id: string; sub_department_id: string }>
+  const subs = (subsResult.data ?? []) as Array<{ id: string; name: string; department_id: string; created_at: string }>
+  const home = pickHomeSubDepartments(subs.map(sub => ({ id: sub.id, departmentId: sub.department_id, createdAt: sub.created_at })))
+  const schemeBySub = new Map(((schemesResult.data ?? []) as Array<{ id: string; sub_department_id: string }>)
+    .map(scheme => [scheme.sub_department_id, scheme.id]))
+  const subDepts: CompanyChartSubDepartment[] = subs.map(sub => ({
+    id: sub.id, name: sub.name, slug: subDeptSlug(sub.name), departmentId: sub.department_id,
+    schemeId: schemeBySub.get(sub.id) ?? null, isHome: home.has(sub.id),
+  }))
 
   const rungs: Rung[] = ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(
     l => ({ id: l.id, rank: l.rank, name: l.name }),
   )
   const rungById = new Map(rungs.map(r => [r.id, r]))
 
-  const homeSubs = new Set(subDepts.filter(s => s.isHome).map(s => s.id))
+  const homeByScheme = new Map(subDepts.filter(sub => sub.isHome && sub.schemeId).map(sub => [sub.schemeId, sub]))
   const recruit = new Map<string, boolean>()
-  for (const r of (rungRows ?? []) as unknown as Array<{
-    title_id: string
-    can_recruit: boolean
-    comm_schemes: {
-      sub_department_id: string
-      comm_sub_departments: { department_id: string } | { department_id: string }[]
-    } | null
-  }>) {
-    if (!r.comm_schemes || !homeSubs.has(r.comm_schemes.sub_department_id)) continue
-    const sub = r.comm_schemes.comm_sub_departments
-    const dept = Array.isArray(sub) ? sub[0]?.department_id : sub?.department_id
-    if (!dept) continue
-    const key = `${dept}:${r.title_id}`
+  for (const r of rungRows) {
+    const sub = homeByScheme.get(r.scheme_id)
+    if (!sub || !r.title_id) continue
+    const key = `${sub.departmentId}:${r.title_id}`
     recruit.set(key, (recruit.get(key) ?? false) || r.can_recruit)
   }
 
@@ -154,6 +148,16 @@ export default async function TeamHierarchyPage() {
     }
   })
 
+  const chartPeople = companyHierarchyRoles({
+    people,
+    departmentIds: new Map(staff.map(person => [person.id, person.department_id])),
+    subDepartments: subDepts,
+    memberships,
+    ranks: rungRows.map(rank => ({ schemeId: rank.scheme_id, titleId: rank.title_id, canRecruit: rank.can_recruit })),
+    levels: rungs,
+    directors: directorRows.map(director => ({ staffId: director.staff_id, subDepartmentId: director.sub_department_id })),
+  })
+
   // The board: every title as a chip, with the headcount holding it.
   const headcount = new Map<string, number>()
   for (const s of staff) {
@@ -190,10 +194,38 @@ export default async function TeamHierarchyPage() {
   return (
     <HierarchyView
       people={people}
+      chartPeople={chartPeople}
       commissionHref={commissionHref}
       rungs={rungs}
       titles={boardTitles}
       breaks={breaks}
     />
   )
+}
+
+/** Same open-membership rule as loadTeam, read with the authenticated client. */
+async function loadOpenMemberships(supabase: SupabaseClient): Promise<CompanyChartMembership[]> {
+  const result: CompanyChartMembership[] = []
+  const pageSize = 1000
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase.from('comm_hierarchy')
+      .select('id, staff_id, scheme_id, upline_staff_id, title_id, titles (name, level_id), comm_schemes!inner (is_active, effective_to)')
+      .is('effective_to', null)
+      .eq('comm_schemes.is_active', true)
+      .is('comm_schemes.effective_to', null)
+      .order('id').range(from, from + pageSize - 1)
+    if (error) throw new Error(`Could not load Revenue memberships for the company hierarchy: ${error.message}`)
+    const rows = (data ?? []) as Array<{
+      staff_id: string; scheme_id: string; upline_staff_id: string | null; title_id: string | null
+      titles: { name: string; level_id: string | null } | Array<{ name: string; level_id: string | null }> | null
+    }>
+    result.push(...rows.map(row => {
+      const title = Array.isArray(row.titles) ? row.titles[0] : row.titles
+      return {
+        staffId: row.staff_id, schemeId: row.scheme_id, uplineStaffId: row.upline_staff_id,
+        titleId: row.title_id, title: title ? { name: title.name, levelId: title.level_id } : null,
+      }
+    }))
+    if (rows.length < pageSize) return result
+  }
 }
