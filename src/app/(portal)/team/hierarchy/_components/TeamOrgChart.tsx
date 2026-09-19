@@ -23,7 +23,6 @@ import {
 import '@xyflow/react/dist/style.css'
 import {
   descendantsOf,
-  wouldCycle,
   NODE_WIDTH,
   type OrgNodeInput,
 } from '@/lib/org-layout'
@@ -336,18 +335,15 @@ function Chart({
   // person who reports to nobody.
   const visibleIds = useMemo(() => new Set(visible.map(p => p.id)), [visible])
 
-  // Sorted by department then name, so unattached people cluster with their
-  // own department instead of interleaving across the top row. The label is
-  // only ever used for ordering — the card draws the real one.
-  // The top of a Revenue tree hangs from the first of its heads, so the tree
-  // is drawn under the director rather than beside them (`layoutParent`).
+  // Reporting guards must follow every home director line, even when a
+  // sub-department has two heads. Layout may choose one parent; cycles may not.
   const graph: OrgNodeInput[] = useMemo(
     () =>
-      people.map(p => ({
+      people.filter(p => !p.secondaryRole).flatMap(p => (p.reportsTo ? [p.reportsTo] : p.leadIds).map(parentId => ({
         id: p.id,
-        parentId: layoutParent(p),
+        parentId,
         label: `${p.department ?? 'zzz'} ${p.name}`,
-      })),
+      }))),
     [people],
   )
 
@@ -544,7 +540,7 @@ function Chart({
       if (parentId) {
         const parent = byId.get(parentId)
         if (!parent) return
-        if (wouldCycle(graph, childId, parentId)) {
+        if (childId === parentId || descendantsOf(graph, childId).has(parentId)) {
           setError(`That would put ${child.name} under their own report.`)
           return
         }
@@ -598,7 +594,7 @@ function Chart({
           // Inside a commission department the line IS the override, so a
           // detach there is a money change and is said in full.
           setNote(
-            child.commissionDept
+            child.commissionDept && !child.isDepartmentHead
               ? landed
                 ? `${moved} The override on their sales goes to ${byId.get(landed)!.name} from this month.`
                 : `${moved} Nobody earns an override on their sales from this month.`

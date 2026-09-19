@@ -11,6 +11,15 @@ npm test --prefix tests/member-sql
 
 The lockfile pins PGlite 0.5.8. Dependency installation requires the npm registry; the test itself uses local package assets and repository SQL only. Migration paths are resolved relative to `import.meta.url`, so the test has no user-specific path or working-directory dependency.
 
+The default command also runs the director reporting regression in
+`validate-director-reporting.mjs`. It loads the real reporting guard, company
+ladder, cycle and commission synchronization functions, then applies the
+director reporting migration. Its 54 checks cover company leaders as director
+managers, unchanged ordinary-member restrictions, title/department transitions,
+no director memberships or overrides, and cycles through every assigned home
+director. Run only these checks with
+`npm run test:director-reporting --prefix tests/member-sql`.
+
 Expected final output:
 
 ```text

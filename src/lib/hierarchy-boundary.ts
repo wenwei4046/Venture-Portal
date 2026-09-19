@@ -35,6 +35,9 @@
  * Departments that are NOT paid by commission keep the old freedom entirely.
  * Nothing here constrains a Finance clerk reporting to an HR lead; there is no
  * second graph over those two, so there is nothing to keep in step.
+ * A commission department head also has a reporting-only company line: heads
+ * hold no commission membership, so their own manager may be outside Revenue
+ * and need not have a recruiting title. Ordinary members retain both rules.
  *
  * Pure. The database triggers `hr_staff_costs_commission_line` refuse the same
  * lines with the same sentences (SQLSTATE 23BND / 23REC); this is what the
@@ -52,6 +55,8 @@ export interface BoundaryPerson {
    * the refusal still has to read as English without one.
    */
   department: string | null
+  /** Department heads have a company reporting line, not a commission upline. */
+  isDepartmentHead?: boolean
 }
 
 /** A manager, as the recruit rule needs to see them. */
@@ -86,6 +91,7 @@ function where(p: BoundaryPerson): string {
  */
 export function boundaryRefusal(mover: BoundaryPerson, target: BoundaryPerson | null): string | null {
   if (!target) return null
+  if (mover.commissionDept && mover.isDepartmentHead) return null
   if (mover.commissionDept === target.commissionDept) return null
 
   if (mover.commissionDept) {
@@ -104,7 +110,7 @@ export function boundaryRefusal(mover: BoundaryPerson, target: BoundaryPerson | 
  * department's ladder happens not to carry.
  */
 export function recruitRefusal(mover: BoundaryPerson, manager: LineManager | null): string | null {
-  if (!manager || !mover.commissionDept) return null
+  if (!manager || !mover.commissionDept || mover.isDepartmentHead) return null
   if (manager.canRecruit === true) return null
 
   if (!manager.title) {

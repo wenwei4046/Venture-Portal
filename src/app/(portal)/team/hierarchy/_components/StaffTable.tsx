@@ -106,10 +106,11 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
   const descendants = useMemo(() => {
     const children = new Map<string, string[]>()
     for (const p of people) {
-      if (!p.reportsTo) continue
-      const list = children.get(p.reportsTo)
-      if (list) list.push(p.id)
-      else children.set(p.reportsTo, [p.id])
+      for (const parentId of p.reportsTo ? [p.reportsTo] : p.leadIds) {
+        const list = children.get(parentId)
+        if (list) list.push(p.id)
+        else children.set(parentId, [p.id])
+      }
     }
     const out = new Map<string, Set<string>>()
     for (const p of people) {
@@ -175,8 +176,8 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
     run(person.id, async () => {
       const result = await setReportsTo(person.id, managerId)
       if (!result.ok) throw new Error(result.reason)
-      // What the column now holds — null when a director was picked, whose
-      // line is derived rather than written (`moveReportingLine`).
+      // A member picking a director lands at the derived department line.
+      // Directors themselves keep their ordinary company reporting line.
       const landed = result.reportsTo
       if (was !== landed) setUndo({ staffId: person.id, reportsTo: was, movedTo: landed })
       const heads = headsLabel(
@@ -189,7 +190,7 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
           : `${person.name} now reports to nobody.`
       // Inside a commission department the line IS the override, so a detach
       // there is a money change and is said in full.
-      if (!person.commissionDept) return moved
+      if (!person.commissionDept || person.isDepartmentHead) return moved
       return landed
         ? `${moved} The override on their sales goes to ${byId.get(landed)?.name ?? manager?.name ?? 'their manager'} from this month.`
         : `${moved} Nobody earns an override on their sales from this month.`
@@ -417,8 +418,10 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
 
       <p className="mt-3 font-serif italic text-muted text-xs max-w-3xl leading-relaxed">
         The rows read the ladder top down — the most senior title first, the same title together,
-        names A→Z. <em>Reports to</em> is the one line: inside Revenue it is also who earns the
-        override on their sales, and the picker offers only titles that may hold downlines. What a
+        names A→Z. Revenue Directors can report to company managers at the same or a higher
+        L level; their reporting lines carry no commission override. For other Revenue members,
+        <em> Reports to</em> is also who earns the override on their sales, and the picker offers
+        only titles that may hold downlines. What a
         month actually pays somebody is not a column here: it belongs to a run, and it is read on
         Revenue.
       </p>

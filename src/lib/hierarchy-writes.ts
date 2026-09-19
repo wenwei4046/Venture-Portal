@@ -179,9 +179,9 @@ export interface LineFacts extends LineManager {
   titleId: string | null
   departmentId: string | null
   /**
-   * Their title heads the department (Revenue Director, 2026-09-11). Inside a
-   * commission department the line to them is derived from the sub-department
-   * rather than written: see `moveReportingLine`.
+   * Their title heads the department (Revenue Director, 2026-09-11). Members'
+   * lines to a head are derived from the sub-department. A head's own company
+   * reporting line is stored normally: see `moveReportingLine`.
    */
   isDepartmentHead: boolean
 }
@@ -272,7 +272,7 @@ export async function loadLineFacts(
  * the reason is the whole point of a refusal.
  *
  * `reportsTo` is what the column now holds — not always the manager that was
- * asked for: dropping a Revenue person on the department's head writes null
+ * asked for: dropping a Revenue member on the department's head writes null
  * (see `moveReportingLine`), and an undo has to put back what was written.
  */
 export type LineResult =
@@ -294,14 +294,16 @@ export type LineResult =
  * before this returns — so a caller that re-reads the chart afterwards sees
  * both already agreeing.
  *
- * REVENUE DIRECTOR (2026-09-11): inside a commission department the head of
- * the department is where every line ENDS, not somebody to point a column
- * at. Which head(s) the top of a tree reports to is a fact of the
- * sub-department (`comm_sub_department_directors`) and is drawn from there —
+ * REVENUE MEMBERS: which head(s) the top of a commission tree reports to is a
+ * fact of the sub-department (`comm_sub_department_directors`) and is drawn from there —
  * two directors would not fit in one column anyway. So a move "under" a head
- * writes null: the person becomes the top of a tree, nobody earns an override
- * on their sales, and the chart draws the director line itself. Outside a
+ * writes null for a commission member: the person becomes the top of a tree,
+ * nobody earns an override on their sales, and the chart draws the director
+ * line itself. Outside a
  * commission department a head is an ordinary manager and the line is kept.
+ * A department head's own line is reporting-only and is always kept, including
+ * under another head or a manager outside Revenue. Ladder and cycle checks
+ * still run in the database for that company reporting line.
  */
 export async function moveReportingLine(
   supabase: SupabaseClient,
@@ -322,7 +324,7 @@ export async function moveReportingLine(
   const refusal = lineRefusal(mover, manager)
   if (refusal) return { ok: false, reason: refusal }
 
-  const written = mover.commissionDept && manager?.isDepartmentHead ? null : reportsToId
+  const written = mover.commissionDept && !mover.isDepartmentHead && manager?.isDepartmentHead ? null : reportsToId
 
   if (mover.reportsTo === written) return { ok: true, mover, manager, reportsTo: written }
 

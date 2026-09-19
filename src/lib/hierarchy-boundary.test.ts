@@ -124,3 +124,34 @@ describe('lineRefusal', () => {
     expect(lineRefusal(rev('Ali'), leader('Ben'))).toBeNull()
   })
 })
+
+describe('a commission department head’s company reporting line', () => {
+  const head: BoundaryPerson = { ...rev('KRIS'), isDepartmentHead: true }
+
+  it('allows a company manager outside Revenue without a commission recruiting title', () => {
+    const manager: LineManager = { ...fin('Company Director'), title: 'Director', canRecruit: null }
+    expect(boundaryRefusal(head, manager)).toBeNull()
+    expect(recruitRefusal(head, manager)).toBeNull()
+    expect(lineRefusal(head, manager)).toBeNull()
+  })
+
+  it('does not apply commission recruiting permissions to a head’s own manager', () => {
+    const manager = leader('PETER', { title: 'Revenue Director', canRecruit: false, isDepartmentHead: true })
+    expect(lineRefusal(head, manager)).toBeNull()
+    expect(lineRefusal(head, { ...manager, title: null, canRecruit: null })).toBeNull()
+    expect(lineRefusal(head, null)).toBeNull()
+  })
+
+  it('does not exempt normal sellers because their target is a head or their name resembles one', () => {
+    const outsideHead = { ...fin('Company Director'), title: 'Director', canRecruit: null, isDepartmentHead: true }
+    expect(lineRefusal({ ...rev('KRIS'), isDepartmentHead: false }, outsideHead)).toContain('commission upline')
+    expect(lineRefusal(rev('Revenue Director'), outsideHead)).toContain('commission upline')
+    expect(recruitRefusal({ ...rev('Seller'), isDepartmentHead: false }, leader('Specialist', { canRecruit: false })))
+      .toContain('cannot hold downlines')
+  })
+
+  it('keeps the ordinary department boundary when a non-commission head reports into Revenue', () => {
+    const financeHead = { ...fin('Finance Head'), isDepartmentHead: true }
+    expect(boundaryRefusal(financeHead, leader('KRIS', { isDepartmentHead: true }))).toContain('never appears on it')
+  })
+})
