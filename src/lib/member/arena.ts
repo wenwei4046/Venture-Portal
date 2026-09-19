@@ -12,12 +12,18 @@ export interface ArenaBrandWeeks {
   weeks: 4 | 5;
   counts: { AKEMI: number; ERGOTEX: number; ZANOTTI: number; DUNLOP: number };
 }
+/** One rung of one brand's incentive ladder, exactly as the scheme has it. */
+export interface ArenaTier {
+  brand: string; bandKey: string; label: string; marginPct: number; amount: number;
+}
 export interface MemberArenaSnapshot {
   principalView?: boolean; viewedStaffId?: string;
   membershipId: string; department: string; selfId: string;
   period: string; window: ArenaWindow; from: string; through: string; asOf: string; live: boolean;
   people: ArenaPerson[]; brands: { code: string; name: string }[];
   brandWeeks: ArenaBrandWeeks | null;
+  /** Empty until the scheme configures a ladder; the board then says so. */
+  tiers: ArenaTier[];
 }
 export interface ArenaRankedPerson {
   id: string; name: string; self: boolean; position: number | null; value: number | null;
@@ -56,4 +62,89 @@ export function arenaRankings(people: readonly ArenaPerson[], metric: ArenaMetri
     previous = row.value;
     return { ...row, position };
   });
+}
+
+/** The brand a bill carries when the ERP put none on it. */
+export const ARENA_UNBRANDED = "UNCLASSIFIED";
+
+export type ArenaIncentiveBlock =
+  | { reason: "no_brand" }
+  | { reason: "no_cost"; brand: string }
+  | { reason: "no_ladder"; brand: string };
+
+export interface ArenaBrandStanding {
+  brand: string; revenue: number; marginPct: number | null; blindOrders: number;
+  /** Band keys this brand's own margin clears. */
+  cleared: string[];
+  /** The next rung of this brand's ladder, and how far off it is. */
+  next: { label: string; marginPct: number; gap: number } | null;
+}
+
+export interface ArenaIncentive {
+  brands: ArenaBrandStanding[];
+  blocked: ArenaIncentiveBlock | null;
+  earned: { bandKey: string; label: string; amount: number }[];
+  amount: number;
+}
+
+/** A brand's blended margin, or null when a bill of it has no cost. */
+function brandMargin(score: ArenaScore): number | null {
+  if (score.blindOrders > 0) return null;
+  if (!(score.marginRevenue > 0)) return null;
+  return (score.marginRevenue - score.marginCost) / score.marginRevenue;
+}
+
+/**
+ * The monthly margin incentive as the ENGINE pays it, not as a ranking.
+ *
+ * Mirrors `marginIncentiveAcrossBrands`: thresholds follow the brand, EVERY
+ * brand sold has to clear a tier for it to count, so the tiers earned are the
+ * intersection of what each brand clears and the money stacks up that
+ * intersection. Anything that makes one brand unjudgeable — a bill with no
+ * brand, a bill with no cost, a brand with no ladder — blocks the whole
+ * incentive and says which, rather than quietly paying on the rest.
+ *
+ * Kept as a pure function beside the ranking because the board's one promise
+ * is that it agrees with the run, and that is only checkable if the rule lives
+ * somewhere a test can reach.
+ */
+export function arenaIncentive(person: ArenaPerson, tiers: readonly ArenaTier[]): ArenaIncentive {
+  // A brand counts the moment it carries commissionable goods revenue, costed
+  // or not — the same test the engine makes before it tallies a bill.
+  const active = Object.entries(person.brands)
+    .filter(([, score]) => score.marginRevenue > 0 || score.blindOrders > 0)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const brands: ArenaBrandStanding[] = active.map(([brand, score]) => {
+    const marginPct = brandMargin(score);
+    const ladder = tiers.filter(tier => tier.brand === brand).slice().sort((a, b) => a.marginPct - b.marginPct);
+    const cleared = marginPct === null ? [] : ladder.filter(tier => marginPct + 1e-9 >= tier.marginPct).map(tier => tier.bandKey);
+    const next = marginPct === null ? undefined : ladder.find(tier => marginPct + 1e-9 < tier.marginPct);
+    return {
+      brand, revenue: score.marginRevenue, marginPct, blindOrders: score.blindOrders, cleared,
+      next: next ? { label: next.label, marginPct: next.marginPct, gap: next.marginPct - marginPct! } : null,
+    };
+  });
+
+  if (brands.length === 0) return { brands, blocked: null, earned: [], amount: 0 };
+
+  const unbranded = brands.some(brand => brand.brand === ARENA_UNBRANDED);
+  const blind = brands.find(brand => brand.marginPct === null);
+  const bare = brands.find(brand => !tiers.some(tier => tier.brand === brand.brand));
+  const blocked: ArenaIncentiveBlock | null = unbranded ? { reason: "no_brand" }
+    : blind ? { reason: "no_cost", brand: blind.brand }
+    : bare ? { reason: "no_ladder", brand: bare.brand } : null;
+  if (blocked) return { brands, blocked, earned: [], amount: 0 };
+
+  let keys = new Set(brands[0].cleared);
+  for (const brand of brands.slice(1)) keys = new Set([...keys].filter(key => brand.cleared.includes(key)));
+
+  // Amounts should agree across brands; the engine takes the lowest if they
+  // ever disagree, so this does too.
+  const earned = [...keys].map(key => {
+    const defs = tiers.filter(tier => tier.bandKey === key);
+    return { bandKey: key, label: defs[0].label, amount: Math.min(...defs.map(def => def.amount)) };
+  }).sort((a, b) => b.amount - a.amount || a.bandKey.localeCompare(b.bandKey));
+
+  return { brands, blocked: null, earned, amount: Math.round(earned.reduce((sum, tier) => sum + tier.amount, 0) * 100) / 100 };
 }
