@@ -65,15 +65,17 @@ export async function inviteUser(formData: FormData): Promise<void> {
   if (emailTaken) throw new Error('That email already has an account')
 
   let existingDeptId: string | null = null
+  let existingTitleId: string | null = null
   if (staffId) {
     const { data: person } = await supabase
       .from('hr_staff_costs')
-      .select('id, employee_name, user_id, department_id')
+      .select('id, employee_name, user_id, department_id, title_id')
       .eq('id', staffId)
       .maybeSingle()
     if (!person) throw new Error('That person is no longer on the roster')
     if (person.user_id) throw new Error(`${person.employee_name} already has an account`)
     existingDeptId = person.department_id
+    existingTitleId = person.title_id
   }
 
   // The department boundary — `lib/hierarchy-boundary.ts`. Checked here for two
@@ -108,11 +110,28 @@ export async function inviteUser(formData: FormData): Promise<void> {
       .departments
     const managerDept: DeptFacts = Array.isArray(embed) ? (embed[0] ?? null) : embed
 
+    // The submitted title wins; an existing person keeps theirs when it is
+    // blank. Read the head flag from the authorised database, never the form:
+    // a Revenue Director's own line is company reporting, not an override.
+    const effectiveTitleId = titleId ?? existingTitleId
+    let isDepartmentHead = false
+    if (ownDept?.payroll_source === 'commission' && effectiveTitleId) {
+      const { data: title, error: titleError } = await supabase
+        .from('titles')
+        .select('is_department_head')
+        .eq('id', effectiveTitleId)
+        .maybeSingle()
+      if (titleError) throw new Error('Could not check their reporting title. Try again.')
+      if (!title) throw new Error('That title is no longer available.')
+      isDepartmentHead = title.is_department_head === true
+    }
+
     const crossing = boundaryRefusal(
       {
         name,
         department: ownDept?.name ?? null,
         commissionDept: ownDept?.payroll_source === 'commission',
+        isDepartmentHead,
       },
       {
         name: (managerRow as { employee_name: string }).employee_name,

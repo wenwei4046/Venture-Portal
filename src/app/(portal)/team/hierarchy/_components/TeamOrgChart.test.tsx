@@ -178,6 +178,32 @@ afterEach(() => {
 })
 
 describe('company hierarchy reporting rules', () => {
+  it('refuses a director reporting under a derived report of the second assigned head', () => {
+    const director = { department: 'Revenue', commissionDept: true, isDepartmentHead: true,
+      canRecruit: true, title: 'Revenue Director', levelRank: 8 }
+    renderChart({ roster: [
+      person('kris', 'Kris', director), person('peter', 'Peter', director),
+      person('anthony', 'Anthony', { department: 'Revenue', commissionDept: true,
+        canRecruit: true, leadIds: ['kris', 'peter'], levelRank: null }),
+    ] })
+    connect('anthony', 'peter')
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/own report/i)
+  })
+
+  it('connects a Revenue Director to a senior company manager without a commission-change notice', async () => {
+    renderChart({ roster: [
+      person('ceo', 'CEO', { department: 'Director', levelRank: 10 }),
+      person('kris', 'Kris', { department: 'Revenue', commissionDept: true,
+        isDepartmentHead: true, canRecruit: true, title: 'Revenue Director', levelRank: 8 }),
+    ] })
+    connect('ceo', 'kris')
+    await waitFor(() => expect(adapters.setReportsTo).toHaveBeenCalledWith('kris', 'ceo'))
+    const message = await screen.findByText('Kris now reports to CEO.')
+    expect(message.textContent).not.toMatch(/override|sales|month/i)
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
+  })
+
   it('writes a valid connector and retains the previous reporting line for Undo', async () => {
     renderChart()
     connect('cara', 'ben')

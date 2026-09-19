@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-member.mjs"
+    "test": "node validate-member.mjs && node validate-director-reporting.mjs",
+    "test:director-reporting": "node validate-director-reporting.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"
