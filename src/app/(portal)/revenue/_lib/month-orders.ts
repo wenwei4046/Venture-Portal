@@ -37,6 +37,12 @@ export interface MonthOrder {
   paidAmount: number
   balance: number | null
   cancelled: boolean
+  /**
+   * Why it is excluded when the ERP is not the reason. `ignored_agent` is a
+   * bill the ERP is perfectly happy with, sold by somebody we have said is not
+   * ours to pay. Null for an ERP-side exclusion — erpStatus says that itself.
+   */
+  excludedReason: string | null
   erpStatus: string | null
   erpOnHold: boolean
   sequenceInDay: number | null
@@ -78,6 +84,7 @@ interface Row {
   paid_amount: number | string
   balance: number | string | null
   cancelled: boolean
+  excluded_reason: string | null
   erp_status: string | null
   erp_on_hold: boolean
   sequence_in_day: number | null
@@ -127,6 +134,7 @@ export async function loadMonthOrders(
     paidAmount: Number(r.paid_amount),
     balance: r.balance === null ? null : Number(r.balance),
     cancelled: r.cancelled,
+    excludedReason: r.excluded_reason,
     erpStatus: r.erp_status,
     erpOnHold: r.erp_on_hold,
     sequenceInDay: r.sequence_in_day,
@@ -217,6 +225,10 @@ export async function loadUncostedProducts(
 /** Why an order earns nothing, in the ERP's own words. Null when it earns. */
 export function exclusionReason(o: MonthOrder): string | null {
   if (!o.cancelled) return null
+  // Asked before the ERP's own status, because this is the one exclusion the
+  // ERP knows nothing about: the document is live over there, the salesperson
+  // on it is simply not ours to pay.
+  if (o.excludedReason === 'ignored_agent') return 'Not our salesperson'
   if (o.erpOnHold) return 'On hold in the ERP'
   if (o.erpStatus === 'DELETED') return 'Deleted in the ERP'
   if (o.erpStatus) return `${o.erpStatus.replace(/_/g, ' ').toLowerCase()} in the ERP`

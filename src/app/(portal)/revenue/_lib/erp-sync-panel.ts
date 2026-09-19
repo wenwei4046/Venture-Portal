@@ -32,6 +32,16 @@ export interface UnmatchedAgentView {
   suggestedStaffId: string | null
 }
 
+/** A name somebody has said will never be anybody, and what it costs the month. */
+export interface IgnoredAgentView {
+  agentKey: string
+  agentName: string
+  erpSalespersonId: string | null
+  note: string | null
+  orders: number
+  total: number
+}
+
 export interface StaffOptionView {
   id: string
   name: string
@@ -44,6 +54,7 @@ export interface ErpSyncPanelData {
   events: SyncEventView[]
   held: HeldPeriodView[]
   unmatched: UnmatchedAgentView[]
+  ignored: IgnoredAgentView[]
   staff: StaffOptionView[]
 }
 
@@ -53,7 +64,13 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
   const { data: feedSub, error } = await supabase.rpc('erp_sync_sub_department')
   if (error) throw new Error(`Could not identify the ERP programme: ${error.message}`)
   if (feedSub !== subDepartmentId) return null
-  const [{ data: eventRows }, { data: heldRows }, { data: agentRows }, { data: staffRows }] = await Promise.all([
+  const [
+    { data: eventRows },
+    { data: heldRows },
+    { data: agentRows },
+    { data: ignoredRows },
+    { data: staffRows },
+  ] = await Promise.all([
     supabase
       .from('erp_sync_events')
       .select('id, doc_no, status, message, warnings, received_at, period_month')
@@ -71,6 +88,7 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
     // back-fill delivered 2,889 unplaced orders the panel showed a third of
     // them, under-counted every name and dropped some people entirely.
     supabase.rpc('erp_sync_unmatched_agents'),
+    supabase.rpc('erp_sync_ignored_agents'),
     supabase
       .from('hr_staff_costs')
       .select('id, employee_name, employee_code, departments!inner (payroll_source)')
@@ -128,12 +146,29 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
     }
   })
 
+  const ignored = ((ignoredRows ?? []) as Array<{
+    agent_key: string
+    agent_name: string | null
+    erp_salesperson_id: string | null
+    note: string | null
+    orders: number | string
+    total: number | string
+  }>).map(a => ({
+    agentKey: a.agent_key,
+    agentName: a.agent_name ?? a.agent_key,
+    erpSalespersonId: a.erp_salesperson_id,
+    note: a.note,
+    orders: Number(a.orders),
+    total: Number(a.total),
+  }))
+
   return {
     subDepartmentId,
     lastEventAt: events[0]?.receivedAt ?? null,
     events,
     held,
     unmatched,
+    ignored,
     staff,
   }
 }
