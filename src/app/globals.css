@@ -2195,6 +2195,10 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .space-memberships button { font-weight: 400; font-size: 11px; }
 .company-canvas .space-team-heading { background: transparent; border: 0; border-radius: 0; }
 .company-canvas { height: clamp(480px, calc(100dvh - 260px), 740px); }
+.company-canvas .org-card .react-flow__handle.company-routing-port,
+.company-canvas .company-department-summary .react-flow__handle.company-routing-port { opacity: 0; pointer-events: none; }
+.company-level-guide { stroke: rgb(var(--cv-muted) / .17); stroke-dasharray: 5 7; vector-effect: non-scaling-stroke; }
+.company-level-label { position: absolute; color: rgb(var(--cv-muted)); font: 500 12px/1.4 var(--font-sans), sans-serif; }
 .company-canvas .space-department { fill: rgb(var(--space-tone) / .045); stroke: rgb(var(--space-tone) / .35); }
 .company-canvas .space-department-heading { gap: 8px; padding: 0 14px; }
 .company-canvas .space-department-heading strong { font-size: 13px; }

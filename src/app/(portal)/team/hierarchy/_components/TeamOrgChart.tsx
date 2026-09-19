@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Background,
   Handle,
+  MarkerType,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -34,6 +35,7 @@ import { boundsOf, rectanglePoints } from '@/lib/hierarchy-spaces'
 import { hierarchyTitleAppearance } from '@/lib/hierarchy-title-appearance'
 import { useCompanyHierarchySpaces } from './CompanyHierarchySpaces'
 import { COMPANY_CARD_HEIGHT, companyChartStructure, companyStaffId, companyZoneId } from '@/lib/company-chart-structure'
+import type { CompanyLevelRole } from '@/lib/company-hierarchy-levels'
 
 export interface ChartPerson {
   id: string
@@ -88,6 +90,17 @@ interface SummaryData extends Record<string, unknown> {
 }
 type CompanyNode = Node<CardData> | Node<SummaryData>
 const summaryId = (zoneId: string) => `summary:${zoneId}`
+
+/** Ports follow the displayed level rows, while arrows retain manager → report. */
+function reportingPorts(source: { x: number; y: number } | undefined, target: { x: number; y: number } | undefined) {
+  if (!source || !target) return {}
+  if (Math.abs(source.y - target.y) < 1) return source.x < target.x
+    ? { sourceHandle: 'source-right', targetHandle: 'target-left' }
+    : { sourceHandle: 'source-left', targetHandle: 'target-right' }
+  return target.y < source.y
+    ? { sourceHandle: 'source-top', targetHandle: 'target-bottom' }
+    : { sourceHandle: 'source-bottom', targetHandle: 'target-top' }
+}
 
 /** No department chosen — the whole company. Exported because the page owns
  *  the choice now: the rail beside this canvas has to answer the same filter. */
@@ -279,7 +292,14 @@ function Chart({
       .map(companyZoneId))],
   })), [shown, structure, people])
   const departmentDefinitions = structure.departments
-  const spaces = useCompanyHierarchySpaces(members, departmentDefinitions, { leaders, visibleDepartmentIds })
+  const levelRoles: CompanyLevelRole[] = useMemo(() => people.map(person => ({
+    id: person.id, departmentId: companyZoneId(person), levelRank: person.levelRank,
+    isDepartmentHead: person.isDepartmentHead, height: COMPANY_CARD_HEIGHT,
+  })), [people])
+  const spaces = useCompanyHierarchySpaces(members, departmentDefinitions, {
+    leaders, visibleDepartmentIds, roles: levelRoles,
+    visibleLeaderIds: leaders.filter(person => scopeIds.has(person.id)).map(person => person.id),
+  })
   const toggleTeam = useCallback((teamId: string) => {
     onFocus(null)
     setExpandedTeams(previous => {
@@ -399,12 +419,13 @@ function Chart({
   const visibleBounds = useCallback(() => {
     const frames = spaces.geometry.departments.filter(department => visibleDepartmentIds === null || visibleDepartmentIds.includes(department.id))
     const points = frames.flatMap(frame => rectanglePoints(frame.bounds))
+    if (spaces.levelGuideBounds) points.push(...rectanglePoints(spaces.levelGuideBounds))
     for (const leader of leaders.filter(person => scopeIds.has(person.id))) {
       const point = spaces.positions.get(leader.id)
       if (point) points.push(...rectanglePoints({ ...point, width: NODE_WIDTH, height: COMPANY_CARD_HEIGHT }))
     }
     return points.length ? boundsOf(points) : null
-  }, [spaces.geometry, spaces.positions, visibleDepartmentIds, leaders, scopeIds])
+  }, [spaces.geometry, spaces.positions, spaces.levelGuideBounds, visibleDepartmentIds, leaders, scopeIds])
   const fitCompany = useCallback(() => {
     const bounds = visibleBounds()
     if (bounds) void fitBounds(bounds, {
@@ -462,6 +483,9 @@ function Chart({
           source: p.reportsTo!,
           target: p.id,
           type: 'smoothstep',
+          ...reportingPorts(spaces.positions.get(p.reportsTo!), spaces.positions.get(p.id)),
+          markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14,
+            color: broken ? 'rgb(var(--danger))' : 'var(--hairline-strong, #b9b0a2)' },
           style: broken
             ? { stroke: 'rgb(var(--danger))', strokeWidth: 1.75 }
             : { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5 },
@@ -477,6 +501,8 @@ function Chart({
         source: line.headId,
         target: line.staffId,
         type: 'smoothstep',
+        ...reportingPorts(spaces.positions.get(line.headId), spaces.positions.get(line.staffId)),
+        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: 'var(--hairline-strong, #b9b0a2)' },
         style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5, strokeDasharray: '5 4' },
       }))
     // A collapsed department stands in for its real roles. Aggregate only
@@ -492,6 +518,8 @@ function Chart({
         const id = `summary:${parent}->${target}`
         summaryCounts.set(id, (summaryCounts.get(id) ?? 0) + 1)
         summaryEdges.set(id, { id, source: parent, target, type: 'smoothstep',
+          ...reportingPorts(spaces.positions.get(parent), spaces.positions.get(target)),
+          markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: 'var(--hairline-strong, #b9b0a2)' },
           style: { stroke: 'var(--hairline-strong, #b9b0a2)', strokeWidth: 1.5,
             ...(person.reportsTo ? {} : { strokeDasharray: '5 4' }) } })
       }
@@ -501,7 +529,7 @@ function Chart({
       labelStyle: { fontSize: 11, fill: 'rgb(var(--cv-graphite))' },
       labelBgStyle: { fill: 'rgb(var(--cv-card))' }, labelBgPadding: [6, 4] as [number, number],
     }))]
-  }, [visible, visibleIds, byId, scoped, expandedZones, structure])
+  }, [visible, visibleIds, byId, scoped, expandedZones, structure, spaces.positions])
 
   const move = useCallback(
     (childId: string, parentId: string | null) => {
@@ -795,7 +823,7 @@ function Chart({
           <button type="button" className="space-tidy" onClick={() => {
             spaces.tidy()
             setArrangementVersion(version => version + 1)
-          }} title="Restore the top-down hierarchy within department zones">Tidy</button>
+          }} title="Align roles by L level within the department zones">Tidy</button>
           <div className="org-zoom">
             <button type="button" onClick={() => void zoomOut({ duration: 250 })} aria-label="Zoom out">−</button>
             <button type="button" className="lv" onClick={fitCompany} aria-label="Fit visible departments"><ZoomReadout /></button>
@@ -825,7 +853,7 @@ function Chart({
           ) : null}
           {pending ? ' · saving…' : ''}
         </p>
-        <span>{pending ? 'Saving reporting line…' : 'Top-down hierarchy · Expand departments to explore'}</span>
+        <span>{pending ? 'Saving reporting line…' : 'Height follows L level · Higher levels above'}</span>
       </div>
 
       {selectedPerson && selectedRoles.length > 1 ? <div className="company-role-switcher" aria-label={`Roles held by ${selectedPerson.name}`}>
@@ -874,7 +902,7 @@ function Chart({
       </div>
 
       <div className="space-footer">
-        <span className="text-xs text-muted">Expand a department, then a team. Drag headings to adjust their position.</span>
+        <span className="text-xs text-muted">Expand a department, then a team. Drag headings left or right; L levels determine height.</span>
         {selectedPerson?.secondaryRole && selectedPerson.membershipHref ? (
           <Link href={selectedPerson.membershipHref} className="text-xs text-accent hover:underline">
             Edit {selectedPerson.name}&rsquo;s {selectedPerson.subDepartment} role on Revenue →
@@ -900,7 +928,7 @@ function Chart({
           <svg width="26" height="6" aria-hidden>
             <line x1="0" y1="3" x2="26" y2="3" stroke="var(--hairline-strong, #b9b0a2)" strokeWidth="1.5" />
           </svg>
-          Reports to
+          Manager → report
         </span>
         {directed > 0 ? (
           <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
@@ -938,6 +966,7 @@ function Chart({
       </div>
 
       <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+        Cards with the same L level share a row, even when one reports to another. Arrows show the reporting direction.
         Each card represents one role. A person with appointments in multiple sub-departments
         appears in each, with that role&rsquo;s title and reporting line. Select a card to
         switch between their roles. Primary reporting lines can be changed by dragging to a
@@ -961,7 +990,13 @@ function PersonCard({ data, isConnectable }: NodeProps<Node<CardData>>) {
       data-space-tone={tone}
       className={`org-card space-person${selected ? ' sel' : ''}${invalidTarget ? ' forbid' : ''}`}
     >
-      <Handle type="target" position={Position.Top} isConnectable={isConnectable && !person.secondaryRole} />
+      <Handle id="target-top" type="target" position={Position.Top} isConnectable={isConnectable && !person.secondaryRole} />
+      <Handle id="source-top" type="source" position={Position.Top} isConnectable={false} className="company-routing-port" />
+      <Handle id="target-bottom" type="target" position={Position.Bottom} isConnectable={false} className="company-routing-port" />
+      <Handle id="source-left" type="source" position={Position.Left} isConnectable={false} className="company-routing-port" />
+      <Handle id="source-right" type="source" position={Position.Right} isConnectable={false} className="company-routing-port" />
+      <Handle id="target-left" type="target" position={Position.Left} isConnectable={false} className="company-routing-port" />
+      <Handle id="target-right" type="target" position={Position.Right} isConnectable={false} className="company-routing-port" />
       <div className="oc-top">
         <div className="oc-nm" title={`${person.name} · ${person.department ?? 'No department'}`}>{person.name}</div>
         {person.levelRank !== null ? <span className="oc-rank" title={`Level ${person.levelRank} · ${person.levelName ?? ''}`}>
@@ -987,14 +1022,17 @@ function PersonCard({ data, isConnectable }: NodeProps<Node<CardData>>) {
         aria-expanded={expanded} onClick={event => { event.stopPropagation(); toggleTeam() }}>
         {expanded ? 'Collapse' : 'Expand'} {teamSize} {teamSize === 1 ? 'member' : 'members'} <span aria-hidden>{expanded ? '−' : '+'}</span>
       </button> : null}
-      <Handle type="source" position={Position.Bottom} isConnectable={isConnectable && !person.secondaryRole} />
+      <Handle id="source-bottom" type="source" position={Position.Bottom} isConnectable={isConnectable && !person.secondaryRole} />
     </div>
   )
 }
 
 function DepartmentSummary({ data }: NodeProps<Node<SummaryData>>) {
   return <div className="company-department-summary" style={{ width: NODE_WIDTH, minHeight: COMPANY_CARD_HEIGHT }}>
-    <Handle type="target" position={Position.Top} isConnectable={false} />
+    <Handle id="target-top" type="target" position={Position.Top} isConnectable={false} />
+    <Handle id="target-bottom" type="target" position={Position.Bottom} isConnectable={false} className="company-routing-port" />
+    <Handle id="target-left" type="target" position={Position.Left} isConnectable={false} className="company-routing-port" />
+    <Handle id="target-right" type="target" position={Position.Right} isConnectable={false} className="company-routing-port" />
     <div className="company-summary-count"><strong>{data.people}</strong><span>people</span></div>
     <p>{data.teams} {data.teams === 1 ? 'team' : 'teams'} · {data.roles} {data.roles === 1 ? 'role' : 'roles'}</p>
     <button type="button" className="nodrag nopan" onClick={event => { event.stopPropagation(); data.expand() }}

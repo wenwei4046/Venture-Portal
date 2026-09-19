@@ -10,7 +10,7 @@ import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 type PersonNode = Node<{ person: ChartPerson; invalidTarget: boolean; selected: boolean }>
 type CanvasNode = Node<Record<string, unknown>>
 type FlowProps = ReactFlowProps<CanvasNode>
-const STORAGE_NAMESPACE = 'company.spaces.v3.structure'
+const STORAGE_NAMESPACE = 'company.spaces.v4.levels'
 const adapters = vi.hoisted(() => ({
   flow: null as FlowProps | null,
   setReportsTo: vi.fn(),
@@ -89,6 +89,19 @@ function multipleRoles(): ChartPerson[] {
       subDepartment: 'IR', schemeId: 'ir', secondaryRole: true, membershipHref: '/revenue/ir/hierarchy' }),
     person('ir:chea', 'Chea Huan', { ...revenue, staffId: 'chea', title: 'Relationship Specialist', levelRank: 2,
       reportsTo: 'ir:rachael', subDepartment: 'IR', schemeId: 'ir', secondaryRole: true, membershipHref: '/revenue/ir/hierarchy' }),
+  ]
+}
+
+function rankedPeople(): ChartPerson[] {
+  return [
+    person('finance-head', 'Finance Head', { levelRank: 6 }),
+    person('finance-manager', 'Finance Manager', { levelRank: 4, reportsTo: 'finance-head' }),
+    person('finance-peer', 'Finance Peer', { levelRank: 4, reportsTo: 'finance-manager' }),
+    person('finance-junior', 'Finance Junior', { levelRank: 2, reportsTo: 'finance-peer' }),
+    person('hr-manager', 'HR Manager', { department: 'HR', levelRank: 4 }),
+    person('hr-junior', 'HR Junior', { department: 'HR', levelRank: 2, reportsTo: 'hr-manager' }),
+    person('cross-manager', 'Cross Manager', { department: 'Marketing', levelRank: 3 }),
+    person('higher-report', 'Higher Report', { department: 'IT', levelRank: 5, reportsTo: 'cross-manager' }),
   ]
 }
 
@@ -242,7 +255,7 @@ describe('company hierarchy reporting rules', () => {
 })
 
 describe('company hierarchy grouped canvas', () => {
-  it('opens a wide company overview at a readable zoom from its left edge', () => {
+  it('opens a wide company overview at a readable zoom with its level labels visible', () => {
     const roster = people().concat(Array.from({ length: 8 }, (_, index) =>
       person(`branch-${index}`, `Branch manager ${index}`, { department: `Branch ${index}` })))
     renderChart({ roster })
@@ -255,9 +268,13 @@ describe('company hierarchy grouped canvas', () => {
     const departments = [...document.querySelectorAll<SVGRectElement>('.space-department')]
     const left = Math.min(...departments.map(element => Number(element.getAttribute('x'))))
     const right = Math.max(...departments.map(element => Number(element.getAttribute('x')) + Number(element.getAttribute('width'))))
+    const levelLabel = document.querySelector<HTMLElement>('.company-level-label')!
+    const labelLeft = Number.parseFloat(levelLabel.style.left)
     expect(viewport.zoom).toBeGreaterThanOrEqual(0.45)
     expect(viewport.zoom).toBeLessThanOrEqual(0.85)
-    expect(viewport.x + left * viewport.zoom).toBeCloseTo(32)
+    expect(labelLeft).toBeLessThan(left)
+    expect(viewport.x + labelLeft * viewport.zoom).toBeCloseTo(32)
+    expect(viewport.x + left * viewport.zoom).toBeGreaterThan(32)
     expect(viewport.x + right * viewport.zoom).toBeGreaterThan(900)
   })
 
@@ -303,24 +320,25 @@ describe('company hierarchy grouped canvas', () => {
       .toEqual(node('alice').position)
   })
 
-  it('Tidy restores the top-down arrangement after departments and teams are dragged vertically', () => {
+  it('Tidy restores the arrangement while group drags leave level heights locked', () => {
     renderChart()
     const defaults = new Map(flow().nodes!.map(item => [item.id, { ...item.position }]))
     const edges = JSON.stringify(flow().edges)
-    dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), 0, 200)
-    dragGroup(screen.getByRole('button', { name: /Alice team: drag to move team/i }), 0, 100)
-    expect(node('alice').position.y).toBeGreaterThan(defaults.get('alice')!.y)
+    dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), -200, 200)
+    dragGroup(screen.getByRole('button', { name: /Alice team: drag to move team/i }), -100, 100)
+    expect(node('alice').position.x).not.toBe(defaults.get('alice')!.x)
+    for (const [id, point] of defaults) expect(node(id).position.y).toBe(point.y)
     fireEvent.click(screen.getByRole('button', { name: 'Tidy' }))
     for (const [id, point] of defaults) expect(node(id).position).toEqual(point)
     expect(JSON.stringify(flow().edges)).toBe(edges)
     expect(adapters.setReportsTo).not.toHaveBeenCalled()
-    expect(readManualLayout(window.localStorage, 'company.spaces.v3.structure').get('alice'))
+    expect(readManualLayout(window.localStorage, STORAGE_NAMESPACE).get('alice'))
       .toEqual(defaults.get('alice'))
   })
 
   it('measured card heights preserve a manually moved group while reserving room for its reports', () => {
     renderChart()
-    dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), 0, 200)
+    dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), -200, 200)
     const leader = { ...node('alice').position }
     const teamHeading = screen.getByRole('button', { name: /Alice team: drag to move team/i })
     const teamTop = teamHeading.style.top
@@ -585,5 +603,155 @@ describe('company hierarchy overview and independent roles', () => {
       node('ir:chea').position.y + COMPANY_CARD_HEIGHT / 2,
       expect.objectContaining({ zoom: 1 }),
     )
+  })
+})
+
+describe('company-wide level alignment', () => {
+  it('aligns matching levels across departments and reporting depths, including cross-department management', () => {
+    renderChart({ roster: rankedPeople() })
+    expect(node('finance-manager').position.y).toBe(node('finance-peer').position.y)
+    expect(node('finance-peer').position.y).toBe(node('hr-manager').position.y)
+    expect(node('finance-junior').position.y).toBe(node('hr-junior').position.y)
+    expect(node('finance-head').position.y).toBeLessThan(node('higher-report').position.y)
+    expect(node('higher-report').position.y).toBeLessThan(node('finance-manager').position.y)
+    expect(node('finance-manager').position.y).toBeLessThan(node('cross-manager').position.y)
+    expect(node('cross-manager').position.y).toBeLessThan(node('finance-junior').position.y)
+    const upward = flow().edges!.find(edge => edge.target === 'higher-report')!
+    expect(upward).toMatchObject({
+      source: 'cross-manager', target: 'higher-report', sourceHandle: 'source-top', targetHandle: 'target-bottom',
+      markerEnd: { type: 'arrowclosed' },
+    })
+    expect(upward.style?.stroke).toBe('rgb(var(--danger))')
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
+  it('uses the level of each role rather than merging the heights of one staff identity', () => {
+    renderChart({ roster: multipleRoles() })
+    expect(node('ir:rachael').position.y).toBeLessThan(node('rachael').position.y)
+    expect(node('chea').position.y).toBe(node('ir:chea').position.y)
+    expect(node('rachael').position.y).toBeLessThan(node('chea').position.y)
+  })
+
+  it('scopes level guides to visible roles while retaining their global heights', () => {
+    const roster = multipleRoles().concat(person('finance-manager', 'Finance Manager'))
+    renderChart({ roster })
+    const guideKeys = () => [...document.querySelectorAll<HTMLElement>('.company-level-label')]
+      .map(label => label.dataset.levelRow)
+    expect(guideKeys()).toContain('department-heads')
+    expect(guideKeys()).toContain('level:6')
+    const financeY = node('finance-manager').position.y
+    fireEvent.click(screen.getByRole('button', { name: 'Finance' }))
+    expect(screen.queryByTestId('node:peter')).toBeNull()
+    expect(guideKeys()).toEqual(['level:4'])
+    expect(node('finance-manager').position.y).toBe(financeY)
+    const guide = document.querySelector<SVGLineElement>('.company-level-guide')!
+    expect(Number(guide.getAttribute('y1'))).toBe(financeY)
+    expect(Number(guide.getAttribute('y2'))).toBe(financeY)
+  })
+
+  it('keeps same-level managers and reports apart and uses facing side ports in both directions', () => {
+    const roster = [
+      person('manager', 'Manager', { levelRank: 4 }),
+      person('report', 'Report', { department: 'HR', levelRank: 4, reportsTo: 'manager' }),
+    ]
+    renderChart({ roster })
+    const assertSidePorts = () => {
+      const source = node('manager').position, target = node('report').position
+      expect(source.y).toBe(target.y)
+      expect(Math.abs(source.x - target.x)).toBeGreaterThanOrEqual(NODE_WIDTH)
+      expect(flow().edges!.find(edge => edge.target === 'report')).toMatchObject({
+        source: 'manager', target: 'report', markerEnd: { type: 'arrowclosed' },
+        sourceHandle: source.x < target.x ? 'source-right' : 'source-left',
+        targetHandle: source.x < target.x ? 'target-left' : 'target-right',
+      })
+    }
+    assertSidePorts()
+    const heading = screen.getByRole('button', { name: /HR: drag to move department/i })
+    for (const side of [-1, 1]) {
+      const targetX = node('manager').position.x + side * NODE_WIDTH * 3
+      dragGroup(heading, (targetX - node('report').position.x) * 0.5, 200)
+      expect(Math.sign(node('report').position.x - node('manager').position.x)).toBe(side)
+      assertSidePorts()
+    }
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
+  it('preserves level heights through collapse, expansion, filters, Tidy and reload', () => {
+    const roster = rankedPeople()
+    const view = renderChart({ roster })
+    const heights = new Map(flow().nodes!.map(item => [item.id, item.position.y]))
+    fireEvent.click(within(screen.getByTestId('node:finance-head')).getByRole('button', { name: /Collapse 3 members/ }))
+    expect(screen.queryByTestId('node:finance-manager')).toBeNull()
+    expect(node('hr-manager').position.y).toBe(heights.get('hr-manager'))
+    fireEvent.click(within(screen.getByTestId('node:finance-head')).getByRole('button', { name: /Expand 3 members/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'HR' }))
+    expect(node('hr-manager').position.y).toBe(heights.get('hr-manager'))
+    expect(node('hr-junior').position.y).toBe(heights.get('hr-junior'))
+    fireEvent.click(screen.getByRole('button', { name: 'Whole company' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tidy' }))
+    for (const [id, y] of heights) expect(node(id).position.y).toBe(y)
+    view.unmount()
+    renderChart({ roster })
+    for (const [id, y] of heights) expect(node(id).position.y).toBe(y)
+  })
+
+  it('locks vertical group dragging and arrow keys while allowing horizontal arrangement', () => {
+    renderChart({ roster: rankedPeople() })
+    const heading = screen.getByRole('button', { name: /Finance: drag to move department/i })
+    const before = new Map(flow().nodes!.map(item => [item.id, { ...item.position }]))
+    dragGroup(heading, 0, 400)
+    fireEvent.keyDown(heading, { key: 'ArrowDown' })
+    fireEvent.keyDown(heading, { key: 'ArrowUp', shiftKey: true })
+    for (const [id, point] of before) expect(node(id).position).toEqual(point)
+    dragGroup(heading, -100, 400)
+    expect(node('finance-head').position.x).not.toBe(before.get('finance-head')!.x)
+    for (const [id, point] of before) expect(node(id).position.y).toBe(point.y)
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
+  it('retains the tallest measured card in a level after that card is hidden', () => {
+    renderChart({ roster: rankedPeople() })
+    const originalJuniorY = node('hr-junior').position.y
+    act(() => flow().onNodesChange?.([{
+      type: 'dimensions', id: 'finance-manager', dimensions: { width: NODE_WIDTH, height: COMPANY_CARD_HEIGHT + 200 },
+    }]))
+    const spaciousJuniorY = node('hr-junior').position.y
+    expect(spaciousJuniorY).toBeGreaterThan(originalJuniorY)
+    expect(node('finance-junior').position.y).toBe(spaciousJuniorY)
+    fireEvent.click(within(screen.getByTestId('node:finance-head')).getByRole('button', { name: /Collapse 3 members/ }))
+    expect(screen.queryByTestId('node:finance-manager')).toBeNull()
+    expect(node('hr-junior').position.y).toBe(spaciousJuniorY)
+    fireEvent.click(screen.getByRole('button', { name: 'HR' }))
+    expect(node('hr-junior').position.y).toBe(spaciousJuniorY)
+    fireEvent.click(screen.getByRole('button', { name: 'Whole company' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
+    expect(node('finance-junior').position.y).toBe(spaciousJuniorY)
+  })
+
+  it('migrates saved X positions from the matching legacy structure while replacing old free-form Y', () => {
+    const roster = multipleRoles()
+    const view = renderChart({ roster, overview: true })
+    const originalNodes = new Map(flow().nodes!.map(item => [item.id, { ...item.position }]))
+    const currentStructure = JSON.parse(window.localStorage.getItem(`${layoutKey(STORAGE_NAMESPACE)}.structure`)!) as {
+      members: unknown[]; departments: unknown[]; leaders: unknown[]
+    }
+    const legacyNamespace = 'company.spaces.v3.structure'
+    window.localStorage.setItem(`${layoutKey(legacyNamespace)}.structure`, JSON.stringify({
+      members: currentStructure.members, departments: currentStructure.departments, leaders: currentStructure.leaders,
+    }))
+    const oldPositions = readManualLayout(window.localStorage, STORAGE_NAMESPACE)
+    writeManualLayout(window.localStorage, legacyNamespace, new Map([...oldPositions].map(([id, point]) => [
+      id, { x: point.x + 600, y: point.y + 9000 },
+    ])))
+    window.localStorage.removeItem(layoutKey(STORAGE_NAMESPACE))
+    window.localStorage.removeItem(`${layoutKey(STORAGE_NAMESPACE)}.structure`)
+    view.unmount()
+    renderChart({ roster, overview: true })
+    for (const [id, point] of originalNodes) {
+      const actual = flow().nodes!.find(item => item.id === id)!.position
+      expect(actual.x).toBe(Math.round(point.x + 600))
+      expect(actual.y).toBe(point.y)
+    }
   })
 })
