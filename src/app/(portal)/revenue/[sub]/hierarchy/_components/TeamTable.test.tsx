@@ -9,6 +9,7 @@ const actions = vi.hoisted(() => ({
   addDirector: vi.fn(), removeDirector: vi.fn(),
 }))
 vi.mock('../../../hierarchy-actions', () => actions)
+vi.mock('../../../employee-actions', () => ({ moveEmployee: vi.fn(), removeEmployeeMembership: vi.fn(), terminateEmployee: vi.fn() }))
 
 afterEach(cleanup)
 beforeEach(() => vi.clearAllMocks())

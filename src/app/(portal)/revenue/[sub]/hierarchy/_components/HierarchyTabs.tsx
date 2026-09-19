@@ -6,6 +6,7 @@ import OrgChart, { type OrgDepartment } from './OrgChart'
 import TeamTable from './TeamTable'
 import type { TeamData } from '../../../_components/config/types'
 import type { MembershipDestination } from '../../../_lib/membership-destinations'
+import type { EmployeeDepartmentDestination } from '../../../_lib/employee-destinations'
 
 export type HierarchyTab = 'chart' | 'team'
 
@@ -32,12 +33,18 @@ export default function HierarchyTabs({
   team,
   departments,
   membershipDestinations,
+  employeeDepartments = [],
+  canManageEmployment = false,
+  employmentToday = '',
 }: {
   subDept: { name: string; slug: string; isHome: boolean }
   schemeId: string
   team: TeamData
   departments: OrgDepartment[]
   membershipDestinations: MembershipDestination[]
+  employeeDepartments?: EmployeeDepartmentDestination[]
+  canManageEmployment?: boolean
+  employmentToday?: string
 }) {
   const searchParams = useSearchParams()
   const tab: HierarchyTab = searchParams.get('tab') === 'team' ? 'team' : 'chart'
@@ -88,7 +95,8 @@ export default function HierarchyTabs({
                 leader and standalone member reports to them — a reporting line only, with no
                 override. Drag a team or department border or
                 heading to move it freely. Hold over a person until the transfer prompt appears
-                to change upline. Right-click a person to add them to another department.
+                to change upline. Right-click a person to manage their memberships, titles,
+                or removal from the chart.
                 The Team tab edits {subDept.name}.
               </>
             )}
@@ -115,7 +123,9 @@ export default function HierarchyTabs({
       ) : departments.length === 0 ? (
         <NobodyYet isHome={subDept.isHome} />
       ) : (
-        <OrgChart departments={departments} membershipDestinations={membershipDestinations} initialDepartmentId={departments.find(department => department.schemeId === schemeId)?.id} />
+        <OrgChart departments={departments} membershipDestinations={membershipDestinations}
+          employeeDepartments={employeeDepartments} canManageEmployment={canManageEmployment} employmentToday={employmentToday}
+          initialDepartmentId={departments.find(department => department.schemeId === schemeId)?.id} />
       )}
     </div>
   )

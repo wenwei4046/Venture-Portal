@@ -15,6 +15,8 @@ const adapters = vi.hoisted(() => ({
   move: vi.fn(),
   add: vi.fn(),
   changeTitle: vi.fn(),
+  removeEmployee: vi.fn(),
+  terminateEmployee: vi.fn(),
   router: { refresh: vi.fn() },
   viewport: {
     fitBounds: vi.fn(), setCenter: vi.fn(), getZoom: () => 0.5,
@@ -26,6 +28,7 @@ const adapters = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({ useRouter: () => adapters.router }))
 vi.mock('../../../hierarchy-actions', () => ({ moveOnChart: adapters.move, addMember: adapters.add, changeMemberTitle: adapters.changeTitle }))
+vi.mock('../../../employee-actions', () => ({ moveEmployee: vi.fn(), removeEmployeeMembership: adapters.removeEmployee, terminateEmployee: adapters.terminateEmployee }))
 vi.mock('@xyflow/react', async importOriginal => {
   const actual = await importOriginal<typeof import('@xyflow/react')>()
   return {
@@ -41,7 +44,7 @@ vi.mock('@xyflow/react', async importOriginal => {
     ReactFlow: (props: FlowProps) => {
       adapters.flow = props
       const Card = props.nodeTypes!.person as ComponentType<{ data: PersonNode['data'] }>
-      return <div>
+      return <div data-testid="flow-pane" onClick={event => { if (event.target === event.currentTarget) props.onPaneClick?.(event) }}>
         {props.nodes?.map(node => <div key={node.id} data-testid={`node:${node.id}`}
           onClick={event => props.onNodeClick?.(event, node)}>
           <Card data={node.data} />
@@ -165,6 +168,8 @@ beforeEach(() => {
   adapters.move.mockResolvedValue({ ok: true })
   adapters.add.mockResolvedValue({ ok: true, note: null })
   adapters.changeTitle.mockResolvedValue({ ok: true, note: null })
+  adapters.removeEmployee.mockResolvedValue({ ok: true, note: null })
+  adapters.terminateEmployee.mockResolvedValue({ ok: true, note: null })
   window.localStorage.clear()
   vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
     matches: query === '(prefers-reduced-motion: reduce)', media: query, onchange: null,
@@ -585,6 +590,51 @@ describe('HierarchySpaces explicit upline edits', () => {
 })
 
 describe('HierarchySpaces department membership actions', () => {
+  it.each(['remove', 'terminate'] as const)('keeps a pending %s confirmation and its error when the chart is clicked, then permits retry', async action => {
+    const writer = action === 'remove' ? adapters.removeEmployee : adapters.terminateEmployee
+    let finish!: (result: { ok: false; note: string }) => void
+    writer.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()}
+      canManageEmployment employmentToday="2026-09-20" />)
+    fireEvent.contextMenu(screen.getByTestId('node:ir-scheme:chea').querySelector('.org-card')!)
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Actions for Chea Huan' }))
+      .getByRole('menuitem', { name: 'Remove employee' }))
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Remove Chea Huan' }))
+      .getByRole('menuitem', { name: action === 'remove' ? 'Remove from this department' : /^Terminate employee/ }))
+    const confirmation = screen.getByRole('dialog', { name: action === 'remove' ? 'Remove Chea Huan from IR' : 'Terminate Chea Huan' })
+    const confirm = within(confirmation).getByRole('button', { name: action === 'remove' ? 'Confirm removal' : 'Confirm termination' })
+    fireEvent.click(confirm)
+    expect(writer).toHaveBeenCalledOnce()
+    expect(confirm).toBeDisabled()
+    expect(screen.getByText('Saving employee…')).toBeInTheDocument()
+    expect(screen.queryByText('Saving upline…')).not.toBeInTheDocument()
+    expect(flow().nodesDraggable).toBe(false)
+    expect(flow().nodesConnectable).toBe(false)
+    expect(flow().elementsSelectable).toBe(false)
+
+    fireEvent.pointerDown(screen.getByTestId('flow-pane'))
+    fireEvent.click(screen.getByTestId('flow-pane'))
+    fireEvent.click(screen.getByTestId('node:fa-scheme:anthony'))
+    fireEvent.contextMenu(screen.getByTestId('node:fa-scheme:anthony').querySelector('.org-card')!)
+    fireEvent.keyDown(screen.getByTestId('flow-pane'), { key: 'Escape' })
+    act(() => flow().onNodesChange?.([{ type: 'select', id: 'fa-scheme:anthony', selected: true }]))
+    connect('fa-scheme:chea', 'fa-scheme:yuny')
+    expect(confirmation).toBeInTheDocument()
+    expect(screen.queryByRole('menu', { name: 'Actions for Anthony' })).not.toBeInTheDocument()
+    expect(node('ir-scheme:chea').selected).toBe(true)
+    expect(node('fa-scheme:anthony').selected).toBe(false)
+    expect(adapters.move).not.toHaveBeenCalled()
+
+    await act(async () => { finish({ ok: false, note: 'Could not update this employee. Try again.' }) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update this employee. Try again.')
+    expect(confirmation).toBeInTheDocument()
+    await waitFor(() => expect(confirm).toBeEnabled())
+    expect(flow().nodesDraggable).toBe(true)
+    fireEvent.click(confirm)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: confirmation.getAttribute('aria-label')! })).not.toBeInTheDocument())
+    expect(writer).toHaveBeenCalledTimes(2)
+  })
+
   it('changes the right-clicked IR membership title without changing the same person in Fair or either upline', async () => {
     render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
     const fairBefore = { ...node('fa-scheme:chea').data.person }
