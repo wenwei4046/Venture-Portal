@@ -261,6 +261,42 @@ src/
 │   │   │                              `lib/erp-sync/feed-key.ts`,
 │   │   │                              `revenue/link-actions.ts`,
 │   │   │                              `_components/ErpLinkPanel.tsx`.
+│   │   │                              **NOT OURS (2026-09-19):** the feed names
+│   │   │                              whoever the ERP put on the document and
+│   │   │                              the portal can only place a name a human
+│   │   │                              MATCHED once (`comm_agent_aliases`) —
+│   │   │                              there is no auto-match by name. Some of
+│   │   │                              those names are nobody: AutoCount import
+│   │   │                              stubs (ERP staff code `ACIMP-<name>`,
+│   │   │                              opened by the cutover from the agent
+│   │   │                              string on an old document), ex-colleagues
+│   │   │                              who still hold an `EMP-` number, a
+│   │   │                              director selling outside the scheme. They
+│   │   │                              can never be answered, so a red list full
+│   │   │                              of them makes the real work unfindable.
+│   │   │                              `comm_ignored_agents` is the other answer
+│   │   │                              — *Not ours* on the Match panel — and it
+│   │   │                              takes their bills OUT: `cancelled` with
+│   │   │                              `sales_orders.excluded_reason =
+│   │   │                              'ignored_agent'`, so they leave the
+│   │   │                              month's sales, the venue and person
+│   │   │                              breakdowns and the engine exactly as an
+│   │   │                              ERP-cancelled bill does (user 2026-09-19).
+│   │   │                              Applied by TRIGGER
+│   │   │                              (`sales_orders_ignored_agent`), not inside
+│   │   │                              the ingest, because the ERP re-pushes a
+│   │   │                              document on every save and a file import
+│   │   │                              writes the same table. Refuses a name that
+│   │   │                              is MATCHED (23IGN) — that is somebody's
+│   │   │                              pay — and leaves a month whose run has
+│   │   │                              paid alone. `erp_sync_ignore_agent` /
+│   │   │                              `_unignore_agent` / `_ignored_agents`,
+│   │   │                              mig `20260919030000`. Brand does NOT gate
+│   │   │                              commission — `classifyLine` reads
+│   │   │                              `item_group` and the KPI list, nothing
+│   │   │                              else — so a brand we no longer carry
+│   │   │                              (MYLATEX) is only out while its
+│   │   │                              salesperson is.
 │   │   │                              **THE MONTH ENDS IN A RAIL (2026-09-17):**
 │   │   │                              `[period]` itself closes on three cuts of
 │   │   │                              the same bills, one `SlidingTabs` rail

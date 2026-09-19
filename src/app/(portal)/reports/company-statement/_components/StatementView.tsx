@@ -99,7 +99,7 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
       >
         {side === 'collect' ? 'TO COLLECT' : 'TO REPAY'} · {items.length}
       </div>
-      <table className="w-full text-sm">
+      <table className="w-full text-sm cf-plain">
         <thead>
           <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
             <th className="text-left py-1.5 px-3 font-medium">Position</th>

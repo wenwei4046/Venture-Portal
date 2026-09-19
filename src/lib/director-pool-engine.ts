@@ -32,6 +32,14 @@ export interface DpCompanyInput {
   salary: number
   kpi: number
   allowance: number
+  /**
+   * Allowance that is transferred on its own, AFTER the month's main payout
+   * (HV's 15th-of-the-month allowance — user ruling 2026-09-18). It still
+   * earns saving and splits 75/25 like any other allowance, but it is NOT
+   * part of Total Pay: the month's advance was already settled by the main
+   * payout, and this transfer is not used to repay it.
+   */
+  excludeFromPay?: boolean
 }
 
 export interface DpMonth {
@@ -41,6 +49,12 @@ export interface DpMonth {
   fullPayout: boolean
   includeBilling: boolean
   billingDeductAdv: boolean
+  /**
+   * Full payout for the separately-transferred allowance only (excludeFromPay
+   * companies): the director gets the whole 95% balance and none of it is
+   * billed. Independent of `fullPayout`, which covers the main payout.
+   */
+  allowExclFullPayout?: boolean
   cos: DpCompanyInput[]
 }
 
@@ -69,6 +83,16 @@ export interface DpContraEvent {
   fromMonthId: string
 }
 
+/** One director's share of one half of the month's allowance. */
+export interface AllowanceSlice {
+  gross: number
+  saving: number
+  balance: number
+  /** The part paid to the director (gb% of balance, or all of it on full payout). */
+  gb: number
+  billInv: number
+}
+
 export interface DirectorMonthResult {
   id: string // director id
   code: string
@@ -86,6 +110,19 @@ export interface DirectorMonthResult {
   allowSaving: number
   allowBalance: number
   allowGB: number
+  /**
+   * The allowance that rides along with the month's main payout — every
+   * company except the excludeFromPay ones. Computed from its own pool, so it
+   * is bit-identical to a month where the excluded company paid nothing.
+   */
+  allowInPay: AllowanceSlice
+  /**
+   * The separately-transferred allowance (excludeFromPay companies) — paid
+   * out, but kept out of Total Pay / Vr KPI / advance (user ruling
+   * 2026-09-18). Every figure is the REMAINDER of the pooled column, so the
+   * two slices always add back up to the pooled total.
+   */
+  allowExcl: AllowanceSlice
   allowBillInv: number
   billInv: number
   billingUserInput: number
@@ -121,6 +158,8 @@ export interface MonthResult {
   fullPayout: boolean
   includeBilling: boolean
   billingDeductAdv: boolean
+  /** Mirrors DpMonth.allowExclFullPayout so views can label the slice. */
+  allowExclFullPayout: boolean
   poolSal: number
   poolKpi: number
   poolAllow: number
@@ -149,11 +188,16 @@ export function showAllowStat(monthDate: string, settings: Pick<DpSettings, 'all
  * salary (no allowance statutory needed).
  */
 export function allowStatTopUpBase(
-  d: Pick<DirectorMonthResult, 'salKpiGB' | 'allowGB' | 'dirFixed'>,
+  d: Pick<DirectorMonthResult, 'salKpiGB' | 'allowGB' | 'dirFixed'> & {
+    allowExcl?: Pick<AllowanceSlice, 'gb'>
+  },
 ): number {
   const gap = r2(d.dirFixed - d.salKpiGB)
   if (gap <= 0) return 0
-  return r2(Math.min(gap, d.allowGB))
+  // Separately-transferred allowance never tops the month up to the fixed
+  // salary (it lands after the payout), so it carries no top-up statutory.
+  const inPay = r2(d.allowGB - (d.allowExcl?.gb ?? 0))
+  return r2(Math.min(gap, inPay))
 }
 
 /** Fixed salary for a director in a month, honouring from-month overrides. */
@@ -210,6 +254,11 @@ export function calcAll(
     const poolSal = r2(month.cos.reduce((s, c) => s + n(c.salary), 0))
     const poolKpi = r2(month.cos.reduce((s, c) => s + n(c.kpi), 0))
     const poolAllow = r2(month.cos.reduce((s, c) => s + n(c.allowance), 0))
+    // Allowance transferred separately after the main payout — still pooled,
+    // saved and split, but held out of Total Pay (see DpCompanyInput).
+    const poolAllowInPay = r2(
+      month.cos.reduce((s, c) => (c.excludeFromPay ? s : s + n(c.allowance)), 0),
+    )
     const poolTotal = r2(poolSal + poolKpi + poolAllow)
 
     const dirRes = directors.map((d): DirectorMonthResult => {
@@ -227,15 +276,52 @@ export function calcAll(
 
       const salKpiGB = month.fullPayout ? salKpiBalance : r2(salKpiBalance * gbP)
       const salKpiBillInv = month.fullPayout ? 0 : r2(salKpiBalance * biP)
-      const allowGB = month.fullPayout ? allowBalance : r2(allowBalance * gbP)
-      const allowBillInv = month.fullPayout ? 0 : r2(allowBalance * biP)
+      const allowPooledGB = month.fullPayout ? allowBalance : r2(allowBalance * gbP)
+      const allowPooledBillInv = month.fullPayout ? 0 : r2(allowBalance * biP)
+
+      // The in-pay allowance runs the chain on its OWN pool rather than being
+      // subtracted from allowPooledGB, so Total Pay comes out bit-identical to
+      // a month where the excluded company simply paid nothing. (Subtracting
+      // afterwards drifts a cent — each r2() step rounds on a different base.)
+      const allowInPayGross = r2(poolAllowInPay * wRatio)
+      const allowInPaySaving = r2(allowInPayGross * savePct)
+      const allowInPayBalance = r2(allowInPayGross * (1 - savePct))
+      const allowGBInPay = month.fullPayout
+        ? allowInPayBalance
+        : r2(allowInPayBalance * gbP)
+      const allowBillInvInPay = month.fullPayout ? 0 : r2(allowInPayBalance * biP)
+      const allowInPay: AllowanceSlice = {
+        gross: allowInPayGross,
+        saving: allowInPaySaving,
+        balance: allowInPayBalance,
+        gb: allowGBInPay,
+        billInv: allowBillInvInPay,
+      }
+
+      // The separately-transferred slice takes the REMAINDER of each pooled
+      // column, then splits on its own terms: allowExclFullPayout hands the
+      // director the whole 95% balance and bills nothing, independently of the
+      // month's own Full Payout (user ruling 2026-09-18).
+      const exclFull = month.fullPayout || month.allowExclFullPayout === true
+      const exclBalance = r2(allowBalance - allowInPayBalance)
+      const allowExcl: AllowanceSlice = {
+        gross: r2(allowGross - allowInPayGross),
+        saving: r2(allowSaving - allowInPaySaving),
+        balance: exclBalance,
+        gb: exclFull ? exclBalance : r2(allowPooledGB - allowGBInPay),
+        billInv: exclFull ? 0 : r2(allowPooledBillInv - allowBillInvInPay),
+      }
+      // Pooled columns are the two streams added back up — identical to the
+      // old figures unless the excluded slice pays out in full.
+      const allowGB = r2(allowGBInPay + allowExcl.gb)
+      const allowBillInv = r2(allowBillInvInPay + allowExcl.billInv)
       const billInv = r2(salKpiBillInv + allowBillInv)
 
       const statKey = `${month.id}_${d.id}`
       const inp = dirInputs[statKey] ?? {}
       const statutoryInput = n(inp.billingStat)
       const billingUserInput = month.includeBilling && !month.fullPayout ? statutoryInput : 0
-      const totalPay = r2(salKpiGB + allowGB + billingUserInput)
+      const totalPay = r2(salKpiGB + allowGBInPay + billingUserInput)
       const dirFixed = getFixed(d.id, month.month, n(settings.fixedSalary), fixedOverrides)
       const vrKpi = r2(totalPay - dirFixed)
 
@@ -305,7 +391,10 @@ export function calcAll(
           const dedStatAl =
             month.fullPayout || !showAllowStat(month.month, settings) ? 0 : n(inp.allowBillingStat)
           const dedSalSys = month.fullPayout ? 0 : salKpiBillInv
-          const dedAlSys = month.fullPayout ? 0 : allowBillInv
+          // The separately-transferred allowance stays out of the repayment
+          // too — the whole HV transfer, 75% and 25% alike, never touches the
+          // advance (user ruling 2026-09-18).
+          const dedAlSys = month.fullPayout ? 0 : allowBillInvInPay
           const billTotal = r2(dedSalSys + dedStatSal + dedAlSys + dedStatAl)
           billingDeduct = r2(Math.min(outstanding, billTotal))
           billingRepaid[d.id] = r2(billingRepaid[d.id] + billingDeduct)
@@ -329,6 +418,8 @@ export function calcAll(
         allowSaving,
         allowBalance,
         allowGB,
+        allowInPay,
+        allowExcl,
         allowBillInv,
         billInv,
         billingUserInput,
@@ -358,6 +449,7 @@ export function calcAll(
       fullPayout: month.fullPayout,
       includeBilling: month.includeBilling,
       billingDeductAdv: month.billingDeductAdv,
+      allowExclFullPayout: month.allowExclFullPayout === true,
       poolSal,
       poolKpi,
       poolAllow,
@@ -387,6 +479,36 @@ export function contraOffset(
     if (fromIdx >= 0 && uptoIdx >= fromIdx) sum += n(ev.amount)
   }
   return r2(sum)
+}
+
+/**
+ * What HR actually transfers to a director for the month, before the payroll
+ * statutory deductions. The Vr KPI offset repays old debt and statFromSurplus
+ * covers this month's keyed statutory, so both come off the payout (user
+ * ruling 2026-07-31); the advance tops the month up to the fixed salary.
+ *
+ * This is the FIRST transfer only — the separately-transferred allowance goes
+ * out on the 15th and is shown on its own (user ruling 2026-09-18); use
+ * hrPayoutTotal() for what the director banks across both transfers.
+ *
+ * Shared by the Flow view and the printed payslip, which must always agree.
+ */
+export function hrPayout(
+  d: Pick<DirectorMonthResult, 'totalPay' | 'advThisMonth' | 'advanceOffset' | 'statFromSurplus'>,
+): number {
+  return r2(
+    n(d.totalPay) + Math.abs(n(d.advThisMonth)) - n(d.advanceOffset) - n(d.statFromSurplus),
+  )
+}
+
+/** Both transfers added up — what the director actually banks for the month. */
+export function hrPayoutTotal(
+  d: Pick<
+    DirectorMonthResult,
+    'totalPay' | 'advThisMonth' | 'advanceOffset' | 'statFromSurplus' | 'allowExcl'
+  >,
+): number {
+  return r2(hrPayout(d) + n(d.allowExcl?.gb))
 }
 
 export interface BillingRow {

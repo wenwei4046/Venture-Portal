@@ -48,6 +48,29 @@ export function matchOutcomeNote(
 }
 
 /**
+ * What an ignore did, in a sentence.
+ *
+ * Said out loud for the same reason a match is: the row leaves the list either
+ * way, so without a number nothing tells you whether the bills went with it —
+ * and here the bills leaving the month is the whole point.
+ */
+export function ignoreOutcomeNote(
+  agentName: string,
+  outcome: { excluded: number; locked: number },
+): string {
+  const bills = (n: number) => `${n} ${n === 1 ? 'bill' : 'bills'}`
+  const head =
+    outcome.excluded > 0
+      ? `${agentName} is not ours: ${bills(outcome.excluded)} left the month.`
+      : `${agentName} is remembered as not ours — no bill of theirs was still counting.`
+  if (outcome.locked === 0) return head
+  return (
+    `${head} ${bills(outcome.locked)} stayed in: their month's commission run ` +
+    `is applied. Reopen that run to take them out too.`
+  )
+}
+
+/**
  * Enough of a key to tell which one is in, never enough to use: the last four
  * characters. A key too short to show four of stays fully hidden.
  */

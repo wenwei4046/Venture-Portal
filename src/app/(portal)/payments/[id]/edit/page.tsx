@@ -55,6 +55,7 @@ export default async function EditPaymentPage({ params }: Props) {
     { data: companies },
     { data: bankAccounts },
     { data: glAccounts },
+    { data: fundSourceRow },
   ] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
@@ -66,6 +67,11 @@ export default async function EditPaymentPage({ params }: Props) {
     // Post-mig 238: chart_of_accounts IS the GL. Pull every active account
     // for the source-row picker; downstream the form filters as needed.
     supabase.from('chart_of_accounts').select('code, name, type, parent_code').eq('is_active', true).order('code'),
+    // The lender's own GL account — the repayment form's principal row
+    // defaults to it (lib/repayment-source-rows).
+    voucher.fund_source_id
+      ? supabase.from('fund_sources').select('account_code').eq('id', voucher.fund_source_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ])
 
   const sourceRows: SourceRow[] = (sources ?? []).map((s) => ({
@@ -125,6 +131,7 @@ export default async function EditPaymentPage({ params }: Props) {
           repayment_breakdown: voucher.repayment_breakdown as { principal: number; interest: number; penalty: number } | null,
         }}
         initialSources={sourceRows}
+        fundSourceAccount={(fundSourceRow as { account_code: string | null } | null)?.account_code ?? null}
         initialCreditAccountCode={initialCreditAccountCode}
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}

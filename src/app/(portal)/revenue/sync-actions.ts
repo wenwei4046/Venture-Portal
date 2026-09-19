@@ -56,6 +56,59 @@ export async function matchErpSalesperson(fd: FormData): Promise<MatchOutcome> {
   return { matched: Number(r.ordersMatched ?? 0), locked: Number(r.ordersLocked ?? 0) }
 }
 
+export interface IgnoreOutcome {
+  /** Bills taken out of the month because this name is not ours to pay. */
+  excluded: number
+  /** Bills left alone because their month's run is applied. */
+  locked: number
+}
+
+/**
+ * The other answer to "who is this?": nobody, ever.
+ *
+ * An AutoCount import stub, an ex-colleague, a director selling outside the
+ * scheme — names that will never be matched and, left alone, sit red on the
+ * panel for good. Saying so takes their bills out of the month the way an
+ * ERP-cancelled bill is out, and the answer is remembered, so the next
+ * delivery under that name arrives already excluded.
+ */
+export async function ignoreErpAgent(
+  agentKey: string,
+  erpSalespersonId: string | null,
+  subDepartmentId: string,
+  note?: string,
+): Promise<IgnoreOutcome> {
+  await requirePermission('revenue')
+  if (!agentKey && !erpSalespersonId) throw new Error('Nothing to ignore')
+
+  const supabase = await client()
+  await assertErpSubDepartment(supabase, subDepartmentId)
+  const { data, error } = await supabase.rpc('erp_sync_ignore_agent', {
+    p_agent_key: agentKey,
+    p_erp_salesperson_id: erpSalespersonId || null,
+    p_note: note ?? null,
+  })
+  if (error) throw new Error(`Could not ignore this salesperson: ${error.message}`)
+
+  revalidatePath('/revenue', 'layout')
+  const r = (data ?? {}) as { ordersExcluded?: number; ordersLocked?: number }
+  return { excluded: Number(r.ordersExcluded ?? 0), locked: Number(r.ordersLocked ?? 0) }
+}
+
+/** Undo an ignore: the bills go back to what the ERP says about them. */
+export async function unignoreErpAgent(agentKey: string, subDepartmentId: string): Promise<number> {
+  await requirePermission('revenue')
+  if (!agentKey) throw new Error('Nothing to restore')
+
+  const supabase = await client()
+  await assertErpSubDepartment(supabase, subDepartmentId)
+  const { data, error } = await supabase.rpc('erp_sync_unignore_agent', { p_agent_key: agentKey })
+  if (error) throw new Error(`Could not restore this salesperson: ${error.message}`)
+
+  revalidatePath('/revenue', 'layout')
+  return Number((data as { ordersRestored?: number } | null)?.ordersRestored ?? 0)
+}
+
 export interface ReplayResult {
   replayed: number
   applied: number

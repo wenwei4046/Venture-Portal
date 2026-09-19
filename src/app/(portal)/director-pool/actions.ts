@@ -62,7 +62,13 @@ export async function addDpMonth(month: string): Promise<{ id: string }> {
 
 export async function updateDpMonth(
   monthId: string,
-  patch: { month?: string; full_payout?: boolean; include_billing?: boolean; billing_deduct_adv?: boolean },
+  patch: {
+    month?: string
+    full_payout?: boolean
+    include_billing?: boolean
+    billing_deduct_adv?: boolean
+    allow_excl_full_payout?: boolean
+  },
 ): Promise<void> {
   await requirePermission('director_pool')
   const supabase = await createClient()

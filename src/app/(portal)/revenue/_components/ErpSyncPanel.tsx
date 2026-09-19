@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
-import { formatAgo, matchOutcomeNote } from '@/lib/erp-sync/format'
+import { formatAgo, ignoreOutcomeNote, matchOutcomeNote } from '@/lib/erp-sync/format'
 import { ActionButton, Choice, Hidden, Hint, RowForm, SaveButton } from '@/components/RowForm'
 import LedgerRow from '@/components/LedgerRow'
-import { matchErpSalesperson, type MatchOutcome, replayHeldErpEvents } from '../sync-actions'
+import {
+  ignoreErpAgent,
+  matchErpSalesperson,
+  type MatchOutcome,
+  replayHeldErpEvents,
+  unignoreErpAgent,
+} from '../sync-actions'
 import type { ErpSyncPanelData } from '../_lib/erp-sync-panel'
 
 /**
@@ -49,6 +55,8 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
 
   const [replayNote, setReplayNote] = useState<string | null>(null)
   const [matchNote, setMatchNote] = useState<string | null>(null)
+  /** Why each name is not ours, while it is still being decided. Keyed by agent. */
+  const [notes, setNotes] = useState<Record<string, string>>({})
 
   return (
     <section className="mb-12">
@@ -68,6 +76,10 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
         </Hint>
       ) : null}
 
+      {/* Outside both tables: answering the last name empties the list the
+          note was living in, and the answer is exactly what wants reading. */}
+      {matchNote ? <p className="font-serif italic text-sm text-graphite mb-3">{matchNote}</p> : null}
+
       {data.unmatched.length > 0 ? (
         <div className="mb-8">
           <h3 className="font-serif italic text-sm text-graphite mb-2">
@@ -77,11 +89,11 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
             These names arrived from the ERP and match nobody in the portal, so their orders pay no
             one until you say who they are. The match is remembered. Where exactly one person on the
             roster carries that name it is already chosen for you — read it before you press Match,
-            because the orders it moves cannot be moved back from here.
+            because the orders it moves cannot be moved back from here. Some of them are nobody at
+            all — an import stub, someone who has left, a director selling outside the scheme.{' '}
+            <em>Not ours</em> says so: their bills leave the month, and the next delivery under that
+            name arrives already out.
           </Hint>
-          {matchNote ? (
-            <p className="font-serif italic text-sm text-graphite mb-3">{matchNote}</p>
-          ) : null}
           <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
             <table className="ledger-table tight">
               <thead>
@@ -90,6 +102,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
                   <th className="right m-hide">Orders</th>
                   <th className="right m-hide">Value</th>
                   <th>Is</th>
+                  <th />
                   <th />
                   <th className="lt-toggle" aria-hidden />
                 </tr>
@@ -136,9 +149,103 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
                         <td>
                           <SaveButton pending={pending} label="Match" />
                         </td>
+                        <td>
+                          <span className="inline-flex items-center gap-2">
+                            {/* The reason is typed here, not asked for in a
+                                dialog: it is worth keeping, and in three
+                                months "why is MAYSON greyed out" is the only
+                                question anybody will have. */}
+                            <input
+                              type="text"
+                              value={notes[u.agentKey] ?? ''}
+                              onChange={e =>
+                                setNotes(n => ({ ...n, [u.agentKey]: e.target.value }))
+                              }
+                              placeholder="why"
+                              aria-label={`Why ${u.agentName} is not ours`}
+                              className="w-24 bg-transparent border-b border-hairline px-1 py-0.5 text-xs font-sans text-ink placeholder:text-muted focus:outline-none focus:border-accent"
+                            />
+                            <ActionButton
+                              label="Not ours"
+                              danger
+                              confirm={
+                                `${u.agentName} is not ours? Their ${u.orders} ` +
+                                `${u.orders === 1 ? 'bill' : 'bills'} (${formatMoney(u.total)}) ` +
+                                `leave the month and will never pay anybody.`
+                              }
+                              run={async () => {
+                                const r = await ignoreErpAgent(
+                                  u.agentKey,
+                                  u.erpSalespersonId,
+                                  data.subDepartmentId,
+                                  notes[u.agentKey],
+                                )
+                                setMatchNote(ignoreOutcomeNote(u.agentName, r))
+                              }}
+                            />
+                          </span>
+                        </td>
                       </LedgerRow>
                     )}
                   </RowForm>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      {data.ignored.length > 0 ? (
+        <div className="mb-8">
+          <h3 className="font-serif italic text-sm text-graphite mb-2">Not our salespeople</h3>
+          <Hint>
+            The ERP keeps naming these, and every bill of theirs is out of the month — out of the
+            sales, out of the venue and person breakdowns, out of the engine. Put one back and its
+            bills go back to whatever the ERP says about them.
+          </Hint>
+          <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+            <table className="ledger-table tight">
+              <thead>
+                <tr>
+                  <th>ERP salesperson</th>
+                  <th className="m-hide">Why</th>
+                  <th className="right m-hide">Bills</th>
+                  <th className="right m-hide">Value out</th>
+                  <th />
+                  <th className="lt-toggle" aria-hidden />
+                </tr>
+              </thead>
+              <tbody>
+                {data.ignored.map(g => (
+                  <LedgerRow key={g.agentKey}>
+                    <td>
+                      <span className="text-muted">{g.agentName}</span>
+                      {g.erpSalespersonId ? (
+                        <span className="ml-2 font-mono text-[11px] text-muted">
+                          {g.erpSalespersonId.slice(0, 8)}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="m-hide font-serif italic text-sm text-graphite" data-label="Why">
+                      {g.note ?? '—'}
+                    </td>
+                    <td className="num m-hide" data-label="Bills">{g.orders}</td>
+                    <td className="num m-hide" data-label="Value out">{formatMoney(g.total)}</td>
+                    <td>
+                      <ActionButton
+                        label="Put back"
+                        confirm={`Put ${g.agentName} back on the list to be answered? Their ${g.orders} ${
+                          g.orders === 1 ? 'bill counts' : 'bills count'
+                        } towards the month again.`}
+                        run={async () => {
+                          const n = await unignoreErpAgent(g.agentKey, data.subDepartmentId)
+                          setMatchNote(
+                            `${g.agentName} is back on the list — ${n} ${n === 1 ? 'bill counts' : 'bills count'} again.`,
+                          )
+                        }}
+                      />
+                    </td>
+                  </LedgerRow>
                 ))}
               </tbody>
             </table>

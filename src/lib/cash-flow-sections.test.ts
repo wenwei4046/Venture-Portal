@@ -66,6 +66,63 @@ describe('defaultSideLayout', () => {
     expect(l.categories.map((c) => c.name)).toEqual([
       'Loans Receivable', 'Staff Refreshment', 'Water & Electricity', 'Office Rental',
     ])
-    expect(l.categories[0].accounts).toEqual(['3053', '3054'])
+    // The PARENT code, so later debtors under 3020 follow the section by themselves.
+    expect(l.categories[0].accounts).toEqual(['3020'])
+    expect(l.categories[1].accounts).toEqual(['9085'])
+  })
+})
+
+describe('buildCashFlowSideSections — parent codes, headed sections (2026-09-18)', () => {
+  it('a listed parent code claims every leaf beneath it (nothing left for 其他)', () => {
+    const layout: ReportLayout = { categories: [{ id: 'loans', name: 'Loans Receivable', accounts: ['3020'] }] }
+    const s = buildCashFlowSideSections([leaf('3053', -200), leaf('3054', -60)], ACCOUNTS, layout, 'fb')
+    expect(s.map((x) => x.label)).toEqual(['Loans Receivable'])
+    expect(s[0].current).toBe(-260)
+  })
+
+  it('an explicit leaf elsewhere beats the parent', () => {
+    const layout: ReportLayout = {
+      categories: [
+        { id: 'loans', name: 'Loans Receivable', accounts: ['3020'] },
+        { id: 'special', name: 'Special', accounts: ['3054'] },
+      ],
+    }
+    const s = buildCashFlowSideSections([leaf('3053', -200), leaf('3054', -60)], ACCOUNTS, layout, 'fb')
+    expect(s.map((x) => [x.label, x.current])).toEqual([['Loans Receivable', -200], ['Special', -60]])
+  })
+
+  it('every layout section is headed; one root named like the section becomes the row', () => {
+    const layout: ReportLayout = {
+      categories: [
+        { id: 'loans', name: 'Loans Receivable', accounts: ['3020'] },
+        { id: 'daily', name: '日常开销', accounts: ['9085', '9091'] },
+      ],
+    }
+    const s = buildCashFlowSideSections(LEAVES, ACCOUNTS, layout, 'fb')
+    const loans = s[0]
+    expect(loans.headed).toBe(true)
+    expect(loans.root?.code).toBe('3020')
+    expect(loans.nodes.map((n) => n.code)).toEqual(['3053', '3054']) // the root's children
+    expect(loans.current).toBe(-260)
+    const daily = s[1]
+    expect(daily.headed).toBe(true)
+    expect(daily.root).toBeUndefined() // two roots — section row is the label
+    expect(daily.nodes.map((n) => n.code)).toEqual(['9085', '9091'])
+    // No layout → the plain fallback section, not headed (unchanged look).
+    expect(buildCashFlowSideSections(LEAVES, ACCOUNTS, null, 'fb')[0].headed).toBeUndefined()
+  })
+
+  it('a lone leaf named like its section is merged too (transactions stay reachable)', () => {
+    const layout: ReportLayout = { categories: [{ id: 'rent', name: 'Office Rental', accounts: ['9094'] }] }
+    const s = buildCashFlowSideSections([leaf('9094', -100)], ACCOUNTS, layout, 'fb')
+    expect(s[0].root?.code).toBe('9094')
+    expect(s[0].nodes).toEqual([])
+  })
+
+  it('drops leaves with no amount in either column', () => {
+    const s = buildCashFlowSideSections([leaf('3053', 0), leaf('3054', -60), { code: '9094', current: 0, previous: -5, txns: [] }], ACCOUNTS, LAYOUT, 'fb')
+    const codes = s.flatMap((x) => (x.root ? [x.root.code] : []).concat(x.nodes.flatMap((n) => [n.code, ...n.children.map((c) => c.code)])))
+    expect(codes).not.toContain('3053')
+    expect(codes).toContain('9094') // previous ≠ 0 keeps it
   })
 })
