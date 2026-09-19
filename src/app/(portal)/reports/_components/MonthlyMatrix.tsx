@@ -15,14 +15,27 @@ export default function MonthlyMatrix({
   columns,
   rows,
   pctBaseByColumn,
+  variant = 'cf',
+  nowKey,
 }: {
   columns: MonthlyMatrixData['columns']
   rows: MonthlyMatrixData['rows']
   /** Per-column base for the % cell. Omit to hide the % column entirely. */
   pctBaseByColumn?: number[]
+  /** 'cf' (default) = the navy / gold report skin (user 2026-09-18 "蓝为主",
+   *  then "report 那边的颜色等等弄到和 cash flow 的一样"): navy header and
+   *  headline bands, category rows on a pale-navy band with a gold edge, flat
+   *  white detail rows (no zebra — "一行一个 colour 看了会 misleading"), zero as
+   *  a dash. 'default' = the portal's plain ledger look. */
+  variant?: 'default' | 'cf'
+  /** Column key to wash as "this month" (cf skin). */
+  nowKey?: string
 }) {
-  // L1 = subtotals only · L2 = + top accounts & parent roll-ups · L3 = every level.
-  const [level, setLevel] = useState<1 | 2 | 3>(3)
+  const cf = variant === 'cf'
+  // L1 = subtotals / categories only · L2 = + top accounts & parent roll-ups ·
+  // L3 = every level. A matrix with layout category rows (Cash Flow) opens
+  // folded to them, as in the approved mock-up; the others open fully.
+  const [level, setLevel] = useState<1 | 2 | 3>(() => (rows.some((r) => r.kind === 'category') ? 1 : 3))
   // Explicit user overrides of the level default, both directions: `collapsed`
   // closes something the level would show, `expanded` opens something the level
   // would hide. Without the second set, clicking ▶ at L2 did nothing — the
@@ -51,13 +64,16 @@ export default function MonthlyMatrix({
     if (!search.trim()) {
       return { hitKeys: new Set<string>(), hitOrder: [] as string[], forceOpen: new Set<string>() }
     }
-    const accounts = rows.filter((r) => r.kind === 'account')
-    const isMatch = (r: (typeof rows)[number]) => matchesAccount(search, r.code, r.label)
-    const order = accounts.filter(isMatch).map((r) => r.key)
+    // Accounts match; a category row (a layout section, or the COA root merged
+    // into it) only ever opens as an ancestor of a match — its label is the
+    // user's own wording, not an account.
+    const tree = rows.filter((r) => r.kind !== 'subtotal')
+    const isMatch = (r: (typeof rows)[number]) => r.kind === 'account' && matchesAccount(search, r.code, r.label)
+    const order = tree.filter(isMatch).map((r) => r.key)
     return {
       hitKeys: new Set(order),
       hitOrder: order,
-      forceOpen: ancestorsOfMatches(accounts, isMatch),
+      forceOpen: ancestorsOfMatches(tree, isMatch),
     }
   }, [rows, search])
 
@@ -110,10 +126,10 @@ export default function MonthlyMatrix({
     const bypassed = r.depth > bypassDepth
     // A match and the path down to it always show, whatever the level.
     const onSearchPath = hitKeys.has(r.key) || forceOpen.has(r.key)
-    // Subtotals (section / grand totals) always show.
-    if (!(r.kind === 'subtotal' || bypassed || r.depth <= maxDepth || onSearchPath)) continue
+    // Subtotals (section / grand totals) and category rows always show.
+    if (!(r.kind !== 'account' || bypassed || r.depth <= maxDepth || onSearchPath)) continue
     visibleRows.push(r)
-    if (r.kind === 'account' && r.isParent) {
+    if (r.kind !== 'subtotal' && r.isParent) {
       if (isOpen(r.key, r.depth)) {
         openKeys.add(r.key)
         if (expanded.has(r.key)) bypassDepth = Math.min(bypassDepth, r.depth)
@@ -125,11 +141,20 @@ export default function MonthlyMatrix({
 
   const pct = (value: number, base: number) =>
     Math.abs(base) < 0.005 ? '—' : `${((value / base) * 100).toFixed(1)}%`
+  // cf: zero is a dash, the accounting convention the statements and the
+  // xlsx/pdf exports already use — a page of 0.00 hid the few real figures.
   const num = (n: number) =>
-    n < 0 ? <span className="neg">{formatMoneyBare(n)}</span> : formatMoneyBare(n)
+    cf && Math.abs(n) < 0.005 ? (
+      <span className="cf-dash">—</span>
+    ) : n < 0 ? (
+      <span className="neg">{formatMoneyBare(n)}</span>
+    ) : (
+      formatMoneyBare(n)
+    )
 
   return (
-    <div>
+    // `cf-report` on the wrapper puts the skin tokens in scope for the pills too.
+    <div className={cf ? 'cf-report' : undefined}>
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs uppercase tracking-wide text-muted font-sans">Detail level</span>
         {([1, 2, 3] as const).map((lv) => (
@@ -140,7 +165,9 @@ export default function MonthlyMatrix({
             title={lv === 1 ? 'Totals only' : lv === 2 ? '+ top-level accounts' : 'All account levels'}
             className={`px-2.5 py-1 rounded-md text-xs font-mono border transition-colors ${
               level === lv
-                ? 'bg-ink text-paper border-ink'
+                ? cf
+                  ? 'cf-pill-on'
+                  : 'bg-ink text-paper border-ink'
                 : 'bg-surface text-graphite border-hairline hover:text-ink'
             }`}
           >
@@ -149,50 +176,80 @@ export default function MonthlyMatrix({
         ))}
       </div>
 
-      <div className="overflow-x-auto table-scroll border border-hairline rounded-md">
+      <div className={`overflow-x-auto table-scroll border rounded-md ${cf ? 'cf-matrix' : 'border-hairline'}`}>
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="border-b border-hairline">
-              <th className="sticky left-0 z-10 bg-surface text-left font-sans text-xs uppercase tracking-wide text-muted px-4 py-3 min-w-[130px] sm:min-w-[220px]">
-                Item
+            <tr className={cf ? '' : 'border-b border-hairline'}>
+              <th className={`sticky left-0 z-10 text-left font-sans text-xs uppercase tracking-wide px-4 py-3 min-w-[130px] sm:min-w-[220px] ${cf ? 'cf-th' : 'bg-surface text-muted'}`}>
+                {cf ? '' : 'Item'}
               </th>
               {columns.map((c) => (
                 <th
                   key={c.key}
                   colSpan={showPct ? 2 : 1}
-                  className={`text-center font-sans text-xs uppercase tracking-wide px-4 py-3 border-l border-hairline ${
-                    c.key === 'acc' ? 'text-ink font-semibold' : 'text-muted'
-                  }`}
+                  className={
+                    cf
+                      ? `cf-th text-right font-sans text-xs uppercase tracking-wide px-4 py-3 ${c.key === 'acc' ? 'font-semibold' : ''} ${c.key === nowKey ? 'cf-th-now' : ''}`
+                      : `text-center font-sans text-xs uppercase tracking-wide px-4 py-3 border-l border-hairline ${c.key === 'acc' ? 'text-ink font-semibold' : 'text-muted'}`
+                  }
                 >
                   {c.label}
                 </th>
               ))}
             </tr>
-            <tr className="border-b border-hairline">
-              <th className="sticky left-0 z-10 bg-surface px-4 py-1.5" />
-              {columns.map((c) => (
-                <Fragment key={c.key}>
-                  <th className="text-right font-mono text-[10px] uppercase text-muted px-4 py-1.5 border-l border-hairline">
-                    RM
-                  </th>
-                  {showPct ? (
-                    <th className="text-right font-mono text-[10px] uppercase text-muted pr-4 py-1.5">%</th>
-                  ) : null}
-                </Fragment>
-              ))}
-            </tr>
+            {/* cf: the unit lives in the page subtitle ("all amounts RM") — one
+                header row, as in the approved mock-up. The sub-row stays when
+                a % column needs its label (Monthly P&L). */}
+            {cf && !showPct ? null : (
+              <tr className={cf ? '' : 'border-b border-hairline'}>
+                <th className={`sticky left-0 z-10 px-4 py-1.5 ${cf ? 'cf-th cf-th-sub' : 'bg-surface'}`} />
+                {columns.map((c) => (
+                  <Fragment key={c.key}>
+                    <th
+                      className={`text-right font-mono text-[10px] uppercase px-4 py-1.5 ${
+                        cf ? `cf-th cf-th-sub ${c.key === nowKey ? 'cf-th-now' : ''}` : 'text-muted border-l border-hairline'
+                      }`}
+                    >
+                      RM
+                    </th>
+                    {showPct ? (
+                      <th className={`text-right font-mono text-[10px] uppercase pr-4 py-1.5 ${cf ? `cf-th cf-th-sub ${c.key === nowKey ? 'cf-th-now' : ''}` : 'text-muted'}`}>
+                        %
+                      </th>
+                    ) : null}
+                  </Fragment>
+                ))}
+              </tr>
+            )}
           </thead>
           <tbody>
             {visibleRows.map((row) => {
               const isSub = row.kind === 'subtotal'
+              const isCat = row.kind === 'category'
               const isStrong = isSub && row.emphasis === 'strong'
-              const isParent = row.kind === 'account' && row.isParent
+              const isParent = row.kind !== 'subtotal' && !!row.isParent
               // Arrow reflects what is actually on screen, level included.
               const isCollapsed = isParent && !openKeys.has(row.key)
-              // Four shaded tiers, darkest → lightest: headline total (accent
-              // wash, matching the GL statements) > section subtotal (surface-2)
-              // > parent roll-up (paper) > leaf / child (surface).
-              const bandBg = isStrong ? 'bg-accent-bg' : isSub ? 'bg-surface-2' : isParent ? 'bg-paper' : 'bg-surface'
+              // Default skin — four shaded tiers, darkest → lightest: headline
+              // total (accent wash, matching the GL statements) > section
+              // subtotal / category (surface-2) > parent roll-up (paper) > leaf
+              // (surface). cf skin — three bands with a job each (headline
+              // navy, category pale navy, "now" column) on flat white.
+              const bandBg = cf
+                ? isStrong
+                  ? 'cf-strong'
+                  : isCat
+                    ? 'cf-cat'
+                    : isSub
+                      ? 'cf-sub'
+                      : 'cf-row'
+                : isStrong
+                  ? 'bg-accent-bg'
+                  : isSub || isCat
+                    ? 'bg-surface-2'
+                    : isParent
+                      ? 'bg-paper'
+                      : 'bg-surface'
               const cellBg = bandBg
               const stickyBg = bandBg
               const labelTone = isSub
@@ -209,16 +266,19 @@ export default function MonthlyMatrix({
                 : row.depth >= 2
                   ? 'text-graphite'
                   : 'text-ink'
-              const labelWeight = isSub || isParent ? 'font-semibold' : 'font-normal'
+              const labelWeight = isSub || isCat || isParent ? 'font-semibold' : 'font-normal'
+              const rowBorder = cf
+                ? isStrong
+                  ? 'cf-strong-row'
+                  : 'cf-hairline-row'
+                : isStrong
+                  ? 'border-t-2 border-b-2 border-accent-border'
+                  : `border-hairline ${isSub || isCat ? 'border-t' : ''}`
               return (
                 <tr
                   key={row.key}
                   id={`mx-row-${row.key}`}
-                  className={`border-b last:border-0 ${
-                    isStrong
-                      ? 'border-t-2 border-b-2 border-accent-border'
-                      : `border-hairline ${isSub ? 'border-t' : ''}`
-                  }${
+                  className={`border-b last:border-0 ${rowBorder}${
                     activeKey === row.key
                       ? ' search-row-active'
                       : hitKeys.has(row.key)
@@ -227,7 +287,7 @@ export default function MonthlyMatrix({
                   }`}
                 >
                   <td
-                    className={`sticky left-0 z-10 ${stickyBg} px-4 font-sans ${labelTone} ${labelWeight} ${
+                    className={`sticky left-0 z-10 ${stickyBg} ${isCat && cf ? 'cf-cat-label' : ''} px-4 font-sans ${labelTone} ${labelWeight} ${
                       isStrong ? 'py-4 text-[15px]' : 'py-2.5'
                     }`}
                     style={{ paddingLeft: `${16 + row.depth * 18}px` }}
@@ -239,7 +299,7 @@ export default function MonthlyMatrix({
                         className="inline-flex items-center gap-1.5 text-left hover:text-accent transition-colors"
                         title={isCollapsed ? 'Expand children' : 'Collapse children'}
                       >
-                        <span className="text-[9px] text-muted w-2 inline-block leading-none">
+                        <span className={`text-[9px] w-2 inline-block leading-none ${isCat && cf ? 'cf-arrow' : 'text-muted'}`}>
                           {isCollapsed ? '▶' : '▼'}
                         </span>
                         <Highlight text={row.label} query={search} />
@@ -251,17 +311,18 @@ export default function MonthlyMatrix({
                   {columns.map((c, i) => {
                     const v = row.values[i] ?? 0
                     const base = pctBaseByColumn?.[i] ?? 0
+                    const now = cf && c.key === nowKey ? ' cf-now' : ''
                     return (
                       <Fragment key={`${row.key}-${c.key}`}>
                         <td
-                          className={`text-right font-mono tabular px-4 border-l border-hairline ${cellBg} ${valueTone} ${
+                          className={`text-right font-mono tabular px-4 ${cf ? '' : 'border-l border-hairline'} ${cellBg}${now} ${valueTone} ${
                             isStrong ? 'py-4 text-[15px]' : 'py-2.5'
                           } ${c.key === 'acc' ? 'font-semibold' : ''}`}
                         >
                           {num(v)}
                         </td>
                         {showPct ? (
-                          <td className={`text-right font-mono tabular text-[11px] text-muted pr-4 ${isStrong ? 'py-4' : 'py-2.5'} ${cellBg}`}>
+                          <td className={`text-right font-mono tabular text-[11px] text-muted pr-4 ${isStrong ? 'py-4' : 'py-2.5'} ${cellBg}${now}`}>
                             {pct(v, base)}
                           </td>
                         ) : null}

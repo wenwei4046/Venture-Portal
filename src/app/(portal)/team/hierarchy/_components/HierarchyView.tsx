@@ -108,9 +108,10 @@ export default function HierarchyView({
               </>
             ) : (
               <>
-                Drag somebody onto their manager, or draw a line from a manager down to them.
-                Nobody can be put under a title the ladder ranks below theirs, and inside Revenue
-                only under a title that may lead. Search a name to find where somebody sits.
+                Explore departments and teams from left to right. Drag the canvas to browse,
+                move group headings or borders freely, and use Tidy to restore the horizontal layout. Move a person
+                onto their manager or draw a reporting line to change who they report to.
+                Search a name to find where somebody sits.
               </>
             )}
           </p>

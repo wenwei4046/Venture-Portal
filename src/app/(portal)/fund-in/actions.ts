@@ -590,6 +590,9 @@ export interface PayableFundSource {
   total_periods: number
   periods_paid: number
   remaining_periods: number
+  /** GL account the source is owed on (fund_sources.account_code, e.g. 4054);
+   *  null on legacy rows without one. */
+  account_code?: string | null
   /** True when this source has zero remaining outstanding but had a principal
    *  repayment in the month passed via opts.includeSettledInMonth. Lets the
    *  schedule render it as a 已付 (done) row in the full-plan view instead of
@@ -614,7 +617,7 @@ export async function listPayableFundSources(
     supabase
       .from('fund_source_outstanding')
       .select('fund_source_id, source_type, from_company_id, from_director_id, from_department_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
-    supabase.from('fund_sources').select('id, status, from_freetext_name'),
+    supabase.from('fund_sources').select('id, status, from_freetext_name, account_code'),
     supabase.from('companies').select('id, name, short_code'),
     // is_internal=false — the 'Venture Office' pseudo-dept is not a fund source.
     supabase.from('departments').select('id, name').eq('is_internal', false),
@@ -629,6 +632,9 @@ export async function listPayableFundSources(
 
   const statusMap = new Map((sources ?? []).map((s) => [s.id, s.status]))
   const freetextMap = new Map((sources ?? []).map((s) => [s.id, (s as { from_freetext_name: string | null }).from_freetext_name]))
+  // The GL account the source is owed on (4054 / 4058 …) — the repayment PV
+  // form defaults its principal row to it (lib/repayment-source-rows).
+  const accountMap = new Map((sources ?? []).map((s) => [s.id, (s as { account_code: string | null }).account_code ?? null]))
   const companyMap = new Map((companies ?? []).map((c) => [c.id, c]))
   const departmentMap = new Map((departments ?? []).map((d) => [d.id, d.name]))
   const directorMap = new Map((directors ?? []).map((d) => [d.id, d.name]))
@@ -701,6 +707,7 @@ export async function listPayableFundSources(
         periods_paid: periodsPaid,
         remaining_periods: remaining,
         settled_in_month: !(statusMap.get(o.fund_source_id) === 'active' && Number(o.outstanding) > 0),
+        account_code: accountMap.get(o.fund_source_id) ?? null,
       }
     })
     .sort((a, b) => b.remaining_periods - a.remaining_periods)

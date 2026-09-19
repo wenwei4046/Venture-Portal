@@ -4,6 +4,7 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createPaymentVoucher } from '../actions'
 import { ACCOUNT_TYPES, typeLabel, type AccountType } from '@/lib/coa'
+import { buildRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import AccountPicker from '@/components/AccountPicker'
 
 interface InvoicePreset {
@@ -39,6 +40,8 @@ interface PayableFundSource {
   total_periods: number
   periods_paid: number
   remaining_periods: number
+  /** GL account the source is owed on (4054 / 4058 …) — the principal row's default. */
+  account_code?: string | null
 }
 
 interface Account {
@@ -106,6 +109,11 @@ interface SourceRow {
   override_account_type?: AccountType | ''
   override_gl_account_code?: string
   override_reason?: string
+  /** Loan-repayment mode: which split component this row carries, and
+   *  whether its account is still the default we filled in (client-only —
+   *  neither field is submitted). */
+  role?: RepaymentRole
+  autoAccount?: boolean
 }
 
 export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, refundPreset, payableFundSources = [], lockedDirection }: Props) {
@@ -220,14 +228,29 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
     setRepayInterest((prev) => (prev === '0.00' || prev === '' ? selectedFundSource.monthly_interest.toFixed(2) : prev))
   }, [isLoanRepayment, selectedFundSource, companies])
 
-  // Loan repayment mode: amount = sum of split. Account is picked manually
-  // per row (post-unified-COA the principal/interest legacy categories no
-  // longer exist — Finance picks 3020 Loans Receivable / 7000 Interest Income
-  // / etc. from the account dropdown).
+  // Loan repayment mode: amount = sum of split.
   useEffect(() => {
     if (!isLoanRepayment) return
     setAmount(repaymentSum.toFixed(2))
   }, [isLoanRepayment, repaymentSum])
+
+  // Loan repayment mode: the source rows FOLLOW the split — one row per
+  // component with its account filled in (principal → the fund source's own
+  // account, interest → 6000, penalty → 9096; lib/repayment-source-rows).
+  // Before this the account was typed by hand on each row and twice went to
+  // the wrong place (2026-09-18: Kingsley's principal to 1010, the directors'
+  // interest to 5027 income). Finance can still change a row's account or
+  // pool — a hand-picked account survives later edits to the split.
+  useEffect(() => {
+    if (!isLoanRepayment || !selectedFundSource) return
+    const split = {
+      principal: parseFloat(repayPrincipal) || 0,
+      interest: parseFloat(repayInterest) || 0,
+      penalty: parseFloat(repayPenalty) || 0,
+    }
+    const active = new Set(accounts.filter((a) => a.is_active).map((a) => a.code))
+    setSourceRows((prev) => buildRepaymentSourceRows(prev, split, selectedFundSource.account_code, (c) => active.has(c)))
+  }, [isLoanRepayment, selectedFundSource, repayPrincipal, repayInterest, repayPenalty, accounts])
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -661,6 +684,8 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
               ) : null}
               <p className="font-serif italic text-muted text-xs">
                 On execute, the system auto-inserts fund_source_repayments rows for this subsidiary/director.
+                The source rows below follow this split — principal on the lender&apos;s own account,
+                interest on 6000, penalty on 9096 — change a row&apos;s account if a case differs.
               </p>
             </div>
           ) : null}
@@ -727,13 +752,20 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
                     value={row.account_code}
                     onChange={(code) => {
                       const next = [...sourceRows]
-                      next[i] = { ...next[i], account_code: code }
+                      // A hand-picked account is kept through later split edits.
+                      next[i] = { ...next[i], account_code: code, autoAccount: false }
                       setSourceRows(next)
                     }}
                     name={`source_rows[${i}][account_code_display]`}
                     placeholder={accountList.length === 0 ? 'No accounts — create one' : 'Select account…'}
                     required
                   />
+                  {row.role ? (
+                    <p className="font-mono text-[10px] text-muted mt-1">
+                      {row.role === 'principal' ? '本金 principal' : row.role === 'interest' ? '利息 interest' : '罚金 penalty'}
+                      {row.autoAccount && row.account_code ? ' · 账户自动带出' : ''}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="relative w-40">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">RM</span>

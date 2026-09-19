@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { updatePaymentVoucher } from '../../../actions'
 import type { AccountType } from '@/lib/coa'
+import { buildRepaymentSourceRows, seedRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import AccountPicker from '@/components/AccountPicker'
 
 interface GlAccount {
@@ -20,6 +21,10 @@ interface SourceRow {
   override_account_type?: AccountType | ''
   override_gl_account_code?: string
   override_reason?: string
+  /** Loan-repayment draft: which split component this row carries, and
+   *  whether its account is still the default (client-only, not submitted). */
+  role?: RepaymentRole
+  autoAccount?: boolean
 }
 
 interface Props {
@@ -42,6 +47,9 @@ interface Props {
     repayment_breakdown: { principal: number; interest: number; penalty: number } | null
   }
   initialSources: SourceRow[]
+  /** The lender's own GL account (fund_sources.account_code) for a repayment
+   *  draft — the principal row's default. */
+  fundSourceAccount?: string | null
   initialCreditAccountCode: string | null
   companies: { id: string; name: string; short_code: string }[]
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
@@ -89,7 +97,7 @@ const OVERRIDE_TYPES: AccountType[] = [
 ]
 
 export default function EditPaymentForm({
-  voucher, initialSources, initialCreditAccountCode,
+  voucher, initialSources, fundSourceAccount = null, initialCreditAccountCode,
   companies, bankAccounts, glAccounts, statutoryDetailsLocked = false, salaryDetailsLocked = false,
 }: Props) {
   const [isPending, startTransition] = useTransition()
@@ -98,6 +106,21 @@ export default function EditPaymentForm({
   const isDebit = voucher.direction === 'debit'
   const paymentDetailsLocked = statutoryDetailsLocked || salaryDetailsLocked
   const amountLocked = !!voucher.repayment_breakdown && (voucher.fund_source_id || voucher.loan_id)
+  // Fund-source repayment draft: the source rows carry the split — one per
+  // component with its account (principal → lender's account, interest → 6000,
+  // penalty → 9096), same as the new-PV form (user 2026-09-18: "编辑草稿的表单
+  // 也做一样的"). Saved rows keep their pool / account (a differing account is
+  // treated as a deliberate pick); rows that don't line up with the split are
+  // rebuilt. lib/repayment-source-rows.
+  const repaymentSplit =
+    isDebit && voucher.fund_source_id && voucher.repayment_breakdown
+      ? {
+          principal: Number(voucher.repayment_breakdown.principal ?? 0),
+          interest: Number(voucher.repayment_breakdown.interest ?? 0),
+          penalty: Number(voucher.repayment_breakdown.penalty ?? 0),
+        }
+      : null
+  const hasGlAccount = (code: string) => glAccounts.some((g) => g.code === code)
 
   const [amount, setAmount] = useState(voucher.amount.toFixed(2))
   const [payeeName, setPayeeName] = useState(voucher.payee_name)
@@ -109,9 +132,20 @@ export default function EditPaymentForm({
   const [notes, setNotes] = useState(voucher.notes ?? '')
   const [targetPool, setTargetPool] = useState(voucher.target_pool ?? '')
   const [accountCode, setAccountCode] = useState(initialCreditAccountCode ?? '')
-  const [sourceRows, setSourceRows] = useState<SourceRow[]>(
-    initialSources.length > 0 ? initialSources : [{ pool: '', amount: '', account_code: '' }],
+  const [sourceRows, setSourceRows] = useState<SourceRow[]>(() =>
+    repaymentSplit
+      ? seedRepaymentSourceRows(initialSources, repaymentSplit, fundSourceAccount, hasGlAccount)
+      : initialSources.length > 0
+        ? initialSources
+        : [{ pool: '', amount: '', account_code: '' }],
   )
+  // "按拆分重带账户": put every component back on its default account.
+  const resetRepaymentAccounts = () => {
+    if (!repaymentSplit) return
+    setSourceRows((prev) =>
+      buildRepaymentSourceRows(prev.map((r) => ({ ...r, autoAccount: true })), repaymentSplit, fundSourceAccount, hasGlAccount),
+    )
+  }
 
   const totalAmount = parseFloat(amount) || 0
   const sourceSum = sourceRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
@@ -364,13 +398,25 @@ export default function EditPaymentForm({
             <label className="block text-sm font-sans font-medium text-graphite">
               Deduct from pools <span className="text-danger">*</span>
             </label>
-            <button
-              type="button"
-              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', account_code: '' }])}
-              className="text-xs text-accent hover:text-accent-hover font-serif italic"
-            >
-              + Add source
-            </button>
+            <span className="flex items-center gap-3">
+              {repaymentSplit ? (
+                <button
+                  type="button"
+                  onClick={resetRepaymentAccounts}
+                  className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                  title="本金 → 借款方账户 · 利息 → 6000 · 罚金 → 9096"
+                >
+                  按拆分重带账户
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', account_code: '' }])}
+                className="text-xs text-accent hover:text-accent-hover font-serif italic"
+              >
+                + Add source
+              </button>
+            </span>
           </div>
           <div className="space-y-3">
             {sourceRows.map((row, i) => {
@@ -408,12 +454,19 @@ export default function EditPaymentForm({
                         value={row.account_code}
                         onChange={(code) => {
                           const next = [...sourceRows]
-                          next[i] = { ...next[i], account_code: code }
+                          // A hand-picked account: 按拆分重带账户 is the only way back to the default.
+                          next[i] = { ...next[i], account_code: code, autoAccount: false }
                           setSourceRows(next)
                         }}
                         name={`source_rows[${i}][account_code_display]`}
                         placeholder="Select account…"
                       />
+                      {row.role ? (
+                        <p className="font-mono text-[10px] text-muted mt-1">
+                          {row.role === 'principal' ? '本金 principal' : row.role === 'interest' ? '利息 interest' : '罚金 penalty'}
+                          {row.autoAccount && row.account_code ? ' · 账户自动带出' : ''}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="relative w-40">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-mono">RM</span>

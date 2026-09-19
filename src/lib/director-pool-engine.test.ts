@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   calcAll,
   allowStatTopUpBase,
+  hrPayout,
+  hrPayoutTotal,
   billingAccum,
   savingAccum,
   allowStatAccum,
@@ -416,5 +418,256 @@ describe('fixed salary overrides', () => {
     ]
     expect(getFixed('WL', '2026-04-01', 14400, ovs)).toBe(15000)
     expect(getFixed('WL', '2026-06-01', 14400, ovs)).toBe(17000)
+  })
+})
+describe('excludeFromPay — allowance transferred after the payout (2026-09-18)', () => {
+  // HV pays its allowance on the 15th, after the month's payout has gone out.
+  // It is pooled, saved and split like any allowance, but must not feed Total
+  // Pay — so it can never repay an advance the main payout already settled.
+  const mkSplit = (normalAllow: number, hvAllow: number): DpMonth => ({
+    id: 'm1',
+    month: '2026-08-01',
+    name: 'Aug',
+    fullPayout: false,
+    includeBilling: false,
+    billingDeductAdv: false,
+    cos: [
+      { companyId: 'others', salary: 60900, kpi: 0, allowance: normalAllow },
+      { companyId: 'hv', salary: 0, kpi: 0, allowance: hvAllow, excludeFromPay: true },
+    ],
+  })
+
+  it('leaves Total Pay, Vr KPI and advance exactly as if HV had paid nothing', () => {
+    const [without] = calcAll(settings, directors, [mkSplit(8058.15, 0)], {})
+    const [withHv] = calcAll(settings, directors, [mkSplit(8058.15, 20429.36)], {})
+    for (const d of withHv.dirRes) {
+      const base = without.dirRes.find((x) => x.code === d.code)!
+      expect(d.totalPay).toBe(base.totalPay)
+      expect(d.vrKpi).toBe(base.vrKpi)
+      expect(d.advThisMonth).toBe(base.advThisMonth)
+      expect(d.accumulated).toBe(base.accumulated)
+    }
+  })
+
+  it('still pools, saves and 75/25-splits the excluded allowance', () => {
+    const [m] = calcAll(settings, directors, [mkSplit(8058.15, 20429.36)], {})
+    expect(m.poolAllow).toBe(28487.51)
+    const ws = m.dirRes.find((d) => d.code === 'WS')!
+    // 105/400 of the whole allowance pool, saved and split as usual
+    expect(ws.allowGross).toBe(7477.97)
+    expect(ws.allowSaving).toBe(373.9)
+    expect(ws.allowGB).toBe(5328.05)
+    expect(ws.allowBillInv).toBe(1776.02)
+    // …of which HV's slice is the remainder once the in-pay slice is taken
+    expect(ws.allowExcl.gb).toBe(3820.92)
+    expect(r2(ws.salKpiGB + r2(ws.allowGB - ws.allowExcl.gb))).toBe(ws.totalPay)
+  })
+
+  it('keeps the excluded slice out of the 75% top-up statutory base', () => {
+    const [m] = calcAll(settings, directors, [mkSplit(8058.15, 20429.36)], {})
+    const wl = m.dirRes.find((d) => d.code === 'WL')!
+    const inPayAllow = r2(wl.allowGB - wl.allowExcl.gb)
+    // Gap to the fixed salary exceeds the in-pay allowance, so the base is
+    // that allowance alone — HV's slice must not inflate it.
+    expect(r2(wl.dirFixed - wl.salKpiGB)).toBeGreaterThan(inPayAllow)
+    expect(allowStatTopUpBase(wl)).toBe(inPayAllow)
+  })
+
+  it('behaves exactly as before when no company is flagged', () => {
+    const plain = [mkMonth('m1', '2026-08-01', { salary: 60900, kpi: 0, allowance: 28487.51 })]
+    const [a] = calcAll(settings, directors, plain, {})
+    for (const d of a.dirRes) {
+      expect(d.allowExcl.gb).toBe(0)
+      expect(d.totalPay).toBe(r2(d.salKpiGB + d.allowGB))
+    }
+  })
+})
+
+describe('allowExclFullPayout — HV pays out 100%, bills nothing (2026-09-18)', () => {
+  const mk = (hvFull: boolean): DpMonth => ({
+    id: 'm1',
+    month: '2026-08-01',
+    name: 'Aug',
+    fullPayout: false,
+    includeBilling: false,
+    billingDeductAdv: false,
+    allowExclFullPayout: hvFull,
+    cos: [
+      { companyId: 'others', salary: 60900, kpi: 0, allowance: 8058.15 },
+      { companyId: 'hv', salary: 0, kpi: 0, allowance: 20429.36, excludeFromPay: true },
+    ],
+  })
+
+  it('hands the director the whole 95% balance and bills none of it', () => {
+    const [m] = calcAll(settings, directors, [mk(true)], {})
+    const wl = m.dirRes.find((d) => d.code === 'WL')!
+    const mkd = m.dirRes.find((d) => d.code === 'MK')!
+    expect(wl.allowExcl.gb).toBe(4124.18)
+    expect(wl.allowExcl.gb).toBe(wl.allowExcl.balance)
+    expect(mkd.allowExcl.gb).toBe(4585.11)
+    expect(m.dirRes.every((d) => d.allowExcl.billInv === 0)).toBe(true)
+  })
+
+  it('drops the excluded slice out of the 25% invoice', () => {
+    const split = calcAll(settings, directors, [mk(false)], {})[0]
+    const full = calcAll(settings, directors, [mk(true)], {})[0]
+    const sum = (r: typeof split) => r2(r.dirRes.reduce((s, d) => s + d.salKpiBillInv + d.allowBillInv, 0))
+    // 23,394.35 − keyed statutory (2,164.80) = 21,229.55 system-calculated
+    expect(sum(split)).toBe(21229.55)
+    // …of which HV's 4,851.97 disappears when it pays out in full
+    expect(sum(full)).toBe(r2(21229.55 - 4851.97))
+  })
+
+  it('still keeps Total Pay, Vr KPI and advance untouched either way', () => {
+    const split = calcAll(settings, directors, [mk(false)], {})[0]
+    const full = calcAll(settings, directors, [mk(true)], {})[0]
+    for (const d of full.dirRes) {
+      const base = split.dirRes.find((x) => x.code === d.code)!
+      expect(d.totalPay).toBe(base.totalPay)
+      expect(d.vrKpi).toBe(base.vrKpi)
+      expect(d.accumulated).toBe(base.accumulated)
+    }
+  })
+
+  it('adds the bigger payout into the pooled 75% Allowance column', () => {
+    const split = calcAll(settings, directors, [mk(false)], {})[0]
+    const full = calcAll(settings, directors, [mk(true)], {})[0]
+    const pooled = (r: typeof split) => r2(r.dirRes.reduce((s, d) => s + d.allowGB, 0))
+    expect(pooled(split)).toBe(20297.35)
+    expect(pooled(full)).toBe(r2(5741.44 + 19407.89))
+  })
+})
+
+describe('billing-deduct months leave the separate transfer alone (2026-09-18)', () => {
+  // The whole HV transfer — 75% payout AND its 25% invoice — must stay out of
+  // the advance. A billing-deduct month repays from the 25% billing total, so
+  // HV's slice has to be excluded there too.
+  const mk = (hv: number): DpMonth => ({
+    id: 'm1',
+    month: '2026-08-01',
+    name: 'Aug',
+    fullPayout: false,
+    includeBilling: false,
+    billingDeductAdv: true,
+    cos: [
+      { companyId: 'others', salary: 60900, kpi: 0, allowance: 8058.15 },
+      { companyId: 'hv', salary: 0, kpi: 0, allowance: hv, excludeFromPay: true },
+    ],
+  })
+
+  it('repays exactly the same amount whether or not HV paid', () => {
+    const without = calcAll(settings, directors, [mk(0)], {})[0]
+    const withHv = calcAll(settings, directors, [mk(20429.36)], {})[0]
+    for (const d of withHv.dirRes) {
+      const base = without.dirRes.find((x) => x.code === d.code)!
+      expect(d.billingDeduct).toBe(base.billingDeduct)
+      expect(d.accumulated).toBe(base.accumulated)
+    }
+  })
+
+  it('still bills HV’s 25% — it just does not repay the advance', () => {
+    const withHv = calcAll(settings, directors, [mk(20429.36)], {})[0]
+    const billed = r2(withHv.dirRes.reduce((s, d) => s + d.allowBillInv, 0))
+    const hvSlice = r2(withHv.dirRes.reduce((s, d) => s + d.allowExcl.billInv, 0))
+    expect(hvSlice).toBe(4851.97)
+    expect(billed).toBe(r2(1913.82 + 4851.97))
+  })
+})
+
+describe('hrPayout — what HR actually transfers (2026-09-18)', () => {
+  const mk = (hv: number, hvFull: boolean): DpMonth => ({
+    id: 'm1',
+    month: '2026-08-01',
+    name: 'Aug',
+    fullPayout: false,
+    includeBilling: false,
+    billingDeductAdv: false,
+    allowExclFullPayout: hvFull,
+    cos: [
+      { companyId: 'others', salary: 60900, kpi: 0, allowance: 8058.15 },
+      { companyId: 'hv', salary: 0, kpi: 0, allowance: hv, excludeFromPay: true },
+    ],
+  })
+
+  it('tops a short month up to the fixed salary when nothing else is paid', () => {
+    const [m] = calcAll(settings, directors, [mk(0, false)], {})
+    const wl = m.dirRes.find((d) => d.code === 'WL')!
+    expect(wl.totalPay).toBe(10440.7)
+    expect(wl.advThisMonth).toBe(-3959.3)
+    expect(hrPayout(wl)).toBe(14400)
+  })
+
+  it('keeps the first transfer at the fixed salary and totals the two', () => {
+    const [m] = calcAll(settings, directors, [mk(20429.36, true)], {})
+    const wl = m.dirRes.find((d) => d.code === 'WL')!
+    expect(wl.allowExcl.gb).toBe(4124.18)
+    expect(hrPayout(wl)).toBe(14400)
+    expect(hrPayoutTotal(wl)).toBe(r2(14400 + 4124.18))
+  })
+
+  it('uses the 75% slice when HV is not on full payout', () => {
+    const [m] = calcAll(settings, directors, [mk(20429.36, false)], {})
+    const wl = m.dirRes.find((d) => d.code === 'WL')!
+    expect(wl.allowExcl.gb).toBe(3093.13)
+    expect(hrPayout(wl)).toBe(14400)
+    expect(hrPayoutTotal(wl)).toBe(r2(14400 + 3093.13))
+  })
+})
+
+describe('allowInPay / allowExcl split cleanly (2026-09-18)', () => {
+  const mk = (hv: number, hvFull: boolean): DpMonth => ({
+    id: 'm1',
+    month: '2026-08-01',
+    name: 'Aug',
+    fullPayout: false,
+    includeBilling: false,
+    billingDeductAdv: false,
+    allowExclFullPayout: hvFull,
+    cos: [
+      { companyId: 'others', salary: 60900, kpi: 0, allowance: 8058.15 },
+      { companyId: 'hv', salary: 0, kpi: 0, allowance: hv, excludeFromPay: true },
+    ],
+  })
+
+  it('each slice adds back up to the pooled allowance columns', () => {
+    const [m] = calcAll(settings, directors, [mk(20429.36, true)], {})
+    for (const d of m.dirRes) {
+      expect(r2(d.allowInPay.gross + d.allowExcl.gross)).toBe(d.allowGross)
+      expect(r2(d.allowInPay.saving + d.allowExcl.saving)).toBe(d.allowSaving)
+      expect(r2(d.allowInPay.balance + d.allowExcl.balance)).toBe(d.allowBalance)
+      expect(r2(d.allowInPay.gb + d.allowExcl.gb)).toBe(d.allowGB)
+      expect(r2(d.allowInPay.billInv + d.allowExcl.billInv)).toBe(d.allowBillInv)
+    }
+  })
+
+  it('splits WL’s Aug allowance into the two transfers', () => {
+    const [m] = calcAll(settings, directors, [mk(20429.36, true)], {})
+    const wl = m.dirRes.find((d) => d.code === 'WL')!
+    // 月头: 8,058.15 × 85/400, saved and split 75/25
+    expect(wl.allowInPay).toEqual({
+      gross: 1712.36,
+      saving: 85.62,
+      balance: 1626.74,
+      gb: 1220.06,
+      billInv: 406.69,
+    })
+    // 15号: HV's own slice, paid out in full so nothing is billed
+    expect(wl.allowExcl).toEqual({
+      gross: 4341.24,
+      saving: 217.06,
+      balance: 4124.18,
+      gb: 4124.18,
+      billInv: 0,
+    })
+  })
+
+  it('puts everything in allowInPay when no company transfers separately', () => {
+    const plain = [mkMonth('m1', '2026-08-01', { salary: 60900, kpi: 0, allowance: 8058.15 })]
+    const [m] = calcAll(settings, directors, plain, {})
+    for (const d of m.dirRes) {
+      expect(d.allowInPay.gross).toBe(d.allowGross)
+      expect(d.allowInPay.gb).toBe(d.allowGB)
+      expect(d.allowExcl.gross).toBe(0)
+    }
   })
 })

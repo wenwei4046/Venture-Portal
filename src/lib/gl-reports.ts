@@ -247,6 +247,14 @@ export interface ReportSection {
   nodes: AccountNode[]
   current: number
   previous: number
+  /** Cash-flow layout sections (2026-09-18): the section row ITSELF carries the
+   *  total — no trailing "— 小计" row, which doubled up with the COA parent
+   *  right above it at L1 (user: "看到两个 total 看了会很乱"). */
+  headed?: boolean
+  /** Set when the section held exactly one COA root named like the section:
+   *  that root IS the section row (code, txns, collapse) and `nodes` are its
+   *  children, so "Loans Receivable" is not printed twice. */
+  root?: AccountNode
 }
 
 export interface Period {

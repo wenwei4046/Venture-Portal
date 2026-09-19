@@ -49,3 +49,64 @@ export async function writeReportLayout(
   )
   if (error) throw new Error(`Save layout failed: ${error.message}`)
 }
+
+// ─── Parent codes in a layout (2026-09-18) ───────────────────────────────────
+// A category may list a COA PARENT code (e.g. 3020 Loans Receivable) instead
+// of — or as well as — leaves. Every leaf under it then follows the parent
+// unless the leaf itself is listed somewhere: an explicit leaf wins, then the
+// NEAREST listed ancestor. Before this a layout only knew leaves, so the ten
+// loan debtors had to be dragged one by one and any new debtor fell into 其他
+// — which is exactly how Loans Receivable / Fund Sources Payable ended up
+// split across two sections of the Cash Flow (user 2026-09-18).
+
+export interface LayoutPlacement {
+  /** category id → leaf codes; category order preserved, leaf order as given. */
+  byCategory: Map<string, string[]>
+  /** Leaves no category claims, explicitly or through an ancestor. */
+  leftovers: string[]
+}
+
+export function placeLeavesInLayout(
+  leafCodes: readonly string[],
+  categories: readonly { id: string; accounts?: string[] }[],
+  ancestorsNearestFirst: (code: string) => readonly string[],
+): LayoutPlacement {
+  // First category to list a code owns it — same rule a duplicate leaf had.
+  const owner = new Map<string, string>()
+  const byCategory = new Map<string, string[]>()
+  for (const c of categories) {
+    byCategory.set(c.id, [])
+    for (const code of c.accounts ?? []) if (!owner.has(code)) owner.set(code, c.id)
+  }
+
+  const leftovers: string[] = []
+  for (const code of leafCodes) {
+    let cat = owner.get(code)
+    if (cat === undefined) {
+      for (const anc of ancestorsNearestFirst(code)) {
+        cat = owner.get(anc)
+        if (cat !== undefined) break
+      }
+    }
+    if (cat === undefined) leftovers.push(code)
+    else byCategory.get(cat)!.push(code)
+  }
+  return { byCategory, leftovers }
+}
+
+/** Nearest-first ancestor chain from a COA parent_code map. Cycles / unknown
+ *  parents stop the walk instead of looping. */
+export function ancestorChain(
+  code: string,
+  parentOf: (code: string) => string | null | undefined,
+): string[] {
+  const out: string[] = []
+  const seen = new Set<string>([code])
+  let cur = parentOf(code)
+  while (cur && !seen.has(cur)) {
+    out.push(cur)
+    seen.add(cur)
+    cur = parentOf(cur)
+  }
+  return out
+}

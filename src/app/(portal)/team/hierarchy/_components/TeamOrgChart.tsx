@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Background,
-  Controls,
   Handle,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  ViewportPortal,
+  applyNodeChanges,
   useReactFlow,
+  useViewport,
   type Connection,
   type Edge,
   type Node,
@@ -20,7 +22,6 @@ import {
 import '@xyflow/react/dist/style.css'
 import {
   descendantsOf,
-  layoutTree,
   wouldCycle,
   NODE_HEIGHT,
   NODE_WIDTH,
@@ -30,6 +31,9 @@ import { ladderAllows, ladderRefusal } from '@/lib/ladder'
 import { lineRefusal } from '@/lib/hierarchy-boundary'
 import { headLines, headsLabel, layoutParent, reportsToHeads } from '@/lib/department-heads'
 import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
+import { boundsOf, rectanglePoints } from '@/lib/hierarchy-spaces'
+import { hierarchyTitleAppearance } from '@/lib/hierarchy-title-appearance'
+import { useCompanyHierarchySpaces } from './CompanyHierarchySpaces'
 
 export interface ChartPerson {
   id: string
@@ -61,11 +65,15 @@ interface CardData extends Record<string, unknown> {
   person: ChartPerson
   invalidTarget: boolean
   selected: boolean
+  tone: number
+  managerName: string | null
 }
 
 /** No department chosen — the whole company. Exported because the page owns
  *  the choice now: the rail beside this canvas has to answer the same filter. */
 export const ALL_DEPARTMENTS = '__all__'
+const NO_DEPARTMENT = '__unassigned__'
+const departmentKey = (name: string | null) => name ?? NO_DEPARTMENT
 
 /**
  * The company org canvas.
@@ -134,7 +142,10 @@ function Chart({
   onFocusDept: (department: string) => void
 }) {
   const router = useRouter()
-  const { getIntersectingNodes, setCenter } = useReactFlow()
+  const { getIntersectingNodes, setCenter, setViewport, fitBounds, zoomIn, zoomOut } = useReactFlow()
+  const [flowReady, setFlowReady] = useState(false)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const [arrangementVersion, setArrangementVersion] = useState(0)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -156,6 +167,7 @@ function Chart({
    */
   const [undo, setUndo] = useState<UndoMoveInput | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
+  const draggedPerson = useRef<string | null>(null)
   /**
    * The name being searched for.
    *
@@ -192,6 +204,22 @@ function Chart({
     for (const p of people) if (p.department) set.add(p.department)
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [people])
+  const departmentDefinitions = useMemo(() => [
+    ...departments.map(name => ({ id: departmentKey(name), name })),
+    ...(people.some(person => !person.department) ? [{ id: NO_DEPARTMENT, name: 'No department' }] : []),
+  ], [departments, people])
+  const members = useMemo(() => people.map(person => ({
+    id: person.id,
+    departmentId: departmentKey(person.department),
+    // Directors remain separate staff cards. Their derived lines do not merge
+    // every Revenue team into a single frame.
+    parentId: person.reportsTo,
+    name: person.name,
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
+  })), [people])
+  const spaces = useCompanyHierarchySpaces(members, departmentDefinitions,
+    focusDept === ALL_DEPARTMENTS ? null : focusDept)
 
   // Focusing a department now REMOVES the rest rather than fading them (user,
   // 2026-09-08: nobody reports across a department boundary today, so a dimmed
@@ -203,7 +231,7 @@ function Chart({
   // a line that leaves the department is counted below rather than drawn as a
   // person who reports to nobody.
   const visible = useMemo(
-    () => (focusDept === ALL_DEPARTMENTS ? people : people.filter(p => p.department === focusDept)),
+    () => (focusDept === ALL_DEPARTMENTS ? people : people.filter(p => departmentKey(p.department) === focusDept)),
     [people, focusDept],
   )
   const visibleIds = useMemo(() => new Set(visible.map(p => p.id)), [visible])
@@ -215,15 +243,13 @@ function Chart({
   // is drawn under the director rather than beside them (`layoutParent`).
   const graph: OrgNodeInput[] = useMemo(
     () =>
-      visible.map(p => ({
+      people.map(p => ({
         id: p.id,
         parentId: layoutParent(p),
         label: `${p.department ?? 'zzz'} ${p.name}`,
       })),
-    [visible],
+    [people],
   )
-
-  const layout = useMemo(() => layoutTree(graph), [graph])
 
   /** Everything the person being dragged may not be dropped on: their own
    *  reports, anybody the ladder ranks below them, everybody on the other side
@@ -245,24 +271,57 @@ function Chart({
     return out
   }, [dragging, graph, byId, visible])
 
-  const nodes: Node<CardData>[] = useMemo(
-    () =>
-      visible.map(p => {
-        const pos = layout.positions.get(p.id)!
+  const [nodes, setNodes] = useState<Node<CardData>[]>([])
+  useEffect(() => {
+    setNodes(visible.flatMap(p => {
+        const pos = spaces.positions.get(p.id)
+        if (!pos) return []
         return {
           id: p.id,
           type: 'person',
+          deletable: false,
+          selected: selected === p.id,
           position: { x: pos.x, y: pos.y },
           data: {
             person: p,
             invalidTarget: forbidden.has(p.id),
             selected: selected === p.id,
+            tone: departmentDefinitions.findIndex(department => department.id === departmentKey(p.department)) % 3,
+            managerName: p.reportsTo ? byId.get(p.reportsTo)?.name ?? 'Outside this chart'
+              : headsLabel(p.leadIds.map(id => byId.get(id)?.name).filter((name): name is string => !!name)) || null,
           },
-          draggable: true,
         }
-      }),
-    [visible, layout, forbidden, selected],
-  )
+      }))
+  }, [visible, spaces.positions, forbidden, selected, departmentDefinitions, byId])
+
+  const fitCompany = useCallback(() => {
+    const frames = spaces.geometry.departments.filter(department => focusDept === ALL_DEPARTMENTS || department.id === focusDept)
+    if (frames.length) void fitBounds(boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds))), {
+      padding: 0.12, duration: 320,
+    })
+  }, [spaces.geometry, focusDept, fitBounds])
+  const showHorizontal = useCallback(() => {
+    const frames = spaces.geometry.departments.filter(department => focusDept === ALL_DEPARTMENTS || department.id === focusDept)
+    if (!frames.length) return
+    const bounds = boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds)))
+    const width = canvasRef.current?.clientWidth || 1100
+    const height = canvasRef.current?.clientHeight || 740
+    // Start at the left of the horizontal canvas at a readable size. Fitting
+    // all seven departments would reduce every card to a tiny thumbnail.
+    const zoom = Math.min(0.7, Math.max(0.45, (height - 64) / bounds.height))
+    void setViewport({
+      x: Math.max(32, (width - bounds.width * zoom) / 2) - bounds.x * zoom,
+      y: 32 - bounds.y * zoom,
+      zoom,
+    }, { duration: 320 })
+  }, [spaces.geometry, focusDept, setViewport])
+  const fittedDepartment = useRef<string | null>(null)
+  useEffect(() => {
+    const viewKey = `${focusDept}:${arrangementVersion}`
+    if (!spaces.loaded || !flowReady || fittedDepartment.current === viewKey) return
+    fittedDepartment.current = viewKey
+    showHorizontal()
+  }, [spaces.loaded, flowReady, focusDept, arrangementVersion, showHorizontal])
 
   const edges: Edge[] = useMemo(() => {
     // A line the ladder would refuse today — drawn after the ladder changed
@@ -301,7 +360,7 @@ function Chart({
   const move = useCallback(
     (childId: string, parentId: string | null) => {
       const child = byId.get(childId)
-      if (!child) return
+      if (!child || pending) return
       if (child.reportsTo === parentId) return
 
       if (parentId) {
@@ -373,18 +432,19 @@ function Chart({
         }
       })
     },
-    [byId, graph, router],
+    [byId, graph, router, pending],
   )
 
   const onNodeDragStop: OnNodeDrag<Node<CardData>> = useCallback(
     (_event, node) => {
+      draggedPerson.current = null
       setDragging(null)
-      const hits = getIntersectingNodes(node).filter(n => !forbidden.has(n.id))
+      setNodes(current => current.map(item => ({ ...item, position: spaces.positions.get(item.id) ?? item.position })))
+      const hits = getIntersectingNodes(node).filter(n => n.id !== node.id && !forbidden.has(n.id))
       const target = hits[0]
       if (target) move(node.id, target.id)
-      else router.refresh() // snap the card back to its laid-out place
     },
-    [forbidden, getIntersectingNodes, move, router],
+    [forbidden, getIntersectingNodes, move, spaces.positions],
   )
 
   const onConnect = useCallback(
@@ -401,16 +461,16 @@ function Chart({
   // focus — re-centring on every render would fight the reader's own panning.
   const centred = useRef<string | null>(null)
   useEffect(() => {
-    if (focused === centred.current) return
-    centred.current = focused
-    if (!focused) return
-    const pos = layout.positions.get(focused)
+    if (!focused) { centred.current = null; return }
+    if (!flowReady || focused === centred.current || !spaces.loaded) return
+    const pos = spaces.positions.get(focused)
     if (!pos) return
+    centred.current = focused
     void setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT / 2, {
       zoom: 1,
       duration: 320,
     })
-  }, [focused, layout, setCenter, revealAt])
+  }, [focused, spaces.positions, spaces.loaded, setCenter, revealAt, flowReady])
 
   /**
    * Show me where this person is.
@@ -424,7 +484,7 @@ function Chart({
     (id: string) => {
       const person = byId.get(id)
       if (!person) return
-      if (focusDept !== ALL_DEPARTMENTS && person.department !== focusDept) {
+      if (focusDept !== ALL_DEPARTMENTS && departmentKey(person.department) !== focusDept) {
         onFocusDept(ALL_DEPARTMENTS)
       }
       // Cleared so somebody ALREADY selected is centred again rather than
@@ -459,7 +519,7 @@ function Chart({
   return (
     <div>
       {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
+        <div role="alert" className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
           {error}
         </div>
       ) : null}
@@ -502,7 +562,20 @@ function Chart({
         </div>
       ) : null}
 
-      <div className="relative w-full sm:w-80 mb-3">
+      <div className="space-toolbar">
+        <div className="space-jumps" aria-label="Filter by department">
+          <button type="button" onClick={() => {
+            if (focusDept === ALL_DEPARTMENTS) showHorizontal()
+            else onFocusDept(ALL_DEPARTMENTS)
+          }} aria-pressed={focusDept === ALL_DEPARTMENTS}>Whole company</button>
+          {departmentDefinitions.map(department => <button
+            key={department.id} type="button"
+            onClick={() => onFocusDept(focusDept === department.id ? ALL_DEPARTMENTS : department.id)}
+            aria-pressed={focusDept === department.id}
+          >{department.name}</button>)}
+        </div>
+        <div className="space-actions">
+      <div className="space-search">
         <input
           type="search"
           value={find}
@@ -514,7 +587,7 @@ function Chart({
             }
             if (e.key === 'Escape') setFind('')
           }}
-          placeholder="Find somebody by name…"
+          placeholder="Find a person…"
           aria-label="Find somebody on the chart by name"
           className="w-full px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border font-sans"
         />
@@ -543,43 +616,22 @@ function Chart({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <button
-          type="button"
-          onClick={() => onFocusDept(ALL_DEPARTMENTS)}
-          aria-pressed={focusDept === ALL_DEPARTMENTS}
-          className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
-            focusDept === ALL_DEPARTMENTS
-              ? 'bg-accent border-accent text-white'
-              : 'bg-surface border-hairline text-graphite hover:bg-surface-2'
-          }`}
-        >
-          Whole company
-        </button>
-        {departments.map(d => {
-          const active = focusDept === d
-          return (
-            <button
-              key={d}
-              type="button"
-              onClick={() => onFocusDept(active ? ALL_DEPARTMENTS : d)}
-              aria-pressed={active}
-              className={`font-serif italic text-sm px-3 py-1.5 rounded-control border transition-colors ${
-                active
-                  ? 'bg-accent border-accent text-white'
-                  : 'bg-surface border-hairline text-graphite hover:bg-surface-2'
-              }`}
-            >
-              {d}
-            </button>
-          )
-        })}
+          <button type="button" className="space-tidy" onClick={() => {
+            spaces.tidy()
+            setArrangementVersion(version => version + 1)
+          }} title="Arrange all departments and teams horizontally">Tidy</button>
+          <div className="org-zoom">
+            <button type="button" onClick={() => void zoomOut({ duration: 250 })} aria-label="Zoom out">−</button>
+            <button type="button" className="lv" onClick={fitCompany} aria-label="Fit visible departments"><ZoomReadout /></button>
+            <button type="button" onClick={() => void zoomIn({ duration: 250 })} aria-label="Zoom in">+</button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 mb-3">
+      <div className="space-overview">
         <p className="font-serif italic text-muted text-xs">
-          {visible.length} people · {layout.roots.length} tree
-          {layout.roots.length === 1 ? '' : 's'} · {unplaced} reporting to nobody
+          {visible.length} people · {spaces.geometry.departments.filter(department => focusDept === ALL_DEPARTMENTS || department.id === focusDept).length} departments
+          {' · '}{spaces.teams.filter(team => focusDept === ALL_DEPARTMENTS || team.departmentId === focusDept).length} teams · {unplaced} reporting to nobody
           {directed > 0 ? ` · ${directed} at the top of a tree under a director` : ''}
           {outside > 0 ? (
             <span className="text-alert">
@@ -596,9 +648,52 @@ function Chart({
           ) : null}
           {pending ? ' · saving…' : ''}
         </p>
-        {selected ? (
+        <span>{pending ? 'Saving reporting line…' : 'Horizontal layout · Drag the canvas to explore'}</span>
+      </div>
+
+      <div ref={canvasRef} className={`org-canvas space-canvas${spaces.moving ? ' space-dragging' : ''}`}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onInit={() => { centred.current = null; setFlowReady(true) }}
+          onNodesChange={changes => {
+            setNodes(current => applyNodeChanges(changes.filter(change => change.type !== 'remove'
+              && (change.type !== 'position' || change.id === draggedPerson.current)), current))
+            const dimensions = changes.flatMap(change => change.type === 'dimensions' && change.dimensions
+              ? [{ id: change.id, ...change.dimensions }] : [])
+            if (dimensions.length) spaces.updateDimensions(dimensions)
+          }}
+          onNodeDragStart={(_e, node) => {
+            draggedPerson.current = node.id
+            setNote(null)
+            setWarn(false)
+            setUndo(null)
+            setDragging(node.id)
+          }}
+          onNodeDragStop={onNodeDragStop}
+          onNodeClick={(_e, node) => onFocus(focused === node.id ? null : node.id)}
+          onConnect={onConnect}
+          minZoom={0.02}
+          deleteKeyCode={null}
+          maxZoom={1.7}
+          panOnDrag={spaces.moving ? false : [0, 1]}
+          proOptions={{ hideAttribution: false }}
+          nodesConnectable={!pending}
+          nodesDraggable={!pending && !spaces.moving}
+          elementsSelectable
+        >
+          <Background gap={24} color="rgb(var(--cv-grid))" />
+          <ViewportPortal>{spaces.frames}</ViewportPortal>
+        </ReactFlow>
+      </div>
+
+      <div className="space-footer">
+        <span className="text-xs text-muted">Drag a team or department heading or border to arrange the canvas.</span>
+        {selected && visibleIds.has(selected) ? (
           <button
             type="button"
+            disabled={pending}
             onClick={() => move(selected, null)}
             className="text-xs font-sans text-accent hover:underline"
           >
@@ -609,39 +704,6 @@ function Chart({
             Click a card to select it, then detach it if it should report to nobody.
           </span>
         )}
-      </div>
-
-      <div
-        className="border border-hairline rounded-card bg-surface"
-        style={{ height: Math.min(760, Math.max(340, layout.height + NODE_HEIGHT * 2.5)) }}
-      >
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodeDragStart={(_e, node) => {
-            setNote(null)
-            setWarn(false)
-            setUndo(null)
-            setDragging(node.id)
-          }}
-          onNodeDragStop={onNodeDragStop}
-          onNodeClick={(_e, node) => onFocus(focused === node.id ? null : node.id)}
-          onConnect={onConnect}
-          fitView
-          // Before anybody is placed the graph is one very wide row, and a
-          // plain fitView would squeeze 24 cards into an unreadable strip.
-          // Floor the zoom and let the reader pan instead.
-          fitViewOptions={{ padding: 0.12, minZoom: 0.55 }}
-          minZoom={0.25}
-          proOptions={{ hideAttribution: false }}
-          nodesConnectable
-          nodesDraggable
-          elementsSelectable
-        >
-          <Background gap={24} color="rgb(var(--hairline))" />
-          <Controls showInteractive={false} />
-        </ReactFlow>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3">
@@ -703,51 +765,42 @@ function Chart({
   )
 }
 
-function PersonCard({ data }: NodeProps<Node<CardData>>) {
-  const { person, invalidTarget, selected } = data
+function ZoomReadout() {
+  const { zoom } = useViewport()
+  return <>{Math.round(zoom * 100)}%</>
+}
 
+function PersonCard({ data }: NodeProps<Node<CardData>>) {
+  const { person, invalidTarget, selected, tone, managerName } = data
+  const title = hierarchyTitleAppearance(person.title)
   return (
     <div
       style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
-      className={[
-        'rounded-control border px-3 py-2 transition-colors',
-        invalidTarget
-          ? 'border-hairline bg-surface-2/50 opacity-40'
-          : selected
-            ? 'border-accent bg-surface shadow-sm'
-            : 'border-hairline bg-surface hover:border-accent-border',
-      ].join(' ')}
+      data-space-tone={tone}
+      className={`org-card space-person${selected ? ' sel' : ''}${invalidTarget ? ' forbid' : ''}`}
     >
-      <Handle type="target" position={Position.Top} className="!bg-[rgb(var(--accent))] !w-2 !h-2" />
-
-      <div className="font-serif text-sm text-ink leading-tight truncate">{person.name}</div>
-      <div className="flex items-baseline justify-between gap-2 mt-0.5">
-        <span className="font-mono text-[0.6rem] text-muted">{person.code ?? '—'}</span>
-        {person.levelName ? (
-          <span
-            className="font-mono text-[0.55rem] uppercase tracking-wide text-accent truncate"
-            title={`Level ${person.levelRank} · ${person.levelName}`}
-          >
-            L{person.levelRank} · {person.levelName}
-          </span>
-        ) : null}
+      <Handle type="target" position={Position.Top} />
+      <div className="oc-top">
+        <div className="oc-nm" title={`${person.name} · ${person.department ?? 'No department'}`}>{person.name}</div>
+        {person.levelRank !== null ? <span className="oc-rank" title={`Level ${person.levelRank} · ${person.levelName ?? ''}`}>
+          L{person.levelRank}
+        </span> : null}
       </div>
-
-      <div className="font-serif italic text-xs text-graphite truncate mt-1.5">
-        {person.title ?? 'no title'}
-        {person.isDepartmentHead ? (
-          <span className="ml-1.5 font-mono not-italic text-[0.55rem] uppercase tracking-wide text-accent">
-            · heads the department
-          </span>
-        ) : null}
-      </div>
-      <div className="flex items-baseline justify-between gap-2 mt-1">
-        <span className="font-mono text-[0.55rem] uppercase tracking-wide text-muted truncate">
-          {person.department ?? 'no department'}
+      <div className="oc-tt oc-title-row">
+        <span className="oc-title-badge" data-title-tone={person.isDepartmentHead ? 'head' : title.tone}>
+          <span className="oc-title-marker" aria-hidden="true">{title.marker}</span>
+          <span className="oc-title-label">{title.label}</span>
         </span>
       </div>
-
-      <Handle type="source" position={Position.Bottom} className="!bg-[rgb(var(--accent))] !w-2 !h-2" />
+      <div className="px-[11px] pb-1 font-mono text-[9px] text-[rgb(var(--cv-muted))] truncate"
+        title={`${person.code ?? 'No employee code'} · ${person.department ?? 'No department'}`}>
+        {person.code ?? '—'} · {person.department ?? 'No department'}
+      </div>
+      <div className="oc-up" title={managerName ?? 'Reports to nobody'}>
+        <span className="k">Reports to</span>
+        <span className={`v${managerName ? '' : ' top'}`}>{managerName ?? 'Nobody'}</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} />
     </div>
   )
 }

@@ -29,6 +29,47 @@ export interface GlReportViewProps {
   /** Column header labels, e.g. "Jun 2026" / "May 2026" or "As at 30 Jun". */
   currentLabel: string
   compareLabel: string
+  /** 'cf' (default) = the navy / gold report skin (user 2026-09-18 "蓝为主",
+   *  then "report 那边的颜色等等弄到和 cash flow 的一样"); 'ledger' = the
+   *  portal's plain ledger look. */
+  skin?: 'cf' | 'ledger'
+}
+
+/** Collapse key for a headed section that is NOT a merged root (its own row
+ *  has no account code to key on). */
+const sectKey = (sectionKey: string) => `sect:${sectionKey}`
+
+/** Every foldable row key (groups) and every leaf with transactions (txns),
+ *  in document order. Row identity is `${section.key}:${code}` — the SAME
+ *  account can appear in two sections (e.g. 3052 in both 实收 and 支出 of the
+ *  cash-flow grammar); bare codes made those rows share React keys + open
+ *  state, so clicking the first copy only ever expanded the last one (user
+ *  2026-08-29: "点不开"). A headed section folds like a group too, keyed by
+ *  its merged root's code or, without one, sectKey(). */
+function collectFoldKeys(blocks: ReportBlock[]): { groups: string[]; txns: string[] } {
+  const groups: string[] = []
+  const txns: string[] = []
+  const walk = (sk: string, n: AccountNode) => {
+    if (n.children.length > 0) {
+      groups.push(`${sk}:${n.code}`)
+      n.children.forEach((c) => walk(sk, c))
+    } else if (n.txns.length > 0) {
+      txns.push(`${sk}:${n.code}`)
+    }
+  }
+  for (const b of blocks) {
+    if (b.kind !== 'section') continue
+    const s = b.section
+    if (s.headed && s.root) {
+      walk(s.key, s.root) // the root's children ARE s.nodes
+    } else if (s.headed) {
+      groups.push(sectKey(s.key))
+      s.nodes.forEach((n) => walk(s.key, n))
+    } else {
+      s.nodes.forEach((n) => walk(s.key, n))
+    }
+  }
+  return { groups, txns }
 }
 
 function stepMonth(ym: string, delta: number): string {
@@ -54,29 +95,23 @@ export default function GlReportView({
   pctBase,
   currentLabel,
   compareLabel,
+  skin = 'cf',
 }: GlReportViewProps) {
   const router = useRouter()
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // A statement with layout (headed) sections opens folded to its category
+  // rows — L1, as in the approved Cash Flow mock-up (2026-09-18); the rail's
+  // L2 / L3 open it up. The plain statements (P&L, BS, R&P) open fully.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() =>
+    blocks.some((b) => b.kind === 'section' && b.section.headed)
+      ? new Set(collectFoldKeys(blocks).groups)
+      : new Set(),
+  )
   const [openTxns, setOpenTxns] = useState<Set<string>>(new Set())
 
   // L1 = top accounts only · L2 = every account level · L3 = + transactions.
-  // Row identity is `${section.key}:${code}` — the SAME account can appear in
-  // two sections (e.g. 3052 in both 实收 and 支出 of the cash-flow grammar);
-  // bare codes made those rows share React keys + open state, so clicking the
-  // first copy only ever expanded the last one (user 2026-08-29: "点不开").
   const { allGroupCodes, allTxnCodes } = useMemo(() => {
-    const groups: string[] = []
-    const txns: string[] = []
-    const walk = (sk: string, n: AccountNode) => {
-      if (n.children.length > 0) {
-        groups.push(`${sk}:${n.code}`)
-        n.children.forEach((c) => walk(sk, c))
-      } else if (n.txns.length > 0) {
-        txns.push(`${sk}:${n.code}`)
-      }
-    }
-    for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach((n) => walk(b.section.key, n))
-    return { allGroupCodes: groups, allTxnCodes: txns }
+    const k = collectFoldKeys(blocks)
+    return { allGroupCodes: k.groups, allTxnCodes: k.txns }
   }, [blocks])
 
   const setLevel = (level: 1 | 2 | 3) => {
@@ -110,7 +145,14 @@ export default function GlReportView({
         for (const c of n.children) walk(sk, c, next)
       }
     }
-    for (const b of blocks) if (b.kind === 'section') b.section.nodes.forEach((n) => walk(b.section.key, n, []))
+    for (const b of blocks) {
+      if (b.kind !== 'section') continue
+      const s = b.section
+      // A merged root is a real account row (searchable); a plain headed
+      // section is an ancestor its hits must force open.
+      if (s.headed && s.root) walk(s.key, s.root, [])
+      else s.nodes.forEach((n) => walk(s.key, n, s.headed ? [sectKey(s.key)] : []))
+    }
     return { hitCodes: hits, forceOpen: open }
   }, [blocks, search])
 
@@ -324,7 +366,7 @@ export default function GlReportView({
 
       {/* ── Statement table ── */}
       <div className="flex-1 min-w-0 overflow-x-auto">
-      <table className="ledger-table gl-report">
+      <table className={`ledger-table gl-report${skin === 'cf' ? ' cf-report' : ''}`}>
         <thead>
           <tr>
             <th>Account</th>
@@ -433,19 +475,9 @@ function SectionRows({
 }) {
   const rows: React.ReactNode[] = []
 
-  // Section title = small-caps eyebrow (matches the portal's sect-head
-  // convention) so it reads clearly apart from the serif-italic subtotal rows.
-  rows.push(
-    <tr key={`sect-${section.key}`} className="row-sect border-t-2 border-hairline">
-      <td colSpan={colCount} className="pt-3.5">
-        <span className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent">
-          {section.label}
-        </span>
-      </td>
-    </tr>,
-  )
-
-  const renderNode = (n: AccountNode, depth: number) => {
+  /** `header` = this node is a headed section's own row (a merged root): band
+   *  styling, same toggles — its children then sit one step in. */
+  const renderNode = (n: AccountNode, depth: number, header = false) => {
     const isGroup = n.children.length > 0
     // Section-scoped row identity — the same account may appear in another
     // section (cash-flow in/out both carry e.g. 3052), and sharing bare-code
@@ -467,7 +499,7 @@ function SectionRows({
       <tr
         key={rk}
         id={`gl-row-${rk}`}
-        className={`${isGroup ? 'row-group' : 'row-leaf'}${
+        className={`${header ? 'row-cat' : isGroup ? 'row-group' : 'row-leaf'}${
           isActive ? ' search-row-active' : isHit ? ' search-row-hit' : ''
         }`}
       >
@@ -505,7 +537,7 @@ function SectionRows({
             <span className="font-mono text-xs text-graphite mr-2">
               <Highlight text={n.code} query={search} />
             </span>
-            <span className={`text-sm text-ink ${isGroup ? 'font-medium' : ''} ${toggleAction ? 'group-hover:text-accent transition-colors' : ''}`}>
+            <span className={`text-sm text-ink ${isGroup || header ? 'font-medium' : ''} ${toggleAction ? 'group-hover:text-accent transition-colors' : ''}`}>
               <Highlight text={n.name} query={search} />
             </span>
             {hasTxns ? (
@@ -513,7 +545,7 @@ function SectionRows({
             ) : null}
           </button>
         </td>
-        <td className={`num ${isGroup ? 'font-medium' : ''}`}>
+        <td className={`num ${isGroup || header ? 'font-medium' : ''}`}>
           {n.current < 0 ? <span className="neg">{money(n.current)}</span> : money(n.current)}
         </td>
         {withCompare ? (
@@ -554,9 +586,59 @@ function SectionRows({
     }
   }
 
-  for (const n of section.nodes) renderNode(n, 0)
+  if (section.headed && section.root) {
+    // The merged root IS the section row; its children (= section.nodes)
+    // render one step in through renderNode's own recursion.
+    renderNode(section.root, 0, true)
+  } else if (section.headed) {
+    // Section row carries the totals and folds its accounts (user 2026-09-18:
+    // no more "— 小计" row doubling the parent above it).
+    const sk = sectKey(section.key)
+    const isCollapsed = collapsed.has(sk) && !forceOpen.has(sk)
+    rows.push(
+      <tr key={`sect-${section.key}`} className="row-cat">
+        <td>
+          <button
+            type="button"
+            onClick={() => onToggleGroup(sk)}
+            className="flex items-baseline text-left w-full cursor-pointer group"
+            aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+          >
+            <span className="mr-1.5 font-mono text-[10px] text-graphite group-hover:text-ink w-3">
+              {isCollapsed ? '▸' : '▾'}
+            </span>
+            <span className="text-sm text-ink font-medium group-hover:text-accent transition-colors">{section.label}</span>
+          </button>
+        </td>
+        <td className="num font-medium">
+          {section.current < 0 ? <span className="neg">{money(section.current)}</span> : money(section.current)}
+        </td>
+        {withCompare ? (
+          <td className="num text-graphite m-hide">
+            {section.previous < 0 ? <span className="neg">{money(section.previous)}</span> : money(section.previous)}
+          </td>
+        ) : null}
+        {withCompare ? <td className="num text-graphite m-hide">{deltaPct(section.current, section.previous)}</td> : null}
+        {pctBase ? <td className="num text-graphite m-hide">{pctOf(section.current, pctBase.current)}</td> : null}
+      </tr>,
+    )
+    if (!isCollapsed) for (const n of section.nodes) renderNode(n, 1)
+  } else {
+    // Section title = small-caps eyebrow (matches the portal's sect-head
+    // convention) so it reads clearly apart from the serif-italic subtotal rows.
+    rows.push(
+      <tr key={`sect-${section.key}`} className="row-sect border-t-2 border-hairline">
+        <td colSpan={colCount} className="pt-3.5">
+          <span className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-accent">
+            {section.label}
+          </span>
+        </td>
+      </tr>,
+    )
+    for (const n of section.nodes) renderNode(n, 0)
+  }
 
-  if (section.nodes.length === 0) {
+  if (section.nodes.length === 0 && !section.root) {
     rows.push(
       <tr key={`empty-${section.key}`}>
         <td colSpan={colCount} className="font-serif italic text-muted text-sm">

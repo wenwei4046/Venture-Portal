@@ -7,7 +7,10 @@ const actions = vi.hoisted(() => ({ fetch: vi.fn(), save: vi.fn() }));
 vi.mock("@/app/(member)/member/arena-actions", () => ({ fetchMemberArena: actions.fetch, saveMemberArenaBrandWeeks: actions.save }));
 const membershipId="10000000-0000-4000-8000-000000000001";
 const snapshot: MemberArenaSnapshot={membershipId,department:"Fair",selfId:"real-employee",period:"2026-09",window:"monthly",from:"2026-09-01",through:"2026-09-16",asOf:"2026-09-16T00:00:00Z",live:true,
-  brands:[{code:"AKEMI",name:"Akemi"}],brandWeeks:null,people:[
+  brands:[{code:"AKEMI",name:"Akemi"}],brandWeeks:null,
+  tiers:[{brand:"AKEMI",bandKey:"incentive_tier_1",label:"Incentive Tier 1",marginPct:.36,amount:1000},
+    {brand:"AKEMI",bandKey:"incentive_tier_2",label:"Incentive Tier 2",marginPct:.43,amount:1500}],
+  people:[
     {id:"real-employee",name:"Actual Employee",self:true,sales:4000,held:0,orders:1,kpiQty:3,marginRevenue:4000,marginCost:2000,blindOrders:0,brands:{AKEMI:{sales:4000,held:0,orders:1,kpiQty:3,marginRevenue:4000,marginCost:2000,blindOrders:0}}},
     {id:"colleague",name:"Other Employee",self:false,sales:8000,held:0,orders:1,kpiQty:2,marginRevenue:8000,marginCost:6000,blindOrders:0,brands:{}},
   ]};
@@ -95,5 +98,23 @@ describe("Live Member Arena",()=>{
     expect(screen.getByRole("heading",{name:"Fair history is not connected yet"})).toBeInTheDocument();
     expect(screen.getByText(/Championship totals will appear/)).toBeInTheDocument();
     expect(screen.queryByText(/\d+\s*pts/)).not.toBeInTheDocument();
+  });
+  it("says which tier the month reached and what it is worth, brand by brand",async()=>{
+    render(<MemberArena membershipId={membershipId}/>);
+    fireEvent.click(await screen.findByRole("button",{name:/Margin Incentive/}));
+    expect(screen.getByRole("heading",{name:"Margin Incentive",level:1})).toBeInTheDocument();
+    // 50% on Akemi clears both rungs, and they stack.
+    expect(screen.getByText("Incentive Tier 2")).toBeInTheDocument();
+    expect(screen.getByText("RM 2,500")).toBeInTheDocument();
+    expect(screen.getByText("50.0%")).toBeInTheDocument();
+  });
+  it("holds the incentive on an uncosted brand instead of paying the rest",async()=>{
+    actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),people:[{...structuredClone(snapshot.people[0]),
+      brands:{...structuredClone(snapshot.people[0].brands),ZANOTTI:{sales:900,held:0,orders:1,kpiQty:0,marginRevenue:0,marginCost:0,blindOrders:1}}}]}});
+    render(<MemberArena membershipId={membershipId}/>);
+    fireEvent.click(await screen.findByRole("button",{name:/Margin Incentive/}));
+    expect(screen.getByText("Held, not lost")).toBeInTheDocument();
+    expect(screen.getByText(/ZANOTTI bill has no cost yet/)).toBeInTheDocument();
+    expect(screen.queryByText("RM 2,500")).not.toBeInTheDocument();
   });
 });

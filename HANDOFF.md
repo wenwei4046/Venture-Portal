@@ -1295,6 +1295,160 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-18 — Cash Flow report rework: parent-code layouts · category rows · navy/gold skin
+
+**Why**: user "那个 cash flow report 我想要优化，我发现分到太散了。你看 fund sources
+payable 分两边, loan receivable 也是, 然后这个 report 整体的颜色或 ui 我想优化".
+Root cause: `report_layouts` cash_flow_in / cash_flow_out listed only the LEAVES
+dragged on 2026-07-30 (3053/3054 · 4202/4051/4052 …); every other debtor / fund
+source fell into 其他, so the same COA parent printed twice. Mock-up went four
+rounds (Artifact https://claude.ai/artifact/67cus1g9tr1YoQ1vCq6sYb): v2 no
+小计 rows ("L1 会看到两个 total 看了会很乱"), v3 gold/navy ("类似这个黄蓝…黄色为
+主"), v3.1 no zebra ("一行一个 colour 看了会 misleading"), v3.2 pinned light
+("整体太暗了") → user: "黄色的颜色不是很好看" then "以蓝色为主的不错" = **navy-led,
+gold only as accent**; zero rows: "没有 amount 的就直接别显示" (no toggle).
+
+**Engine**
+- `lib/report-layouts.ts`: `placeLeavesInLayout(leafCodes, categories,
+  ancestorsNearestFirst)` + `ancestorChain`. A category may list COA PARENT
+  codes: explicit leaf wins → nearest listed ancestor → 其他; first category to
+  list a code owns it. Tests `report-layouts.test.ts`.
+- `lib/cash-flow-sections.ts` (statement): placement as above; leaves with no
+  amount in current AND previous are dropped; every layout section is
+  `headed` (new `ReportSection.headed`) — the section row carries the totals;
+  a section that is exactly ONE COA root named like it (`sameName`) gets
+  `root` = that node and `nodes` = root.children so the name isn't printed
+  twice; a lone leaf merges the same way (its txns stay reachable). No-layout
+  fallback unchanged (unheaded). `defaultSideLayout` now seeds the PARENT code
+  per top-level root.
+- `lib/cash-flow-custom.ts` (matrix): `buildSideMatrixRows` same rules; emits
+  `kind: 'category'` rows (new `MatrixRow` kind: depth 0, `isParent`, totals,
+  sits ABOVE its accounts) and no "— 小计" rows; merged root → the category row
+  carries `code`; all-zero accounts dropped, categories left empty vanish;
+  side-total row unchanged. `categoryRows()` helper.
+- `lib/gl-report-blocks.ts`: `cashFlowBlocks` adds no 小计 summary for headed
+  sections (legacy unheaded still get one); `flattenGlReport` (xlsx/pdf)
+  prints a headed section as ONE totals row (`code label` when merged) with
+  its accounts indented a step — screen and file keep the same shape.
+- DB mig `20260918010000_cash_flow_layout_parent_codes`: cash_flow_in/out
+  `grp-3020` → `["3020"]`, `grp-4000` → `["4000"]`; other categories untouched
+  (Salary & Statutory keeps its explicit 4070–4074 — 4075 Accrual-Others was
+  never in it, not my call to add). Applied live BEFORE the deploy, so for a
+  few minutes the old code saw an unknown leaf code and showed those under
+  其他 — resolved by the deploy.
+
+**Views**
+- `GlReportView` gains `skin?: 'cf'` (cash-flow/page passes it). Headed
+  sections render as `row-cat` band rows: a merged root is the node row itself
+  (its own group/txn toggles), a plain headed section is label + totals + a
+  fold toggle keyed `sect:<section.key>`; accounts sit at depth 1. L1 folds
+  sections too (`collectFoldKeys`), search force-opens through the `sect:`
+  key, and the cf skin opens folded (L1) by default.
+- `MonthlyMatrix` gains `variant?: 'cf'` + `nowKey` (monthly-cash-flow/page
+  passes `period`): category rows always visible + collapsible, opens at L1,
+  ONE navy header row (no RM sub-row — unit is in the page subtitle), zero →
+  dash, "now" column wash, flat rows (no zebra). Search treats categories as
+  ancestors only. Default variant (Monthly P&L / R&P) unchanged apart from the
+  widened `kind` union.
+- `globals.css`: `.cf-report` token set (light + dark): navy header and
+  headline bands (流入/流出合计, net change, closing) with gold figures,
+  pale-navy category rows with a gold inset rule (`row-cat` / `cf-cat`),
+  pale-gold `cf-now` column, `.cf-pill-on`. Scoped — the rest of the portal
+  keeps Walnut / Harbour (DESIGN.md's "one signal colour" rule is deliberately
+  bent here, at the user's request, for this report only). A default
+  `gl-report tr.row-cat` band exists so headed sections never render unstyled.
+- Layout editor (`ReportLayoutEditor` + cash-flow/layout/page): **▣ 整组** group
+  chips — every COA parent present on the side (with its leaf count) in its
+  own palette; dropping one lists the PARENT code; leaves a category holds
+  through a group show as dashed ghost chips (draggable → explicit override).
+  Saved codes with no movement this month are now KEPT on save (they were
+  silently dropped — the editor only lists this month's active accounts).
+  monthly-pnl layout page passes no groups → behaves as before.
+
+**Gates**: `report-layouts.test.ts` (6 new), cash-flow-sections (+5),
+cash-flow-custom (+5, first tests for `buildSideMatrixRows`); full vitest
+1908 green; `next build` green.
+
+**Skin across all Reports (second commit, same day)**: user "report 那边的颜色
+等等弄到和 cash flow 的一样". `reports/layout.tsx` wraps the section in
+`.cf-scope` (tokens live on `.cf-report, .cf-scope`); globals.css restyles
+every `ledger-table` under it (navy header + gold rule, flat white rows, no
+zebra, navy ink) and the Company Statement's plain table opts in with
+`cf-plain`. `GlReportView` `skin` now defaults to 'cf' ('ledger' = old look);
+folds to L1 only when a headed (layout) section exists, so P&L / BS / R&P still
+open fully; unheaded section eyebrows (`row-sect`) get the pale band + gold
+rule. `MonthlyMatrix` `variant` defaults to 'cf' with `nowKey` from all three
+monthly pages; opens at L1 only when category rows exist; the RM / % header
+sub-row stays (navy) when a % column is shown (Monthly P&L), with the gold rule
+under the last header row only.
+
+**Kingsley 100,000 under Equity (data fix, same day)**: user asked what the
+100,000 in "Equity & Internal Funds → HV Operating Fund" was. PV
+HV-PV-202608-0309 (2026-08-07, HLB → Kingsley, "Return to Kingsley Through
+Houzs") was a fund-source repayment (fund_source_id set, breakdown principal
+100,000, fund_source_repayments row written, source marked repaid) but its
+voucher_type was `expense` and the source row's account was 1010 HV Operating
+Fund, so the debit leg hit equity instead of 4058. Per user ("直接改我做的 PV
+挂 Kingsley 那边") ran `reassign_voucher_gl_account(pv, '1010', '4058', …)` as
+the Finance user (set_config jwt claims) — JE-202608-0540 now Dr 4058 / Cr
+3000, note appended, payment_voucher_sources synced; 4058 nets to 0. Note for
+later: the `loan_repayment` voucher type forces the debit to '4000' (the
+PARENT), not the fund source's own `account_code` — worth fixing if the user
+asks; also offered to auto-fill the source row's account from the fund source
+when the repay box is ticked.
+
+**Money-out 其他 filed (mig 20260918020000)**: the 2026-07-30 layout only
+listed seven expense leaves, so a dozen accounts sat in 其他. User: "费用类没
+问题 / Computer-equipment 算 Capex / Account payable 是啥？/ 其他的你跟着排".
+Now: General Expense + 9088 (group) 9089 9092 9096 9097 9000 4050 (4050 = the
+imported supplier-bill payments YSL 2,250.60 + Feb electricity 828.40 via
+HOUZS Century — told the user, filed under General Expense, easy to move);
+Salary & Statutory + 4075; NEW Interest Expense = 6000 + 4060 (group); NEW
+Capex = 2000; 1900 Opening Balance Clearing stays in 其他.
+
+**4050 payments re-pointed (data fix, user: "ysl 的是 secretary fees, KL
+gateway 的就是电费, 就挂去相对应的费用")**: manual_jv PV-000005 (3/6, YSL
+2,250.60) Dr 4050 → 9097 — no PI ever booked it, so the expense was missing
+from the P&L until now; PV-000038 (4/14, KL Gateway Feb electricity via
+HOUZS Century, 828.40) Dr 4050 → 9091 and the Feb accrual PI-000004 (Dr 9091
+/ Cr 4050) DELETED via delete_manual_journal_voucher, so the expense is booked
+once, on payment (Feb → Apr). Both JEs carry a "[GL reassigned …]" note. 4050
+now holds only PI-000001 (3/29 office rental Cr 3,000) with no payment against
+it — told the user, not touched.
+
+**Director-interest legs re-pointed (data fix, user: "改，两张都换去 6000")**:
+HV-PV-202609-0339 (Lim Wei Siang, interest 450) and HV-PV-202609-0340 (Lim
+Wei Liang, interest 300), both 2026-09-08, had their interest source row keyed
+to 5027 Loan Interest (an INCOME account) — the Cash Flow showed 750 of money
+out under "Interest Income - Loans". `reassign_voucher_gl_account(pv, '5027',
+'6000', …)` on both (JE-202609-0642 / 0644 now Dr 6000, sources synced). Same
+root cause as the Kingsley one: the repayment form's source-row account was
+free-typed.
+
+**Repayment PV source rows now follow the split (user: "做，自动带出账户")**:
+`lib/repayment-source-rows.ts` `buildRepaymentSourceRows(prev, split,
+fundSourceAccount, hasAccount)` — one row per non-zero component: principal →
+the fund source's `account_code` (4054 / 4058 …), interest → 6000, penalty →
+9096; pool defaults venture_pool; a row whose account Finance picked by hand
+(`autoAccount: false`) keeps it through later split edits, auto ones follow
+the source. `listPayableFundSources` now returns `account_code`;
+`NewPaymentForm` rebuilds the rows on fund-source / split change, the account
+picker marks a manual pick, rows show 本金 / 利息 / 罚金 + "账户自动带出".
+The form always submits voucher_type `expense`, so the approval RPC honours
+the row accounts (the `loan_repayment` type would force '4000' — unused).
+Tests `repayment-source-rows.test.ts`.
+Edit form too (user: "编辑草稿的表单也做一样的"): `seedRepaymentSourceRows`
+gives a repayment draft's SAVED rows their roles by matching amounts to the
+(locked) breakdown — a saved account is kept and flagged manual unless it
+already equals the default; a lump / mismatched row set is rebuilt with the
+defaults. `payments/[id]/edit/page.tsx` passes `fundSourceAccount`
+(fund_sources.account_code); the form shows the role labels and a
+**按拆分重带账户** button that forces every row back to its default.
+Tests in `EditPaymentForm.test.tsx` (+2).
+
+**Open / not done**: month columns stay Accumulated + latest-first (mock-up
+drew them chronological; user never raised it).
+
 ## SESSION 2026-09-14/15 — cancel-loan overload fix · 作废已开发票 · water RM36→39 amend
 
 **Cancel pending loan crashed (commit ca40c0bb, mig 20260914010000)**: TWO

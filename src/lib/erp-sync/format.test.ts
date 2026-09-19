@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAgo, keyHint, matchOutcomeNote } from './format'
+import { formatAgo, ignoreOutcomeNote, keyHint, matchOutcomeNote } from './format'
 
 const NOW = Date.parse('2026-09-05T10:00:00Z')
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString()
@@ -45,6 +45,30 @@ describe('matchOutcomeNote', () => {
   it('still confirms a match that had nothing to back-fill', () => {
     expect(matchOutcomeNote('Yuny', { matched: 0, locked: 0 })).toBe(
       'Yuny is remembered — no order was waiting on the answer.',
+    )
+  })
+})
+
+describe('ignoreOutcomeNote', () => {
+  it('counts the bills that left the month, because that is the whole point', () => {
+    expect(ignoreOutcomeNote('MAYSON', { excluded: 2, locked: 0 })).toBe(
+      'MAYSON is not ours: 2 bills left the month.',
+    )
+    expect(ignoreOutcomeNote('GRACE', { excluded: 1, locked: 0 })).toBe(
+      'GRACE is not ours: 1 bill left the month.',
+    )
+  })
+
+  it('names the bills an applied run kept, and says how to take them out too', () => {
+    expect(ignoreOutcomeNote('NINA', { excluded: 2, locked: 3 })).toBe(
+      "NINA is not ours: 2 bills left the month. 3 bills stayed in: their month's " +
+        'commission run is applied. Reopen that run to take them out too.',
+    )
+  })
+
+  it('still confirms an ignore that had no bill left to take out', () => {
+    expect(ignoreOutcomeNote('STEPHY', { excluded: 0, locked: 0 })).toBe(
+      'STEPHY is remembered as not ours — no bill of theirs was still counting.',
     )
   })
 })

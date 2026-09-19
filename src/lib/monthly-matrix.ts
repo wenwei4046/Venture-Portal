@@ -17,8 +17,10 @@ export interface MatrixRow {
    *  stay unique across sections, so search needs the bare code separately. */
   code?: string
   depth: number // indent level (0 = top)
-  kind: 'account' | 'subtotal'
-  /** true when this account rolls up child accounts under it. */
+  /** 'category' = a layout section's own row: carries the section totals, sits
+   *  ABOVE its accounts and collapses them like a parent (Cash Flow, 2026-09-18). */
+  kind: 'account' | 'subtotal' | 'category'
+  /** true when this account (or category) rolls up rows beneath it. */
   isParent?: boolean
   tone?: 'ledger' | 'danger' | 'auto'
   /** Headline total (side totals, net change, opening/closing, net income) —
