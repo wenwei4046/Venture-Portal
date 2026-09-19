@@ -111,7 +111,8 @@ export default function HierarchyView({
               </>
             ) : (
               <>
-                Directors sit above department zones. Expand a department or team to explore its reporting lines,
+                Roles align by L level across department zones, with higher levels above and equal levels on the same row.
+                Expand a department or team to explore its reporting lines,
                 and search a name to find every role they hold. People in several Revenue sub-departments appear
                 in each role; edit additional roles on their own sub-department hierarchy.
               </>
