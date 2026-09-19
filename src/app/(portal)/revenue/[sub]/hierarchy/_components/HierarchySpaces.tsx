@@ -24,10 +24,18 @@ import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
 import HierarchyPersonCard, { PersonMenuContext, UplineContext, type PersonNode } from './HierarchyPersonCard'
 import PersonContextMenu from './PersonContextMenu'
 import type { MembershipDestination } from '../../../_lib/membership-destinations'
+import type { EmployeeDepartmentDestination } from '../../../_lib/employee-destinations'
 import { membershipKey, type OrgDepartment, type OrgDirector } from './org-chart-types'
 import { useHierarchyCamera } from './useHierarchyCamera'
 
-interface Props { departments: OrgDepartment[]; initialDepartmentId?: string; membershipDestinations?: MembershipDestination[] }
+interface Props {
+  departments: OrgDepartment[]
+  initialDepartmentId?: string
+  membershipDestinations?: MembershipDestination[]
+  employeeDepartments?: EmployeeDepartmentDestination[]
+  canManageEmployment?: boolean
+  employmentToday?: string
+}
 type ReportingEdge = Edge<{ fresh?: boolean }, 'line'>
 type DropTarget = { id: string; reason: string | null; armed: boolean; unchanged: boolean }
 type ArrangeOptions = { keepVisible?: boolean; alignMembers?: boolean; origin?: ManualLayout }
@@ -47,7 +55,7 @@ export default function HierarchySpaces(props: Props) {
   return <ReactFlowProvider><SpaceChart {...props} /></ReactFlowProvider>
 }
 
-function SpaceChart({ departments: serverDepartments, initialDepartmentId, membershipDestinations = [] }: Props) {
+function SpaceChart({ departments: serverDepartments, initialDepartmentId, membershipDestinations = [], employeeDepartments = [], canManageEmployment = false, employmentToday = '' }: Props) {
   const { fitBounds, setCenter, getZoom, zoomIn, zoomOut, screenToFlowPosition } = useReactFlow()
   const camera = useHierarchyCamera()
   const { interrupt: interruptCamera, makeRoom, followTransfer } = camera
@@ -61,7 +69,14 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
       return saved?.source === serverDepartments ? { ...person, uplineStaffId: saved.parentId } : person
     }),
   })), [serverDepartments, savedMoves])
-  const [pending, startTransition] = useTransition()
+  const [movePending, startTransition] = useTransition()
+  const [menuPending, setMenuPending] = useState(false)
+  const menuPendingRef = useRef(false)
+  const onMenuPendingChange = useCallback((busy: boolean) => {
+    menuPendingRef.current = busy
+    setMenuPending(busy)
+  }, [])
+  const pending = movePending || menuPending
   const [nodes, setNodes] = useState<PersonNode[]>([])
   const nodesRef = useRef<PersonNode[]>([])
   const positions = useRef<ManualLayout>(new Map())
@@ -238,7 +253,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
   const scheduleArrange = useCallback((anchor?: SpaceAnchor) => {
     if (arrangeTimer.current) clearTimeout(arrangeTimer.current)
     arrangeTimer.current = setTimeout(() => {
-      if (!draggedMember.current && !groupDrag.current) arrange(anchor, { alignMembers: true })
+      if (!draggedMember.current && !groupDrag.current && !menuPendingRef.current) arrange(anchor, { alignMembers: true })
     }, 160)
   }, [arrange])
   useEffect(() => () => cancelAnimation(), [cancelAnimation])
@@ -326,6 +341,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
   }, [loaded, initialDepartmentId, focusDepartment])
 
   const onNodesChange = useCallback((changes: NodeChange<PersonNode>[]) => {
+    if (menuPendingRef.current) changes = changes.filter(change => change.type !== 'position' && change.type !== 'select')
     if (dragSession.current?.cancelled) changes = changes.filter(change => change.type !== 'position')
     let needsSpacing = false
     let anchor: SpaceAnchor | undefined
@@ -363,6 +379,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
       && point.y >= candidate.position.y && point.y <= candidate.position.y + (candidate.measured?.height ?? NODE_HEIGHT))
   }, [screenToFlowPosition])
   const onNodeDragStart: OnNodeDrag<PersonNode> = useCallback((_event, node) => {
+    if (menuPendingRef.current) return
     const priorGeometry = geometryRef.current
     cancelAnimation()
     geometryOverride.current = priorGeometry
@@ -376,7 +393,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
     setError(null)
   }, [cancelAnimation, interruptCamera, clearDropTarget])
   const onNodeDrag: OnNodeDrag<PersonNode> = useCallback((event, node) => {
-    if (dragSession.current?.cancelled || writing.current) return
+    if (dragSession.current?.cancelled || writing.current || menuPendingRef.current) return
     const hit = hitTarget(event, node.id)
     if (!hit) { if (dropTargetRef.current) clearDropTarget(); return }
     if (dropTargetRef.current?.id === hit.id) return
@@ -403,6 +420,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
     }, 450)
   }, [byId, hitTarget, clearDropTarget])
   const onNodeDragStop: OnNodeDrag<PersonNode> = useCallback((event, node) => {
+    if (menuPendingRef.current) return
     const session = dragSession.current, target = dropTargetRef.current
     const hit = target ? hitTarget(event, node.id) : null
     if (!session?.cancelled) positions.current.set(node.id, { ...node.position })
@@ -431,7 +449,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
       ...(anchor.departmentId ? [departmentPositionKey(anchor.departmentId)] : [])])
   }
   const groupDown = (event: PointerEvent<HTMLButtonElement>, anchor: SpaceAnchor) => {
-    if ((event.button !== 0 && event.button !== 2) || groupDrag.current || writing.current) return
+    if ((event.button !== 0 && event.button !== 2) || groupDrag.current || writing.current || menuPendingRef.current) return
     const departmentId = anchor.departmentId ?? teams.find(team => team.id === anchor.teamId)?.departmentId
     if (!departmentId) return
     event.preventDefault()
@@ -490,7 +508,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
     if (drag.element.hasPointerCapture(drag.pointerId)) drag.element.releasePointerCapture(drag.pointerId)
   }
   const groupKey = (event: KeyboardEvent<HTMLButtonElement>, anchor: SpaceAnchor) => {
-    if (writing.current || pending || groupDrag.current) return
+    if (writing.current || pending || menuPendingRef.current || groupDrag.current) return
     const delta = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, number[]>)[event.key]
     if (!delta) return
     event.preventDefault()
@@ -527,7 +545,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
 
   const move = useCallback((childId: string, parentId: string | null, origin?: ManualLayout) => {
     const child = byId.get(childId), parent = parentId ? byId.get(parentId) : null
-    if (!child || pending || writing.current) return
+    if (!child || pending || writing.current || menuPendingRef.current) return
     const restore = () => {
       if (origin) glide(origin, [childId])
       else { geometryOverride.current = null; scheduleArrange() }
@@ -583,20 +601,24 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
     if (connection.source && connection.target) move(connection.target, connection.source)
   }, [move])
   const openUpline = useCallback((id: string, anchor: PopAnchor) => {
+    if (menuPendingRef.current) return
     setPersonMenu(null)
     setPopover(current => current?.id === id ? null : { id, anchor })
   }, [])
   const openPersonMenu = useCallback((id: string, anchor: PopAnchor) => {
+    if (menuPendingRef.current) return
     menuTrigger.current = document.activeElement as HTMLElement | null
     setSelected(id)
     setPopover(null)
     setPersonMenu({ id, anchor })
   }, [])
-  const closePersonMenu = useCallback(() => {
+  const closePersonMenu = useCallback((completed = false) => {
+    if (menuPendingRef.current && !completed) return
     setPersonMenu(null)
     menuTrigger.current?.focus({ preventScroll: true })
   }, [])
   const beginAdd = (id: string, button: HTMLButtonElement) => {
+    if (menuPendingRef.current) return
     const rect = button.getBoundingClientRect()
     menuTrigger.current = button
     setPopover(null)
@@ -605,6 +627,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
     setPersonMenu({ id, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom }, startAtDepartments: true })
   }
   const reveal = useCallback((id: string) => {
+    if (menuPendingRef.current) return
     const point = positions.current.get(id), record = byId.get(id)
     if (!point || !record) return
     interruptCamera()
@@ -638,6 +661,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
 
   return (
     <div className="hierarchy-spaces" onKeyDown={event => {
+      if (menuPendingRef.current) return
       const target = event.target as HTMLElement
       if (/INPUT|TEXTAREA|SELECT/.test(target.tagName) || target.isContentEditable) return
       if (event.key === 'Escape') {
@@ -679,7 +703,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
               </button>) : <p>No matching person.</p>}
             </div> : null}
           </div>
-          <button type="button" className="space-tidy" onClick={() => { interruptCamera(); arrange(undefined, { keepVisible: true, alignMembers: true }) }} title="Align members and separate overlapping teams; keep team locations">Tidy</button>
+          <button type="button" className="space-tidy" disabled={pending} onClick={() => { if (menuPendingRef.current) return; interruptCamera(); arrange(undefined, { keepVisible: true, alignMembers: true }) }} title="Align members and separate overlapping teams; keep team locations">Tidy</button>
           <div className="org-zoom">
             <button type="button" onClick={() => { interruptCamera(); void zoomOut({ duration: duration(250) }) }} aria-label="Zoom out">−</button>
             <button type="button" className="lv" onClick={() => focusDepartment(null)} aria-label="Fit all departments"><ZoomReadout /></button>
@@ -687,7 +711,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
           </div>
         </div>
       </div>
-      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams{directorCount ? ` · ${directorCount} director${directorCount === 1 ? '' : 's'}` : ''}</span><span>{pending ? 'Saving upline…' : 'Magnetic layout · Free canvas'}</span></div>
+      <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams{directorCount ? ` · ${directorCount} director${directorCount === 1 ? '' : 's'}` : ''}</span><span>{menuPending ? 'Saving employee…' : movePending ? 'Saving upline…' : 'Magnetic layout · Free canvas'}</span></div>
       <PersonMenuContext.Provider value={openPersonMenu}>
       <UplineContext.Provider value={openUpline}>
         <div ref={camera.canvas} onPointerDownCapture={interruptCamera} onWheelCapture={interruptCamera}
@@ -695,11 +719,11 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
           <ReactFlow<PersonNode, ReportingEdge>
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
             onNodesChange={onNodesChange} onNodeDragStart={onNodeDragStart} onNodeDrag={onNodeDrag} onNodeDragStop={onNodeDragStop}
-            onNodeClick={(_event, node) => { if (performance.now() >= suppressClick.current) { setSelected(node.id); setPersonMenu(null) } }}
-            onPaneClick={() => { setSelected(null); setPopover(null); setPersonMenu(null) }} onConnect={onConnect}
+            onNodeClick={(_event, node) => { if (!menuPendingRef.current && performance.now() >= suppressClick.current) { setSelected(node.id); setPersonMenu(null) } }}
+            onPaneClick={() => { if (menuPendingRef.current) return; setSelected(null); setPopover(null); setPersonMenu(null) }} onConnect={onConnect}
             minZoom={0.15} maxZoom={1.7} panOnDrag={movingDepartment || movingTeam ? false : [0, 1]}
             zoomOnScroll={!movingDepartment && !movingTeam} zoomOnPinch={!movingDepartment && !movingTeam}
-            deleteKeyCode={null} nodesDraggable={!pending} nodesConnectable={!pending} elementsSelectable
+            deleteKeyCode={null} nodesDraggable={!pending} nodesConnectable={!pending} elementsSelectable={!pending}
             autoPanOnNodeDrag autoPanOnConnect
             proOptions={{ hideAttribution: false }}
           >
@@ -807,7 +831,9 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
       </div>
       {personMenu && menuPerson ? <PersonContextMenu key={`${personMenu.id}:${personMenu.anchor.left}:${personMenu.anchor.top}:${!!personMenu.startAtDepartments}`}
         person={menuPerson.person} currentDepartment={menuPerson.department} destinations={membershipDestinations} anchor={personMenu.anchor} startAtDepartments={personMenu.startAtDepartments}
-        onClose={closePersonMenu} onAdded={message => { closePersonMenu(); setError(null); setNote(message) }}
+        employeeDepartments={employeeDepartments} canManageEmployment={canManageEmployment} employmentToday={employmentToday}
+        onPendingChange={onMenuPendingChange}
+        onClose={closePersonMenu} onAdded={message => { closePersonMenu(true); setError(null); setNote(message) }}
         onUpline={() => { const current = personMenu; closePersonMenu(); openUpline(current.id, current.anchor) }} /> : null}
       {popover && mover ? <MovePopover key={popover.id} mover={mover.person} people={mover.department.people}
         graph={mover.department.people.map(person => ({ id: person.staffId, parentId: person.uplineStaffId, label: person.name }))}

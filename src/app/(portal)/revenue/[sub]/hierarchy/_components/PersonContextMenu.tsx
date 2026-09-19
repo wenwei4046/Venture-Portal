@@ -1,46 +1,51 @@
 'use client'
 
-import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { addMember, changeMemberTitle } from '../../../hierarchy-actions'
 import type { MembershipDestination } from '../../../_lib/membership-destinations'
 import type { PopAnchor } from './MovePopover'
 import styles from './membership-controls.module.css'
+import MenuPanel, { beside, hasSideSpace, openWithArrow, type OpenMenu } from './ContextMenuPanel'
+import EmployeeRemovalMenu from './EmployeeRemovalMenu'
+import type { EmployeeDepartmentDestination } from '../../../_lib/employee-destinations'
 
 interface MembershipPerson { staffId: string; name: string; titleId: string | null }
-interface MenuAnchor extends PopAnchor { right?: number; parentTop?: number }
-interface OpenMenu { anchor: MenuAnchor; focus: boolean }
 
-function beside(button: HTMLButtonElement): MenuAnchor {
-  const row = button.getBoundingClientRect()
-  const panel = button.closest('[role="menu"]')!.getBoundingClientRect()
-  return { left: panel.left, right: panel.right, top: row.top, bottom: row.bottom, parentTop: panel.top }
-}
 
-function hasSideSpace(anchor: MenuAnchor) {
-  const width = (anchor.right ?? anchor.left) - anchor.left
-  return (anchor.right ?? anchor.left) - 1 + width <= window.innerWidth - 8 || anchor.left - width + 1 >= 8
-}
 
 /** One boundary for the root and all its portalled, cascading submenus. */
-export default function PersonContextMenu({ person, currentDepartment, destinations, anchor, startAtDepartments = false, onUpline, onAdded, onClose }: {
+export default function PersonContextMenu({ person, currentDepartment, destinations, employeeDepartments = [], canManageEmployment = false, employmentToday = '', anchor, startAtDepartments = false, onUpline, onAdded, onClose, onPendingChange }: {
   person: MembershipPerson
   currentDepartment?: { schemeId: string; name: string; isHome: boolean }
   destinations: MembershipDestination[]
+  employeeDepartments?: EmployeeDepartmentDestination[]
+  canManageEmployment?: boolean
+  employmentToday?: string
   anchor: PopAnchor
   startAtDepartments?: boolean
   onUpline?: () => void
   onAdded: (note: string) => void
   onClose: () => void
+  onPendingChange?: (pending: boolean) => void
 }) {
   const boundary = useRef<HTMLDivElement>(null)
   const addButton = useRef<HTMLButtonElement>(null)
   const changeTitleButton = useRef<HTMLButtonElement>(null)
+  const removeButton = useRef<HTMLButtonElement>(null)
   const destinationButtons = useRef(new Map<string, HTMLButtonElement>())
   const restoreFocus = useRef<HTMLButtonElement | null>(null)
   const retryFocus = useRef<HTMLButtonElement | null>(null)
   const writing = useRef(false)
-  const [pending, startTransition] = useTransition()
+  const [saving, startTransition] = useTransition()
+  const [removalPending, setRemovalPending] = useState(false)
+  const pending = saving || removalPending
+  const [removalMenu, setRemovalMenu] = useState<OpenMenu | null>(null)
+  const [removalStacked, setRemovalStacked] = useState(false)
+  const removalMenuId = useId()
+  const removalBusy = useCallback((busy: boolean) => {
+    writing.current = busy; setRemovalPending(busy); onPendingChange?.(busy)
+  }, [onPendingChange])
   const [departmentMenu, setDepartmentMenu] = useState<OpenMenu | null>(startAtDepartments ? { anchor, focus: true } : null)
   const [departmentsStacked, setDepartmentsStacked] = useState(false)
   const [titleMenu, setTitleMenu] = useState<(OpenMenu & { schemeId: string; mode: 'add' | 'change' }) | null>(null)
@@ -84,6 +89,8 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
     // A hover must not replace the row under the pointer with a save action.
     // Narrow menus require an explicit click or Right-arrow to go deeper.
     if (!focus && !hasSideSpace(nextAnchor)) return
+    setRemovalMenu(null)
+    setRemovalStacked(false)
     setDepartmentMenu({ anchor: nextAnchor, focus })
     setTitleMenu(null)
     setTitlesStacked(false)
@@ -101,10 +108,29 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
     if (writing.current || titleChangeReason() || !currentDestination || !changeTitleButton.current) return
     const nextAnchor = beside(changeTitleButton.current)
     if (!focus && !hasSideSpace(nextAnchor)) return
+    setRemovalMenu(null)
+    setRemovalStacked(false)
     setDepartmentMenu(null)
     setDepartmentsStacked(false)
     setTitleMenu({ schemeId: currentDestination.schemeId, mode: 'change', anchor: nextAnchor, focus })
     setError(null)
+  }
+  function openRemoval(focus: boolean) {
+    if (writing.current || !removeButton.current) return
+    const nextAnchor = beside(removeButton.current)
+    if (!focus && !hasSideSpace(nextAnchor)) return
+    setDepartmentMenu(null)
+    setDepartmentsStacked(false)
+    setTitleMenu(null)
+    setTitlesStacked(false)
+    setError(null)
+    setRemovalMenu({ anchor: nextAnchor, focus })
+  }
+  function backFromRemoval() {
+    if (writing.current) return
+    setRemovalMenu(null)
+    setRemovalStacked(false)
+    restoreFocus.current = removeButton.current
   }
   function backToDepartments() {
     if (writing.current) return
@@ -119,6 +145,7 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
       || !item.titles.some(option => option.id === title.id)) return
     retryFocus.current = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null
     writing.current = true
+    onPendingChange?.(true)
     setError(null)
     const data = new FormData()
     data.set('staff_id', person.staffId)
@@ -132,7 +159,7 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
           : `${person.name} added to ${item.departmentName} / ${item.name} as ${title.name}. Set their upline in ${item.name}.`)
       } catch {
         setError('Could not save this membership. Please try again.')
-      } finally { writing.current = false }
+      } finally { writing.current = false; onPendingChange?.(false) }
     })
   }
 
@@ -140,7 +167,7 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
     // Wait for a replaced parent to be visible, then restore its exact row.
     restoreFocus.current?.focus({ preventScroll: true })
     restoreFocus.current = null
-  }, [departmentMenu, titleMenu])
+  }, [departmentMenu, titleMenu, removalMenu])
   useLayoutEffect(() => {
     if (!pending && error && retryFocus.current?.isConnected) retryFocus.current.focus({ preventScroll: true })
   }, [pending, error])
@@ -165,7 +192,7 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
 
   return createPortal(<div ref={boundary} className={styles.layer} onContextMenu={event => event.preventDefault()}>
     {!startAtDepartments ? <MenuPanel label={`Actions for ${person.name}`} anchor={anchor} focus
-      hidden={(!!departmentMenu && departmentsStacked) || (changingTitle && titlesStacked)} onBack={close} onClose={close}>
+      hidden={(!!departmentMenu && departmentsStacked) || (changingTitle && titlesStacked) || (!!removalMenu && removalStacked)} onBack={close} onClose={close}>
       <div className={styles.menuHeading}>{person.name}</div>
       <button ref={addButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="menu"
         aria-expanded={!!departmentMenu} aria-controls={departmentMenu ? departmentMenuId : undefined}
@@ -182,8 +209,14 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
         {!titleChangeReason() ? <span aria-hidden className={styles.chevron}>›</span> : null}
       </button> : null}
       {onUpline ? <button type="button" role="menuitem" tabIndex={-1} disabled={pending}
-        onMouseEnter={() => { if (!writing.current) { setDepartmentMenu(null); setDepartmentsStacked(false); setTitleMenu(null); setTitlesStacked(false) } }}
+        onMouseEnter={() => { if (!writing.current) { setDepartmentMenu(null); setDepartmentsStacked(false); setTitleMenu(null); setTitlesStacked(false); setRemovalMenu(null); setRemovalStacked(false) } }}
         onClick={onUpline}>Change upline</button> : null}
+      {currentDepartment ? <button ref={removeButton} type="button" role="menuitem" tabIndex={-1}
+        aria-haspopup="menu" aria-expanded={!!removalMenu} aria-controls={removalMenu ? removalMenuId : undefined}
+        disabled={pending} onMouseEnter={() => openRemoval(false)} onClick={() => openRemoval(true)}
+        onKeyDown={event => openWithArrow(event, () => openRemoval(true))}>
+        <span>Remove employee</span><span className={styles.chevron} aria-hidden>›</span>
+      </button> : null}
     </MenuPanel> : null}
 
     {departmentMenu ? <MenuPanel id={departmentMenuId} label={`Add ${person.name} to department`}
@@ -231,66 +264,10 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
           : `No upline is copied. Set it in ${selectedDestination.name} after adding.`}</p>}
       {error ? <p role="alert" className={styles.error}>{error}</p> : null}
     </MenuPanel> : null}
+    {removalMenu && currentDepartment ? <EmployeeRemovalMenu id={removalMenuId} person={person}
+      currentDepartment={currentDepartment} destinations={destinations} employeeDepartments={employeeDepartments}
+      canManageEmployment={canManageEmployment} employmentToday={employmentToday}
+      anchor={removalMenu.anchor} focus={removalMenu.focus} onStackedChange={setRemovalStacked}
+      onBusyChange={removalBusy} onBack={backFromRemoval} onClose={close} onDone={onAdded} /> : null}
   </div>, document.body)
-}
-
-function openWithArrow(event: KeyboardEvent, open: () => void) {
-  if (event.key !== 'ArrowRight') return
-  event.preventDefault()
-  event.stopPropagation()
-  open()
-}
-
-/** Position beside a parent row; replace it in place only when neither side fits. */
-function MenuPanel({ id, label, anchor, submenu = false, hidden = false, focus, onStackedChange, onBack, onClose, children }: {
-  id?: string
-  label: string
-  anchor: MenuAnchor
-  submenu?: boolean
-  hidden?: boolean
-  focus: boolean
-  onStackedChange?: (stacked: boolean) => void
-  onBack: () => void
-  onClose: () => void
-  children: ReactNode
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState({ left: anchor.left, top: anchor.bottom })
-  useLayoutEffect(() => {
-    const menu = ref.current
-    if (!menu) return
-    const place = () => {
-      const { width, height } = menu.getBoundingClientRect()
-      const right = (anchor.right ?? anchor.left) - 1
-      const left = anchor.left - width + 1
-      const stacked = submenu && right + width > window.innerWidth - 8 && left < 8
-      const x = !submenu ? anchor.left : right + width <= window.innerWidth - 8 ? right : left >= 8 ? left : anchor.left
-      const y = submenu ? stacked ? anchor.parentTop ?? anchor.top : anchor.top : anchor.bottom
-      setPosition({ left: Math.max(8, Math.min(x, window.innerWidth - width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - height - 8)) })
-      onStackedChange?.(stacked)
-    }
-    place()
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place)
-    observer?.observe(menu)
-    return () => observer?.disconnect()
-  }, [anchor, submenu, onStackedChange])
-  useLayoutEffect(() => {
-    if (focus && !hidden) (ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)') ?? ref.current)?.focus({ preventScroll: true })
-  }, [focus, hidden, anchor])
-
-  return <div ref={ref} id={id} role="menu" tabIndex={-1} aria-label={label} className={styles.menu}
-    style={{ ...position, visibility: hidden ? 'hidden' : undefined }} onKeyDown={event => {
-      event.stopPropagation()
-      if (event.key === 'Escape' || event.key === 'ArrowLeft') { event.preventDefault(); onBack(); return }
-      if (event.key === 'Tab') { onClose(); return }
-      const buttons = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
-      if (!buttons.length) return
-      const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
-      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
-        event.preventDefault()
-        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
-          : (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
-        buttons[next]?.focus()
-      }
-    }}>{children}</div>
 }

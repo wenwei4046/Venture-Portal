@@ -612,6 +612,22 @@ Team rules. Home sub-departments show the People Management instruction
 instead, because their title is the company title. Other sub-departments and
 the company role are not changed by this shortcut.
 
+`Remove employee ›` opens three choices beside the card menu: `Move to other
+department`, `Remove from this department`, and `Terminate employee`. Moving
+offers sibling sub-departments and, with People Management permission, other
+main departments. A new destination asks for one of its available titles;
+an existing destination keeps its own title and reporting line. Moving across
+main departments changes the company department and title, clears the old
+company reporting line, and ends memberships in the old department. Home
+membership still follows the roster and cannot be removed on its own.
+Every exit ends in a small adjacent confirmation panel naming the employee
+and affected department. Termination also asks for the last working day and
+marks the employee inactive, retaining their record and payroll history.
+Neither hovering nor selecting a destination writes data. A Cancel/Back row
+is always available before saving; errors stay in the panel for retry. Use
+the existing menu placement and keyboard behavior, with danger text only on
+the final removal/termination control. There is no centered dialog or scrim.
+
 Two rules the canvas keeps that the rest of the page does not: a card dropped
 on empty ground **stays there** (remembered per browser and scheme in
 `localStorage`; Tidy or any move clears it, because a moved tree has a new

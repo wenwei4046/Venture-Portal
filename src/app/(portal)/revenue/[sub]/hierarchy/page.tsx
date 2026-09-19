@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
+import { can } from '@/lib/permissions'
 import { revenuePath } from '@/lib/revenue'
 import { titleCanRecruit } from '@/lib/commission/titles'
 import { rankLabelOf, rankPayLabelOf } from '@/lib/commission/ranks'
@@ -11,6 +12,7 @@ import { loadTeam } from '../../_components/config/load'
 import type { TeamData } from '../../_components/config/types'
 import { listSubDepartments, type SubDepartment } from '../../_lib/sub-departments'
 import { loadMembershipDestinations } from '../../_lib/membership-destinations'
+import { loadEmployeeDepartmentDestinations } from '../../_lib/employee-destinations'
 
 interface PageProps {
   params: Promise<{ sub: string }>
@@ -36,7 +38,10 @@ interface PageProps {
  * so they are never among the `people` and the Team tab lists them apart.
  */
 export default async function StaffHierarchyPage({ params }: PageProps) {
-  await requirePermission('revenue')
+  const user = await requirePermission('revenue')
+  const canManageEmployment = can(user, 'team')
+  // Employment dates follow Malaysia's calendar, regardless of server timezone.
+  const employmentToday = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const { sub } = await params
   // The same authenticated/RLS-filtered list used by the sidebar. Only
   // siblings of this route belong on its overview, not another department.
@@ -53,7 +58,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       department.departmentId === subDept.departmentId && department.schemeId !== null,
   )
   const currentTeam = loadTeam(subDept.schemeId, { isHome: subDept.isHome, subDepartmentId: subDept.id })
-  const [team, departments, membershipDestinations] = await Promise.all([
+  const [team, departments, membershipDestinations, employeeDepartments] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
@@ -69,6 +74,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       }
     })),
     loadMembershipDestinations(subDepartments),
+    canManageEmployment ? loadEmployeeDepartmentDestinations() : Promise.resolve([]),
   ])
 
   return (
@@ -78,6 +84,9 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       departments={departments}
       team={team}
       membershipDestinations={membershipDestinations}
+      employeeDepartments={employeeDepartments}
+      canManageEmployment={canManageEmployment}
+      employmentToday={employmentToday}
     />
   )
 }

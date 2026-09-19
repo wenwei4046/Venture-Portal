@@ -5,6 +5,7 @@ import PersonContextMenu from './PersonContextMenu'
 
 const actions = vi.hoisted(() => ({ addMember: vi.fn(), changeMemberTitle: vi.fn() }))
 vi.mock('../../../hierarchy-actions', () => actions)
+vi.mock('../../../employee-actions', () => ({ moveEmployee: vi.fn(), removeEmployeeMembership: vi.fn(), terminateEmployee: vi.fn() }))
 
 const person = { staffId: 'mei', name: 'Mei Ting', titleId: 'specialist' as string | null, titleName: 'Revenue Specialist' }
 

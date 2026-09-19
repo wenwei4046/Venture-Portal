@@ -25,4 +25,11 @@
 .chevron { flex-shrink: 0; color: rgb(var(--muted)); font-size: 15px; }
 .hint { margin: 4px 0 0; padding: 7px 9px; border-top: 1px solid rgb(var(--hairline)); font-size: 11px; line-height: 1.5; color: rgb(var(--muted)); }
 .error { margin: 4px; padding: 8px; border-radius: 4px; background: rgb(var(--danger-bg)); color: rgb(var(--danger)); font-size: 12px; line-height: 1.5; }
+.confirmCopy { padding: 7px 9px; font-size: 12px; line-height: 1.5; color: rgb(var(--graphite)); overflow-wrap: anywhere; }
+.dateField { display: grid; gap: 6px; padding: 7px 9px; font-size: 12px; }
+.dateField input { min-width: 0; width: 100%; border: 1px solid rgb(var(--hairline)); border-radius: 4px; padding: 7px; background: rgb(var(--paper)); color: rgb(var(--ink)); }
+.dateField input:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 1px; }
+.menu button.danger { color: rgb(var(--danger)); }
+.menu button.danger:hover:not(:disabled), .menu button.danger:focus-visible { background: rgb(var(--danger-bg)); color: rgb(var(--danger)); }
+.menu button.danger:disabled { color: rgb(var(--muted)); }
 @media (pointer: coarse) { .menu button { min-height: 44px; } }

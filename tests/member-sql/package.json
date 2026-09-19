@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs",
+    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs",
     "test:director-reporting": "node validate-director-reporting.mjs",
-    "test:ir-specialist-downlines": "node validate-ir-specialist-downlines.mjs"
+    "test:ir-specialist-downlines": "node validate-ir-specialist-downlines.mjs",
+    "test:employee-chart-lifecycle": "node validate-employee-chart-lifecycle.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"
