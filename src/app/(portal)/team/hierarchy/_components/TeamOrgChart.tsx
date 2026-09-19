@@ -142,8 +142,10 @@ function Chart({
   onFocusDept: (department: string) => void
 }) {
   const router = useRouter()
-  const { getIntersectingNodes, setCenter, fitBounds, zoomIn, zoomOut } = useReactFlow()
+  const { getIntersectingNodes, setCenter, setViewport, fitBounds, zoomIn, zoomOut } = useReactFlow()
   const [flowReady, setFlowReady] = useState(false)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const [arrangementVersion, setArrangementVersion] = useState(0)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -298,12 +300,28 @@ function Chart({
       padding: 0.12, duration: 320,
     })
   }, [spaces.geometry, focusDept, fitBounds])
+  const showHorizontal = useCallback(() => {
+    const frames = spaces.geometry.departments.filter(department => focusDept === ALL_DEPARTMENTS || department.id === focusDept)
+    if (!frames.length) return
+    const bounds = boundsOf(frames.flatMap(frame => rectanglePoints(frame.bounds)))
+    const width = canvasRef.current?.clientWidth || 1100
+    const height = canvasRef.current?.clientHeight || 740
+    // Start at the left of the horizontal canvas at a readable size. Fitting
+    // all seven departments would reduce every card to a tiny thumbnail.
+    const zoom = Math.min(0.7, Math.max(0.45, (height - 64) / bounds.height))
+    void setViewport({
+      x: Math.max(32, (width - bounds.width * zoom) / 2) - bounds.x * zoom,
+      y: 32 - bounds.y * zoom,
+      zoom,
+    }, { duration: 320 })
+  }, [spaces.geometry, focusDept, setViewport])
   const fittedDepartment = useRef<string | null>(null)
   useEffect(() => {
-    if (!spaces.loaded || !flowReady || fittedDepartment.current === focusDept) return
-    fittedDepartment.current = focusDept
-    fitCompany()
-  }, [spaces.loaded, flowReady, focusDept, fitCompany])
+    const viewKey = `${focusDept}:${arrangementVersion}`
+    if (!spaces.loaded || !flowReady || fittedDepartment.current === viewKey) return
+    fittedDepartment.current = viewKey
+    showHorizontal()
+  }, [spaces.loaded, flowReady, focusDept, arrangementVersion, showHorizontal])
 
   const edges: Edge[] = useMemo(() => {
     // A line the ladder would refuse today — drawn after the ladder changed
@@ -444,7 +462,7 @@ function Chart({
   const centred = useRef<string | null>(null)
   useEffect(() => {
     if (!focused) { centred.current = null; return }
-    if (focused === centred.current || !spaces.loaded) return
+    if (!flowReady || focused === centred.current || !spaces.loaded) return
     const pos = spaces.positions.get(focused)
     if (!pos) return
     centred.current = focused
@@ -547,7 +565,7 @@ function Chart({
       <div className="space-toolbar">
         <div className="space-jumps" aria-label="Filter by department">
           <button type="button" onClick={() => {
-            if (focusDept === ALL_DEPARTMENTS) fitCompany()
+            if (focusDept === ALL_DEPARTMENTS) showHorizontal()
             else onFocusDept(ALL_DEPARTMENTS)
           }} aria-pressed={focusDept === ALL_DEPARTMENTS}>Whole company</button>
           {departmentDefinitions.map(department => <button
@@ -598,8 +616,10 @@ function Chart({
         ) : null}
       </div>
 
-          <button type="button" className="space-tidy" onClick={spaces.tidy}
-            title="Align members and separate overlapping teams; keep team locations">Tidy</button>
+          <button type="button" className="space-tidy" onClick={() => {
+            spaces.tidy()
+            setArrangementVersion(version => version + 1)
+          }} title="Arrange all departments and teams horizontally">Tidy</button>
           <div className="org-zoom">
             <button type="button" onClick={() => void zoomOut({ duration: 250 })} aria-label="Zoom out">−</button>
             <button type="button" className="lv" onClick={fitCompany} aria-label="Fit visible departments"><ZoomReadout /></button>
@@ -628,10 +648,10 @@ function Chart({
           ) : null}
           {pending ? ' · saving…' : ''}
         </p>
-        <span>{pending ? 'Saving reporting line…' : 'Magnetic layout · Free canvas'}</span>
+        <span>{pending ? 'Saving reporting line…' : 'Horizontal layout · Drag the canvas to explore'}</span>
       </div>
 
-      <div className={`org-canvas space-canvas${spaces.moving ? ' space-dragging' : ''}`}>
+      <div ref={canvasRef} className={`org-canvas space-canvas${spaces.moving ? ' space-dragging' : ''}`}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -654,7 +674,7 @@ function Chart({
           onNodeDragStop={onNodeDragStop}
           onNodeClick={(_e, node) => onFocus(focused === node.id ? null : node.id)}
           onConnect={onConnect}
-          minZoom={0.15}
+          minZoom={0.02}
           deleteKeyCode={null}
           maxZoom={1.7}
           panOnDrag={spaces.moving ? false : [0, 1]}

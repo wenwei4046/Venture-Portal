@@ -136,6 +136,101 @@ describe('geometryForSpaces and initialSpacePositions', () => {
   })
 })
 
+describe('horizontal initialSpacePositions', () => {
+  function company() {
+    const departments = Array.from({ length: 7 }, (_, index) => ({ id: `department-${index}`, name: `Department ${index}` }))
+    const members: SpaceMember[] = [
+      { ...member('wide-leader', departments[0].id, null, 'A wide team'), width: 360, height: 180 },
+      ...Array.from({ length: 5 }, (_, index) => ({
+        ...member(`wide-child-${index}`, departments[0].id, 'wide-leader'), width: 310 + index * 10, height: 140 + index * 20,
+      })),
+      { ...member('grandchild', departments[0].id, 'wide-child-2'), width: 280, height: 160 },
+      member('second-leader', departments[0].id, null, 'B second team'),
+      member('third-leader', departments[0].id, null, 'C third team'),
+      { ...member('tall-leader', departments[0].id, null, 'D tall team'), width: 280, height: 240 },
+      { ...member('tall-child', departments[0].id, 'tall-leader'), width: 320, height: 290 },
+      member('tall-grandchild', departments[0].id, 'tall-child'),
+      ...[1, 3, 4, 5].flatMap(index => [
+        member(`leader-${index}`, departments[index].id),
+        member(`child-${index}`, departments[index].id, `leader-${index}`),
+      ]),
+    ]
+    return { departments, members, teams: buildSpaceTeams(members) }
+  }
+
+  it('keeps seven departments and every team in top-aligned horizontal rows without overlaps', () => {
+    const { departments, members, teams } = company()
+    const positions = initialSpacePositions(departments, members, teams, 'horizontal')
+    const geometry = geometryForSpaces(departments, members, teams, positions)
+    expect(geometry.departments.map(department => department.id)).toEqual(departments.map(department => department.id))
+    expect(positions.size).toBe(members.length + departments.length)
+    for (const [index, department] of geometry.departments.entries()) {
+      expect(department.bounds.y).toBe(0)
+      expect(positions.get(departmentPositionKey(department.id))).toEqual({ x: department.bounds.x, y: 0 })
+      if (index > 0) {
+        const previous = geometry.departments[index - 1].bounds
+        expect(department.bounds.x - previous.x - previous.width).toBeCloseTo(SPACE_DEPARTMENT_GAP)
+      }
+      const contents = geometry.teams.filter(team => team.departmentId === department.id)
+      for (const [teamIndex, team] of contents.entries()) {
+        expect(team.bounds.y).toBe(contents[0].bounds.y)
+        if (teamIndex > 0) {
+          const previous = contents[teamIndex - 1].bounds
+          expect(team.bounds.x - previous.x - previous.width).toBeCloseTo(SPACE_TEAM_GAP)
+        }
+        for (const point of rectanglePoints(team.bounds)) expect(contains(department.bounds, point)).toBe(true)
+      }
+    }
+    const wide = geometry.teams.find(team => team.leaderId === 'wide-leader')!
+    expect(wide.bounds.width).toBeGreaterThan(1200)
+    expect(geometry.teams.filter(team => team.departmentId === departments[0].id)).toHaveLength(4)
+    for (const id of [departments[2].id, departments[6].id]) {
+      expect(geometry.teams.some(team => team.departmentId === id)).toBe(false)
+      const empty = geometry.departments.find(department => department.id === id)!
+      expect(empty.bounds.width).toBeGreaterThan(200)
+      expect(empty.bounds.height).toBeGreaterThan(100)
+    }
+    // Different measured card heights still reserve enough room for reports.
+    for (const person of members) {
+      const rectangle = { ...positions.get(person.id)!, width: person.width ?? NODE_WIDTH, height: person.height ?? NODE_HEIGHT }
+      const team = geometry.teams.find(team => team.memberIds.includes(person.id))!
+      for (const point of rectanglePoints(rectangle)) expect(contains(team.bounds, point)).toBe(true)
+      if (person.parentId) {
+        const parent = members.find(candidate => candidate.id === person.parentId)!
+        expect(rectangle.y - positions.get(parent.id)!.y - (parent.height ?? NODE_HEIGHT)).toBeGreaterThanOrEqual(40)
+      }
+    }
+  })
+
+  it('requires no overlap correction and preserves all input objects and reporting lines', () => {
+    const { departments, members, teams } = company()
+    const before = structuredClone({ departments, members, teams })
+    for (const department of departments) Object.freeze(department)
+    for (const person of members) Object.freeze(person)
+    for (const team of teams) { Object.freeze(team.memberIds); Object.freeze(team) }
+    Object.freeze(departments)
+    Object.freeze(members)
+    Object.freeze(teams)
+    const positions = initialSpacePositions(departments, members, teams, 'horizontal')
+    const snapshot = new Map([...positions].map(([id, point]) => [id, { ...point }]))
+    expect(resolveSpaceOverlaps(departments, members, teams, positions)).toEqual(positions)
+    expect(positions).toEqual(snapshot)
+    expect({ departments, members, teams }).toEqual(before)
+  })
+
+  it('preserves the existing wrapping grid unless horizontal arrangement is requested', () => {
+    const { departments, members, teams } = company()
+    const positions = initialSpacePositions(departments, members, teams)
+    expect(initialSpacePositions(departments, members, teams, 'grid')).toEqual(positions)
+    const geometry = geometryForSpaces(departments, members, teams, positions)
+    expect(geometry.departments[0].bounds.y).toBe(geometry.departments[1].bounds.y)
+    expect(geometry.departments[2].bounds.y).toBeGreaterThan(geometry.departments[0].bounds.y)
+    const contents = geometry.teams.filter(team => team.departmentId === departments[0].id)
+    expect(contents[1].bounds.y).toBeGreaterThan(contents[0].bounds.y)
+    expect(initialSpacePositions([], [], undefined, 'horizontal')).toEqual(new Map())
+  })
+})
+
 describe('alignSpaceTeams', () => {
   const members = [
     member('leader', 'fa'), member('alice', 'fa', 'leader'), member('bob', 'fa', 'leader'),

@@ -1,7 +1,9 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Connection, Node, ReactFlowProps } from '@xyflow/react'
+import type { Connection, Node, ReactFlowInstance, ReactFlowProps } from '@xyflow/react'
+import { layoutKey, readManualLayout, writeManualLayout } from '@/lib/commission/chart-layout-store'
+import { NODE_HEIGHT, NODE_WIDTH } from '@/lib/org-layout'
 import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 
 type PersonNode = Node<{ person: ChartPerson; invalidTarget: boolean; selected: boolean }>
@@ -71,10 +73,10 @@ function people(): ChartPerson[] {
   ]
 }
 
-function Chart({ roster = people(), initialDepartment = ALL_DEPARTMENTS }: {
-  roster?: ChartPerson[]; initialDepartment?: string
+function Chart({ roster = people(), initialDepartment = ALL_DEPARTMENTS, initialFocused = null }: {
+  roster?: ChartPerson[]; initialDepartment?: string; initialFocused?: string | null
 }) {
-  const [focused, setFocused] = useState<string | null>(null)
+  const [focused, setFocused] = useState<string | null>(initialFocused)
   const [department, setDepartment] = useState(initialDepartment)
   return <TeamOrgChart people={roster} commissionHref="/revenue/fair/hierarchy"
     focused={focused} onFocus={setFocused} focusDept={department} onFocusDept={setDepartment} />
@@ -94,6 +96,26 @@ function node(id: string): PersonNode {
 function connect(source: string, target: string) {
   const connection: Connection = { source, target, sourceHandle: null, targetHandle: null }
   act(() => flow().onConnect?.(connection))
+}
+
+function initializeFlow() {
+  act(() => flow().onInit?.(adapters.viewport as unknown as ReactFlowInstance<PersonNode>))
+}
+
+function frame(kind: 'department' | 'team', id: string) {
+  const element = document.querySelector<SVGRectElement>(`.space-${kind}[data-${kind}-id="${id}"]`)
+  expect(element, `${kind} frame ${id}`).not.toBeNull()
+  return {
+    x: Number(element!.getAttribute('x')), y: Number(element!.getAttribute('y')),
+    width: Number(element!.getAttribute('width')), height: Number(element!.getAttribute('height')),
+  }
+}
+
+function dragGroup(handle: HTMLElement, dx: number, dy: number) {
+  const start = { pointerId: 9, pointerType: 'mouse', button: 0, clientX: 400, clientY: 300 }
+  fireEvent.pointerDown(handle, start)
+  fireEvent.pointerMove(handle, { ...start, clientX: start.clientX + dx, clientY: start.clientY + dy })
+  fireEvent.pointerUp(handle, { ...start, clientX: start.clientX + dx, clientY: start.clientY + dy })
 }
 
 beforeEach(() => {
@@ -191,8 +213,108 @@ describe('company hierarchy reporting rules', () => {
 })
 
 describe('company hierarchy grouped canvas', () => {
+  it('opens a wide horizontal company at a readable zoom from its left edge', () => {
+    const roster = people().concat(Array.from({ length: 8 }, (_, index) =>
+      person(`branch-${index}`, `Branch manager ${index}`, { department: `Branch ${index}` })))
+    render(<Chart roster={roster} />)
+    const canvas = document.querySelector('.space-canvas')!
+    Object.defineProperty(canvas, 'clientWidth', { value: 900, configurable: true })
+    Object.defineProperty(canvas, 'clientHeight', { value: 700, configurable: true })
+    initializeFlow()
+    expect(adapters.viewport.setViewport).toHaveBeenCalled()
+    const viewport = adapters.viewport.setViewport.mock.calls.at(-1)![0] as { x: number; y: number; zoom: number }
+    const departments = [...document.querySelectorAll<SVGRectElement>('.space-department')]
+    const left = Math.min(...departments.map(element => Number(element.getAttribute('x'))))
+    const right = Math.max(...departments.map(element => Number(element.getAttribute('x')) + Number(element.getAttribute('width'))))
+    expect(viewport.zoom).toBeGreaterThanOrEqual(0.45)
+    expect(viewport.zoom).toBeLessThanOrEqual(0.7)
+    expect(viewport.x + left * viewport.zoom).toBeCloseTo(32)
+    expect(viewport.x + right * viewport.zoom).toBeGreaterThan(900)
+  })
+
+  it('centers an initially selected far-right person after initializing the default company view', () => {
+    const roster = people().concat(Array.from({ length: 8 }, (_, index) =>
+      person(`branch-${index}`, `Branch manager ${index}`, { department: `Branch ${index}` })))
+    render(<Chart roster={roster} initialFocused="yuny" />)
+    expect(adapters.viewport.setCenter).not.toHaveBeenCalled()
+    initializeFlow()
+    const selected = node('yuny')
+    expect(selected.position.x).toBeGreaterThan(3000)
+    expect(adapters.viewport.setViewport).toHaveBeenCalled()
+    expect(adapters.viewport.setCenter).toHaveBeenLastCalledWith(
+      selected.position.x + NODE_WIDTH / 2,
+      selected.position.y + NODE_HEIGHT / 2,
+      expect.objectContaining({ zoom: 1 }),
+    )
+    expect(adapters.viewport.setCenter.mock.invocationCallOrder.at(-1))
+      .toBeGreaterThan(adapters.viewport.setViewport.mock.invocationCallOrder.at(-1)!)
+  })
+
+  it('starts every department and its teams side by side on one top-aligned row', () => {
+    render(<Chart roster={people().concat(person('daniel', 'Daniel'), person('elise', 'Elise'))} />)
+    const departments = ['Finance', 'HR', 'Revenue'].map(id => frame('department', id))
+    for (let index = 1; index < departments.length; index++) {
+      expect(departments[index].y).toBe(departments[0].y)
+      expect(departments[index].x).toBeGreaterThan(departments[index - 1].x + departments[index - 1].width)
+    }
+    const teams = ['alice', 'cara', 'daniel', 'elise'].map(id => frame('team', `team:Finance:${id}`))
+    for (let index = 1; index < teams.length; index++) {
+      expect(teams[index].y).toBe(teams[0].y)
+      expect(teams[index].x).toBeGreaterThan(teams[index - 1].x + teams[index - 1].width)
+    }
+  })
+
+  it('ignores saved vertical layouts from v1 and stores the fresh horizontal arrangement in v2', () => {
+    writeManualLayout(window.localStorage, 'company.spaces.v1', new Map(people().map((member, index) => [
+      member.id, { x: 7000, y: 5000 + index * 500 },
+    ])))
+    render(<Chart />)
+    const top = frame('department', 'Finance').y
+    expect(frame('department', 'HR').y).toBe(top)
+    expect(frame('department', 'Revenue').y).toBe(top)
+    expect(node('alice').position.x).toBeLessThan(7000)
+    expect(node('alice').position.y).toBeLessThan(5000)
+    expect(window.localStorage.getItem(layoutKey('company.spaces.v2.horizontal'))).not.toBeNull()
+    expect(readManualLayout(window.localStorage, 'company.spaces.v2.horizontal').get('alice'))
+      .toEqual(node('alice').position)
+  })
+
+  it('Tidy restores the horizontal arrangement after departments and teams are dragged vertically', () => {
+    render(<Chart />)
+    const defaults = new Map(flow().nodes!.map(item => [item.id, { ...item.position }]))
+    const edges = JSON.stringify(flow().edges)
+    dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), 0, 200)
+    dragGroup(screen.getByRole('button', { name: /Alice team: drag to move team/i }), 0, 100)
+    expect(node('alice').position.y).toBeGreaterThan(defaults.get('alice')!.y)
+    fireEvent.click(screen.getByRole('button', { name: 'Tidy' }))
+    for (const [id, point] of defaults) expect(node(id).position).toEqual(point)
+    expect(frame('department', 'Revenue').y).toBe(frame('department', 'Finance').y)
+    expect(JSON.stringify(flow().edges)).toBe(edges)
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+    expect(readManualLayout(window.localStorage, 'company.spaces.v2.horizontal').get('alice'))
+      .toEqual(defaults.get('alice'))
+  })
+
+  it('measured card heights preserve a manually moved group while reserving room for its reports', () => {
+    render(<Chart />)
+    dragGroup(screen.getByRole('button', { name: /Finance: drag to move department/i }), 0, 200)
+    const leader = { ...node('alice').position }
+    const teamTop = frame('team', 'team:Finance:alice').y
+    const childBefore = { ...node('ben').position }
+    const measuredHeight = NODE_HEIGHT + 80
+    act(() => flow().onNodesChange?.([{
+      type: 'dimensions', id: 'alice', dimensions: { width: NODE_WIDTH, height: measuredHeight },
+    }]))
+    expect(node('alice').position).toEqual(leader)
+    expect(frame('team', 'team:Finance:alice').y).toBe(teamTop)
+    expect(node('ben').position.y).toBeGreaterThan(childBefore.y)
+    expect(node('ben').position.y).toBeGreaterThan(leader.y + measuredHeight)
+    expect(adapters.setReportsTo).not.toHaveBeenCalled()
+  })
+
   it('finds a person outside the focused department and reveals their card', async () => {
     render(<Chart initialDepartment="Finance" />)
+    initializeFlow()
     expect(screen.queryByTestId('node:yuny')).toBeNull()
     const search = screen.getByRole('searchbox')
     fireEvent.change(search, { target: { value: 'Yuny' } })
@@ -249,6 +371,9 @@ describe('company hierarchy grouped canvas', () => {
     const view = render(<Chart />)
     fireEvent.keyDown(screen.getByRole('button', { name: /Alice team: drag to move team/i }), { key: 'ArrowLeft' })
     const arranged = { ...node('alice').position }
+    fireEvent.click(screen.getByTestId('node:alice'))
+    expect(node('alice').data.selected).toBe(true)
+    expect(node('alice').position).toEqual(arranged)
     fireEvent.click(screen.getByRole('button', { name: 'Revenue' }))
     expect(screen.queryByTestId('node:alice')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Whole company' }))

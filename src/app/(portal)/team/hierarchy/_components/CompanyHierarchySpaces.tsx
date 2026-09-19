@@ -10,7 +10,8 @@ import {
   type SpaceAnchor, type SpaceDepartment, type SpaceMember,
 } from '@/lib/hierarchy-space-layout'
 
-const STORAGE_NAMESPACE = 'company.spaces.v1'
+// The previous two-column layout must not override the new horizontal default.
+const STORAGE_NAMESPACE = 'company.spaces.v2.horizontal'
 const layoutStorage = () => { try { return window.localStorage } catch { return null } }
 type Dimensions = { id: string; width: number; height: number }
 type GroupDrag = {
@@ -83,7 +84,7 @@ export function useCompanyHierarchySpaces(
     const currentIds = new Set(value.members.map(member => member.id))
     for (const id of dimensions.current.keys()) if (!currentIds.has(id)) dimensions.current.delete(id)
     const measured = measuredMembers()
-    const next = initialSpacePositions(value.departments, measured, value.teams)
+    const next = initialSpacePositions(value.departments, measured, value.teams, 'horizontal')
     const remembered = initializedModel.current === null
       ? readManualLayout(layoutStorage(), STORAGE_NAMESPACE) : positionsRef.current
     for (const [id, point] of remembered) if (next.has(id)) next.set(id, point)
@@ -117,8 +118,9 @@ export function useCompanyHierarchySpaces(
   }, [measuredMembers, publish])
   const tidy = useCallback(() => {
     cancelGroup()
-    arrange(undefined, true)
-  }, [arrange, cancelGroup])
+    const value = model.current
+    publish(initialSpacePositions(value.departments, measuredMembers(), value.teams, 'horizontal'), true)
+  }, [cancelGroup, measuredMembers, publish])
   const updateDimensions = useCallback((updates: Dimensions[]) => {
     const ids = new Set(model.current.members.map(member => member.id))
     let changed = false
