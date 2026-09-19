@@ -108,8 +108,8 @@ export default function HierarchyView({
               </>
             ) : (
               <>
-                Explore the company by department and team. Drag a team or department heading
-                or border to arrange the canvas, and use Tidy to align its members. Move a person
+                Explore departments and teams from left to right. Drag the canvas to browse,
+                move group headings or borders freely, and use Tidy to restore the horizontal layout. Move a person
                 onto their manager or draw a reporting line to change who they report to.
                 Search a name to find where somebody sits.
               </>

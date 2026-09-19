@@ -386,11 +386,16 @@ export function alignSpaceTeams(
   return next
 }
 
-/** A readable starting layout; later collision resolution never calls this reset. */
+/**
+ * A readable starting layout; later collision resolution never calls this reset.
+ * Horizontal canvases keep departments and their teams on one row each, while
+ * reporting trees retain their top-down rows. Revenue keeps the default grid.
+ */
 export function initialSpacePositions(
   departments: readonly SpaceDepartment[],
   members: readonly SpaceMember[],
   teams: readonly SpaceTeam[] = buildSpaceTeams(members),
+  arrangement: 'grid' | 'horizontal' = 'grid',
 ): Map<string, Point> {
   const positions = new Map<string, Point>()
   const byId = new Map(members.map(member => [member.id, member]))
@@ -406,7 +411,7 @@ export function initialSpacePositions(
       for (const [id, point] of canonicalTeamPositions(team, byId)) positions.set(id, point)
       const shape = teamGeometry(team, byId, positions)
       if (!shape) continue
-      if (rowCount >= 2 || (rowCount > 0 && cursorX + shape.bounds.width > 1200)) {
+      if (arrangement === 'grid' && (rowCount >= 2 || (rowCount > 0 && cursorX + shape.bounds.width > 1200))) {
         cursorX = 0
         cursorY += rowHeight + SPACE_TEAM_GAP
         rowHeight = 0
@@ -427,10 +432,11 @@ export function initialSpacePositions(
   }
 
   let rowY = 0
-  for (let index = 0; index < departmentList.length; index += 2) {
+  const departmentsPerRow = arrangement === 'horizontal' ? Math.max(1, departmentList.length) : 2
+  for (let index = 0; index < departmentList.length; index += departmentsPerRow) {
     let columnX = 0
     let rowHeight = 0
-    for (const department of departmentList.slice(index, index + 2)) {
+    for (const department of departmentList.slice(index, index + departmentsPerRow)) {
       const bounds = departmentSizes.get(department.id)!
       translatePositions(positions, members.filter(member => member.departmentId === department.id).map(member => member.id), {
         x: columnX - bounds.x, y: rowY - bounds.y,
