@@ -21,11 +21,13 @@ import {
 } from '@/lib/hierarchy-space-layout'
 import { moveOnChart } from '../../../hierarchy-actions'
 import MovePopover, { subjectOf, type PopAnchor } from './MovePopover'
-import HierarchyPersonCard, { UplineContext, type PersonNode } from './HierarchyPersonCard'
+import HierarchyPersonCard, { PersonMenuContext, UplineContext, type PersonNode } from './HierarchyPersonCard'
+import PersonContextMenu from './PersonContextMenu'
+import type { MembershipDestination } from '../../../_lib/membership-destinations'
 import { membershipKey, type OrgDepartment, type OrgDirector } from './org-chart-types'
 import { useHierarchyCamera } from './useHierarchyCamera'
 
-interface Props { departments: OrgDepartment[]; initialDepartmentId?: string }
+interface Props { departments: OrgDepartment[]; initialDepartmentId?: string; membershipDestinations?: MembershipDestination[] }
 type ReportingEdge = Edge<{ fresh?: boolean }, 'line'>
 type DropTarget = { id: string; reason: string | null; armed: boolean; unchanged: boolean }
 type ArrangeOptions = { keepVisible?: boolean; alignMembers?: boolean; origin?: ManualLayout }
@@ -45,7 +47,7 @@ export default function HierarchySpaces(props: Props) {
   return <ReactFlowProvider><SpaceChart {...props} /></ReactFlowProvider>
 }
 
-function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Props) {
+function SpaceChart({ departments: serverDepartments, initialDepartmentId, membershipDestinations = [] }: Props) {
   const { fitBounds, setCenter, getZoom, zoomIn, zoomOut, screenToFlowPosition } = useReactFlow()
   const camera = useHierarchyCamera()
   const { interrupt: interruptCamera, makeRoom, followTransfer } = camera
@@ -74,6 +76,8 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
   const [note, setNote] = useState<string | null>(null)
   const [find, setFind] = useState('')
   const [popover, setPopover] = useState<{ id: string; anchor: PopAnchor } | null>(null)
+  const [personMenu, setPersonMenu] = useState<{ id: string; anchor: PopAnchor; startAtDepartments?: boolean } | null>(null)
+  const menuTrigger = useRef<HTMLElement | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const dropTargetRef = useRef<DropTarget | null>(null)
@@ -579,8 +583,27 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
     if (connection.source && connection.target) move(connection.target, connection.source)
   }, [move])
   const openUpline = useCallback((id: string, anchor: PopAnchor) => {
+    setPersonMenu(null)
     setPopover(current => current?.id === id ? null : { id, anchor })
   }, [])
+  const openPersonMenu = useCallback((id: string, anchor: PopAnchor) => {
+    menuTrigger.current = document.activeElement as HTMLElement | null
+    setSelected(id)
+    setPopover(null)
+    setPersonMenu({ id, anchor })
+  }, [])
+  const closePersonMenu = useCallback(() => {
+    setPersonMenu(null)
+    menuTrigger.current?.focus({ preventScroll: true })
+  }, [])
+  const beginAdd = (id: string, button: HTMLButtonElement) => {
+    const rect = button.getBoundingClientRect()
+    menuTrigger.current = button
+    setPopover(null)
+    setError(null)
+    setNote(null)
+    setPersonMenu({ id, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom }, startAtDepartments: true })
+  }
   const reveal = useCallback((id: string) => {
     const point = positions.current.get(id), record = byId.get(id)
     if (!point || !record) return
@@ -602,6 +625,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
   }), [records, byId, fresh])
   const selectedRecord = selected ? byId.get(selected) : undefined
   const mover = popover ? byId.get(popover.id) : undefined
+  const menuPerson = personMenu ? byId.get(personMenu.id) : undefined
   const distinctPeople = new Set(records.map(record => record.person.staffId)).size
   const directorCount = railDirectors.length
   // At the top of a tree the footer names who the leader reports to.
@@ -624,7 +648,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
           clearDropTarget()
           glide(dragSession.current.origin, [dragSession.current.id])
         }
-        setSelected(null); setPopover(null)
+        setSelected(null); setPopover(null); setPersonMenu(null)
       }
       if (/^[0-9]$/.test(event.key)) {
         const index = Number(event.key) - 1
@@ -664,14 +688,15 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
         </div>
       </div>
       <div className="space-overview"><span>{distinctPeople} people · {records.length} memberships · {teams.length} teams{directorCount ? ` · ${directorCount} director${directorCount === 1 ? '' : 's'}` : ''}</span><span>{pending ? 'Saving upline…' : 'Magnetic layout · Free canvas'}</span></div>
+      <PersonMenuContext.Provider value={openPersonMenu}>
       <UplineContext.Provider value={openUpline}>
         <div ref={camera.canvas} onPointerDownCapture={interruptCamera} onWheelCapture={interruptCamera}
           className={`org-canvas space-canvas${movingDepartment || movingTeam ? ' space-dragging' : ''}`}>
           <ReactFlow<PersonNode, ReportingEdge>
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
             onNodesChange={onNodesChange} onNodeDragStart={onNodeDragStart} onNodeDrag={onNodeDrag} onNodeDragStop={onNodeDragStop}
-            onNodeClick={(_event, node) => { if (performance.now() >= suppressClick.current) setSelected(node.id) }}
-            onPaneClick={() => { setSelected(null); setPopover(null) }} onConnect={onConnect}
+            onNodeClick={(_event, node) => { if (performance.now() >= suppressClick.current) { setSelected(node.id); setPersonMenu(null) } }}
+            onPaneClick={() => { setSelected(null); setPopover(null); setPersonMenu(null) }} onConnect={onConnect}
             minZoom={0.15} maxZoom={1.7} panOnDrag={movingDepartment || movingTeam ? false : [0, 1]}
             zoomOnScroll={!movingDepartment && !movingTeam} zoomOnPinch={!movingDepartment && !movingTeam}
             deleteKeyCode={null} nodesDraggable={!pending} nodesConnectable={!pending} elementsSelectable
@@ -764,6 +789,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
           </div> : null}
         </div>
       </UplineContext.Provider>
+      </PersonMenuContext.Provider>
       <div className="space-footer" aria-live="polite">
         <div>
           <strong>{selectedRecord ? `${selectedRecord.person.name} · ${selectedRecord.department.name}` : 'Sub-department → Team → Member'}</strong>
@@ -772,12 +798,17 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId }: Pro
         {selectedRecord ? <div className="space-memberships" aria-label="This person's other memberships">
           {records.filter(record => record.person.staffId === selectedRecord.person.staffId && record.id !== selectedRecord.id).map(record =>
             <button type="button" key={record.id} onClick={() => reveal(record.id)}>{record.department.name} · {record.person.titleName ?? 'No title'} ↗</button>)}
+          <button type="button" disabled={pending} aria-haspopup="menu" onClick={event => beginAdd(selectedRecord.id, event.currentTarget)}>Add to department</button>
           <button type="button" disabled={pending} data-org-open onClick={event => {
             const rect = event.currentTarget.getBoundingClientRect()
             openUpline(selectedRecord.id, { left: rect.left, top: rect.top, bottom: rect.bottom })
           }}>Change upline</button>
         </div> : null}
       </div>
+      {personMenu && menuPerson ? <PersonContextMenu key={`${personMenu.id}:${personMenu.anchor.left}:${personMenu.anchor.top}:${!!personMenu.startAtDepartments}`}
+        person={menuPerson.person} sourceSchemeId={menuPerson.department.schemeId} destinations={membershipDestinations} anchor={personMenu.anchor} startAtDepartments={personMenu.startAtDepartments}
+        onClose={closePersonMenu} onAdded={message => { closePersonMenu(); setError(null); setNote(message) }}
+        onUpline={() => { const current = personMenu; closePersonMenu(); openUpline(current.id, current.anchor) }} /> : null}
       {popover && mover ? <MovePopover key={popover.id} mover={mover.person} people={mover.department.people}
         graph={mover.department.people.map(person => ({ id: person.staffId, parentId: person.uplineStaffId, label: person.name }))}
         directorNames={sortHeads(mover.department.directors ?? []).map(director => director.name)}

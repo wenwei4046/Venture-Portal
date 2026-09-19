@@ -5,6 +5,7 @@ import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 import OrgChart, { type OrgDepartment } from './OrgChart'
 import TeamTable from './TeamTable'
 import type { TeamData } from '../../../_components/config/types'
+import type { MembershipDestination } from '../../../_lib/membership-destinations'
 
 export type HierarchyTab = 'chart' | 'team'
 
@@ -30,14 +31,17 @@ export default function HierarchyTabs({
   schemeId,
   team,
   departments,
+  membershipDestinations,
 }: {
   subDept: { name: string; slug: string; isHome: boolean }
   schemeId: string
   team: TeamData
   departments: OrgDepartment[]
+  membershipDestinations: MembershipDestination[]
 }) {
   const searchParams = useSearchParams()
   const tab: HierarchyTab = searchParams.get('tab') === 'team' ? 'team' : 'chart'
+  const currentDestination = membershipDestinations.find(destination => destination.schemeId === schemeId)
 
   const tabs: TabItem[] = [
     { key: 'chart', label: 'Hierarchy' },
@@ -84,7 +88,8 @@ export default function HierarchyTabs({
                 leader and standalone member reports to them — a reporting line only, with no
                 override. Drag a team or department border or
                 heading to move it freely. Hold over a person until the transfer prompt appears
-                to change upline. The Team tab edits {subDept.name}.
+                to change upline. Right-click a person to add them to another department.
+                The Team tab edits {subDept.name}.
               </>
             )}
           </p>
@@ -98,18 +103,19 @@ export default function HierarchyTabs({
           people={team.people}
           ranks={team.ranks}
           titles={team.titles}
-          candidates={team.candidates}
+          candidates={team.candidates.filter(person => currentDestination?.eligibleStaffIds.includes(person.staff_id))}
           directors={team.directors}
           directorCandidates={team.directorCandidates}
           subDepartmentId={team.subDepartmentId}
           schemeId={schemeId}
           subDeptName={subDept.name}
           isHome={subDept.isHome}
+          membershipDestinations={membershipDestinations}
         />
       ) : departments.length === 0 ? (
         <NobodyYet isHome={subDept.isHome} />
       ) : (
-        <OrgChart departments={departments} initialDepartmentId={departments.find(department => department.schemeId === schemeId)?.id} />
+        <OrgChart departments={departments} membershipDestinations={membershipDestinations} initialDepartmentId={departments.find(department => department.schemeId === schemeId)?.id} />
       )}
     </div>
   )

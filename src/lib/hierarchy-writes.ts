@@ -539,6 +539,11 @@ export async function openMembership(
     effective_from: currentPeriodStart(),
     created_by: userId,
   })
+  // The exclusion constraint is the final authority when two add dialogs
+  // submit together after both have read an empty destination membership.
+  if (error?.code === '23P01') {
+    return { ok: false, reason: 'They already have a membership covering this period in this sub-department. Refresh to see the latest membership.' }
+  }
   if (error) return { ok: false, reason: safeReason(error) }
   return { ok: true }
 }

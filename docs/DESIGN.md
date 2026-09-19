@@ -583,6 +583,22 @@ the artifact is linked from the project memory. Everything below lives in
 | `.space-director` (+ `.space-rail-label`, `.org-card .oc-role`, `.space-director-line`, `.space-director-bus`, `.space-director-dot`, `.space-department-heading .space-heads`) | The Revenue Director layer (2026-09-11), drawn since 2026-09-12 as a **rail** (design A of the Director Line artifact): every director ONCE, A→Z, in one row above all the sub-department frames, centred over their union, 48 px above the highest frame (`directorRail` in `lib/hierarchy-space-layout.ts`; cards `SPACE_DIRECTOR_X_GAP` 24 apart), under the label `REVENUE DIRECTORS · REPORTING ONLY` in the canvas's mono caps. Same family as a member card — name, `no rank` where the rank chip sits, the title badge and the top border in the `head` tone — but the last row reads **`Directs · Fair · IR`** (every sub-department they direct) in the slot a member's Upline button occupies, and it is HTML in the viewport portal, not a node: nothing can be dropped on it, it takes no upline, it stands where the frames put it and re-centres as they are dragged. From its bottom edge one **dashed** line per sub-department it directs: a drop (`.space-director-line`) to a bus 24 px below the cards, the bus (`.space-director-bus`, one per frame — two directors of one frame join on the same bar and share one landing) across to the frame's top-centre and down to its **top edge**, where a dot (`.space-director-dot`, r 3.5, `--cv-line`) lands. A director's lines leave the card 50 px apart, and a bar within 64 px of another takes a level 18 px higher (PETER's line to IR); nothing is drawn inside the frame, so no line can cross a team. The frame's header gains `Reports to KRIS · PETER` (`.space-heads`, mono-caps key), and a leader's own last row still reads `Reports to · KRIS · PETER` (italic, the `top` style) instead of `Top of team` | The head of a department, above every frame they direct. Never for anybody with a rank |
 | Motion | Cards rise in one after another when the chart opens (`.org-canvas.enter`, `--i` per card); a re-layout glides through the node state over 500 ms with an overshoot so the edges follow the cards; the line a move just made draws itself (`pathLength="1"` + `.react-flow__edge.fresh`); Fit / Centre / ± animate; the note and selection bar slide in (`.org-slide`). All off under `prefers-reduced-motion` | — |
 
+**Membership context menu (2026-09-19).** `PersonContextMenu` uses compact,
+portalled paper menus: 13px Inter, surface background, hairline border, 8px
+corners and the small dropdown shadow. `Add to department ›` expands beside
+the right-click menu, listing sub-departments under their main department's
+name. Existing memberships remain visible and disabled. Choosing a destination
+adds the person with the title held on the source card; there is no title picker
+or promotion in this shortcut. The server reads that source title again when
+saving. A missing current title or a destination without that title on its
+ladder is disabled with a reason. Hover and click both open the department
+submenu, but hover never saves. There is no scrim or modal.
+Panels flip left and clamp vertically at window edges; if neither side fits,
+the child replaces its parent in place with a Back row. Arrow keys navigate,
+Right opens, Left/Escape goes back one level, and outside click dismisses the
+whole menu. Team-row and selection-bar buttons open the same destination menu
+at their own button. Original memberships are retained.
+
 Two rules the canvas keeps that the rest of the page does not: a card dropped
 on empty ground **stays there** (remembered per browser and scheme in
 `localStorage`; Tidy or any move clears it, because a moved tree has a new

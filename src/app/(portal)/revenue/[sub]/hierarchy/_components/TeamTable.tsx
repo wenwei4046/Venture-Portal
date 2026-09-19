@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { earnedFloor } from '@/lib/commission/titles'
 import { rankLabelOf } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
 import { headsLabel } from '@/lib/department-heads'
 import { addMember, removeMember, setStaffRank, updateStaffTax, type RankOutcome } from '../../../hierarchy-actions'
 import DirectorsSection from './DirectorsSection'
+import PersonContextMenu from './PersonContextMenu'
+import type { PopAnchor } from './MovePopover'
+import type { MembershipDestination } from '../../../_lib/membership-destinations'
 import {
   ActionForm,
   Choice,
@@ -68,6 +71,7 @@ export default function TeamTable({
   schemeId,
   subDeptName,
   isHome,
+  membershipDestinations = [],
 }: {
   people: SalespersonRow[]
   ranks: RankRow[]
@@ -79,8 +83,15 @@ export default function TeamTable({
   schemeId: string
   subDeptName: string
   isHome: boolean
+  membershipDestinations?: MembershipDestination[]
 }) {
   const [note, setNote] = useState<RankOutcome | null>(null)
+  const [addingMember, setAddingMember] = useState<{ person: SalespersonRow; anchor: PopAnchor } | null>(null)
+  const menuTrigger = useRef<HTMLButtonElement | null>(null)
+  const closeMembershipMenu = () => {
+    setAddingMember(null)
+    menuTrigger.current?.focus({ preventScroll: true })
+  }
   const nameOf = new Map(people.map(p => [p.staff_id, p.employee_name]))
   // Who the top of a tree reports to: the sub-department's directors, A→Z.
   const reportsTo = headsLabel(directors.map(d => d.employee_name))
@@ -123,6 +134,7 @@ export default function TeamTable({
     <section>
       {note?.note ? (
         <div
+          role={note.ok ? 'status' : 'alert'}
           className={`rounded-md p-3 mb-4 text-sm font-sans border ${
             note.ok ? 'bg-accent-bg border-accent-border text-accent' : 'bg-danger-bg border-danger/50 text-danger'
           }`}
@@ -232,7 +244,7 @@ export default function TeamTable({
                 <th className="w-44">Rate mode</th>
                 <th>Upline</th>
                 <th className="w-40">Withholding</th>
-                {!isHome ? <th className="w-24" /> : null}
+                <th>Membership</th>
               </tr>
             </thead>
             <tbody>
@@ -360,8 +372,16 @@ export default function TeamTable({
                         )}
                       </ActionForm>
                     </td>
-                    {!isHome ? (
-                      <td>
+                    <td>
+                      <button type="button" className="text-xs text-accent hover:underline whitespace-nowrap"
+                        aria-label={`Add ${p.employee_name} to department`} aria-haspopup="menu"
+                        onClick={event => {
+                          const rect = event.currentTarget.getBoundingClientRect()
+                          menuTrigger.current = event.currentTarget
+                          setNote(null)
+                          setAddingMember({ person: p, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom } })
+                        }}>Add to department</button>
+                      {!isHome ? (
                         <RowForm action={removeMember} onDone={done} confirm={`Remove ${p.employee_name} from ${subDeptName}?`}>
                           {({ pending }) => (
                             <>
@@ -371,8 +391,8 @@ export default function TeamTable({
                             </>
                           )}
                         </RowForm>
-                      </td>
-                    ) : null}
+                      ) : null}
+                    </td>
                   </tr>
                 )
               })}
@@ -380,6 +400,10 @@ export default function TeamTable({
           </table>
         </div>
       )}
+      {addingMember ? <PersonContextMenu key={addingMember.person.staff_id} sourceSchemeId={schemeId} startAtDepartments anchor={addingMember.anchor}
+        person={{ staffId: addingMember.person.staff_id, name: addingMember.person.employee_name, titleId: addingMember.person.title_id }}
+        destinations={membershipDestinations} onClose={closeMembershipMenu}
+        onAdded={message => { closeMembershipMenu(); setNote({ ok: true, note: message }) }} /> : null}
     </section>
   )
 }

@@ -6,12 +6,14 @@ import { NODE_HEIGHT, NODE_WIDTH } from '@/lib/org-layout'
 import { readManualLayout } from '@/lib/commission/chart-layout-store'
 import type { PersonNode } from './HierarchyPersonCard'
 import type { OrgDepartment, OrgPerson } from './org-chart-types'
+import type { MembershipDestination } from '../../../_lib/membership-destinations'
 import HierarchySpaces from './HierarchySpaces'
 
 type FlowProps = ReactFlowProps<PersonNode>
 const adapters = vi.hoisted(() => ({
   flow: null as FlowProps | null,
   move: vi.fn(),
+  add: vi.fn(),
   router: { refresh: vi.fn() },
   viewport: {
     fitBounds: vi.fn(), setCenter: vi.fn(), getZoom: () => 0.5,
@@ -22,7 +24,7 @@ const adapters = vi.hoisted(() => ({
 }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => adapters.router }))
-vi.mock('../../../hierarchy-actions', () => ({ moveOnChart: adapters.move }))
+vi.mock('../../../hierarchy-actions', () => ({ moveOnChart: adapters.move, addMemberWithCurrentTitle: adapters.add }))
 vi.mock('@xyflow/react', async importOriginal => {
   const actual = await importOriginal<typeof import('@xyflow/react')>()
   return {
@@ -65,9 +67,9 @@ function departments(): OrgDepartment[] {
       id: 'fa', name: 'Fair', slug: 'fair', schemeId: 'fa-scheme', isHome: true, ranks: [],
       people: [
         person('anthony', 'Anthony'),
-        person('yuny', 'Yuny', { uplineStaffId: 'anthony', titleName: 'Team Assistant', levelRank: 3 }),
+        person('yuny', 'Yuny', { uplineStaffId: 'anthony', titleName: 'Team Assistant', titleId: 'assistant', levelRank: 3 }),
         person('chea', 'Chea Huan'),
-        person('howard', 'Howard', { uplineStaffId: 'chea', titleName: 'Revenue Specialist', levelRank: 2, canRecruit: false }),
+        person('howard', 'Howard', { uplineStaffId: 'chea', titleName: 'Revenue Specialist', titleId: 'specialist', levelRank: 2, canRecruit: false }),
       ],
     },
     {
@@ -79,6 +81,20 @@ function departments(): OrgDepartment[] {
       ],
     },
   ]
+}
+
+function membershipDestinations(): MembershipDestination[] {
+  return departments().map(department => ({
+    subDepartmentId: department.id, name: department.name, slug: department.slug,
+    departmentId: 'revenue', departmentName: 'Revenue', schemeId: department.schemeId,
+    isHome: department.isHome, titles: [
+      { id: 'leader', name: 'Team Leader' }, { id: 'assistant', name: 'Team Assistant' },
+      { id: 'specialist', name: 'Revenue Specialist' },
+    ],
+    memberStaffIds: department.people.map(member => member.staffId),
+    eligibleStaffIds: ['anthony', 'yuny', 'chea', 'howard', 'rachael', 'lawrence'],
+    unavailableReason: null,
+  }))
 }
 
 function flow(): FlowProps {
@@ -146,6 +162,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   adapters.flow = null
   adapters.move.mockResolvedValue({ ok: true })
+  adapters.add.mockResolvedValue({ ok: true, note: null })
   window.localStorage.clear()
   vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
     matches: query === '(prefers-reduced-motion: reduce)', media: query, onchange: null,
@@ -562,6 +579,101 @@ describe('HierarchySpaces explicit upline edits', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('You do not have permission to change this hierarchy.')
     expect(adapters.router.refresh).not.toHaveBeenCalled()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
+describe('HierarchySpaces department membership actions', () => {
+  it('adds the right-clicked person to a destination without editing their original membership or upline', async () => {
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
+    const original = { ...node('fa-scheme:yuny').data.person }
+    const card = screen.getByTestId('node:fa-scheme:yuny').querySelector('.org-card')!
+    fireEvent.contextMenu(card, { clientX: 320, clientY: 200 })
+
+    const menu = screen.getByRole('menu', { name: 'Actions for Yuny' })
+    expect(within(menu).getByRole('menuitem', { name: 'Change upline' })).toBeEnabled()
+    expect(adapters.move).not.toHaveBeenCalled()
+    expect(adapters.add).not.toHaveBeenCalled()
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Add to department/ }))
+
+    const destinations = screen.getByRole('menu', { name: 'Add Yuny to department' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(destinations).getByRole('menuitem', { name: 'Fair' })).toBeDisabled()
+    expect(within(destinations).getByRole('menuitem', { name: 'IR' })).toHaveTextContent('Team Assistant')
+    expect(screen.queryByRole('menuitem', { name: 'Team Leader' })).not.toBeInTheDocument()
+    fireEvent.click(within(destinations).getByRole('menuitem', { name: 'IR' }))
+
+    await waitFor(() => expect(adapters.add).toHaveBeenCalledOnce())
+    const payload = adapters.add.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'yuny', source_scheme_id: 'fa-scheme', scheme_id: 'ir-scheme' })
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    expect(node('fa-scheme:yuny').data.person).toEqual(original)
+    expect(adapters.move).not.toHaveBeenCalled()
+  })
+
+  it('adds from the selected card membership after a normal left click', async () => {
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
+    fireEvent.click(screen.getByTestId('node:fa-scheme:howard'))
+    expect(screen.getByText('Howard · Fair')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Add to department/ }))
+    expect(screen.getByRole('menu', { name: 'Add Howard to department' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(adapters.add).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Add Howard to department' }))
+      .getByRole('menuitem', { name: 'IR' }))
+    await waitFor(() => expect(adapters.add).toHaveBeenCalledOnce())
+    const payload = adapters.add.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'howard', source_scheme_id: 'fa-scheme', scheme_id: 'ir-scheme' })
+    expect(adapters.move).not.toHaveBeenCalled()
+  })
+
+  it('uses the clicked IR card as the source even when Fair is the home department', async () => {
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
+    fireEvent.contextMenu(screen.getByTestId('node:ir-scheme:lawrence').querySelector('.org-card')!)
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Actions for Lawrence' }))
+      .getByRole('menuitem', { name: /Add to department/ }))
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Add Lawrence to department' }))
+      .getByRole('menuitem', { name: 'Fair' }))
+    await waitFor(() => expect(adapters.add).toHaveBeenCalledOnce())
+    const payload = adapters.add.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'lawrence', source_scheme_id: 'ir-scheme', scheme_id: 'fa-scheme' })
+    expect(adapters.move).not.toHaveBeenCalled()
+  })
+
+  it('dismisses the right-click menu with Escape without performing a write', () => {
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
+    fireEvent.contextMenu(screen.getByTestId('node:fa-scheme:anthony').querySelector('.org-card')!)
+    const menu = screen.getByRole('menu', { name: 'Actions for Anthony' })
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(adapters.add).not.toHaveBeenCalled()
+    expect(adapters.move).not.toHaveBeenCalled()
+  })
+
+  it('opens the card menu with Shift+F10 and restores card focus after Escape', () => {
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
+    const card = screen.getByLabelText('Yuny in Fair')
+    card.focus()
+    fireEvent.keyDown(card, { key: 'F10', shiftKey: true })
+    const menu = screen.getByRole('menu', { name: 'Actions for Yuny' })
+    expect(within(menu).getByRole('menuitem', { name: /Add to department/ })).toHaveFocus()
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(card).toHaveFocus()
+    expect(adapters.add).not.toHaveBeenCalled()
+    expect(adapters.move).not.toHaveBeenCalled()
+  })
+
+  it('keeps Change upline scoped to the membership that was right-clicked', () => {
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
+    fireEvent.contextMenu(screen.getByTestId('node:ir-scheme:chea').querySelector('.org-card')!)
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Actions for Chea Huan' }))
+      .getByRole('menuitem', { name: 'Change upline' }))
+    const dialog = screen.getByRole('dialog', { name: 'Move Chea Huan' })
+    expect(within(dialog).getByRole('option', { name: /Rachael/ })).toHaveAttribute('aria-selected', 'true')
+    expect(within(dialog).queryByRole('option', { name: /Anthony|Howard|Yuny/ })).not.toBeInTheDocument()
+    expect(adapters.add).not.toHaveBeenCalled()
+    expect(adapters.move).not.toHaveBeenCalled()
   })
 })
 
