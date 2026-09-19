@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fetchMemberArena, saveMemberArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
-import { arenaRankings, validArenaBrandWeeks, ARENA_WEEK_BRANDS, type ArenaBrandWeeks, type ArenaMetric, type ArenaWindow, type MemberArenaSnapshot, type ArenaRankedPerson } from "@/lib/member/arena";
+import { arenaIncentive, arenaRankings, validArenaBrandWeeks, ARENA_WEEK_BRANDS, type ArenaBrandWeeks, type ArenaIncentive, type ArenaMetric, type ArenaPerson, type ArenaWindow, type MemberArenaSnapshot, type ArenaRankedPerson } from "@/lib/member/arena";
 import { Icon, initials } from "./MemberUI";
 import { ArenaPodium } from "./design-preview/ArenaPodium";
 import type { Standing } from "./design-preview/arena-model";
@@ -46,9 +46,58 @@ function BrandWeeks({ data, onSaved }: { data: MemberArenaSnapshot; onSaved: (va
   </form>;
 }
 
+const percent = (fraction: number) => `${(fraction * 100).toFixed(1)}%`;
+const points = (fraction: number) => { const value = fraction * 100; return `${value.toFixed(1)} point${Math.abs(value - 1) < .05 ? "" : "s"}`; };
+const money = (value: number) => `RM ${new Intl.NumberFormat("en-MY", { maximumFractionDigits: 2 }).format(value)}`;
+const brandLabel = (code: string) => code === "UNCLASSIFIED" ? "No brand on the bill" : code;
+
+/**
+ * The month's margin incentive for ONE person: which tier it reaches, what is
+ * holding it back, and how far the nearest rung is. Deliberately not a
+ * ranking — the tier is money, and a board of everybody's tiers would be a
+ * board of everybody's pay.
+ */
+function Incentive({ person, tiers, readOnly, name }: { person?: ArenaPerson; tiers: MemberArenaSnapshot["tiers"]; readOnly: boolean; name: string }) {
+  const ladder = tiers ?? [];
+  const result: ArenaIncentive | null = person ? arenaIncentive(person, ladder) : null;
+  if (!result || !result.brands.length) return <section className={s.incentive}><p className={s.message}>Nothing to judge this month yet — the incentive reads deposit-cleared, commissionable sales.</p></section>;
+  const subject = readOnly ? name : "you";
+  const blocked = result.blocked;
+  const reason = !blocked ? "" : blocked.reason === "no_brand"
+    ? `A bill carries no brand at all, so its ladder is unknown.`
+    : blocked.reason === "no_cost"
+      ? `A ${blocked.brand} bill has no cost yet, so ${blocked.brand} has no margin to judge.`
+      : `${blocked.brand} has no incentive ladder in the scheme rules.`;
+  // The binding brand is the one furthest from its own next rung: clearing
+  // that one is what moves the whole month, because every brand must clear.
+  const binding = result.brands.filter(brand => brand.next).sort((a, b) => (b.next!.gap) - (a.next!.gap))[0];
+  return <section className={s.incentive}>
+    <div className={s.tier}>
+      {blocked ? <><strong>Held, not lost</strong><small>{reason} The rule is that <em>every</em> brand {subject} sold has to clear a tier, so one unjudgeable brand holds the whole incentive. It pays as soon as that bill is costed.</small></>
+        : result.earned.length ? <><strong>{result.earned[0].label}</strong><b>{money(result.amount)}</b><small>Cleared by every brand {subject} sold this month{result.earned.length > 1 ? `, and it stacks: ${result.earned.map(tier => tier.label).join(" + ")}` : ""}.</small></>
+          : <><strong>No tier yet</strong><small>{binding ? `${brandLabel(binding.brand)} is ${points(binding.next!.gap)} short of ${binding.next!.label} (${percent(binding.next!.marginPct)}), and every brand has to clear it.` : "No rung is within reach from this month's margin."}</small></>}
+    </div>
+    <div className={s.sectionHead}><h2>Brand by brand</h2><span>{result.brands.length} brand{result.brands.length === 1 ? "" : "s"}</span></div>
+    {result.brands.map(brand => {
+      const cleared = ladder.filter(tier => tier.brand === brand.brand && brand.cleared.includes(tier.bandKey)).sort((a, b) => b.marginPct - a.marginPct)[0];
+      return <div className={s.brandRow} key={brand.brand} data-blocked={brand.marginPct === null || undefined}>
+        <strong>{brandLabel(brand.brand)}</strong>
+        <b>{brand.marginPct === null ? `${brand.blindOrders || "Some"} bill${brand.blindOrders === 1 ? "" : "s"} without cost` : percent(brand.marginPct)}</b>
+        <small>{brand.marginPct === null
+          ? brand.brand === "UNCLASSIFIED" ? "Give this bill a brand and it joins that brand's ladder." : "Its margin cannot be worked out until every bill of it has a cost."
+          : `${cleared ? `Clears ${cleared.label}` : "Below the first rung"}${brand.next ? ` · ${points(brand.next.gap)} to ${brand.next.label} (${percent(brand.next.marginPct)})` : " · top rung"} · ${money(brand.revenue)} of goods`}</small>
+      </div>;
+    })}
+    <details className={s.basis}><summary>How the incentive is judged</summary>
+      <p>Each brand&apos;s margin is blended across the month&apos;s deposit-cleared, commissionable bills, on the Revenue Team cost basis — the same figure the commission run pays on, not the company&apos;s own margin.</p>
+      <p>Thresholds follow the brand and are not the same for all of them. A tier counts only when <em>every</em> brand sold that month clears it, and the tiers earned stack. A brand with a bill that has no cost, or a bill with no brand at all, holds the whole incentive until it is fixed.</p>
+    </details>
+  </section>;
+}
+
 export default function MemberArena({ membershipId, context }: { membershipId: string; context?: MemberReadContext }) {
   const [period, setPeriod] = useState(currentMonth), [window, setWindow] = useState<ArenaWindow>("monthly");
-  const [view, setView] = useState<"home" | ArenaMetric | "weeks" | "availability">("home");
+  const [view, setView] = useState<"home" | ArenaMetric | "weeks" | "availability" | "incentive">("home");
   const [brand, setBrand] = useState("");
   const [data, setData] = useState<MemberArenaSnapshot | null>(null), [busy, setBusy] = useState(true), [error, setError] = useState("");
   const [revision, setRevision] = useState(0), [showAll, setShowAll] = useState(false);
@@ -81,7 +130,7 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
 
   return <div className={s.arena} data-arena-design="c">
     <header className={s.heading}>{view !== "home" && <button className={s.back} onClick={() => go("home")}><Icon name="back" size={19} />Arena</button>}
-      <h1>{selected?.label ?? (view === "weeks" ? readOnly ? "Member brand weeks" : "My brand weeks" : view === "availability" ? "Championship & Fair results" : "Arena")}</h1>
+      <h1>{selected?.label ?? (view === "weeks" ? readOnly ? "Member brand weeks" : "My brand weeks" : view === "availability" ? "Championship & Fair results" : view === "incentive" ? "Margin Incentive" : "Arena")}</h1>
       <p>{view === "home" ? readOnly ? `${viewedName} · Performance and rankings` : "Your performance. Your next milestone." : data?.department}</p>
     </header>
     <div className={s.controls}><div className={s.segments} role="group" aria-label="Ranking period">{(["monthly", "quarterly", "annual"] as const).map(value => <button key={value} aria-pressed={window === value} onClick={() => { setWindow(value); if (view === "weeks") setView("home"); }}>{value === "monthly" ? "Monthly" : value === "quarterly" ? "Quarterly" : "Annual"}</button>)}</div>
@@ -93,7 +142,8 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
       {view === "home" && <><div className={s.overview}>{metrics.map(metric => {
         const own = arenaRankings(data.people, metric.id).find(row => row.id === viewedId);
         return <button key={metric.id} className={s.metric} data-metric={metric.id} onClick={() => go(metric.id)}><span className={s.metricIcon}><Icon name={metric.icon} size={28} /></span><span><strong>{metric.label}</strong><small>{metric.subtitle}</small><b>{format(metric.id, own?.value ?? null)}</b></span><span className={s.ownRank}>{own?.position ? `#${own.position}` : "—"}<Icon name="arrow" size={17} /></span></button>;
-      })}</div><button className={s.feature} onClick={() => go("availability")}><span><strong>Championship & Fair results</strong><small>Scoreboard and fair history setup</small></span><Icon name="arrow" /></button>
+      })}</div>{window === "monthly" && <button className={s.feature} onClick={() => go("incentive")}><span><strong>Margin Incentive</strong><small>{readOnly ? `${viewedName}'s tier this month, brand by brand` : "Your tier this month, brand by brand"}</small></span><Icon name="arrow" /></button>}
+        <button className={s.feature} onClick={() => go("availability")}><span><strong>Championship & Fair results</strong><small>Scoreboard and fair history setup</small></span><Icon name="arrow" /></button>
         {window === "monthly" && <button className={s.feature} onClick={() => go("weeks")}><span><strong>{readOnly ? "Member brand weeks" : "My brand weeks"}</strong><small>{data.brandWeeks ? `${data.brandWeeks.weeks} weeks saved` : readOnly ? "No brand weeks saved" : "Choose 4 or 5 weeks"}</small></span><Icon name="arrow" /></button>}</>}
       {selected && <>{selected.id !== "kpi" && <label className={s.brand}>Ranking by<select value={brand} onChange={event => setBrand(event.target.value)}><option value="">All brands · Total</option>{brands.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>}
         <Leaders rows={rankings} metric={selected.id} selfId={viewedId} readOnly={readOnly} onOpen={() => { setShowAll(true); requestAnimationFrame(() => table.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })); }} />
@@ -103,8 +153,9 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
           {!rankings.length && <p>No people in this department yet.</p>}{!showAll && rankings.length > 10 && <button className={s.textLink} onClick={() => setShowAll(true)}>View all {rankings.length} people<Icon name="arrow" /></button>}
         </section></>}
       {view === "weeks" && (readOnly ? <section className={s.weeks} aria-label="Member brand weeks"><h2>{viewedName}</h2><p>Only the member can save brand weeks from their own account.</p>{data.brandWeeks ? <><p>{data.brandWeeks.weeks} weeks saved</p>{ARENA_WEEK_BRANDS.map(({ code, name }) => <div className={s.weekRow} key={code}><strong>{name}</strong><span>{data.brandWeeks!.counts[code]} weeks</span></div>)}</> : <p>No brand weeks saved for this month.</p>}</section> : <BrandWeeks key={`${membershipId}-${period}`} data={data} onSaved={value => setData(previous => previous ? { ...previous, brandWeeks: value } : previous)} />)}
+      {view === "incentive" && <Incentive person={data.people.find(person => person.id === viewedId)} tiers={data.tiers} readOnly={readOnly} name={viewedName} />}
       {view === "availability" && <section className={s.availability}><Icon name="trophy" size={32} /><h2>Fair history is not connected yet</h2><p>Weekly finishes and Highest Fair Record need each fair’s venue, start date and end date. Existing order dates and branch labels cannot reliably identify a completed fair.</p><h2>Championship</h2><p>{readOnly ? "Members can save their own brand weeks now." : "Your brand weeks can be saved now."} Championship totals will appear after all ranking sources and the scoring ledger are connected.</p><p>Sales, Margin and KPI rankings already use {readOnly ? "the selected" : "your"} department’s real data.</p></section>}
-      {view !== "weeks" && <details className={s.basis}><summary>How these rankings are measured</summary><p>Deposit-cleared commissionable sales and KPI items. Each order is counted once in its released commission month; unreleased orders are shown in the current open month. Quarterly and Annual aggregate those months.</p><p>Margin uses commissionable goods revenue and cost together. A salesperson with incomplete cost data stays pending for Margin Ranking. Directors are excluded. These are live performance figures, not a payroll statement.</p></details>}
+      {view !== "weeks" && view !== "incentive" && <details className={s.basis}><summary>How these rankings are measured</summary><p>Deposit-cleared commissionable sales and KPI items. Each order is counted once in its released commission month; unreleased orders are shown in the current open month. Quarterly and Annual aggregate those months.</p><p>Margin uses commissionable goods revenue and cost together. A salesperson with incomplete cost data stays pending for Margin Ranking. Directors are excluded. These are live performance figures, not a payroll statement.</p></details>}
     </div>}
   </div>;
 }
