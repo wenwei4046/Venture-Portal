@@ -400,7 +400,7 @@ export default function TeamTable({
           </table>
         </div>
       )}
-      {addingMember ? <PersonContextMenu key={addingMember.person.staff_id} sourceSchemeId={schemeId} startAtDepartments anchor={addingMember.anchor}
+      {addingMember ? <PersonContextMenu key={addingMember.person.staff_id} startAtDepartments anchor={addingMember.anchor}
         person={{ staffId: addingMember.person.staff_id, name: addingMember.person.employee_name, titleId: addingMember.person.title_id }}
         destinations={membershipDestinations} onClose={closeMembershipMenu}
         onAdded={message => { closeMembershipMenu(); setNote({ ok: true, note: message }) }} /> : null}

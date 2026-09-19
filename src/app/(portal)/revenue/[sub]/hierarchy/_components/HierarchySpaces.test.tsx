@@ -14,6 +14,7 @@ const adapters = vi.hoisted(() => ({
   flow: null as FlowProps | null,
   move: vi.fn(),
   add: vi.fn(),
+  changeTitle: vi.fn(),
   router: { refresh: vi.fn() },
   viewport: {
     fitBounds: vi.fn(), setCenter: vi.fn(), getZoom: () => 0.5,
@@ -24,7 +25,7 @@ const adapters = vi.hoisted(() => ({
 }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => adapters.router }))
-vi.mock('../../../hierarchy-actions', () => ({ moveOnChart: adapters.move, addMemberWithCurrentTitle: adapters.add }))
+vi.mock('../../../hierarchy-actions', () => ({ moveOnChart: adapters.move, addMember: adapters.add, changeMemberTitle: adapters.changeTitle }))
 vi.mock('@xyflow/react', async importOriginal => {
   const actual = await importOriginal<typeof import('@xyflow/react')>()
   return {
@@ -163,6 +164,7 @@ beforeEach(() => {
   adapters.flow = null
   adapters.move.mockResolvedValue({ ok: true })
   adapters.add.mockResolvedValue({ ok: true, note: null })
+  adapters.changeTitle.mockResolvedValue({ ok: true, note: null })
   window.localStorage.clear()
   vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
     matches: query === '(prefers-reduced-motion: reduce)', media: query, onchange: null,
@@ -583,6 +585,26 @@ describe('HierarchySpaces explicit upline edits', () => {
 })
 
 describe('HierarchySpaces department membership actions', () => {
+  it('changes the right-clicked IR membership title without changing the same person in Fair or either upline', async () => {
+    render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
+    const fairBefore = { ...node('fa-scheme:chea').data.person }
+    const irUpline = node('ir-scheme:chea').data.person.uplineStaffId
+    fireEvent.contextMenu(screen.getByTestId('node:ir-scheme:chea').querySelector('.org-card')!)
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Actions for Chea Huan' }))
+      .getByRole('menuitem', { name: /Change title/ }))
+    const titles = screen.getByRole('menu', { name: 'Change Chea Huan title in IR' })
+    expect(adapters.changeTitle).not.toHaveBeenCalled()
+    fireEvent.click(within(titles).getByRole('menuitem', { name: 'Team Assistant' }))
+    await waitFor(() => expect(adapters.changeTitle).toHaveBeenCalledOnce())
+    const payload = adapters.changeTitle.mock.calls[0][0] as FormData
+    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'chea', scheme_id: 'ir-scheme', title_id: 'assistant' })
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    expect(node('fa-scheme:chea').data.person).toEqual(fairBefore)
+    expect(node('ir-scheme:chea').data.person.uplineStaffId).toBe(irUpline)
+    expect(adapters.move).not.toHaveBeenCalled()
+    expect(adapters.add).not.toHaveBeenCalled()
+  })
+
   it('adds the right-clicked person to a destination without editing their original membership or upline', async () => {
     render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
     const original = { ...node('fa-scheme:yuny').data.person }
@@ -598,13 +620,17 @@ describe('HierarchySpaces department membership actions', () => {
     const destinations = screen.getByRole('menu', { name: 'Add Yuny to department' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(within(destinations).getByRole('menuitem', { name: 'Fair' })).toBeDisabled()
-    expect(within(destinations).getByRole('menuitem', { name: 'IR' })).toHaveTextContent('Team Assistant')
     expect(screen.queryByRole('menuitem', { name: 'Team Leader' })).not.toBeInTheDocument()
     fireEvent.click(within(destinations).getByRole('menuitem', { name: 'IR' }))
+    expect(adapters.add).not.toHaveBeenCalled()
+    const titles = screen.getByRole('menu', { name: 'Add Yuny to IR as' })
+    expect(titles).toHaveTextContent('No upline is copied. Set it in IR after adding.')
+    expect(within(titles).getByRole('menuitem', { name: 'Team Assistant' })).toHaveTextContent('Current title')
+    fireEvent.click(within(titles).getByRole('menuitem', { name: 'Team Leader' }))
 
     await waitFor(() => expect(adapters.add).toHaveBeenCalledOnce())
     const payload = adapters.add.mock.calls[0][0] as FormData
-    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'yuny', source_scheme_id: 'fa-scheme', scheme_id: 'ir-scheme' })
+    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'yuny', scheme_id: 'ir-scheme', title_id: 'leader' })
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
     expect(node('fa-scheme:yuny').data.person).toEqual(original)
     expect(adapters.move).not.toHaveBeenCalled()
@@ -620,22 +646,28 @@ describe('HierarchySpaces department membership actions', () => {
     expect(adapters.add).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('menu', { name: 'Add Howard to department' }))
       .getByRole('menuitem', { name: 'IR' }))
+    expect(adapters.add).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Add Howard to IR as' }))
+      .getByRole('menuitem', { name: 'Team Assistant' }))
     await waitFor(() => expect(adapters.add).toHaveBeenCalledOnce())
     const payload = adapters.add.mock.calls[0][0] as FormData
-    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'howard', source_scheme_id: 'fa-scheme', scheme_id: 'ir-scheme' })
+    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'howard', scheme_id: 'ir-scheme', title_id: 'assistant' })
     expect(adapters.move).not.toHaveBeenCalled()
   })
 
-  it('uses the clicked IR card as the source even when Fair is the home department', async () => {
+  it('adds the clicked IR card to Fair with a new title even when Fair is the home department', async () => {
     render(<HierarchySpaces departments={departments()} membershipDestinations={membershipDestinations()} />)
     fireEvent.contextMenu(screen.getByTestId('node:ir-scheme:lawrence').querySelector('.org-card')!)
     fireEvent.click(within(screen.getByRole('menu', { name: 'Actions for Lawrence' }))
       .getByRole('menuitem', { name: /Add to department/ }))
     fireEvent.click(within(screen.getByRole('menu', { name: 'Add Lawrence to department' }))
       .getByRole('menuitem', { name: 'Fair' }))
+    expect(adapters.add).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Add Lawrence to Fair as' }))
+      .getByRole('menuitem', { name: 'Revenue Specialist' }))
     await waitFor(() => expect(adapters.add).toHaveBeenCalledOnce())
     const payload = adapters.add.mock.calls[0][0] as FormData
-    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'lawrence', source_scheme_id: 'ir-scheme', scheme_id: 'fa-scheme' })
+    expect(Object.fromEntries(payload.entries())).toEqual({ staff_id: 'lawrence', scheme_id: 'fa-scheme', title_id: 'specialist' })
     expect(adapters.move).not.toHaveBeenCalled()
   })
 
