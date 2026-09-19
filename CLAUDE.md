@@ -502,6 +502,41 @@ src/
 │   │                                  learn (mig 20260916010000). Arithmetic in
 │   │                                  `lib/member/insight.ts`, data in
 │   │                                  `member_insight_snapshot()`.
+│   │                                  **TWO MARGINS, AND THEY ONLY SEE THE
+│   │                                  SECOND (2026-09-19):** layer 1 is price
+│   │                                  vs the ERP's cost — what the COMPANY
+│   │                                  makes; layer 2 is price vs
+│   │                                  `cost ÷ comm_schemes.revenue_cost_divisor`
+│   │                                  (Fair 0.7) — what the SALESPERSON is
+│   │                                  measured and paid on. Layer 2 is the only
+│   │                                  one the member app may show (user
+│   │                                  2026-09-19). `member_order_facts` is the
+│   │                                  ONLY member-side function that touches
+│   │                                  `cost_amount`, and RLS keeps
+│   │                                  `sales_orders`/`_lines` to hr+admin, so
+│   │                                  that one division is the whole boundary —
+│   │                                  it had been missing since PR #114 and the
+│   │                                  app read 12–22 points high (mig
+│   │                                  `20260919050000`).
+│   │                                  **MARGIN INCENTIVE (2026-09-19):** the
+│   │                                  Arena's fourth board, and NOT a ranking —
+│   │                                  the tier is money and everyone on a tier
+│   │                                  gets the same money, so a board of tiers
+│   │                                  would be a board of pay. It is the viewed
+│   │                                  person's own: tier, RM, each brand's
+│   │                                  margin, and how many points short the
+│   │                                  BINDING brand is. `arenaIncentive()` in
+│   │                                  `lib/member/arena.ts` mirrors
+│   │                                  `marginIncentiveAcrossBrands` — thresholds
+│   │                                  follow the BRAND and differ (AKEMI/ERGOTEX
+│   │                                  36+43, DUNLOP/ZANOTTI 33+36, mig
+│   │                                  `20260919040000`), EVERY brand sold must
+│   │                                  clear a tier, earned tiers are the
+│   │                                  INTERSECTION and the money stacks; a brand
+│   │                                  with an uncosted bill, or a bill with no
+│   │                                  brand, HOLDS the lot and the board names
+│   │                                  it. The ladder rides in the snapshot
+│   │                                  (`tiers`, mig `20260919060000`).
 │   │                                  **TEAM** is a mapping map, not an indented
 │   │                                  list: every sub-department as a frame, its
 │   │                                  directors above it, one card per MEMBERSHIP,
