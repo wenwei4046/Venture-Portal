@@ -806,7 +806,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
         </div> : null}
       </div>
       {personMenu && menuPerson ? <PersonContextMenu key={`${personMenu.id}:${personMenu.anchor.left}:${personMenu.anchor.top}:${!!personMenu.startAtDepartments}`}
-        person={menuPerson.person} sourceSchemeId={menuPerson.department.schemeId} destinations={membershipDestinations} anchor={personMenu.anchor} startAtDepartments={personMenu.startAtDepartments}
+        person={menuPerson.person} currentDepartment={menuPerson.department} destinations={membershipDestinations} anchor={personMenu.anchor} startAtDepartments={personMenu.startAtDepartments}
         onClose={closePersonMenu} onAdded={message => { closePersonMenu(); setError(null); setNote(message) }}
         onUpline={() => { const current = personMenu; closePersonMenu(); openUpline(current.id, current.anchor) }} /> : null}
       {popover && mover ? <MovePopover key={popover.id} mover={mover.person} people={mover.department.people}
