@@ -26,7 +26,7 @@ export interface MoveSubject {
   staffId: string
   name: string
   titleName: string | null
-  /** May their title hold downlines — a Revenue Specialist's may not. */
+  /** May their title hold downlines on this sub-department's configured ladder? */
   canRecruit: boolean
   /** Where their title stands on the company ladder; null = not on it. */
   levelRank: number | null

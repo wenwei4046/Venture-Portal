@@ -56,7 +56,7 @@ describe('moveRefusal', () => {
     expect(moveRefusal(people[0], people[2], downlines)).toBe('downline')
   })
 
-  it('refuses a title that may not recruit — an RS cannot lead anyone', () => {
+  it('refuses a title configured not to recruit on this ladder', () => {
     expect(moveRefusal(people[3], people[2], none)).toBe('no-downlines')
     expect(moveRefusal(people[3], people[4], none)).toBe('no-downlines')
   })
