@@ -10,6 +10,7 @@ import type { OrgDirector } from './_components/org-chart-types'
 import { loadTeam } from '../../_components/config/load'
 import type { TeamData } from '../../_components/config/types'
 import { listSubDepartments, type SubDepartment } from '../../_lib/sub-departments'
+import { loadMembershipDestinations } from '../../_lib/membership-destinations'
 
 interface PageProps {
   params: Promise<{ sub: string }>
@@ -52,7 +53,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       department.departmentId === subDept.departmentId && department.schemeId !== null,
   )
   const currentTeam = loadTeam(subDept.schemeId, { isHome: subDept.isHome, subDepartmentId: subDept.id })
-  const [team, departments] = await Promise.all([
+  const [team, departments, membershipDestinations] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
@@ -67,6 +68,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
         ...chartData(membership),
       }
     })),
+    loadMembershipDestinations(subDepartments),
   ])
 
   return (
@@ -75,6 +77,7 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
       schemeId={subDept.schemeId}
       departments={departments}
       team={team}
+      membershipDestinations={membershipDestinations}
     />
   )
 }

@@ -26,6 +26,7 @@ export interface PersonCardData extends Record<string, unknown> {
 }
 export type PersonNode = Node<PersonCardData, 'person'>
 export const UplineContext = createContext<(id: string, anchor: PopAnchor) => void>(() => {})
+export const PersonMenuContext = createContext<(id: string, anchor: PopAnchor) => void>(() => {})
 
 function rankChip(person: OrgPerson): string {
   const label = (person.rankLabel ?? '').replace(/^rank\s+/i, '')
@@ -35,6 +36,7 @@ function rankChip(person: OrgPerson): string {
 
 export default function HierarchyPersonCard({ data }: NodeProps<PersonNode>) {
   const open = useContext(UplineContext)
+  const openMenu = useContext(PersonMenuContext)
   const { person, uplineName } = data
   const title = hierarchyTitleAppearance(person.titleName)
   // At the top of a tree the line goes up to the sub-department's director(s).
@@ -44,6 +46,24 @@ export default function HierarchyPersonCard({ data }: NodeProps<PersonNode>) {
       className={`org-card space-person${data.selected ? ' sel' : ''}${person.rankId === null ? ' unplaced' : ''}`}
       data-space-tone={data.tone}
       style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
+      tabIndex={0}
+      aria-label={`${person.name} in ${data.departmentName}`}
+      aria-haspopup="menu"
+      onContextMenu={event => {
+        event.preventDefault()
+        event.stopPropagation()
+        if (data.pending) return
+        event.currentTarget.focus({ preventScroll: true })
+        openMenu(data.membershipId, { left: event.clientX, top: event.clientY, bottom: event.clientY })
+      }}
+      onKeyDown={event => {
+        if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
+        event.preventDefault()
+        event.stopPropagation()
+        if (data.pending) return
+        const rect = event.currentTarget.getBoundingClientRect()
+        openMenu(data.membershipId, { left: rect.left, top: rect.top, bottom: rect.bottom })
+      }}
     >
       <Handle type="target" position={Position.Top} isConnectable={!data.pending} />
       <div className="oc-top">

@@ -215,29 +215,132 @@ export async function setStaffRank(formData: FormData): Promise<RankOutcome> {
 }
 
 /**
- * Add somebody from the department to a non-home sub-department, with the
- * title they hold there. They start at the top of their own tree at that
- * title's floor rung; the chart moves them from there.
+ * Add somebody from the department to a non-home sub-department using the
+ * Team tab's explicit title selection. This only opens the destination membership: their
+ * existing memberships, company title and reporting line stay in place.
+ * They start at the top of their own tree at the selected title's floor rung.
  */
 export async function addMember(formData: FormData): Promise<RankOutcome> {
   const user = await requirePermission('revenue')
-  const supabase = await client()
-
-  const staffId = ((formData.get('staff_id') as string) ?? '').trim()
-  const schemeId = ((formData.get('scheme_id') as string) ?? '').trim()
-  const titleId = ((formData.get('title_id') as string) ?? '').trim()
+  const field = (name: string) => {
+    const value = formData.get(name)
+    return typeof value === 'string' ? value.trim() : ''
+  }
+  const staffId = field('staff_id')
+  const schemeId = field('scheme_id')
+  const titleId = field('title_id')
   if (!staffId || !schemeId || !titleId) return { ok: false, note: 'Pick a person and the title they hold here.' }
 
-  const sub = await subDepartmentOf(schemeId)
-  if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
-  if (sub.isHome) {
-    return { ok: false, note: 'Everybody in the department is on the home sub-department already — add people under People Management.' }
+  return addMemberToScheme(user.id, staffId, schemeId, { titleId })
+}
+
+/** Quick-add copies the source card's current title; it never chooses a new one. */
+export async function addMemberWithCurrentTitle(formData: FormData): Promise<RankOutcome> {
+  const user = await requirePermission('revenue')
+  const field = (name: string) => {
+    const value = formData.get(name)
+    return typeof value === 'string' ? value.trim() : ''
+  }
+  const staffId = field('staff_id')
+  const schemeId = field('scheme_id')
+  const sourceSchemeId = field('source_scheme_id')
+  if (!staffId || !schemeId || !sourceSchemeId) {
+    return { ok: false, note: 'Choose a person and a destination from their current sub-department.' }
   }
 
-  const result = await openMembership(supabase, user.id, schemeId, staffId, titleId)
-  if (!result.ok) return { ok: false, note: result.reason }
-  refresh()
-  return { ok: true, note: null }
+  // title_id from the browser is deliberately not accepted. The source may
+  // have changed since the card was rendered, so read its title again below.
+  return addMemberToScheme(user.id, staffId, schemeId, { sourceSchemeId })
+}
+
+async function addMemberToScheme(
+  userId: string,
+  staffId: string,
+  schemeId: string,
+  titleSource: { titleId: string } | { sourceSchemeId: string },
+): Promise<RankOutcome> {
+  try {
+    const supabase = await client()
+    const subDepartments = await listSubDepartments()
+    const sub = subDepartments.find(candidate => candidate.schemeId === schemeId)
+    if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
+    if (sub.isHome) {
+      return { ok: false, note: 'Home sub-department membership follows the roster. Manage it under People Management.' }
+    }
+
+    // Recheck roster eligibility on the server: the chart or Team picker may
+    // have been open while somebody was deactivated or moved department.
+    // Cross-department memberships cannot be paid by the payroll sync, which
+    // requires the roster and destination to share their payroll department.
+    const { data: staff, error } = await supabase
+      .from('hr_staff_costs')
+      .select('id, status, department_id, title_id, titles (is_department_head)')
+      .eq('id', staffId)
+      .maybeSingle()
+    if (error) return { ok: false, note: `Could not check this person's roster details: ${safeReason(error)}.` }
+    if (!staff || staff.status !== 'active') {
+      return { ok: false, note: 'This person is no longer active on the roster. Refresh the chart and try again.' }
+    }
+    if (staff.department_id !== sub.departmentId) {
+      return { ok: false, note: 'Choose a sub-department within this person’s current department.' }
+    }
+    if (one(staff.titles as { is_department_head: boolean } | { is_department_head: boolean }[] | null)?.is_department_head) {
+      return { ok: false, note: 'Department heads are assigned as directors and cannot hold a member position.' }
+    }
+
+    let titleId: string
+    if ('sourceSchemeId' in titleSource) {
+      const source = subDepartments.find(candidate => candidate.schemeId === titleSource.sourceSchemeId)
+      if (!source) return { ok: false, note: 'The source sub-department has no active scheme. Refresh the chart and try again.' }
+      if (source.departmentId !== sub.departmentId) {
+        return { ok: false, note: 'Choose a source and destination within this person’s current department.' }
+      }
+
+      const { data: position, error: positionError } = await supabase
+        .from('comm_hierarchy')
+        .select('title_id')
+        .eq('scheme_id', source.schemeId!)
+        .eq('staff_id', staffId)
+        .is('effective_to', null)
+        .maybeSingle()
+      if (positionError) return { ok: false, note: `Could not check their current membership: ${safeReason(positionError)}.` }
+      if (!position && !source.isHome) {
+        return { ok: false, note: 'They are no longer a member of the source sub-department. Refresh the chart and try again.' }
+      }
+
+      // Match loadTeam: an open membership supplies the displayed title. The
+      // home chart also draws roster members without a ladder position yet.
+      const currentTitleId = position ? position.title_id : staff.title_id
+      if (!currentTitleId) {
+        return { ok: false, note: 'They have no current title to carry over. Set their title separately before adding them.' }
+      }
+      titleId = currentTitleId
+
+      // The destination menu only offers active member titles. Recheck here
+      // so a retired title or a newly designated director cannot be copied
+      // from a stale card. openMembership checks this title's destination rung.
+      const { data: title, error: titleError } = await supabase
+        .from('titles')
+        .select('id, is_active, is_department_head')
+        .eq('id', titleId)
+        .maybeSingle()
+      if (titleError) return { ok: false, note: `Could not check their current title: ${safeReason(titleError)}.` }
+      if (!title?.is_active || title.is_department_head) {
+        return { ok: false, note: 'Their current title is not an active member title. Set their title separately before adding them.' }
+      }
+    } else {
+      titleId = titleSource.titleId
+    }
+
+    const result = await openMembership(supabase, userId, schemeId, staffId, titleId)
+    if (!result.ok) return { ok: false, note: result.reason }
+    refresh()
+    return { ok: true, note: null }
+  } catch (error) {
+    if (isControlFlow(error)) throw error
+    console.error('[addMember]', error)
+    return { ok: false, note: 'Could not add this person. Please try again.' }
+  }
 }
 
 /** Take somebody out of a non-home sub-department. */

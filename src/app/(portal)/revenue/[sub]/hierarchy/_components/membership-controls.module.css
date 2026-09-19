@@ -1,0 +1,28 @@
+.layer { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+.menu {
+  position: fixed;
+  pointer-events: auto;
+  width: min(224px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 8px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  box-shadow: 0 4px 12px rgb(var(--ink) / 8%);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 13px;
+}
+.menuHeading { padding: 7px 9px; color: rgb(var(--graphite)); font-size: 12px; overflow-wrap: anywhere; border-bottom: 1px solid rgb(var(--hairline)); margin-bottom: 4px; }
+.groupHeading { padding: 6px 9px 4px; color: rgb(var(--muted)); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 34px; border-radius: 4px; padding: 7px 9px; text-align: left; }
+.menu button:hover:not(:disabled), .menu button:focus-visible, .menu button[aria-expanded="true"] { background: rgb(var(--accent-bg)); color: rgb(var(--accent)); outline: none; }
+.menu button:disabled { color: rgb(var(--muted)); cursor: default; }
+.rowCopy { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.rowCopy small { font-size: 11px; line-height: 1.4; color: rgb(var(--muted)); }
+.chevron { flex-shrink: 0; color: rgb(var(--muted)); font-size: 15px; }
+.hint { margin: 4px 0 0; padding: 7px 9px; border-top: 1px solid rgb(var(--hairline)); font-size: 11px; line-height: 1.5; color: rgb(var(--muted)); }
+.error { margin: 4px; padding: 8px; border-radius: 4px; background: rgb(var(--danger-bg)); color: rgb(var(--danger)); font-size: 12px; line-height: 1.5; }
+@media (pointer: coarse) { .menu button { min-height: 44px; } }
