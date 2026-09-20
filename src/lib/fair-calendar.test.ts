@@ -10,6 +10,7 @@ import {
   gapLooksLikeSeveralFairs,
   monthOf,
   sortFairs,
+  unmovedByApply,
   windowsOverlap,
   type Fair,
   type FairGap,
@@ -253,6 +254,48 @@ describe('fairCalendarSummary', () => {
       gaps: 0,
       gapsNeedingSplit: 0,
     })
+  })
+})
+
+describe('unmovedByApply', () => {
+  it('counts the gaps sitting in a month the apply moves bills into', () => {
+    const r = unmovedByApply(
+      [fair()],
+      [gap(), gap({ venueKey: 'SUNWAY PYRAMID', bills: 39, total: 238292, spreadDays: 17 })],
+    )
+    expect(r.bills).toBe(100)
+    expect(r.value).toBe(638292)
+    expect(r.months).toEqual(['2026-08-01'])
+  })
+
+  it('ignores a gap in a month nothing is moving into', () => {
+    const r = unmovedByApply(
+      [fair()],
+      [gap({ periodMonth: '2026-09-01', bills: 46, total: 242574 })],
+    )
+    expect(r).toEqual({ bills: 0, value: 0, months: [] })
+  })
+
+  it('ignores a fair that has nothing to move', () => {
+    const r = unmovedByApply([fair({ billsToMove: 0, valueToMove: 0 })], [gap()])
+    expect(r).toEqual({ bills: 0, value: 0, months: [] })
+  })
+
+  it('names every destination month once, earliest first', () => {
+    const r = unmovedByApply(
+      [fair(), fair({ fairId: 'f2', periodMonth: '2026-09-01' })],
+      [
+        gap({ periodMonth: '2026-09-01', bills: 1, total: 10 }),
+        gap({ periodMonth: '2026-08-01', bills: 2, total: 20 }),
+        gap({ periodMonth: '2026-08-01', venueKey: 'KLCC', bills: 3, total: 30 }),
+      ],
+    )
+    expect(r.bills).toBe(6)
+    expect(r.months).toEqual(['2026-08-01', '2026-09-01'])
+  })
+
+  it('is empty before anything is typed', () => {
+    expect(unmovedByApply([], [])).toEqual({ bills: 0, value: 0, months: [] })
   })
 })
 

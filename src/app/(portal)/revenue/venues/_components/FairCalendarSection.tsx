@@ -19,6 +19,7 @@ import {
   fairMonthLabel,
   fairWindowLabel,
   gapLooksLikeSeveralFairs,
+  unmovedByApply,
   type Fair,
   type FairGap,
 } from '@/lib/fair-calendar'
@@ -62,6 +63,8 @@ export default function FairCalendarSection({
   organisers: Organiser[]
 }) {
   const summary = fairCalendarSummary(fairs, gaps)
+  const staying = unmovedByApply(fairs, gaps)
+  const stayingMonths = staying.months.map(fairMonthLabel).join(' and ')
   const pickable = organisers.filter(o => o.isActive)
 
   return (
@@ -95,8 +98,25 @@ export default function FairCalendarSection({
           <ActionButton
             run={applyFairCalendar}
             label="Move the bills"
-            confirm={`Move ${summary.billsToMove} bills into the month of the fair they were written at? Runs over the months this touches must be computed again. A month whose run has already paid will be refused.`}
+            confirm={
+              `Move ${summary.billsToMove} bills into the month of the fair they were written at?` +
+              (staying.bills > 0
+                ? ` ${staying.bills} bills worth ${formatMoney(staying.value)} already in ${stayingMonths} belong to no fair and will NOT move. Check Still to place first if any of them should have.`
+                : '') +
+              ' Runs over the months this touches must be computed again. A month whose run has already paid will be refused.'
+            }
           />
+          {staying.bills > 0 ? (
+            <p className="basis-full text-sm text-graphite m-0">
+              <strong className="font-semibold text-ink">
+                {staying.bills} bill{staying.bills === 1 ? '' : 's'}
+              </strong>{' '}
+              worth <span className="num">{formatMoney(staying.value)}</span> already in{' '}
+              {stayingMonths} belong to no fair and will not move. Some of that is a fair nobody
+              has typed yet; some of it never was a fair. Check <em>Still to place</em>, below,
+              before you decide the month is right.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
