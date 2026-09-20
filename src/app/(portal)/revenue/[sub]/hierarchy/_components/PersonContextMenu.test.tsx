@@ -12,7 +12,8 @@ const person = { staffId: 'mei', name: 'Mei Ting', titleId: 'specialist' as stri
 function destination(extra: Partial<MembershipDestination> = {}): MembershipDestination {
   return {
     subDepartmentId: 'ir', name: 'IR', slug: 'ir', departmentId: 'revenue',
-    departmentName: 'Revenue', schemeId: 'ir-scheme', isHome: false,
+    departmentName: 'Revenue', schemeId: 'ir-scheme', createdAt: '2026-09-10T00:00:00Z', isHome: false,
+    homeStaffIds: [],
     titles: [{ id: 'specialist', name: 'Revenue Specialist' }, { id: 'leader', name: 'Team Leader' }],
     memberStaffIds: [], eligibleStaffIds: ['mei'], unavailableReason: null,
     ...extra,
@@ -23,7 +24,8 @@ function destinations(): MembershipDestination[] {
   return [
     destination({
       subDepartmentId: 'fair', name: 'Fair', slug: 'fair', schemeId: 'fair-scheme',
-      isHome: true, memberStaffIds: ['mei'], titles: [{ id: 'specialist', name: 'Revenue Specialist' }],
+      createdAt: '2026-08-31T00:00:00Z', isHome: true, homeStaffIds: ['mei'], memberStaffIds: ['mei'],
+      titles: [{ id: 'specialist', name: 'Revenue Specialist' }],
     }),
     destination(),
     destination({ subDepartmentId: 'events', name: 'Events', slug: 'events', schemeId: 'events-scheme', memberStaffIds: ['mei'] }),

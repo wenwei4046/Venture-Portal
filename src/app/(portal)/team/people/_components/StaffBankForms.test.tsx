@@ -19,7 +19,7 @@ const staff: StaffRow = {
 
 describe('staff bank account forms', () => {
   it('keeps the optional second pair separate from Account 1 on add', () => {
-    const { container } = render(<AddStaffForm departments={[]} titles={[]} nextCode={null} />)
+    const { container } = render(<AddStaffForm subDepartments={[]} managers={[]} departments={[]} titles={[]} nextCode={null} />)
     fireEvent.change(screen.getByLabelText('Account 1 bank'), { target: { value: 'Maybank' } })
     fireEvent.change(screen.getByLabelText(/Account 1 number/), { target: { value: '0012345678' } })
     const form = container.querySelector('form')!

@@ -4,7 +4,16 @@ import { useMemo, useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { addStaff } from '../actions'
-import { offersVariablePay, titlesForDepartment, type TitleOption } from '@/lib/staff-form'
+import {
+  baseUnavailableReason,
+  managersForDepartment,
+  offersVariablePay,
+  subDepartmentsForDepartment,
+  titlesForDepartment,
+  type ManagerOption,
+  type SubDepartmentOption,
+  type TitleOption,
+} from '@/lib/staff-form'
 import { BANK_NAMES } from '@/lib/banks'
 
 export interface AddStaffDepartment {
@@ -19,6 +28,10 @@ export interface AddStaffDepartment {
 interface Props {
   departments: AddStaffDepartment[]
   titles: TitleOption[]
+  /** Every live sub-department, with the titles its ladder carries. */
+  subDepartments: SubDepartmentOption[]
+  /** The active roster, as candidates for the reporting line. */
+  managers: ManagerOption[]
   /**
    * The employee code the person will get — `next_staff_code()`, HV + the
    * largest number on the roster + 1. The database hands it out when the row
@@ -63,7 +76,7 @@ const rmPrefix =
  * number plus one. The form shows which that will be and nothing more — a
  * disabled input is not submitted, which is the point.
  */
-export default function AddStaffForm({ departments, titles, nextCode }: Props) {
+export default function AddStaffForm({ departments, titles, subDepartments, managers, nextCode }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -71,6 +84,8 @@ export default function AddStaffForm({ departments, titles, nextCode }: Props) {
 
   const [departmentId, setDepartmentId] = useState('')
   const [titleId, setTitleId] = useState('')
+  const [homeSubDepartmentId, setHomeSubDepartmentId] = useState('')
+  const [reportsTo, setReportsTo] = useState('')
   const [fullCommission, setFullCommission] = useState(false)
   const [variablePay, setVariablePay] = useState(false)
   const [pay, setPay] = useState({ basic: '', allowances: ZERO, nonStat: ZERO })
@@ -83,6 +98,14 @@ export default function AddStaffForm({ departments, titles, nextCode }: Props) {
   const titleChoices = useMemo(
     () => titlesForDepartment(titles, departmentId),
     [titles, departmentId],
+  )
+  const subChoices = useMemo(
+    () => subDepartmentsForDepartment(subDepartments, departmentId),
+    [subDepartments, departmentId],
+  )
+  const managerChoices = useMemo(
+    () => managersForDepartment(managers, departmentId, isCommissionDept),
+    [managers, departmentId, isCommissionDept],
   )
 
   useEffect(() => {
@@ -120,10 +143,26 @@ export default function AddStaffForm({ departments, titles, nextCode }: Props) {
     setPayLocked(on)
   }
 
+  /**
+   * The base and the title ratchet against each other: the base carries the
+   * company title, so a title with no rung on that ladder cannot be based
+   * there. Changing either drops a pairing that has stopped being possible
+   * rather than sending it to the database to be refused.
+   */
+  function pickTitle(id: string) {
+    setTitleId(id)
+    const chosen = subChoices.find(sub => sub.id === homeSubDepartmentId)
+    if (chosen && baseUnavailableReason(chosen, id || null)) setHomeSubDepartmentId('')
+  }
+
   function pickDepartment(id: string) {
     const dept = departments.find(d => d.id === id) ?? null
     setDepartmentId(id)
     setTitleId('')
+    // The department's own default, so a hire nobody thinks about lands where
+    // they would have landed before any of this existed.
+    setHomeSubDepartmentId(subDepartmentsForDepartment(subDepartments, id).find(sub => sub.isHome)?.id ?? '')
+    setReportsTo('')
     // Each department decides which tick it offers, on by default; switching
     // resets both so a tick from the old department never rides along hidden.
     const commission = dept?.payroll_source === 'commission'
@@ -184,6 +223,70 @@ export default function AddStaffForm({ departments, titles, nextCode }: Props) {
           </select>
         </div>
         <div>
+          <label htmlFor="staff-sub-department" className={labelBase}>
+            Sub-department <span className={hintBase}>(where they are based)</span>
+          </label>
+          <select
+            id="staff-sub-department"
+            name="home_sub_department_id"
+            value={homeSubDepartmentId}
+            disabled={subChoices.length === 0}
+            onChange={e => setHomeSubDepartmentId(e.target.value)}
+            aria-describedby="staff-sub-department-hint"
+            className={textInput}
+          >
+            <option value="">{subChoices.length === 0 ? '— none' : '— department default'}</option>
+            {subChoices.map(sub => {
+              const reason = baseUnavailableReason(sub, titleId || null)
+              return (
+                <option key={sub.id} value={sub.id} disabled={!!reason}>
+                  {sub.name}
+                  {sub.isHome ? ' · default' : ''}
+                  {reason ? ` — ${reason}` : ''}
+                </option>
+              )
+            })}
+          </select>
+          <p id="staff-sub-department-hint" className="font-serif italic text-muted text-xs mt-1">
+            {departmentId === ''
+              ? 'Pick a department first.'
+              : subChoices.length === 0
+                ? `${department?.name} is not divided into sub-departments.`
+                : 'The chart that draws them from the roster, and the ladder their title is read against.'}
+          </p>
+        </div>
+        <div>
+          <label htmlFor="staff-upline" className={labelBase}>
+            Reporting upline <span className={hintBase}>(optional)</span>
+          </label>
+          <select
+            id="staff-upline"
+            name="reports_to"
+            value={reportsTo}
+            onChange={e => setReportsTo(e.target.value)}
+            aria-describedby="staff-upline-hint"
+            className={textInput}
+          >
+            <option value="">— None</option>
+            {managerChoices.map(person => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+                {person.code ? ` · ${person.code}` : ''}
+                {person.departmentId !== departmentId && person.departmentName
+                  ? ` — ${person.departmentName}`
+                  : ''}
+              </option>
+            ))}
+          </select>
+          <p id="staff-upline-hint" className="font-serif italic text-muted text-xs mt-1">
+            {departmentId === ''
+              ? 'Pick a department first.'
+              : isCommissionDept
+                ? 'Inside a commission department this line is also the commission upline, so it stays inside the department.'
+                : 'Leave it blank to draw the line later on the hierarchy chart.'}
+          </p>
+        </div>
+        <div>
           <label htmlFor="staff-title" className={labelBase}>
             Designation{' '}
             <span className={hintBase}>(optional · a title from Role &amp; Permission)</span>
@@ -192,7 +295,7 @@ export default function AddStaffForm({ departments, titles, nextCode }: Props) {
             id="staff-title"
             name="title_id"
             value={titleId}
-            onChange={e => setTitleId(e.target.value)}
+            onChange={e => pickTitle(e.target.value)}
             className={textInput}
           >
             <option value="">— None</option>

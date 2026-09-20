@@ -2,7 +2,8 @@ import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import type { TitleOption } from '@/lib/staff-form'
+import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
+import { listSubDepartments } from '../../../revenue/_lib/sub-departments'
 import AddStaffForm, { type AddStaffDepartment } from '../_components/AddStaffForm'
 
 export default async function NewStaffPage() {
@@ -15,7 +16,7 @@ export default async function NewStaffPage() {
   // segment_key 'director' is the one the Director Salary engine pays, and so
   // the one that offers "Variable pay".
   // Titles are rows since 2026-09-01; only the active ones are on offer.
-  const [{ data: departments }, { data: titles }, nextCode] = await Promise.all([
+  const [{ data: departments }, { data: titles }, subDepartments, { data: roster }, { data: rungs }, nextCode] = await Promise.all([
     supabase
       .from('departments')
       .select('id, name, payroll_source, segment_key')
@@ -26,6 +27,23 @@ export default async function NewStaffPage() {
       .select('id, name, department_id')
       .eq('is_active', true)
       .order('name'),
+    // A department may be divided (Revenue: Fair, IR). Which one somebody is
+    // BASED in is their own fact since 2026-09-20 and is chosen here, at the
+    // one moment the whole record is being written.
+    listSubDepartments(),
+    // Who they report to. Inside a commission department that line is also the
+    // commission upline, so the form keeps it inside the department; the
+    // database refuses the rest (23BND, 23REC, 23LAD).
+    supabase
+      .from('hr_staff_costs')
+      .select('id, employee_name, employee_code, department_id, departments (name)')
+      .eq('status', 'active')
+      .order('employee_name'),
+    // A base carries the company title, so it needs a rung on that ladder.
+    (supabase as unknown as SupabaseClient)
+      .from('comm_ranks')
+      .select('scheme_id, title_id')
+      .then(r => r, () => ({ data: [] as Array<{ scheme_id: string; title_id: string }> })),
     // The code the person will get — HV + the largest number on the roster
     // + 1, handed out by the database when the row is saved (trigger
     // `hr_staff_costs_assign_code`, 2026-09-12). Asked here only so the form
@@ -39,6 +57,30 @@ export default async function NewStaffPage() {
         () => null,
       ),
   ])
+
+  const titlesByScheme = new Map<string, string[]>()
+  for (const rung of (rungs ?? []) as Array<{ scheme_id: string; title_id: string }>) {
+    titlesByScheme.set(rung.scheme_id, [...(titlesByScheme.get(rung.scheme_id) ?? []), rung.title_id])
+  }
+  const subDepartmentOptions: SubDepartmentOption[] = subDepartments
+    .filter(sub => sub.schemeId)
+    .map(sub => ({
+      id: sub.id,
+      name: sub.name,
+      departmentId: sub.departmentId,
+      isHome: sub.isHome,
+      titleIds: [...new Set(titlesByScheme.get(sub.schemeId!) ?? [])],
+    }))
+  const managers: ManagerOption[] = ((roster ?? []) as Array<{
+    id: string; employee_name: string; employee_code: string | null; department_id: string | null
+    departments: { name: string } | Array<{ name: string }> | null
+  }>).map(person => ({
+    id: person.id,
+    name: person.employee_name,
+    code: person.employee_code,
+    departmentId: person.department_id,
+    departmentName: (Array.isArray(person.departments) ? person.departments[0] : person.departments)?.name ?? null,
+  }))
 
   return (
     <div>
@@ -61,6 +103,8 @@ export default async function NewStaffPage() {
       <AddStaffForm
         departments={(departments ?? []) as AddStaffDepartment[]}
         titles={(titles ?? []) as TitleOption[]}
+        subDepartments={subDepartmentOptions}
+        managers={managers}
         nextCode={nextCode}
       />
     </div>

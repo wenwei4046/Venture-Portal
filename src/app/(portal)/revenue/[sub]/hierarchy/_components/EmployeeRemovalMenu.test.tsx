@@ -12,9 +12,9 @@ vi.mock('../../../employee-actions', () => actions)
 function destination(extra: Partial<MembershipDestination> = {}): MembershipDestination {
   return {
     subDepartmentId: 'ir', name: 'IR', slug: 'ir', departmentId: 'revenue',
-    departmentName: 'Revenue', schemeId: 'ir-scheme', isHome: false,
+    departmentName: 'Revenue', schemeId: 'ir-scheme', createdAt: '2026-09-10T00:00:00Z', isHome: false,
     titles: [{ id: 'specialist', name: 'Revenue Specialist' }, { id: 'leader', name: 'Team Leader' }],
-    memberStaffIds: [], eligibleStaffIds: ['mei'], unavailableReason: null,
+    homeStaffIds: [], memberStaffIds: [], eligibleStaffIds: ['mei'], unavailableReason: null,
     ...extra,
   }
 }
@@ -23,11 +23,11 @@ function destinations(): MembershipDestination[] {
   return [
     destination({
       subDepartmentId: 'fair', name: 'Fair', slug: 'fair', schemeId: 'fair-scheme',
-      isHome: true, memberStaffIds: ['mei'], unavailableReason: 'Membership follows the department roster.',
+      createdAt: '2026-08-31T00:00:00Z', isHome: true, homeStaffIds: ['mei'], memberStaffIds: ['mei'],
     }),
     destination({ memberStaffIds: ['mei'] }),
-    destination({ subDepartmentId: 'events', name: 'Events', slug: 'events', schemeId: 'events-scheme' }),
-    destination({ subDepartmentId: 'retail', name: 'Retail', slug: 'retail', schemeId: 'retail-scheme', memberStaffIds: ['mei'] }),
+    destination({ subDepartmentId: 'events', name: 'Events', slug: 'events', schemeId: 'events-scheme', createdAt: '2026-09-12T00:00:00Z' }),
+    destination({ subDepartmentId: 'retail', name: 'Retail', slug: 'retail', schemeId: 'retail-scheme', createdAt: '2026-09-14T00:00:00Z', memberStaffIds: ['mei'] }),
   ]
 }
 
@@ -123,16 +123,77 @@ describe('EmployeeRemovalMenu', () => {
     expectNoWrites()
   })
 
-  it('explains that a home membership follows the roster and cannot be removed or moved to a sibling', () => {
-    setup({ currentDepartment: { schemeId: 'fair-scheme', name: 'Fair', isHome: true } })
+  /**
+   * A cascade that never closes a branch leaves two open at once, and the
+   * panel the pointer has walked away from is the one covering what it wants.
+   * The rows this happens on are usually the greyed-out ones, which fire no
+   * hover of their own — so the PANEL hears it and closes the branch.
+   */
+  it('closes the move list when the pointer walks onto another row, disabled ones included', () => {
+    setup({ currentDepartment: { schemeId: 'fair-scheme', name: 'Fair', isHome: true },
+      destinations: destinations().map(item => item.schemeId === 'fair-scheme'
+        ? item : { ...item, memberStaffIds: [] }) })
+    // Fair is their only department here, so the removal row below is disabled.
+    fireEvent.mouseEnter(within(rootMenu()).getByRole('menuitem', { name: 'Move to other department' }))
+    expect(screen.getByRole('menu', { name: 'Move Mei Ting to department' })).toBeInTheDocument()
+
     const removal = within(rootMenu()).getByRole('menuitem', { name: /^Remove from this department/ })
     expect(removal).toBeDisabled()
-    expect(rootMenu()).toHaveTextContent(/home|roster/i)
+    fireEvent.mouseOver(removal)
+    expect(screen.queryByRole('menu', { name: 'Move Mei Ting to department' })).not.toBeInTheDocument()
+    expectNoWrites()
+  })
+
+  it('keeps a branch the pointer opened while the pointer is still inside it', () => {
+    setup()
     const choices = moveChoices()
-    expect(within(choices).getByRole('menuitem', { name: 'IR' })).toBeDisabled()
-    expect(within(choices).getByRole('menuitem', { name: 'Events' })).toBeDisabled()
+    fireEvent.mouseOver(within(choices).getByRole('menuitem', { name: 'Events' }))
+    expect(screen.getByRole('menu', { name: 'Move Mei Ting to department' })).toBeInTheDocument()
+    expectNoWrites()
+  })
+
+  it('leaves the department somebody is based in, naming the oldest one they keep working in as their new base', () => {
+    setup({ currentDepartment: { schemeId: 'fair-scheme', name: 'Fair', isHome: true } })
+    const removal = within(rootMenu()).getByRole('menuitem', { name: /^Remove from this department/ })
+    expect(removal).toBeEnabled()
+    // IR (2026-09-10) is older than Retail (2026-09-14), and it is the one the
+    // database moves the base to, so it is the one the menu may name.
+    expect(removal).toHaveTextContent('Their base moves to IR')
+    const choices = moveChoices()
+    expect(within(choices).getByRole('menuitem', { name: 'IR' })).toBeEnabled()
+    expect(within(choices).getByRole('menuitem', { name: 'Events' })).toBeEnabled()
     expect(within(choices).getByRole('menuitem', { name: 'HR' })).toBeEnabled()
     expectNoWrites()
+  })
+
+  it('sends somebody who works nowhere else to Terminate employee instead of removing their only department', () => {
+    setup({
+      currentDepartment: { schemeId: 'fair-scheme', name: 'Fair', isHome: true },
+      destinations: destinations().map(item => item.schemeId === 'fair-scheme'
+        ? item : { ...item, memberStaffIds: [] }),
+    })
+    const removal = within(rootMenu()).getByRole('menuitem', { name: /^Remove from this department/ })
+    expect(removal).toBeDisabled()
+    expect(removal).toHaveTextContent('the only department Mei Ting works in')
+    expect(removal).toHaveTextContent('Terminate employee')
+    expect(within(rootMenu()).getByRole('menuitem', { name: /^Terminate employee/ })).toBeEnabled()
+    expectNoWrites()
+  })
+
+  it('confirms a removal by saying where the base and the company line are going', async () => {
+    const { onDone } = setup({ currentDepartment: { schemeId: 'fair-scheme', name: 'Fair', isHome: true } })
+    fireEvent.click(within(rootMenu()).getByRole('menuitem', { name: /^Remove from this department/ }))
+    expect(newestPanel()).toHaveTextContent('IR')
+    expect(newestPanel()).toHaveTextContent(/becomes the department they are based in/)
+    expect(newestPanel()).toHaveTextContent(/company reporting line follows them/)
+    expectNoWrites()
+    actions.removeEmployeeMembership.mockResolvedValueOnce({ ok: true, note: null })
+    fireEvent.click(confirmAction())
+    await waitFor(() => expect(actions.removeEmployeeMembership).toHaveBeenCalledOnce())
+    expect(payloadOf(actions.removeEmployeeMembership)).toEqual({
+      staff_id: 'mei', source_scheme_id: 'fair-scheme',
+    })
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
   })
 
   it('requires confirmation to move to a new sibling membership and sends the source, destination and selected title', async () => {

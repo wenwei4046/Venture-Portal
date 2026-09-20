@@ -10,8 +10,9 @@ import { rankAfterTitleChange, rankForTitle, titleCanRecruit, type AssignableRun
  *
  * ONE LINE (user, 2026-09-10): inside a commission department the reporting
  * line IS the commission upline. `hr_staff_costs.reports_to` is the fact for
- * the HOME sub-department — the department's oldest — and the membership the
- * engine reads (`comm_hierarchy`) is derived from it by the database
+ * the sub-department that person is BASED in — their own
+ * `home_sub_department_id`, else the department's oldest (2026-09-20) — and
+ * the membership the engine reads (`comm_hierarchy`) is derived from it by the database
  * (trigger `hr_staff_costs_one_line_sync`, migrations 20260910120000 and
  * 20260910160000) with the company title and the rank it guarantees.
  *
@@ -143,7 +144,8 @@ async function updateChecked(
  * Known codes get a sentence written here; the triggers that refuse a line
  * write theirs for a reader (23LAD the ladder, 23BND the department edge,
  * 23REC a title that cannot hold downlines, 23RNK a title with no rung,
- * 23DIR a department head where one may not be) and those pass through;
+ * 23DIR a department head where one may not be, 23HOM a base that is not
+ * theirs to have) and those pass through;
  * anything else gets a shrug, and the detail stays in the server log.
  */
 export function safeReason(error: { code?: string; message: string }): string {
@@ -157,6 +159,7 @@ export function safeReason(error: { code?: string; message: string }): string {
     case '23CAP':
     case '23MEM':
     case '23DIR':
+    case '23HOM':
       return error.message
     case '23P01':
       return 'they already hold a position covering that period'
@@ -207,10 +210,11 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 
 /**
  * The roster facts a line's two ends need, read fresh. `canRecruit` is asked
- * the way the trigger asks it — does any rung of the title, on the HOME
- * ladder of the person's own department, allow downlines — so the sentence
- * the page shows before the round trip is the sentence the database would
- * have sent.
+ * the way the trigger asks it — does any rung of the title, on the ladder of
+ * the sub-department THAT PERSON is based in, allow downlines — so the
+ * sentence the page shows before the round trip is the sentence the database
+ * would have sent. Per person since 2026-09-20: Fair and IR disagree about a
+ * Revenue Specialist, so the department could not answer for both.
  */
 export async function loadLineFacts(
   supabase: SupabaseClient,
@@ -228,15 +232,15 @@ export async function loadLineFacts(
   if (error) throw new Error(`Could not read the roster: ${safeReason(error)}`)
   const rows = (data ?? []) as unknown as StaffRow[]
 
-  // Who may recruit on the home ladder, per (department, title) — the same
-  // answer `comm_title_can_recruit` gives the trigger.
+  // Who may recruit on their own base's ladder — the same answer
+  // `comm_staff_can_recruit` gives the trigger.
   const recruit = new Map<string, boolean | null>()
   await Promise.all(
     rows
       .filter(r => r.department_id && r.title_id && one(r.departments)?.payroll_source === 'commission')
       .map(async r => {
-        const { data: can } = await supabase.rpc('comm_title_can_recruit', {
-          p_department_id: r.department_id,
+        const { data: can } = await supabase.rpc('comm_staff_can_recruit', {
+          p_staff_id: r.id,
           p_title_id: r.title_id,
         })
         recruit.set(r.id, typeof can === 'boolean' ? can : null)

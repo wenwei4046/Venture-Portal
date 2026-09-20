@@ -1,5 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
+import { homeSubDepartmentOf } from '@/lib/revenue'
+import { listSubDepartments } from '../../_lib/sub-departments'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
@@ -49,7 +51,7 @@ const loadCommissionRoster = cache(async () => {
   const supabase = await untyped()
   return supabase
     .from('hr_staff_costs')
-    .select('id, employee_name, employee_code, reports_to, tax_mode, withholding_rate, title_id, titles (name, level_id, is_department_head), departments!inner (name, payroll_source)')
+    .select('id, employee_name, employee_code, reports_to, tax_mode, withholding_rate, title_id, department_id, home_sub_department_id, titles (name, level_id, is_department_head), departments!inner (name, payroll_source)')
     .eq('status', 'active')
     .eq('departments.payroll_source', 'commission')
     .order('employee_name')
@@ -179,14 +181,18 @@ export async function loadCommissionSettings(
  */
 export async function loadTeam(
   schemeId: string,
-  opts: { isHome: boolean; subDepartmentId: string },
+  opts: { subDepartmentId: string },
 ): Promise<TeamData> {
   const supabase = await untyped()
 
-  const [{ data: rankRows }, { data: staffRows }, { data: positions }, { data: levelRows }, { data: titleRows }, capacity, expansions, currentCapacity, { data: directorRows }] =
+  const [{ data: rankRows }, { data: staffRows }, subDepartments, { data: positions }, { data: levelRows }, { data: titleRows }, capacity, expansions, currentCapacity, { data: directorRows }] =
     await Promise.all([
       supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
       loadCommissionRoster(),
+      // Who is BASED here (2026-09-20). Home is a person's own fact now, so
+      // one sub-department can draw some people from the roster and others
+      // from their membership row — the answer is per name, never per chart.
+      listSubDepartments(),
       supabase
         .from('comm_hierarchy')
         .select('id, staff_id, scheme_id, upline_staff_id, rank_id, rate_mode, effective_from, title_id, titles (name, level_id), comm_ranks (rank_key, label)')
@@ -254,6 +260,8 @@ export async function loadTeam(
     tax_mode: 'pcb' | 'withholding' | 'none' | null
     withholding_rate: number | null
     title_id: string | null
+    department_id: string | null
+    home_sub_department_id: string | null
     titles: TitleEmbed | TitleEmbed[] | null
   }>(staffRows)
 
@@ -263,16 +271,28 @@ export async function loadTeam(
   const heads = staff.filter(isHead)
   const members = staff.filter(s => !isHead(s))
 
+  // BASED HERE: this sub-department is where the company roster describes
+  // them — their line is `reports_to` and their title is the company title.
+  // Somebody else's membership of the same sub-department is its own chart's,
+  // so the two kinds of row sit side by side on one table.
+  const basedHere = (s: { id: string; department_id: string | null; home_sub_department_id: string | null }) =>
+    homeSubDepartmentOf(
+      { departmentId: s.department_id, homeSubDepartmentId: s.home_sub_department_id },
+      subDepartments,
+    ) === opts.subDepartmentId
+  const homeStaffIds = members.filter(basedHere).map(s => s.id)
+
   const people: SalespersonRow[] = members
-    .filter(s => opts.isHome || positionByStaff.has(s.id))
+    .filter(s => basedHere(s) || positionByStaff.has(s.id))
     .map(s => {
       const pos = positionByStaff.get(s.id)
+      const home = basedHere(s)
       const companyTitle = oneTitle(s.titles)
       // The title held HERE. The home membership mirrors the roster, so for
       // somebody the home chart draws without a membership yet (a title with
       // no rung) the roster's title is the right one to show.
-      const title = pos ? oneTitle(pos.titles) : opts.isHome ? companyTitle : null
-      const titleId = pos ? (pos.title_id ?? null) : opts.isHome ? (s.title_id ?? null) : null
+      const title = pos ? oneTitle(pos.titles) : home ? companyTitle : null
+      const titleId = pos ? (pos.title_id ?? null) : home ? (s.title_id ?? null) : null
       const rung = title?.level_id ? (rungByLevel.get(title.level_id) ?? null) : null
       const rank = Array.isArray(pos?.comm_ranks) ? (pos?.comm_ranks[0] ?? null) : (pos?.comm_ranks ?? null)
       return {
@@ -285,7 +305,12 @@ export async function loadTeam(
         title_level_name: rung?.name ?? null,
         company_title_name: companyTitle?.name ?? null,
         hierarchy_id: pos?.id ?? null,
-        upline_staff_id: opts.isHome ? (s.reports_to ?? null) : (pos?.upline_staff_id ?? null),
+        based_here: home,
+        // The membership row is the answer whenever there is one: for somebody
+        // based here the database keeps it equal to `reports_to`, except under
+        // a department head, where it is null and the director rail draws the
+        // line instead. Only a roster row with no membership yet falls back.
+        upline_staff_id: pos ? (pos.upline_staff_id ?? null) : home ? (s.reports_to ?? null) : null,
         reports_to: s.reports_to ?? null,
         rank_id: pos?.rank_id ?? null,
         rank_key: rank?.rank_key ?? null,
@@ -301,10 +326,11 @@ export async function loadTeam(
       }
     })
 
-  const candidates: MemberCandidate[] = opts.isHome
-    ? []
-    : members
-        .filter(s => !positionByStaff.has(s.id))
+  // Anybody in the department who neither holds a membership here nor is
+  // based here can be added by hand — including, since 2026-09-20, to the
+  // department's default home, which somebody else may have left.
+  const candidates: MemberCandidate[] = members
+        .filter(s => !positionByStaff.has(s.id) && !basedHere(s))
         .map(s => ({
           staff_id: s.id,
           employee_name: s.employee_name,
@@ -327,6 +353,7 @@ export async function loadTeam(
 
   return {
     subDepartmentId: opts.subDepartmentId,
+    homeStaffIds,
     ranks: rows<RankRow>(rankRows),
     people,
     titles: rows<{ id: string; name: string }>(titleRows).map(t => ({ id: t.id, name: t.name })),

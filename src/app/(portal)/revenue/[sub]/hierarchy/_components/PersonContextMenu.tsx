@@ -6,7 +6,7 @@ import { addMember, changeMemberTitle } from '../../../hierarchy-actions'
 import type { MembershipDestination } from '../../../_lib/membership-destinations'
 import type { PopAnchor } from './MovePopover'
 import styles from './membership-controls.module.css'
-import MenuPanel, { beside, hasSideSpace, openWithArrow, type OpenMenu } from './ContextMenuPanel'
+import MenuPanel, { beside, hasSideSpace, hoverMayCollapse, openWithArrow, type OpenMenu } from './ContextMenuPanel'
 import EmployeeRemovalMenu from './EmployeeRemovalMenu'
 import type { EmployeeDepartmentDestination } from '../../../_lib/employee-destinations'
 
@@ -17,6 +17,7 @@ interface MembershipPerson { staffId: string; name: string; titleId: string | nu
 /** One boundary for the root and all its portalled, cascading submenus. */
 export default function PersonContextMenu({ person, currentDepartment, destinations, employeeDepartments = [], canManageEmployment = false, employmentToday = '', anchor, startAtDepartments = false, onUpline, onAdded, onClose, onPendingChange }: {
   person: MembershipPerson
+  /** `isHome`: THIS PERSON is based here (2026-09-20), not the department's default. */
   currentDepartment?: { schemeId: string; name: string; isHome: boolean }
   destinations: MembershipDestination[]
   employeeDepartments?: EmployeeDepartmentDestination[]
@@ -126,6 +127,26 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
     setError(null)
     setRemovalMenu({ anchor: nextAnchor, focus })
   }
+  /**
+   * Hovering any row but the three that own a branch collapses whatever is
+   * open — including the disabled ones, which fire nothing of their own.
+   */
+  function collapseBranches(row: HTMLButtonElement | null, panel: HTMLDivElement) {
+    if (writing.current) return
+    if (row === addButton.current || row === changeTitleButton.current || row === removeButton.current) return
+    if (!departmentMenu && !removalMenu && !changingTitle) return
+    if (!hoverMayCollapse(panel)) return
+    setDepartmentMenu(null); setDepartmentsStacked(false)
+    setTitleMenu(null); setTitlesStacked(false)
+    setRemovalMenu(null); setRemovalStacked(false)
+    setError(null)
+  }
+  function collapseTitles(row: HTMLButtonElement | null, panel: HTMLDivElement) {
+    if (writing.current || !titleMenu || changingTitle) return
+    if (row && row === destinationButtons.current.get(titleMenu.schemeId)) return
+    if (!hoverMayCollapse(panel)) return
+    setTitleMenu(null); setTitlesStacked(false); setError(null)
+  }
   function backFromRemoval() {
     if (writing.current) return
     setRemovalMenu(null)
@@ -192,7 +213,8 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
 
   return createPortal(<div ref={boundary} className={styles.layer} onContextMenu={event => event.preventDefault()}>
     {!startAtDepartments ? <MenuPanel label={`Actions for ${person.name}`} anchor={anchor} focus
-      hidden={(!!departmentMenu && departmentsStacked) || (changingTitle && titlesStacked) || (!!removalMenu && removalStacked)} onBack={close} onClose={close}>
+      hidden={(!!departmentMenu && departmentsStacked) || (changingTitle && titlesStacked) || (!!removalMenu && removalStacked)}
+      onRowHover={collapseBranches} onBack={close} onClose={close}>
       <div className={styles.menuHeading}>{person.name}</div>
       <button ref={addButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="menu"
         aria-expanded={!!departmentMenu} aria-controls={departmentMenu ? departmentMenuId : undefined}
@@ -222,7 +244,7 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
     {departmentMenu ? <MenuPanel id={departmentMenuId} label={`Add ${person.name} to department`}
       anchor={departmentMenu.anchor} submenu={!startAtDepartments} focus={departmentMenu.focus}
       hidden={!!titleMenu && titlesStacked}
-      onStackedChange={setDepartmentsStacked}
+      onStackedChange={setDepartmentsStacked} onRowHover={collapseTitles}
       onBack={backToActions} onClose={close}>
       {!startAtDepartments && departmentsStacked ? <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={backToActions}>‹ Back</button> : null}
       <div className={styles.menuHeading}>Add {person.name} to</div>

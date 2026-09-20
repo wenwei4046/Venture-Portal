@@ -525,9 +525,9 @@ never written as an upline by the app:
 
 - `hr_staff_costs_one_line_sync` (AFTER INSERT OR UPDATE OF reports_to,
   title_id, department_id, status) calls `comm_sync_position(staff_id,
-  actor)`: upline = `reports_to`; scheme = the department's live scheme
-  (`comm_scheme_for_department`, oldest active sub-department — a person →
-  sub-department column is owed the day a department has two); rank = the
+  actor)`: upline = `reports_to`; scheme = THAT PERSON's live scheme
+  (`comm_home_scheme_for_staff` — their own `home_sub_department_id`, else
+  the department's oldest; see "A person's own home" below); rank = the
   title's floor rung (`comm_floor_rank`) when a position is first opened,
   raised to a new title's floor when that stands higher, never lowered. A
   position that started this period (`comm_period_start()`, Malaysian time)
@@ -540,13 +540,41 @@ never written as an upline by the app:
   title_id, department_id) refuses, with a sentence: a line across the
   department's edge in either direction, or a department change that would
   leave reports on the other side (`23BND`); inside the department a manager
-  whose title may not hold downlines (`comm_title_can_recruit` — SRS and
-  above on Fair), or a title change to one that may not while somebody
-  reports to them (`23REC`). The app says the same sentences first
-  (`lib/hierarchy-boundary.ts`).
+  whose title may not hold downlines (`comm_staff_can_recruit`, on the
+  MANAGER's own base ladder — SRS and above on Fair, any title in IR), or a
+  title change to one that may not while somebody reports to them (`23REC`).
+  The app says the same sentences first (`lib/hierarchy-boundary.ts`).
 
 The only `comm_hierarchy` write left in the app for the home sub-department is
 the rank (Team tab, `setMembershipRank`).
+
+**A person's own home (2026-09-20, migration
+`20260920040000_home_sub_department_per_person`).** Which sub-department the
+roster describes was the DEPARTMENT's oldest, chosen by `created_at` and by
+nobody: every Revenue employee was drawn on Fair whether or not they ever
+worked a fair. `hr_staff_costs.home_sub_department_id` is the choice; NULL
+keeps the old answer, so the migration moved no one.
+
+- `comm_home_sub_department(staff)` / `comm_home_scheme_for_staff(staff)`
+  resolve it — their own choice while it belongs to their department, else
+  that department's oldest (the same rule as `comm_scheme_for_department`,
+  which stays for questions asked of a department rather than a person).
+  SECURITY DEFINER: they answer with an id, and the answer must not depend on
+  who is asking. `homeSubDepartmentOf` in `lib/revenue.ts` is the twin.
+- `hr_staff_costs_home_sub_department` (BEFORE INSERT OR UPDATE OF
+  home_sub_department_id, department_id, title_id) keeps it honest (`23HOM`):
+  an active sub-department of the person's own department, with a live
+  scheme, and — when the choice is first made — a rung for their company
+  title. A department change clears it.
+- `employee_chart_lifecycle('remove', …)` on the sub-department somebody is
+  based in no longer refuses: while they still hold a membership elsewhere in
+  the department, the base MOVES to the oldest of those, and `reports_to` is
+  set to the upline they already have on that chart — so the roster starts by
+  agreeing with the receiving tree instead of flattening it. Refused when it
+  is their only one ("use Terminate employee"), and when anybody still
+  reports to them on the company chart.
+- `apply_commission_run` raises the COMPANY title only for the run's own
+  scheme when that scheme is the person's base, not the department's.
 
 **Memberships per sub-department (2026-09-10, migration `20260910160000`).**
 A sub-department is a world of its own, so a person holds one `comm_hierarchy`
@@ -631,6 +659,11 @@ hr_staff_costs (
     title_id        uuid FK → titles NULL            -- ON DELETE SET NULL (2026-09-01)
     user_id         uuid FK → users NULL             -- 登录账号，唯一，多数人为 NULL
     reports_to      uuid FK → hr_staff_costs NULL    -- 直属上司，全公司（2026-09-01）
+    home_sub_department_id uuid FK → comm_sub_departments NULL
+                                                     -- 他 BASED 在哪个 sub-department（2026-09-20）：
+                                                     --   roster（reports_to + 公司 title）描述的就是这一张图的 membership。
+                                                     --   NULL = 该部门最老的那个（2026-09-20 之前所有人都是这样），
+                                                     --   换部门时自动清空
     employee_code   text NULL                        -- HV001, HV002 …（2026-09-12）：trigger 发号 = 全表最大号 + 1（inactive 也算），
                                                      --   一旦有了就不会被清空；partial UNIQUE (employee_code) WHERE status = 'active'
     infotech_code   text NULL                        -- InfoTech 自己的 Emp No（2026-09-12）：两个 import 先按它配人、再按名字；

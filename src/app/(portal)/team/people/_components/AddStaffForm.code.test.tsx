@@ -13,7 +13,7 @@ vi.mock('../actions', () => ({ addStaff: vi.fn() }))
  */
 describe('Add Staff — employee code', () => {
   it('shows the number the person will get, disabled and unnamed so nothing is submitted', () => {
-    const { container } = render(<AddStaffForm departments={[]} titles={[]} nextCode="HV062" />)
+    const { container } = render(<AddStaffForm subDepartments={[]} managers={[]} departments={[]} titles={[]} nextCode="HV062" />)
 
     const code = screen.getByLabelText(/Employee code/i) as HTMLInputElement
     expect(code.value).toBe('HV062')
@@ -24,7 +24,7 @@ describe('Add Staff — employee code', () => {
   })
 
   it('still says how the code is made when the preview could not be read', () => {
-    render(<AddStaffForm departments={[]} titles={[]} nextCode={null} />)
+    render(<AddStaffForm subDepartments={[]} managers={[]} departments={[]} titles={[]} nextCode={null} />)
 
     const code = screen.getByLabelText(/Employee code/i) as HTMLInputElement
     expect(code.value).toBe('HV…')

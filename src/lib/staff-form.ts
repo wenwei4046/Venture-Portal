@@ -29,6 +29,13 @@ export interface RawStaffForm {
    * none. Statutory categories still apply to whatever is keyed.
    */
   variablePay?: boolean
+  /**
+   * The sub-department a commission hire is BASED in (2026-09-20). Blank for a
+   * department that has none, and blank means the department's default.
+   */
+  homeSubDepartmentId?: string | null
+  /** Who they report to. Blank is allowed: a line can be drawn later on the chart. */
+  reportsTo?: string | null
   basicSalary?: string | null
   allowances?: string | null
   nonStatutoryAllowance?: string | null
@@ -48,6 +55,8 @@ export interface ValidStaffForm {
   name: string
   departmentId: string
   titleId: string | null
+  homeSubDepartmentId: string | null
+  reportsTo: string | null
   employmentType: StaffEmploymentType
   basicSalary: number
   allowances: number
@@ -115,6 +124,8 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
     name,
     departmentId,
     titleId: clean(raw.titleId),
+    homeSubDepartmentId: clean(raw.homeSubDepartmentId),
+    reportsTo: clean(raw.reportsTo),
     employmentType: fullCommission ? 'commission_eligible' : variablePay ? 'variable' : 'salaried',
     basicSalary,
     allowances,
@@ -129,6 +140,74 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
     emergencyContactPhone: clean(raw.emergencyContactPhone),
     emergencyContactRelationship: clean(raw.emergencyContactRelationship),
   }
+}
+
+/** A sub-department, as the Add Staff form offers it. */
+export interface SubDepartmentOption {
+  id: string
+  name: string
+  departmentId: string
+  /** The department's default: where somebody lands who chooses nothing. */
+  isHome: boolean
+  /** The titles with a rung on this sub-department's ladder. */
+  titleIds: string[]
+}
+
+/**
+ * The sub-departments of one department, the default first.
+ *
+ * A department with none — Marketing, Finance — gets an empty list and the
+ * form leaves the field blank: the question does not arise there.
+ */
+export function subDepartmentsForDepartment(
+  subs: readonly SubDepartmentOption[],
+  departmentId: string,
+): SubDepartmentOption[] {
+  if (!departmentId) return []
+  return subs
+    .filter(sub => sub.departmentId === departmentId)
+    .sort((a, b) => Number(b.isHome) - Number(a.isHome) || a.name.localeCompare(b.name))
+}
+
+/**
+ * Why a sub-department cannot be somebody's base, or null when it can.
+ *
+ * The base carries the COMPANY title, so that title needs a rung on that
+ * ladder — the database says the same thing (23HOM) and the form would rather
+ * not let anybody reach it. No title chosen yet: no rung to want.
+ */
+export function baseUnavailableReason(sub: SubDepartmentOption, titleId: string | null): string | null {
+  if (!titleId) return null
+  return sub.titleIds.includes(titleId) ? null : 'no rung for this title'
+}
+
+/** Somebody already on the roster, as the Add Staff form offers them as a manager. */
+export interface ManagerOption {
+  id: string
+  name: string
+  code: string | null
+  departmentId: string | null
+  departmentName: string | null
+}
+
+/**
+ * Who a new hire may be filed as reporting to.
+ *
+ * Inside a commission department the reporting line IS the commission upline,
+ * so it may not leave the department (23BND) — there the list is the
+ * department's own people and nobody else. Everywhere else a line across
+ * departments is ordinary, so everybody is on offer with their department
+ * named. The database checks the ladder and the recruiting title again.
+ */
+export function managersForDepartment(
+  people: readonly ManagerOption[],
+  departmentId: string,
+  commission: boolean,
+): ManagerOption[] {
+  if (!departmentId) return []
+  const own = people.filter(person => person.departmentId === departmentId)
+  if (commission) return own
+  return [...own, ...people.filter(person => person.departmentId !== departmentId)]
 }
 
 export interface TitleOption {

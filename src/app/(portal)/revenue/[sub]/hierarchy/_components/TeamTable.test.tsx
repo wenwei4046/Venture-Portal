@@ -21,15 +21,15 @@ describe('TeamTable membership actions', () => {
       staff_id: 'mei', employee_name: 'Mei Ting', employee_code: 'HV015',
       title_id: 'specialist', title_name: 'Revenue Specialist', title_level_rank: 2,
       title_level_name: 'Executive', company_title_name: 'Revenue Specialist',
-      hierarchy_id: 'fair-membership-mei', upline_staff_id: null, reports_to: null,
+      hierarchy_id: 'fair-membership-mei', based_here: true, upline_staff_id: null, reports_to: null,
       rank_id: null, rank_key: null, rank_label: null, rate_mode: null,
       placed_since: null, tax_mode: 'none', withholding_rate: 0,
     }
     const destination: MembershipDestination = {
       subDepartmentId: 'ir', name: 'IR', slug: 'ir', departmentId: 'revenue',
-      departmentName: 'Revenue', schemeId: 'ir-scheme', isHome: false,
+      departmentName: 'Revenue', schemeId: 'ir-scheme', createdAt: '2026-09-10T00:00:00Z', isHome: false,
       titles: [{ id: 'specialist', name: 'Revenue Specialist' }, { id: 'leader', name: 'Team Leader' }],
-      memberStaffIds: [], eligibleStaffIds: ['mei'], unavailableReason: null,
+      homeStaffIds: [], memberStaffIds: [], eligibleStaffIds: ['mei'], unavailableReason: null,
     }
     render(<TeamTable people={[person]} ranks={[]} titles={[]} candidates={[]}
       directors={[]} directorCandidates={[]} subDepartmentId="fair" schemeId="fair-scheme"

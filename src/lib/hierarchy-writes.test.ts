@@ -56,7 +56,7 @@ describe('department-head reporting writes', () => {
     expect(result).toMatchObject({ ok: true, reportsTo: 'principal', mover: { isDepartmentHead: true, reportsTo: 'principal' } })
     expect(db.writes).toEqual([{ table: 'hr_staff_costs', id: 'kris', patch: { reports_to: 'principal' } }])
     expect(db.from.mock.calls.every(([table]) => table === 'hr_staff_costs')).toBe(true)
-    expect(db.rpc.mock.calls.every(([name]) => name === 'comm_title_can_recruit')).toBe(true)
+    expect(db.rpc.mock.calls.every(([name]) => name === 'comm_staff_can_recruit')).toBe(true)
   })
 
   it('retains the real reports_to for head-to-head moves instead of normalizing to null', async () => {

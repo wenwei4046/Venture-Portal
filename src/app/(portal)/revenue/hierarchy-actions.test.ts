@@ -41,8 +41,17 @@ function database() {
     ],
   }
   const writes: Array<{ table: string; row: Row }> = []
-  const state = { insertError: null as DbError | null, readError: null as DbError | null, titleReadError: null as DbError | null, rpcError: null as DbError | null }
-  const rpc = vi.fn(async (_name: string, _args: Row) => ({ data: null, error: state.rpcError }))
+  const state = {
+    insertError: null as DbError | null, readError: null as DbError | null,
+    titleReadError: null as DbError | null, rpcError: null as DbError | null,
+    /** Where the person is BASED — what `comm_home_sub_department` answers. */
+    basedIn: 'fair' as string | null,
+  }
+  // The home lookup is a read every membership action now makes, so it is kept
+  // off `writeRpc`: "nothing was written" has to stay a statement about writes.
+  const writeRpc = vi.fn(async (_name: string, _args: Row) => ({ data: null, error: state.rpcError }))
+  const rpc = vi.fn(async (name: string, args: Row) =>
+    name === 'comm_home_sub_department' ? { data: state.basedIn, error: null } : writeRpc(name, args))
   const from = vi.fn((table: string) => {
     const filters: Array<(row: Row) => boolean> = []
     const result = () => ({ data: tables[table].filter(row => filters.every(filter => filter(row))), error: state.readError ?? (table === 'titles' ? state.titleReadError : null) })
@@ -60,7 +69,7 @@ function database() {
     }
     return query
   })
-  return { from, rpc, tables, writes, state, source }
+  return { from, rpc, writeRpc, tables, writes, state, source }
 }
 
 function form(overrides: Record<string, string> = {}) {
@@ -238,7 +247,7 @@ describe('changeMemberTitle on the current sub-department card', () => {
     const request = form({ title_id: 'leader-title', rank_id: 'other-title-rank', rate_mode: 'fixed', upline_staff_id: 'someone-else' })
 
     expect(await changeMemberTitle(request)).toEqual({ ok: true, note: null })
-    expect(db.rpc).toHaveBeenCalledExactlyOnceWith('comm_replace_membership_position', {
+    expect(db.writeRpc).toHaveBeenCalledExactlyOnceWith('comm_replace_membership_position', {
       p_position_id: 'ir-position', p_title_id: 'leader-title', p_rank_id: 'leader-floor',
       p_rate_mode: 'variable', p_upline_staff_id: 'ir-manager', p_actor: 'actor',
     })
@@ -255,14 +264,14 @@ describe('changeMemberTitle on the current sub-department card', () => {
     db.tables.comm_ranks.push({ id: 'earned-rank', scheme_id: 'ir-scheme', title_id: 'leader-title', can_recruit: true, sort_order: 9 })
     position.rank_id = 'earned-rank'
     expect(await changeMemberTitle(form({ title_id: 'leader-title' }))).toEqual({ ok: true, note: null })
-    expect(db.rpc).toHaveBeenCalledWith('comm_replace_membership_position', expect.objectContaining({
+    expect(db.writeRpc).toHaveBeenCalledWith('comm_replace_membership_position', expect.objectContaining({
       p_rank_id: 'earned-rank', p_title_id: 'leader-title', p_rate_mode: 'variable', p_upline_staff_id: 'ir-manager',
     }))
   })
 
   it('does not rewrite an already selected title or accept browser rank/mode changes', async () => {
     expect(await changeMemberTitle(form({ rank_id: 'leader-floor', rate_mode: 'fixed' }))).toEqual({ ok: true, note: null })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
     expect(db.writes).toEqual([])
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
@@ -277,7 +286,7 @@ describe('changeMemberTitle on the current sub-department card', () => {
     ['title from another scheme', { title_id: 'company-title' }, 'no rung'],
   ])('rejects %s without writing', async (_label, overrides, note) => {
     expect(await changeMemberTitle(form(overrides))).toMatchObject({ ok: false, note: expect.stringContaining(note) })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
     expect(db.writes).toEqual([])
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
@@ -289,7 +298,7 @@ describe('changeMemberTitle on the current sub-department card', () => {
   ])('rejects somebody who became %s after their menu opened', async (_label, patch, note) => {
     Object.assign(db.tables.hr_staff_costs[0], patch)
     expect(await changeMemberTitle(form({ title_id: 'leader-title' }))).toMatchObject({ ok: false, note: expect.stringContaining(note) })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -299,27 +308,27 @@ describe('changeMemberTitle on the current sub-department card', () => {
   ])('rejects a %s title even if a rung still references it', async (_label, patch) => {
     Object.assign(db.tables.titles[2], patch)
     expect(await changeMemberTitle(form({ title_id: 'leader-title' }))).toMatchObject({ ok: false, note: expect.stringContaining('no longer an active member title') })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
   })
 
   it.each(['missing', 'closed'])('rejects a %s current membership even when another department has one', async kind => {
     if (kind === 'missing') db.tables.comm_hierarchy = [db.source]
     else position.effective_to = '2026-08-31'
     expect(await changeMemberTitle(form({ title_id: 'leader-title' }))).toMatchObject({ ok: false, note: expect.stringContaining('no longer a member') })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
     expect(db.writes).toEqual([])
   })
 
   it('refuses to carry a malformed cross-scheme current rank into the replacement', async () => {
     position.rank_id = 'other-title-rank'
     expect(await changeMemberTitle(form({ title_id: 'leader-title' }))).toMatchObject({ ok: false, note: expect.stringContaining('current rank is not on') })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
   })
 
   it('refuses a title whose rung was removed after the menu opened', async () => {
     db.tables.comm_ranks = db.tables.comm_ranks.filter(row => row.id !== 'leader-floor')
     expect(await changeMemberTitle(form({ title_id: 'leader-title' }))).toMatchObject({ ok: false, note: expect.stringContaining('no rung') })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
   })
 
   it('returns a readable database refusal without claiming success or issuing a separate row write', async () => {
@@ -337,7 +346,7 @@ describe('changeMemberTitle on the current sub-department card', () => {
     db.state.readError = null
     db.state.titleReadError = { code: '42501', message: 'permission denied' }
     expect(await changeMemberTitle(form())).toMatchObject({ ok: false, note: expect.stringContaining('selected title') })
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
 
@@ -346,6 +355,6 @@ describe('changeMemberTitle on the current sub-department card', () => {
     mocks.requirePermission.mockRejectedValueOnce(denied)
     await expect(changeMemberTitle(form({ title_id: 'leader-title' }))).rejects.toBe(denied)
     expect(mocks.createClient).not.toHaveBeenCalled()
-    expect(db.rpc).not.toHaveBeenCalled()
+    expect(db.writeRpc).not.toHaveBeenCalled()
   })
 })

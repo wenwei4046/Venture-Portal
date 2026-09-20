@@ -19,7 +19,8 @@
 .groupHeading { padding: 6px 9px 4px; color: rgb(var(--muted)); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
 .menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 34px; border-radius: 4px; padding: 7px 9px; text-align: left; }
 .menu button:hover:not(:disabled), .menu button:focus-visible, .menu button[aria-expanded="true"] { background: rgb(var(--accent-bg)); color: rgb(var(--accent)); outline: none; }
-.menu button:disabled { color: rgb(var(--muted)); cursor: default; }
+/* No pointer events: the panel hears the hover instead, and collapses the branch a disabled row is standing under. Every disabled row prints its reason inline, so no native title tooltip is lost. */
+.menu button:disabled { color: rgb(var(--muted)); cursor: default; pointer-events: none; }
 .rowCopy { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .rowCopy small { font-size: 11px; line-height: 1.4; color: rgb(var(--muted)); }
 .chevron { flex-shrink: 0; color: rgb(var(--muted)); font-size: 15px; }

@@ -7,15 +7,16 @@ vi.mock('server-only', () => ({}))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 
 const subDepartments: SubDepartment[] = [
-  { id: 'fair', name: 'Fair', slug: 'fair', departmentId: 'revenue', schemeId: 'fair-scheme', isHome: true },
-  { id: 'ir', name: 'IR', slug: 'ir', departmentId: 'revenue', schemeId: 'ir-scheme', isHome: false },
+  { id: 'fair', name: 'Fair', slug: 'fair', departmentId: 'revenue', schemeId: 'fair-scheme', createdAt: '2026-08-31T00:00:00Z', isHome: true },
+  { id: 'ir', name: 'IR', slug: 'ir', departmentId: 'revenue', schemeId: 'ir-scheme', createdAt: '2026-09-10T00:00:00Z', isHome: false },
 ]
 
 function client(failingPage = false) {
   const data: Record<string, unknown[]> = {
     departments: [{ id: 'revenue', name: 'Revenue' }],
     hr_staff_costs: Array.from({ length: 1001 }, (_, index) => ({
-      id: `person-${index}`, department_id: 'revenue', titles: { is_department_head: false },
+      id: `person-${index}`, department_id: 'revenue', home_sub_department_id: null,
+      titles: { is_department_head: false },
     })),
     comm_ranks: [{ scheme_id: 'ir-scheme', title_id: 'specialist', titles: {
       id: 'specialist', name: 'Revenue Specialist', is_active: true, is_department_head: false,
@@ -55,6 +56,10 @@ describe('membership destination pagination', () => {
     expect(ir.memberStaffIds).toHaveLength(1001)
     expect(ir.memberStaffIds).toContain('person-1000')
     expect(ir.titles).toEqual([{ id: 'specialist', name: 'Revenue Specialist' }])
+    // Nobody chose a base, so all 1,001 fall back to the department's oldest.
+    const fair = destinations.find(destination => destination.subDepartmentId === 'fair')!
+    expect(fair.homeStaffIds).toHaveLength(1001)
+    expect(ir.homeStaffIds).toEqual([])
     for (const table of ['hr_staff_costs', 'comm_hierarchy']) {
       expect(queries.get(table)?.range.mock.calls).toEqual([[0, 999], [1000, 1999]])
     }

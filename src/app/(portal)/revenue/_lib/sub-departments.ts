@@ -35,6 +35,8 @@ export interface SubDepartment {
   departmentId: string
   /** The live scheme every rule row hangs off. Null only mid-setup. */
   schemeId: string | null
+  /** When it was opened. The tie-breaker everything that picks a home orders by. */
+  createdAt: string
   /** The department's oldest active sub-department — the one the company chart describes. */
   isHome: boolean
 }
@@ -90,6 +92,7 @@ export const listSubDepartments = cache(async (): Promise<SubDepartment[]> => {
     slug: subDeptSlug(s.name),
     departmentId: s.department_id,
     schemeId: schemeBySub.get(s.id) ?? null,
+    createdAt: s.created_at,
     isHome: home.has(s.id),
   }))
 })

@@ -65,6 +65,45 @@ export interface HomeCandidate {
  * by `created_at`, the first wins — so the two can never disagree about which
  * chart People is looking at.
  */
+/** What deciding one person's home needs to know about them. */
+export interface HomeMember {
+  departmentId: string | null
+  /**
+   * Their own choice of base. Null — which is what everybody carried before
+   * 2026-09-20 — means the department's default.
+   */
+  homeSubDepartmentId?: string | null
+}
+
+/** A sub-department, as `homeSubDepartmentOf` needs to see it. */
+export interface HomeChoice {
+  id: string
+  departmentId: string
+  /** The department's default home: its oldest, per `pickHomeSubDepartments`. */
+  isHome: boolean
+}
+
+/**
+ * The sub-department ONE PERSON is based in (2026-09-20).
+ *
+ * Their own `home_sub_department_id` while it belongs to their department,
+ * else that department's default. The TypeScript twin of
+ * `comm_home_sub_department` in SQL, and the two must agree: this decides
+ * which chart draws somebody from the roster, and that decides which
+ * membership the database derives.
+ */
+export function homeSubDepartmentOf(
+  person: HomeMember,
+  subs: readonly HomeChoice[],
+): string | null {
+  if (!person.departmentId) return null
+  const chosen = person.homeSubDepartmentId
+    ? subs.find(s => s.id === person.homeSubDepartmentId && s.departmentId === person.departmentId)
+    : undefined
+  if (chosen) return chosen.id
+  return subs.find(s => s.isHome && s.departmentId === person.departmentId)?.id ?? null
+}
+
 export function pickHomeSubDepartments(subs: readonly HomeCandidate[]): Set<string> {
   const oldest = new Map<string, HomeCandidate>()
   for (const s of subs) {
