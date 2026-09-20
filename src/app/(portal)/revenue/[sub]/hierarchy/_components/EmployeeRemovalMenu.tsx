@@ -4,7 +4,7 @@ import { useId, useLayoutEffect, useRef, useState, useTransition } from 'react'
 import { moveEmployee, removeEmployeeMembership, terminateEmployee } from '../../../employee-actions'
 import type { MembershipDestination } from '../../../_lib/membership-destinations'
 import type { EmployeeDepartmentDestination } from '../../../_lib/employee-destinations'
-import MenuPanel, { beside, hasSideSpace, openWithArrow, type MenuAnchor, type OpenMenu } from './ContextMenuPanel'
+import MenuPanel, { beside, hasSideSpace, hoverMayCollapse, openWithArrow, type MenuAnchor, type OpenMenu } from './ContextMenuPanel'
 import styles from './membership-controls.module.css'
 
 type Title = { id: string; name: string }
@@ -18,6 +18,7 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
   canManageEmployment, employmentToday, anchor, focus, onStackedChange, onBusyChange, onBack, onClose, onDone }: {
   id?: string
   person: { staffId: string; name: string; titleId: string | null }
+  /** `isHome`: THIS PERSON is based here (2026-09-20), not the department's default. */
   currentDepartment: { schemeId: string; name: string; isHome: boolean }
   destinations: MembershipDestination[]
   employeeDepartments: EmployeeDepartmentDestination[]
@@ -51,7 +52,20 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
   const siblings = destinations.filter(item => item.departmentId === source?.departmentId)
   const otherDepartments = employeeDepartments.filter(item => item.id !== source?.departmentId)
   const sourceIssue = !source?.memberStaffIds.includes(person.staffId) ? 'This membership is no longer available. Refresh the chart.' : null
-  const removeReason = sourceIssue ?? (currentDepartment.isHome ? 'This home membership follows the company roster. Move to another main department instead.' : null)
+  // Everywhere else in the department they still work (user, 2026-09-20).
+  // Leaving one department is allowed while another is left; leaving the LAST
+  // one is leaving the company, which is what Terminate employee records.
+  // Oldest first, because that is the one the database moves a base to.
+  const elsewhere = destinations.filter(item => item.departmentId === source?.departmentId
+    && item.schemeId !== currentDepartment.schemeId && item.memberStaffIds.includes(person.staffId))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.subDepartmentId.localeCompare(b.subDepartmentId))
+  const removeReason = sourceIssue
+    ?? (elsewhere.length === 0
+      ? `This is the only department ${person.name} works in. Use Terminate employee to record that they have left the company.`
+      : null)
+  // Their base moves with them: the roster has to describe one of the charts
+  // they are still on, and the oldest of them is the one the database picks.
+  const newBase = currentDepartment.isHome ? (elsewhere[0] ?? null) : null
 
   function reasonFor(destination: Destination): string | null {
     if (sourceIssue) return sourceIssue
@@ -62,7 +76,8 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
     }
     const item = destination.item
     if (item.schemeId === currentDepartment.schemeId) return 'Current sub-department'
-    if (removeReason) return removeReason
+    // A move always leaves them somewhere, so the "only department" refusal
+    // that stops a bare removal has no say here.
     if (item.departmentId !== source?.departmentId || !item.eligibleStaffIds.includes(person.staffId)) return 'Outside this person’s department'
     // Joining an existing destination is a move out of the source only.
     if (item.memberStaffIds.includes(person.staffId)) return null
@@ -99,6 +114,19 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
     setConfirmation({ action, trigger, destination, title, anchor: beside(trigger), focus: true })
     if (action !== 'move') { setMoveMenu(null); setTitleMenu(null); setMovesStacked(false); setTitlesStacked(false) }
     setError(null)
+  }
+  /** Hovering off the row that opened the move list takes the list with it. */
+  function collapseMoves(row: HTMLButtonElement | null, panel: HTMLDivElement) {
+    if (writing.current || confirmation || row === moveButton.current) return
+    if (!moveMenu && !titleMenu) return
+    if (!hoverMayCollapse(panel)) return
+    setMoveMenu(null); setTitleMenu(null); setMovesStacked(false); setTitlesStacked(false); setError(null)
+  }
+  function collapseTitles(row: HTMLButtonElement | null, panel: HTMLDivElement) {
+    if (writing.current || confirmation || !titleMenu) return
+    if (row && row === destinationButtons.current.get(destinationKey(titleMenu.destination))) return
+    if (!hoverMayCollapse(panel)) return
+    setTitleMenu(null); setTitlesStacked(false); setError(null)
   }
   function openDestination(destination: Destination, takeFocus: boolean) {
     const trigger = destinationButtons.current.get(destinationKey(destination))
@@ -176,7 +204,7 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
   const directConfirmation = confirmation && confirmation.action !== 'move'
   return <>
     <MenuPanel id={id} label={`Remove ${person.name}`} anchor={anchor} submenu focus={focus}
-      hidden={(!!moveMenu && movesStacked) || (!!directConfirmation && confirmationStacked)}
+      hidden={(!!moveMenu && movesStacked) || (!!directConfirmation && confirmationStacked)} onRowHover={collapseMoves}
       onStackedChange={stacked => { setRootStacked(stacked); onStackedChange(stacked) }} onBack={safeBack} onClose={safeClose}>
       {rootStacked ? <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={safeBack}>‹ Back</button> : null}
       <div className={styles.menuHeading}>{person.name} · {currentDepartment.name}</div>
@@ -187,7 +215,9 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
       </button>
       <button type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog" disabled={pending || !!removeReason}
         title={removeReason ?? undefined} onClick={event => openConfirmation('remove', event.currentTarget)}>
-        <span className={styles.rowCopy}><span>Remove from this department</span>{removeReason ? <small>{removeReason}</small> : null}</span>
+        <span className={styles.rowCopy}><span>Remove from this department</span>
+          {removeReason ? <small>{removeReason}</small>
+            : newBase ? <small>Their base moves to {newBase.name}</small> : null}</span>
       </button>
       <button type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog" disabled={pending || !canManageEmployment || !!sourceIssue}
         onClick={event => openConfirmation('terminate', event.currentTarget)}>
@@ -197,7 +227,7 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
 
     {moveMenu ? <MenuPanel id={movesId} label={`Move ${person.name} to department`} anchor={moveMenu.anchor} submenu focus={moveMenu.focus}
       hidden={(!!titleMenu && titlesStacked) || (!!confirmation && !titleMenu && confirmationStacked)}
-      onStackedChange={setMovesStacked} onBack={backFromMoves} onClose={safeClose}>
+      onRowHover={collapseTitles} onStackedChange={setMovesStacked} onBack={backFromMoves} onClose={safeClose}>
       {movesStacked ? <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={backFromMoves}>‹ Back</button> : null}
       <div className={styles.menuHeading}>Move {person.name} to</div>
       <div className={styles.groupHeading}>{source?.departmentName ?? 'Current department'} · Sub-departments</div>
@@ -223,7 +253,9 @@ export default function EmployeeRemovalMenu({ id, person, currentDepartment, des
       onStackedChange={setConfirmationStacked} onBack={backFromConfirmation} onClose={safeClose}>
       <div className={styles.menuHeading}>{confirmationLabel}</div>
       <p className={styles.confirmCopy}>
-        {confirmation.action === 'remove' ? <>Remove <strong>{person.name}</strong> from <strong>{currentDepartment.name}</strong> only. Their other memberships and employment remain.</>
+        {confirmation.action === 'remove' ? newBase
+          ? <>Remove <strong>{person.name}</strong> from <strong>{currentDepartment.name}</strong>. <strong>{newBase.name}</strong> becomes the department they are based in, and their company reporting line follows them to whoever they already earn under there. Employment and every other membership remain.</>
+          : <>Remove <strong>{person.name}</strong> from <strong>{currentDepartment.name}</strong> only. Their other memberships and employment remain.</>
           : confirmation.action === 'terminate' ? <>Mark <strong>{person.name}</strong> as no longer working. They leave active staff lists and hierarchy charts. Their record and payroll history remain.</>
           : destination?.kind === 'department' ? <>Move <strong>{person.name}</strong> to <strong>{destination.item.name}</strong> as {confirmation.title?.name}. This changes their company department and title, ends memberships in {source?.departmentName}, and clears their company reporting line.</>
           : confirmation.title ? <>Move <strong>{person.name}</strong> from <strong>{currentDepartment.name}</strong> to <strong>{destination?.item.name}</strong> as {confirmation.title.name}. Set a new upline there after moving. Other memberships remain.</>

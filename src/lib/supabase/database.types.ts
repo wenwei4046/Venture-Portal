@@ -4338,6 +4338,7 @@ export type Database = {
           emergency_contact_phone: string | null
           emergency_contact_relationship: string | null
           employee_code: string | null
+          home_sub_department_id: string | null
           infotech_code: string | null
           employee_name: string
           employment_type: Database["public"]["Enums"]["hr_employment_type"]
@@ -4381,6 +4382,7 @@ export type Database = {
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           employee_code?: string | null
+          home_sub_department_id?: string | null
           infotech_code?: string | null
           employee_name: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
@@ -4424,6 +4426,7 @@ export type Database = {
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
           employee_code?: string | null
+          home_sub_department_id?: string | null
           infotech_code?: string | null
           employee_name?: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]

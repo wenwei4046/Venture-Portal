@@ -15,7 +15,7 @@ const person = (over: Partial<OrgPerson> & { staffId: string; name: string }): O
   rankId: 'r-a',
   rankLabel: 'Rank A',
   productRate: 0.1,
-  canRecruit: true,
+  canRecruit: true, basedHere: true,
   rateMode: 'variable',
   placedSince: '2026-07-01',
   ...over,

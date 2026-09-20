@@ -25,8 +25,22 @@ export function openWithArrow(event: KeyboardEvent, open: () => void) {
   open()
 }
 
+/**
+ * A hover that lands anywhere but the row which opened a submenu should
+ * collapse that submenu: leaving one row for another is how a pointer says it
+ * changed its mind. Disabled rows take no pointer events (CSS), so the panel
+ * itself receives the hover for them — which is the whole point, because the
+ * rows a cascade most often strands are the greyed-out ones underneath.
+ * `hoverMayCollapse` keeps that to branches the pointer opened: once focus has
+ * moved into a submenu it was clicked or typed into, and Escape dismisses it.
+ */
+export function hoverMayCollapse(panel: HTMLElement): boolean {
+  const active = document.activeElement
+  return !active || active === document.body || panel.contains(active)
+}
+
 /** Position beside a parent row; replace it in place only when neither side fits. */
-export default function MenuPanel({ id, label, anchor, submenu = false, hidden = false, dialog = false, focus, onStackedChange, onBack, onClose, children }: {
+export default function MenuPanel({ id, label, anchor, submenu = false, hidden = false, dialog = false, focus, onStackedChange, onRowHover, onBack, onClose, children }: {
   id?: string
   label: string
   anchor: MenuAnchor
@@ -35,6 +49,8 @@ export default function MenuPanel({ id, label, anchor, submenu = false, hidden =
   dialog?: boolean
   focus: boolean
   onStackedChange?: (stacked: boolean) => void
+  /** The row under the pointer, or null for a gap, a heading or a disabled row. */
+  onRowHover?: (row: HTMLButtonElement | null, panel: HTMLDivElement) => void
   onBack: () => void
   onClose: () => void
   children: ReactNode
@@ -64,7 +80,10 @@ export default function MenuPanel({ id, label, anchor, submenu = false, hidden =
   }, [focus, hidden, anchor])
 
   return <div ref={ref} id={id} role={dialog ? 'dialog' : 'menu'} tabIndex={-1} aria-label={label} className={styles.menu}
-    style={{ ...position, visibility: hidden ? 'hidden' : undefined }} onKeyDown={event => {
+    style={{ ...position, visibility: hidden ? 'hidden' : undefined }}
+    onMouseOver={onRowHover ? event => {
+      if (ref.current) onRowHover((event.target as HTMLElement).closest('button'), ref.current)
+    } : undefined} onKeyDown={event => {
       event.stopPropagation()
       if (dialog) {
         if (event.key === 'Escape') { event.preventDefault(); onBack() }

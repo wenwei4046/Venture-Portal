@@ -181,7 +181,7 @@ export default function TeamTable({
         ) : null}
       </Hint>
 
-      {!isHome ? (
+      {candidates.length > 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-4 mb-4">
           {/* RowForm rather than ActionForm: its `onDone` carries the action's
               result, and a refusal here is a returned note, not a throw. */}
@@ -273,7 +273,7 @@ export default function TeamTable({
                           <td className="font-serif italic text-sm text-graphite">
                             <Hidden name="staff_id" value={p.staff_id} />
                             <Hidden name="scheme_id" value={schemeId} />
-                            {isHome ? (
+                            {p.based_here ? (
                               <>
                                 {p.title_name ?? <span className="text-muted">— none yet —</span>}
                                 {/* The rung — the rows are in its order. */}
@@ -381,7 +381,7 @@ export default function TeamTable({
                           setNote(null)
                           setAddingMember({ person: p, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom } })
                         }}>Add to department</button>
-                      {!isHome ? (
+                      {!p.based_here ? (
                         <RowForm action={removeMember} onDone={done} confirm={`Remove ${p.employee_name} from ${subDeptName}?`}>
                           {({ pending }) => (
                             <>

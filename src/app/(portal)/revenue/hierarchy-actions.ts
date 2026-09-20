@@ -26,14 +26,16 @@ import { listSubDepartments, type SubDepartment } from './_lib/sub-departments'
  * canvas, which moves people between trees, and the Team table, which sets
  * the rank (and, away from home, the title and the membership itself).
  *
- * Two kinds of sub-department, one set of actions (user, 2026-09-10):
+ * Two kinds of ROW, one set of actions (user, 2026-09-10; per person since
+ * 2026-09-20, so one chart can hold both at once):
  *
- *   home    the department's oldest. Its tree IS the company reporting line,
- *           its titles ARE the company titles, and the database derives the
- *           membership from the roster. A move here writes `reports_to`; the
- *           title is changed on People; nobody joins or leaves by hand.
- *   other   a world of its own. Its chart writes the membership row directly:
- *           who earns under whom here, the title held here, who is in it.
+ *   based here  the person the company roster describes on this chart. Their
+ *               line IS `reports_to`, their title IS the company title, and
+ *               the database derives the membership. A move writes
+ *               `reports_to`; the title is changed on People; they do not
+ *               join or leave by hand.
+ *   a member    a world of its own. The chart writes the membership row
+ *               directly: who earns under whom here, the title held here.
  *
  * The rule that shapes every membership write: **a position is never mutated
  * in place once a month has closed over it.** A change writes a NEW
@@ -55,6 +57,22 @@ function refresh() {
 /** The sub-department a scheme belongs to, or null when no active one carries it. */
 async function subDepartmentOf(schemeId: string): Promise<SubDepartment | null> {
   return (await listSubDepartments()).find(s => s.schemeId === schemeId) ?? null
+}
+
+/**
+ * Is this the sub-department that person is BASED in (2026-09-20)?
+ *
+ * The question used to be about the sub-department alone — the department's
+ * oldest was everybody's home. It is a person's own fact now, so every branch
+ * below asks it per name, and asks the DATABASE: `comm_home_sub_department`
+ * is what the trigger derives from, and a second opinion here would let the
+ * page write a membership the trigger then overwrites.
+ */
+async function basedIn(supabase: SupabaseClient, staffId: string, sub: SubDepartment): Promise<boolean> {
+  if (!staffId) return false
+  const { data, error } = await supabase.rpc('comm_home_sub_department', { p_staff_id: staffId })
+  if (error) throw new Error(`Could not read where they are based: ${safeReason(error)}`)
+  return typeof data === 'string' && data === sub.id
 }
 
 interface LadderRow {
@@ -136,7 +154,7 @@ export async function moveOnChart(
   const mover = staffId?.trim() ?? ''
   const upline = uplineStaffId?.trim() || null
 
-  if (sub.isHome) {
+  if (await basedIn(supabase, mover, sub)) {
     const result = await moveReportingLine(supabase, mover, upline)
     if (result.ok) refresh()
     return result
@@ -187,19 +205,20 @@ export async function setStaffRank(formData: FormData): Promise<RankOutcome> {
     return { ok: false, note: 'That rank belongs to another sub-department’s scheme.' }
   }
 
+  const home = await basedIn(supabase, staffId, sub)
   const position = (await loadOpenPositions(supabase, schemeId)).get(staffId)
   if (!position) {
     return {
       ok: false,
-      note: sub.isHome
+      note: home
         ? 'They hold no position yet — their title has no rung on this ladder, so there is no rank to set. Give them a ladder title on People first.'
         : 'They are not a member of this sub-department.',
     }
   }
 
-  // The title held here may only change on a non-home chart: the home
-  // membership's title is the company title and is changed on People.
-  const nextTitle = !sub.isHome && titleId ? titleId : undefined
+  // The title held here may only change where they are NOT based: the
+  // membership the roster describes carries the company title, changed on People.
+  const nextTitle = !home && titleId ? titleId : undefined
   const rungs = await loadRungs(supabase, schemeId)
   try {
     await setMembership(supabase, user.id, position, { titleId: nextTitle, rankId, rateMode }, rungs)
@@ -209,7 +228,7 @@ export async function setStaffRank(formData: FormData): Promise<RankOutcome> {
   }
 
   const after = (await loadOpenPositions(supabase, schemeId)).get(staffId)
-  const gap = titleGap(ladder, after?.titleId ?? position.titleId, after?.rankId ?? rankId, sub.isHome)
+  const gap = titleGap(ladder, after?.titleId ?? position.titleId, after?.rankId ?? rankId, home)
   refresh()
   return { ok: true, note: gap }
 }
@@ -271,8 +290,8 @@ export async function addMember(formData: FormData): Promise<RankOutcome> {
     const supabase = await client()
     const sub = await subDepartmentOf(schemeId)
     if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
-    if (sub.isHome) {
-      return { ok: false, note: 'Home sub-department membership follows the roster. Manage it under People Management.' }
+    if (await basedIn(supabase, staffId, sub)) {
+      return { ok: false, note: `${sub.name} is where they are based, so the roster already has them there.` }
     }
 
     const eligibilityIssue = await memberEligibilityIssue(supabase, staffId, sub.departmentId)
@@ -301,8 +320,8 @@ export async function changeMemberTitle(formData: FormData): Promise<RankOutcome
     const supabase = await client()
     const sub = await subDepartmentOf(schemeId)
     if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
-    if (sub.isHome) {
-      return { ok: false, note: 'The home sub-department uses their company title. Change it under People Management.' }
+    if (await basedIn(supabase, staffId, sub)) {
+      return { ok: false, note: `They are based in ${sub.name}, so this membership carries their company title. Change it under People Management.` }
     }
 
     const eligibilityIssue = await memberEligibilityIssue(supabase, staffId, sub.departmentId)
@@ -346,8 +365,8 @@ export async function removeMember(formData: FormData): Promise<RankOutcome> {
 
   const sub = await subDepartmentOf(schemeId)
   if (!sub) return { ok: false, note: 'That sub-department has no active scheme.' }
-  if (sub.isHome) {
-    return { ok: false, note: 'The home sub-department is the roster — deactivate or move the person under People Management instead.' }
+  if (await basedIn(supabase, staffId, sub)) {
+    return { ok: false, note: `They are based in ${sub.name}. Use Remove employee on the chart to move their base, or People Management to move their department.` }
   }
 
   const result = await closeMembership(supabase, schemeId, staffId)

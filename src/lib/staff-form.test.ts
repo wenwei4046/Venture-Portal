@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
-  validateStaffForm,
-  titlesForDepartment,
+  baseUnavailableReason,
   designationForTitle,
   isFullyCommissionBased,
   isVariablePay,
+  managersForDepartment,
   offersVariablePay,
   payFieldsForUpdate,
-  type RawStaffForm,
+  subDepartmentsForDepartment,
+  titlesForDepartment,
   type RawPayFields,
+  type RawStaffForm,
+  validateStaffForm,
 } from './staff-form'
 
 const ok: RawStaffForm = {
@@ -36,6 +39,8 @@ describe('validateStaffForm', () => {
       departmentId: 'dept-marketing',
       titleId: 'title-1',
       employmentType: 'salaried',
+      homeSubDepartmentId: null,
+      reportsTo: null,
       basicSalary: 3500,
       allowances: 200.5,
       nonStatutoryAllowance: 0,
@@ -311,5 +316,54 @@ describe('payFieldsForUpdate', () => {
     expect(() => payFieldsForUpdate({ ...salaried, allowances: '-5' })).toThrow(
       /Statutory allowance cannot be negative/,
     )
+  })
+})
+
+/**
+ * A divided department asks one more question on Add Staff (2026-09-20):
+ * which sub-department the person is BASED in. The rules the form obeys are
+ * the ones the database enforces, so nobody reaches a refusal it could have
+ * shown them first.
+ */
+describe('the base a new hire is filed under', () => {
+  const subs = [
+    { id: 'ir', name: 'IR', departmentId: 'revenue', isHome: false, titleIds: ['rs', 'tl'] },
+    { id: 'fair', name: 'Fair', departmentId: 'revenue', isHome: true, titleIds: ['rs', 'srs', 'tl'] },
+    { id: 'roadshow', name: 'Roadshow', departmentId: 'events', isHome: true, titleIds: [] },
+  ]
+
+  it('offers one department’s own sub-departments, its default first', () => {
+    expect(subDepartmentsForDepartment(subs, 'revenue').map(sub => sub.id)).toEqual(['fair', 'ir'])
+  })
+
+  it('has nothing to offer a department that is not divided, or before one is picked', () => {
+    expect(subDepartmentsForDepartment(subs, 'marketing')).toEqual([])
+    expect(subDepartmentsForDepartment(subs, '')).toEqual([])
+  })
+
+  it('refuses a base whose ladder has no rung for the chosen title, and asks nothing without one', () => {
+    const ir = subs[0]!
+    expect(baseUnavailableReason(ir, 'rs')).toBeNull()
+    expect(baseUnavailableReason(ir, 'srs')).toBe('no rung for this title')
+    expect(baseUnavailableReason(ir, null)).toBeNull()
+  })
+})
+
+describe('who a new hire may be filed as reporting to', () => {
+  const people = [
+    { id: 'chea', name: 'Chea Huan', code: 'HV009', departmentId: 'revenue', departmentName: 'Revenue Department' },
+    { id: 'ken', name: 'Ken', code: 'HV002', departmentId: 'marketing', departmentName: 'Marketing' },
+  ]
+
+  it('keeps a commission department’s line inside it — the line is also the commission upline', () => {
+    expect(managersForDepartment(people, 'revenue', true).map(person => person.id)).toEqual(['chea'])
+  })
+
+  it('lets an ordinary department report across the company, its own people first', () => {
+    expect(managersForDepartment(people, 'marketing', false).map(person => person.id)).toEqual(['ken', 'chea'])
+  })
+
+  it('offers nobody before a department is picked', () => {
+    expect(managersForDepartment(people, '', false)).toEqual([])
   })
 })

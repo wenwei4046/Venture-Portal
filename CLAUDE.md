@@ -67,7 +67,13 @@ src/
 │   │   │                              largest HV number on the table + 1
 │   │   │                              (inactive rows count; a code is never
 │   │   │                              cleared). Add Staff has no code field —
-│   │   │                              it shows `next_staff_code()`. Inside one
+│   │   │                              it shows `next_staff_code()`; it DOES
+│   │   │                              ask for a **Sub-department** and a
+│   │   │                              **Reporting upline** (2026-09-20) —
+│   │   │                              blank for a department with none, and
+│   │   │                              a base whose ladder has no rung for the
+│   │   │                              chosen title is offered greyed out.
+│   │   │                              Inside one
 │   │   │                              title the roster sorts by code
 │   │   │                              (`compareByLadder`). Mig
 │   │   │                              `20260915040000`. InfoTech's own number
@@ -225,12 +231,29 @@ src/
 │   │   │                              scheme) (`one_position_per_scheme`),
 │   │   │                              each with its OWN `title_id`, upline and
 │   │   │                              rank (mig 20260910160000). ONE LINE
-│   │   │                              applies to the HOME sub-department only
-│   │   │                              — the department's oldest
-│   │   │                              (`comm_scheme_for_department`,
-│   │   │                              `pickHomeSubDepartments` in
-│   │   │                              `lib/revenue.ts`); its chart writes
-│   │   │                              `reports_to`. Every other sub-department
+│   │   │                              applies to the sub-department somebody
+│   │   │                              is BASED in, and that is THEIR OWN FACT
+│   │   │                              since 2026-09-20:
+│   │   │                              `hr_staff_costs.home_sub_department_id`,
+│   │   │                              null meaning the department's oldest
+│   │   │                              (`comm_home_scheme_for_staff` in SQL,
+│   │   │                              `homeSubDepartmentOf` in
+│   │   │                              `lib/revenue.ts`; mig `20260920040000`).
+│   │   │                              So ONE chart holds both kinds of row —
+│   │   │                              `based_here` / `basedHere` is asked per
+│   │   │                              NAME, never per sub-department — and
+│   │   │                              **Remove from this department** works on
+│   │   │                              a base while they still work elsewhere
+│   │   │                              in the department: the base moves to the
+│   │   │                              oldest of those and `reports_to` takes
+│   │   │                              the upline they already have THERE,
+│   │   │                              rather than the roster flattening that
+│   │   │                              tree. Their only one is refused —
+│   │   │                              that is Terminate employee. Who may hold
+│   │   │                              downlines follows the manager's own base
+│   │   │                              ladder (`comm_staff_can_recruit`), which
+│   │   │                              is why an RS may lead in IR and may not
+│   │   │                              in Fair. Every other sub-department
 │   │   │                              (IR) edits its memberships directly:
 │   │   │                              `moveMembership` / `openMembership` /
 │   │   │                              `closeMembership` / `setMembershipTitle`

@@ -177,7 +177,14 @@ export interface SalespersonRow {
   /** The company title, for the row's small print when it differs from the one held here. */
   company_title_name: string | null
   hierarchy_id: string | null
-  /** Who they earn under HERE. On the home sub-department this is `reports_to`. */
+  /**
+   * This sub-department is where they are BASED (2026-09-20): the company
+   * roster describes this membership, so their title comes from People and
+   * their line is `reports_to`. Everybody else on the same chart is here by a
+   * membership of their own.
+   */
+  based_here: boolean
+  /** Who they earn under HERE. For somebody based here this mirrors `reports_to`. */
   upline_staff_id: string | null
   /** Who they report to on the company chart — `hr_staff_costs.reports_to`. */
   reports_to: string | null
@@ -219,12 +226,14 @@ export interface DirectorRow {
 export interface TeamData {
   /** The sub-department the scheme belongs to — what the directors hang off. */
   subDepartmentId: string
+  /** Everyone BASED here: the people whose company roster row describes this membership. */
+  homeStaffIds: string[]
   ranks: RankRow[]
   /** The members. A department head is never one: they hold no rank. */
   people: SalespersonRow[]
   /** Titles a membership may hold — the commission departments' rows of `titles`, heads excluded. */
   titles: TitleRow[]
-  /** Empty on the home sub-department: everybody in the department is a member there. */
+  /** Anybody in the department neither based here nor already a member. */
   candidates: MemberCandidate[]
   /** Who this sub-department reports to, A→Z. A reporting line only: no override reaches them. */
   directors: DirectorRow[]

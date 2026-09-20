@@ -28,6 +28,12 @@ const str = (formData: FormData, key: string): string | null =>
  * table here — it has to exist, be active and fit the department — and
  * `designation`, the free-text column the InfoTech import writes and the
  * payroll export reads, is set to mirror its name.
+ *
+ * A DIVIDED DEPARTMENT (2026-09-20) is asked one more question: which
+ * sub-department the person is based in. Blank means its default, which is
+ * what everybody hired before that date got. The reporting line is asked here
+ * too, because filing it now is what makes the commission membership the
+ * database derives correct on the first write.
  */
 export async function addStaff(formData: FormData) {
   const user = await requirePermission('team')
@@ -37,6 +43,8 @@ export async function addStaff(formData: FormData) {
     name: str(formData, 'name'),
     departmentId: str(formData, 'department_id'),
     titleId: str(formData, 'title_id'),
+    homeSubDepartmentId: str(formData, 'home_sub_department_id'),
+    reportsTo: str(formData, 'reports_to'),
     fullCommission: formData.get('full_commission') === 'on',
     variablePay: formData.get('variable_pay') === 'on',
     basicSalary: str(formData, 'basic_salary'),
@@ -68,6 +76,15 @@ export async function addStaff(formData: FormData) {
     employee_name: form.name,
     department_id: form.departmentId,
     title_id: form.titleId,
+    // Where they are BASED and who they report to (2026-09-20). Both are
+    // roster columns with triggers of their own: the base must be an active
+    // sub-department of this department whose ladder carries the title
+    // (23HOM), and inside a commission department the line may not cross the
+    // department's edge (23BND) or land on a title that cannot lead (23REC).
+    // Written on the insert so the commission membership the trigger derives
+    // is right the first time, rather than created in Fair and moved after.
+    home_sub_department_id: form.homeSubDepartmentId,
+    reports_to: form.reportsTo,
     designation,
     employment_type: form.employmentType,
     basic_salary: form.basicSalary,
@@ -88,11 +105,17 @@ export async function addStaff(formData: FormData) {
 
   if (error) {
     if (error.code === '23505') throw new Error('Employee already exists')
+    // A trigger that refused the base or the reporting line wrote a sentence
+    // for whoever is at the screen; it is the whole answer, so pass it on.
+    if (['23HOM', '23BND', '23REC', '23LAD', '23RNK', '23DIR', '23514'].includes(error.code ?? '')) {
+      throw new Error(error.message)
+    }
     throw new Error(`Failed to add staff: ${error.message}`)
   }
 
   revalidatePath('/hr-costing')
   revalidatePath('/team', 'layout')
+  revalidatePath('/revenue', 'layout')
 }
 
 export async function updateStaff(id: string, formData: FormData) {

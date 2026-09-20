@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { homeSubDepartmentOf } from '@/lib/revenue'
 import type { SubDepartment } from './sub-departments'
 
 /** Serializable choices shared by the chart and Team tab's membership menu. */
@@ -11,8 +12,17 @@ export interface MembershipDestination {
   departmentId: string
   departmentName: string
   schemeId: string
+  /** When it was opened — how the database breaks a tie when a base has to move. */
+  createdAt: string
+  /** The DEPARTMENT's default home — its oldest. Who is based here is `homeStaffIds`. */
   isHome: boolean
   titles: Array<{ id: string; name: string }>
+  /**
+   * Everybody BASED here (2026-09-20): the roster describes their membership,
+   * so they cannot be added or given a title by hand. A subset of
+   * `memberStaffIds`, which also counts memberships opened on the chart.
+   */
+  homeStaffIds: string[]
   memberStaffIds: string[]
   /** Active non-directors in this parent department; checked again when saving. */
   eligibleStaffIds: string[]
@@ -29,6 +39,7 @@ interface Title {
 interface EligibleStaff {
   id: string
   department_id: string
+  home_sub_department_id: string | null
   titles: { is_department_head: boolean } | Array<{ is_department_head: boolean }> | null
 }
 
@@ -76,7 +87,7 @@ export async function loadMembershipDestinations(
   const [departments, staff, ladder, memberships] = await Promise.all([
     allRows<{ id: string; name: string }>(supabase.from('departments').select('id, name')
       .in('id', departmentIds).eq('payroll_source', 'commission').order('id')),
-    allRows<EligibleStaff>(supabase.from('hr_staff_costs').select('id, department_id, titles (is_department_head)')
+    allRows<EligibleStaff>(supabase.from('hr_staff_costs').select('id, department_id, home_sub_department_id, titles (is_department_head)')
       .in('department_id', departmentIds).eq('status', 'active').order('id')),
     allRows<MembershipRung>(supabase.from('comm_ranks').select('scheme_id, title_id, titles (id, name, is_active, is_department_head)')
       .in('scheme_id', schemeIds).order('sort_order').order('id')),
@@ -86,11 +97,23 @@ export async function loadMembershipDestinations(
 
   const departmentNames = new Map(departments.map(department => [department.id, department.name]))
   const eligibleByDepartment = new Map<string, string[]>()
+  const basedIn = new Map<string, string[]>()
   for (const person of staff) {
     if (one(person.titles)?.is_department_head) continue
     const eligible = eligibleByDepartment.get(person.department_id) ?? []
     eligible.push(person.id)
     eligibleByDepartment.set(person.department_id, eligible)
+    // Where the roster puts them (2026-09-20): their own choice, else the
+    // department's default. Sub-departments with no live scheme cannot be
+    // anybody's base, and `active` has already dropped those.
+    const home = homeSubDepartmentOf(
+      { departmentId: person.department_id, homeSubDepartmentId: person.home_sub_department_id },
+      subDepartments,
+    )
+    if (!home) continue
+    const based = basedIn.get(home) ?? []
+    based.push(person.id)
+    basedIn.set(home, based)
   }
 
   const titlesByScheme = new Map<string, Map<string, { id: string; name: string }>>()
@@ -112,10 +135,10 @@ export async function loadMembershipDestinations(
   return active.filter(sub => departmentNames.has(sub.departmentId)).map(sub => {
     const titles = [...(titlesByScheme.get(sub.schemeId)?.values() ?? [])]
     const eligibleStaffIds = eligibleByDepartment.get(sub.departmentId) ?? []
-    // The home chart includes roster members even before a matching rung exists.
-    const memberStaffIds = sub.isHome
-      ? [...new Set([...eligibleStaffIds, ...(membersByScheme.get(sub.schemeId) ?? [])])]
-      : [...(membersByScheme.get(sub.schemeId) ?? [])]
+    const homeStaffIds = basedIn.get(sub.id) ?? []
+    // Somebody based here is a member even before their title has a rung: the
+    // chart draws them from the roster, with no membership row of their own.
+    const memberStaffIds = [...new Set([...homeStaffIds, ...(membersByScheme.get(sub.schemeId) ?? [])])]
     return {
       subDepartmentId: sub.id,
       name: sub.name,
@@ -123,13 +146,16 @@ export async function loadMembershipDestinations(
       departmentId: sub.departmentId,
       departmentName: departmentNames.get(sub.departmentId)!,
       schemeId: sub.schemeId,
+      createdAt: sub.createdAt,
       isHome: sub.isHome,
       titles,
+      homeStaffIds,
       memberStaffIds,
       eligibleStaffIds,
-      unavailableReason: sub.isHome
-        ? 'Membership here follows the department roster automatically.'
-        : titles.length === 0 ? 'Set up a title on this sub-department’s ladder first.' : null,
+      // Not per person any more: whoever is BASED here already counts as a
+      // member, and the caller says so with 'Already a member'. What is left
+      // is the one reason nobody can join — an empty ladder.
+      unavailableReason: titles.length === 0 ? 'Set up a title on this sub-department’s ladder first.' : null,
     }
   }).sort((a, b) => a.departmentName.localeCompare(b.departmentName) || a.name.localeCompare(b.name))
 }

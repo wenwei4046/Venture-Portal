@@ -25,11 +25,15 @@ interface PageProps {
  * `loadTeam` read, so both show the same titles, uplines and ranks.
  *
  * MEMBERSHIPS (user, 2026-09-10): a sub-department is a world of its own —
- * its own tree, and its own title and rank per person. The HOME
- * sub-department (the department's oldest) is the company chart itself: its
- * line is `reports_to`, its titles are the company titles, and the database
- * keeps its memberships in step with the roster. Every other sub-department
- * is drawn and edited here, member by member.
+ * its own tree, and its own title and rank per person. Somebody's HOME
+ * sub-department is the company chart itself: its line is `reports_to`, its
+ * title is the company title, and the database keeps that one membership in
+ * step with the roster. Every other membership is drawn and edited here.
+ *
+ * WHOSE home (2026-09-20): a person's own, not the department's. One chart
+ * can therefore hold both kinds of row at once — people based here, and
+ * people who work here as well as somewhere else — so `basedHere` is asked
+ * per name and never per sub-department.
  *
  * REVENUE DIRECTOR (user, 2026-09-11): a department head stands above every
  * tree of the sub-departments they direct — a row of cards under the frame's
@@ -57,13 +61,13 @@ export default async function StaffHierarchyPage({ params }: PageProps) {
     (department): department is SubDepartment & { schemeId: string } =>
       department.departmentId === subDept.departmentId && department.schemeId !== null,
   )
-  const currentTeam = loadTeam(subDept.schemeId, { isHome: subDept.isHome, subDepartmentId: subDept.id })
+  const currentTeam = loadTeam(subDept.schemeId, { subDepartmentId: subDept.id })
   const [team, departments, membershipDestinations, employeeDepartments] = await Promise.all([
     currentTeam,
     Promise.all(siblings.map(async (department): Promise<OrgDepartment> => {
       const membership = department.id === subDept.id
         ? await currentTeam
-        : await loadTeam(department.schemeId, { isHome: department.isHome, subDepartmentId: department.id })
+        : await loadTeam(department.schemeId, { subDepartmentId: department.id })
       return {
         id: department.id,
         name: department.name,
@@ -112,6 +116,7 @@ function chartData(team: TeamData): { people: OrgPerson[]; ranks: OrgRank[]; dir
   }))
   const rankById = new Map(ranks.map(r => [r.id, r]))
 
+  const basedHere = new Set(team.homeStaffIds)
   const people: OrgPerson[] = team.people.map(p => {
     const rank = p.rank_id ? rankById.get(p.rank_id) : undefined
     return {
@@ -132,6 +137,7 @@ function chartData(team: TeamData): { people: OrgPerson[]; ranks: OrgRank[]; dir
       // a Team Assistant back on 5% for a month keeps their team. A title the
       // ladder does not carry cannot lead anyone here.
       canRecruit: titleCanRecruit(ranks, p.title_id) ?? false,
+      basedHere: basedHere.has(p.staff_id),
       rateMode: p.rate_mode,
       placedSince: p.placed_since,
       directLineCount: p.direct_line_count,

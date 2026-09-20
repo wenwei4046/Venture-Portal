@@ -830,7 +830,9 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
         </div> : null}
       </div>
       {personMenu && menuPerson ? <PersonContextMenu key={`${personMenu.id}:${personMenu.anchor.left}:${personMenu.anchor.top}:${!!personMenu.startAtDepartments}`}
-        person={menuPerson.person} currentDepartment={menuPerson.department} destinations={membershipDestinations} anchor={personMenu.anchor} startAtDepartments={personMenu.startAtDepartments}
+        person={menuPerson.person}
+        currentDepartment={{ schemeId: menuPerson.department.schemeId, name: menuPerson.department.name, isHome: menuPerson.person.basedHere }}
+        destinations={membershipDestinations} anchor={personMenu.anchor} startAtDepartments={personMenu.startAtDepartments}
         employeeDepartments={employeeDepartments} canManageEmployment={canManageEmployment} employmentToday={employmentToday}
         onPendingChange={onMenuPendingChange}
         onClose={closePersonMenu} onAdded={message => { closePersonMenu(true); setError(null); setNote(message) }}

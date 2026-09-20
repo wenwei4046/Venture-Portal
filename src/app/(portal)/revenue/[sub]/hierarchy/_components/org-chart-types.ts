@@ -24,6 +24,12 @@ export interface OrgPerson {
   rankPayLabel?: string
   isGroupPackage?: boolean
   canRecruit: boolean
+  /**
+   * This sub-department is where they are BASED: the roster describes this
+   * membership, so their title comes from People and their line is the
+   * company one. Per person — the same chart draws both kinds (2026-09-20).
+   */
+  basedHere: boolean
   rateMode: 'fixed' | 'variable' | null
   placedSince: string | null
   directLineCount?: number

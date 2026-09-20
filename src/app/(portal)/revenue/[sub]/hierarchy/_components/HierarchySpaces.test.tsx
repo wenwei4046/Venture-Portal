@@ -60,7 +60,7 @@ function person(staffId: string, name: string, extra: Partial<OrgPerson> = {}): 
     staffId, name, code: null, titleName: 'Team Leader', titleId: 'leader',
     levelRank: 4, levelName: 'Leader', uplineStaffId: null,
     rankId: 'rank-a', rankLabel: 'Rank A', productRate: 0.09,
-    canRecruit: true, rateMode: 'variable', placedSince: null,
+    canRecruit: true, basedHere: true, rateMode: 'variable', placedSince: null,
     ...extra,
   }
 }
@@ -79,9 +79,9 @@ function departments(): OrgDepartment[] {
     {
       id: 'ir', name: 'IR', slug: 'ir', schemeId: 'ir-scheme', isHome: false, ranks: [],
       people: [
-        person('rachael', 'Rachael', { titleName: 'Head of IR' }),
-        person('chea', 'Chea Huan', { uplineStaffId: 'rachael', titleName: 'Relationship Specialist', levelRank: 2, canRecruit: false }),
-        person('lawrence', 'Lawrence'),
+        person('rachael', 'Rachael', { titleName: 'Head of IR', basedHere: false }),
+        person('chea', 'Chea Huan', { uplineStaffId: 'rachael', titleName: 'Relationship Specialist', levelRank: 2, canRecruit: false, basedHere: false }),
+        person('lawrence', 'Lawrence', { basedHere: false }),
       ],
     },
   ]
@@ -91,7 +91,8 @@ function membershipDestinations(): MembershipDestination[] {
   return departments().map(department => ({
     subDepartmentId: department.id, name: department.name, slug: department.slug,
     departmentId: 'revenue', departmentName: 'Revenue', schemeId: department.schemeId,
-    isHome: department.isHome, titles: [
+    createdAt: department.isHome ? '2026-08-31T00:00:00Z' : '2026-09-10T00:00:00Z',
+    isHome: department.isHome, homeStaffIds: department.isHome ? department.people.map(p => p.staffId) : [], titles: [
       { id: 'leader', name: 'Team Leader' }, { id: 'assistant', name: 'Team Assistant' },
       { id: 'specialist', name: 'Revenue Specialist' },
     ],
