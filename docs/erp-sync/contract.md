@@ -120,7 +120,7 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | Portal field | From | Note |
 |---|---|---|
 | order number | `docNo` | the identity; one live row per document |
-| order date / period | `header.so_date` | month = `date_trunc('month', so_date)` |
+| order date | `header.so_date` | the day the document was OPENED IN THE BACK OFFICE. **It is not the day of the sale and, since 2026-09-20, it no longer decides the month** — see §10 |
 | status | `header.status` | see §4 for which earn commission |
 | hold | `header.on_hold` | the mig-0324 marker; a held order earns nothing while held |
 | salesperson identity | `salesperson.id` ?? `header.salesperson_id` | matched to a portal staff row once, remembered (`comm_agent_aliases.erp_salesperson_id`) |
@@ -167,6 +167,14 @@ Put a plain string there — the organiser's name, spelled the same way every
 time. `header.venue_id` is the other half of the same problem and is still
 never populated; if the ERP ever fills it, say so and the portal will match on
 the id instead of the name.
+
+**A venue-only edit is never forwarded (2026-09-20).** `trg_vp_outbox_so`
+fires on `status, on_hold, so_date, branding, salesperson_id, agent,
+debtor_name, debtor_code, sales_location, company_id` and the money columns.
+`venue` is not in that list, so correcting the venue on an existing document
+queues nothing and the portal keeps the old spelling forever. The value does
+ride along on any other re-push, which is why this looks like it works. Add
+`venue` (and `venue_id`) to the trigger's `UPDATE OF` list.
 
 What the portal does with it:
 
@@ -631,3 +639,43 @@ The portal's **Costing gaps** table (Revenue -> Product List) is that list,
 sorted by what it is worth, and it names which side each row belongs to. A row
 marked *in SKU master* is the ERP's gap: its cost field is empty over there, and
 filling it there fixes it for every system at once.
+
+
+## 10. The one date the feed does not carry (2026-09-20)
+
+**Ask.** Put the day of the SALE on the delivery, or an id for the fair it was
+written at. Anything stable would do: `header.event_date`, a `fair_id` with a
+`fairs` table behind it, or simply populating `header.venue_id` so the venue's
+own calendar can be joined on it.
+
+**Why.** `header.so_date` is the day the document was opened in the back
+office. Fairs run Friday to Sunday, the paperwork comes back afterwards, and an
+out-station fair is keyed a week later. The portal pays commission by MONTH, so
+a fair at month end lands its whole weekend in the next month's payroll.
+
+Measured against a hand-computed August 2026 claim form, bill by bill:
+
+| | bills | value |
+|---|---:|---:|
+| in the portal's August, where the claim form has them | 174 | RM 1,202,637 |
+| **pushed into September by `so_date`** | **106** | **RM 674,744** |
+| never delivered at all | 60 | RM 253,086 |
+
+Of the 280 documents that matched, **five** carried the right date. Median lag
++4 days, worst +42. Whole fairs moved: Kuching 28-31 Aug, MITC 30-31 Aug,
+IOI GECC 29-31 Aug.
+
+**What the portal checked before asking.** Every `header` key of all 552
+deliveries it holds was enumerated on 2026-09-20. There is no `fair`, `event`,
+`roadshow`, `exhibition` or `campaign` field of any spelling. `venue_id` exists
+and is NULL on every order, including those received that morning. The other
+dates are not substitutes: `created_at` / `updated_at` are record timestamps,
+`payment_date` copies `so_date` (and is NULL on new orders),
+`processing_date` equals `so_date`, and `customer_delivery_date` is delivery.
+
+**What the portal does meanwhile.** A human types the fair calendar into
+`comm_venue_events` (venue + organiser + the days it was open) and
+`venue_event_for_order()` reads each bill's month off it. That works, but it is
+typed once per fair forever and cannot know about a fair nobody typed. If the
+feed starts carrying an event date or a populated `venue_id`, say so: the
+resolver gains one step ahead of the calendar and the typing stops.

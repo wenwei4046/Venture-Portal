@@ -12,6 +12,8 @@ import {
   registerSummary,
   type VenueRegisterRow,
 } from '@/lib/venue-register'
+import type { Fair, FairGap } from '@/lib/fair-calendar'
+import FairCalendarSection from './FairCalendarSection'
 import OrganiserSection from './OrganiserSection'
 import VenueTable from './VenueTable'
 
@@ -32,11 +34,17 @@ export default function VenueWorkbench({
   register,
   organisers,
   slugs,
+  fairs,
+  gaps,
 }: {
   register: VenueRegisterRow[]
   organisers: Organiser[]
   /** sub-department id → slug, for the link into a month. */
   slugs: Record<string, string>
+  /** Every fair on record — when it ran, and what it sold. */
+  fairs: Fair[]
+  /** Bills belonging to no fair, by place and the month their ERP date gives them. */
+  gaps: FairGap[]
 }) {
   const searchParams = useSearchParams()
   const months = useMemo(() => registerMonths(register), [register])
@@ -69,6 +77,18 @@ export default function VenueWorkbench({
     () => withFairs(organisers, organiserTotals(shown)),
     [organisers, shown],
   )
+  // The calendar narrows with everything else. A fair is filed under the month
+  // its bills COUNT in, and a gap under the month its ERP dates give it — so
+  // picking September shows both September's fairs and the September-dated
+  // bills that may well belong to an August one.
+  const shownFairs = useMemo(
+    () => (month ? fairs.filter(f => f.periodMonth === month) : fairs),
+    [fairs, month],
+  )
+  const shownGaps = useMemo(
+    () => (month ? gaps.filter(g => g.periodMonth === month) : gaps),
+    [gaps, month],
+  )
 
   return (
     <div>
@@ -77,6 +97,13 @@ export default function VenueWorkbench({
       ) : null}
 
       <OrganiserSection organisers={withRuns} month={month} />
+
+      <FairCalendarSection
+        fairs={shownFairs}
+        gaps={shownGaps}
+        places={places}
+        organisers={organisers}
+      />
 
       <VenueTable
         venues={venues}

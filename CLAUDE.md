@@ -112,6 +112,67 @@ src/
 │   │   │                              as…*. Department-level because neither table
 │   │   │                              carries a scheme; `?month=` narrows both
 │   │   │                              tables client-side.
+│   │   │                              **THE FAIR SETS THE MONTH (2026-09-20):**
+│   │   │                              `period_month` followed `header.so_date` —
+│   │   │                              the day the ERP document was OPENED IN THE
+│   │   │                              BACK OFFICE, not the day the customer signed
+│   │   │                              at the fair. Of August's 280 matchable bills
+│   │   │                              only FIVE carried the right date; median lag
+│   │   │                              +4 days, worst +42. Mid-month that is
+│   │   │                              harmless; at month end it moves a whole
+│   │   │                              weekend into the next payroll — Kuching
+│   │   │                              (8/28-31), MITC and IOI GECC, **RM 674,744
+│   │   │                              of August landing in September**, while
+│   │   │                              July's month-end fairs sat in August. The two
+│   │   │                              cancel to a 10% difference in the total, which
+│   │   │                              is why nobody saw that half the month's bills
+│   │   │                              had been swapped.
+│   │   │                              THE ERP CANNOT HELP: every `header` key of all
+│   │   │                              552 deliveries was enumerated 2026-09-20 — no
+│   │   │                              fair / event / campaign field exists and
+│   │   │                              `venue_id` is NULL on every order including
+│   │   │                              the ones that arrived that morning. So the
+│   │   │                              calendar is the portal's own fact.
+│   │   │                              `comm_venue_events` BECOMES THE FAIR:
+│   │   │                              `start_date` / `end_date`, and the old
+│   │   │                              `UNIQUE(venue, month)` drops — one hall holds
+│   │   │                              two or three fairs a month with a DIFFERENT
+│   │   │                              organiser each (REX at MVEC SOUTHKEY
+│   │   │                              mid-August, BIGHOME at the same hall month
+│   │   │                              end), which is the ALTER 20260918040000 said
+│   │   │                              it was leaving room for. An EXCLUDE forbids
+│   │   │                              two fairs at one place overlapping; a partial
+│   │   │                              UNIQUE keeps one undated row per (place,
+│   │   │                              month). `venue_event_for_order()` is the ONE
+│   │   │                              rule — the fair open on the order date, else
+│   │   │                              the most recent one there that closed within
+│   │   │                              45 days (worst observed lag 42) — and it
+│   │   │                              stamps `sales_orders.fair_event_id` /
+│   │   │                              `fair_source` by TRIGGER, the way
+│   │   │                              `sales_orders_ignored_agent` does and for the
+│   │   │                              same reason. Editing a fair re-stamps that
+│   │   │                              place's bills.
+│   │   │                              TWO STEPS, ALWAYS: saving a fair MOVES
+│   │   │                              NOTHING. `revenue_fair_calendar_moves` shows
+│   │   │                              every bill that would move;
+│   │   │                              `revenue_apply_fair_calendar` moves
+│   │   │                              `period_month` AND `batch_id` together (the
+│   │   │                              run reads orders by BATCH) and REFUSES a month
+│   │   │                              whose run has paid (23RUN), like
+│   │   │                              `recost_sales_order_lines`. Every run over a
+│   │   │                              touched month must be computed again.
+│   │   │                              `event_date` is NOT touched: spec 4.4 reads
+│   │   │                              Open Bill as "1st/2nd/3rd bill of the EVENT
+│   │   │                              DAY", and collapsing a four-day fair onto one
+│   │   │                              date would turn three bonuses into one — a
+│   │   │                              separate decision with its own money attached.
+│   │   │                              UI: *Fair calendar* + *Still to place* on
+│   │   │                              Revenue > Venues, the second being the work
+│   │   │                              list (`revenue_fair_calendar_gaps()`), which
+│   │   │                              flags a place whose bills spread over more
+│   │   │                              than 8 days as more than one fair.
+│   │   │                              `lib/fair-calendar.ts`, `fair-actions.ts`,
+│   │   │                              mig `20260920050000`.
 │   │   │                              **THE SKU MASTER, BOUND (2026-09-17):**
 │   │   │                              `products/` is no longer a hand-keyed cost
 │   │   │                              list — it is the ERP's own SKU master,
