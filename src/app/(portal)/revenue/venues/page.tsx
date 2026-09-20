@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import { loadOrganisers, loadVenueRegister } from '../_lib/venue-register'
+import { loadFairCalendar, loadFairGaps } from '../_lib/fair-calendar'
 import { listSubDepartments } from '../_lib/sub-departments'
 import VenueWorkbench from './_components/VenueWorkbench'
 
@@ -35,9 +36,11 @@ export default async function VenueRegisterPage() {
   // The register first: the organiser rows are only names, and what each one
   // has actually run is counted from these.
   const register = await loadVenueRegister(supabase)
-  const [organisers, subDepts] = await Promise.all([
+  const [organisers, subDepts, fairs, gaps] = await Promise.all([
     loadOrganisers(supabase),
     listSubDepartments(),
+    loadFairCalendar(supabase),
+    loadFairGaps(supabase),
   ])
 
   const slugs = Object.fromEntries(subDepts.map(s => [s.id, s.slug]))
@@ -66,7 +69,13 @@ export default async function VenueRegisterPage() {
         ) : null}
       </div>
 
-      <VenueWorkbench register={register} organisers={organisers} slugs={slugs} />
+      <VenueWorkbench
+        register={register}
+        organisers={organisers}
+        slugs={slugs}
+        fairs={fairs}
+        gaps={gaps}
+      />
     </div>
   )
 }

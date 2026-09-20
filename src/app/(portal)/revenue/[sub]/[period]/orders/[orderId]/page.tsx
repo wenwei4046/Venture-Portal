@@ -126,11 +126,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
         ? supabase.from('comm_kpi_items').select('product_code, kpi_amount').eq('scheme_id', subDept.schemeId)
         : Promise.resolve({ data: null }),
       supabase.from('sales_order_open_bill_tags').select('bill_rank, auto_suggested').eq('order_id', orderId).maybeSingle(),
-      // The organiser is a fact about THIS MONTH's fair at this venue, not
-      // about the hall: the same place has a different organiser from month to
-      // month (comm_venue_events, 2026-09-17). One SQL function owns the
-      // lookup, so this page and revenue_month_orders cannot drift apart.
-      supabase.rpc('venue_event_organiser', { p_venue: order.venue, p_period: period }),
+      // The organiser is a fact about the FAIR this bill was written at, not
+      // about the hall and not about the month: one hall holds two or three
+      // fairs a month and each has its own organiser (REX at MVEC SOUTHKEY
+      // mid-August, BIGHOME at the same hall month end — 2026-09-20). One SQL
+      // function owns the lookup, and it falls back to the month's answer
+      // where the fair calendar has no fair covering the day.
+      supabase.rpc('venue_event_organiser_for_order', {
+        p_venue: order.venue,
+        p_order_date: order.order_date,
+      }),
       subDept.schemeId
         ? supabase
             .from('comm_schemes')
