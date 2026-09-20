@@ -1,3 +1,5 @@
+import type { ArenaHistorySnapshot } from "./arena-history";
+
 /** Live Arena facts only. No sample scores or client-awarded championship points. */
 export type ArenaWindow = "monthly" | "quarterly" | "annual";
 export type ArenaMetric = "sales" | "margin" | "kpi";
@@ -24,6 +26,9 @@ export interface MemberArenaSnapshot {
   brandWeeks: ArenaBrandWeeks | null;
   /** Empty until the scheme configures a ladder; the board then says so. */
   tiers: ArenaTier[];
+  /** Optional during the read-only Fair history rollout. Never replaced by fixtures. */
+  history?: ArenaHistorySnapshot;
+  historyError?: string;
 }
 export interface ArenaRankedPerson {
   id: string; name: string; self: boolean; position: number | null; value: number | null;

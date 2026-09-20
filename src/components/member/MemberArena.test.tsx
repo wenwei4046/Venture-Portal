@@ -99,6 +99,23 @@ describe("Live Member Arena",()=>{
     expect(screen.getByText(/Championship totals will appear/)).toBeInTheDocument();
     expect(screen.queryByText(/\d+\s*pts/)).not.toBeInTheDocument();
   });
+  it("ranks the fairs that closed in the period and counts what no fair could claim",async()=>{
+    actions.fetch.mockResolvedValue({ok:true,data:{...structuredClone(snapshot),history:{
+      asOf:"2026-09-16T00:00:00Z",provisional:true as const,unassignedOrders:2,unassignedSales:5000,
+      championship:{status:"pending" as const,reason:"Championship totals need every ranking source and a settled scoring ledger."},
+      events:[{id:"fair-1",venue:"SPICE ARENA",start:"2026-09-05",end:"2026-09-07",periodMonth:"2026-09",people:[
+        {id:"real-employee",name:"Actual Employee",sales:4000,held:0,orders:1},
+        {id:"colleague",name:"Other Employee",sales:8000,held:0,orders:1}]}]}}});
+    render(<MemberArena membershipId={membershipId}/>);
+    fireEvent.click(await screen.findByRole("button",{name:/Championship & Fair results/}));
+    expect(screen.queryByRole("heading",{name:"Fair history is not connected yet"})).not.toBeInTheDocument();
+    expect(screen.getByText(/Provisional results/)).toBeInTheDocument();
+    expect(screen.getByRole("heading",{name:"Your fair finishes"})).toBeInTheDocument();
+    expect(screen.getByText("SPICE ARENA")).toBeInTheDocument();
+    expect(screen.getByRole("heading",{name:"Highest Fair Record"})).toBeInTheDocument();
+    expect(screen.getByText(/RM 5,000 over 2 bills sits on no fair yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/\d+\s*pts/)).not.toBeInTheDocument();
+  });
   it("says which tier the month reached and what it is worth, brand by brand",async()=>{
     render(<MemberArena membershipId={membershipId}/>);
     fireEvent.click(await screen.findByRole("button",{name:/Margin Incentive/}));

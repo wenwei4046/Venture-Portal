@@ -621,6 +621,37 @@ src/
 │   │                                  brand, HOLDS the lot and the board names
 │   │                                  it. The ladder rides in the snapshot
 │   │                                  (`tiers`, mig `20260919060000`).
+│   │                                  **FAIR RESULTS (2026-09-21):** the Arena's
+│   │                                  *Championship & Fair results* page said
+│   │                                  "not connected yet" because a finish needs
+│   │                                  a fair's venue and DATES, and an order date
+│   │                                  beside a branch label cannot identify one.
+│   │                                  `20260920050000` gave `comm_venue_events`
+│   │                                  start/end and stamps every bill with
+│   │                                  `sales_orders.fair_event_id`, so the board
+│   │                                  is now real: each completed fair ranked on
+│   │                                  its own, medal counts per person, and the
+│   │                                  **Highest Fair Record** (largest single
+│   │                                  fair, all-time, outside any window).
+│   │                                  PROVISIONAL AND IT SAYS SO — a recorded
+│   │                                  sale is not attendance, so somebody who
+│   │                                  worked a fair and sold nothing cannot be
+│   │                                  told from somebody who was never there;
+│   │                                  and a bill no fair could claim is COUNTED
+│   │                                  OUT LOUD (`unassignedOrders`/`Sales`, 196
+│   │                                  bills / RM 1.12M on 2026-09-21) rather
+│   │                                  than spread over the fairs that did
+│   │                                  happen. Nothing is awarded: every
+│   │                                  `points` field is 0 and the championship
+│   │                                  stays `pending`. Same roster, committed
+│   │                                  sources, deposit gate and commissionable
+│   │                                  lines as `member_arena_for_staff` — a
+│   │                                  fair's sales must agree with the month's.
+│   │                                  `lib/member/arena-history.ts`, mig
+│   │                                  `20260921010000`, and the design-preview
+│   │                                  `ArenaFairResults`/`RankingList` are the
+│   │                                  live board (parameterized `selfId`, so
+│   │                                  one component serves both).
 │   │                                  **TEAM** is a mapping map, not an indented
 │   │                                  list: every sub-department as a frame, its
 │   │                                  directors above it, one card per MEMBERSHIP,

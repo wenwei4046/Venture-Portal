@@ -15,15 +15,17 @@ const brands: { code: BrandCode; label: string; tone: number }[] = [
 interface ArenaBrandWeeksFormProps {
   initialValue?: MonthlyBrandWeeks;
   monthLabel: string;
-  onSave: (value: MonthlyBrandWeeks) => { ok: boolean; error?: string };
+  onSave: (value: MonthlyBrandWeeks) => { ok: boolean; error?: string } | Promise<{ ok: boolean; error?: string }>;
+  successMessage?: string;
 }
 
-export function ArenaBrandWeeksForm({ initialValue, monthLabel, onSave }: ArenaBrandWeeksFormProps) {
+export function ArenaBrandWeeksForm({ initialValue, monthLabel, onSave, successMessage = "Saved on this device for the preview." }: ArenaBrandWeeksFormProps) {
   const id = useId();
   const [draft, setDraft] = useState<MonthlyBrandWeeks>(() => initialValue
     ? { weeks: initialValue.weeks, counts: { ...initialValue.counts } }
     : { weeks: 4, counts: { AKEMI: 0, DUNLOP: 0, ZANOTTI: 0, ERGOTEX: 0 } });
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
   const allocated = allocatedWeeks(draft);
   const remaining = draft.weeks - allocated;
   const valid = isValidBrandWeeks(draft);
@@ -42,21 +44,23 @@ export function ArenaBrandWeeksForm({ initialValue, monthLabel, onSave }: ArenaB
     setFeedback(null);
   }
 
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isValidBrandWeeks(draft)) return;
+    if (!isValidBrandWeeks(draft) || busy) return;
+    setBusy(true);
+    setFeedback(null);
     try {
-      const result = onSave({ weeks: draft.weeks, counts: { ...draft.counts } });
+      const result = await onSave({ weeks: draft.weeks, counts: { ...draft.counts } });
       setFeedback(result.ok
-        ? { ok: true, text: "Saved on this device for the preview." }
+        ? { ok: true, text: successMessage }
         : { ok: false, text: result.error || "Your weeks could not be saved. Please try again." });
     } catch {
       setFeedback({ ok: false, text: "Your weeks could not be saved. Please try again." });
-    }
+    } finally { setBusy(false); }
   }
 
   return <form className={s.form} onSubmit={save} aria-label={`Brand weeks for ${monthLabel}`}>
-    <fieldset className={s.monthCard}>
+    <fieldset className={s.monthCard} disabled={busy}>
       <legend>Weeks this month</legend>
       <div className={s.weekOptions}>
         {([4, 5] as const).map(weeks => <label className={s.weekOption} key={weeks}>
@@ -81,9 +85,9 @@ export function ArenaBrandWeeksForm({ initialValue, monthLabel, onSave }: ArenaB
             <div><strong>{brand.label}</strong><span>{Math.round(draft.counts[brand.code] / draft.weeks * 100)}%</span></div>
           </div>
           <div className={s.stepper}>
-            <button type="button" aria-label={`Remove 1 week from ${brand.label}`} disabled={draft.counts[brand.code] === 0} onClick={() => changeBrand(brand.code, -1)}>−</button>
+            <button type="button" aria-label={`Remove 1 week from ${brand.label}`} disabled={busy || draft.counts[brand.code] === 0} onClick={() => changeBrand(brand.code, -1)}>−</button>
             <output aria-label={`${brand.label} weeks`}>{draft.counts[brand.code]}</output>
-            <button type="button" aria-label={`Add 1 week to ${brand.label}`} disabled={remaining <= 0} onClick={() => changeBrand(brand.code, 1)}>+</button>
+            <button type="button" aria-label={`Add 1 week to ${brand.label}`} disabled={busy || remaining <= 0} onClick={() => changeBrand(brand.code, 1)}>+</button>
           </div>
         </div>)}
       </div>
@@ -96,8 +100,8 @@ export function ArenaBrandWeeksForm({ initialValue, monthLabel, onSave }: ArenaB
 
     <div className={s.saveArea}>
       <p>Save to update your ranking formulas.</p>
-      <button className={s.saveButton} type="submit" disabled={!valid}>Save brand weeks</button>
-      {feedback && <p className={s.feedback} data-error={!feedback.ok} role={feedback.ok ? "status" : "alert"}>{feedback.text}</p>}
+      <button className={s.saveButton} type="submit" disabled={busy || !valid}>{busy ? "Saving…" : "Save brand weeks"}</button>
+      {feedback && <p className={s.feedback} data-error={!feedback.ok} aria-label="Brand weeks save status" role={feedback.ok ? "status" : "alert"}>{feedback.text}</p>}
     </div>
   </form>;
 }
