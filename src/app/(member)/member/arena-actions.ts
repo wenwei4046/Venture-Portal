@@ -7,6 +7,7 @@ import { isPrincipalAccount } from "@/lib/view-as";
 import { principalReadContext } from "@/lib/member/read-access";
 import type { MemberReadContext } from "@/lib/member/types";
 import { validArenaBrandWeeks, type ArenaWindow, type ArenaBrandWeeks, type MemberArenaSnapshot } from "@/lib/member/arena";
+import type { ArenaHistorySnapshot } from "@/lib/member/arena-history";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function validPeriod(period: string) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(period); }
@@ -33,7 +34,19 @@ export async function fetchMemberArena(membershipId: string, period: string, win
     });
     if (error) throw new Error(error.message);
     if (!data || !Array.isArray(data.people)) throw new Error("Arena information is temporarily unavailable.");
-    return { ok: true as const, data: data as MemberArenaSnapshot };
+    const snapshot = data as MemberArenaSnapshot;
+    // A history rollout cannot take away the existing sales/margin/KPI boards.
+    // Both reads retain the same explicitly authorized employee/Principal scope.
+    const history = await db.rpc(principal ? "member_principal_arena_history" : "member_arena_history", {
+      p_sub_department: membershipId,
+      ...(principal ? { p_staff: context!.staffId } : {}),
+    });
+    if (!history.error && history.data && Array.isArray(history.data.events)) {
+      snapshot.history = history.data as ArenaHistorySnapshot;
+    } else {
+      snapshot.historyError = "Fair results are not available yet. Your sales, margin and KPI rankings are up to date.";
+    }
+    return { ok: true as const, data: snapshot };
   } catch (error) { return failure(error); }
 }
 export async function saveMemberArenaBrandWeeks(membershipId: string, period: string, value: ArenaBrandWeeks) {

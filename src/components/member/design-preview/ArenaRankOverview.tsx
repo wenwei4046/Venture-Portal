@@ -15,6 +15,7 @@ export interface ArenaRankOverviewRow {
 interface ArenaRankOverviewProps {
   rows: readonly ArenaRankOverviewRow[];
   onNavigate: (view: ArenaRankView) => void;
+  heading?: string;
 }
 
 const icons: Record<ArenaRankView, string> = {
@@ -23,11 +24,11 @@ const icons: Record<ArenaRankView, string> = {
   kpi: "receipt",
 };
 
-export function ArenaRankOverview({ rows, onNavigate }: ArenaRankOverviewProps) {
+export function ArenaRankOverview({ rows, onNavigate, heading = "Your rankings" }: ArenaRankOverviewProps) {
   return (
-    <section className={s.overview} aria-label="Your rankings">
+    <section className={s.overview} aria-label={heading}>
       <div className={s.heading}>
-        <h2>Your rankings</h2>
+        <h2>{heading}</h2>
         <span>Current position</span>
       </div>
       <div className={s.table}>

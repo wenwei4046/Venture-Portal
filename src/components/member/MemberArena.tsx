@@ -5,6 +5,9 @@ import { fetchMemberArena, saveMemberArenaBrandWeeks } from "@/app/(member)/memb
 import { arenaIncentive, arenaRankings, validArenaBrandWeeks, ARENA_WEEK_BRANDS, type ArenaBrandWeeks, type ArenaIncentive, type ArenaMetric, type ArenaPerson, type ArenaWindow, type MemberArenaSnapshot, type ArenaRankedPerson } from "@/lib/member/arena";
 import { Icon, initials } from "./MemberUI";
 import { ArenaPodium } from "./design-preview/ArenaPodium";
+import { ArenaFairResults } from "./design-preview/ArenaFairResults";
+import { RankingList } from "./design-preview/ArenaRankingList";
+import { arenaFairEvents, arenaFairRecords } from "@/lib/member/arena-history";
 import type { Standing } from "./design-preview/arena-model";
 import type { MemberReadContext } from "@/lib/member/types";
 import s from "./MemberArena.module.css";
@@ -95,6 +98,45 @@ function Incentive({ person, tiers, readOnly, name }: { person?: ArenaPerson; ti
   </section>;
 }
 
+const fairDay = (date: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+const fairRange = (start: string, end: string) => start === end ? fairDay(start) : `${fairDay(start)} – ${fairDay(end)}`;
+
+/**
+ * Completed fairs, ranked. Reported, never awarded: there is no championship
+ * ledger yet, and a recorded sale is not attendance — somebody who worked a
+ * fair and sold nothing cannot be told apart here from somebody who was never
+ * there. A bill that no fair could claim is missing information rather than a
+ * zero, so it is counted out loud instead of being spread over the fairs that
+ * did happen.
+ */
+function FairHistory({ data, viewedId, viewedName, readOnly, window, periodLabel }: {
+  data: MemberArenaSnapshot; viewedId: string; viewedName: string; readOnly: boolean; window: ArenaWindow; periodLabel: string;
+}) {
+  const history = data.history;
+  if (!history) return <section className={s.availability}><Icon name="trophy" size={32} /><h2>Fair history is not connected yet</h2>
+    <p>{data.historyError ?? "Weekly finishes and Highest Fair Record need each fair’s venue, start date and end date."}</p>
+    <h2>Championship</h2><p>{readOnly ? "Members can save their own brand weeks now." : "Your brand weeks can be saved now."} Championship totals will appear after all ranking sources and the scoring ledger are connected.</p>
+    <p>Sales, Margin and KPI rankings already use {readOnly ? "the selected" : "your"} department’s real data.</p></section>;
+  const events = arenaFairEvents(history, data.from, data.through);
+  const records = arenaFairRecords(history);
+  const selfLabel = readOnly ? "Selected" : "You";
+  return <section className={s.availability}>
+    {events.length
+      ? <ArenaFairResults events={events} people={data.people.map(person => ({ id: person.id, name: person.name }))}
+          cutoff={data.through} period={window} periodLabel={periodLabel} selfId={viewedId} selfLabel={selfLabel}
+          personalLabel={readOnly ? `${viewedName}’s` : "Your"} provisional />
+      : <p>No fair on the calendar closed inside {periodLabel}.</p>}
+    {records.length > 0 && <RankingList heading="Highest Fair Record" format={money} points={false}
+      unrankedLabel="No record yet" selfId={viewedId} selfLabel={selfLabel} rows={records.map(record => ({
+        id: record.id, name: record.name, value: record.value ?? Number.NaN, eligible: !record.pending, active: true,
+        position: record.position, scoringPosition: null, scoringValue: 0, basePoints: 0, incentivePoints: 0, points: 0,
+        note: `${record.venue} · ${fairRange(record.start, record.end)}`,
+      }))} />}
+    {history.unassignedOrders > 0 && <p className={s.message}>{money(history.unassignedSales)} over {history.unassignedOrders} bill{history.unassignedOrders === 1 ? "" : "s"} sits on no fair yet — a place the calendar has no dates for cannot claim its bills. Those sales still count in the rankings; only the finishes wait.</p>}
+    <h2>Championship</h2><p>{history.championship.reason}</p>
+  </section>;
+}
+
 export default function MemberArena({ membershipId, context }: { membershipId: string; context?: MemberReadContext }) {
   const [period, setPeriod] = useState(currentMonth), [window, setWindow] = useState<ArenaWindow>("monthly");
   const [view, setView] = useState<"home" | ArenaMetric | "weeks" | "availability" | "incentive">("home");
@@ -127,6 +169,7 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
   const brands = data ? [...new Map([...data.people.flatMap(person => Object.keys(person.brands).map(code => ({ code, name: code === "UNCLASSIFIED" ? "Unclassified" : code }))), ...data.brands].map(item => [item.code, item])).values()] : [];
   function go(next: typeof view) { setView(next); setBrand(""); setShowAll(false); }
   const periodTitle = data ? `${data.from} – ${data.through}` : period;
+  const fairsClosed = data?.history ? arenaFairEvents(data.history, data.from, data.through).length : null;
 
   return <div className={s.arena} data-arena-design="c">
     <header className={s.heading}>{view !== "home" && <button className={s.back} onClick={() => go("home")}><Icon name="back" size={19} />Arena</button>}
@@ -143,7 +186,7 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
         const own = arenaRankings(data.people, metric.id).find(row => row.id === viewedId);
         return <button key={metric.id} className={s.metric} data-metric={metric.id} onClick={() => go(metric.id)}><span className={s.metricIcon}><Icon name={metric.icon} size={28} /></span><span><strong>{metric.label}</strong><small>{metric.subtitle}</small><b>{format(metric.id, own?.value ?? null)}</b></span><span className={s.ownRank}>{own?.position ? `#${own.position}` : "—"}<Icon name="arrow" size={17} /></span></button>;
       })}</div>{window === "monthly" && <button className={s.feature} onClick={() => go("incentive")}><span><strong>Margin Incentive</strong><small>{readOnly ? `${viewedName}'s tier this month, brand by brand` : "Your tier this month, brand by brand"}</small></span><Icon name="arrow" /></button>}
-        <button className={s.feature} onClick={() => go("availability")}><span><strong>Championship & Fair results</strong><small>Scoreboard and fair history setup</small></span><Icon name="arrow" /></button>
+        <button className={s.feature} onClick={() => go("availability")}><span><strong>Championship & Fair results</strong><small>{fairsClosed === null ? "Scoreboard and fair history setup" : `${fairsClosed} completed fair${fairsClosed === 1 ? "" : "s"} · Highest Fair Record`}</small></span><Icon name="arrow" /></button>
         {window === "monthly" && <button className={s.feature} onClick={() => go("weeks")}><span><strong>{readOnly ? "Member brand weeks" : "My brand weeks"}</strong><small>{data.brandWeeks ? `${data.brandWeeks.weeks} weeks saved` : readOnly ? "No brand weeks saved" : "Choose 4 or 5 weeks"}</small></span><Icon name="arrow" /></button>}</>}
       {selected && <>{selected.id !== "kpi" && <label className={s.brand}>Ranking by<select value={brand} onChange={event => setBrand(event.target.value)}><option value="">All brands · Total</option>{brands.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>}
         <Leaders rows={rankings} metric={selected.id} selfId={viewedId} readOnly={readOnly} onOpen={() => { setShowAll(true); requestAnimationFrame(() => table.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })); }} />
@@ -154,7 +197,7 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
         </section></>}
       {view === "weeks" && (readOnly ? <section className={s.weeks} aria-label="Member brand weeks"><h2>{viewedName}</h2><p>Only the member can save brand weeks from their own account.</p>{data.brandWeeks ? <><p>{data.brandWeeks.weeks} weeks saved</p>{ARENA_WEEK_BRANDS.map(({ code, name }) => <div className={s.weekRow} key={code}><strong>{name}</strong><span>{data.brandWeeks!.counts[code]} weeks</span></div>)}</> : <p>No brand weeks saved for this month.</p>}</section> : <BrandWeeks key={`${membershipId}-${period}`} data={data} onSaved={value => setData(previous => previous ? { ...previous, brandWeeks: value } : previous)} />)}
       {view === "incentive" && <Incentive person={data.people.find(person => person.id === viewedId)} tiers={data.tiers} readOnly={readOnly} name={viewedName} />}
-      {view === "availability" && <section className={s.availability}><Icon name="trophy" size={32} /><h2>Fair history is not connected yet</h2><p>Weekly finishes and Highest Fair Record need each fair’s venue, start date and end date. Existing order dates and branch labels cannot reliably identify a completed fair.</p><h2>Championship</h2><p>{readOnly ? "Members can save their own brand weeks now." : "Your brand weeks can be saved now."} Championship totals will appear after all ranking sources and the scoring ledger are connected.</p><p>Sales, Margin and KPI rankings already use {readOnly ? "the selected" : "your"} department’s real data.</p></section>}
+      {view === "availability" && <FairHistory data={data} viewedId={viewedId} viewedName={viewedName} readOnly={readOnly} window={window} periodLabel={periodTitle} />}
       {view !== "weeks" && view !== "incentive" && <details className={s.basis}><summary>How these rankings are measured</summary><p>Deposit-cleared commissionable sales and KPI items. Each order is counted once in its released commission month; unreleased orders are shown in the current open month. Quarterly and Annual aggregate those months.</p><p>Margin uses commissionable goods revenue and cost together. A salesperson with incomplete cost data stays pending for Margin Ranking. Directors are excluded. These are live performance figures, not a payroll statement.</p></details>}
     </div>}
   </div>;
