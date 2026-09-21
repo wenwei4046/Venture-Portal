@@ -1369,6 +1369,19 @@ into the statement and the schedule (loans + fund sources). Worked example
 in `treasury-terms.test.ts`: Lim Wei Liang 60k, 4% compound from 2026-01 on
 51,000 → 59,118.53 at the start of Sep-26, Sep interest 2,364.74.
 
+**Liang 60k data fixes (same day, user: "要直接更改哦，不是开 JE 补")**: the
+August PV HV-PV-202608-0276 (1,300, 10 Aug) had been keyed WITHOUT the
+repayment link, so the fund source showed August unpaid (43,000) — linked
+it (fund_source_id + breakdown 1,000/300), inserted the two
+fund_source_repayments rows (payment_voucher_id set) → outstanding 42,000.
+Its JE and the June (0019 / JE-202606-0059) + July (0108 / JE-202607-0253)
+JEs had the whole 1,300 on 4055: split in place to 4055 1,000 + a new 6000
+300 line each, payment_voucher_sources updated in step (pvs_sum_matches
+trigger paused for the two statements), "[split 2026-09-21 …]" note on each
+JE. No reclass JVs, per the user. The 4%-compound-from-January question was
+answered on paper only (Jan-1 base 51,000 for both the Cont loan and the
+Liang fund-in; user has not asked to apply it).
+
 **Gates**: vitest green, next build green. Not verified in the browser (no
 login) — user to try one change and look at fund-in detail + statement.
 
