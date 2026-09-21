@@ -1360,8 +1360,17 @@ and a collapsible 差价 row per change (old/new principal + interest per month,
 Δ, paid, shortfall, totals). Schedule / Loan Monitor rows carry "· terms
 from X".
 
-**Gates**: vitest 2268 green, next build green. Not verified in the browser
-(no login) — user to try one change and look at fund-in detail + statement.
+**Flat → compound (same day, user's live example)**: `compoundRoll(segments,
+{principal, startYM, currentYM, paymentsByMonth})` — a deal that compounded
+from day one rolls from the record month on the original principal (legacy);
+a FLAT deal turned compounding at X rolls from X on the principal still owed
+then (the flat months paid their interest, nothing to capitalise). Wired
+into the statement and the schedule (loans + fund sources). Worked example
+in `treasury-terms.test.ts`: Lim Wei Liang 60k, 4% compound from 2026-01 on
+51,000 → 59,118.53 at the start of Sep-26, Sep interest 2,364.74.
+
+**Gates**: vitest green, next build green. Not verified in the browser (no
+login) — user to try one change and look at fund-in detail + statement.
 
 ## SESSION 2026-09-18 — Cash Flow report rework: parent-code layouts · category rows · navy/gold skin
 

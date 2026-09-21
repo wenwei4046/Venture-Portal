@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState, minInterestStatus } from '@/lib/treasury-schedule'
 import { resolveFirstDueYM } from '@/lib/loan-monitor'
-import { buildTermsSegments, currentSegment, principalPaidSince, rateAt, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
+import { buildTermsSegments, compoundRoll, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../fund-in/actions'
@@ -120,13 +120,16 @@ export default async function RepaymentSchedulePage({
       if (!firstDueYM || firstDueYM <= currentYM) {
         const isCompound = (l as { compound_interest?: boolean }).compound_interest === true
         const due = isCompound
-          ? compoundInterestState({
-              principal,
-              monthlyRate: seg ? (ym) => rateAt(segments, ym) : rate,
-              startYM: ((l.disbursement_date as string | null) ?? '').slice(0, 7) || currentYM,
-              currentYM,
-              paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {},
-            }).thisMonthInterest
+          ? (seg
+              ? compoundRoll(segments, { principal, startYM: ((l.disbursement_date as string | null) ?? '').slice(0, 7) || null, currentYM, paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {} })!
+              : compoundInterestState({
+                  principal,
+                  monthlyRate: rate,
+                  startYM: ((l.disbursement_date as string | null) ?? '').slice(0, 7) || currentYM,
+                  currentYM,
+                  paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {},
+                })
+            ).thisMonthInterest
           : seg
             ? seg.interestPerMonth
             : r2(principal * rate)
@@ -144,7 +147,9 @@ export default async function RepaymentSchedulePage({
     const compounding = (l as { compound_interest?: boolean }).compound_interest === true && rate > 0
     if (compounding) {
       const startYM = ((l.disbursement_date as string | null) ?? '').slice(0, 7) || currentYM
-      const cs = compoundInterestState({ principal, monthlyRate: seg ? (ym) => rateAt(segments, ym) : rate, startYM, currentYM, paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {} })
+      const cs = seg
+        ? compoundRoll(segments, { principal, startYM, currentYM, paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {} })!
+        : compoundInterestState({ principal, monthlyRate: rate, startYM, currentYM, paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {} })
       const remainingPrincipal = r2(principal - Number(out?.total_principal_paid ?? 0))
       collectCompound.push({
         key: l.id as string,
@@ -221,15 +226,22 @@ export default async function RepaymentSchedulePage({
     (fsReps ?? []).map((rp) => ({ id: rp.fund_source_id as string, amount: Number(rp.amount), payment_date: rp.payment_date as string, payment_type: rp.payment_type as string })),
     (t) => t === 'principal' || t === 'netting',
   )
-  // Per-month rate for a fund source whose terms changed (compounding rows).
-  const fsRateAt = (id: string): number | ((ym: string) => number) | null => {
+  // Segments of a fund source whose terms changed (compounding rows roll per
+  // lib/treasury-terms compoundRoll); null when unchanged.
+  const fsSegments = (id: string): TermsSegment[] | null => {
     const m = fsMeta.get(id)
     if (!m || !m.terms_effective_from) return null
     const segs = buildTermsSegments(
       termsForFundSource({ amount: m.amount ?? 0, cost_rate: m.cost_rate ?? 0, lock_in_months: m.lock_in_months ?? null, compound_interest: m.compound_interest, effective_date: m.effective_date ?? null, repayment_start_month: m.repayment_start_month, terms_effective_from: m.terms_effective_from }, fsHist.get(id) ?? []),
       fsPrincipalByMonth.get(id) ?? {},
     )
-    return termsChanged(segs) ? (ym: string) => rateAt(segs, ym) : null
+    return termsChanged(segs) ? segs : null
+  }
+  const fsCompound = (id: string, principal: number, rate: number, startYM: string) => {
+    const segs = fsSegments(id)
+    return segs
+      ? compoundRoll(segs, { principal, startYM, currentYM, paymentsByMonth: fsPayByMonth.get(id) ?? {} })!
+      : compoundInterestState({ principal, monthlyRate: rate, startYM, currentYM, paymentsByMonth: fsPayByMonth.get(id) ?? {} })
   }
   const fsPayByMonth = new Map<string, Record<string, number>>()
   const fsDoneThisMonth = new Set<string>()
@@ -276,13 +288,7 @@ export default async function RepaymentSchedulePage({
       if (!firstDueYM || firstDueYM <= currentYM) {
         const isCompound = fsm.compound_interest === true
         const due = isCompound
-          ? compoundInterestState({
-              principal: p.original_amount,
-              monthlyRate: fsRateAt(p.id) ?? p.cost_rate,
-              startYM: (fsm.effective_date ?? '').slice(0, 7) || currentYM,
-              currentYM,
-              paymentsByMonth: fsPayByMonth.get(p.id) ?? {},
-            }).thisMonthInterest
+          ? fsCompound(p.id, p.original_amount, p.cost_rate, (fsm.effective_date ?? '').slice(0, 7) || currentYM).thisMonthInterest
           : p.terms_from
             ? p.monthly_interest
             : r2(p.original_amount * p.cost_rate)
@@ -297,7 +303,7 @@ export default async function RepaymentSchedulePage({
     }
     if (!p.settled_in_month && fsm?.compound_interest === true && p.cost_rate > 0) {
       const startYM = (fsm?.effective_date ?? '').slice(0, 7) || currentYM
-      const cs = compoundInterestState({ principal: p.original_amount, monthlyRate: fsRateAt(p.id) ?? p.cost_rate, startYM, currentYM, paymentsByMonth: fsPayByMonth.get(p.id) ?? {} })
+      const cs = fsCompound(p.id, p.original_amount, p.cost_rate, startYM)
       repayCompound.push({
         key: p.id,
         counterparty: cp,
@@ -342,7 +348,7 @@ export default async function RepaymentSchedulePage({
       let extra = ''
       if (compounding) {
         const startYM = (meta?.effective_date ?? '').slice(0, 7) || currentYM
-        const cs = compoundInterestState({ principal: p.original_amount, monthlyRate: fsRateAt(p.id) ?? p.cost_rate, startYM, currentYM, paymentsByMonth: fsPayByMonth.get(p.id) ?? {} })
+        const cs = fsCompound(p.id, p.original_amount, p.cost_rate, startYM)
         interestDue = cs.thisMonthInterest
         extra = ` · compound balance RM ${cs.balance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
       }

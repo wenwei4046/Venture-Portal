@@ -8,6 +8,7 @@ import {
   segmentAt,
   segmentRemainingPeriods,
   termsChanged,
+  compoundRoll,
   type PositionTerms,
 } from './treasury-terms'
 
@@ -137,5 +138,47 @@ describe('compareTermsChange', () => {
 
   it('returns null for the original segment', () => {
     expect(compareTermsChange(buildTermsSegments(ORIGINAL), 0, { currentYM: '2026-10' })).toBeNull()
+  })
+})
+
+// ─── compoundRoll: the user's live example (2026-09-21) ──────────────────────
+// Lim Wei Liang 60,000 @ 0.5% flat × 60 from 2025-04; 1,000 + 300 paid every
+// month Apr-25..Jul-26, nothing in Aug-26, again in Sep-26 → 43,000 owed.
+// "从一月才开始重新算, 4% per month, compound": roll from 2026-01 on the
+// 51,000 still owed then; the flat months before it capitalise nothing.
+
+describe('compoundRoll', () => {
+  const pay: Record<string, number> = {}
+  for (const ym of ['2025-04','2025-05','2025-06','2025-07','2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-09']) pay[ym] = 1300
+  const principalOnly: Record<string, number> = Object.fromEntries(Object.keys(pay).map((k) => [k, 1000]))
+  const terms: PositionTerms = {
+    principal: 60000,
+    startYM: '2025-04',
+    firstDueYM: '2025-05',
+    current: { rate: 0.04, months: null, compounding: true, effectiveFrom: '2026-01' },
+    history: [{ validFrom: '2025-05', validTo: '2025-12', rate: 0.005, months: 60, compounding: false }],
+  }
+
+  it('flat → compound at X: starts at X on the principal still owed, not from day one', () => {
+    const segs = buildTermsSegments(terms, principalOnly)
+    expect(segs[1]).toMatchObject({ fromYM: '2026-01', compounding: true, base: 51000 })
+    const roll = compoundRoll(segs, { principal: 60000, startYM: '2025-04', currentYM: '2026-09', paymentsByMonth: pay })!
+    expect(roll.fromYM).toBe('2026-01')
+    expect(roll.base).toBe(51000)
+    // Jan 51,000 → +2,040 −1,300 = 51,740 → … → Aug (no payment) 59,118.53
+    expect(roll.balance).toBe(59118.53)
+    expect(roll.thisMonthInterest).toBe(2364.74)
+  })
+
+  it('compound from day one still rolls from the record month on the original principal', () => {
+    const fromStart: PositionTerms = { ...terms, current: { ...terms.current, effectiveFrom: null }, history: [] }
+    const segs = buildTermsSegments(fromStart, principalOnly)
+    const roll = compoundRoll(segs, { principal: 60000, startYM: '2025-04', currentYM: '2025-06', paymentsByMonth: pay })!
+    // Apr: 60,000 + 2,400 − 1,300 = 61,100 · May: 61,100 + 2,444 − 1,300 = 62,244
+    expect(roll).toMatchObject({ fromYM: '2025-04', base: 60000, balance: 62244, thisMonthInterest: 2489.76 })
+  })
+
+  it('null when the current terms do not compound', () => {
+    expect(compoundRoll(buildTermsSegments(ORIGINAL), { principal: 30000, startYM: '2026-04', currentYM: '2026-09', paymentsByMonth: {} })).toBeNull()
   })
 })

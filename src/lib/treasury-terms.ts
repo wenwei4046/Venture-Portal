@@ -206,6 +206,53 @@ export function rateAt(segments: TermsSegment[], ym: string): number {
   return rate
 }
 
+export interface CompoundRoll {
+  /** Outstanding incl. capitalised interest at the START of currentYM. */
+  balance: number
+  /** Interest due for currentYM on that balance. */
+  thisMonthInterest: number
+  /** Month the roll started from and the balance it started with. */
+  fromYM: string
+  base: number
+}
+
+/** 利滚利 balance for a deal that compounds now. A deal that compounded from
+ *  day one rolls from the record's own month on the original principal (the
+ *  legacy reading, the rate switching where the terms did). A deal that was
+ *  FLAT and turned compounding at X rolls from X on the principal still owed
+ *  then — the flat months paid their interest separately, nothing to
+ *  capitalise (user's example 2026-09-21: 60k @ 0.5% flat, 43k owed, "从一月
+ *  才开始重新算 4% compound"). Null when the current terms don't compound. */
+export function compoundRoll(
+  segments: TermsSegment[],
+  opts: {
+    principal: number
+    /** The record's own month (disbursement / effective), 'YYYY-MM'. */
+    startYM: string | null
+    currentYM: string
+    /** Total repaid (all types) per calendar month. */
+    paymentsByMonth: Record<string, number>
+  },
+): CompoundRoll | null {
+  const last = segments[segments.length - 1]
+  if (!last || !last.compounding) return null
+  const k = segments.findIndex((s) => s.compounding)
+  const seg = segments[k]
+  const fromYM = k === 0 ? (opts.startYM ?? seg.fromYM) : seg.fromYM
+  let balance = k === 0 ? opts.principal : seg.base
+  let ym = fromYM
+  let guard = 0
+  while (ym < opts.currentYM && guard < 1200) {
+    const interest = r2(balance * rateAt(segments, ym))
+    const paid = opts.paymentsByMonth[ym] ?? 0
+    balance = r2(balance + interest - paid)
+    if (balance < 0) balance = 0
+    ym = addMonthsYM(ym, 1)
+    guard++
+  }
+  return { balance, thisMonthInterest: r2(balance * rateAt(segments, opts.currentYM)), fromYM, base: k === 0 ? opts.principal : seg.base }
+}
+
 /** Principal repaid in months on/after the segment's first month. */
 export function principalPaidSince(byMonth: Record<string, number>, fromYM: string): number {
   let s = 0

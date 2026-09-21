@@ -19,9 +19,9 @@ import { remainingPeriods, resolveFirstDueYM } from '@/lib/loan-monitor'
 import { compoundInterestState } from '@/lib/treasury-schedule'
 import {
   allTermsChanges,
+  compoundRoll,
   currentSegment,
   principalPaidSince,
-  rateAt,
   segmentRemainingPeriods,
   termsChanged,
   type TermsChangeComparison,
@@ -142,14 +142,18 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
 
   if (p.compounding) {
     // Accrual starts the month the money moved — same as /repayment-schedule.
+    // A deal whose terms changed rolls per lib/treasury-terms compoundRoll
+    // (a flat deal turned compounding starts at X on what was still owed).
     const accrualStart = (p.startDate ?? '').slice(0, 7) || currentYM
-    const cs = compoundInterestState({
-      principal: p.principal,
-      monthlyRate: changed ? (ym) => rateAt(p.segments!, ym) : p.monthlyRate,
-      startYM: accrualStart,
-      currentYM,
-      paymentsByMonth: p.paymentsByMonth,
-    })
+    const cs = changed
+      ? compoundRoll(p.segments!, { principal: p.principal, startYM: accrualStart, currentYM, paymentsByMonth: p.paymentsByMonth })!
+      : compoundInterestState({
+          principal: p.principal,
+          monthlyRate: p.monthlyRate,
+          startYM: accrualStart,
+          currentYM,
+          paymentsByMonth: p.paymentsByMonth,
+        })
     return {
       ...base,
       kind: 'compound',
