@@ -1382,6 +1382,19 @@ JE. No reclass JVs, per the user. The 4%-compound-from-January question was
 answered on paper only (Jan-1 base 51,000 for both the Cont loan and the
 Liang fund-in; user has not asked to apply it).
 
+**PENDING — do NOT apply until the user says so (user 2026-09-21 "记起来先，
+别做先")**: the Liang 60k mirror pair is to be changed from 2026-01, both
+sides, different methods. Fund in [BI#7] 4cb7ee6d: 10% p.a. flat on the
+51,000 owed at Jan-1 → 425/month, principal 1,000 × 51 remaining (ends
+2030-03), Jan–Sep paid at 300 → 1,125 short, +6,375 interest over the life.
+Fund out [LO#7] e6569127 (The Cont): 4%/month COMPOUND on 51,000 →
+monthly-roll (method A) 57,818.53 at Sep-1; the user asked for "daily
+calculation" — B (4%×12/365 daily, capitalised monthly, payments on their
+dates) 57,395.18 or C (4%/30 daily) 57,663.47 — the engine only does A, so
+B/C means a daily-rest engine first. Open: 51 months + exact-425 precision
+(rate column is 6-dp monthly → 424.98), and A/B/C. Both tables were shown
+to the user; also in memory `liang-cont-terms-change-pending`.
+
 **Gates**: vitest green, next build green. Not verified in the browser (no
 login) — user to try one change and look at fund-in detail + statement.
 
