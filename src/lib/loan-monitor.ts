@@ -10,17 +10,16 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled, loanMonthlyInstallment } from '@/lib/treasury-schedule'
+import { buildSegmentedAging, buildTermsSegments, currentSegment, principalPaidSince, resolveFirstDueYM, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
+import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { buildInstallmentAging, sumBuckets, type AgingBuckets, EMPTY_BUCKETS } from './loan-aging'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
-/** First installment month: the agreed start when set, else disb/effective +1. */
-export function resolveFirstDueYM(startMonth: string | null, baseDate: string | null): string | null {
-  if (startMonth) return startMonth.slice(0, 7)
-  if (!baseDate) return null
-  return dayjs(`${baseDate.slice(0, 7)}-01`).add(1, 'month').format('YYYY-MM')
-}
+/** First installment month: the agreed start when set, else disb/effective +1.
+ *  Lives in lib/treasury-terms now; re-exported so callers keep importing from here. */
+export { resolveFirstDueYM }
 
 /** Remaining flat installments given principal already repaid. */
 export function remainingPeriods(principal: number, tenure: number, principalPaid: number): number {
@@ -82,20 +81,20 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
   ] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, terms_effective_from')
       .eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, name, short_code'),
     fetchAllRows((lo, hi) =>
-      supabase.from('repayments').select('loan_id, amount, payment_date').order('id', { ascending: true }).range(lo, hi),
+      supabase.from('repayments').select('loan_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi),
     ),
     supabase
       .from('fund_sources')
-      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month')
+      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, terms_effective_from')
       .in('status', ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
     fetchAllRows((lo, hi) =>
-      supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date').order('id', { ascending: true }).range(lo, hi),
+      supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi),
     ),
     supabase.from('directors').select('id, name, code'),
     supabase.from('departments').select('id, name'),
@@ -106,6 +105,20 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
   const deptById = new Map((departments ?? []).map((d) => [d.id as string, d]))
   const loanOutBy = new Map((loanOut ?? []).map((o) => [o.loan_id as string, o]))
   const fsOutBy = new Map((fsOut ?? []).map((o) => [o.fund_source_id as string, o]))
+  // Terms that changed mid-life (2026-09-21): each month ages at the
+  // installment its own segment prescribes.
+  const [loanHist, fsHist] = await Promise.all([
+    fetchTermsHistory(supabase, 'loan', (loans ?? []).map((l) => l.id as string)),
+    fetchTermsHistory(supabase, 'fund_source', (fsrcs ?? []).map((s) => s.id as string)),
+  ])
+  const loanPrincipalByMonth = principalPaidByMonth(
+    (loanReps ?? []).map((rp) => ({ id: rp.loan_id as string, amount: Number(rp.amount), payment_date: rp.payment_date as string, payment_type: (rp as { payment_type?: string }).payment_type ?? 'principal' })),
+    isLoanPrincipal,
+  )
+  const fsPrincipalByMonth = principalPaidByMonth(
+    (fsReps ?? []).map((rp) => ({ id: rp.fund_source_id as string, amount: Number(rp.amount), payment_date: rp.payment_date as string, payment_type: (rp as { payment_type?: string }).payment_type ?? 'principal' })),
+    isFundSourcePrincipal,
+  )
 
   // ALL-TIME pooled payments — the aging allocates them FIFO from the first
   // agreed installment, so settled months vanish automatically.
@@ -142,6 +155,10 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     const unscheduled = isLoanUnscheduled(l.repayment_terms as string | null)
     const startMonth = (l as { repayment_start_month?: string | null }).repayment_start_month ?? null
     const firstDueYM = resolveFirstDueYM(startMonth, l.disbursement_date as string | null)
+    const segments = buildTermsSegments(termsForLoan(l, loanHist.get(l.id as string) ?? []), loanPrincipalByMonth.get(l.id as string) ?? {})
+    const changed = termsChanged(segments)
+    const seg = changed ? currentSegment(segments, currentYM) : null
+    const termsTag = seg ? ` · terms from ${seg.fromYM}` : ''
 
     if (compounding || unscheduled || !(tenure > 0)) {
       if (outstanding > 0.005) {
@@ -161,7 +178,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
       collectSched.push({
         key: l.id as string,
         counterparty,
-        detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo`,
+        detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo${termsTag}`,
         source,
         outstanding,
         startLabel: startLabel(startMonth, firstDueYM),
@@ -169,25 +186,29 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     }
 
     if (!firstDueYM || firstDueYM > currentYM) continue // plan not started yet
-    const inst = loanMonthlyInstallment({
-      principal,
-      effectiveRate: rate,
-      tenureMonths: tenure,
-      principalPaid: Number(out?.total_principal_paid ?? 0),
-    })
-    const buckets = buildInstallmentAging({
-      principal,
-      monthlyRate: rate,
-      tenureMonths: tenure,
-      firstDueYM,
-      asOfYM: currentYM,
-      totalPaid: paidByLoan.get(l.id as string) ?? 0,
-    })
+    const remainingLeft = seg
+      ? segmentRemainingPeriods(seg, principalPaidSince(loanPrincipalByMonth.get(l.id as string) ?? {}, seg.fromYM))
+      : loanMonthlyInstallment({
+          principal,
+          effectiveRate: rate,
+          tenureMonths: tenure,
+          principalPaid: Number(out?.total_principal_paid ?? 0),
+        }).remainingPeriods
+    const buckets = changed
+      ? buildSegmentedAging({ segments, asOfYM: currentYM, totalPaid: paidByLoan.get(l.id as string) ?? 0 })
+      : buildInstallmentAging({
+          principal,
+          monthlyRate: rate,
+          tenureMonths: tenure,
+          firstDueYM,
+          asOfYM: currentYM,
+          totalPaid: paidByLoan.get(l.id as string) ?? 0,
+        })
     if (buckets.total <= 0.005) continue // fully caught up → disappears
     collectDue.push({
       key: l.id as string,
       counterparty,
-      detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo · ${inst.remainingPeriods} left`,
+      detail: `RM ${money(principal)} @ ${(rate * 100).toFixed(3)}%/mo · ${tenure}mo · ${remainingLeft} left${termsTag}`,
       source,
       buckets,
     })
@@ -211,6 +232,10 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
     const compounding = (s as { compound_interest?: boolean }).compound_interest === true
     const startMonth = (s as { repayment_start_month?: string | null }).repayment_start_month ?? null
     const firstDueYM = resolveFirstDueYM(startMonth, s.effective_date as string | null)
+    const segments = buildTermsSegments(termsForFundSource(s, fsHist.get(s.id as string) ?? []), fsPrincipalByMonth.get(s.id as string) ?? {})
+    const changed = termsChanged(segments)
+    const seg = changed ? currentSegment(segments, currentYM) : null
+    const termsTag = seg ? ` · terms from ${seg.fromYM}` : ''
 
     if (compounding || !lockIn || lockIn <= 0) {
       if (outstanding > 0.005) {
@@ -229,7 +254,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
       repaySched.push({
         key: s.id as string,
         counterparty: from as string,
-        detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${lockIn}mo`,
+        detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${lockIn}mo${termsTag}`,
         outstanding,
         startLabel: startLabel(startMonth, firstDueYM),
       })
@@ -237,20 +262,24 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<Lo
 
     if (!firstDueYM || firstDueYM > currentYM) continue
     const principalPaid = Number(out?.total_principal_paid ?? 0)
-    const remaining = remainingPeriods(amount, lockIn, principalPaid)
-    const buckets = buildInstallmentAging({
-      principal: amount,
-      monthlyRate: rate,
-      tenureMonths: lockIn,
-      firstDueYM,
-      asOfYM: currentYM,
-      totalPaid: paidByFs.get(s.id as string) ?? 0,
-    })
+    const remaining = seg
+      ? segmentRemainingPeriods(seg, principalPaidSince(fsPrincipalByMonth.get(s.id as string) ?? {}, seg.fromYM))
+      : remainingPeriods(amount, lockIn, principalPaid)
+    const buckets = changed
+      ? buildSegmentedAging({ segments, asOfYM: currentYM, totalPaid: paidByFs.get(s.id as string) ?? 0 })
+      : buildInstallmentAging({
+          principal: amount,
+          monthlyRate: rate,
+          tenureMonths: lockIn,
+          firstDueYM,
+          asOfYM: currentYM,
+          totalPaid: paidByFs.get(s.id as string) ?? 0,
+        })
     if (buckets.total <= 0.005) continue
     repayDue.push({
       key: s.id as string,
       counterparty: from as string,
-      detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${lockIn}mo · ${remaining} left`,
+      detail: `RM ${money(amount)} @ ${(rate * 100).toFixed(3)}%/mo · ${lockIn}mo · ${remaining} left${termsTag}`,
       buckets,
     })
   }

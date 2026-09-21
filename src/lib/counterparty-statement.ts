@@ -17,6 +17,16 @@
 
 import { remainingPeriods, resolveFirstDueYM } from '@/lib/loan-monitor'
 import { compoundInterestState } from '@/lib/treasury-schedule'
+import {
+  allTermsChanges,
+  currentSegment,
+  principalPaidSince,
+  rateAt,
+  segmentRemainingPeriods,
+  termsChanged,
+  type TermsChangeComparison,
+  type TermsSegment,
+} from '@/lib/treasury-terms'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -60,6 +70,13 @@ export interface PositionInput {
   /** 最低还息单 (2026-09-04) — the deal requires each month's interest paid. */
   minPayInterest?: boolean
   source?: string | null
+  /** Terms segments (lib/treasury-terms) when the deal's terms changed
+   *  mid-life (2026-09-21). Omitted / single unchanged segment = legacy maths. */
+  segments?: TermsSegment[]
+  /** Principal repaid per month — the segment re-basing input. */
+  principalByMonth?: Record<string, number>
+  /** Principal + interest repaid per month — the 已付 side of a change comparison. */
+  paidByMonth?: Record<string, { principal: number; interest: number }>
 }
 
 export interface PositionRow {
@@ -84,25 +101,43 @@ export interface PositionRow {
   /** 最低还息单 — statement notes "每月最低应还利息 = monthlyInterest". */
   minPayInterest: boolean
   source?: string | null
+  /** Set when the terms changed mid-life: the month the CURRENT terms took
+   *  effect, the base they run on, and every change with its 差价. */
+  termsFrom?: string | null
+  termsBase?: number
+  termsChanges?: TermsChangeComparison[]
 }
 
 export function buildPositionRow(p: PositionInput, currentYM: string): PositionRow | null {
   if (p.outstanding <= 0.005) return null
-  const monthlyInterest = r2(p.principal * p.monthlyRate)
   const startYM = resolveFirstDueYM(p.startMonth, p.startDate)
+  // Terms changed mid-life (2026-09-21): every figure below reads the segment
+  // in force now — base, rate, per-month amounts, remaining count — and the
+  // row carries the change comparisons for the statement to show.
+  const changed = !!p.segments && termsChanged(p.segments)
+  const seg = changed ? currentSegment(p.segments!, currentYM) : null
+  const monthlyRate = seg ? seg.rate : p.monthlyRate
+  const monthlyInterest = seg ? seg.interestPerMonth : r2(p.principal * p.monthlyRate)
   const base = {
     id: p.id,
     side: p.side,
     counterparty: p.counterparty,
     principal: p.principal,
-    monthlyRate: p.monthlyRate,
-    tenureMonths: p.tenureMonths,
+    monthlyRate,
+    tenureMonths: seg ? seg.months : p.tenureMonths,
     principalPaid: r2(p.principalPaid),
     principalOutstanding: r2(p.outstanding),
     monthlyInterest,
     startYM,
     minPayInterest: p.minPayInterest === true,
     source: p.source ?? null,
+    ...(seg
+      ? {
+          termsFrom: seg.fromYM,
+          termsBase: seg.base,
+          termsChanges: allTermsChanges(p.segments!, { currentYM, paidByMonth: p.paidByMonth }),
+        }
+      : {}),
   }
 
   if (p.compounding) {
@@ -110,7 +145,7 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
     const accrualStart = (p.startDate ?? '').slice(0, 7) || currentYM
     const cs = compoundInterestState({
       principal: p.principal,
-      monthlyRate: p.monthlyRate,
+      monthlyRate: changed ? (ym) => rateAt(p.segments!, ym) : p.monthlyRate,
       startYM: accrualStart,
       currentYM,
       paymentsByMonth: p.paymentsByMonth,
@@ -124,21 +159,26 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
     }
   }
 
-  const tenure = p.tenureMonths ?? 0
+  const tenure = (seg ? seg.months : p.tenureMonths) ?? 0
   if (p.unscheduled || tenure <= 0) {
     return { ...base, kind: 'no_term', interestOutstanding: 0, remainingPeriods: null, finishYM: null }
   }
 
-  const remaining = remainingPeriods(p.principal, tenure, p.principalPaid)
+  // Remaining installments: legacy counts from the original plan; a changed
+  // deal counts within its current segment (principal repaid since it began).
+  const remaining = seg
+    ? segmentRemainingPeriods(seg, principalPaidSince(p.principalByMonth ?? {}, seg.fromYM))
+    : remainingPeriods(p.principal, tenure, p.principalPaid)
+  const planStart = seg ? seg.fromYM : startYM
   let finishYM: string | null = null
   if (remaining <= 0) {
     // Rounding tail: principal counted as fully installment-paid but a few sen
     // remain on the view — settles with the next payment.
     finishYM = currentYM
-  } else if (startYM) {
-    const contractual = addMonthsYM(startYM, tenure - 1)
+  } else if (planStart) {
+    const contractual = addMonthsYM(planStart, tenure - 1)
     const periodsDone = tenure - remaining
-    const scheduledSoFar = startYM <= currentYM ? diffMonths(startYM, currentYM) + 1 : 0
+    const scheduledSoFar = planStart <= currentYM ? diffMonths(planStart, currentYM) + 1 : 0
     finishYM =
       periodsDone >= scheduledSoFar - 1 // this month's installment may still be in flight
         ? contractual

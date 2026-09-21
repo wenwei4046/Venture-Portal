@@ -7,6 +7,16 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
+import { buildTermsSegments } from '@/lib/treasury-terms'
+import {
+  fetchTermsHistory,
+  isFundSourcePrincipal,
+  isLoanPrincipal,
+  paidByMonthByType,
+  principalPaidByMonth,
+  termsForFundSource,
+  termsForLoan,
+} from '@/lib/treasury-terms-data'
 import { fundingSourceFromTerms, lentToFromNotes } from '@/lib/utils'
 import {
   buildPositionRow,
@@ -42,7 +52,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('loans')
       .select(
-        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, min_pay_interest',
+        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, min_pay_interest, terms_effective_from',
       )
       .eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
@@ -50,21 +60,21 @@ export async function fetchCounterpartyStatement(
     fetchAllRows((lo, hi) =>
       supabase
         .from('repayments')
-        .select('loan_id, amount, payment_date')
+        .select('loan_id, amount, payment_date, payment_type')
         .order('id', { ascending: true })
         .range(lo, hi),
     ),
     supabase
       .from('fund_sources')
       .select(
-        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes, min_pay_interest',
+        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes, min_pay_interest, terms_effective_from',
       )
       .in('status', ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
     fetchAllRows((lo, hi) =>
       supabase
         .from('fund_source_repayments')
-        .select('fund_source_id, amount, payment_date')
+        .select('fund_source_id, amount, payment_date, payment_type')
         .order('id', { ascending: true })
         .range(lo, hi),
     ),
@@ -73,6 +83,19 @@ export async function fetchCounterpartyStatement(
   ])
 
   const r2 = (n: number) => Math.round(n * 100) / 100
+  // Terms that changed mid-life (2026-09-21): earlier segments per record,
+  // plus the per-month repayment splits a later segment re-bases on / the
+  // statement compares against.
+  const [loanHist, fsHist] = await Promise.all([
+    fetchTermsHistory(supabase, 'loan', (loans ?? []).map(l => l.id as string)),
+    fetchTermsHistory(supabase, 'fund_source', (fsrcs ?? []).map(s => s.id as string)),
+  ])
+  const loanRepRows = (loanReps ?? []).map(rp => ({ id: rp.loan_id as string, amount: Number(rp.amount), payment_date: rp.payment_date as string, payment_type: (rp as { payment_type?: string }).payment_type ?? 'principal' }))
+  const fsRepRows = (fsReps ?? []).map(rp => ({ id: rp.fund_source_id as string, amount: Number(rp.amount), payment_date: rp.payment_date as string, payment_type: (rp as { payment_type?: string }).payment_type ?? 'principal' }))
+  const loanPrincipalByMonth = principalPaidByMonth(loanRepRows, isLoanPrincipal)
+  const fsPrincipalByMonth = principalPaidByMonth(fsRepRows, isFundSourcePrincipal)
+  const loanPaidByType = paidByMonthByType(loanRepRows, isLoanPrincipal)
+  const fsPaidByType = paidByMonthByType(fsRepRows, isFundSourcePrincipal)
   const coById = new Map((companies ?? []).map(c => [c.id as string, c]))
   const dirById = new Map((directors ?? []).map(d => [d.id as string, d]))
   const deptById = new Map((departments ?? []).map(d => [d.id as string, d]))
@@ -126,6 +149,9 @@ export async function fetchCounterpartyStatement(
       paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {},
       minPayInterest: (l as { min_pay_interest?: boolean }).min_pay_interest === true,
       source: fundingSourceFromTerms(l.repayment_terms as string | null),
+      segments: buildTermsSegments(termsForLoan(l, loanHist.get(l.id as string) ?? []), loanPrincipalByMonth.get(l.id as string) ?? {}),
+      principalByMonth: loanPrincipalByMonth.get(l.id as string) ?? {},
+      paidByMonth: loanPaidByType.get(l.id as string) ?? {},
     })
   }
 
@@ -160,6 +186,9 @@ export async function fetchCounterpartyStatement(
       source:
         lentToFromNotes(s.notes as string | null) ??
         (((s.notes as string | null) ?? '').trim().slice(0, 60) || null),
+      segments: buildTermsSegments(termsForFundSource(s, fsHist.get(s.id as string) ?? []), fsPrincipalByMonth.get(s.id as string) ?? {}),
+      principalByMonth: fsPrincipalByMonth.get(s.id as string) ?? {},
+      paidByMonth: fsPaidByType.get(s.id as string) ?? {},
     })
   }
 

@@ -9,6 +9,8 @@ import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { FundSourceType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
+import { buildTermsSegments, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
+import { fetchTermsHistory, termsForFundSource } from '@/lib/treasury-terms-data'
 
 // ─── Amend an ACTIVE fund source (Principal — self-service, direct apply) ─────
 // Principal is the top approval authority, so edits apply immediately via the
@@ -54,6 +56,73 @@ export async function amendFundSource(formData: FormData): Promise<{ error: stri
   revalidatePath('/repayment-schedule')
   revalidatePath('/dashboard')
   redirect(`/fund-in/${id}`)
+}
+
+// ─── 「从某月起生效」 (user 2026-09-21) ────────────────────────────────────────
+// Same gate as amendFundSource (Principal), but the months before the chosen
+// one keep their old terms — the RPC files them into treasury_terms_history
+// and the record carries the new terms from that month (lib/treasury-terms).
+export async function amendFundSourceFrom(formData: FormData): Promise<{ error: string } | undefined> {
+  await requirePermission('override')
+  const supabase = await createClient()
+
+  const id = (formData.get('fund_source_id') as string) ?? ''
+  if (!id) return { error: 'Fund source id is required' }
+  const fromYM = ((formData.get('effective_from') as string) ?? '').trim()
+  if (!/^\d{4}-\d{2}$/.test(fromYM)) return { error: '请选生效月' }
+
+  const ratePctRaw = ((formData.get('cost_rate_percent') as string) ?? '').trim()
+  let rate: number | null = null
+  if (ratePctRaw !== '') {
+    const ratePct = parseFloat(ratePctRaw)
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    rate = Math.round((ratePct / 100) * 1e6) / 1e6
+  }
+  const remainingRaw = ((formData.get('remaining_months') as string) ?? '').trim()
+  let remaining: number | null = null
+  if (remainingRaw !== '') {
+    const n = parseInt(remainingRaw, 10)
+    if (isNaN(n) || n < 1 || n > 120) return { error: '剩余期数必须在 1–120,或留空保持原到期月' }
+    remaining = n
+  }
+  const compound = formData.get('compound_interest') === 'on'
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+
+  const { error } = await supabase.rpc('amend_fund_source_from', {
+    p_fund_source_id: id,
+    p_effective_from: `${fromYM}-01`,
+    p_cost_rate: rate,
+    p_remaining_months: remaining,
+    p_compound_interest: compound,
+    p_reason: reason || null,
+  })
+  if (error) return { error: `修改失败: ${error.message}` }
+
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/fund-in')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports/company-statement')
+  revalidatePath('/reports/loan-aging')
+  revalidatePath('/dashboard')
+  redirect(`/fund-in/${id}`)
+}
+
+/** Undo the latest 从某月起 change on a loan or fund source (Principal). */
+export async function revertTermsChange(
+  kind: 'loan' | 'fund_source',
+  id: string,
+): Promise<{ error: string } | undefined> {
+  await requirePermission('override')
+  const supabase = await createClient()
+  if (!id) return { error: 'Record id is required' }
+  const { error } = await supabase.rpc('revert_terms_change', { p_record_kind: kind, p_record_id: id })
+  if (error) return { error: `撤销失败: ${error.message}` }
+  revalidatePath(kind === 'loan' ? `/fund-out/${id}` : `/fund-in/${id}`)
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports/company-statement')
+  revalidatePath('/reports/loan-aging')
+  revalidatePath('/dashboard')
+  return undefined
 }
 
 interface CreateFundSourceInput {
@@ -593,6 +662,10 @@ export interface PayableFundSource {
   /** GL account the source is owed on (fund_sources.account_code, e.g. 4054);
    *  null on legacy rows without one. */
   account_code?: string | null
+  /** 'YYYY-MM' the current terms took effect when they changed mid-life
+   *  (2026-09-21); the monthly figures above then come from that segment,
+   *  re-based on the principal still owed at its first month. */
+  terms_from?: string | null
   /** True when this source has zero remaining outstanding but had a principal
    *  repayment in the month passed via opts.includeSettledInMonth. Lets the
    *  schedule render it as a 已付 (done) row in the full-plan view instead of
@@ -617,14 +690,14 @@ export async function listPayableFundSources(
     supabase
       .from('fund_source_outstanding')
       .select('fund_source_id, source_type, from_company_id, from_director_id, from_department_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
-    supabase.from('fund_sources').select('id, status, from_freetext_name, account_code'),
+    supabase.from('fund_sources').select('id, status, from_freetext_name, account_code, effective_date, repayment_start_month, compound_interest, terms_effective_from'),
     supabase.from('companies').select('id, name, short_code'),
     // is_internal=false — the 'Venture Office' pseudo-dept is not a fund source.
     supabase.from('departments').select('id, name').eq('is_internal', false),
     supabase.from('directors').select('id, name'),
     fetchAllRows((lo, hi) => supabase
       .from('fund_source_repayments')
-      .select('fund_source_id, payment_type, payment_date')
+      .select('fund_source_id, payment_type, payment_date, amount')
       .eq('payment_type', 'principal')
       .order('id', { ascending: true })
       .range(lo, hi)).then((data) => ({ data })),
@@ -635,6 +708,17 @@ export async function listPayableFundSources(
   // The GL account the source is owed on (4054 / 4058 …) — the repayment PV
   // form defaults its principal row to it (lib/repayment-source-rows).
   const accountMap = new Map((sources ?? []).map((s) => [s.id, (s as { account_code: string | null }).account_code ?? null]))
+  const sourceById = new Map((sources ?? []).map((s) => [s.id, s as unknown as { effective_date: string | null; repayment_start_month: string | null; compound_interest: boolean | null; terms_effective_from: string | null }]))
+  // Terms that changed mid-life (2026-09-21): the monthly figures come from
+  // the segment in force now, not the day-one terms.
+  const history = await fetchTermsHistory(supabase, 'fund_source', (sources ?? []).map((s) => s.id))
+  const principalByMonth = new Map<string, Record<string, number>>()
+  for (const r of repayments ?? []) {
+    const m = principalByMonth.get(r.fund_source_id) ?? {}
+    const k = (r.payment_date as string).slice(0, 7)
+    m[k] = Math.round(((m[k] ?? 0) + Number((r as { amount?: number | string }).amount ?? 0)) * 100) / 100
+    principalByMonth.set(r.fund_source_id, m)
+  }
   const companyMap = new Map((companies ?? []).map((c) => [c.id, c]))
   const departmentMap = new Map((departments ?? []).map((d) => [d.id, d.name]))
   const directorMap = new Map((directors ?? []).map((d) => [d.id, d.name]))
@@ -664,13 +748,32 @@ export async function listPayableFundSources(
     })
     .map((o) => {
       const amount = Number(o.original_amount)
-      const rate = Number(o.cost_rate)
-      const months = o.lock_in_months ?? 1
-      const monthlyPayment = Number(o.monthly_payment)
-      const monthlyInterest = months > 0 ? Number((amount * rate).toFixed(2)) : 0
-      const monthlyPrincipal = Number((monthlyPayment - monthlyInterest).toFixed(2))
-      const periodsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
-      const remaining = Math.max(0, months - periodsPaid)
+      let rate = Number(o.cost_rate)
+      let months = o.lock_in_months ?? 1
+      let monthlyPayment = Number(o.monthly_payment)
+      let monthlyInterest = months > 0 ? Number((amount * rate).toFixed(2)) : 0
+      let monthlyPrincipal = Number((monthlyPayment - monthlyInterest).toFixed(2))
+      let periodsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
+      let remaining = Math.max(0, months - periodsPaid)
+      let termsFrom: string | null = null
+      const meta = sourceById.get(o.fund_source_id)
+      if (meta) {
+        const segs = buildTermsSegments(
+          termsForFundSource({ amount, cost_rate: o.cost_rate ?? 0, lock_in_months: o.lock_in_months, compound_interest: meta.compound_interest, effective_date: meta.effective_date, repayment_start_month: meta.repayment_start_month, terms_effective_from: meta.terms_effective_from }, history.get(o.fund_source_id) ?? []),
+          principalByMonth.get(o.fund_source_id) ?? {},
+        )
+        if (termsChanged(segs)) {
+          const seg = currentSegment(segs, dayjs().format('YYYY-MM'))
+          rate = seg.rate
+          months = seg.months ?? months
+          monthlyPrincipal = seg.principalPerMonth
+          monthlyInterest = seg.interestPerMonth
+          monthlyPayment = Number((monthlyPrincipal + monthlyInterest).toFixed(2))
+          remaining = seg.months ? segmentRemainingPeriods(seg, principalPaidSince(principalByMonth.get(o.fund_source_id) ?? {}, seg.fromYM)) : remaining
+          periodsPaid = seg.months ? seg.months - remaining : periodsPaid
+          termsFrom = seg.fromYM
+        }
+      }
 
       // Mig 194: dept-pool fund sources label by department name (not the
       // "Director" fallback that earlier versions showed for any row without
@@ -708,6 +811,7 @@ export async function listPayableFundSources(
         remaining_periods: remaining,
         settled_in_month: !(statusMap.get(o.fund_source_id) === 'active' && Number(o.outstanding) > 0),
         account_code: accountMap.get(o.fund_source_id) ?? null,
+        terms_from: termsFrom,
       }
     })
     .sort((a, b) => b.remaining_periods - a.remaining_periods)

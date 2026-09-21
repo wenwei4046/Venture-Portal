@@ -11,6 +11,9 @@ import WithdrawButton from './_components/WithdrawButton'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
 import MinPayInterestToggle from './_components/MinPayInterestToggle'
 import NotesEditor from './_components/NotesEditor'
+import TermsTimeline from '@/components/treasury/TermsTimeline'
+import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged } from '@/lib/treasury-terms'
+import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   subsidiary: 'Subsidiary',
@@ -45,6 +48,12 @@ export default async function FundSourceDetailPage({ params }: Props) {
   ])
 
   if (error || !source) notFound()
+
+  // Terms over time (2026-09-21): segments + each 从某月起 change with its 差价.
+  const termsHistory = await fetchTermsHistory(supabase, 'fund_source', [source.id])
+  const repRows = (repayments ?? []).map((r) => ({ id: source.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
+  const termsSegments = buildTermsSegments(termsForFundSource(source, termsHistory.get(source.id) ?? []), principalPaidByMonth(repRows, isFundSourcePrincipal).get(source.id) ?? {})
+  const termsChanges = allTermsChanges(termsSegments, { currentYM: dayjs().format('YYYY-MM'), paidByMonth: paidByMonthByType(repRows, isFundSourcePrincipal).get(source.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation (cancelFundSource files a
   // tier_change approval). Finance can't see /approvals (principal-only), so
@@ -150,8 +159,12 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const totalInterestDue = Number(outstandingRow?.total_interest_due ?? 0)
   const monthlyPayment = Number(outstandingRow?.monthly_payment ?? 0)
 
-  // Monthly interest = fixed rate × original principal
-  const monthlyInterest = Number(source.amount) * Number(source.cost_rate)
+  // Monthly interest = fixed rate × original principal — or, once the terms
+  // changed mid-life, the current segment's figure (rate × principal still
+  // owed when it began).
+  const monthlyInterest = termsChanged(termsSegments)
+    ? currentSegment(termsSegments, dayjs().format('YYYY-MM')).interestPerMonth
+    : Number(source.amount) * Number(source.cost_rate)
 
   const repaymentsList = repayments ?? []
 
@@ -435,6 +448,10 @@ export default async function FundSourceDetailPage({ params }: Props) {
         sourceId={source.id}
         current={(source as { min_pay_interest?: boolean }).min_pay_interest === true}
       />
+
+      <div className="mt-8">
+        <TermsTimeline kind="fund_source" recordId={source.id} segments={termsSegments} changes={termsChanges} canRevert={user.role === 'principal' && source.status === 'active'} />
+      </div>
 
       <NotesEditor sourceId={source.id} current={(source.notes as string | null) ?? null} />
 

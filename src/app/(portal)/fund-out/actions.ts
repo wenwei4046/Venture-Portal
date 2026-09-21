@@ -579,6 +579,54 @@ export async function amendLoan(formData: FormData): Promise<{ error: string } |
   redirect(`/fund-out/${loanId}`)
 }
 
+// ─── 「从某月起生效」 (user 2026-09-21) ────────────────────────────────────────
+// Principal-only like amendLoan, but the months before the chosen one keep
+// their old terms (treasury_terms_history + lib/treasury-terms).
+export async function amendLoanFrom(formData: FormData): Promise<{ error: string } | undefined> {
+  await requirePermission('override')
+  const supabase = await createClient()
+
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  if (!loanId) return { error: 'Loan id is required' }
+  const fromYM = ((formData.get('effective_from') as string) ?? '').trim()
+  if (!/^\d{4}-\d{2}$/.test(fromYM)) return { error: '请选生效月' }
+
+  const ratePctRaw = ((formData.get('effective_rate_percent') as string) ?? '').trim()
+  let rate: number | null = null
+  if (ratePctRaw !== '') {
+    const ratePct = parseFloat(ratePctRaw)
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    rate = Math.round((ratePct / 100) * 1e6) / 1e6
+  }
+  const remainingRaw = ((formData.get('remaining_months') as string) ?? '').trim()
+  let remaining: number | null = null
+  if (remainingRaw !== '') {
+    const n = parseInt(remainingRaw, 10)
+    if (isNaN(n) || n < 1 || n > 120) return { error: '剩余期数必须在 1–120,或留空保持原到期月' }
+    remaining = n
+  }
+  const compound = formData.get('compound_interest') === 'on'
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+
+  const { error } = await supabase.rpc('amend_loan_from', {
+    p_loan_id: loanId,
+    p_effective_from: `${fromYM}-01`,
+    p_effective_rate: rate,
+    p_remaining_months: remaining,
+    p_compound_interest: compound,
+    p_reason: reason || null,
+  })
+  if (error) return { error: `修改失败: ${error.message}` }
+
+  revalidatePath(`/fund-out/${loanId}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports/company-statement')
+  revalidatePath('/reports/loan-aging')
+  revalidatePath('/dashboard')
+  redirect(`/fund-out/${loanId}`)
+}
+
 // ─── 资金来源 (Finance self-service, mig 20260722000000) ─────────────────────
 // Unlike amendLoan (Principal-only, whole-terms edit), this may be called by
 // Finance too: the set_loan_funding_source RPC rewrites ONLY the

@@ -77,8 +77,9 @@ function nextYM(ym: string): string {
 
 export interface CompoundInput {
   principal: number
-  /** Monthly rate as decimal, e.g. 0.02 = 2%/month. */
-  monthlyRate: number
+  /** Monthly rate as decimal, e.g. 0.02 = 2%/month — or a lookup per
+   *  'YYYY-MM' when the rate changed mid-life (lib/treasury-terms rateAt). */
+  monthlyRate: number | ((ym: string) => number)
   startYM: string // 'YYYY-MM' — first month interest accrues
   currentYM: string // 'YYYY-MM' — the month we want the figure for
   /** Total repaid (principal+interest) per calendar month, keyed 'YYYY-MM'. */
@@ -95,11 +96,12 @@ export interface CompoundState {
 }
 
 export function compoundInterestState(i: CompoundInput): CompoundState {
+  const rateAt = (ym: string) => (typeof i.monthlyRate === 'function' ? i.monthlyRate(ym) : i.monthlyRate)
   let balance = i.principal
   let ym = i.startYM
   let guard = 0
   while (ym < i.currentYM && guard < 1200) {
-    const interest = r2(balance * i.monthlyRate)
+    const interest = r2(balance * rateAt(ym))
     const paid = i.paymentsByMonth[ym] ?? 0
     balance = r2(balance + interest - paid)
     if (balance < 0) balance = 0
@@ -108,7 +110,7 @@ export function compoundInterestState(i: CompoundInput): CompoundState {
   }
   return {
     balance,
-    thisMonthInterest: r2(balance * i.monthlyRate),
+    thisMonthInterest: r2(balance * rateAt(i.currentYM)),
     netChange: r2(balance - i.principal),
   }
 }

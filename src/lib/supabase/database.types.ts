@@ -3860,6 +3860,7 @@ export type Database = {
           repaid_by: string | null
           repayment_date: string | null
           repayment_start_month: string | null
+          terms_effective_from: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status: Database["public"]["Enums"]["fund_source_status"]
           updated_at: string
@@ -3890,6 +3891,7 @@ export type Database = {
           repaid_by?: string | null
           repayment_date?: string | null
           repayment_start_month?: string | null
+          terms_effective_from?: string | null
           source_type: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
@@ -3920,6 +3922,7 @@ export type Database = {
           repaid_by?: string | null
           repayment_date?: string | null
           repayment_start_month?: string | null
+          terms_effective_from?: string | null
           source_type?: Database["public"]["Enums"]["fund_source_type"]
           status?: Database["public"]["Enums"]["fund_source_status"]
           updated_at?: string
@@ -4976,6 +4979,7 @@ export type Database = {
           min_pay_interest: boolean
           principal: number
           repayment_start_month: string | null
+          terms_effective_from: string | null
           repayment_terms: string | null
           risk_premium: number
           status: Database["public"]["Enums"]["loan_status"]
@@ -4997,6 +5001,7 @@ export type Database = {
           min_pay_interest?: boolean
           principal: number
           repayment_start_month?: string | null
+          terms_effective_from?: string | null
           repayment_terms?: string | null
           risk_premium: number
           status?: Database["public"]["Enums"]["loan_status"]
@@ -5018,6 +5023,7 @@ export type Database = {
           min_pay_interest?: boolean
           principal?: number
           repayment_start_month?: string | null
+          terms_effective_from?: string | null
           repayment_terms?: string | null
           risk_premium?: number
           status?: Database["public"]["Enums"]["loan_status"]
@@ -6669,6 +6675,54 @@ export type Database = {
           },
         ]
       }
+      treasury_terms_history: {
+        Row: {
+          compound_interest: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          months: number | null
+          rate: number
+          reason: string | null
+          record_id: string
+          record_kind: string
+          valid_from: string
+          valid_to: string
+          was_effective_from: string | null
+          was_maturity_date: string | null
+        }
+        Insert: {
+          compound_interest?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          months?: number | null
+          rate: number
+          reason?: string | null
+          record_id: string
+          record_kind: string
+          valid_from: string
+          valid_to: string
+          was_effective_from?: string | null
+          was_maturity_date?: string | null
+        }
+        Update: {
+          compound_interest?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          months?: number | null
+          rate?: number
+          reason?: string | null
+          record_id?: string
+          record_kind?: string
+          valid_from?: string
+          valid_to?: string
+          was_effective_from?: string | null
+          was_maturity_date?: string | null
+        }
+        Relationships: []
+      }
       treasury_config: {
         Row: {
           config_key: string
@@ -7766,6 +7820,32 @@ export type Database = {
       delete_voucher_attachment: {
         Args: { p_attachment_id: string }
         Returns: string
+      }
+      amend_fund_source_from: {
+        Args: {
+          p_compound_interest: boolean | null
+          p_cost_rate: number | null
+          p_effective_from: string
+          p_fund_source_id: string
+          p_reason: string | null
+          p_remaining_months: number | null
+        }
+        Returns: undefined
+      }
+      amend_loan_from: {
+        Args: {
+          p_compound_interest: boolean | null
+          p_effective_from: string
+          p_effective_rate: number | null
+          p_loan_id: string
+          p_reason: string | null
+          p_remaining_months: number | null
+        }
+        Returns: undefined
+      }
+      revert_terms_change: {
+        Args: { p_record_id: string; p_record_kind: string }
+        Returns: undefined
       }
       void_issued_invoice: {
         Args: { p_invoice_id: string; p_reason: string }

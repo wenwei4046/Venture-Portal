@@ -8,6 +8,7 @@ import type {
   PositionRow,
   StatementTotals,
 } from '@/lib/counterparty-statement'
+import { TermsChangeSummary, TermsChangeTable } from '@/components/treasury/TermsChangeTable'
 
 function num(v: number, opts?: { danger?: boolean }) {
   if (!v) return <span className="num text-muted">—</span>
@@ -119,14 +120,24 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
         <tbody>
           {items.map(item => {
             const totalInterest = totalInterestOf(item)
+            const changes = item.termsChanges ?? []
             return (
-              <tr key={item.id} className="border-b border-hairline/60">
+              <Fragment key={item.id}>
+              <tr className="border-b border-hairline/60">
                 <td className="py-1.5 px-3">
                   <span className="font-serif text-ink">
                     {pct(item.monthlyRate)} · {kindLabel(item)}
                     {item.startYM ? ` · starts ${item.startYM}` : ''}
                   </span>
                   <SourceBadge source={item.source} side={item.side} />
+                  {item.termsFrom ? (
+                    <span
+                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5"
+                      title={`Terms changed — current terms from ${item.termsFrom}, on RM ${formatMoneyBare(item.termsBase ?? 0)} still owed then`}
+                    >
+                      Terms from {item.termsFrom}
+                    </span>
+                  ) : null}
                   {item.minPayInterest ? (
                     <span
                       className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
@@ -169,6 +180,22 @@ function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' 
                   </Link>
                 </td>
               </tr>
+              {/* 差价 of each 从某月起 change (user 2026-09-21: "主要是 company
+                  statement 那边") — old plan vs new, month by month, with
+                  what was already paid. */}
+              {changes.map(c => (
+                <tr key={`${item.id}-terms-${c.fromYM}`} className="border-b border-hairline/60 bg-surface/40">
+                  <td colSpan={8} className="py-2 px-3">
+                    <details>
+                      <summary className="cursor-pointer">
+                        <TermsChangeSummary c={c} />
+                      </summary>
+                      <TermsChangeTable c={c} />
+                    </details>
+                  </td>
+                </tr>
+              ))}
+              </Fragment>
             )
           })}
           <tr className="bg-surface/40">

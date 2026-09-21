@@ -12,6 +12,9 @@ import RepaymentStartEditor from './_components/RepaymentStartEditor'
 import MinPayInterestToggle from './_components/MinPayInterestToggle'
 import VoidRepaymentButton from './_components/VoidRepaymentButton'
 import LedgerRow from '@/components/LedgerRow'
+import TermsTimeline from '@/components/treasury/TermsTimeline'
+import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged } from '@/lib/treasury-terms'
+import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -58,6 +61,12 @@ export default async function LoanDetailPage({ params }: Props) {
     supabase.from('users').select('name').eq('id', loan.created_by).single(),
   ])
 
+  // Terms over time (2026-09-21): segments + each 从某月起 change with its 差价.
+  const termsHistory = await fetchTermsHistory(supabase, 'loan', [loan.id])
+  const repRows = (repayments ?? []).map((r) => ({ id: loan.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
+  const termsSegments = buildTermsSegments(termsForLoan(loan, termsHistory.get(loan.id) ?? []), principalPaidByMonth(repRows, isLoanPrincipal).get(loan.id) ?? {})
+  const termsChanges = allTermsChanges(termsSegments, { currentYM: dayjs().format('YYYY-MM'), paidByMonth: paidByMonthByType(repRows, isLoanPrincipal).get(loan.id) ?? {} })
+
   // A filed-but-not-yet-approved cancellation. Finance can't see /approvals
   // (principal-only), so surface "审批中" here so it doesn't look like the
   // Request cancellation click did nothing (user 2026-06-15).
@@ -72,7 +81,11 @@ export default async function LoanDetailPage({ params }: Props) {
     .maybeSingle()
 
   const outstandingAmount = Number(outstanding?.outstanding ?? loan.principal)
-  const monthlyInterest = outstandingAmount * Number(loan.effective_rate)
+  // Once the terms changed mid-life, the current segment's figure (rate ×
+  // principal still owed when it began) is the monthly interest.
+  const monthlyInterest = termsChanged(termsSegments)
+    ? currentSegment(termsSegments, dayjs().format('YYYY-MM')).interestPerMonth
+    : outstandingAmount * Number(loan.effective_rate)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
   const totalInterestPaid = Number(outstanding?.total_interest_paid ?? 0)
   const repaymentList = repayments ?? []
@@ -327,6 +340,8 @@ export default async function LoanDetailPage({ params }: Props) {
           current={(loan as { min_pay_interest?: boolean }).min_pay_interest === true}
         />
       </section>
+
+      <TermsTimeline kind="loan" recordId={loan.id} segments={termsSegments} changes={termsChanges} canRevert={user.role === 'principal' && loan.status === 'active'} />
 
       {/* ───────── Repayment history ───────── */}
       <section className="mb-12">

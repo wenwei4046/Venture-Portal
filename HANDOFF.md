@@ -1295,6 +1295,74 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-21 — 「从某月起生效」 terms changes for loans / fund sources (mig 20260921010000)
+
+**Ask**: user "如果已经确定了的 fund in / fund out percentage, repayment period
+等等，我要如何更改？然后要重新算…" → the old Amend re-stated the whole deal
+from day one. Approved design A (versioned terms, one record), with three
+decisions: (1) months already paid: nothing recorded moves — PVs, repayment
+rows, GL stay; only what each month is DUE is recomputed and compared with
+what was paid; (2) interest from the effective month X = **principal still
+owed at the start of X (actual repaid) × new rate**, flat for the segment;
+principal/month = that base ÷ remaining months (blank = keep the old end
+month); compound: balance keeps rolling, rate switches at X; (3) 差价 lives
+mainly on the Company Statement.
+
+**DB** (`supabase/migrations/20260921010000_terms_effective_from.sql`, applied
+live in two steps): `treasury_terms_history` (record_kind/record_id,
+valid_from/valid_to month-starts, rate, months, compound, was_effective_from,
+was_maturity_date, reason, created_by; RLS select = treasury scope, writes
+only via RPC); `loans.terms_effective_from` + `fund_sources.terms_effective_from`
+(null = unchanged since day one). RPCs (Principal-only, SECURITY DEFINER):
+`amend_loan_from(id, effective_from, rate, remaining_months, compound, reason)`,
+`amend_fund_source_from(...)` — file the current segment into history up to
+X−1, record columns become the new terms; a blank remaining_months is
+computed to keep the old end month; X must be later than the current
+segment's first installment month; fund-source maturity_date follows only if
+it already had one. `revert_terms_change(kind, id)` pops the latest history
+row back (exact restore incl. maturity). `terms_months_between(a,b)` helper.
+Round-trip tested live on Lim Wei Liang's 60k (two changes → revert ×2 →
+identical), `database.types.ts` hand-patched.
+
+**Engine** `lib/treasury-terms.ts` (tests: 10): `buildTermsSegments(terms,
+principalPaidByMonth)` → ordered `TermsSegment[]` {fromYM, toYM, rate,
+compounding, months, base, principalPerMonth, interestPerMonth,
+scheduledEndYM, changed, reason}; segment 0 = legacy reading (all existing
+figures unchanged when nothing changed); `segmentAt / currentSegment /
+rateAt / segmentRemainingPeriods / principalPaidSince`; `buildSegmentedAging`
+(FIFO like loan-aging, per-month installment); `compareTermsChange /
+allTermsChanges` → old plan carried on vs new, month rows with paid +
+shortfall for months ≤ now, totals. `resolveFirstDueYM` moved here
+(loan-monitor re-exports). `compoundInterestState.monthlyRate` may be a
+per-month lookup. Loader side `lib/treasury-terms-data.ts`:
+`fetchTermsHistory`, `principalPaidByMonth`, `paidByMonthByType`,
+`termsForLoan / termsForFundSource` (principal types: loans 'principal';
+fund sources 'principal' + 'netting').
+
+**Wired in**: `counterparty-statement(-data)` (PositionInput.segments /
+principalByMonth / paidByMonth → PositionRow.termsFrom / termsBase /
+termsChanges; monthly figures, remaining, payoff from the current segment),
+`loan-monitor` (aging + "terms from X" tag), `repayment-schedule/page`
+(loans + fund sources incl. min-pay due and compounding rate lookups),
+`listPayableFundSources` (monthly_principal/interest/remaining/total_periods
+from the current segment + `terms_from` → the repayment PV form's defaults),
+both detail pages' monthly-interest line.
+
+**UI**: Amend forms (fund-in edit, fund-out edit) now have 生效方式 — 从某月起
+生效 (default; 生效月 default next month, 剩余期数 blank = keep end month,
+原因) vs 整条重算 (the old whole-life amend, now labelled 改错用) → actions
+`amendFundSourceFrom` / `amendLoanFrom` / `revertTermsChange` (fund-in
+actions.ts, fund-out actions.ts). `components/treasury/TermsTimeline` on both
+detail pages (segments list, each change as <details> with
+`TermsChangeSummary` + `TermsChangeTable`, Principal's 撤销最近一次变更 via
+`RevertTermsButton`). Company Statement: "Terms from X" tag on the position
+and a collapsible 差价 row per change (old/new principal + interest per month,
+Δ, paid, shortfall, totals). Schedule / Loan Monitor rows carry "· terms
+from X".
+
+**Gates**: vitest 2268 green, next build green. Not verified in the browser
+(no login) — user to try one change and look at fund-in detail + statement.
+
 ## SESSION 2026-09-18 — Cash Flow report rework: parent-code layouts · category rows · navy/gold skin
 
 **Why**: user "那个 cash flow report 我想要优化，我发现分到太散了。你看 fund sources
