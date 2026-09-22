@@ -54,13 +54,24 @@ describe('buildTermsSegments', () => {
     expect(segs[1].interestPerMonth).toBe(450)
   })
 
-  it('a rate-only change keeps the old end month (months inherited)', () => {
-    const rateOnly: PositionTerms = { ...CHANGED, current: { ...CHANGED.current, months: null } }
+  it('a rate-only change keeps the old end month (the RPC stores the 8 months left)', () => {
+    const rateOnly: PositionTerms = { ...CHANGED, current: { ...CHANGED.current, months: 8 } }
     const segs = buildTermsSegments(rateOnly, PAID)
-    expect(segs[1].months).toBe(8) // Sep..Apr = the 8 installments the old plan had left
     expect(segs[1].scheduledEndYM).toBe('2027-04')
     expect(segs[1].principalPerMonth).toBe(2500)
     expect(segs[1].interestPerMonth).toBe(600) // 20,000 × 3%
+  })
+
+  it('months null from X = no fixed term: open-ended, no principal due, flat interest on the X base (convention A)', () => {
+    const noTerm: PositionTerms = { ...CHANGED, current: { rate: 0.1 / 12, months: null, compounding: false, effectiveFrom: '2026-09' } }
+    const segs = buildTermsSegments(noTerm, PAID)
+    expect(segs[1]).toMatchObject({ fromYM: '2026-09', toYM: null, months: null, base: 20000, principalPerMonth: 0, scheduledEndYM: null, changed: true })
+    expect(segs[1].interestPerMonth).toBe(166.67) // 20,000 × 10%/12, and it stays so however much principal is repaid later
+    expect(segmentAt(segs, '2031-01')?.fromYM).toBe('2026-09')
+    expect(segmentRemainingPeriods(segs[1], 5000)).toBe(0)
+    const c = compareTermsChange(segs, 1, { currentYM: '2026-10' })!
+    expect(c.rows).toHaveLength(8) // the OLD plan's Sep..Apr; new = 0 principal + 166.67 each
+    expect(c.rows[0]).toMatchObject({ newPrincipal: 0, newInterest: 166.67 })
   })
 
   it('two changes chain: the second re-bases on what was paid under the first', () => {

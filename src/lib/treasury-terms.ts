@@ -151,14 +151,12 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
 
   const out: TermsSegment[] = []
   raw.forEach((seg, i) => {
-    const prev = out[i - 1]
     const base = i === 0 ? t.principal : r2(Math.max(0, t.principal - principalPaidBefore(principalPaidByMonth, seg.fromYM)))
-    // A segment that names no month count inherits the previous schedule's
-    // END, i.e. keeps the same last installment month with the new rate.
-    let months = seg.months
-    if (months == null && prev && prev.scheduledEndYM) {
-      months = Math.max(1, monthsBetweenYM(seg.fromYM, prev.scheduledEndYM) + 1)
-    }
+    // months null = NO fixed term from here on (user 2026-09-22: repayments
+    // come in any size, the flat interest stays base × rate). A rate-only
+    // change that keeps the old end month is materialised by the amend RPC
+    // as an explicit count, so nothing is inherited here.
+    const months = seg.months
     const scheduledEndYM = months ? addMonthsYM(seg.fromYM, months - 1) : null
     // Flat: a segment ends where the next one starts or at its own schedule end.
     const toYM = seg.toYM ?? (seg.compounding ? null : scheduledEndYM)

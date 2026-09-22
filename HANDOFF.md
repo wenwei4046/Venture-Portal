@@ -1395,8 +1395,26 @@ B/C means a daily-rest engine first. Open: 51 months + exact-425 precision
 (rate column is 6-dp monthly → 424.98), and A/B/C. Both tables were shown
 to the user; also in memory `liang-cont-terms-change-pending`.
 
-**Gates**: vitest green, next build green. Not verified in the browser (no
-login) — user to try one change and look at fund-in detail + statement.
+**2026-09-22 — 「从某月起改成无固定期限」 (boss-approved, mig
+20260922010000)**: interest convention confirmed = A (flat interest stays
+base × rate on the principal owed at X, however much principal is repaid
+later — no "reducing balance" mode needed). RPCs gain `p_no_fixed_term`:
+fund_sources → lock_in_months null + maturity null; loans keep tenure_months
+(NOT NULL, 1–120) and get the ' · 未定还款(自 X 起)' marker appended to
+repayment_terms (isLoanUnscheduled), previous text saved on the history row
+(`was_repayment_terms`) and restored by revert. amend_loan_from now refuses a
+rate below base_rate (loans CHECK risk_premium ≥ 0). Engine: the "months
+null = inherit old end" rule is GONE (the RPC materialises the inherited
+count) — months null is an open-ended segment: principalPerMonth 0,
+interestPerMonth = base × rate, toYM null; `termsForLoan` reads
+repayment_terms for 未定. Forms: 改成无固定期限 checkbox (disables 剩余期数);
+actions pass the flag. Schedule's no-term loan rows use the segment's
+interest. Round-trip tested live on Lim Wei Siang's 90k (no-term → revert).
+The Liang 60k pair is STILL untouched — the user will confirm rate/period
+before any 从一月起 change is applied.
+
+**Gates**: vitest 2560 green, next build green. Not verified in the browser
+(no login) — user to try one change and look at fund-in detail + statement.
 
 ## SESSION 2026-09-18 — Cash Flow report rework: parent-code layouts · category rows · navy/gold skin
 

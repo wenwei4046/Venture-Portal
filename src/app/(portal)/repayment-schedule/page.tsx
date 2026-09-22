@@ -166,9 +166,11 @@ export default async function RepaymentSchedulePage({
       collectNoTerm.push({
         key: l.id as string,
         counterparty,
-        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · undecided`,
+        detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · undecided${termsTag}`,
         outstanding: Number(out?.outstanding ?? principal),
-        monthlyInterest: r2(principal * rate),
+        // A deal turned no-term from X keeps the flat interest on what was
+        // owed at X (user 2026-09-22, convention A).
+        monthlyInterest: seg ? seg.interestPerMonth : r2(principal * rate),
         source,
       })
       continue

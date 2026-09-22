@@ -2,6 +2,7 @@
 // loans / fund sources and shape a record + its history into PositionTerms.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { resolveFirstDueYM, type PositionTerms, type TermsHistoryRow } from '@/lib/treasury-terms'
 
 export type TermsRecordKind = 'loan' | 'fund_source'
@@ -118,17 +119,21 @@ export function termsForLoan(
     disbursement_date: string | null
     repayment_start_month?: string | null
     terms_effective_from?: string | null
+    /** 未定还款 / 无还款方式 in the text = no fixed term (tenure_months is
+     *  NOT NULL on loans, so this is how a loan says "no schedule"). */
+    repayment_terms?: string | null
   },
   history: TermsHistoryRow[] = [],
 ): PositionTerms {
   const start = l.disbursement_date ? ym(l.disbursement_date) : null
+  const unscheduled = isLoanUnscheduled(l.repayment_terms ?? null)
   return {
     principal: Number(l.principal),
     startYM: start,
     firstDueYM: resolveFirstDueYM(l.repayment_start_month ?? null, l.disbursement_date),
     current: {
       rate: Number(l.effective_rate),
-      months: l.tenure_months == null || Number(l.tenure_months) <= 0 ? null : Number(l.tenure_months),
+      months: unscheduled || l.tenure_months == null || Number(l.tenure_months) <= 0 ? null : Number(l.tenure_months),
       compounding: l.compound_interest === true,
       effectiveFrom: l.terms_effective_from ? ym(l.terms_effective_from) : null,
     },

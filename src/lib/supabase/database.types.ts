@@ -6690,6 +6690,7 @@ export type Database = {
           valid_to: string
           was_effective_from: string | null
           was_maturity_date: string | null
+          was_repayment_terms: string | null
         }
         Insert: {
           compound_interest?: boolean
@@ -7827,6 +7828,7 @@ export type Database = {
           p_cost_rate: number | null
           p_effective_from: string
           p_fund_source_id: string
+          p_no_fixed_term?: boolean
           p_reason: string | null
           p_remaining_months: number | null
         }
@@ -7838,6 +7840,7 @@ export type Database = {
           p_effective_from: string
           p_effective_rate: number | null
           p_loan_id: string
+          p_no_fixed_term?: boolean
           p_reason: string | null
           p_remaining_months: number | null
         }

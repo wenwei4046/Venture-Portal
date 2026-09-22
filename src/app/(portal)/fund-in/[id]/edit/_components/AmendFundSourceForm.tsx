@@ -39,6 +39,9 @@ export default function AmendFundSourceForm({
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'from' | 'whole'>('from')
   const fromMode = mode === 'from'
+  // 从某月起改成无固定期限 (user 2026-09-22): no monthly principal from X,
+  // repayments in any size; the flat interest stays on the principal owed at X.
+  const [noFixedTerm, setNoFixedTerm] = useState(false)
 
   const field =
     'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border'
@@ -105,8 +108,15 @@ export default function AmendFundSourceForm({
             <label htmlFor="remaining_months" className="block text-sm font-sans font-medium text-graphite mb-1.5">
               剩余期数 · Remaining months <span className="text-muted font-normal">— 留空 = 到期月不变</span>
             </label>
-            <input id="remaining_months" name="remaining_months" type="number" step="1" min="1" max="120" className={field} />
+            <input id="remaining_months" name="remaining_months" type="number" step="1" min="1" max="120" className={field} disabled={noFixedTerm} />
             <p className="font-serif italic text-muted text-xs mt-1.5">从生效月起数。每月本金 = 生效月初剩余本金 ÷ 剩余期数。</p>
+            <label className="flex items-start gap-2 mt-3 cursor-pointer">
+              <input id="no_fixed_term" name="no_fixed_term" type="checkbox" checked={noFixedTerm} onChange={(e) => setNoFixedTerm(e.target.checked)} className="h-4 w-4 mt-0.5 accent-[var(--accent)]" />
+              <span className="text-sm font-sans text-graphite">
+                改成无固定期限
+                <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起没有每月应还本金，想还多少还多少；利息照生效月初剩余本金 × 利率算，不随本金减少。</span>
+              </span>
+            </label>
           </div>
         ) : (
           <div>
