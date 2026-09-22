@@ -904,6 +904,20 @@ table.ledger-table.cf-report tbody tr.search-row-active:hover { background: rgb(
 .cf-matrix td.text-graphite { color: rgb(var(--cf-graphite)); }
 .cf-matrix tr.search-row-hit > td, .cf-matrix tr.search-row-active > td { background: rgb(var(--cf-now)); }
 .cf-pill-on { background: rgb(var(--cf-navy)); color: rgb(var(--cf-navy-ink)); border-color: rgb(var(--cf-navy)); }
+
+/* ── Deal form preview (2026-09-22, New loan / New fund source): the right-hand
+   panel borrows the Cash Flow navy + gold so the live figures read as "the
+   record this will become". Put cf-scope on the same element for the tokens. */
+.deal-side { background: rgb(var(--cf-navy)); color: rgb(var(--cf-navy-ink)); border-top: 3px solid rgb(var(--cf-gold)); }
+.deal-side-muted { color: rgb(var(--cf-navy-ink) / 0.72); }
+.deal-side-big { color: rgb(var(--cf-gold-ink)); }
+.deal-side-sep { border-top: 1px solid rgb(var(--cf-navy-2)); margin: 4px 0; }
+.deal-side-gl { background: rgb(var(--cf-navy-2)); color: rgb(var(--cf-navy-ink) / 0.85); }
+.deal-side-gl b { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-weight: 500; color: rgb(var(--cf-navy-ink)); }
+.deal-side-btn { background: rgb(var(--cf-gold)); color: rgb(var(--cf-navy)); }
+.deal-side-btn:hover:not(:disabled) { background: rgb(var(--cf-gold-ink)); }
+.deal-side-link { color: rgb(var(--cf-navy-ink) / 0.72); }
+.deal-side-link:hover { color: rgb(var(--cf-navy-ink)); }
 table.ledger-table td {
   padding: 13px 12px;
   vertical-align: baseline;
