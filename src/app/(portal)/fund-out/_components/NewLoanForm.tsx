@@ -8,6 +8,7 @@ import type { BsAccountOption } from '@/lib/loan-disbursement'
 import AccountPicker from '@/components/AccountPicker'
 import type { AccountType } from '@/lib/coa'
 import { formatMoney } from '@/lib/utils'
+import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import { bankShort, dealPreviewFigures, loanMaturity, numberOrNull } from '@/lib/deal-preview'
 import {
   DealCard,
@@ -45,6 +46,7 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
   )
   const [principal, setPrincipal] = useState<string>('')
   const [tenure, setTenure] = useState<string>('')
+  const [firstDue, setFirstDue] = useState<string>('')
   const [compound, setCompound] = useState(false)
   const [minPay, setMinPay] = useState(false)
   const [disbursementAccountCode, setDisbursementAccountCode] = useState<string>('')
@@ -75,7 +77,10 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
     months,
     compounding: compound,
   })
-  const maturity = loanMaturity(startDate, months)
+  // With a first installment date the plan ends first + (n − 1) months, the
+  // same way the fund-in side reads it; otherwise start + n (the maturity).
+  const n = months != null && months >= 1 ? Math.floor(months) : null
+  const planEnd = n ? (firstDue ? expectedFullRepaymentDate(firstDue, n) : loanMaturity(startDate, n)) : null
   const bank = banks.find((b) => b.id === bankId)
   const glAccount = bsAccounts.find((a) => a.code === disbursementAccountCode)
   const previewRows: DealPreviewRow[] = [
@@ -90,9 +95,10 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
     { label: compound ? '首月利息' : '每月利息', value: formatMoney(fig.interestPerMonth) },
     { label: '每月合计', value: formatMoney(fig.totalPerMonth), big: true },
     'sep',
+    { label: '首期', value: firstDue ? dayjs(firstDue).format('D MMM YYYY') : '还没定 · 放款次月' },
     {
-      label: '到期',
-      value: maturity ? `${dayjs(maturity).format('D MMM YYYY')} · ${months} 期` : '无固定期限 · 只按月滚利息',
+      label: '还清约',
+      value: planEnd ? `${dayjs(planEnd).format('D MMM YYYY')} · ${n} 期` : '无固定期限 · 只按月滚利息',
     },
     {
       label: '全程利息',
@@ -151,7 +157,7 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
               <DealLabel
                 htmlFor="loan_start_date"
                 required
-                hint="利息从这天开始算。Contractual start date — interest accrues from here. Defaults to today; back- or future-date as needed. Maturity = start date + tenure."
+                hint="利息从这天开始算。Contractual start date — interest accrues from here. Defaults to today; back- or future-date as needed. 还清 = 首期 + 期数（没填首期就是 start date + 期数）。"
               >
                 Loan start date
               </DealLabel>
@@ -259,9 +265,9 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
               <DealLabel
                 htmlFor="tenure_months"
                 optional
-                hint="留空 = 无固定期限，只按月滚利息。1–12 months if scheduled."
+                hint="留空 = 无固定期限，只按月滚利息。1–120 months if scheduled. Principal ÷ months each installment."
               >
-                Tenure
+                Repayment period
               </DealLabel>
               <div className="relative">
                 <input
@@ -270,7 +276,7 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
                   type="number"
                   step="1"
                   min="1"
-                  max="12"
+                  max="120"
                   value={tenure}
                   onChange={(e) => setTenure(e.target.value)}
                   className={`${CTL_MONO} pr-16 placeholder:font-sans placeholder:font-normal`}
@@ -281,26 +287,44 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
                 </span>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 content-end">
-              <DealToggle
-                id="compound_interest"
-                name="compound_interest"
-                label="利滚利"
-                sub="Compound interest"
-                hint="勾选后未收利息每月并入本金继续生息（利滚利）。不勾则为单利按月计。"
-                checked={compound}
-                onChange={setCompound}
-              />
-              <DealToggle
-                id="min_pay_interest"
-                name="min_pay_interest"
-                label="最低还息"
-                sub="Minimum pay interest"
-                hint="勾选后代表约定「本金可以慢慢还，但每月利息一定要还」。Repayment schedule 会追踪当月利息收齐了没有，statement 上也会注明。"
-                checked={minPay}
-                onChange={setMinPay}
+            <div>
+              <DealLabel
+                htmlFor="repayment_start_date"
+                optional
+                hint="还没定就留空 — 默认放款次月起还，利息照算。First installment date; the schedule starts from its month. Must be on or after the loan start date."
+              >
+                Expected repayment date
+              </DealLabel>
+              <input
+                id="repayment_start_date"
+                name="repayment_start_date"
+                type="date"
+                value={firstDue}
+                min={startDate || undefined}
+                onChange={(e) => setFirstDue(e.target.value)}
+                className={CTL_MONO}
               />
             </div>
+          </DealRow>
+          <DealRow className="mt-3">
+            <DealToggle
+              id="compound_interest"
+              name="compound_interest"
+              label="利滚利"
+              sub="Compound interest"
+              hint="勾选后未收利息每月并入本金继续生息（利滚利）。不勾则为单利按月计。"
+              checked={compound}
+              onChange={setCompound}
+            />
+            <DealToggle
+              id="min_pay_interest"
+              name="min_pay_interest"
+              label="最低还息"
+              sub="Minimum pay interest"
+              hint="勾选后代表约定「本金可以慢慢还，但每月利息一定要还」。Repayment schedule 会追踪当月利息收齐了没有，statement 上也会注明。"
+              checked={minPay}
+              onChange={setMinPay}
+            />
           </DealRow>
         </DealCard>
 

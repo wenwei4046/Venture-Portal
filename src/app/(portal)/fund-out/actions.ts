@@ -49,11 +49,21 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   if (principal > 100_000_000) {
     return { error: 'Principal exceeds RM 100M ceiling' }
   }
-  if (!noFixedTerm && (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 12)) {
-    return { error: 'Tenure must be between 1 and 12 months (or leave blank for no fixed term)' }
+  // 1..120 like fund sources (2026-09-22, mig 20260922020000 lifted the RPC's 12).
+  if (!noFixedTerm && (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 120)) {
+    return { error: 'Repayment period must be between 1 and 120 months (or leave blank for no fixed term)' }
   }
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
     throw new Error('Loan start date is required')
+  }
+  // 首期还款日 (2026-09-22, "首期日 fund in 和 fund out 要一样"): optional, on or
+  // after the start date; only its month matters (repayment_start_month).
+  const repaymentStartDate = ((formData.get('repayment_start_date') as string) ?? '').trim()
+  if (repaymentStartDate) {
+    if (!dayjs(repaymentStartDate).isValid()) return { error: 'Expected repayment date is not a valid date' }
+    if (dayjs(repaymentStartDate).isBefore(dayjs(loanStartDate), 'day')) {
+      return { error: 'Expected repayment date must be on or after the loan start date' }
+    }
   }
   const effectiveTenure = noFixedTerm ? 1 : tenureMonths
   if (noFixedTerm) {
@@ -176,16 +186,18 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
   // doesn't take them, so flag the just-created loan. Safe: it's still
   // pending_approval (no GL/cash yet), and both flags only affect the
   // schedule/tracking math, not the disbursement.
-  const creationFlags: { compound_interest?: boolean; min_pay_interest?: boolean } = {}
+  const creationFlags: { compound_interest?: boolean; min_pay_interest?: boolean; repayment_start_month?: string } = {}
   if (formData.get('compound_interest') === 'on') creationFlags.compound_interest = true
   if (formData.get('min_pay_interest') === 'on') creationFlags.min_pay_interest = true
+  // First installment month, same field the detail page's 还款起始月 editor sets.
+  if (repaymentStartDate) creationFlags.repayment_start_month = dayjs(repaymentStartDate).startOf('month').format('YYYY-MM-DD')
   if (Object.keys(creationFlags).length > 0) {
     const { error: cErr } = await supabase
       .from('loans')
       .update(creationFlags)
       .eq('id', loanId as string)
       .eq('status', 'pending_approval')
-    if (cErr) return { error: `Loan created but marking 利滚利/最低还息 failed: ${cErr.message}` }
+    if (cErr) return { error: `Loan created but marking 利滚利/最低还息/首期 failed: ${cErr.message}` }
   }
 
   revalidatePath('/fund-out')

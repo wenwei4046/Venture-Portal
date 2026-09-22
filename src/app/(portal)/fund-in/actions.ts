@@ -248,6 +248,10 @@ export async function createFundSource(formData: FormData) {
     lock_in_months: !isNaN(raw.lock_in_months) && raw.lock_in_months >= 1 ? raw.lock_in_months : null,
     effective_date: raw.effective_date,
     repayment_date: raw.repayment_date || null,
+    // Its month is also the schedule's first installment month (2026-09-22:
+    // before this the New form's date was advisory and the schedule still
+    // started the month after the effective date).
+    repayment_start_month: raw.repayment_date ? dayjs(raw.repayment_date).startOf('month').format('YYYY-MM-DD') : null,
     account_code: accountCode,
     bank_account_id: bankAccountId,
     // Mig 12 trigger auto-fills maturity_date from effective_date + lock_in_months

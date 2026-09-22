@@ -23,7 +23,7 @@ describe('NewLoanForm (2026-09-22 shell)', () => {
     setup()
     for (const n of [
       'company_id', 'loan_start_date', 'funding_source', 'principal', 'custom_rate_percent', 'tenure_months',
-      'compound_interest', 'min_pay_interest', 'disbursement_account_code', 'bank_account_id', 'repayment_terms',
+      'repayment_start_date', 'compound_interest', 'min_pay_interest', 'disbursement_account_code', 'bank_account_id', 'repayment_terms',
     ]) expect(byName(n), n).not.toBeNull()
   })
 
@@ -47,8 +47,21 @@ describe('NewLoanForm (2026-09-22 shell)', () => {
     expect(screen.getByText('RM 1,500.00')).toBeInTheDocument()
     expect(screen.getByText('RM 9,833.33')).toBeInTheDocument()
     expect(screen.getByText('RM 18,000.00')).toBeInTheDocument()
-    expect(screen.getByText('22 Sep 2027 · 12 期')).toBeInTheDocument()
+    expect(screen.getByText('22 Sep 2027 · 12 期')).toBeInTheDocument() // no first date: start + 12
     expect(screen.getByText('Maybank ···5678')).toBeInTheDocument()
+    // A first installment date moves the plan: first + 11 months, like fund in.
+    fireEvent.change(byName('repayment_start_date'), { target: { value: '2026-10-05' } })
+    expect(screen.getByText('5 Oct 2026')).toBeInTheDocument()
+    expect(screen.getByText('5 Sep 2027 · 12 期')).toBeInTheDocument()
+  })
+
+  it('repayment period accepts up to 120 months and is labelled like fund in', () => {
+    setup()
+    expect(screen.getByText('Repayment period')).toBeInTheDocument()
+    expect(byName('tenure_months').max).toBe('120')
+    fireEvent.change(byName('principal'), { target: { value: '80000' } })
+    fireEvent.change(byName('tenure_months'), { target: { value: '60' } })
+    expect(screen.getByText('RM 1,333.33')).toBeInTheDocument()
   })
 
   it('blank tenure reads 无固定期限; 利滚利 relabels the interest line', () => {
