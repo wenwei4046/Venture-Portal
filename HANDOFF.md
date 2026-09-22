@@ -1338,6 +1338,50 @@ something looks off, the likeliest spots: the rate box grid (`grid-cols-
 [auto_auto_1fr]` + the `col-span-3` effective line) and ⓘ tooltips near the
 right edge (they open to the left:0 of the icon, `max-w-[80vw]`).
 
+**Follow-ups shipped (594ad430, deployed)**: both forms say **Repayment period**;
+loan cap lifted to 120 (mig `20260922020000_loan_tenure_120.sql` re-creates
+`create_loan_with_approval` with `> 120`; action + form follow). New loan has
+**Expected repayment date** (`repayment_start_date` form field → month written to
+`loans.repayment_start_month` in the post-RPC update); New fund source now also
+writes `repayment_start_month` from its `repayment_date` (before, the schedule
+ignored that date and started effective + 1). Preview shows 首期 / 还清约 on both.
+A3 (Locked effective relabel) — user said 不用.
+
+**DATA OPS 2026-09-22 — Chai Meng Keat → CMI 80k via HV (user-confirmed)**
+Facts from the user: 80,000 · 6% p.a. = 0.5%/mo flat · 60 期 · loan 2025-05-31 ·
+首期 2025-07-15 · CMI has never repaid HV; HV pays Chai; the 2025 six
+installments (10,400) were paid by HC on HV's behalf → HV owes HC 10,400.
+Split per installment = principal 1,333.33 + interest 400 (user's earlier
+1,387.20/346.80 dropped — "1. 对"); actual 1,734 payments → 1,334 + 400.
+- `[BI#35]` fund_sources 31357674-ec7b-44a5-af93-a9641f53a18d (director_loan
+  Chai, 4056, start 2025-07-01, maturity 2030-06-15). 18 repayment rows:
+  2025-07-15…12-15 × (1,333.33 [Dec 1,333.35] + 400) = 10,400; PV
+  HV-PV-202606-0009 (6,936 = 4 installments Jan–Apr 26) 5,336 + 1,600;
+  PV 202608-0314 (May) and 202609-0424 (Jun) 1,334 + 400 each. Outstanding
+  principal 63,996, 48 installments left (Jul-26 → Jun-30).
+- `[LO#35] · 资金来源: MK` loans 642e3772-fd7d-45f2-9b20-8d9de9ac7ab4 (CMI,
+  base 0 + premium 0.005, tenure 60, start 2025-07-01, approved_by Principal,
+  created_by Finance). No repayments — Loan Monitor will show CMI's dues from
+  2025-07 unpaid; that is the record, not a flag (see dont-audit memory).
+- `[BI#36]` fund_sources 76048840-eb31-4b87-9674-17ce1ee32e66 (subsidiary
+  HOUZS Century, 10,400 @ 0%, no term, 2025-12-15, 4052).
+- BI#13 (Chai 9k → Conts): its two rows (6,936 "对账修正 2026-06-12" and the
+  auto-synced 1,734) were repointed to BI#35 — BI#13 is back to 9,000 unpaid
+  (user: "5. 可以").
+- PVs 0009/0314/0424: fund_source_id → BI#35, repayment_breakdown set,
+  payment_voucher_sources split 4056 principal + 6000 interest
+  (pvs_sum_matches_trigger disabled during the split), JE lines split in place
+  (no reclass JV — user rule).
+- JEs via `create_manual_journal_voucher` as Finance: JE-202505-0755
+  (2025-05-31, director) Dr 3057 80,000 / Cr 4056 80,000; JE-202512-0756
+  (2025-12-15, corporate) Dr 4056 8,000 + Dr 6000 2,400 / Cr 4052 10,400.
+- Balances after: 4056 102,996 Cr (Conts 39,000 + CMI 63,996); 3057
+  135,540.08 Dr (55,540.08 capital inject + 80,000); 6000 +4,800; 4052 +10,400.
+- Convention reused from the May import: historical deals are inserted
+  directly (status active, approved_by Principal), GL brought in by manual JV
+  as pass-through Dr 30xx (due from sub) / Cr 40xx (due to lender); no bank
+  lines because the cash never crossed HV's bank inside the books.
+
 **Not done / ideas floated**: pre-fill a fund-out from its 资金来源 fund-in;
 give the Amend-terms forms the same shell; regroup the detail pages'
 settings (assessment given 2026-09-22, not built).
