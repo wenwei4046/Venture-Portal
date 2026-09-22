@@ -1295,6 +1295,53 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-22 (later) — New loan / New fund source: one two-column deal form (c10a7fc5)
+
+**Ask**: "就你看 new loan 我需要往下滑，旁边其实有位置 然后排法很混乱" →
+mockup (scratch `form-mockup.html`, before/after, live numbers) → user picked
+**预览栏深蓝、备注默认收起、手机版不用钉** → "直接 push".
+
+**Built** (field `name`s unchanged; `createLoan` / `createFundSource` untouched):
+- `src/components/treasury/DealFormShell.tsx` — `dealFormClass` (grid
+  `lg:[minmax(0,1fr)_300px]`), `DealCards`, `DealCard` (numbered ①–④),
+  `DealRow` (`1-1` / `2-1`), `DealLabel` (+ required/optional/hint),
+  `DealHint` (ⓘ: hover or tap; the old under-field paragraphs live here),
+  `DealToggle` (checkbox card, `has-[:checked]`), `DealMore` (`<details>`,
+  collapsed), `DealPreview` (navy aside inside the `<form>`, Submit/Cancel/
+  error there, `lg:sticky`; phones: bottom, not pinned).
+- `src/lib/deal-preview.ts` (+test) — `dealPreviewFigures` (flat: rate ×
+  original principal, principal ÷ months; open-ended → principal null; compound
+  → totalInterest null), `numberOrNull`, `loanMaturity` (start + tenure, like
+  the detail page), `bankShort`.
+- globals.css `.deal-side*` after the cf-pill rules — uses `--cf-*` tokens, so
+  the aside carries `cf-scope`.
+- NewLoanForm: ① Borrower + Loan start date, 资金来源 · ② Principal + rate box
+  (base + custom = locked effective, shown before a borrower is picked) ·
+  Tenure + 利滚利/最低还息 toggles · ③ Disbursement account + Pay from bank ·
+  ④ Repayment terms (folded). Preview: 本金/利率(sub base+x)/每月本金/每月利息
+  (首月利息 when compound)/每月合计/到期 (D MMM YYYY · n 期 | 无固定期限)/全程
+  利息/出账 bank + Dr account. Submit disabled until a borrower is picked (as before).
+- NewFundSourceForm: ① Source type (hint = the type's blurb) + Effective date,
+  From (select / free text / dept — `fromLabel` state feeds "借自 …") · ②
+  Amount + Interest rate · Repayment period + Expected repayment date ·
+  toggles · ③ Amount due to (BS account) + Receive into bank · ④ Notes
+  (folded). Preview: 首期 / 还清约 (`expectedFullRepaymentDate` · n 期 | "n 期
+  · 首期未定" | 无固定期限) / Cr account or "4000 Fund Sources Payable".
+- Tests: `NewLoanForm.test.tsx` (5) and `NewFundSourceForm.test.tsx` (4) —
+  every field name present, preview arithmetic (100k @ 1+0.5 × 12; Liang 60k
+  @ 0.5 × 60 from 5 Oct 2026 → 5 Sep 2031), folded notes.
+
+**Gates**: tsc clean (only the other session's MemberWorkspace*.test errors),
+vitest 2577 green, next build green. NOT eyeballed in a browser (dev server
+needs a login I cannot type) — user chose to check on the live site. If
+something looks off, the likeliest spots: the rate box grid (`grid-cols-
+[auto_auto_1fr]` + the `col-span-3` effective line) and ⓘ tooltips near the
+right edge (they open to the left:0 of the icon, `max-w-[80vw]`).
+
+**Not done / ideas floated**: pre-fill a fund-out from its 资金来源 fund-in;
+give the Amend-terms forms the same shell; regroup the detail pages'
+settings (assessment given 2026-09-22, not built).
+
 ## SESSION 2026-09-21 — 「从某月起生效」 terms changes for loans / fund sources (mig 20260921010000)
 
 **Ask**: user "如果已经确定了的 fund in / fund out percentage, repayment period
