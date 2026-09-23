@@ -50,9 +50,33 @@ export interface MemberProduct {
   cost?: number | null;
   /** Sofa modules: the seat height × fabric tier choices. Never carries a cost. */
   options?: CostOption[];
+  /**
+   * The ERP model the SKU belongs to — the key of its option dropdowns in
+   * `MemberData.catalogueModels` (leg heights, specials, a bed frame's divan /
+   * total / gap heights).
+   */
+  modelId?: string | null;
   /** Server-only: the priced grid behind `options`. Never enters an RPC response. */
   costGrid?: CostCell[] | null;
+  /** Server-only: the ERP's category (SOFA / BEDFRAME / MATTRESS / …) — which options a line takes. */
+  kind?: string | null;
+  /** Server-only: a sofa module's base model (`8030`) and module (`1A(LHF)`), what combos match on. */
+  baseModel?: string | null;
+  moduleCode?: string | null;
   version: string;
+}
+/** The option lists a model may be quoted with — what Product List › Modular ticked. */
+export interface MemberModelOptions {
+  leg_heights?: string[];
+  specials?: string[];
+  divan_heights?: string[];
+  total_heights?: string[];
+  gaps?: string[];
+}
+export interface MemberCatalogueModel {
+  id: string;
+  kind: "SOFA" | "BEDFRAME";
+  options: MemberModelOptions;
 }
 export interface MemberBand {
   brand: string;
@@ -165,6 +189,8 @@ export interface MemberData {
   };
   memberships: MemberMembership[];
   products: MemberProduct[];
+  /** The option dropdowns of every sofa and bed frame model in `products`. */
+  catalogueModels?: MemberCatalogueModel[];
   bands: MemberBand[];
   departments?: {
     id: string;
@@ -183,10 +209,25 @@ export interface QuoteLine {
   /** The role selected for this line, independently of the product's eligibility. */
   gift: boolean;
 }
-/** The sofa build for every sofa module in the cart: one seat height, one fabric tier. */
+/** The bed frame build for every bed frame in the cart — the ERP's bed frame options. */
+export interface BedframeBuild {
+  divan?: string;
+  leg?: string;
+  total?: string;
+  gap?: string;
+  specials?: string[];
+}
+/**
+ * The build for every sofa module in the cart — one seat height, one fabric
+ * tier, one leg height and one set of specials — and one for every bed frame.
+ * Only what the cart's models were ticked for on Product List › Modular.
+ */
 export interface QuoteBuild {
   height?: string;
   tier?: string;
+  leg?: string;
+  specials?: string[];
+  bedframe?: BedframeBuild;
 }
 export interface QuoteInput {
   schemeId: string;

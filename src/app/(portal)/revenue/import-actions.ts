@@ -160,13 +160,16 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     ...new Set(input.orders.filter(o => !staffByAgent.get(o.agentKey)).map(o => o.agentName)),
   ]
 
-  // ── Cost and brand lookups ─────────────────────────────────────────────
+  // ── Brand lookups ──────────────────────────────────────────────────────
+  // Cost is NOT decided here: every line is priced from the Product List by
+  // the database as it lands (trigger `sales_order_lines_fill_cost`, the same
+  // rule the live feed and a recost use — user 2026-09-24).
   const { data: productRows } = await supabase
     .from('comm_products')
-    .select('item_code, brand_code, unit_cost')
+    .select('item_code, brand_code')
   const products = new Map(
-    ((productRows ?? []) as Array<{ item_code: string; brand_code: string | null; unit_cost: number | string | null }>).map(
-      p => [norm(p.item_code), { brand: p.brand_code, cost: p.unit_cost === null ? null : Number(p.unit_cost) }],
+    ((productRows ?? []) as Array<{ item_code: string; brand_code: string | null }>).map(
+      p => [norm(p.item_code), { brand: p.brand_code }],
     ),
   )
 
@@ -259,10 +262,7 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     const orderId = insertedIds.get(o.orderNo)
     if (!orderId) return []
     return o.lines.map(l => {
-      const product = products.get(norm(l.itemCode))
       const brand = brandOf(l.itemCode)
-      const cost = product?.cost === null || product?.cost === undefined ? null : product.cost * l.qty
-      if (cost === null) linesWithoutCost++
       if (!brand) linesWithoutBrand++
       return {
         order_id: orderId,
@@ -277,7 +277,6 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
         unit_price: l.unitPrice,
         line_amount: l.lineAmount,
         brand_code: brand,
-        cost_amount: cost === null ? null : Math.round(cost * 100) / 100,
       }
     })
   })
@@ -286,6 +285,15 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     const { error } = await supabase.from('sales_order_lines').insert(part)
     if (error) throw new Error(`Could not write the order lines: ${error.message}`)
   }
+
+  // What the Product List could not price, as the database priced it.
+  const { count: blindCount, error: blindError } = await supabase
+    .from('sales_order_lines')
+    .select('id, sales_orders!inner(batch_id)', { count: 'exact', head: true })
+    .eq('sales_orders.batch_id', batchId)
+    .is('cost_amount', null)
+  if (blindError) throw new Error(`Could not count the unpriced lines: ${blindError.message}`)
+  linesWithoutCost = blindCount ?? 0
 
   // ── Remember the agent matches ─────────────────────────────────────────
   if (input.saveAliases) {

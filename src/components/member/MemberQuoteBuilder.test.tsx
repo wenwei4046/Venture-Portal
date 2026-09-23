@@ -1473,3 +1473,76 @@ describe("Member quote builder workflows", () => {
     ).toBeEnabled();
   });
 });
+
+// Product List › Modular decides what the calculator's dropdowns offer (user
+// 2026-09-24): a sofa's leg heights and specials, a bed frame's divan / leg /
+// total / gap heights and specials — only what every model in the cart was
+// ticked for.
+describe("build options from the Product List", () => {
+  function catalogueData(): MemberData {
+    const data = memberDemo();
+    return {
+      ...data,
+      products: data.products.map((product) =>
+        product.id === "sofa-2-o"
+          ? { ...product, modelId: "everyday", kind: "SOFA" }
+          : product.id === "sofa-3-w"
+            ? { ...product, modelId: "lounge", kind: "SOFA" }
+            : product,
+      ),
+      catalogueModels: [
+        { id: "everyday", kind: "SOFA", options: { leg_heights: ["Default", '4"'], specials: ["Nylon Fabric", "Pillow Back"] } },
+        { id: "lounge", kind: "SOFA", options: { leg_heights: ['4"'], specials: ["Nylon Fabric"] } },
+      ],
+    };
+  }
+  const sofaCart = (ids: string[], build?: QuoteInput["build"]): QuoteInput => ({
+    ...blankQuote(),
+    lines: ids.map((productId) => ({ productId, quantity: 1, gift: false })),
+    build,
+  });
+
+  it("offers the ticked leg heights and specials for the sofa in the cart", () => {
+    render(<WorkspaceHarness data={catalogueData()} initialInput={sofaCart(["sofa-2-o"])} />);
+    openCalculator();
+    const build = within(screen.getByRole("region", { name: "Sofa build" }));
+    const leg = build.getByRole("combobox", { name: "Leg height" }) as HTMLSelectElement;
+    expect([...leg.options].map((o) => o.textContent)).toEqual(["Not chosen", "Default", '4"']);
+    fireEvent.change(leg, { target: { value: '4"' } });
+    expect(leg.value).toBe('4"');
+    const nylon = build.getByRole("checkbox", { name: "Nylon Fabric" });
+    fireEvent.click(nylon);
+    expect(nylon).toBeChecked();
+    expect(build.getByRole("checkbox", { name: "Pillow Back" })).not.toBeChecked();
+  });
+
+  it("offers only what every sofa model in the cart shares", () => {
+    render(<WorkspaceHarness data={catalogueData()} initialInput={sofaCart(["sofa-2-o", "sofa-3-w"])} />);
+    openCalculator();
+    const build = within(screen.getByRole("region", { name: "Sofa build" }));
+    const leg = build.getByRole("combobox", { name: "Leg height" }) as HTMLSelectElement;
+    expect([...leg.options].map((o) => o.textContent)).toEqual(["Not chosen", '4"']);
+    expect(build.queryByRole("checkbox", { name: "Pillow Back" })).not.toBeInTheDocument();
+    expect(build.getByRole("checkbox", { name: "Nylon Fabric" })).toBeInTheDocument();
+  });
+
+  it("drops a chosen option the cart no longer offers", () => {
+    render(
+      <WorkspaceHarness
+        data={catalogueData()}
+        initialInput={sofaCart(["sofa-2-o", "sofa-3-w"], { leg: "Default", specials: ["Pillow Back"] })}
+      />,
+    );
+    openCalculator();
+    const build = within(screen.getByRole("region", { name: "Sofa build" }));
+    expect((build.getByRole("combobox", { name: "Leg height" }) as HTMLSelectElement).value).toBe("");
+    expect(build.getByRole("checkbox", { name: "Nylon Fabric" })).not.toBeChecked();
+  });
+
+  it("shows no build options for a cart without a ticked model", () => {
+    render(<WorkspaceHarness data={memberDemo()} initialInput={sofaCart(["sofa-2-o"])} />);
+    openCalculator();
+    expect(screen.queryByRole("combobox", { name: "Leg height" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Bed frame build" })).not.toBeInTheDocument();
+  });
+});

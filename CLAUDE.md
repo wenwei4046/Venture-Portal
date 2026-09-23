@@ -209,37 +209,83 @@ src/
 │   │   │                              the SAME scheme columns as Rules. Member
 │   │   │                              Insight/Arena do not read shares yet. Mig
 │   │   │                              `20260924010000`.
-│   │   │                              **THE SKU MASTER, BOUND (2026-09-17):**
-│   │   │                              `products/` is no longer a hand-keyed cost
-│   │   │                              list — it is the ERP's own SKU master,
-│   │   │                              mirrored into `erp_products`, with
-│   │   │                              `erp_sofa_combos` beside it and
-│   │   │                              `comm_products` demoted to OVERRIDES. The
-│   │   │                              ERP pushes both to
-│   │   │                              `POST /api/erp/v1/products` on the same
-│   │   │                              key as the sales-order feed (contract §9).
-│   │   │                              ONE function decides a cost —
-│   │   │                              `erp_resolve_unit_cost()`: the ERP's own
-│   │   │                              `line_cost_sen` on the sale → the SKU
-│   │   │                              master's `cost_price` → a sofa module's
-│   │   │                              seat-height cost grid → `base_price`
-│   │   │                              ("PRICE 2") → `price_1` → the override
-│   │   │                              table → NULL. **`sell_price` is NEVER in
-│   │   │                              that chain** (it would read as 0% margin).
-│   │   │                              `sales_order_lines.cost_source` records
-│   │   │                              which one answered, and *Costing gaps* is
-│   │   │                              what nothing could cost, worth-first.
-│   │   │                              **WHY IT MATTERS:** a sofa COMBO build
-│   │   │                              lands as N lines with the whole price on
-│   │   │                              the FIRST and 0 on the rest, and the
-│   │   │                              ingest treated `cost 0 + amount 0` as a
-│   │   │                              real zero — 1,720 lines, and 177 of
-│   │   │                              August's 186 bills with a margin
-│   │   │                              (RM 1.28M) were judged on one. It always
-│   │   │                              errs one way: cost too low → margin too
-│   │   │                              high → the penalty never fires and the
-│   │   │                              incentive is paid unearned. Mig
-│   │   │                              `20260919010000`.
+│   │   │                              **THE CATALOGUE, MIRRORED — ITEMS ONLY
+│   │   │                              (2026-09-24):** `products/` (Product List)
+│   │   │                              is the Houzs ERP's Products page mirrored
+│   │   │                              item by item — SKU Master, Modular (models
+│   │   │                              + their allowed options), Maintenance
+│   │   │                              (Bedframe + Sofa pools and specials, the
+│   │   │                              fabrics and their PRICE_1/2/3 tier — NOT
+│   │   │                              "Products Maintenance"), Combo Pricing —
+│   │   │                              with a fifth tab, Costing gaps. Not
+│   │   │                              mirrored: Variants, Fabric Converter,
+│   │   │                              Categories. **User rule: the mirror syncs
+│   │   │                              ITEMS, never a price or a cost; every price
+│   │   │                              is typed HERE and every margin in the
+│   │   │                              portal — the member calculator, the run,
+│   │   │                              the drill-downs — is measured against it.**
+│   │   │                              Two halves, and the split is the rule:
+│   │   │                              `erp_*` (`erp_products`,
+│   │   │                              `erp_product_models`,
+│   │   │                              `erp_maintenance_options`, `erp_fabrics`,
+│   │   │                              `erp_sofa_combos`) is what the ERP says
+│   │   │                              EXISTS, written only by
+│   │   │                              `ingest_erp_catalogue` (service role, money
+│   │   │                              stripped again on the way in, `full: true`
+│   │   │                              retires what a carried section omits as
+│   │   │                              `removed_at` — never deletes; an empty
+│   │   │                              section retires nothing); `catalogue_*`
+│   │   │                              (`catalogue_skus` price / sofa
+│   │   │                              `price_grid` / `offered`,
+│   │   │                              `catalogue_models` offered + `enabled`
+│   │   │                              option ticks + gift / section / brand
+│   │   │                              overrides, `catalogue_option_prices`,
+│   │   │                              `catalogue_combo_prices` keyed on (base
+│   │   │                              model, slots, tier)) is what the PORTAL
+│   │   │                              decides and no delivery touches. A SKU the
+│   │   │                              ERP adds arrives UNticked. First sight
+│   │   │                              inherits the old hand-keyed list's price
+│   │   │                              (`catalogue_adopt_legacy`: ERP bridge code,
+│   │   │                              own code, then for a mattress brand +
+│   │   │                              model + size when unique both ways — mig
+│   │   │                              `20260924025000`; bed frames were keyed by
+│   │   │                              SUPPLIER codes the ERP does not have, so
+│   │   │                              they wait for a person).
+│   │   │                              **ONE COST RULE (mig `20260924030000`):**
+│   │   │                              `catalogue_line_cost()` = the SKU's portal
+│   │   │                              price (a sofa module's grid cell at the
+│   │   │                              line's seat height × fabric tier, else its
+│   │   │                              one figure) + each Maintenance option's
+│   │   │                              portal surcharge (none priced = adds
+│   │   │                              nothing), × qty; the options read from the
+│   │   │                              line's `raw.variants` when the feed carries
+│   │   │                              them, else parsed from the ERP's own
+│   │   │                              `description2` grammar
+│   │   │                              (`catalogue_line_facts`). Then, at COMMIT
+│   │   │                              (deferred trigger), a sofa build covering a
+│   │   │                              priced combo is costed at the combo, spread
+│   │   │                              over its modules by their own costs — the
+│   │   │                              ERP's `recomputeTotals`, rule for rule (the
+│   │   │                              combo always wins; one tier + one height;
+│   │   │                              uniform qty or no combo). The ERP's own
+│   │   │                              line cost is NOT a fallback: nothing
+│   │   │                              priced = no cost = no margin, and *Costing
+│   │   │                              gaps* says why (`not_in_sku_master` /
+│   │   │                              `unpriced` / `no_height`).
+│   │   │                              `recost_sales_order_lines` RE-PRICES a
+│   │   │                              month from the Product List (23RUN kept);
+│   │   │                              a month already landed changes only when
+│   │   │                              somebody presses Recost, and the run must
+│   │   │                              be computed again. The TypeScript twins
+│   │   │                              are `lib/catalogue/*` — the calculator and
+│   │   │                              the run cannot disagree about a sofa.
+│   │   │                              The ERP pushes the catalogue to
+│   │   │                              `POST /api/erp/v1/products` (contract §9,
+│   │   │                              v2) on the sales-order feed's key, whole,
+│   │   │                              only when its digest changed.
+│   │   │                              `lib/erp-sync/catalogue.ts`,
+│   │   │                              `revenue/catalogue-actions.ts`, migs
+│   │   │                              `20260924020000` / `025000` / `030000`.
 │   │   │                              Inside a view, sections get their own nav
 │   │   │                              (2026-09-05): rules = 9 sections (`?tab=`)
 │   │   │                              in a VERTICAL sidebar since 2026-09-07 —
@@ -714,8 +760,9 @@ src/
 │   │                                  `tools/generate-pwa-icons.mjs`.
 │   └── api/erp/v1/                 ← the ONLY machine endpoints: the Houzs ERP's two
 │                                      receivers — `sales-orders` (POST, live per-save)
-│                                      and `products` (POST, the SKU master + Combo
-│                                      Pricing catalogue, 2026-09-17), plus `health`
+│                                      and `products` (POST, the catalogue mirror —
+│                                      SKU master, Modular, Maintenance, fabrics,
+│                                      combos; ITEMS ONLY, 2026-09-24), plus `health`
 │                                      (GET). The only POST route handlers in the app —
 │                                      see the machine-ingest exception under Coding
 │                                      Conventions. Everything else stays Server Actions.
@@ -726,12 +773,9 @@ src/
 │   │   ├── client.ts               ← Browser client (anon key + RLS)
 │   │   ├── server.ts               ← Server client (anon key + RLS via SSR cookies)
 │   │   ├── admin.ts                ← Service role client. BYPASSES RLS. 'server-only',
-│   │   │                              built on FIRST USE not at import time. Exactly three
-│   │   │                              callers: the ERP receiver, team/people invites, and
-│   │   │                              `lib/erp-sync/feed-key.ts` (the ERP's feed key in and
-│   │   │                              out of Vault — four service-role-only RPCs, nothing
-│   │   │                              else; 2026-09-13). A FIFTH is a decision, not a
-│   │   │                              detail.
+│   │   │                              built on FIRST USE not at import time. Six callers,
+│   │   │                              listed under Coding Conventions › Supabase client.
+│   │   │                              Another is a decision, not a detail.
 │   │   └── database.types.ts       ← Generated from Supabase
 │   ├── auth.ts                     ← requireAuth / requireRole helpers
 │   ├── roles.ts                    ← canAccess* helpers for sidebar visibility
@@ -856,8 +900,8 @@ Finance CANNOT see individual employee salaries — only department lump sum
 Finance CANNOT access the Director Salary module or Director Pool at all. (Director Pool v2 2026-07-21: the old aggregate-bucket view Finance used was replaced by the standalone calculator — Principal + HR only.)
 HR CAN access Director Pool v2 (standalone calculator — full per-director detail; granted by user 2026-07-21)
 Only HR and Principal can see individual salary details
-Member catalogue & margin cost basis (2026-09-12)
-The member Quote page reads `comm_products` ⋈ `member_product_options` (two Principal-only steps: Revenue › Product List, then People › Member Services › Product options; seed: `scripts/seed-fair-catalogue.mjs`). **Riders**: bed frames and accessories carry NO brand (`brand_code` NULL) — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (`lib/member/calculator.ts`, engine `marginBase`). Sofas are ZANOTTI and costed the ERP way: `comm_products.cost_grid` = [{height, tier PRICE_1/2/3, cost}] per module, summed for the cart's seat height + fabric tier (`resolveUnitCost`, mirrors ERP `resolveSeatHeightSen`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
+Member catalogue & margin cost basis (2026-09-12, catalogue 2026-09-24)
+The member Quote page sells from the Product List, not a list of its own: `member_catalogue()` (mig `20260924040000`) answers every SKU ticked on **Product List › Modular** (`catalogue_skus.offered`, and its model's `catalogue_models.offered`), still ACTIVE in the ERP, under a brand the member's calculator scheme sells — "10 SKUs, 7 ticked → the calculator offers 7" (user 2026-09-24). Both snapshots read it UNPRICED (names, sizes, the sofa grid's height × tier choices, each sofa / bed frame model's dropdowns = the portal's ticks ∩ what the ERP still allows ∩ the live Maintenance pool) and return `catalogueModels`; the quote reads it PRICED through the service role only (`lib/member/server.ts`, after `member_quote_context` authorised the session) — no price ever reaches a browser. The cart carries ONE sofa build (seat height, tier, leg, specials) and ONE bed frame build (divan, leg, total, gap, specials); a dropdown offers only what every model of that kind in the cart was ticked for (`lib/member/build.ts`), and the server refuses anything else. The calculator costs the way the run does (`lib/member/calculator.ts` `costLines` over `lib/catalogue/*`): SKU price at the build + option surcharges, a matched priced combo costed as the combo. People › Member Services › Product options is now a pointer to Modular (`comm_products` / `member_product_options` are no longer read by the member app). **Riders**: bed frames and accessories carry NO brand — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (engine `marginBase`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
 Development Phases
 Phase 1 (✅ Shipped 2026-04-10): Treasury Core
 Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,
@@ -889,8 +933,8 @@ TypeScript strict mode — no `any`
 Server Components by default — Client Components only when needed (forms, interactive widgets)
 Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
 Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5).
-Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. TWO of them exist, both the Houzs ERP's: `sales-orders` and, since 2026-09-17, `products` (the SKU master + Combo Pricing mirror). A second endpoint of an existing feed is not a second exception — a second SYSTEM would be. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
-Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly FOUR callers: `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second was added 2026-09-17 for the SKU master + Combo Pricing mirror and is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
+Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. TWO of them exist, both the Houzs ERP's: `sales-orders` and, since 2026-09-17, `products` (the catalogue mirror; items only since 2026-09-24). A second endpoint of an existing feed is not a second exception — a second SYSTEM would be. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
+Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly SIX callers: `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second, since 2026-09-24 the items-only catalogue mirror, is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `app/api/member-queue/route.ts` (the cron-secret queue sweep, `member_process_all_queues`), `lib/member/server.ts` (a member quote's PRICES — `member_catalogue(…, p_priced)`, service-role-only, read only after `member_quote_context` authorised the session — and the invoice attestation insert), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
 Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases.

@@ -124,13 +124,7 @@ export default function MemberAdmin({
     [titleId, setTitleId] = useState(""),
     [uplineStaffId, setUplineStaffId] = useState(""),
     [rosterChecked, setRosterChecked] = useState(false),
-    [invoiceUrl, setInvoiceUrl] = useState(""),
-    [productSearch, setProductSearch] = useState("");
-  const visibleProducts = data.products.filter((p) =>
-    `${p.name} ${p.code} ${p.brand}`
-      .toLocaleLowerCase()
-      .includes(productSearch.trim().toLocaleLowerCase()),
-  );
+    [invoiceUrl, setInvoiceUrl] = useState("");
   const request = data.requests.find((r) => r.id === selected);
   const running = useRef(false);
   const requestSub = String(
@@ -1110,113 +1104,22 @@ export default function MemberAdmin({
           <section className={s.card}>
             <div className={s.sectionHead}>
               <h2>Sales catalogue</h2>
-              <Link className={s.link} href="/revenue/products">
-                Manage products & costs →
+              <Link className={s.link} href="/revenue/products?tab=modular">
+                Open Product List › Modular →
               </Link>
             </div>
             <p className={s.sub}>
-              Principal maintains costs in the product catalogue. Set the
-              specifications and free gift options that members can select for
-              each SKU here.
+              What members can quote is now set on the Product List, which
+              mirrors the Houzs ERP&apos;s catalogue item by item. Tick a model
+              and its SKUs on the Modular tab to offer them in the calculator,
+              tick the leg heights, specials and bed frame heights its
+              dropdowns may show, and key each SKU&apos;s price on the SKU
+              Master tab — every margin is measured against those prices.
             </p>
-            <label className={s.field} style={{ marginTop: 18 }}>
-              <span>Search by product, SKU or brand</span>
-              <input
-                type="search"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="e.g. Cloud, AK-001 or Akemi"
-              />
-            </label>
-            <p className={s.caption} style={{ marginTop: 10 }} role="status">
-              Showing {visibleProducts.length} / {data.products.length} SKUs
+            <p className={s.caption} style={{ marginTop: 10 }}>
+              A SKU the ERP adds arrives unticked: the calculator never offers
+              what nobody here decided to offer.
             </p>
-            {!visibleProducts.length && (
-              <p className={s.notice} style={{ marginTop: 18 }}>
-                No matching products. Try a different search.
-              </p>
-            )}
-            {visibleProducts.map((p) => (
-              <form
-                key={p.id}
-                className={s.card}
-                style={{ marginTop: 18 }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const f = new FormData(e.currentTarget);
-                  void run({
-                    action: "configure_product",
-                    productId: p.id,
-                    category: f.get("category"),
-                    size: f.get("size"),
-                    color: f.get("color"),
-                    gift: f.get("gift") === "on",
-                    available: f.get("available") === "on",
-                  });
-                }}
-              >
-                <h3>{p.name}</h3>
-                <p className={s.caption} style={{ marginBottom: 16 }}>
-                  {p.brand} · {p.code}
-                </p>
-                <div className={s.form}>
-                  <label className={s.field}>
-                    <span>Category</span>
-                    <select name="category" defaultValue={p.category || "床垫"}>
-                      {Array.from(
-                        new Set([
-                          "床垫",
-                          "床架",
-                          "沙发",
-                          "枕头",
-                          "Protector",
-                          "赠品床架",
-                          ...(p.category ? [p.category] : []),
-                        ]),
-                      ).map((c) => (
-                        <option key={c} value={c}>
-                          {categoryNames[c] ?? c}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className={s.two}>
-                    <label className={s.field}>
-                      <span>Size / seating</span>
-                      <input
-                        name="size"
-                        defaultValue={p.size}
-                        placeholder="Queen / King / 3-seater"
-                        required
-                      />
-                    </label>
-                    <label className={s.field}>
-                      <span>Colour</span>
-                      <input name="color" defaultValue={p.color} />
-                    </label>
-                  </div>
-                  <label className={s.check}>
-                    <input
-                      type="checkbox"
-                      name="gift"
-                      defaultChecked={p.gift}
-                    />
-                    Available as a free gift
-                  </label>
-                  <label className={s.check}>
-                    <input
-                      type="checkbox"
-                      name="available"
-                      defaultChecked={p.available}
-                    />
-                    Available to members
-                  </label>
-                  <button className={s.button} disabled={busy}>
-                    Save product options
-                  </button>
-                </div>
-              </form>
-            ))}
           </section>
         )}
       </main>
