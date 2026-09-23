@@ -10,6 +10,7 @@ import {
   gapLooksLikeSeveralFairs,
   monthOf,
   sortFairs,
+  unmovedByApply,
   windowsOverlap,
   type Fair,
   type FairGap,
@@ -39,6 +40,8 @@ function fair(over: Partial<Fair> = {}): Fair {
     total: 203339,
     billsToMove: 30,
     valueToMove: 199339,
+    confirmedToMove: 0,
+    confirmedValueToMove: 0,
     ...over,
   }
 }
@@ -241,6 +244,29 @@ describe('fairCalendarSummary', () => {
     expect(s.gapsNeedingSplit).toBe(1)
   })
 
+  it('keeps what a human confirmed apart from what the calendar guessed', () => {
+    // 2026-09-23: 174 bills wanted to leave September for August; the claim
+    // form named 96 of them. The other 78 were September's own fairs at the
+    // same halls, reached by the 45-day grace because September was not typed.
+    const s = fairCalendarSummary(
+      [
+        fair({ billsToMove: 30, valueToMove: 199339, confirmedToMove: 30, confirmedValueToMove: 199339 }),
+        fair({
+          fairId: 'ioi',
+          venueKey: 'IOI MALL PUTRAJAYA',
+          billsToMove: 35,
+          valueToMove: 180000,
+          confirmedToMove: 4,
+          confirmedValueToMove: 17816,
+        }),
+      ],
+      [],
+    )
+    expect(s.billsToMove).toBe(65)
+    expect(s.confirmedToMove).toBe(34)
+    expect(s.confirmedValueToMove).toBe(217155)
+  })
+
   it('is all zeroes before anything is typed', () => {
     const s = fairCalendarSummary([], [])
     expect(s).toEqual({
@@ -248,11 +274,55 @@ describe('fairCalendarSummary', () => {
       undated: 0,
       billsToMove: 0,
       valueToMove: 0,
+      confirmedToMove: 0,
+      confirmedValueToMove: 0,
       unplacedBills: 0,
       unplacedValue: 0,
       gaps: 0,
       gapsNeedingSplit: 0,
     })
+  })
+})
+
+describe('unmovedByApply', () => {
+  it('counts the gaps sitting in a month the apply moves bills into', () => {
+    const r = unmovedByApply(
+      [fair()],
+      [gap(), gap({ venueKey: 'SUNWAY PYRAMID', bills: 39, total: 238292, spreadDays: 17 })],
+    )
+    expect(r.bills).toBe(100)
+    expect(r.value).toBe(638292)
+    expect(r.months).toEqual(['2026-08-01'])
+  })
+
+  it('ignores a gap in a month nothing is moving into', () => {
+    const r = unmovedByApply(
+      [fair()],
+      [gap({ periodMonth: '2026-09-01', bills: 46, total: 242574 })],
+    )
+    expect(r).toEqual({ bills: 0, value: 0, months: [] })
+  })
+
+  it('ignores a fair that has nothing to move', () => {
+    const r = unmovedByApply([fair({ billsToMove: 0, valueToMove: 0 })], [gap()])
+    expect(r).toEqual({ bills: 0, value: 0, months: [] })
+  })
+
+  it('names every destination month once, earliest first', () => {
+    const r = unmovedByApply(
+      [fair(), fair({ fairId: 'f2', periodMonth: '2026-09-01' })],
+      [
+        gap({ periodMonth: '2026-09-01', bills: 1, total: 10 }),
+        gap({ periodMonth: '2026-08-01', bills: 2, total: 20 }),
+        gap({ periodMonth: '2026-08-01', venueKey: 'KLCC', bills: 3, total: 30 }),
+      ],
+    )
+    expect(r.bills).toBe(6)
+    expect(r.months).toEqual(['2026-08-01', '2026-09-01'])
+  })
+
+  it('is empty before anything is typed', () => {
+    expect(unmovedByApply([], [])).toEqual({ bills: 0, value: 0, months: [] })
   })
 })
 

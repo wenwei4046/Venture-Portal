@@ -40,6 +40,14 @@ export interface Fair {
   /** Of those, how many are still in a different month than the fair. */
   billsToMove: number
   valueToMove: number
+  /**
+   * Of THOSE, how many a human placed at this fair (`fair_source = 'manual'`,
+   * e.g. from the month's claim form). The rest are `venue_event_for_order`'s
+   * guess — and the guess reaches back 45 days, so while next month's fairs
+   * are not typed it pulls next month's bills at the same hall into this one.
+   */
+  confirmedToMove: number
+  confirmedValueToMove: number
 }
 
 /** Bills that belong to no fair yet, grouped by place and order month. */
@@ -175,6 +183,9 @@ export interface FairCalendarSummary {
   /** Bills sitting in a month their fair disagrees with. */
   billsToMove: number
   valueToMove: number
+  /** Of those, the ones a human placed — what *Move confirmed bills* moves. */
+  confirmedToMove: number
+  confirmedValueToMove: number
   /** Bills belonging to no fair at all. */
   unplacedBills: number
   unplacedValue: number
@@ -192,10 +203,53 @@ export function fairCalendarSummary(
     undated: fairs.filter(f => f.startDate === null).length,
     billsToMove: fairs.reduce((n, f) => n + f.billsToMove, 0),
     valueToMove: fairs.reduce((n, f) => n + f.valueToMove, 0),
+    confirmedToMove: fairs.reduce((n, f) => n + f.confirmedToMove, 0),
+    confirmedValueToMove: fairs.reduce((n, f) => n + f.confirmedValueToMove, 0),
     unplacedBills: gaps.reduce((n, g) => n + g.bills, 0),
     unplacedValue: gaps.reduce((n, g) => n + g.total, 0),
     gaps: gaps.length,
     gapsNeedingSplit: gaps.filter(gapLooksLikeSeveralFairs).length,
+  }
+}
+
+export interface UnmovedByApply {
+  /** Bills the apply leaves where they are, in the months it moves bills into. */
+  bills: number
+  value: number
+  /** Those months, earliest first. */
+  months: string[]
+}
+
+/**
+ * What *Move the bills* will NOT touch.
+ *
+ * The apply moves a bill only when a fair claims it, so the banner's one
+ * number — what moves — is half the month. August 2026 is the case: 147 bills
+ * were waiting in September to come back, while 129 bills worth RM 741,367
+ * already in August belonged to no fair at all.
+ *
+ * Those 129 are NOT late entries waiting for a window to be typed. Their
+ * places — Sunway Pyramid, Kota Bharu, the SUTERA/KLUANG/NILAI roadshows —
+ * appear nowhere on the hand-written fair claim form, and the reconciliation
+ * matched on document number, not venue, so the claim form genuinely does not
+ * have them. They are the department's non-fair selling, and no fair will ever
+ * claim them. That is why applying carries August from 9% under the claim form
+ * to 31% over it while the total looks no worse for it.
+ *
+ * So both numbers belong on the banner: what moves, and what stays put. Some
+ * of what stays is a fair nobody has typed yet and some of it never was a
+ * fair, and only the person reading it can tell which.
+ */
+export function unmovedByApply(
+  fairs: readonly Fair[],
+  gaps: readonly FairGap[],
+): UnmovedByApply {
+  const destinations = new Set(fairs.filter(f => f.billsToMove > 0).map(f => f.periodMonth))
+  const staying = gaps.filter(g => destinations.has(g.periodMonth))
+  return {
+    bills: staying.reduce((n, g) => n + g.bills, 0),
+    value: staying.reduce((n, g) => n + g.total, 0),
+    months: [...new Set(staying.map(g => g.periodMonth))].sort(),
   }
 }
 

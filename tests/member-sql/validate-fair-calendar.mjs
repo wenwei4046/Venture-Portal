@@ -158,6 +158,12 @@ try {
   await db.exec(
     await readFile(new URL('20260920050000_the_fair_sets_the_month.sql', migrations), 'utf8'),
   )
+  await db.exec(
+    await readFile(new URL('20260923010000_the_claim_form_confirms_the_fair.sql', migrations), 'utf8'),
+  )
+  await db.exec(
+    await readFile(new URL('20260923020000_venue_key_once_per_call.sql', migrations), 'utf8'),
+  )
 
   const augBatch = await one(
     `INSERT INTO sales_import_batches(period_month,file_name,sub_department_id)
@@ -298,6 +304,54 @@ try {
 
   check((await q('SELECT * FROM revenue_apply_fair_calendar($1)', [FAIR_SUB]))[0].orders_moved, 0,
     'running it again moves nothing')
+
+  // ─── moving only what a human confirmed (20260923010000) ──────────────────
+  //
+  // With September's fairs untyped, the 45-day grace hands a September bill
+  // at Kuching to the August fair. The claim form is what tells them apart.
+
+  const guess = await bill('HC70001', '2026-09-20', 'BORNEO CONVENTION CENTRE KUCHING', sepBatch, 3000)
+  const claimed = await bill('HC70002', '2026-09-20', 'BORNEO CONVENTION CENTRE KUCHING', sepBatch, 7000)
+  await q(`UPDATE sales_orders SET fair_source='manual' WHERE id=$1`, [claimed])
+
+  const split = await q(
+    `SELECT order_no, confirmed FROM revenue_fair_calendar_moves($1) ORDER BY order_no`, [FAIR_SUB])
+  check(split.map(r => [r.order_no, r.confirmed]), [
+    ['HC70001', false],
+    ['HC70002', true],
+  ], 'the preview says which move a human confirmed')
+
+  const kuchingRow = (await q(
+    `SELECT bills_to_move, confirmed_to_move, confirmed_value_to_move
+       FROM revenue_fair_calendar() WHERE fair_id=$1`, [kuching]))[0]
+  check([kuchingRow.bills_to_move, kuchingRow.confirmed_to_move, Number(kuchingRow.confirmed_value_to_move)],
+    [2, 1, 7000], 'the calendar counts confirmed moves per fair')
+
+  const confirmedOnly = (await q(
+    `SELECT orders_moved, value_moved FROM revenue_apply_fair_calendar($1, TRUE)`, [FAIR_SUB]))[0]
+  check([confirmedOnly.orders_moved, Number(confirmedOnly.value_moved)], [1, 7000],
+    'confirmed-only moves only the claimed bill')
+  check(await one('SELECT period_month::text FROM sales_orders WHERE id=$1', [claimed]), AUG,
+    "the claimed bill is in the fair's month")
+  check(await one('SELECT period_month::text FROM sales_orders WHERE id=$1', [guess]), SEP,
+    'the guessed bill stayed where it was')
+  check(Number(await one(
+    `SELECT count(*) FROM sales_orders o JOIN sales_import_batches b ON b.id=o.batch_id
+      WHERE b.period_month <> o.period_month`)), 0,
+    'the claimed bill took its batch with it')
+  check((await q('SELECT * FROM revenue_apply_fair_calendar($1, TRUE)', [FAIR_SUB]))[0].orders_moved, 0,
+    'confirmed-only has nothing left to move')
+
+  // A typed September fair takes the guess back; the pinned bill does not budge.
+  const kuchingSep = await fair('BORNEO CONVENTION CENTRE KUCHING', SEP, '2026-09-18', '2026-09-20')
+  check(await one('SELECT fair_event_id FROM sales_orders WHERE id=$1', [guess]), kuchingSep,
+    "typing next month's fair re-stamps the guess")
+  check(await one('SELECT fair_event_id FROM sales_orders WHERE id=$1', [claimed]), kuching,
+    "and leaves the claim form's answer alone")
+  check(Number(await one(`SELECT count(*) FROM revenue_fair_calendar_moves($1)`, [FAIR_SUB])), 0,
+    'nothing disagrees any more')
+  await q('DELETE FROM sales_orders WHERE id = ANY($1)', [[guess, claimed]])
+  await q('DELETE FROM comm_venue_events WHERE id=$1', [kuchingSep])
 
   // ─── a run that has paid refuses the move ─────────────────────────────────
 

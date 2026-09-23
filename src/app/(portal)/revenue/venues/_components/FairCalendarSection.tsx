@@ -19,10 +19,16 @@ import {
   fairMonthLabel,
   fairWindowLabel,
   gapLooksLikeSeveralFairs,
+  unmovedByApply,
   type Fair,
   type FairGap,
 } from '@/lib/fair-calendar'
-import { applyFairCalendar, deleteFair, upsertFair } from '../../fair-actions'
+import {
+  applyConfirmedFairCalendar,
+  applyFairCalendar,
+  deleteFair,
+  upsertFair,
+} from '../../fair-actions'
 
 /**
  * The fair calendar: when each fair actually ran.
@@ -62,6 +68,15 @@ export default function FairCalendarSection({
   organisers: Organiser[]
 }) {
   const summary = fairCalendarSummary(fairs, gaps)
+  const staying = unmovedByApply(fairs, gaps)
+  const stayingMonths = staying.months.map(fairMonthLabel).join(' and ')
+  const guessed = summary.billsToMove - summary.confirmedToMove
+  const stayingNote =
+    staying.bills > 0
+      ? ` ${staying.bills} bills worth ${formatMoney(staying.value)} already in ${stayingMonths} belong to no fair and will NOT move. Check Still to place first if any of them should have.`
+      : ''
+  const rerun =
+    ' Runs over the months this touches must be computed again. A month whose run has already paid will be refused.'
   const pickable = organisers.filter(o => o.isActive)
 
   return (
@@ -92,11 +107,60 @@ export default function FairCalendarSection({
               be computed again.
             </span>
           </p>
-          <ActionButton
-            run={applyFairCalendar}
-            label="Move the bills"
-            confirm={`Move ${summary.billsToMove} bills into the month of the fair they were written at? Runs over the months this touches must be computed again. A month whose run has already paid will be refused.`}
-          />
+          <span className="inline-flex flex-wrap items-center gap-3">
+            {summary.confirmedToMove > 0 && guessed > 0 ? (
+              <ActionButton
+                run={applyConfirmedFairCalendar}
+                label={`Move the ${summary.confirmedToMove} confirmed`}
+                confirm={
+                  `Move the ${summary.confirmedToMove} bills a person placed at their fair into that fair's month? The ${guessed} the calendar only guessed stay where they are.` +
+                  rerun
+                }
+              />
+            ) : null}
+            <ActionButton
+              run={applyFairCalendar}
+              label={summary.confirmedToMove > 0 && guessed > 0 ? `Move all ${summary.billsToMove}` : 'Move the bills'}
+              confirm={
+                `Move ${summary.billsToMove} bills into the month of the fair they were written at?` +
+                (summary.confirmedToMove > 0 && guessed > 0
+                  ? ` ${guessed} of them are only the calendar's guess.`
+                  : '') +
+                stayingNote +
+                rerun
+              }
+            />
+          </span>
+          {guessed > 0 ? (
+            <p className="basis-full text-sm text-graphite m-0">
+              {summary.confirmedToMove > 0 ? (
+                <>
+                  <strong className="font-semibold text-ink">{summary.confirmedToMove}</strong> of
+                  them (<span className="num">{formatMoney(summary.confirmedValueToMove)}</span>)
+                  were placed at their fair by a person — from the month&rsquo;s claim form or by
+                  hand. The other{' '}
+                </>
+              ) : (
+                <>All </>
+              )}
+              <strong className="font-semibold text-ink">{guessed}</strong> are the
+              calendar&rsquo;s guess: the last fair at that hall within 45 days. While next
+              month&rsquo;s fairs are not typed, that guess reaches back into this month and takes
+              next month&rsquo;s bills with it — type those fairs first
+              {summary.confirmedToMove > 0 ? ', or move only the confirmed ones' : ''}.
+            </p>
+          ) : null}
+          {staying.bills > 0 ? (
+            <p className="basis-full text-sm text-graphite m-0">
+              <strong className="font-semibold text-ink">
+                {staying.bills} bill{staying.bills === 1 ? '' : 's'}
+              </strong>{' '}
+              worth <span className="num">{formatMoney(staying.value)}</span> already in{' '}
+              {stayingMonths} belong to no fair and will not move. Some of that is a fair nobody
+              has typed yet; some of it never was a fair. Check <em>Still to place</em>, below,
+              before you decide the month is right.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

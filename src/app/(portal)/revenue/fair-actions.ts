@@ -124,6 +124,25 @@ export async function deleteFair(id: string): Promise<void> {
  * is answering a question about a different set of bills.
  */
 export async function applyFairCalendar(): Promise<void> {
+  await moveBills(false)
+}
+
+/**
+ * Move only the bills a HUMAN placed at their fair (`fair_source = 'manual'`)
+ * and leave the calendar's guesses where they are.
+ *
+ * The guess reaches back 45 days, so until next month's fairs are typed it
+ * pulls next month's bills at the same hall into this one. On 2026-09-23 it
+ * wanted 174 of September's bills in August; August's claim form named 96 of
+ * them, and the other 78 were September's own fairs at IOI Mall Putrajaya,
+ * Mid Valley and MVEC Southkey. No grace window separates the two — their
+ * lags overlap — so only a human record can.
+ */
+export async function applyConfirmedFairCalendar(): Promise<void> {
+  await moveBills(true)
+}
+
+async function moveBills(confirmedOnly: boolean): Promise<void> {
   await requirePermission('revenue')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const subDepts = await listSubDepartments()
@@ -134,6 +153,7 @@ export async function applyFairCalendar(): Promise<void> {
   for (const sub of subDepts) {
     const { data, error } = await supabase.rpc('revenue_apply_fair_calendar', {
       p_sub_department_id: sub.id,
+      p_confirmed_only: confirmedOnly,
     })
     if (error) {
       if (error.code === '23RUN') {

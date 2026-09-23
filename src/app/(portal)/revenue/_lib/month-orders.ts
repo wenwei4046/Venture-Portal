@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchByKeys } from '@/lib/paginate'
 
 /**
  * A month's sales orders, as `revenue_month_orders` returns them.
@@ -233,4 +234,73 @@ export function exclusionReason(o: MonthOrder): string | null {
   if (o.erpStatus === 'DELETED') return 'Deleted in the ERP'
   if (o.erpStatus) return `${o.erpStatus.replace(/_/g, ' ').toLowerCase()} in the ERP`
   return 'Excluded'
+}
+
+// ─── Shared bills (2026-09-24) ──────────────────────────────────────────────
+
+/** One `sales_order_shares` row with the holder's name. */
+export interface OrderShareView {
+  orderId: string
+  staffId: string
+  name: string
+  /** 0.5 = half the bill. */
+  pct: number
+}
+
+/**
+ * Who else holds a part of these bills. Chunked by `fetchByKeys` because a
+ * month is several hundred ids and PostgREST takes its filters in the URL.
+ */
+export async function loadOrderShares(
+  supabase: SupabaseClient,
+  orderIds: readonly string[],
+): Promise<OrderShareView[]> {
+  type Row = {
+    order_id: string
+    staff_id: string
+    share_pct: number | string
+    // PostgREST embeds a to-one relation as an object; the untyped client types it as a list.
+    hr_staff_costs: { employee_name: string } | { employee_name: string }[] | null
+  }
+  const rows = await fetchByKeys<Row, string>(orderIds, chunk =>
+    supabase
+      .from('sales_order_shares')
+      .select('order_id, staff_id, share_pct, hr_staff_costs (employee_name)')
+      .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  )
+  return rows.map(r => {
+    const who = Array.isArray(r.hr_staff_costs) ? r.hr_staff_costs[0] : r.hr_staff_costs
+    return {
+      orderId: r.order_id,
+      staffId: r.staff_id,
+      name: who?.employee_name ?? '—',
+      pct: Number(r.share_pct),
+    }
+  })
+}
+
+/**
+ * Everybody a bill here may be shared with: the sub-department's members,
+ * A→Z. A share with somebody outside it would pay nobody — the run only ranks
+ * the scheme's own members.
+ */
+export async function loadShareTeam(
+  supabase: SupabaseClient,
+  schemeId: string | null,
+): Promise<{ staffId: string; name: string }[]> {
+  if (!schemeId) return []
+  const { data, error } = await supabase
+    .from('comm_hierarchy')
+    .select('staff_id, hr_staff_costs!comm_hierarchy_staff_id_fkey (employee_name, status)')
+    .eq('scheme_id', schemeId)
+    .is('effective_to', null)
+  if (error) throw new Error(`Could not read the team: ${error.message}`)
+  const rows = (data ?? []) as unknown as {
+    staff_id: string
+    hr_staff_costs: { employee_name: string; status: string | null } | null
+  }[]
+  return rows
+    .filter(r => r.hr_staff_costs && r.hr_staff_costs.status !== 'terminated')
+    .map(r => ({ staffId: r.staff_id, name: r.hr_staff_costs!.employee_name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }

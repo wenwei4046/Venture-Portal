@@ -15,6 +15,7 @@ import type {
   MarginBandRow,
   OpenBillRuleRow,
   OpenBillTagRow,
+  OrderShareRow,
   PriorMonthRow,
   RankRow,
   SalesOrderRow,
@@ -212,6 +213,12 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank').in('order_id', chunk),
   )
 
+  // Who else each bill is shared with (2026-09-24). Chunked for the same reason
+  // as the picks above; a shared bill reaches the engine as one part per holder.
+  const shareRows = await fetchByKeys<OrderShareRow, string>(orderIds, chunk =>
+    supabase.from('sales_order_shares').select('order_id, staff_id, share_pct').in('order_id', chunk),
+  )
+
   // ── The months before, for the streak gates ────────────────────────────
   // A rung with `personal_sales_threshold` × N months looks back N − 1 months
   // at what those months' runs paid as own revenue. Only months that were
@@ -245,6 +252,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     orders: orderRows,
     releasedOrderNos,
     priorMonths: rows<PriorMonthRow>(priorRows),
+    shares: shareRows,
   })
 
   const result = runEngine(input)
@@ -366,6 +374,51 @@ export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): 
     if (error) throw new Error(error.message)
   }
 
+  revalidatePath('/revenue', 'layout')
+}
+
+/**
+ * Share a bill with another team member (2026-09-24). Default 50/50: the owner
+ * keeps 1 − Σ(shares). Each part is paid at its holder's own rate and climbs
+ * its holder's own upline line — `lib/commission/shares.ts`. Sharing again with
+ * the same person changes their part. The table refuses a share with the owner,
+ * shares that leave the owner nothing (23SHR) and a paid month (23RUN).
+ */
+export async function shareOrder(orderId: string, staffId: string, pct = 0.5): Promise<void> {
+  await requirePermission('revenue')
+  if (!(pct > 0 && pct < 1)) throw new Error('A share is more than 0% and less than 100% of the bill')
+  const supabase = await client()
+
+  const { data: orderRow } = await supabase
+    .from('sales_orders')
+    .select('id, staff_id, period_month, sales_import_batches!inner (sub_department_id)')
+    .eq('id', orderId)
+    .maybeSingle()
+  const order = orderRow as {
+    staff_id: string | null
+    period_month: string
+    sales_import_batches: { sub_department_id: string }
+  } | null
+  if (!order) throw new Error('Order not found')
+  if (!order.staff_id) throw new Error('Match this bill to a salesperson before sharing it.')
+  if (order.staff_id === staffId) throw new Error('That is who the bill already belongs to.')
+
+  await assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id)
+
+  const { error } = await supabase
+    .from('sales_order_shares')
+    .upsert({ order_id: orderId, staff_id: staffId, share_pct: Math.round(pct * 10_000) / 10_000 }, { onConflict: 'order_id,staff_id' })
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/revenue', 'layout')
+}
+
+/** Take a share back: the owner holds that part again. */
+export async function unshareOrder(orderId: string, staffId: string): Promise<void> {
+  await requirePermission('revenue')
+  const supabase = await client()
+  const { error } = await supabase.from('sales_order_shares').delete().eq('order_id', orderId).eq('staff_id', staffId)
+  if (error) throw new Error(error.message)
   revalidatePath('/revenue', 'layout')
 }
 
