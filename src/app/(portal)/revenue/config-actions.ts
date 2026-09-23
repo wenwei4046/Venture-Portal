@@ -747,3 +747,31 @@ export async function deleteMarginBand(id: string) {
   check((await supabase.from('comm_margin_bands').delete().eq('id', id)).error, 'Could not remove the band')
   refresh()
 }
+
+// ─── Quick switches on the month page (2026-09-24) ──────────────────────────
+
+/**
+ * What a run pays, switched from the month it is about. The SAME columns as
+ * Rules › Scheme rules — one setting, two places to reach it — so the two can
+ * never disagree. Margin is one switch here because the user asked for it as
+ * one ("margin incentive & penalty"): it sets the penalty and the incentive
+ * together; Rules still sets them apart. Off means the run pays none of it;
+ * every run computed afterwards follows.
+ */
+export type SchemeSwitch = 'open_bill' | 'margin' | 'kpi'
+
+export async function setSchemeSwitch(schemeId: string, which: SchemeSwitch, on: boolean): Promise<void> {
+  await requirePermission('revenue')
+  const supabase = await client()
+  const patch =
+    which === 'open_bill'
+      ? { enable_open_bill: on }
+      : which === 'kpi'
+        ? { enable_kpi: on }
+        : { enable_margin_penalty: on, enable_margin_incentive: on }
+  check(
+    (await supabase.from('comm_schemes').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', schemeId)).error,
+    'Could not change the switch',
+  )
+  refresh()
+}

@@ -26,6 +26,7 @@
  *     from group sales — and group sales drive promotions.
  */
 
+import { splitOrdersByShares } from './shares'
 import {
   indexItemGroups,
   indexKpiItems,
@@ -193,6 +194,15 @@ export interface RunSourceRows {
   releasedOrderNos: string[]
   /** The months before this one that have a run, any order. */
   priorMonths: PriorMonthRow[]
+  /** `sales_order_shares` for these orders. Absent = nobody shares anything. */
+  shares?: OrderShareRow[]
+}
+
+/** A `sales_order_shares` row. */
+export interface OrderShareRow {
+  order_id: string
+  staff_id: string
+  share_pct: Num
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -311,7 +321,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
   // An unmatched agent has no staff_id, so the order pays nobody. It is dropped
   // here rather than passed through as a phantom salesperson — the period page
   // and the import wizard are where that gets resolved, loudly.
-  const orders: SalesOrder[] = rows.orders
+  const wholeOrders: SalesOrder[] = rows.orders
     .filter(o => o.staff_id !== null)
     .map(o => ({
       id: o.id,
@@ -335,6 +345,13 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         costAmount: numOrNull(l.cost_amount) ?? undefined,
       })),
     }))
+
+  // A shared bill becomes one part per holder, each paid at its holder's rate
+  // and climbing its holder's line (`lib/commission/shares.ts`).
+  const orders = splitOrdersByShares(
+    wholeOrders,
+    (rows.shares ?? []).map(r => ({ orderId: r.order_id, staffId: r.staff_id, pct: num(r.share_pct) })),
+  )
 
   return {
     periodMonth: rows.periodMonth,
@@ -457,15 +474,28 @@ export function releasedOrders(input: EngineInput, result: EngineResult): Releas
     : new Map<string, number>()
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
 
-  return input.orders
-    .filter(o => !o.alreadyReleased && !held.has(o.id))
-    .map(o => ({
+  // One release per BILL: a shared bill reaches the engine as one part per
+  // holder, but it is paid — and must never be paid again — as one document
+  // (`uq_comm_release_per_sub_order`). The owner's part comes first, so the
+  // release names the owner; the revenue is the whole bill's.
+  const byOrder = new Map<string, ReleasedOrderDto>()
+  for (const o of input.orders) {
+    if (o.alreadyReleased || held.has(o.id)) continue
+    const revenue = orderProductRevenue(o, kpiIndex, groupIndex)
+    const seen = byOrder.get(o.id)
+    if (seen) {
+      seen.product_revenue = round2(seen.product_revenue + revenue)
+      continue
+    }
+    byOrder.set(o.id, {
       order_id: o.id,
       order_no: o.orderNo,
       staff_id: o.staffId,
       order_period_month: o.periodMonth,
-      product_revenue: round2(orderProductRevenue(o, kpiIndex, groupIndex)),
-    }))
+      product_revenue: round2(revenue),
+    })
+  }
+  return [...byOrder.values()]
 }
 
 function toStatementDto(s: Statement): StatementDto {

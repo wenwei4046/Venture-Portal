@@ -189,6 +189,26 @@ src/
 │   │   │                              "no fair": a pin is forever and would stop
 │   │   │                              it finding its fair once that is typed.
 │   │   │                              Mig `20260923010000`.
+│   │   │                              **SHARED BILLS (2026-09-24):** a bill can be
+│   │   │                              shared with other team members
+│   │   │                              (`sales_order_shares`, default 50/50; the
+│   │   │                              owner keeps 1 − Σ, never stored). Each PART
+│   │   │                              is paid at its holder's own rate and climbs
+│   │   │                              its holder's own upline line. Split BEFORE
+│   │   │                              the engine (`lib/commission/shares.ts`):
+│   │   │                              every money figure scaled, so deposit ratio
+│   │   │                              and margin are unchanged per part; releases
+│   │   │                              stay one per bill. Trigger refuses the
+│   │   │                              owner, Σ ≥ 100% (23SHR) and a paid month
+│   │   │                              (23RUN). UI: *Share…* (click or right-click)
+│   │   │                              under the salesperson on `[period]/orders`;
+│   │   │                              a person's page lists bills shared TO them;
+│   │   │                              Sales by person credits the parts. The
+│   │   │                              month page's *This run pays* switches (Open
+│   │   │                              Bill / Margin incentive & penalty / KPI) are
+│   │   │                              the SAME scheme columns as Rules. Member
+│   │   │                              Insight/Arena do not read shares yet. Mig
+│   │   │                              `20260924010000`.
 │   │   │                              **THE SKU MASTER, BOUND (2026-09-17):**
 │   │   │                              `products/` is no longer a hand-keyed cost
 │   │   │                              list — it is the ERP's own SKU master,

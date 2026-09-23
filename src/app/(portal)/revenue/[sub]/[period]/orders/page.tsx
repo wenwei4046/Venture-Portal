@@ -11,11 +11,14 @@ import { requireSubDepartment } from '../../../_lib/sub-departments'
 import {
   exclusionReason,
   loadMonthOrders,
+  loadOrderShares,
+  loadShareTeam,
   loadUncostedProducts,
   type MonthOrder,
 } from '../../../_lib/month-orders'
 import OpenBillPicker from './_components/OpenBillPicker'
 import CostGapPanel from './_components/CostGapPanel'
+import ShareControl from './_components/ShareControl'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
@@ -83,11 +86,27 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   const openBillPaid = Boolean((scheme as { enable_open_bill: boolean } | null)?.enable_open_bill)
   const runLocked = Boolean(locked)
 
+  // Who else holds a part of each bill, and who a bill may be shared with.
+  const [shares, team] = await Promise.all([
+    loadOrderShares(supabase, all.map(o => o.orderId)),
+    loadShareTeam(supabase, subDept.schemeId),
+  ])
+  const sharesByOrder = new Map<string, typeof shares>()
+  for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
+
   const includeExcluded = show === 'all'
   const rows = all.filter(o => {
     if (!includeExcluded && o.cancelled) return false
     if (staffFilter === 'unmatched' && o.staffId) return false
-    if (staffFilter && staffFilter !== 'unmatched' && o.staffId !== staffFilter) return false
+    // A person's bills include the ones shared TO them: that part is theirs.
+    if (
+      staffFilter &&
+      staffFilter !== 'unmatched' &&
+      o.staffId !== staffFilter &&
+      !(sharesByOrder.get(o.orderId) ?? []).some(sh => sh.staffId === staffFilter)
+    ) {
+      return false
+    }
     // The filter is a PLACE, not a spelling: merged venues answer as one.
     if (venueFilter !== undefined && (o.venueGroupKey ?? '') !== venueFilter) return false
     return true
@@ -136,11 +155,16 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · {label(period).toUpperCase()}
           </div>
           <h1 className="page-title">
-            {person?.employeeName ?? (staffFilter === 'unmatched' ? 'Unmatched bills' : venueName ?? 'Sales orders')}
+            {person?.employeeName ??
+              // Somebody who only holds SHARES this month owns no bill to read a name from.
+              shares.find(sh => sh.staffId === staffFilter)?.name ??
+              (staffFilter === 'unmatched' ? 'Unmatched bills' : venueName ?? 'Sales orders')}
           </h1>
           {filtered ? (
             <p className="font-serif italic text-graphite text-base mt-3">
-              {person ? `${person.employeeCode ? person.employeeCode + ' · ' : ''}every bill of theirs this month` : null}
+              {person || shares.some(sh => sh.staffId === staffFilter)
+                ? `${person?.employeeCode ? person.employeeCode + ' · ' : ''}every bill of theirs this month, and every bill shared with them`
+                : null}
               {staffFilter === 'unmatched' ? 'Bills whose ERP agent is not yet a salesperson here, so they pay nobody' : null}
               {venueName && !staffFilter ? 'Every bill written at this venue' : null}
             </p>
@@ -302,12 +326,31 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                     </td>
                     <td className="m-hide" data-label="Salesperson">
                       {o.staffId ? (
-                        <Link
-                          href={keep({ staff: o.staffId, venue: undefined })}
-                          className="font-serif text-[14px] text-ink hover:text-accent"
-                        >
-                          {o.employeeName}
-                        </Link>
+                        <>
+                          <Link
+                            href={keep({ staff: o.staffId, venue: undefined })}
+                            className="font-serif text-[14px] text-ink hover:text-accent"
+                          >
+                            {o.employeeName}
+                          </Link>
+                          <ShareControl
+                            orderId={o.orderId}
+                            ownerStaffId={o.staffId}
+                            ownerName={o.employeeName ?? '—'}
+                            shares={(sharesByOrder.get(o.orderId) ?? []).map(sh => ({
+                              staffId: sh.staffId,
+                              name: sh.name,
+                              pct: sh.pct,
+                            }))}
+                            team={team}
+                            disabled={runLocked || o.cancelled}
+                            disabledReason={
+                              runLocked
+                                ? 'The run for this month has paid — reopen it before changing who shares a bill'
+                                : `${exclusionReason(o)} — nothing to share`
+                            }
+                          />
+                        </>
                       ) : (
                         <span
                           className={

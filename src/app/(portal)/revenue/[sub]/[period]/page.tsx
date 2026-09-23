@@ -10,6 +10,7 @@ import { salesByVenue, venueKey } from '@/lib/venues'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import { summariseOpenBill } from '@/lib/commission/open-bill-summary'
 import RunControls from './_components/RunControls'
+import SchemeSwitches from './_components/SchemeSwitches'
 import { loadFairsForMonth, loadOrganisers } from '../../_lib/venue-register'
 import VenueSection from './_components/VenueSection'
 import PersonSection from './_components/PersonSection'
@@ -17,7 +18,7 @@ import OpenBillSection from './_components/OpenBillSection'
 import MonthBreakdownTabs from './_components/MonthBreakdownTabs'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
-import { loadMonthOrders } from '../../_lib/month-orders'
+import { loadMonthOrders, loadOrderShares } from '../../_lib/month-orders'
 import { loadOpenBillPaid } from '../../_lib/open-bill'
 import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
@@ -151,7 +152,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const { data: scheme } = subDept.schemeId
     ? await supabase
         .from('comm_schemes')
-        .select('deposit_threshold_pct, enable_open_bill')
+        .select('deposit_threshold_pct, enable_open_bill, enable_kpi, enable_margin_penalty, enable_margin_incentive')
         .eq('id', subDept.schemeId)
         .maybeSingle()
     : { data: null }
@@ -223,14 +224,27 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     string,
     { key: string; staffId: string | null; name: string; orders: number; total: number; held: number }
   >()
+  // A shared bill is credited in parts (2026-09-24): the owner keeps what
+  // nobody else holds, each holder their share — the same parts the run pays.
+  const shares = await loadOrderShares(supabase, orders.map(o => o.orderId))
+  const sharesByOrder = new Map<string, typeof shares>()
+  for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
+  const credit = (key: string, staffId: string | null, name: string, value: number, held: boolean) => {
+    const e = bySalesperson.get(key) ?? { key, staffId, name, orders: 0, total: 0, held: 0 }
+    e.orders++
+    e.total += value
+    if (held) e.held += value
+    bySalesperson.set(key, e)
+  }
   for (const o of orders) {
     const key = o.staffId ?? `agent:${o.agentName}`
     const name = o.employeeName ?? `${o.agentName} (unmatched)`
-    const e = bySalesperson.get(key) ?? { key, staffId: o.staffId, name, orders: 0, total: 0, held: 0 }
-    e.orders++
-    e.total += o.orderTotal
-    if (!o.depositMet) e.held += o.orderTotal
-    bySalesperson.set(key, e)
+    const mine = o.staffId ? (sharesByOrder.get(o.orderId) ?? []) : []
+    const given = mine.reduce((a, sh) => a + Math.round(o.orderTotal * sh.pct * 100) / 100, 0)
+    credit(key, o.staffId, name, o.orderTotal - given, !o.depositMet)
+    for (const sh of mine) {
+      credit(sh.staffId, sh.staffId, sh.name, Math.round(o.orderTotal * sh.pct * 100) / 100, !o.depositMet)
+    }
   }
   const people = [...bySalesperson.values()].sort((a, b) => b.total - a.total)
 
@@ -445,6 +459,18 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                   warningCount={warnings.length}
                   hasImport={Boolean(batchRow)}
                 />
+
+                {subDept.schemeId && scheme ? (
+                  <SchemeSwitches
+                    schemeId={subDept.schemeId}
+                    openBill={Boolean((scheme as { enable_open_bill: boolean }).enable_open_bill)}
+                    margin={Boolean(
+                      (scheme as { enable_margin_penalty: boolean }).enable_margin_penalty ||
+                        (scheme as { enable_margin_incentive: boolean }).enable_margin_incentive,
+                    )}
+                    kpi={Boolean((scheme as { enable_kpi: boolean }).enable_kpi)}
+                  />
+                ) : null}
 
                 {warnings.length > 0 ? (
                   <div className="w-full border border-hairline rounded-card bg-surface p-4">
