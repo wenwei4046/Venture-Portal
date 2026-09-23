@@ -1,6 +1,7 @@
 "use client";
 
 import MemberLoginForm from "./MemberLoginForm";
+import LoginInstallCard from "@/components/pwa/LoginInstallCard";
 import s from "./MemberLogin.module.css";
 
 type LoginAction = (form: FormData) => Promise<{ error: string } | void>;
@@ -92,6 +93,7 @@ export default function MemberLoginScreen({
                 </svg>
               </a>
             )}
+            <LoginInstallCard />
             <p className={s.invitation}><strong>New to the team?</strong> Your HR team will help you get started.</p>
           </div>
         </section>

@@ -660,6 +660,22 @@ src/
 │   │                                  `lib/member/org-map-layout.ts`, on
 │   │                                  `member_org_map()`. Names, titles and
 │   │                                  reporting lines only.
+│   │                                  **INSTALLABLE (2026-09-23):** the whole
+│   │                                  portal is a PWA — ONE app, `start_url`
+│   │                                  `/` (which already routes member →
+│   │                                  /member, everybody else → /dashboard).
+│   │                                  `public/manifest.webmanifest` is linked BY
+│   │                                  HAND in the root layout's <head>: an
+│   │                                  `app/manifest.ts` gets streamed into
+│   │                                  <body> and Chrome then refuses to install.
+│   │                                  `public/sw.js` caches NOTHING but
+│   │                                  `offline.html` — every page is somebody's
+│   │                                  money, and a cached copy would outlive the
+│   │                                  session on a shared phone. Install entry
+│   │                                  points: login card, member Profile row,
+│   │                                  Principal Profile card (`components/pwa/`,
+│   │                                  `lib/pwa/install.ts`). Icons from
+│   │                                  `tools/generate-pwa-icons.mjs`.
 │   └── api/erp/v1/                 ← the ONLY machine endpoints: the Houzs ERP's two
 │                                      receivers — `sales-orders` (POST, live per-save)
 │                                      and `products` (POST, the SKU master + Combo

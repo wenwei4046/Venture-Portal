@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
+import PwaRegister from '@/components/pwa/PwaRegister'
 import './globals.css'
 
 // Typography — loaded via next/font for zero-CLS self-hosting.
@@ -44,7 +45,13 @@ export const metadata: Metadata = {
   description: 'Internal ledger for HOUZS Venture Sdn Bhd',
   // Added to home screen, the portal should open chromeless so the bottom tab
   // bar is the only bar on screen.
+  // It installs as an app too — public/manifest.webmanifest (linked in <head>
+  // below), public/sw.js, PwaRegister.
+  applicationName: 'HOUZS Venture',
   appleWebApp: { capable: true, title: 'Venture', statusBarStyle: 'default' },
+  // iOS turns long digit runs into phone links — an IC, an account number or
+  // an amount in a ledger is not a phone number.
+  formatDetection: { telephone: false },
 }
 
 // `viewportFit: 'cover'` is what makes env(safe-area-inset-bottom) resolve to
@@ -74,6 +81,13 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* The installable app (public/manifest.webmanifest — ONE app for
+            everybody: start_url `/` already sends a Revenue member to /member
+            and everyone else to /dashboard). Written here by hand, not as
+            app/manifest.ts: Next streams metadata links into <body> for
+            browsers, and Chrome only reads a manifest link from <head> — the
+            portal was not installable that way. Icons: tools/generate-pwa-icons.mjs. */}
+        <link rel="manifest" href="/manifest.webmanifest" />
         {/* Theme script — runs before paint to prevent FOUC */}
         <script
           dangerouslySetInnerHTML={{
@@ -88,6 +102,7 @@ export default function RootLayout({
           showSpinner={false}
           shadow="0 0 8px rgb(204 90 46 / 0.35)"
         />
+        <PwaRegister />
         {children}
       </body>
     </html>

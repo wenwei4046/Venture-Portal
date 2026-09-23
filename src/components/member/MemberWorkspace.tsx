@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import InstallSteps from "@/components/pwa/InstallSteps";
+import { useInstallApp } from "@/components/pwa/install-store";
 import { bandFor } from "@/lib/member/calculator";
 import MemberInsightPanel from "./MemberInsightPanel";
 import MemberOrgMap from "./MemberOrgMap";
@@ -294,6 +296,9 @@ export default function MemberWorkspace({
     [treeMode, setTreeMode] = useState(true),
     [teamSearch, setTeamSearch] = useState(""),
     [busyAck, setBusyAck] = useState(false);
+  // Profile › Install the app: a real prompt on Android, the Share steps on
+  // iOS, nothing once opened from the home screen (src/lib/pwa/install.ts).
+  const appInstall = useInstallApp();
   // Insight and the team map are fetched when their tab is first opened: a
   // department-wide board on every Today load would slow the page most people
   // open most often, for a number most of them are not looking at.
@@ -2141,6 +2146,35 @@ export default function MemberWorkspace({
               </div>
               <Icon name="chevron" size={16} />
             </button>
+            {(appInstall.path === "prompt" ||
+              appInstall.path === "ios" ||
+              appInstall.path === "in-app") && (
+              <button
+                className={s.listRow}
+                onClick={async () => {
+                  const path = appInstall.path;
+                  if (path === "ios" || path === "in-app") {
+                    setDialog({
+                      title: "Install the app",
+                      content: (
+                        <div className={s.stack}>
+                          <InstallSteps path={path} />
+                        </div>
+                      ),
+                    });
+                    return;
+                  }
+                  if ((await appInstall.install()) === "accepted")
+                    notify("Venture is on your home screen");
+                }}
+              >
+                <div className={s.listIcon}>
+                  <Icon name="install" />
+                  <span>Install the app</span>
+                </div>
+                <Icon name="chevron" size={16} />
+              </button>
+            )}
             <Link className={s.listRow} href="/login">
               <div className={s.listIcon}>
                 <Icon name="user" />

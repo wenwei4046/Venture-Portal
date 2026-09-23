@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en-MY">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fcfaf7">
+  <title>Offline · HOUZS Venture</title>
+  <style>
+    /* Self-contained: served by the service worker with no network, so no
+       stylesheet, font or script can be fetched. Colours mirror globals.css. */
+    :root { --surface: 252 250 247; --ink: 43 31 23; --graphite: 90 78 68; --hairline: 211 203 192; --button: 90 62 43; }
+    @media (prefers-color-scheme: dark) {
+      :root { --surface: 37 32 27; --ink: 234 226 217; --graphite: 166 152 138; --hairline: 68 59 50; --button: 204 90 46; }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      display: grid; place-items: center; min-height: 100dvh;
+      padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+      background: rgb(var(--surface)); color: rgb(var(--ink));
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    main { width: 100%; max-width: 360px; text-align: center; }
+    img { width: 64px; height: 64px; border-radius: 16px; }
+    h1 { margin: 22px 0 8px; font: 400 30px/1.2 Georgia, serif; letter-spacing: -.03em; }
+    p { margin: 0; color: rgb(var(--graphite)); font-size: 14px; }
+    button {
+      margin-top: 28px; width: 100%; min-height: 52px; border: 0; border-radius: 12px;
+      background: rgb(var(--button)); color: #fcfaf7; font: 500 15px/1 inherit; cursor: pointer;
+    }
+    small { display: block; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgb(var(--hairline)); color: rgb(var(--graphite)); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/icons/icon-192.png" alt="">
+    <h1>You're offline.</h1>
+    <p>HOUZS Venture needs a connection to show your figures. Check your Wi-Fi or mobile data, then try again.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+    <small>Nothing is stored on this phone — your data stays safe on the server.</small>
+  </main>
+  <script>
+    // Come back by itself the moment the signal returns.
+    window.addEventListener('online', function () { location.reload() })
+  </script>
+</body>
+</html>
