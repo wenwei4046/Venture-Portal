@@ -71,11 +71,13 @@ export function parseLineFacts(description2: string | null | undefined, raw?: un
     return fromVariants(variants as Record<string, unknown>)
   }
 
-  const d2 = (description2 ?? '').trim()
-  if (d2 === '') return { ...EMPTY, specials: [] }
+  const d2 = description2 ?? ''
+  if (d2.trim() === '') return { ...EMPTY, specials: [] }
 
   const out: LineFacts = { ...EMPTY, specials: [] }
   let hit = false
+  // Split BEFORE trimming, as the SQL does: a leading " / " leaves an empty
+  // first segment and a trailing one an empty last, never "30 /" as a seat.
   d2.split(/\s+\/\s+/).forEach((part, i) => {
     const seg = part.trim()
     let m: RegExpMatchArray | null

@@ -1,10 +1,11 @@
 /**
  * The portal's own prices, read the way the run reads them — the TypeScript
- * twins of `catalogue_grid_price`, `catalogue_unit_price`,
- * `catalogue_line_surcharge` and `catalogue_line_cost` (migration
- * 20260924030000). The member calculator costs a quote with these, the Product
- * List shows what a SKU would cost with these, and the SQL costs a sales line
- * with its twins; a test pins each against the same examples so a quote and a
+ * twins of `catalogue_grid_price`, `catalogue_unit_price` and
+ * `catalogue_line_surcharge` (migration 20260924030000); the twin of
+ * `catalogue_line_cost` + `catalogue_apply_combos` built from them is the
+ * member calculator's `costLines` (lib/member/calculator.ts). The Product List
+ * shows what a SKU would cost with these, and the SQL costs a sales line with
+ * its twins; tests pin each against the same examples so a quote and a
  * payslip cannot disagree about what a sofa cost.
  *
  * THE RULE (user 2026-09-24): every margin is measured against the price keyed
@@ -30,7 +31,11 @@ export interface SkuPrice {
   grid: PriceCell[] | null
 }
 
-/** Only well-formed cells, never a negative or non-finite price. */
+/**
+ * Only well-formed cells, never a negative or non-finite price — and a price
+ * written as text must be a plain decimal (`^\d+(\.\d+)?$`, the SQL's own
+ * test): a blank is NO price, never RM 0 (a zero cost reads as a 100% margin).
+ */
 export function priceGridOf(raw: unknown): PriceCell[] {
   if (!Array.isArray(raw)) return []
   const out: PriceCell[] = []
@@ -39,8 +44,13 @@ export function priceGridOf(raw: unknown): PriceCell[] {
     const c = cell as Record<string, unknown>
     const height = typeof c.height === 'string' ? c.height.trim() : ''
     const tier = typeof c.tier === 'string' ? c.tier.trim() : ''
-    const value = typeof c.price === 'string' ? Number(c.price) : c.price
-    if (!height || !tier || typeof value !== 'number' || !Number.isFinite(value) || value < 0) continue
+    const value =
+      typeof c.price === 'number'
+        ? c.price
+        : typeof c.price === 'string' && /^\d+(\.\d+)?$/.test(c.price)
+          ? Number(c.price)
+          : NaN
+    if (!height || !tier || !Number.isFinite(value) || value < 0) continue
     out.push({ height, tier, price: value })
   }
   return out
@@ -194,7 +204,15 @@ export function lineSurcharge(
   return { amount, parts }
 }
 
-/** Money to the cent, the way the SQL's ROUND(…, 2) lands it. */
+/**
+ * Money to the cent, the way the SQL's ROUND(…, 2) lands it: half away from
+ * zero, on the DECIMAL the number prints as — 10.075 rounds to 10.08 though
+ * its binary double is a hair below, and -1.005 to -1.01.
+ */
 export function roundCents(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100
+  if (!Number.isFinite(n)) return n
+  const sign = n < 0 ? -1 : 1
+  const shifted = Number(`${Math.abs(n)}e2`)
+  const cents = Math.round(Number.isFinite(shifted) ? shifted : Math.abs(n) * 100)
+  return cents === 0 ? 0 : (sign * cents) / 100
 }

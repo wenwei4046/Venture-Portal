@@ -49,17 +49,37 @@ export function stripMoney(row: Row): Row {
   return out
 }
 
+/**
+ * A flag as Postgres reads `(x->>'active')::BOOLEAN` in the ingest: `false`,
+ * `'f'`, `'false'`, `'no'`, `'off'`, `'0'` or `0` are off; anything else,
+ * absent included, is on.
+ */
+function flagOn(v: unknown): boolean {
+  if (v === false || v === 0) return false
+  if (typeof v === 'string') return !['f', 'false', 'n', 'no', 'off', '0'].includes(v.trim().toLowerCase())
+  return true
+}
+
+/** A value as text: the ERP writes most as strings, a seat height sometimes as a number. */
+function valueText(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
+}
+
 /** A Maintenance pool entry keeps its value and its active flag, nothing else. */
 function poolEntry(entry: unknown): { value: string; active: boolean } | null {
-  if (typeof entry === 'string') {
-    const v = entry.trim()
+  if (!isRow(entry)) {
+    const v = valueText(entry)
     return v ? { value: v, active: true } : null
   }
-  if (isRow(entry) && typeof entry.value === 'string' && entry.value.trim()) {
-    return { value: entry.value.trim(), active: entry.active !== false }
-  }
-  return null
+  const v = valueText(entry.value)
+  return v ? { value: v, active: flagOn(entry.active) } : null
 }
+
+/** A fabric's stock and usage (in its own `_sen` units) never cross either — the ingest drops them too. */
+const FABRIC_STOCK_KEYS = new Set([
+  'soh_sen', 'po_outstanding_sen', 'last_month_usage_sen', 'one_week_usage_sen',
+  'two_weeks_usage_sen', 'one_month_usage_sen', 'shortage_sen', 'reorder_point_sen',
+])
 
 /** The ERP's config keys the portal mirrors — Bedframe and Sofa, not "Products Maintenance". */
 export const MAINTENANCE_POOL_KEYS = [
@@ -96,7 +116,8 @@ export function parseCatalogueDelivery(body: unknown): CatalogueParseResult {
   if (!isRow(body)) return { ok: false, error: 'delivery must be an object' }
 
   const companyRaw = body.companyId ?? body.company_id ?? 1
-  const companyId = Number(companyRaw)
+  const companyId =
+    typeof companyRaw === 'number' ? companyRaw : typeof companyRaw === 'string' && /^\d+$/.test(companyRaw.trim()) ? Number(companyRaw) : NaN
   if (!Number.isInteger(companyId) || companyId < 1) {
     return { ok: false, error: 'companyId must be a positive integer' }
   }
@@ -114,7 +135,10 @@ export function parseCatalogueDelivery(body: unknown): CatalogueParseResult {
     const raw = body[section]
     if (raw === undefined || raw === null) continue
     if (!Array.isArray(raw)) return { ok: false, error: `${section} must be an array` }
-    const rows = raw.filter(isRow).map(stripMoney)
+    const rows = raw
+      .filter(isRow)
+      .map(stripMoney)
+      .map(r => (section === 'fabrics' ? Object.fromEntries(Object.entries(r).filter(([k]) => !FABRIC_STOCK_KEYS.has(k))) : r))
     counts.sent[section] = raw.length
     counts.unreadable += raw.length - rows.length
     total += raw.length

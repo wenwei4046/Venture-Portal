@@ -48,9 +48,9 @@ export function optionKeysOf(category: string | null): OptionKey[] {
   if (c === 'BEDFRAME') {
     return [
       { key: 'divan_heights', pool: 'bedframe_divan_heights', label: 'Divan height', priced: true },
-      { key: 'leg_heights', pool: 'bedframe_leg_heights', label: 'Leg height', priced: true },
       { key: 'total_heights', pool: 'bedframe_total_heights', label: 'Total height', priced: true },
       { key: 'gaps', pool: 'bedframe_gaps', label: 'Gap', priced: false },
+      { key: 'leg_heights', pool: 'bedframe_leg_heights', label: 'Leg height', priced: true },
       { key: 'specials', pool: 'bedframe_specials', label: 'Specials', priced: true },
     ]
   }
@@ -100,7 +100,7 @@ export function allowedValues(allowed: unknown, key: string): string[] {
 
 /** The calculator's section for a model — `catalogue_calc_category` in TypeScript. */
 export function calcCategoryOf(category: string | null, name: string | null): string {
-  const c = (category ?? '').toUpperCase()
+  const c = (category ?? '').trim().toUpperCase()
   const n = name ?? ''
   if (c === 'MATTRESS') return 'Mattress'
   if (c === 'BEDFRAME') return 'Bed frame'
@@ -135,10 +135,11 @@ const SIZE_WORDS: Record<string, string> = {
   SP: 'Special size',
 }
 
+/** The TypeScript twin of `catalogue_size_word` (migration 20260924040000): a blank label falls back to the code. */
 export function sizeWordOf(sizeCode: string | null, sizeLabel: string | null): string {
   const code = (sizeCode ?? '').trim().toUpperCase()
   if (code && SIZE_WORDS[code]) return SIZE_WORDS[code]
-  return (sizeLabel ?? sizeCode ?? '').trim()
+  return (sizeLabel ?? '').trim() || (sizeCode ?? '').trim()
 }
 
 /** The one label a SKU carries under its model: its module, its size, or its code. */

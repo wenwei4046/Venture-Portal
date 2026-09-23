@@ -9,7 +9,7 @@
  * as zero: a zero here would be a margin of 100%.
  */
 
-import { heightKey } from './keys'
+import { heightKey, valueKey } from './keys'
 import { TIERS, type PriceCell } from './pricing'
 
 export class EditError extends Error {}
@@ -23,7 +23,8 @@ export function parseMoney(raw: string | number | null | undefined, what: string
   const n = Number(s)
   if (!Number.isFinite(n) || Math.abs(n) > 99_999_999) throw new EditError(`${what}: "${raw}" is out of range`)
   if (n < 0 && !allowNegative) throw new EditError(`${what}: a price cannot be negative`)
-  return Math.round(n * 100) / 100
+  const rounded = Math.round(n * 100) / 100
+  return rounded === 0 ? 0 : rounded
 }
 
 export interface SkuPriceEdit {
@@ -100,7 +101,14 @@ export function validateModelEdit(e: ModelEdit): {
   for (const [key, values] of Object.entries(e.enabled ?? {})) {
     if (!OPTION_KEYS.has(key)) throw new EditError(`Unknown option list "${key}"`)
     if (!Array.isArray(values)) throw new EditError(`${key} must be a list`)
-    const clean = [...new Set(values.map(v => String(v).trim()).filter(v => v && v.length <= 80))]
+    const clean = [
+      ...new Set(
+        values
+          .filter(v => v !== null && v !== undefined)
+          .map(v => String(v).trim())
+          .filter(v => v && v.length <= 80),
+      ),
+    ]
     enabled[key] = clean
   }
   const calc = e.calcCategory ? String(e.calcCategory) : null
@@ -138,9 +146,13 @@ export function validateOptionPrices(pool: string, edits: readonly OptionPriceEd
   if (pool === 'bedframe_gaps' || pool === 'sofa_sizes') throw new EditError('That list carries no price')
   const upserts: Array<{ pool: string; value: string; price: number }> = []
   const clears: string[] = []
+  const seen = new Set<string>()
   for (const e of edits) {
     const value = String(e?.value ?? '').trim()
     if (!value) throw new EditError('An option names no value')
+    const k = valueKey(value)!
+    if (seen.has(k)) throw new EditError(`${value} appears twice`)
+    seen.add(k)
     const price = parseMoney(e.price, value, true)
     if (price === null) clears.push(value)
     else upserts.push({ pool, value, price })
@@ -163,18 +175,27 @@ export function validateComboPrices(edits: readonly ComboPriceEdit[]): Array<{
 }> {
   if (!Array.isArray(edits) || edits.length === 0) throw new EditError('Nothing to save')
   return edits.map(e => {
-    const baseModel = String(e?.baseModel ?? '').trim()
+    // The mirror stores a combo's base model upper-cased, and the price is
+    // joined to it exactly.
+    const baseModel = String(e?.baseModel ?? '').trim().toUpperCase()
     const slotsKey = String(e?.slotsKey ?? '').trim()
     if (!baseModel || !slotsKey.startsWith('[')) throw new EditError('A combo row is incomplete')
     const tier = e.tier ? String(e.tier).toUpperCase() : ''
     if (tier !== '' && !(TIERS as readonly string[]).includes(tier)) throw new EditError(`Unknown tier ${e.tier}`)
     const out: Record<string, number> = {}
+    const heights = new Set<string>()
     const prices: Record<string, string | null> = e.prices ?? {}
     for (const [h, raw] of Object.entries(prices)) {
       const height = h.trim()
       if (!height || height.length > 20) continue
       const p = parseMoney(raw, `${baseModel} at ${height}`)
-      if (p !== null) out[height] = p
+      if (p === null) continue
+      // `30` and `30"` are one seat height; two prices for it would leave the
+      // run to pick one.
+      const k = heightKey(height)!
+      if (heights.has(k)) throw new EditError(`${baseModel}: two prices for seat height ${height}`)
+      heights.add(k)
+      out[height] = p
     }
     return { base_model: baseModel, slots_key: slotsKey, tier, price_by_height: out }
   })

@@ -106,12 +106,23 @@ $fn$;
 
 -- An option value as the ERP's summary prints it (`LEG DEFAULT`, `NO LEG`,
 -- `DIVAN 10”`) against the pool's own spelling (`Default`, `No Leg`, `10"`).
+-- Whitespace is folded BEFORE the trim, so a tab or a newline at either end
+-- goes too (BTRIM alone trims only spaces) — the TypeScript twin's trim().
 CREATE OR REPLACE FUNCTION catalogue_value_key(p TEXT)
 RETURNS TEXT
 LANGUAGE sql
 IMMUTABLE
 AS $fn$
-    SELECT NULLIF(LOWER(REGEXP_REPLACE(REGEXP_REPLACE(BTRIM(COALESCE(p, '')), '[”“]', '"', 'g'), '\s+', ' ', 'g')), '');
+    SELECT NULLIF(LOWER(BTRIM(REGEXP_REPLACE(REGEXP_REPLACE(COALESCE(p, ''), '[”“]', '"', 'g'), '\s+', ' ', 'g'))), '');
+$fn$;
+
+-- The same for a product code (20260924020000 §12 trimmed spaces only).
+CREATE OR REPLACE FUNCTION catalogue_code_key(p_code TEXT)
+RETURNS TEXT
+LANGUAGE sql
+IMMUTABLE
+AS $fn$
+    SELECT UPPER(BTRIM(REGEXP_REPLACE(COALESCE(p_code, ''), '\s+', ' ', 'g')));
 $fn$;
 
 -- ── 3. What the line says it is ─────────────────────────────────────────────
@@ -136,9 +147,10 @@ BEGIN
     specials := '{}';
 
     IF v IS NOT NULL THEN
-        fabric := NULLIF(BTRIM(COALESCE(v->>'fabricCode', v->>'fabricColor', '')), '');
-        seat   := NULLIF(BTRIM(COALESCE(v->>'seatHeight', v->>'depth', '')), '');
-        leg    := NULLIF(BTRIM(COALESCE(v->>'legHeight', v->>'sofaLegHeight', '')), '');
+        -- A blank key falls through to its alternative, as a missing one does.
+        fabric := COALESCE(NULLIF(BTRIM(v->>'fabricCode'), ''), NULLIF(BTRIM(v->>'fabricColor'), ''));
+        seat   := COALESCE(NULLIF(BTRIM(v->>'seatHeight'), ''), NULLIF(BTRIM(v->>'depth'), ''));
+        leg    := COALESCE(NULLIF(BTRIM(v->>'legHeight'), ''), NULLIF(BTRIM(v->>'sofaLegHeight'), ''));
         divan  := NULLIF(BTRIM(COALESCE(v->>'divanHeight', '')), '');
         gap    := NULLIF(BTRIM(COALESCE(v->>'gap', '')), '');
         total  := NULLIF(BTRIM(COALESCE(v->>'totalHeight', '')), '');
@@ -255,13 +267,14 @@ RETURNS NUMERIC
 LANGUAGE sql
 IMMUTABLE
 AS $fn$
+    -- NULLS LAST: a cell with no tier must never outrank one that has it.
     SELECT (c->>'price')::NUMERIC
       FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_grid) = 'array' THEN p_grid ELSE '[]'::JSONB END) c
      WHERE catalogue_height_key(c->>'height') = catalogue_height_key(p_height)
        AND (c->>'price') ~ '^\d+(\.\d+)?$'
-     ORDER BY (c->>'tier' = COALESCE(p_tier, 'PRICE_2')) DESC,
-              (c->>'tier' = 'PRICE_2') DESC,
-              c->>'tier'
+     ORDER BY (c->>'tier' = COALESCE(p_tier, 'PRICE_2')) DESC NULLS LAST,
+              (c->>'tier' = 'PRICE_2') DESC NULLS LAST,
+              c->>'tier' NULLS LAST
      LIMIT 1;
 $fn$;
 
@@ -468,84 +481,107 @@ COMMENT ON FUNCTION catalogue_line_cost(BIGINT, TEXT, TEXT, TEXT, JSONB, NUMERIC
     'One sales line at the portal''s prices: (unit price at its seat height and fabric tier + each option''s surcharge) × qty. cost NULL = nothing could price it; detail says why (reason) or how (how, height, tier, options).';
 
 -- ── 10. Does a build cover a combo's slots? ─────────────────────────────────
--- SUBSET coverage, as the ERP's matchComboSubset: every slot filled by a
--- DISTINCT built module whose code is in that slot's OR-set; extras allowed.
--- Returns the 1-based indices of the modules consumed, ascending, or NULL.
--- An exhaustive search in slot order (a slot that CAN be covered always is),
--- trying modules in build order — the same first choice the ERP's Kuhn pass
--- makes. Builds are a handful of modules; this is cheap.
+-- SUBSET coverage, as the ERP's matchComboSubset (scm/shared/
+-- sofa-combo-pricing.ts): every slot filled by a DISTINCT built module whose
+-- code is in that slot's OR-set; extras allowed. Returns the 1-based indices
+-- of the modules consumed, ascending, or NULL.
+--
+-- The ERP's algorithm line for line — Kuhn's augmenting-path matching,
+-- oriented slot → module, slots in order, each trying modules in build order —
+-- with its recursion as an explicit stack. Where the OR-sets overlap it moves
+-- an earlier slot to another module to free one for a later slot, so WHICH
+-- modules the combo consumes (and which stay extras at their own price) is the
+-- ERP's choice exactly. An empty slot is dropped, as the ERP's normaliser
+-- drops it. The TypeScript twin is matchComboSlots (lib/catalogue/combos.ts).
 CREATE OR REPLACE FUNCTION catalogue_match_slots(p_built TEXT[], p_slots JSONB)
 RETURNS INTEGER[]
 LANGUAGE plpgsql
 IMMUTABLE
 AS $fn$
 DECLARE
-    n       INTEGER := CASE WHEN jsonb_typeof(p_slots) = 'array' THEN jsonb_array_length(p_slots) ELSE 0 END;
-    m       INTEGER := COALESCE(array_length(p_built, 1), 0);
-    cand    JSONB := '[]'::JSONB;
-    slot    JSONB;
-    codes   TEXT[];
-    opts    INTEGER[];
-    pos     INTEGER[];
-    chosen  INTEGER[];
-    used    BOOLEAN[];
-    j       INTEGER;
-    k       INTEGER;
-    idx     INTEGER;
-    found   BOOLEAN;
+    m         INTEGER := COALESCE(array_length(p_built, 1), 0);
+    cand      JSONB := '[]'::JSONB;   -- per slot: the built indices that can fill it, in build order
+    slot      JSONB;
+    codes     TEXT[];
+    opts      INTEGER[];
+    n         INTEGER;
+    mod_slot  INTEGER[];              -- per built module: the slot it fills (1-based), 0 = free
+    seen      BOOLEAN[];
+    st_slot   INTEGER[];              -- the search stack: a slot, how far through its
+    st_k      INTEGER[];              -- candidates it is, and the module it is trying
+    st_mod    INTEGER[];
+    depth     INTEGER;
+    j         INTEGER;
+    k         INTEGER;
+    i         INTEGER;
+    f         INTEGER;
+    ok        BOOLEAN;
 BEGIN
-    IF n = 0 OR m < n THEN
+    IF p_slots IS NULL OR jsonb_typeof(p_slots) <> 'array' THEN
         RETURN NULL;
     END IF;
 
-    FOR j IN 0 .. n - 1 LOOP
-        slot  := p_slots->j;
+    FOR slot IN SELECT e FROM jsonb_array_elements(p_slots) e LOOP
         codes := CASE WHEN jsonb_typeof(slot) = 'array'
                       THEN ARRAY(SELECT BTRIM(x) FROM jsonb_array_elements_text(slot) x WHERE BTRIM(x) <> '')
-                      ELSE ARRAY[BTRIM(slot #>> '{}')] END;
-        opts  := ARRAY(SELECT i FROM generate_subscripts(p_built, 1) i
-                        WHERE BTRIM(COALESCE(p_built[i], '')) = ANY (codes)
-                        ORDER BY i);
+                      ELSE ARRAY(SELECT BTRIM(slot #>> '{}') WHERE BTRIM(COALESCE(slot #>> '{}', '')) <> '') END;
+        CONTINUE WHEN COALESCE(array_length(codes, 1), 0) = 0;
+        opts := ARRAY(SELECT x FROM generate_subscripts(p_built, 1) x
+                       WHERE BTRIM(COALESCE(p_built[x], '')) <> ''
+                         AND BTRIM(p_built[x]) = ANY (codes)
+                       ORDER BY x);
         IF COALESCE(array_length(opts, 1), 0) = 0 THEN
             RETURN NULL;
         END IF;
         cand := cand || jsonb_build_array(to_jsonb(opts));
     END LOOP;
 
-    pos    := array_fill(0, ARRAY[n]);
-    chosen := array_fill(0, ARRAY[n]);
-    used   := array_fill(FALSE, ARRAY[m]);
-    j := 1;
-    WHILE j BETWEEN 1 AND n LOOP
-        IF chosen[j] > 0 THEN
-            used[chosen[j]] := FALSE;
-            chosen[j] := 0;
-        END IF;
-        found := FALSE;
-        k := pos[j] + 1;
-        WHILE k <= jsonb_array_length(cand->(j - 1)) LOOP
-            idx := (cand->(j - 1)->>(k - 1))::INTEGER;
-            IF NOT used[idx] THEN
-                used[idx]  := TRUE;
-                chosen[j]  := idx;
-                pos[j]     := k;
-                found      := TRUE;
+    n := jsonb_array_length(cand);
+    IF n = 0 OR m < n THEN
+        RETURN NULL;
+    END IF;
+
+    mod_slot := array_fill(0, ARRAY[m]);
+    FOR j IN 1 .. n LOOP
+        -- One augmenting path from slot j: the ERP's recursive assignSlot.
+        seen    := array_fill(FALSE, ARRAY[m]);
+        st_slot := ARRAY[j];
+        st_k    := ARRAY[0];
+        st_mod  := ARRAY[0];
+        depth   := 1;
+        ok      := FALSE;
+        WHILE depth > 0 LOOP
+            k := st_k[depth] + 1;
+            IF k > jsonb_array_length(cand->(st_slot[depth] - 1)) THEN
+                -- This slot found nothing; the slot below tries its next module.
+                depth := depth - 1;
+                CONTINUE;
+            END IF;
+            st_k[depth] := k;
+            i := (cand->(st_slot[depth] - 1)->>(k - 1))::INTEGER;
+            CONTINUE WHEN seen[i];
+            seen[i] := TRUE;
+            st_mod[depth] := i;
+            IF mod_slot[i] = 0 THEN
+                -- A free module: every slot on the path takes the one it was trying.
+                FOR f IN 1 .. depth LOOP
+                    mod_slot[st_mod[f]] := st_slot[f];
+                END LOOP;
+                ok := TRUE;
                 EXIT;
             END IF;
-            k := k + 1;
+            -- Taken: ask the slot holding it to move.
+            depth := depth + 1;
+            st_slot[depth] := mod_slot[i];
+            st_k[depth]    := 0;
+            st_mod[depth]  := 0;
         END LOOP;
-        IF found THEN
-            j := j + 1;
-        ELSE
-            pos[j] := 0;
-            j := j - 1;
+        IF NOT ok THEN
+            RETURN NULL;
         END IF;
     END LOOP;
 
-    IF j <= n THEN
-        RETURN NULL;
-    END IF;
-    RETURN ARRAY(SELECT x FROM unnest(chosen) x ORDER BY x);
+    RETURN ARRAY(SELECT x FROM generate_subscripts(mod_slot, 1) x WHERE mod_slot[x] > 0 ORDER BY x);
 END;
 $fn$;
 
@@ -625,10 +661,12 @@ BEGIN
         SELECT x.* INTO c
           FROM (SELECT sc.erp_id, sc.label, sc.tier, sc.effective_from, sc.erp_created_at,
                        catalogue_match_slots(g.mods, sc.modules) AS matched,
+                       -- A usable price at the build's height: a zero or a
+                       -- word under another spelling of it never hides one.
                        (SELECT kv.value::NUMERIC
                           FROM jsonb_each_text(cp.price_by_height) kv
                          WHERE catalogue_height_key(kv.key) = g.height_key
-                           AND kv.value ~ '^\d+(\.\d+)?$'
+                           AND CASE WHEN kv.value ~ '^\d+(\.\d+)?$' THEN kv.value::NUMERIC > 0 ELSE FALSE END
                          LIMIT 1) AS price
                   FROM erp_sofa_combos sc
                   JOIN catalogue_combo_prices cp
@@ -1419,5 +1457,6 @@ NOTIFY pgrst, 'reload schema';
 -- DROP FUNCTION IF EXISTS catalogue_line_facts(TEXT, JSONB);
 -- DROP FUNCTION IF EXISTS catalogue_value_key(TEXT);
 -- DROP FUNCTION IF EXISTS catalogue_height_key(TEXT);
+-- (catalogue_code_key: re-run its 20260924020000 definition — the adoption uses it)
 -- ALTER TABLE sales_order_lines DROP COLUMN IF EXISTS list_cost_amount, DROP COLUMN IF EXISTS cost_detail;
 -- (the dropped erp_* money columns held nothing; re-add them only with 20260919010000)

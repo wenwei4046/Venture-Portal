@@ -49,65 +49,64 @@ export function normaliseComboModules(raw: unknown): ComboSlots {
 }
 
 /**
- * Order-independent key for a slot-set — sort within each slot, sort the
- * slots, stringify. Must agree with the ERP's `comboSlotsKey` and the SQL's
- * `erp_combo_slots_key()`, because it is half of the key the portal's combo
- * price is stored under.
+ * The key the PORTAL stores a combo's price under — the text of the SQL's
+ * `erp_combo_slots_key()` (migration 20260919010000), which is what
+ * `erp_sofa_combos.slots_key` and `catalogue_combo_prices.slots_key` hold:
+ * codes sorted inside each slot, slots ordered by their JSON text, printed the
+ * way jsonb prints (`", "` between elements). Not the ERP's own
+ * `comboSlotsKey` (plain JSON.stringify, slots by joined codes), which names
+ * the same combo differently.
+ *
+ * Code order follows JavaScript's comparison; the database orders by its
+ * collation, which can differ for mixed-case codes — so a price is always
+ * found by JOINING on the stored key, never by recomputing it here.
  */
 export function comboSlotsKey(raw: unknown): string {
-  const slots = normaliseComboModules(raw)
-    .map(slot => [...slot].sort())
-    .sort((a, b) => (a.join('') < b.join('') ? -1 : a.join('') > b.join('') ? 1 : 0))
-  return JSON.stringify(slots)
+  const slotText = (slot: string[]) => `[${[...slot].sort().map(c => JSON.stringify(c)).join(', ')}]`
+  const slots = normaliseComboModules(raw).map(slotText)
+  slots.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  return `[${slots.join(', ')}]`
 }
 
 /**
  * Which built modules cover the combo's slots — 0-based indices into `built`,
- * ascending — or null when a slot cannot be filled. An exhaustive search in
- * slot order trying modules in build order, so a slot that CAN be covered
- * always is (the ERP uses Kuhn's matching for the same guarantee), and the
- * first choice is the same one the SQL twin makes.
+ * ascending — or null when a slot cannot be filled. The ERP's
+ * `matchComboSubset` (scm/shared/sofa-combo-pricing.ts), line for line:
+ * Kuhn's augmenting-path matching oriented slot → module, slots in order,
+ * each trying modules in build order. Where the OR-sets overlap it can move an
+ * earlier slot to another module to free one for a later slot, so WHICH
+ * modules the combo consumes — and so which stay extras at their own price —
+ * is the ERP's choice exactly. The SQL twin is `catalogue_match_slots`.
  */
 export function matchComboSlots(built: readonly string[], rawSlots: unknown): number[] | null {
   const slots = normaliseComboModules(rawSlots)
   const mods = built.map(m => m.trim())
   if (slots.length === 0 || mods.length < slots.length) return null
 
-  const cand = slots.map(slot => {
+  const canTake = slots.map(slot => {
     const set = new Set(slot)
     return mods.map((_m, i) => i).filter(i => mods[i] !== '' && set.has(mods[i]))
   })
-  if (cand.some(c => c.length === 0)) return null
+  if (canTake.some(c => c.length === 0)) return null
 
-  const used = new Array<boolean>(mods.length).fill(false)
-  const chosen = new Array<number>(slots.length).fill(-1)
-  const pos = new Array<number>(slots.length).fill(-1)
-  let j = 0
-  while (j >= 0 && j < slots.length) {
-    if (chosen[j] !== -1) {
-      used[chosen[j]] = false
-      chosen[j] = -1
-    }
-    let found = false
-    for (let k = pos[j] + 1; k < cand[j].length; k++) {
-      const i = cand[j][k]
-      if (!used[i]) {
-        used[i] = true
-        chosen[j] = i
-        pos[j] = k
-        found = true
-        break
+  const modToSlot = new Array<number>(mods.length).fill(-1)
+  const assignSlot = (j: number, seen: boolean[]): boolean => {
+    for (const i of canTake[j]) {
+      if (seen[i]) continue
+      seen[i] = true
+      if (modToSlot[i] === -1 || assignSlot(modToSlot[i], seen)) {
+        modToSlot[i] = j
+        return true
       }
     }
-    if (found) {
-      j++
-    } else {
-      pos[j] = -1
-      j--
-    }
+    return false
   }
-  if (j < slots.length) return null
-  return [...chosen].sort((a, b) => a - b)
+  for (let j = 0; j < slots.length; j++) {
+    if (!assignSlot(j, new Array<boolean>(mods.length).fill(false))) return null
+  }
+  const subset: number[] = []
+  for (let i = 0; i < mods.length; i++) if (modToSlot[i] !== -1) subset.push(i)
+  return subset
 }
 
 /** A combo the ERP defines, with the portal's price per seat height. */
@@ -147,6 +146,10 @@ function priceAt(combo: PricedCombo, height: string): number | null {
  * and that the portal priced at this seat height. A tier-specific combo beats
  * an any-tier one; then the newest effective row, the newest created, the id —
  * the ERP's own tie-breaks.
+ *
+ * `asOf` (an ISO date) drops combos not yet in effect. Without it nothing is
+ * dropped — the SQL twin and the ERP default to today, and so does the one
+ * caller that matters: `member_catalogue` answers only combos in effect today.
  */
 export function pickCombo(
   build: { baseModel: string; modules: readonly string[]; height: string; tier: string },
@@ -187,11 +190,13 @@ export function spreadComboTotal(ownCents: readonly number[], totalCents: number
   const n = ownCents.length
   if (n === 0) return []
   const total = Math.max(0, Math.round(totalCents))
-  const weights = ownCents.map(c => Math.max(0, Math.round(c)))
+  const raw = ownCents.map(c => Math.round(c))
+  const weights = raw.map(c => Math.max(0, c))
   const sum = weights.reduce((a, b) => a + b, 0)
   const out = sum <= 0 ? weights.map(() => Math.floor(total / n)) : weights.map(w => Math.floor((w * total) / sum))
+  // The dearest line by its RAW cost, as the ERP and the SQL twin pick it.
   let target = 0
-  for (let i = 1; i < n; i++) if (weights[i] > weights[target]) target = i
+  for (let i = 1; i < n; i++) if (raw[i] > raw[target]) target = i
   out[target] += total - out.reduce((a, b) => a + b, 0)
   return out
 }
