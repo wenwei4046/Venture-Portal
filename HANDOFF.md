@@ -3,7 +3,7 @@
 ## ACTIVE CHECKPOINT 2026-09-24 (done) — ERP catalogue mirror, items only; every margin at the portal's own prices
 
 Branch `feat/erp-catalogue-mirror` (worktree `.claude/worktrees/sku-master-mirror`),
-PR → see `gh pr list`; ERP side **Houzs-Century/Houzs-ERP#4248** (branch
+**VP PR #147**; ERP side **Houzs-Century/Houzs-ERP#4248** (branch
 `feat/vp-catalogue-push`, worktree `C:\Users\wenwe\houzs-erp-vp-catalogue`).
 Both OPEN, not merged.
 
@@ -42,6 +42,7 @@ to the calculator, 248 models offered, **0 option surcharges, 0 combo prices**.
 - Twin audit: TS vs SQL run side by side (PGlite); combo slot matching is now the ERP's Kuhn algorithm in BOTH twins; blank price string ≠ RM 0; see commit 9bcde03.
 
 ### Known limits (tell the user, don't "fix" silently)
+- `npm run verify:worker` fails its yoga-wasm assertion in a Windows worktree with a junctioned node_modules — identically on a clean origin/main (checked 2026-09-24), so it is the environment; production runs on Vercel.
 - Hand-typed AutoCount-era `description2` (most of August: `Col:PC151-15/Divan:8+2”leg/Gap:10”`) parses to nothing → such bed frames get their SKU price only, no option surcharge. ERP-written lines parse (150 bed frame + 95 sofa lines today) and new lines carry `variants`.
 - No Fair staff has a login yet → the member snapshot can only be exercised as the Principal (Revenue View) on prod.
 - Seat heights offered = the portal's grid heights ∩ the model's ticked `sizes`; the ERP's allowed sizes are NOT intersected for seat heights (the old lists priced 60cm/75cm on some models the ERP lists as 24–35).
