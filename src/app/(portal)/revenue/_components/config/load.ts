@@ -9,7 +9,6 @@ import type {
   CommissionSettingsData,
   DirectorRow,
   MemberCandidate,
-  ProductRow,
   RankDefRow,
   RankRow,
   SalespersonRow,
@@ -360,35 +359,5 @@ export async function loadTeam(
     candidates,
     directors,
     directorCandidates,
-  }
-}
-
-export async function loadProducts(): Promise<ProductRow[]> {
-  const supabase = await untyped()
-  // PAGED, because PostgREST caps a response at 1,000 rows and says nothing
-  // about it. This table holds 1,553 and the page printed "1000 PRODUCTS" over
-  // it — the same silent truncation that made Open Bill pay RM 0 on a 507-id
-  // `.in()`. Ask for one more than a page and stop when a page comes back
-  // short.
-  const PAGE = 1000
-  const out: ProductRow[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from('comm_products')
-      .select(
-        'id, item_code, erp_item_code, product_name, brand_code, item_group, unit_cost, cost_grid, is_active, updated_at',
-      )
-      .order('item_code')
-      .range(from, from + PAGE - 1)
-    if (error) throw new Error(error.message)
-    const page = rows<ProductRow>(data)
-    out.push(
-      ...page.map(p => ({
-        ...p,
-        unit_cost: p.unit_cost === null ? null : Number(p.unit_cost),
-        cost_grid: Array.isArray(p.cost_grid) ? p.cost_grid : null,
-      })),
-    )
-    if (page.length < PAGE) return out
   }
 }

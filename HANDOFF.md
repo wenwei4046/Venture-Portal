@@ -1,5 +1,108 @@
 # HOUZS Venture Portal — Session Handoff
 
+## ACTIVE CHECKPOINT 2026-09-24 — ERP catalogue mirror (items only) + the portal's own prices
+
+Branch `feat/erp-catalogue-mirror`, worktree `.claude/worktrees/sku-master-mirror`
+(from `43689bb`). **WIP, not pushed, no PR yet.** Read this first.
+
+### What the user asked (2026-09-24)
+Mirror the Houzs ERP Products page into Revenue › Product List, synced by API:
+1. **Items only** — no price/cost ever syncs. Prices are typed in VP; every VP
+   margin (calculator, run, drill-downs) is measured against VP's prices.
+   ERP adds an item → VP adds it; ERP price changes never reach VP.
+2. **SKU Master** — every item. 3. **Modular** — models + ERP allowed options,
+   mirrored exactly; VP's OWN ticks gate the Revenue calculator's dropdowns
+   (10 SKUs in ERP, 7 ticked in VP → calculator offers 7).
+4. **Maintenance** — Bedframe (divan/total/gaps/leg/specials), Sofa
+   (sizes/leg/specials), Fabrics. NOT "Products Maintenance".
+5. **Sofa Combo** — synced; price per seat height is VP's.
+Not wanted: Variants, Fabric Converter, Categories.
+
+### ERP facts (read from code + prod DB `anogrigyjbduyzclzjgn`, read-only via claude.ai Supabase MCP)
+SKU master `scm.mfg_products` (co.1: 2,350) · Modular `scm.product_models` +
+`allowed_options` (co.1: 703) · Maintenance pools in
+`scm.maintenance_config_history` JSON (master scope, latest effective) + specials
+in `scm.special_addons` (co.1: 35) · Fabrics `scm.fabric_trackings` (co.1: 950,
+859 active) · Combos `scm.sofa_combo_pricing` master rows (co.1: 97, 76 live).
+ERP costs a sofa set by spreading the matched master combo's price over the
+lines (`recomputeTotals`) — VP now does the same with VP's combo price.
+The ERP does NOT push the catalogue (its VP feed is sales orders only).
+
+### Done
+- **mig `20260924020000_erp_catalogue_mirror` — APPLIED LIVE.** Mirror tables
+  `erp_products` (reshaped, PK erp_id, `vp_id` uuid), `erp_product_models`,
+  `erp_maintenance_options`, `erp_fabrics`, `erp_sofa_combos` (definitions);
+  VP-owned `catalogue_skus` (price / price_grid / offered),
+  `catalogue_models` (offered / enabled / gift / calc_category / brand_code),
+  `catalogue_option_prices`, `catalogue_combo_prices`; `ingest_erp_catalogue`
+  (service role only; strips money; `full` retires as removed_at);
+  `catalogue_adopt_legacy` (first sight inherits old comm_products price,
+  grid and calculator tick). RLS fixed (old `has_scope(['product_list'])` was
+  always false). Cost chain NOT changed yet.
+- **Initial load via MCP relay (md5-verified per chunk):** products 2,350 ✓,
+  maintenance 69 + specials 35 ✓, combos 97 ✓. Models: 480/703 and fabrics
+  0/950 were still relaying when the session ended (agent may have finished) —
+  **verify** `select count(*) from erp_product_models / erp_fabrics` (703 / 950);
+  if short, re-run the chunk SQL (M3 = models ORDER BY id OFFSET 480 LIMIT 240;
+  F1/F2 = fabrics ORDER BY id OFFSET 0/480 LIMIT 480; the export SQL + md5
+  guard pattern is in the relay prompts: `WITH p AS (<chunk>) SELECT
+  md5(payload::text), payload` on ERP, then `SELECT CASE WHEN md5(p::text)=…
+  THEN ingest_erp_catalogue(p) …` on VP). Then `select catalogue_adopt_legacy(1)`
+  to adopt models whose SKUs arrived before the model rows.
+- **mig `20260924030000_catalogue_costs_the_margin` — WRITTEN, NOT APPLIED.**
+  Uniform VP pricing: `catalogue_line_facts` (parses ERP description2
+  `FABRIC / SEAT h / LEG l / SPECIAL: a + b`, bedframe `DIVAN d + LEG l / GAP g
+  / T.Heights t`, or raw.variants), `catalogue_unit_price` (grid by seat height ×
+  fabric tier, else flat), option surcharges, `catalogue_line_cost`, fill
+  trigger rewritten (ignores ERP line cost), deferred constraint trigger
+  `sales_order_lines_apply_combos` → `catalogue_apply_combos` (ERP rules),
+  `recost_sales_order_lines` now RE-PRICES the month (23RUN kept),
+  `revenue_costing_gaps` / `revenue_uncosted_products` return
+  in_sku_master/has_price/reason, drops retired ERP money columns + redefines
+  ingest without them. **Apply only at deploy time** (drops columns the live
+  page still selects) and after dry-running coverage (BEGIN…ROLLBACK).
+- **TS:** `src/lib/catalogue/{keys,facts,pricing,combos,options,edits}.ts`
+  (twins of the SQL), `src/lib/erp-sync/catalogue.ts` (v2 delivery parser),
+  route `/api/erp/v1/products` → `ingest_erp_catalogue`, Product List rebuilt:
+  `products/page.tsx` + tabs SKU Master / Modular / Maintenance / Combo Pricing
+  / Costing gaps (`_components/*Tab.tsx`, `ModelEditor.tsx`, `ui.tsx`),
+  actions `revenue/catalogue-actions.ts`. CostGapPanel + recost copy updated.
+  Removed v1 money parser, sku-master helper, comm_products Overrides UI.
+  `tsc` clean (only pre-existing test-file errors).
+
+### Next (in order)
+1. Verify/finish the relay (above). Check adoption: legacy comm_products codes
+   vs ERP codes (AK-/AKEMI, DL-/DUNLOPILLO etc.) — 784 SKUs adopted so far;
+   list what did not match before deciding extra match rules.
+2. **Member calculator (not started):** `member_data_snapshot` +
+   `member_principal_snapshot` still read comm_products ⋈ member_product_options
+   (and LOST the rider clause in 20260917050000/060000 — bed frames/accessories
+   are invisible to members today). Plan: new SECURITY DEFINER
+   `member_catalogue(p_brands)` → {products (id=vp_id, name=model name, size
+   word/module, brand via override|catalogue_brand_of, gift, calc category,
+   options = VP grid heights ∩ enabled sizes), models (extras = enabled &
+   priced pools)}; patch both snapshots (products + new `catalogueModels`
+   key); `server.ts calculateMemberQuote` reads catalogue_skus/option/combo
+   prices via admin client; QuoteBuild gains sofa `leg`, `specials[]` and
+   `bedframe {divan, leg, total, gap, specials[]}` (cart-level, like seat
+   height); `calculateQuote` adds surcharges + `pickCombo`/`spreadComboTotal`.
+   MemberAdmin "Product options" tab → pointer to Product List › Modular.
+3. Tests: vitest for lib/catalogue + edits + erp-sync/catalogue; PGlite script
+   `tests/member-sql/validate-catalogue.mjs` running both migrations verbatim.
+4. Dry-run mig 030000 on prod (coverage before/after for Aug/Sep), then E2E
+   (Playwright, Principal) of all tabs + a real save, `npm run build`.
+5. **ERP-side push (separate PR in `C:\Users\wenwe\Houzs ERP`, from
+   origin/main in its own worktree — local main is behind):** SQL
+   `scm.vp_build_catalogue(p_company)` (the relay's export SQL, allowlisted
+   columns, no money) + digest; sender in `venture-portal-outbox.ts` posting
+   to `vp.url` with `/sales-orders`→`/products`, `full:true`, only when the
+   md5 changed; `*/5` cron; optionally add structured `variants` to
+   `vp_build_payloads` items. Follow ERP CLAUDE.md (migration number at merge,
+   `-- REVERSAL:`, tests, module doc line).
+6. Docs: CLAUDE.md (products section, admin.ts callers unchanged),
+   `docs/erp-sync/contract.md` §9 rewrite (v2 items-only), DESIGN.md note.
+7. PR; apply 030000 at deploy; tell user months need Recost + run recompute.
+
 ## ACTIVE CHECKPOINT 2026-09-17 — The venue register, and who ran each fair
 
 Branch `feat/venue-organiser-register`, worktree

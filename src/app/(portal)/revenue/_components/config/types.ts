@@ -241,26 +241,6 @@ export interface TeamData {
   directorCandidates: DirectorRow[]
 }
 
-export interface ProductRow {
-  id: string
-  item_code: string
-  /** What the ERP calls this product on a sales-order line. The bridge to cost. */
-  erp_item_code: string | null
-  product_name: string | null
-  brand_code: string | null
-  item_group: string | null
-  unit_cost: number | null
-  /**
-   * Sofa modules: [{height, tier, cost}] — the ERP seat_height_prices shape.
-   * The member calculator costs a module from it for the cart's chosen seat
-   * height and fabric tier; unit_cost is the flat fallback. Loaded by the
-   * catalogue seed; read-only on the page for now.
-   */
-  cost_grid: { height: string; tier: string; cost: number }[] | null
-  is_active: boolean
-  updated_at: string | null
-}
-
 /**
  * One sub-department's rules — everything below `scheme` is filtered to it —
  * plus the three unscoped lists the "generate a new sub-department" form needs.

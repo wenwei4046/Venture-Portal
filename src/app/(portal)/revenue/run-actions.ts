@@ -485,17 +485,16 @@ export interface RecostResult {
 }
 
 /**
- * Fill a month's missing line costs from the Product List.
+ * Re-price a month's lines from the Product List.
  *
- * The ERP's delivery carries a cost per line only sometimes; when it does not,
- * the Product List is the fallback — and until 2026-09-18 that fallback matched
- * on the list's own item code alone, so every product the ERP spells
- * differently (`AKEMI ULTIMATE MATT (K)` against `AK-ULTIMATE MATT (K)`) missed
- * by one hyphen and its bill lost its margin.
- *
- * New deliveries are costed on arrival by a database trigger. This is for the
- * months that already landed: the same lookup, applied to rows already there.
- * It never overwrites a cost, and the RPC refuses a month whose run has paid.
+ * Since 2026-09-24 every line is costed at the portal's own price (user:
+ * margin 统一由产品这边的价格来计算) — a SKU's figure, a sofa module's cell at
+ * the line's seat height and fabric tier, each option's surcharge, and a sofa
+ * build's combo — never the ERP's own costing. New deliveries are priced on
+ * arrival by a database trigger. This is for the months that already landed:
+ * the same pricing, re-applied to every line of the month, so a price keyed or
+ * corrected on the Product List reaches bills sold before it. The RPC refuses a
+ * month whose run has paid.
  *
  * A COST CHANGES WHAT THE MONTH PAYS — it moves the margin, the margin moves
  * the band, and the band moves the commission — so the run has to be computed
