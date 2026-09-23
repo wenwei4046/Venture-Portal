@@ -20,6 +20,7 @@ import {
   tierLabel,
 } from "@/lib/member/catalog";
 import { buildChoicesFor, buildKey, pruneBuild } from "@/lib/member/build";
+import { heightKey } from "@/lib/catalogue/keys";
 import type {
   BedframeBuild,
   MemberData,
@@ -565,7 +566,11 @@ export default function MemberQuoteBuilder({
   // Sofa modules carry a seat height × fabric tier grid; the cart picks one build for all of them.
   const buildChoices = useMemo(() => {
     const options = cartProducts.flatMap((p) => p.options ?? []);
-    const heights = [...new Set(options.map((o) => o.height))].sort(compareHeights);
+    // One entry per seat height however the grids spell it (75cm / 75CM) —
+    // the pricing folds the spellings the same way.
+    const heights = [
+      ...new Map(options.map((o) => [heightKey(o.height) ?? o.height, o.height])).values(),
+    ].sort(compareHeights);
     const tiers = [...new Set(options.map((o) => o.tier))].sort(
       (a, b) =>
         ((TIERS as readonly string[]).indexOf(a) + 1 || 99) -
