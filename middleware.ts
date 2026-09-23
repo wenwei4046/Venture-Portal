@@ -75,6 +75,9 @@ export const config = {
     // /api/erp/* is the ERP live feed: a database calling in with a shared
     // secret, no session to refresh and nothing to redirect. It authenticates
     // itself (src/lib/erp-sync/auth.ts) and must never be bounced to /login.
-    '/((?!api/erp/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // The installable-app files are public too: the browser fetches the
+    // manifest without cookies, and the service worker and its offline page
+    // must load when nobody is signed in.
+    '/((?!api/erp/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

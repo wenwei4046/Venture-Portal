@@ -13,6 +13,24 @@ const nextConfig: NextConfig = {
     },
   },
 
+  // The service worker must never be served from a cache, or a fix to it
+  // reaches phones days late. (public/sw.js, the installable app.)
+  async headers() {
+    return [
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+        ],
+      },
+      {
+        source: '/manifest.webmanifest',
+        headers: [{ key: 'Content-Type', value: 'application/manifest+json; charset=utf-8' }],
+      },
+    ]
+  },
+
   // Resolve old bookmarks before rendering any page.
   async redirects() {
     return [

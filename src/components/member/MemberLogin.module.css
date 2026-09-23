@@ -82,6 +82,10 @@
 .previewNotice { padding: 13px 15px; background: rgb(var(--accent-bg)); color: rgb(var(--accent)); border: 1px solid rgb(var(--accent-border) / .5); border-radius: 10px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .previewLink { display: flex; justify-content: center; align-items: center; gap: 10px; min-height: 48px; margin-top: 12px; font-size: 13px; color: rgb(var(--accent)); text-decoration: none; border-radius: 10px; }
 .previewLink:hover { background: rgb(var(--paper)); }
+.installCard { display: grid; gap: 10px; margin-top: 14px; }
+.installButton { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px; padding: 12px 18px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: transparent; color: rgb(var(--ink)); font-size: 14px !important; font-weight: 500; transition: background 160ms; }
+.installButton:hover { background: rgb(var(--paper)); }
+.installSteps strong { color: rgb(var(--ink)); font-weight: 600; }
 .invitation { border-top: 1px solid rgb(var(--hairline) / .7); padding-top: 22px; margin-top: 28px !important; color: rgb(var(--graphite)); font-size: 12px; line-height: 1.8; }
 .invitation strong { display: block; color: rgb(var(--ink)); font-weight: 500; }
 .footer { width: min(100%, 1336px); margin: 0 auto; padding: 25px 48px 28px; display: flex; justify-content: space-between; gap: 20px; color: rgb(var(--graphite)); font-size: 10px; letter-spacing: .02em; }

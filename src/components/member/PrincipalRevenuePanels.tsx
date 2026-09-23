@@ -7,6 +7,8 @@ import base from "./member.module.css";
 import preview from "./design-preview/RevenueWorkspacePreview.module.css";
 import { Icon, initials } from "./MemberUI";
 import { hasNoGoodsMargin } from "./LiveBrandMarginList";
+import InstallSteps from "@/components/pwa/InstallSteps";
+import { useInstallApp } from "@/components/pwa/install-store";
 import p from "./PrincipalRevenuePanels.module.css";
 
 // Principal keeps its authorised department data while sharing the approved C UI.
@@ -25,6 +27,14 @@ export function RevenueManagementButton({ children = "Member Services", destinat
     <input type="hidden" name="destination" value={destination} />
     <button className={`${s.button} ${s.full} ${p.managementButton}`} type="submit">{children} <span aria-hidden="true">↗</span></button>
   </form>;
+}
+
+/** Profile › Install the app — the Principal's copy of the member Profile row. */
+function InstallAppCard() {
+  const { path, install } = useInstallApp();
+  const [open, setOpen] = useState(false);
+  if (path !== "prompt" && path !== "ios" && path !== "in-app") return null;
+  return <section className={s.card}><SectionHeading icon="install" tone="brown">Install the app</SectionHeading><p className={s.sub}>Open Venture from your home screen, full screen, like any app.</p><button className={`${s.button} ${s.full}`} aria-expanded={path === "prompt" ? undefined : open} onClick={() => path === "prompt" ? void install() : setOpen(v => !v)}>Install the app<Icon name="install" size={22} /></button>{path !== "prompt" && open && <div style={{ marginTop: 14 }}><InstallSteps path={path} className={s.sub} /></div>}</section>;
 }
 
 function SectionHeading({ children, icon, tone = "orange" }: { children: React.ReactNode; icon: string; tone?: "orange" | "brown" | "amber" }) {
@@ -172,6 +182,7 @@ export default function PrincipalRevenuePanels({ data, member, page, navigate, o
         {onPrivateMode && <section className={s.card}><SectionHeading icon="eye" tone="brown">Privacy</SectionHeading><button className={`${s.button} ${s.full}`} aria-pressed={privateMode} onClick={onPrivateMode}>{privateMode ? "Show income amounts" : "Hide income amounts"}<Icon name={privateMode ? "eyeOff" : "eye"} size={22} /></button></section>}
         <section className={s.card}><SectionHeading icon="team" tone="amber">Manage Revenue</SectionHeading><p className={s.sub}>Review staff requests, department capacity, memos and commission configuration with your Principal access.</p><RevenueManagementButton /><RevenueManagementButton destination="/revenue">Revenue configuration</RevenueManagementButton></section>
         <section className={s.card}><SectionHeading icon="gift">Products & costs</SectionHeading><p className={s.sub}>Maintain current products and costs in Principal view.</p><RevenueManagementButton destination="/revenue/products">Manage products & costs</RevenueManagementButton></section>
+        <InstallAppCard />
         <form action="/member/signout" method="post"><button type="submit" className={`${s.button} ${s.full} ${p.signOut}`}><Icon name="logout" size={22} /> Sign out</button></form>
       </div>
     </div>}
