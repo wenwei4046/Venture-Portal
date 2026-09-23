@@ -40,6 +40,14 @@ export interface Fair {
   /** Of those, how many are still in a different month than the fair. */
   billsToMove: number
   valueToMove: number
+  /**
+   * Of THOSE, how many a human placed at this fair (`fair_source = 'manual'`,
+   * e.g. from the month's claim form). The rest are `venue_event_for_order`'s
+   * guess — and the guess reaches back 45 days, so while next month's fairs
+   * are not typed it pulls next month's bills at the same hall into this one.
+   */
+  confirmedToMove: number
+  confirmedValueToMove: number
 }
 
 /** Bills that belong to no fair yet, grouped by place and order month. */
@@ -175,6 +183,9 @@ export interface FairCalendarSummary {
   /** Bills sitting in a month their fair disagrees with. */
   billsToMove: number
   valueToMove: number
+  /** Of those, the ones a human placed — what *Move confirmed bills* moves. */
+  confirmedToMove: number
+  confirmedValueToMove: number
   /** Bills belonging to no fair at all. */
   unplacedBills: number
   unplacedValue: number
@@ -192,6 +203,8 @@ export function fairCalendarSummary(
     undated: fairs.filter(f => f.startDate === null).length,
     billsToMove: fairs.reduce((n, f) => n + f.billsToMove, 0),
     valueToMove: fairs.reduce((n, f) => n + f.valueToMove, 0),
+    confirmedToMove: fairs.reduce((n, f) => n + f.confirmedToMove, 0),
+    confirmedValueToMove: fairs.reduce((n, f) => n + f.confirmedValueToMove, 0),
     unplacedBills: gaps.reduce((n, g) => n + g.bills, 0),
     unplacedValue: gaps.reduce((n, g) => n + g.total, 0),
     gaps: gaps.length,

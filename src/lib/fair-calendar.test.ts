@@ -40,6 +40,8 @@ function fair(over: Partial<Fair> = {}): Fair {
     total: 203339,
     billsToMove: 30,
     valueToMove: 199339,
+    confirmedToMove: 0,
+    confirmedValueToMove: 0,
     ...over,
   }
 }
@@ -242,6 +244,29 @@ describe('fairCalendarSummary', () => {
     expect(s.gapsNeedingSplit).toBe(1)
   })
 
+  it('keeps what a human confirmed apart from what the calendar guessed', () => {
+    // 2026-09-23: 174 bills wanted to leave September for August; the claim
+    // form named 96 of them. The other 78 were September's own fairs at the
+    // same halls, reached by the 45-day grace because September was not typed.
+    const s = fairCalendarSummary(
+      [
+        fair({ billsToMove: 30, valueToMove: 199339, confirmedToMove: 30, confirmedValueToMove: 199339 }),
+        fair({
+          fairId: 'ioi',
+          venueKey: 'IOI MALL PUTRAJAYA',
+          billsToMove: 35,
+          valueToMove: 180000,
+          confirmedToMove: 4,
+          confirmedValueToMove: 17816,
+        }),
+      ],
+      [],
+    )
+    expect(s.billsToMove).toBe(65)
+    expect(s.confirmedToMove).toBe(34)
+    expect(s.confirmedValueToMove).toBe(217155)
+  })
+
   it('is all zeroes before anything is typed', () => {
     const s = fairCalendarSummary([], [])
     expect(s).toEqual({
@@ -249,6 +274,8 @@ describe('fairCalendarSummary', () => {
       undated: 0,
       billsToMove: 0,
       valueToMove: 0,
+      confirmedToMove: 0,
+      confirmedValueToMove: 0,
       unplacedBills: 0,
       unplacedValue: 0,
       gaps: 0,

@@ -35,6 +35,8 @@ interface FairRpcRow {
   sales_value: number | string
   bills_to_move: number
   value_to_move: number | string | null
+  confirmed_to_move: number
+  confirmed_value_to_move: number | string | null
 }
 
 interface GapRpcRow {
@@ -68,6 +70,8 @@ export async function loadFairCalendar(supabase: SupabaseClient): Promise<Fair[]
       total: Number(r.sales_value),
       billsToMove: r.bills_to_move,
       valueToMove: Number(r.value_to_move ?? 0),
+      confirmedToMove: r.confirmed_to_move ?? 0,
+      confirmedValueToMove: Number(r.confirmed_value_to_move ?? 0),
     })),
   )
 }
