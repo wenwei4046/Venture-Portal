@@ -133,8 +133,9 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | balance | `header.balance_sen_live` / 100 (else `balance_sen`) | what the deposit gate measures |
 | created at | `header.created_at` | orders the 1st / 2nd / 3rd bill of the day |
 | company | `header.company_id` | stored; Houzs = 1 |
-| lines | `items[]` where `cancelled = false`, by `line_no` | `item_group`, `item_code`, `description`, `qty`, `unit_price_sen`, `total_sen`, `branding` |
-| **line cost** | `items[].line_cost_sen` / 100 | **the cost source the margin layer was waiting for.** 0 on a priced line = unknown → Product List fallback → warning |
+| lines | `items[]` where `cancelled = false`, by `line_no` | `item_group`, `item_code`, `description`, `description2`, `qty`, `unit_price_sen`, `total_sen`, `branding` |
+| **line build** | `items[].variants` (since 2026-09-24) | ALLOWLISTED to `fabricCode`, `seatHeight`, `legHeight`, `divanHeight`, `gap`, `totalHeight`, `size`, `specials` (strings) and stored on the line's `raw.variants` — what the cost rule reads a sofa's seat height and a bed frame's options from before it ever parses `description2` (§9.4). The ERP's `variants` also carries money (`extraAddonAmountRM`) and free text; neither is kept, and the ERP's own builder now sends only the allowlist |
+| line cost | `items[].line_cost_sen` / 100 | stored on `raw.cost` only. **Since 2026-09-24 it decides no margin** — every line is priced from the Product List (§9) |
 
 
 ### What it does NOT send — the organiser
