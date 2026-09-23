@@ -4,7 +4,18 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import { heightKey, valueKey } from '@/lib/catalogue/keys'
-import { allowedValues, CALC_CATEGORIES, calcCategoryOf, defaultGift, optionKeysOf, skuKeyOf } from '@/lib/catalogue/options'
+import {
+  CALC_CATEGORIES,
+  calcCategoryOf,
+  defaultGift,
+  erpAllows,
+  isRestricted,
+  isRiderModel,
+  optionKeysOf,
+  RIDER,
+  skuKeyOf,
+  type OptionKey,
+} from '@/lib/catalogue/options'
 import { saveModelSettings } from '../../catalogue-actions'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
 import { Notice } from './ui'
@@ -24,8 +35,6 @@ import { Notice } from './ui'
  * height, leg height, specials, divan / total heights, gaps) are ticked per
  * model. Something the ERP adds later arrives unticked.
  */
-
-const RIDER = 'RIDER'
 
 function priceBadge(s: CatalogueModel['skus'][number]) {
   if (s.price !== null) return <span className="text-num-ink">{formatMoney(s.price)}</span>
@@ -68,10 +77,29 @@ export default function ModelEditor({
     return m
   }, [options])
 
+  /** Each Maintenance pool's live values, in the pool's own order. */
+  const poolValues = useMemo(() => {
+    const byPool = new Map<string, MaintenanceOption[]>()
+    for (const o of options) {
+      if (o.active && !o.removed) byPool.set(o.pool, [...(byPool.get(o.pool) ?? []), o])
+    }
+    return new Map(
+      [...byPool].map(([pool, list]) => [
+        pool,
+        list.sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value)).map(o => o.value),
+      ]),
+    )
+  }, [options])
+
+  /** What the ERP lets this model take for one key — the whole pool when it restricts nothing. */
+  function erpFor(o: OptionKey): string[] {
+    return erpAllows(model.allowed, o.key, poolValues.get(o.pool) ?? [])
+  }
+
   /** The chips for one option key: what the ERP allows, then anything ticked here the ERP no longer allows. */
-  function chipsFor(key: string): string[] {
-    const erp = allowedValues(model.allowed, key)
-    const mine = enabled[key] ?? []
+  function chipsFor(o: OptionKey): string[] {
+    const erp = erpFor(o)
+    const mine = enabled[o.key] ?? []
     const seen = new Set(erp.map(v => valueKey(v)))
     return [...erp, ...mine.filter(v => !seen.has(valueKey(v)))]
   }
@@ -90,8 +118,8 @@ export default function ModelEditor({
     })
   }
 
-  function setAll(key: string, on: boolean) {
-    setEnabled(prev => ({ ...prev, [key]: on ? chipsFor(key) : [] }))
+  function setAll(o: OptionKey, on: boolean) {
+    setEnabled(prev => ({ ...prev, [o.key]: on ? chipsFor(o) : [] }))
   }
 
   const liveSkus = model.skus.filter(s => !s.removed)
@@ -107,7 +135,7 @@ export default function ModelEditor({
       !model.configured && Object.values(skuTicks).every(v => !v) && Object.keys(enabled).length === 0
     if (on && untouched) {
       setSkuTicks(Object.fromEntries(model.skus.map(s => [s.erpId, !s.removed && s.active])))
-      setEnabled(Object.fromEntries(optionKeys.map(o => [o.key, allowedValues(model.allowed, o.key)])))
+      setEnabled(Object.fromEntries(optionKeys.map(o => [o.key, erpFor(o)])))
       setNote('Started from everything the ERP allows for this model — untick what the calculator should not offer.')
     }
   }
@@ -164,6 +192,18 @@ export default function ModelEditor({
 
       {note ? <Notice tone="ok">{note}</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
+      {!isRiderModel(model.category, brand) && !(brand ?? model.derivedBrand) ? (
+        <Notice tone="error">
+          No margin ladder. A {(model.category ?? '').toUpperCase() === 'SOFA' ? 'sofa' : 'mattress'} sells under its
+          brand&rsquo;s ladder, and{' '}
+          {model.branding ? (
+            <>the ERP branding &ldquo;{model.branding}&rdquo; matches no brand the calculator sells.</>
+          ) : (
+            <>the ERP gives this model no branding.</>
+          )}{' '}
+          It is not offered until a Margin ladder is chosen below.
+        </Notice>
+      ) : null}
 
       <div>
         <div className="flex items-baseline gap-3 mb-2">
@@ -209,8 +249,9 @@ export default function ModelEditor({
       </div>
 
       {optionKeys.map(o => {
-        const chips = chipsFor(o.key)
-        const erp = new Set(allowedValues(model.allowed, o.key).map(v => valueKey(v)))
+        const chips = chipsFor(o)
+        const erp = new Set(erpFor(o).map(v => valueKey(v)))
+        const restricted = isRestricted(model.allowed, o.key)
         return (
           <div key={o.key}>
             <div className="flex items-baseline gap-3 mb-2">
@@ -220,17 +261,24 @@ export default function ModelEditor({
               </span>
               {chips.length > 0 ? (
                 <>
-                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setAll(o.key, true)}>
+                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setAll(o, true)}>
                     Tick all
                   </button>
-                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setAll(o.key, false)}>
+                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setAll(o, false)}>
                     Untick all
                   </button>
                 </>
               ) : null}
+              {!restricted && chips.length > 0 ? (
+                <span className="text-[10.5px] text-muted">The ERP does not restrict this model: the whole pool</span>
+              ) : null}
             </div>
             {chips.length === 0 ? (
-              <p className="font-serif italic text-sm text-muted">The ERP allows none for this model.</p>
+              <p className="font-serif italic text-sm text-muted">
+                {restricted
+                  ? 'The ERP allows none for this model.'
+                  : 'The ERP does not restrict this model, and its Maintenance pool is empty.'}
+              </p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {chips.map(v => {
@@ -310,7 +358,11 @@ export default function ModelEditor({
             className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
           >
             <option value="">
-              {model.brandOverride === null && model.brand ? `${model.brand} (from the ERP branding)` : 'From the ERP branding'}
+              {model.derivedBrand
+                ? `${model.derivedBrand} (from the ERP branding)`
+                : isRiderModel(model.category, null)
+                  ? 'Rider (from the ERP category)'
+                  : 'None: the ERP branding matches no brand'}
             </option>
             {brands.map(b => (
               <option key={b.code} value={b.code}>{b.name}</option>

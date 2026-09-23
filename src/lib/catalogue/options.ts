@@ -98,6 +98,42 @@ export function allowedValues(allowed: unknown, key: string): string[] {
   return out
 }
 
+/** Whether the ERP restricts one of a model's option keys at all: a non-empty list does, nothing else. */
+export function isRestricted(allowed: unknown, key: string): boolean {
+  if (!allowed || typeof allowed !== 'object' || Array.isArray(allowed)) return false
+  const raw = (allowed as Record<string, unknown>)[key]
+  return Array.isArray(raw) && raw.length > 0
+}
+
+/**
+ * What the ERP lets a model take for one option key: its own list — or, when
+ * that list is empty or missing, everything in the Maintenance pool. The
+ * ERP's own rule (allowed-options-check.ts `hasRestriction`): only a
+ * non-empty allowed_options.<key> restricts; an empty one is a model nobody
+ * restricted, not a model that may take nothing. The twin of
+ * `catalogue_model_options`' allowed test (migration 20260924040000).
+ */
+export function erpAllows(allowed: unknown, key: string, pool: readonly string[]): string[] {
+  return isRestricted(allowed, key) ? allowedValues(allowed, key) : [...pool]
+}
+
+/** The brand override that marks a model a rider on Modular. */
+export const RIDER = 'RIDER'
+
+/**
+ * Whether a model's SKUs join any cart, the way `member_catalogue` reads it
+ * (migration 20260924040000): marked Rider on Modular, or a bed frame or an
+ * accessory nobody gave a brand. A mattress or a sofa decides the cart's
+ * ladder, so it is never a rider by default — one whose ERP branding matches
+ * no brand the portal knows is not offered until a ladder is chosen for it.
+ */
+export function isRiderModel(category: string | null, brandOverride: string | null): boolean {
+  if (brandOverride === RIDER) return true
+  if (brandOverride) return false
+  const c = (category ?? '').trim().toUpperCase()
+  return c !== 'MATTRESS' && c !== 'SOFA'
+}
+
 /** The calculator's section for a model — `catalogue_calc_category` in TypeScript. */
 export function calcCategoryOf(category: string | null, name: string | null): string {
   const c = (category ?? '').trim().toUpperCase()

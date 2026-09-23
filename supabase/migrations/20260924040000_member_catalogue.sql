@@ -20,7 +20,10 @@
 --   * whose model is offered too (`catalogue_models.offered`) when it has one,
 --   * selling under a brand one of the member's calculator schemes sells — or
 --     under none: a bed frame or an accessory is a RIDER and joins any cart
---     (user 2026-09-12).
+--     (user 2026-09-12), and so is anything marked Rider on Modular. A
+--     mattress or a sofa is never a rider by default — it decides the cart's
+--     ladder — so one whose ERP branding matches no brand the portal knows
+--     (MYLATEX, or none at all) is not offered until a ladder is chosen for it.
 --
 -- WHAT ITS DROPDOWNS MAY OFFER:
 --
@@ -29,7 +32,9 @@
 --     cost a module at, and a height nobody ticked is not offered;
 --   * a model's leg heights, specials and (a bed frame's) divan / total / gap
 --     heights: the portal's ticks (`catalogue_models.enabled`) that the ERP
---     still allows for that model and its Maintenance pool still lists.
+--     still allows for that model and its Maintenance pool still lists. An
+--     empty or missing ERP list is the ERP's own "no restriction"
+--     (allowed-options-check.ts): the whole pool.
 --
 -- THE SAME FUNCTION PRICES THE QUOTE. `p_priced` adds the portal's prices —
 -- the SKU's price and grid, the option surcharges, the combos with their price
@@ -76,7 +81,10 @@ $fn$;
 -- ── 2. One of a model's dropdowns ───────────────────────────────────────────
 -- The portal's ticks (`enabled`), that the ERP still allows for the model
 -- (`allowed`, strings or {value} objects) and that its Maintenance pool still
--- lists — in the pool's own order. Nothing ticked = nothing offered.
+-- lists — in the pool's own order. Nothing ticked = nothing offered. An EMPTY
+-- or missing `allowed` is the ERP's "no restriction" (hasRestriction in its
+-- allowed-options-check.ts: only a non-empty list restricts), so the pool
+-- alone bounds the ticks. The TypeScript twin is erpAllows (lib/catalogue/options.ts).
 CREATE OR REPLACE FUNCTION catalogue_model_options(p_company BIGINT, p_pool TEXT, p_enabled JSONB, p_allowed JSONB)
 RETURNS JSONB
 LANGUAGE sql
@@ -93,12 +101,13 @@ AS $fn$
                      FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(p_enabled) = 'array'
                                                          THEN p_enabled ELSE '[]'::JSONB END) v
                     WHERE catalogue_value_key(v) = catalogue_value_key(o.value))
-       AND EXISTS (SELECT 1
-                     FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_allowed) = 'array'
-                                                    THEN p_allowed ELSE '[]'::JSONB END) a
-                    WHERE catalogue_value_key(CASE WHEN jsonb_typeof(a) = 'object'
-                                                   THEN a->>'value' ELSE a #>> '{}' END)
-                          = catalogue_value_key(o.value));
+       AND (CASE WHEN jsonb_typeof(p_allowed) = 'array' THEN jsonb_array_length(p_allowed) = 0 ELSE TRUE END
+            OR EXISTS (SELECT 1
+                         FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_allowed) = 'array'
+                                                        THEN p_allowed ELSE '[]'::JSONB END) a
+                        WHERE catalogue_value_key(CASE WHEN jsonb_typeof(a) = 'object'
+                                                       THEN a->>'value' ELSE a #>> '{}' END)
+                              = catalogue_value_key(o.value)));
 $fn$;
 
 -- ── 3. The calculator's catalogue ───────────────────────────────────────────
@@ -140,8 +149,19 @@ BEGIN
                         catalogue_calc_category(COALESCE(m.category, e.category),
                                                 COALESCE(m.name, e.description))) AS calc,
                cm.gift AS gift_override,
-               COALESCE(cm.brand_code,
-                        catalogue_brand_of(COALESCE(m.category, e.category), m.branding, e.branding)) AS brand
+               CASE WHEN cm.brand_code = 'RIDER' THEN NULL
+                    ELSE COALESCE(cm.brand_code,
+                                  catalogue_brand_of(COALESCE(m.category, e.category), m.branding, e.branding))
+               END AS brand,
+               -- A rider joins any cart: a bed frame or an accessory nobody gave
+               -- a brand, or anything marked Rider on Modular. A mattress or a
+               -- sofa decides the cart's ladder, so one whose brand no scheme
+               -- knows is sold under nothing and falls out below — never a
+               -- rider by accident (the TypeScript twin is isRiderModel).
+               COALESCE(cm.brand_code = 'RIDER'
+                        OR (cm.brand_code IS NULL
+                            AND UPPER(COALESCE(m.category, e.category, '')) NOT IN ('MATTRESS', 'SOFA')),
+                        FALSE) AS rider
           FROM erp_products e
           JOIN catalogue_skus s ON s.erp_product_id = e.erp_id AND s.offered
           LEFT JOIN erp_product_models m ON m.erp_id = e.model_erp_id
@@ -153,7 +173,7 @@ BEGIN
     ), eligible AS (
         SELECT o.*, COALESCE(o.gift_override, catalogue_default_gift(o.calc)) AS gift
           FROM offered o
-         WHERE o.brand IS NULL OR o.brand = ANY (p_brands)
+         WHERE o.brand = ANY (p_brands) OR o.rider
     ), chosen AS (
         SELECT * FROM eligible WHERE p_ids IS NULL OR vp_id = ANY (p_ids)
         UNION

@@ -5,27 +5,35 @@ import { POOLS } from '../catalogue/pricing'
 import {
   CATALOGUE_MAX_ROWS,
   CATALOGUE_SECTIONS,
+  isMoneyKey,
   MAINTENANCE_POOL_KEYS,
+  MONEY_KEY_PATTERN,
+  MONEY_KEY_SUFFIX,
   MONEY_KEYS,
+  NOT_MONEY_KEY,
   parseCatalogueDelivery,
   stripMoney,
 } from './catalogue'
 
 /**
  * The catalogue receiver's parser (POST /api/erp/v1/products, contract §9 v2).
- * ITEMS ONLY: no row may carry a price or a cost past it — the ingest RPC
- * strips money again with catalogue_strip_money, and the two lists are pinned
- * to each other below. A delivery the portal cannot read is refused (the route
+ * ITEMS ONLY: no row may carry a price or a cost past it, at any depth — the
+ * ingest RPC strips money again with catalogue_strip_money, and the two
+ * patterns are pinned to each other below. A delivery the portal cannot read is refused (the route
  * answers 422 with this reason) rather than vanishing into a 200.
  */
 
 const migration = (file: string) => readFileSync(join(process.cwd(), 'supabase/migrations', file), 'utf8')
-const MIRROR_SQL = migration('20260924020000_erp_catalogue_mirror.sql')
+const COSTS_SQL = migration('20260924030000_catalogue_costs_the_margin.sql')
 /** 20260924030000 redefines ingest_erp_catalogue; this is the live definition. */
 const INGEST_SQL = (() => {
-  const sql = migration('20260924030000_catalogue_costs_the_margin.sql')
-  const at = sql.indexOf('CREATE OR REPLACE FUNCTION ingest_erp_catalogue')
-  return sql.slice(at, sql.indexOf('$fn$;', at))
+  const at = COSTS_SQL.indexOf('CREATE OR REPLACE FUNCTION ingest_erp_catalogue')
+  return COSTS_SQL.slice(at, COSTS_SQL.indexOf('$fn$;', at))
+})()
+/** catalogue_is_money_key, as 20260924030000 defines it. */
+const MONEY_KEY_SQL = (() => {
+  const at = COSTS_SQL.indexOf('CREATE OR REPLACE FUNCTION catalogue_is_money_key')
+  return COSTS_SQL.slice(at, COSTS_SQL.indexOf('$fn$;', at))
 })()
 
 function parsed(body: unknown) {
@@ -51,30 +59,61 @@ describe('stripMoney — catalogue_strip_money', () => {
     expect(stripMoney(withMoney(row))).toEqual(row)
   })
 
-  it('keeps what only looks like money: a fabric’s price TIER is not a price', () => {
-    const row = { price_tier: 'PRICE_1', sofa_price_tier: 'PRICE_2', bedframe_price_tier: 'PRICE_3', priced: true, prices_note: 'x' }
+  it('keeps a fabric’s price TIER: a label the portal prices by, not a price', () => {
+    const row = { price_tier: 'PRICE_1', sofa_price_tier: 'PRICE_2', bedframe_price_tier: 'PRICE_3', priceTier: 'PRICE_2', tier: 'PRICE_1' }
     expect(stripMoney(row)).toEqual(row)
   })
 
-  it('reaches the top level only, as `jsonb - text[]` does', () => {
-    // A nested money key is out of reach of both twins; the ERP's export
-    // allowlists its columns, and allowed_options carries values only.
-    const row = { id: 'm1', allowed_options: { specials: [{ value: 'A', priceSen: 500 }] } }
+  it('reads keys, never values: a label that says “price” stays', () => {
+    const row = { id: 's1', label: 'Price-match special', description: 'cost-down frame' }
     expect(stripMoney(row)).toEqual(row)
+  })
+
+  it('reaches every depth — a special’s option-group surcharges, a pool entry inside allowed_options', () => {
+    const row = {
+      id: 's1',
+      code: 'Right Drawer',
+      option_groups: [{ label: 'Thickness', choices: [{ label: '10"', extraSen: 2000 }, { label: '8"', extraSen: 0 }] }],
+      allowed_options: { specials: [{ value: 'A', priceSen: 500 }, 'B'], leg_heights: ['4"'] },
+    }
+    expect(stripMoney(row)).toEqual({
+      id: 's1',
+      code: 'Right Drawer',
+      option_groups: [{ label: 'Thickness', choices: [{ label: '10"' }, { label: '8"' }] }],
+      allowed_options: { specials: [{ value: 'A' }, 'B'], leg_heights: ['4"'] },
+    })
   })
 
   it('does not touch the row it was given', () => {
-    const row = withMoney({ id: 'mfg-1' })
+    const row = { ...withMoney({ id: 'mfg-1' }), nested: [{ costSen: 1 }] }
     stripMoney(row)
-    expect(Object.keys(row)).toHaveLength(MONEY_KEYS.length + 1)
+    expect(Object.keys(row)).toHaveLength(MONEY_KEYS.length + 2)
+    expect(row.nested).toEqual([{ costSen: 1 }])
   })
 
-  it('MONEY_KEYS is exactly the list catalogue_strip_money removes', () => {
-    const at = MIRROR_SQL.indexOf('CREATE OR REPLACE FUNCTION catalogue_strip_money')
-    const open = MIRROR_SQL.indexOf('ARRAY[', at) + 'ARRAY['.length
-    const sqlKeys = [...MIRROR_SQL.slice(open, MIRROR_SQL.indexOf(']', open)).matchAll(/'([^']+)'/g)].map(m => m[1])
-    expect(sqlKeys).toHaveLength(MONEY_KEYS.length)
-    expect([...MONEY_KEYS].sort()).toEqual([...sqlKeys].sort())
+  it('every key the ERP has sent as money matches the pattern', () => {
+    expect(MONEY_KEYS.filter(k => !isMoneyKey(k))).toEqual([])
+  })
+
+  it('never strips a field the ingest reads', () => {
+    const read = [...new Set([...INGEST_SQL.matchAll(/e->>?'(\w+)'/g)].map(m => m[1]))]
+    expect(read.length).toBeGreaterThan(20)
+    expect(read.filter(isMoneyKey)).toEqual([])
+    expect(read).toEqual(expect.arrayContaining(['sofa_price_tier', 'bedframe_price_tier', 'price_tier']))
+  })
+
+  it('is the pattern catalogue_is_money_key applies, word for word', () => {
+    expect(MONEY_KEY_SQL).toContain(`p_key ~* '${MONEY_KEY_PATTERN.source}'`)
+    expect(MONEY_KEY_SQL).toContain(`p_key ~ '${MONEY_KEY_SUFFIX.source}'`)
+    expect(MONEY_KEY_SQL).toContain(`p_key !~* '${NOT_MONEY_KEY.source}'`)
+    expect(MONEY_KEY_PATTERN.flags).toBe('i')
+    expect(MONEY_KEY_SUFFIX.flags).toBe('')
+    expect(NOT_MONEY_KEY.flags).toBe('i')
+  })
+
+  it('the ingest strips the whole delivery before it reads a field', () => {
+    const begin = INGEST_SQL.indexOf('\nBEGIN\n')
+    expect(INGEST_SQL.slice(begin, begin + 80)).toContain('p_batch := catalogue_strip_money(p_batch);')
   })
 })
 

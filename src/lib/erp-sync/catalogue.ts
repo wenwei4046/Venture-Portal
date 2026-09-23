@@ -7,8 +7,8 @@
  * the Maintenance pools, specials, fabrics, combos) and never a price or a
  * cost. The portal's prices are typed on the Product List. The ERP strips
  * money in its own SQL before anything leaves; `ingest_erp_catalogue` strips
- * it again on the way in, and so does this, so a money field can survive
- * neither end.
+ * it again on the way in, and so does this — each at any depth, each on its
+ * own — so a money field can survive neither end.
  *
  * The rows are the ERP's own, verbatim — its snake_case column names — so the
  * sender is a plain SELECT and the mapping lives in ONE place, the ingest RPC.
@@ -31,22 +31,51 @@ export type CatalogueSection = (typeof CATALOGUE_SECTIONS)[number]
  */
 export const CATALOGUE_MAX_ROWS = 20_000
 
-/** Keys that are money on the ERP side. Never forwarded, whatever the sender did. */
+/**
+ * Keys the ERP has sent that are money — its SKU master's prices, its combo
+ * grids, a pool entry's priceSen, a special's option-group extraSen, a
+ * fabric's stock in `_sen` units. The strip does not stop at these: it goes
+ * by the pattern below, so a key the ERP adds tomorrow is caught too. Kept as
+ * the list the tests prove the pattern on.
+ */
 export const MONEY_KEYS = [
   'cost_price_sen', 'base_price_sen', 'price1_sen', 'sell_price_sen', 'pwp_price_sen',
   'seat_height_prices', 'prices_by_height', 'selling_prices_by_height', 'pwp_prices_by_height',
   'priceSen', 'costSen', 'sellingPriceSen', 'price', 'price_sen', 'selling_price_sen',
   'cost_price', 'costPrice', 'basePrice', 'price1', 'sellPrice', 'default_surcharge',
+  'extraSen', 'soh_sen', 'po_outstanding_sen', 'last_month_usage_sen', 'shortage_sen',
 ] as const
 
-const MONEY = new Set<string>(MONEY_KEYS)
+/**
+ * A key is money by the ERP's own pattern (scm.vp_strip_money_keys) — named
+ * like a price, cost, amount, surcharge, discount or margin, or ending _sen /
+ * Sen / RM — except a price TIER (`sofa_price_tier`: PRICE_1/2/3), which is a
+ * label the portal prices by, not a price. The twin of
+ * `catalogue_is_money_key` (migration 20260924030000); a test pins the texts.
+ */
+export const MONEY_KEY_PATTERN = /(price|cost|amount|surcharge|discount|margin|_sen$)/i
+export const MONEY_KEY_SUFFIX = /(Sen|RM)$/
+export const NOT_MONEY_KEY = /tier$/i
 
-export function stripMoney(row: Row): Row {
-  const out: Row = {}
-  for (const [k, v] of Object.entries(row)) {
-    if (!MONEY.has(k)) out[k] = v
+export function isMoneyKey(key: string): boolean {
+  return (MONEY_KEY_PATTERN.test(key) || MONEY_KEY_SUFFIX.test(key)) && !NOT_MONEY_KEY.test(key)
+}
+
+function withoutMoney(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutMoney)
+  if (value !== null && typeof value === 'object') {
+    const out: Row = {}
+    for (const [k, v] of Object.entries(value as Row)) {
+      if (!isMoneyKey(k)) out[k] = withoutMoney(v)
+    }
+    return out
   }
-  return out
+  return value
+}
+
+/** The row with every money key removed at any depth, as a new value; the row given is untouched. */
+export function stripMoney(row: Row): Row {
+  return withoutMoney(row) as Row
 }
 
 /**
@@ -74,12 +103,6 @@ function poolEntry(entry: unknown): { value: string; active: boolean } | null {
   const v = valueText(entry.value)
   return v ? { value: v, active: flagOn(entry.active) } : null
 }
-
-/** A fabric's stock and usage (in its own `_sen` units) never cross either — the ingest drops them too. */
-const FABRIC_STOCK_KEYS = new Set([
-  'soh_sen', 'po_outstanding_sen', 'last_month_usage_sen', 'one_week_usage_sen',
-  'two_weeks_usage_sen', 'one_month_usage_sen', 'shortage_sen', 'reorder_point_sen',
-])
 
 /** The ERP's config keys the portal mirrors — Bedframe and Sofa, not "Products Maintenance". */
 export const MAINTENANCE_POOL_KEYS = [
@@ -135,10 +158,8 @@ export function parseCatalogueDelivery(body: unknown): CatalogueParseResult {
     const raw = body[section]
     if (raw === undefined || raw === null) continue
     if (!Array.isArray(raw)) return { ok: false, error: `${section} must be an array` }
-    const rows = raw
-      .filter(isRow)
-      .map(stripMoney)
-      .map(r => (section === 'fabrics' ? Object.fromEntries(Object.entries(r).filter(([k]) => !FABRIC_STOCK_KEYS.has(k))) : r))
+    // A fabric's stock and usage (its `_sen` units) go with the money.
+    const rows = raw.filter(isRow).map(stripMoney)
     counts.sent[section] = raw.length
     counts.unreadable += raw.length - rows.length
     total += raw.length

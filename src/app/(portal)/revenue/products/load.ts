@@ -314,6 +314,8 @@ export interface CatalogueModel {
   calcOverride: string | null
   brand: string | null
   brandOverride: string | null
+  /** The brand the ERP branding alone gives — what "From the ERP branding" means. */
+  derivedBrand: string | null
   skus: CatalogueSku[]
 }
 
@@ -369,6 +371,7 @@ export async function loadModels(): Promise<{ models: CatalogueModel[]; brands: 
       const calc = calcOverride ?? derivedCalc
       const giftOverride = s && s.gift !== null && s.gift !== undefined ? s.gift === true : null
       const brandOverride = s ? str(s.brand_code) : null
+      const derivedBrand = brandOf(category, str(m.branding), skus.find(k => k.branding)?.branding ?? null, t.brands)
       return {
         erpId,
         code: String(m.model_code),
@@ -389,10 +392,9 @@ export async function loadModels(): Promise<{ models: CatalogueModel[]; brands: 
         giftOverride,
         calcCategory: calc,
         calcOverride,
-        brand:
-          brandOverride ??
-          brandOf(category, str(m.branding), skus.find(k => k.branding)?.branding ?? null, t.brands),
+        brand: brandOverride ?? derivedBrand,
         brandOverride,
+        derivedBrand,
         skus,
       }
     }),

@@ -7,8 +7,12 @@ import {
   CALC_CATEGORIES,
   calcCategoryOf,
   defaultGift,
+  erpAllows,
+  isRestricted,
+  isRiderModel,
   MAINTENANCE_SECTIONS,
   optionKeysOf,
+  RIDER,
   sizeWordOf,
   skuKeyOf,
   skuOptionLabel,
@@ -130,6 +134,69 @@ describe('allowedValues', () => {
 
   it.each<[unknown]>([[null], [undefined], [[['30']]], ['sizes'], [42]])('allowed_options %j → []', allowed => {
     expect(allowedValues(allowed, 'sizes')).toEqual([])
+  })
+})
+
+describe('erpAllows — an empty ERP list restricts nothing', () => {
+  const pool = ['No Leg', '2"', '4"', '6"']
+
+  it('a non-empty list is the model’s own', () => {
+    expect(isRestricted({ leg_heights: ['4"'] }, 'leg_heights')).toBe(true)
+    expect(erpAllows({ leg_heights: ['4"', { value: '6"' }] }, 'leg_heights', pool)).toEqual(['4"', '6"'])
+  })
+
+  // allowed-options-check.ts hasRestriction: Array.isArray(pool) && pool.length > 0.
+  it.each<[string, unknown]>([
+    ['an empty list', { leg_heights: [] }],
+    ['a missing key', { specials: ['Hydraulic'] }],
+    ['a JSON null', { leg_heights: null }],
+    ['no allowed_options at all', null],
+    ['allowed_options that is not an object', ['4"']],
+  ])('%s is the whole pool', (_, allowed) => {
+    expect(isRestricted(allowed, 'leg_heights')).toBe(false)
+    expect(erpAllows(allowed, 'leg_heights', pool)).toEqual(pool)
+  })
+
+  it('a list of blanks restricts, as the ERP’s does — to nothing it can match', () => {
+    expect(isRestricted({ leg_heights: [''] }, 'leg_heights')).toBe(true)
+    expect(erpAllows({ leg_heights: [''] }, 'leg_heights', pool)).toEqual([])
+  })
+
+  it('hands back a copy of the pool, never the pool itself', () => {
+    const out = erpAllows({}, 'gaps', pool)
+    expect(out).toEqual(pool)
+    expect(out).not.toBe(pool)
+  })
+
+  it('is the test catalogue_model_options applies', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260924040000_member_catalogue.sql'), 'utf8')
+    const fn = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION catalogue_model_options'))
+    expect(fn.slice(0, fn.indexOf('$fn$;', fn.indexOf('AS $fn$') + 8))).toContain(
+      "CASE WHEN jsonb_typeof(p_allowed) = 'array' THEN jsonb_array_length(p_allowed) = 0 ELSE TRUE END",
+    )
+  })
+})
+
+describe('isRiderModel — who joins any cart', () => {
+  it.each<[string | null, string | null, boolean]>([
+    ['BEDFRAME', null, true],
+    ['ACCESSORY', null, true],
+    [null, null, true],
+    ['MATTRESS', null, false],
+    ['sofa', null, false],
+    ['MATTRESS', RIDER, true],
+    ['BEDFRAME', 'AKEMI', false],
+    ['MATTRESS', 'AKEMI', false],
+  ])('%s with override %s → %s', (category, override, rider) => {
+    expect(isRiderModel(category, override)).toBe(rider)
+  })
+
+  it('is the rule member_catalogue applies', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260924040000_member_catalogue.sql'), 'utf8')
+    expect(sql).toContain("CASE WHEN cm.brand_code = 'RIDER' THEN NULL")
+    expect(sql).toContain("AND UPPER(COALESCE(m.category, e.category, '')) NOT IN ('MATTRESS', 'SOFA')),")
+    expect(sql).toContain('WHERE o.brand = ANY (p_brands) OR o.rider')
+    expect(RIDER).toBe('RIDER')
   })
 })
 

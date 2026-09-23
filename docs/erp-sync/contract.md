@@ -477,10 +477,24 @@ The ERP's Products page, as the portal's Product List mirrors it:
 **Not sent:** Variants, Fabric Converter, Categories, the "Products
 Maintenance" pools (bed frame and mattress sizes, compartments, brandings,
 supplier categories), and **any money**: no `*_sen`, no price grid values, no
-option `priceSen`, no fabric price or stock. The ERP strips money in its own
-SQL before anything leaves (minimum privilege); the receiver strips it again
-(`MONEY_KEYS`, `lib/erp-sync/catalogue.ts`), and so does the ingest
-(`catalogue_strip_money`) — a money field can survive none of the three.
+option `priceSen`, no special's option-group `extraSen`, no fabric price or
+stock. The ERP strips money in its own SQL before anything leaves (minimum
+privilege: an allowlist of columns, then `scm.vp_strip_money_keys` at any
+depth); the receiver strips it again (`isMoneyKey` / `stripMoney`,
+`lib/erp-sync/catalogue.ts`), and so does the ingest, over the whole delivery
+before it reads a field (`catalogue_strip_money`, mig `20260924030000` §0b) —
+each at ANY depth and each on its own, so a money field can survive none of
+the three. A key is money by the ERP's own pattern: named like a price, cost,
+amount, surcharge, discount or margin, or ending `_sen` / `Sen` / `RM` —
+except a price TIER (`sofa_price_tier`, `price_tier`: PRICE_1/2/3), which is a
+label the portal prices by. The two portal strips are pinned to each other by
+test.
+
+**An empty `allowed_options` list is "no restriction", the ERP's own rule**
+(`hasRestriction`, `allowed-options-check.ts`: only a non-empty list
+restricts). The portal reads it the same way: a model the ERP left
+unrestricted may offer anything in the Maintenance pool that Modular ticks
+(`catalogue_model_options`, `erpAllows`).
 
 ### 9.2 The endpoint
 

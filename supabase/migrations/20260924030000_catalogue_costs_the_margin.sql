@@ -27,14 +27,14 @@
 -- uniform quantity, subset coverage with extras at full price, the combo
 -- always wins).
 --
--- WHERE THE LINE'S OPTIONS COME FROM. The feed does not carry the ERP's
--- structured `variants`; it carries `description2`, which for every line the
--- ERP wrote itself is its own buildVariantSummary — `BO315-01 / SEAT 30 /
--- LEG DEFAULT / SPECIAL: Nylon Fabric`, `NB-04 / DIVAN 8" + LEG 4" / GAP 12"
--- / T.Heights 24"`. That grammar is parsed; a line whose raw DOES carry
--- `variants` (the ERP can add it to the feed) is read from those instead.
--- Hand-typed AutoCount-era text parses to nothing, and such a line is costed
--- on its SKU alone.
+-- WHERE THE LINE'S OPTIONS COME FROM. The ERP sends each line's structured
+-- `variants` (the order feed keeps them, allowlisted, from this release —
+-- contract §3); a line that landed before, or carries none, is read from
+-- `description2`, which for every line the ERP wrote itself is its own
+-- buildVariantSummary — `BO315-01 / SEAT 30 / LEG DEFAULT / SPECIAL: Nylon
+-- Fabric`, `NB-04 / DIVAN 8" + LEG 4" / GAP 12" / T.Heights 24"`. That
+-- grammar is parsed. Hand-typed AutoCount-era text parses to nothing, and
+-- such a line is costed on its SKU alone.
 --
 -- A LINE NOTHING HERE CAN PRICE HAS NO COST, and its bill has no margin —
 -- the engine's designed behaviour, and the Costing gaps list names it. The
@@ -48,7 +48,9 @@
 -- when somebody presses Recost on it, and the recost still refuses a month
 -- whose run has paid (23RUN).
 --
--- Also drops the ERP money columns 20260924020000 left NULL for one release.
+-- Also drops the ERP money columns 20260924020000 left NULL for one release,
+-- and makes the money strip reach every depth (§0b) — 020000's removed a
+-- fixed list of top-level keys only.
 --
 -- Reversal: the DOWN block at the foot.
 -- ════════════════════════════════════════════════════════════════════════════
@@ -70,6 +72,67 @@ ALTER TABLE erp_sofa_combos
     DROP COLUMN IF EXISTS customer_id,
     DROP COLUMN IF EXISTS supplier_id,
     DROP COLUMN IF EXISTS erp_snapshot_at;
+
+-- ── 0b. The strip reaches every depth ───────────────────────────────────────
+-- 20260924020000's catalogue_strip_money removed a fixed list of TOP-LEVEL
+-- keys, so money nested inside a row — a special's
+-- option_groups[].choices[].extraSen, the shape of the ERP's own
+-- scm.special_addons — would have gone through to `raw`. None has: the ERP's
+-- export allowlists its columns and strips at any depth itself
+-- (scm.vp_strip_money_keys). But contract §9.1 promises each of the three
+-- strips holds on its own, whatever the sender did, and a strip that trusts
+-- the one before it is not one of three.
+--
+-- A key is money by the ERP's own pattern — named like a price, cost, amount,
+-- surcharge, discount or margin, or ending _sen / Sen / RM — EXCEPT a price
+-- TIER (`sofa_price_tier`: PRICE_1/2/3), which is a label the portal prices
+-- by, not a price. The TypeScript twin is isMoneyKey / stripMoney
+-- (lib/erp-sync/catalogue.ts); both are pinned to this text.
+CREATE OR REPLACE FUNCTION catalogue_is_money_key(p_key TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+IMMUTABLE
+AS $fn$
+    SELECT (p_key ~* '(price|cost|amount|surcharge|discount|margin|_sen$)' OR p_key ~ '(Sen|RM)$')
+       AND p_key !~* 'tier$';
+$fn$;
+
+CREATE OR REPLACE FUNCTION catalogue_strip_money(p_row JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $fn$
+BEGIN
+    -- The common case: nothing to strip, answered by one scan.
+    IF p_row IS NULL OR NOT jsonb_path_exists(p_row,
+         'lax $.** ? (@.type() == "object").keyvalue() ? ((@.key like_regex "price|cost|amount|surcharge|discount|margin|_sen$" flag "i" || @.key like_regex "(Sen|RM)$") && !(@.key like_regex "tier$" flag "i"))') THEN
+        RETURN p_row;
+    END IF;
+    IF jsonb_typeof(p_row) = 'object' THEN
+        RETURN COALESCE((
+            SELECT jsonb_object_agg(e.key, catalogue_strip_money(e.value))
+              FROM jsonb_each(p_row) e
+             WHERE NOT catalogue_is_money_key(e.key)), '{}'::JSONB);
+    END IF;
+    RETURN (SELECT jsonb_agg(catalogue_strip_money(e.value) ORDER BY e.ord)
+              FROM jsonb_array_elements(p_row) WITH ORDINALITY AS e(value, ord));
+END
+$fn$;
+
+COMMENT ON FUNCTION catalogue_strip_money(JSONB) IS
+    'The value with every money key removed at any depth (catalogue_is_money_key: the ERP''s own pattern, a price TIER excepted). The catalogue ingest runs a whole delivery through it before reading a field.';
+
+-- Whatever 020000's strip let through is scrubbed from what is stored.
+UPDATE erp_products            SET raw = catalogue_strip_money(raw) WHERE raw IS DISTINCT FROM catalogue_strip_money(raw);
+UPDATE erp_product_models      SET raw = catalogue_strip_money(raw) WHERE raw IS DISTINCT FROM catalogue_strip_money(raw);
+UPDATE erp_product_models      SET allowed_options = catalogue_strip_money(allowed_options)
+                             WHERE allowed_options IS DISTINCT FROM catalogue_strip_money(allowed_options);
+UPDATE erp_maintenance_options SET raw = catalogue_strip_money(raw) WHERE raw IS DISTINCT FROM catalogue_strip_money(raw);
+UPDATE erp_fabrics             SET raw = catalogue_strip_money(raw) WHERE raw IS DISTINCT FROM catalogue_strip_money(raw);
+UPDATE erp_sofa_combos         SET raw = catalogue_strip_money(raw) WHERE raw IS DISTINCT FROM catalogue_strip_money(raw);
+UPDATE erp_sofa_combos         SET modules = catalogue_strip_money(modules)
+                             WHERE modules IS DISTINCT FROM catalogue_strip_money(modules);
 
 -- ── 1. Where a line's cost came from, and what it was made of ───────────────
 ALTER TABLE sales_order_lines
@@ -829,6 +892,7 @@ DECLARE
     v_batch   UUID;
     v_changed INTEGER := 0;
     v_order   UUID;
+    v_before  JSONB;
 BEGIN
     IF commission_order_period_locked(p_sub_department_id, p_period) THEN
         RAISE EXCEPTION 'The run for this month has paid. Reopen it before refilling costs — a cost changes the margin, and the margin changes what the run paid.'
@@ -845,6 +909,16 @@ BEGIN
         RETURN QUERY SELECT 0, 0, 0;
         RETURN;
     END IF;
+
+    -- What each line cost before. The count is of lines whose cost (or where it
+    -- came from) MOVED — not of the combo lines the UPDATE below resets to
+    -- their own price and catalogue_apply_combos then puts back.
+    SELECT COALESCE(jsonb_object_agg(sl.id::TEXT, jsonb_build_array(sl.cost_amount, sl.cost_source)), '{}'::JSONB)
+      INTO v_before
+      FROM sales_order_lines sl
+      JOIN sales_orders o ON o.id = sl.order_id
+     WHERE o.batch_id = v_batch
+       AND COALESCE(sl.cost_source, '') <> 'manual';
 
     WITH priced AS (
         SELECT sl.id, r.cost, r.detail
@@ -866,7 +940,6 @@ BEGIN
          OR sl.list_cost_amount IS DISTINCT FROM p.cost
          OR sl.cost_detail      IS DISTINCT FROM p.detail
          OR sl.cost_source      IS DISTINCT FROM CASE WHEN p.cost IS NULL THEN NULL ELSE 'catalogue' END);
-    GET DIAGNOSTICS v_changed = ROW_COUNT;
 
     FOR v_order IN
         SELECT DISTINCT o.id
@@ -877,6 +950,13 @@ BEGIN
     LOOP
         PERFORM catalogue_apply_combos(v_order);
     END LOOP;
+
+    SELECT COUNT(*)::INTEGER INTO v_changed
+      FROM sales_order_lines sl
+      JOIN sales_orders o ON o.id = sl.order_id
+     WHERE o.batch_id = v_batch
+       AND COALESCE(sl.cost_source, '') <> 'manual'
+       AND v_before->(sl.id::TEXT) IS DISTINCT FROM jsonb_build_array(sl.cost_amount, sl.cost_source);
 
     RETURN QUERY
     SELECT v_changed,
@@ -893,7 +973,7 @@ END;
 $fn$;
 
 COMMENT ON FUNCTION recost_sales_order_lines(UUID, DATE) IS
-    'Re-prices one sub-department''s month from the Product List: every line (catalogue_line_cost), then every sofa build (catalogue_apply_combos). Refuses a paid month (23RUN). Returns lines changed, lines still without a cost, bills fully costed.';
+    'Re-prices one sub-department''s month from the Product List: every line (catalogue_line_cost), then every sofa build (catalogue_apply_combos). Refuses a paid month (23RUN). Returns the lines whose cost moved, the lines still without a cost, the bills fully costed.';
 
 -- ── 15. The one lookup's old names ──────────────────────────────────────────
 -- Kept, pointed at the portal's price, so nothing that asks by the old name
@@ -1056,7 +1136,10 @@ GRANT EXECUTE ON FUNCTION catalogue_line_facts(TEXT, JSONB)            TO authen
 
 -- ── 17. The ingest, without the columns §0 dropped ──────────────────────────
 -- Identical to 20260924020000 §13 except that it no longer writes
--- erp_sofa_combos' customer / supplier / money columns, which are gone.
+-- erp_sofa_combos' customer / supplier / money columns, which are gone, and
+-- that the whole delivery goes through the deep strip (§0b) before a field is
+-- read — so a money key nested anywhere, in allowed_options or a combo's
+-- modules as much as in raw, is never stored.
 CREATE OR REPLACE FUNCTION ingest_erp_catalogue(p_batch JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -1073,6 +1156,7 @@ DECLARE
     v_pool      RECORD;
     v_adopted   JSONB;
 BEGIN
+    p_batch := catalogue_strip_money(p_batch);
     IF jsonb_typeof(p_batch->'products') = 'array' THEN
         WITH incoming AS (
             SELECT DISTINCT ON (BTRIM(e->>'id'))
@@ -1458,5 +1542,7 @@ NOTIFY pgrst, 'reload schema';
 -- DROP FUNCTION IF EXISTS catalogue_value_key(TEXT);
 -- DROP FUNCTION IF EXISTS catalogue_height_key(TEXT);
 -- (catalogue_code_key: re-run its 20260924020000 definition — the adoption uses it)
+-- (catalogue_strip_money: re-run its 20260924020000 definition, then)
+-- DROP FUNCTION IF EXISTS catalogue_is_money_key(TEXT);
 -- ALTER TABLE sales_order_lines DROP COLUMN IF EXISTS list_cost_amount, DROP COLUMN IF EXISTS cost_detail;
 -- (the dropped erp_* money columns held nothing; re-add them only with 20260919010000)

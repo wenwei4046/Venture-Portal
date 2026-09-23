@@ -536,9 +536,9 @@ export default function MemberQuoteBuilder({
   const localResult = useMemo(
     () =>
       data.demo && input.lines.length && input.price
-        ? calculateQuote(input, data.products, data.bands)
+        ? calculateQuote(input, data.products, data.bands, undefined, data.demoPricing)
         : null,
-    [data.demo, data.products, data.bands, input],
+    [data.demo, data.products, data.bands, data.demoPricing, input],
   );
   const currentResult = data.demo
     ? localResult
@@ -994,7 +994,7 @@ export default function MemberQuoteBuilder({
       key = JSON.stringify(snapshot);
     try {
       const checked = data.demo
-        ? calculateQuote(snapshot, data.products, data.bands)
+        ? calculateQuote(snapshot, data.products, data.bands, undefined, data.demoPricing)
         : await calculateMemberQuote(snapshot).then((response) => {
             if (!response.ok)
               throw new Error(response.error ?? "Unable to confirm the quote.");

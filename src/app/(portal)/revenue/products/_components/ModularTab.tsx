@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react'
 import { Hint } from '@/components/RowForm'
+import { isRiderModel, RIDER } from '@/lib/catalogue/options'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
 import ModelEditor from './ModelEditor'
 import { FilterChip, MirrorFlags, Stat, Toolbar, categoryLabel, orderedCategories } from './ui'
@@ -145,7 +146,18 @@ export default function ModularTab({
                     <td className="text-sm">{m.name && m.name !== m.code ? m.name : <span className="text-graphite">—</span>}</td>
                     <td className="text-xs">{categoryLabel(m.category)}</td>
                     <td className="text-xs">
-                      {m.brand && m.brand !== 'RIDER' ? m.brand : <span className="text-graphite">rider</span>}
+                      {m.brand && m.brand !== RIDER ? (
+                        m.brand
+                      ) : isRiderModel(m.category, m.brandOverride) ? (
+                        <span className="text-graphite">rider</span>
+                      ) : (
+                        <span
+                          className="text-danger"
+                          title="A mattress or sofa sells under its brand's margin ladder, and this one's ERP branding matches none. It is not offered until a ladder is chosen on the model."
+                        >
+                          no brand
+                        </span>
+                      )}
                     </td>
                     <td className="num whitespace-nowrap">
                       {ticked}/{liveSkus.length}

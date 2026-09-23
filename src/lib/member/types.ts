@@ -1,3 +1,4 @@
+import type { QuotePricing } from "./calculator";
 export type MemberPage =
   | "today"
   | "insight"
@@ -58,9 +59,9 @@ export interface MemberProduct {
   modelId?: string | null;
   /** Server-only: the priced grid behind `options`. Never enters an RPC response. */
   costGrid?: CostCell[] | null;
-  /** Server-only: the ERP's category (SOFA / BEDFRAME / MATTRESS / …) — which options a line takes. */
+  /** The ERP's category (SOFA / BEDFRAME / MATTRESS / …) — which build a line takes. Not money. */
   kind?: string | null;
-  /** Server-only: a sofa module's base model (`8030`) and module (`1A(LHF)`), what combos match on. */
+  /** A sofa module's base model (`8030`) and module (`1A(LHF)`), what combos match on. Not money. */
   baseModel?: string | null;
   moduleCode?: string | null;
   version: string;
@@ -191,6 +192,12 @@ export interface MemberData {
   products: MemberProduct[];
   /** The option dropdowns of every sofa and bed frame model in `products`. */
   catalogueModels?: MemberCatalogueModel[];
+  /**
+   * Preview only: the demo's fictional option and combo prices, so the
+   * preview's calculator prices a build the way the live one does. A live
+   * snapshot never carries it — live prices stay on the server.
+   */
+  demoPricing?: QuotePricing;
   bands: MemberBand[];
   departments?: {
     id: string;

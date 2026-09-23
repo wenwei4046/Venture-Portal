@@ -40,9 +40,16 @@ to the calculator, 248 models offered, **0 option surcharges, 0 combo prices**.
 - Order feed keeps allowlisted `variants` per line (`lib/erp-sync/contract.ts lineVariantsOf`) — the ERP WAS sending them all along; our parser dropped them.
 - Bill drill-down + Open Bill queue fixed (PGRST201: `sales_order_shares` made `hr_staff_costs(…)` ambiguous — name `!sales_orders_staff_id_fkey`). Each line's cost now has a provenance caption (`lib/catalogue/provenance.ts`).
 - Twin audit: TS vs SQL run side by side (PGlite); combo slot matching is now the ERP's Kuhn algorithm in BOTH twins; blank price string ≠ RM 0; see commit 9bcde03.
+- PGlite regression `tests/member-sql/validate-catalogue.mjs` (164 checks; the four migrations verbatim; in `npm test --prefix tests/member-sql`). It found four real bugs, all fixed in the two unapplied migrations + their TS twins:
+  1. nested money survived both portal strips (a special's `option_groups[].choices[].extraSen`) → 030000 §0b: `catalogue_strip_money` goes deep by the ERP's own key pattern (a price TIER excepted), scrubs what 020000 stored, and the ingest strips the whole delivery first; TS `isMoneyKey`/`stripMoney` the same, pinned by test. Live data was already clean (the ERP export allowlists).
+  2. recost counted every combo line as "re-priced" every time → counts lines whose final cost/source MOVED.
+  3. an EMPTY ERP `allowed_options` list was read as "nothing allowed"; the ERP means "no restriction" (`hasRestriction`) → whole pool, in `catalogue_model_options` and on Modular (`erpAllows`). 1 bed frame model today.
+  4. a mattress/sofa whose branding maps to no brand (MYLATEX + unbranded: 170 SKUs, none ticked yet) would have been a RIDER for every member → not offered until a Margin ladder is chosen; Modular shows "no brand" + a notice. And the Modular "Rider" choice (`brand_code = 'RIDER'`) had never been honoured by member_catalogue (it was read as a brand nobody sells) → now read as no brand.
+- Member preview (`/member/preview?design=live`, dev / Principal+HR) now demos the builds: a modular sofa with a grid, bed frame models with ticks, fictional surcharges and an L-shape combo (`lib/member/demo.ts demoPricing`, pinned by `demo.test.ts`).
+- CI (GitHub Actions) ran on #147 and passed both jobs, the Cloudflare worker + PDF smoke included.
 
 ### Known limits (tell the user, don't "fix" silently)
-- `npm run verify:worker` fails its yoga-wasm assertion in a Windows worktree with a junctioned node_modules — identically on a clean origin/main (checked 2026-09-24), so it is the environment; production runs on Vercel.
+- `npm run verify:worker` fails its yoga-wasm assertion in a Windows worktree with a junctioned node_modules — identically on a clean origin/main (checked 2026-09-24), and CI's Linux run of it passes on #147, so it is the local environment only.
 - Hand-typed AutoCount-era `description2` (most of August: `Col:PC151-15/Divan:8+2”leg/Gap:10”`) parses to nothing → such bed frames get their SKU price only, no option surcharge. ERP-written lines parse (150 bed frame + 95 sofa lines today) and new lines carry `variants`.
 - No Fair staff has a login yet → the member snapshot can only be exercised as the Principal (Revenue View) on prod.
 - Seat heights offered = the portal's grid heights ∩ the model's ticked `sizes`; the ERP's allowed sizes are NOT intersected for seat heights (the old lists priced 60cm/75cm on some models the ERP lists as 24–35).
