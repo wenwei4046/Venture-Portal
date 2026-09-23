@@ -294,6 +294,21 @@ describe('the catalogue behind the member calculator', () => {
     expect(mocks.adminClient).not.toHaveBeenCalled()
   })
 
+  it('quotes a seat height however the Product List spells it (STD, 75cm, even ?)', async () => {
+    const odd = (id: string, height: string) => ({
+      ...sofaModule(id, '1A(LHF)', 1000), options: [{ height, tier: 'PRICE_2' }],
+      grid: [{ height, tier: 'PRICE_2', price: 1000 }],
+    })
+    for (const height of ['STD', '75cm', '?']) {
+      mocks.adminRpc.mockResolvedValue(pricedCatalogue([odd(moduleA, height)], { models, optionPrices }))
+      const result = await calculateMemberQuote({
+        schemeId, price: '5000', delivery: '0', build: { height, tier: 'PRICE_2' },
+        lines: [{ productId: moduleA, quantity: 1, gift: false }],
+      })
+      expect(result.ok).toBe(true)
+    }
+  })
+
   it('refuses a malformed build before any cost lookup', async () => {
     const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', specials: ['<script>'] }))
     expect(result.ok).toBe(false)

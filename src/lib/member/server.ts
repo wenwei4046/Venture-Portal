@@ -491,8 +491,13 @@ function quoteBuild(raw: unknown): QuoteInput["build"] {
     return list.length ? list : undefined;
   };
   const b = raw as Record<string, unknown>;
+  // A seat height is whatever the Product List's grid calls it (`28`, `75cm`,
+  // `STD`, even `?`) and is matched against the SKU's own grid, so it needs
+  // only the options' shape check; the tier is one of three words.
+  const height = option(b.height, "sofa seat height");
+  if (height && height.length > 20) throw new Error("The sofa seat height is invalid.");
   const build: NonNullable<QuoteInput["build"]> = {
-    height: plain(b.height, "seat height"),
+    height,
     tier: plain(b.tier, "fabric tier"),
   };
   const leg = option(b.leg, "sofa leg height");
