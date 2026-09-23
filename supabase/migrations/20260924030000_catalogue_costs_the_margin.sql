@@ -431,15 +431,20 @@ BEGIN
     v_cat  := UPPER(COALESCE(v_cat, p_item_group, ''));
     v_tier := CASE WHEN v_cat IN ('SOFA', 'BEDFRAME') THEN catalogue_fabric_tier(p_company, f.fabric, v_cat) END;
 
+    -- A line nothing can price still says what it was read as, so a gap can
+    -- be argued with: which seat height, which fabric, where that came from.
     SELECT * INTO u FROM catalogue_unit_price(p_company, p_code, f.seat, v_tier);
     IF NOT FOUND THEN
-        detail := jsonb_build_object('reason', 'not_in_sku_master');
+        detail := jsonb_strip_nulls(jsonb_build_object(
+            'reason', 'not_in_sku_master', 'height', f.seat, 'fabric', f.fabric,
+            'parsed_from', f.parsed_from));
         RETURN NEXT;
         RETURN;
     END IF;
     IF u.unit_price IS NULL THEN
         detail := jsonb_strip_nulls(jsonb_build_object(
-            'reason', u.how, 'erp_product_id', u.erp_product_id, 'height', f.seat, 'tier', v_tier));
+            'reason', u.how, 'erp_product_id', u.erp_product_id, 'height', f.seat, 'tier', v_tier,
+            'fabric', f.fabric, 'parsed_from', f.parsed_from));
         RETURN NEXT;
         RETURN;
     END IF;

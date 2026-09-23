@@ -7,6 +7,7 @@ import { formatMoney, formatDate } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
 import { classifyLine, normaliseCode, type LineClass } from '@/lib/commission/engine'
+import { costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 
@@ -46,6 +47,10 @@ interface LineRow {
   line_amount: number | string
   brand_code: string | null
   cost_amount: number | string | null
+  /** Which rule priced it (catalogue / catalogue_combo / manual / the pre-2026-09-24 chain). */
+  cost_source?: string | null
+  /** How it was priced, or why nothing could — 20260924030000; absent before it. */
+  cost_detail?: unknown
 }
 
 interface PaymentRow {
@@ -79,7 +84,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const { data: orderData } = await supabase
     .from('sales_orders')
     .select(
-      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, hr_staff_costs (employee_name, employee_code)',
+      // The FK is named: since sales_order_shares (20260924010000) joins
+      // sales_orders to hr_staff_costs as well, a bare `hr_staff_costs (…)`
+      // is ambiguous to PostgREST (PGRST201) and the page read no order.
+      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -114,9 +122,11 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }] =
     await Promise.all([
+      // Every column rather than a list: `cost_detail` exists only once
+      // 20260924030000 is applied, and naming it would break this page before.
       supabase
         .from('sales_order_lines')
-        .select('id, line_no, item_group, product_code, product_name, description2, uom, qty, unit_price, line_amount, brand_code, cost_amount')
+        .select('*')
         .eq('order_id', orderId)
         .order('line_no'),
       subDept.schemeId
@@ -406,6 +416,18 @@ export default async function OrderDetailPage({ params }: PageProps) {
                     <td className="num">{formatMoney(amount)}</td>
                     <td className="num m-hide" data-label="Cost">
                       {lineCost === null ? <span className="neg">none</span> : formatMoney(lineCost)}
+                      {(() => {
+                        // Where the cost came from — the Product List, a combo,
+                        // or why nothing could price it.
+                        const p = costProvenance(l.cost_source, l.cost_detail, lineCost !== null)
+                        return (
+                          <div
+                            className={`font-sans text-[10.5px] mt-0.5 whitespace-normal ${p.missing ? 'text-danger' : 'text-muted'}`}
+                          >
+                            {p.label}
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="num m-hide" data-label="Margin">{pct(lineMargin)}</td>
                   </LedgerRow>

@@ -53,7 +53,8 @@ export default async function OpenBillPage({ params }: PageProps) {
   const { data: orderRows } = batchId
     ? await supabase
         .from('sales_orders')
-        .select('id, order_no, staff_id, event_date, order_total, sequence_in_day, hr_staff_costs (employee_name)')
+        // Named FK: sales_order_shares makes a bare embed ambiguous (PGRST201).
+        .select('id, order_no, staff_id, event_date, order_total, sequence_in_day, hr_staff_costs!sales_orders_staff_id_fkey (employee_name)')
         .eq('batch_id', batchId)
         .eq('cancelled', false)
         .not('staff_id', 'is', null)
