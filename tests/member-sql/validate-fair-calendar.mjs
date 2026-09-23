@@ -161,6 +161,9 @@ try {
   await db.exec(
     await readFile(new URL('20260923010000_the_claim_form_confirms_the_fair.sql', migrations), 'utf8'),
   )
+  await db.exec(
+    await readFile(new URL('20260923020000_venue_key_once_per_call.sql', migrations), 'utf8'),
+  )
 
   const augBatch = await one(
     `INSERT INTO sales_import_batches(period_month,file_name,sub_department_id)
