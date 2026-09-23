@@ -5,6 +5,34 @@
 Branch `feat/erp-catalogue-mirror`, worktree `.claude/worktrees/sku-master-mirror`
 (from `43689bb`). **WIP, not pushed, no PR yet.** Read this first.
 
+### THE GOAL of the next session: finish the whole request below, end to end
+(mirror + sync by API, VP-owned prices, Modular gating the calculator,
+Maintenance, combos — including the ERP-side push and the member calculator),
+then test, E2E, PR.
+
+The user's words (2026-09-24, verbatim):
+> 我要你把 SKU Master 做一个镜像过来，通过 API 接过来做同步。
+> 1. 价格与成本：所有镜像功能只同步 item，不同步价钱与 costing。价钱由我这边填，Venture Portal 里的 margin 统一由产品这边的价格来计算 costing 和 margin。ERP 这边只要加了新 item，那边就会自动同步新增；但改价钱不会同步，所有价格都在 Venture Portal 这边调。
+> 2. SKU Master：完整同步 item 过来。
+> 3. Modular tab：需要一模一样搬过来，并且保持同步（ERP 加了新 SKU，这边就同步新增）。最关键的是要有 allowed options 功能：Modular 是独立的，用来控制 Revenue team 的 calculator 上有哪些选项可以 drop down 下拉选择。比如 SKU Master 里有 10 个 SKU，我在 Modular 这边开启了 7 个，那 calculator 上就只能选到这 7 个，其他不能选。
+> 4. Maintenance tab：Fabric、Bed Frame 和 Sofa 需要拉过来同步。下面的 Product Maintenance 不需要拉过来。
+> 5. Sofa Combo：同样做同步（synchronize）。这边加了新的 Sofa Combo，Venture Portal 那边就会新增，但价格一样是由我们在 Venture Portal 这边自己调。
+> 不需要拉过来（不需要搬）的内容：Variants、Fabric Converter、Category。
+
+### Access you HAVE (use it, do not guess about the ERP)
+- **Houzs ERP code base:** `C:\Users\wenwe\Houzs ERP` (GitHub
+  `hello-houzs/Houzs-ERP`). Local main is behind origin and has untracked files
+  — do not edit it; read with `git -C "C:/Users/wenwe/Houzs ERP" fetch` +
+  `git -C "C:/Users/wenwe/Houzs ERP" show origin/main:<path>`; build the
+  ERP-side change in its own worktree from origin/main. Its rules: its root
+  `CLAUDE.md`; VP feed module doc `docs/modules/venture-portal-feed.md`.
+- **ERP Supabase, direct (read-only):** production project
+  **`anogrigyjbduyzclzjgn`** via `mcp__claude_ai_Supabase__execute_sql`
+  (`project_id: "anogrigyjbduyzclzjgn"`) — works although `list_projects`
+  does not show it. Schema `scm`, Houzs = `company_id = 1`. SELECT only.
+  (`ctbaifabbzghtsrmpirm` is an OLD copy; staging is `minnapsemfzjmtvnnvdd`.)
+- **VP Supabase:** `mcp__supabase__*` (project `gixpptmfuryskbwkmiwz`).
+
 ### What the user asked (2026-09-24)
 Mirror the Houzs ERP Products page into Revenue › Product List, synced by API:
 1. **Items only** — no price/cost ever syncs. Prices are typed in VP; every VP
