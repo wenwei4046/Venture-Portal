@@ -11,7 +11,6 @@ import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
 import MoreSheet from './MoreSheet'
 import BackToTop from '@/components/BackToTop'
-import commissionStyles from '@/app/(portal)/revenue/[sub]/[period]/_components/commission-workbench.module.css'
 
 // Portal shell.
 //
@@ -63,7 +62,7 @@ export default function PortalFrame({
   }, [pathname])
 
   return (
-    <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible ${commissionWorkbench ? commissionStyles.theme : ''}${productList ? ' product-theme' : ''}`}>
+    <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible${productList ? ' product-theme' : ''}`}>
       <div className="print:hidden contents">
         <Sidebar viewer={user} navData={navData} />
       </div>
