@@ -11,6 +11,8 @@ import { loadPayBoard } from './pay-preview'
 export async function loadCommissionWorkbench(
   db: SupabaseClient, subDepartmentId: string, period: string,
   monthOrders: MonthOrder[], runId?: string,
+  /** The All bills page reads commission only; the salary preview is the month page's. */
+  { pay: withPay = true }: { pay?: boolean } = {},
 ) {
   const [{ input, currentHierarchy, currentRules, unmatchedOrderNos }, calendar] = await Promise.all([
     loadCommissionInput(period, subDepartmentId, db, { replayRunId: runId, includeCurrentRules: true }),
@@ -20,9 +22,11 @@ export async function loadCommissionWorkbench(
   const [people, pay] = await Promise.all([
     fetchByKeys<{ id: string; employee_name: string; employee_code: string | null }, string>(ids, keys =>
       db.from('hr_staff_costs').select('id, employee_name, employee_code').in('id', keys)),
-    loadPayBoard(db, subDepartmentId, period, { allowWithoutRun: true, previewStaffIds: ids })
-      .then(value => ({ ...value, unavailable: false }))
-      .catch(() => ({ rows: [], unavailable: true })),
+    withPay
+      ? loadPayBoard(db, subDepartmentId, period, { allowWithoutRun: true, previewStaffIds: ids })
+        .then(value => ({ ...value, unavailable: false }))
+        .catch(() => ({ rows: [], unavailable: true }))
+      : Promise.resolve({ rows: [], unavailable: true }),
   ])
   // Carry-forward bills need the same resolved venue/organiser as the source month's board.
   const earlierPeriods = [...new Set(input.orders.filter(o => !o.upsale && o.periodMonth !== period).map(o => o.periodMonth))]

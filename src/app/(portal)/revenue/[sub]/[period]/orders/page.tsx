@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
-import LedgerRow from '@/components/LedgerRow'
+import { buildCommissionWorkbench } from '@/lib/commission/workbench'
+import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
 import {
   exclusionReason,
@@ -16,9 +17,10 @@ import {
   loadUncostedProducts,
   type MonthOrder,
 } from '../../../_lib/month-orders'
-import OpenBillPicker from './_components/OpenBillPicker'
+import { loadCommissionWorkbench } from '../../../_lib/commission-workbench'
+import workbenchStyles from '../_components/commission-workbench.module.css'
 import CostGapPanel from './_components/CostGapPanel'
-import ShareControl from './_components/ShareControl'
+import AllBillsTable, { type BillRow } from './_components/AllBillsTable'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
@@ -31,10 +33,6 @@ function label(period: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   })
-}
-
-function pct(v: number | null): string {
-  return v === null ? '—' : `${(v * 100).toFixed(1)}%`
 }
 
 /**
@@ -95,8 +93,9 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
 
   const includeExcluded = show === 'all'
-  const rows = all.filter(o => {
-    if (!includeExcluded && o.cancelled) return false
+  // Every bill the URL's filters allow, excluded ones too: the table hides
+  // those itself behind *Show excluded*, so the toggle is not a round trip.
+  const base0 = all.filter(o => {
     if (staffFilter === 'unmatched' && o.staffId) return false
     // A person's bills include the ones shared TO them: that part is theirs.
     if (
@@ -111,6 +110,32 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     if (venueFilter !== undefined && (o.venueGroupKey ?? '') !== venueFilter) return false
     return true
   })
+  // The tiles are the month's money, so they read the live bills only.
+  const rows = base0.filter(o => !o.cancelled)
+
+  // What the live calculation pays on each bill — the same engine, rules and
+  // team history as the month page's salesperson ledger, without its drafts.
+  let workbench: Awaited<ReturnType<typeof loadCommissionWorkbench>> | null = null
+  let commissionNote: string | null = subDept.schemeId ? null : 'This sub-department has no commission scheme, so no bill pays commission.'
+  if (subDept.schemeId && all.length > 0) {
+    try {
+      const { data: run } = await supabase
+        .from('comm_runs')
+        .select('id')
+        .eq('period_month', period)
+        .eq('sub_department_id', subDept.id)
+        .maybeSingle()
+      workbench = await loadCommissionWorkbench(supabase, subDept.id, period, all, (run as { id: string } | null)?.id, { pay: false })
+    } catch (e) {
+      commissionNote = `The live commission could not be calculated: ${e instanceof Error ? e.message : 'unknown error'}. The bills themselves are complete.`
+    }
+  }
+  const board = workbench
+    ? buildCommissionWorkbench(workbench.input, { people: workbench.people, orders: workbench.orders })
+    : null
+  const byBill = board ? commissionByBill(board.personalRows, period) : new Map<string, BillCommission>()
+  const personOf = new Map((board?.people ?? []).map(p => [p.staffId, p]))
+  const eventOf = new Map((workbench?.orders ?? []).map(o => [o.orderId, o]))
 
   const person = staffFilter && staffFilter !== 'unmatched'
     ? all.find(o => o.staffId === staffFilter)
@@ -126,7 +151,6 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   const held = rows.filter(o => !o.cancelled && !o.depositMet)
   const heldValue = held.reduce((a, o) => a + o.orderTotal, 0)
   const noCost = rows.reduce((a, o) => a + o.linesWithoutCost, 0)
-  const excludedCount = all.filter(o => o.cancelled).length
 
   // A bill with no margin is the figure worth counting, not the lines behind
   // it: one uncosted line blinds the whole bill, so ten lines can be one
@@ -137,7 +161,6 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   const tagged = live.filter(o => o.openBillRank !== null)
   const stillSuggested = tagged.filter(o => o.openBillAuto).length
 
-  const filtered = Boolean(staffFilter) || venueFilter !== undefined
   const base = revenuePath(subDept.slug, period, 'orders')
   const keep = (extra: Record<string, string | undefined>) => {
     const q = new URLSearchParams()
@@ -147,8 +170,73 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     return s ? `${base}?${s}` : base
   }
 
+  const billRows: BillRow[] = base0.map(o => {
+    const paid = byBill.get(o.orderId)
+    const who = o.staffId ? personOf.get(o.staffId) : undefined
+    const reason = exclusionReason(o)
+    return {
+      orderId: o.orderId,
+      orderNo: o.orderNo,
+      href: revenuePath(subDept.slug, period, 'orders', o.orderId),
+      orderDate: o.orderDate,
+      eventDate: o.eventDate,
+      sequenceInDay: o.sequenceInDay,
+      customerName: o.customerName,
+      venue: o.venue,
+      venueHref: o.venue ? keep({ venue: o.venueGroupKey ?? '', staff: undefined }) : null,
+      // Only when the document's spelling is not the place's own.
+      venuePlace: o.venueGroupName && venueKey(o.venue) !== o.venueGroupKey ? o.venueGroupName : null,
+      eventName: eventOf.get(o.orderId)?.eventName ?? null,
+      organizer: eventOf.get(o.orderId)?.organizer ?? o.organizer,
+      location: o.location,
+      brands: paid?.brands.length ? paid.brands : o.brandCode ? [o.brandCode] : [],
+      categories: paid?.categories ?? [],
+      orderTotal: o.orderTotal,
+      paidAmount: o.paidAmount,
+      depositShort: o.depositRequired !== null && !o.depositMet ? o.depositRequired : null,
+      marginPct: o.marginPct,
+      marginValue: o.marginCost === null ? null : Math.round((o.marginRevenue - o.marginCost) * 100) / 100,
+      marginKeyed: o.marginSource === 'manual',
+      status: reason ?? (!o.staffId ? 'Pays nobody' : !o.depositMet ? 'Deposit pending' : 'Included'),
+      cancelled: o.cancelled,
+      staff: o.staffId
+        ? {
+            id: o.staffId,
+            name: o.employeeName ?? '—',
+            code: o.employeeCode,
+            href: keep({ staff: o.staffId, venue: undefined }),
+          }
+        : null,
+      agent: o.staffId ? null : { name: o.agentName, ignored: o.excludedReason === 'ignored_agent' },
+      shares: (sharesByOrder.get(o.orderId) ?? []).map(sh => ({ staffId: sh.staffId, name: sh.name, pct: sh.pct })),
+      shareDisabled: runLocked || o.cancelled,
+      shareDisabledReason: runLocked
+        ? 'The run for this month has paid — reopen it before changing who shares a bill'
+        : `${reason} — nothing to share`,
+      title: who?.titleLabel ?? null,
+      rank: who?.rankLabel ?? null,
+      rate: who ? who.productRate : null,
+      openBill: {
+        rank: o.openBillRank === 1 || o.openBillRank === 2 || o.openBillRank === 3 ? o.openBillRank : null,
+        suggested: o.openBillAuto === true,
+        disabled: runLocked || o.cancelled || !o.staffId,
+        disabledReason: runLocked
+          ? 'The run for this month has paid — reopen it before changing the picks'
+          : o.cancelled
+            ? `${reason} — no Open Bill bonus`
+            : 'This bill has no matched salesperson yet',
+      },
+      commission: paid
+        ? { product: paid.product, kpi: paid.kpi, marginIncentive: paid.marginIncentive, openBill: paid.openBill, total: paid.total }
+        : o.cancelled || commissionNote
+          ? null
+          : { product: 0, kpi: 0, marginIncentive: 0, openBill: 0, total: 0 },
+    }
+  })
+
+  const filtered = Boolean(staffFilter) || venueFilter !== undefined
   return (
-    <div>
+    <div className={workbenchStyles.page}>
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
@@ -215,7 +303,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         <div className="sect-head">
           <h2>Bills</h2>
           <span className="rule" aria-hidden />
-          <span className="count">{rows.length} ROWS</span>
+          <span className="count">{rows.length} BILLS</span>
         </div>
         <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
           In the order the day wrote them — the running number is what the Open Bill bonus reads.
@@ -231,208 +319,26 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               .
             </>
           ) : null}
-          {excludedCount > 0 ? (
-            <>
-              {' '}
-              {includeExcluded ? (
-                <>
-                  Cancelled, drafted, held and ignored bills are shown, greyed;{' '}
-                  <Link href={keep({ show: undefined })} className="text-accent hover:underline">
-                    hide them
-                  </Link>
-                  .
-                </>
-              ) : (
-                <>
-                  {excludedCount} excluded bill{excludedCount === 1 ? ' is' : 's are'} not shown;{' '}
-                  <Link href={keep({ show: 'all' })} className="text-accent hover:underline">
-                    show them
-                  </Link>
-                  .
-                </>
-              )}
-            </>
-          ) : null}
         </p>
 
-        {rows.length === 0 ? (
+        {base0.length === 0 ? (
           <div className="py-12 text-center border border-hairline rounded-card bg-surface">
             <p className="font-serif text-xl text-ink">No bills match.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Bill</th>
-                  <th className="m-hide">Date</th>
-                  <th className="m-hide">Customer</th>
-                  <th className="m-hide">Venue</th>
-                  <th className="m-hide">Salesperson</th>
-                  <th className="m-hide">Brand</th>
-                  <th className="right m-hide">Amount</th>
-                  <th className="right m-hide">Paid</th>
-                  <th className="right m-hide">Margin</th>
-                  {openBillPaid ? <th className="m-hide">Open Bill</th> : null}
-                  <th className="right">Counts as</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(o => (
-                  <LedgerRow key={o.orderId}>
-                    <td>
-                      <Link
-                        href={revenuePath(subDept.slug, period, 'orders', o.orderId)}
-                        className="font-mono text-xs text-ink hover:text-accent"
-                      >
-                        {o.orderNo}
-                      </Link>
-                      {!openBillPaid && o.openBillRank ? (
-                        <div className="font-mono text-[10.5px] text-accent mt-0.5">
-                          OPEN BILL {o.openBillRank}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="font-mono text-xs text-graphite m-hide" data-label="Date">
-                      {formatDate(o.orderDate)}
-                      {o.sequenceInDay ? (
-                        <span className="text-muted"> · #{o.sequenceInDay}</span>
-                      ) : null}
-                    </td>
-                    <td className="m-hide" data-label="Customer">
-                      <span className="font-serif text-[14px] text-ink">{o.customerName ?? '—'}</span>
-                    </td>
-                    <td className="m-hide" data-label="Venue">
-                      {o.venue ? (
-                        <Link
-                          href={keep({ venue: o.venueGroupKey ?? '', staff: undefined })}
-                          className="font-serif text-[13px] text-graphite hover:text-accent"
-                        >
-                          {o.venue}
-                        </Link>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                      {/* Only when the document's spelling is not the place's own. */}
-                      {o.venueGroupName && venueKey(o.venue) !== o.venueGroupKey ? (
-                        <div className="font-serif italic text-[11px] text-muted mt-0.5">
-                          at {o.venueGroupName}
-                        </div>
-                      ) : null}
-                      {o.organizer ? (
-                        <div className="font-mono text-[10.5px] text-muted mt-0.5">{o.organizer}</div>
-                      ) : null}
-                    </td>
-                    <td className="m-hide" data-label="Salesperson">
-                      {o.staffId ? (
-                        <>
-                          <Link
-                            href={keep({ staff: o.staffId, venue: undefined })}
-                            className="font-serif text-[14px] text-ink hover:text-accent"
-                          >
-                            {o.employeeName}
-                          </Link>
-                          <ShareControl
-                            orderId={o.orderId}
-                            ownerStaffId={o.staffId}
-                            ownerName={o.employeeName ?? '—'}
-                            shares={(sharesByOrder.get(o.orderId) ?? []).map(sh => ({
-                              staffId: sh.staffId,
-                              name: sh.name,
-                              pct: sh.pct,
-                            }))}
-                            team={team}
-                            disabled={runLocked || o.cancelled}
-                            disabledReason={
-                              runLocked
-                                ? 'The run for this month has paid — reopen it before changing who shares a bill'
-                                : `${exclusionReason(o)} — nothing to share`
-                            }
-                          />
-                        </>
-                      ) : (
-                        <span
-                          className={
-                            o.excludedReason === 'ignored_agent'
-                              ? 'text-muted font-serif text-[14px]'
-                              : 'text-danger font-serif text-[14px]'
-                          }
-                        >
-                          {/* Red means "answer this". An ignored name HAS been
-                              answered, so it stops asking. */}
-                          {o.agentName} · {o.excludedReason === 'ignored_agent' ? 'not ours' : 'unmatched'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="font-mono text-[11px] text-graphite m-hide" data-label="Brand">
-                      {o.brandCode ?? <span className="neg">none</span>}
-                    </td>
-                    <td className="num m-hide" data-label="Amount">{formatMoney(o.orderTotal)}</td>
-                    <td className="num m-hide" data-label="Paid">
-                      {formatMoney(o.paidAmount)}
-                      {o.depositRequired !== null && !o.depositMet ? (
-                        <div className="font-mono text-[10.5px] text-danger">
-                          needs {formatMoney(o.depositRequired)}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="num m-hide" data-label="Margin">
-                      {o.marginPct === null ? (
-                        <span className="neg">no cost</span>
-                      ) : (
-                        <>
-                          {pct(o.marginPct)}
-                          {o.marginSource === 'manual' ? (
-                            <div className="font-mono text-[10.5px] text-accent">keyed</div>
-                          ) : null}
-                        </>
-                      )}
-                    </td>
-                    {openBillPaid ? (
-                      <td className="m-hide" data-label="Open Bill">
-                        <OpenBillPicker
-                          orderId={o.orderId}
-                          staffName={o.employeeName}
-                          eventDate={o.eventDate}
-                          rank={
-                            o.openBillRank === 1 || o.openBillRank === 2 || o.openBillRank === 3
-                              ? o.openBillRank
-                              : null
-                          }
-                          suggested={o.openBillAuto === true}
-                          disabled={runLocked || o.cancelled || !o.staffId}
-                          disabledReason={
-                            runLocked
-                              ? 'The run for this month has paid — reopen it before changing the picks'
-                              : o.cancelled
-                                ? `${exclusionReason(o)} — no Open Bill bonus`
-                                : 'This bill has no matched salesperson yet'
-                          }
-                        />
-                      </td>
-                    ) : null}
-                    <td className="num">
-                      {o.cancelled ? (
-                        <span className="font-serif italic text-muted text-sm">
-                          {exclusionReason(o)}
-                        </span>
-                      ) : !o.depositMet ? (
-                        <span className="font-serif italic text-alert text-sm">Held</span>
-                      ) : (
-                        <span className="font-semibold">{formatMoney(o.orderTotal)}</span>
-                      )}
-                    </td>
-                  </LedgerRow>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AllBillsTable
+            rows={billRows}
+            team={team}
+            openBillPaid={openBillPaid}
+            commissionNote={commissionNote}
+            initialShowExcluded={includeExcluded}
+          />
         )}
 
         <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
-          &quot;Counts as&quot; is the bill&apos;s SALES value, not its commission: transport and disposal
-          lines leave the base, KPI items move to their own allowance, and a held bill pays in the
+          &quot;Total commission&quot; is the live calculation&apos;s personal commission on the bill —
+          every shared part added together, overriding left to the upline — from the same rules as
+          the month&apos;s salesperson ledger, without its review drafts. A held bill pays in the
           month its deposit clears. Open the bill to see it line by line.
           {openBillPaid ? (
             <>
