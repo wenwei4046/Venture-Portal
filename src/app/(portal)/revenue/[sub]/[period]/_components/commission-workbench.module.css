@@ -1,6 +1,5 @@
-/* Matches the approved Product List workspace, with its palette scoped to
-   this report. Monetary meaning is expressed by labels, not coloured ink. */
-.theme,
+/* Keep the Product List palette inside this report. The shared header,
+   sidebar and mobile navigation inherit the portal's original colour tone. */
 .page {
   color-scheme: light;
   --paper: 243 243 241;
@@ -23,15 +22,6 @@
   --work-table-rule: 207 197 183;
   --work-table-border: 216 210 200;
   --work-row-hover: 255 245 233;
-}
-
-.theme :global(.sidebar-contrast) {
-  --chrome: 222 215 202;
-  --ink: 0 0 0;
-  --graphite: 0 0 0;
-  --muted: 0 0 0;
-  --accent: 233 154 83;
-  --accent-bg: 255 244 231;
 }
 
 .page {
