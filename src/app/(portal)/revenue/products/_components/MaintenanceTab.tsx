@@ -2,305 +2,288 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Hint } from '@/components/RowForm'
 import { formatMoney } from '@/lib/utils'
+import { validateOptionPrices } from '@/lib/catalogue/edits'
 import { MAINTENANCE_SECTIONS } from '@/lib/catalogue/options'
 import { saveOptionPrices } from '../../catalogue-actions'
 import type { FabricRow, MaintenanceOption } from '../load'
-import { MONEY_INPUT, MirrorFlags, Notice } from './ui'
-
-/**
- * Maintenance — the ERP's Bedframe and Sofa option pools, and the fabrics.
- *
- * What the user asked for (2026-09-24): Fabric, Bed Frame and Sofa, kept in
- * step; NOT the "Products Maintenance" pools below them (bedframe and mattress
- * sizes, compartments, brandings, supplier categories). The rail is the ERP's
- * own, minus those.
- *
- * The values arrive from the ERP; the RM beside a priced option is the
- * portal's. In the ERP that figure is a COST surcharge ("这些价钱都是
- * costing") and it is what choosing the option adds to a line — so here it is
- * what choosing it adds to the cost a margin is measured against, in the
- * calculator and in the run. An option nobody has priced adds nothing, and
- * says so.
- */
+import { useProductDraftGuard } from './ProductWorkspace'
 
 const FABRICS = 'fabrics'
+const PAGE_SIZE = 300
+type Drafts = Map<string, Map<string, string>>
+type Prices = Map<string, Map<string, number | null>>
 
-export default function MaintenanceTab({
-  options,
-  fabrics,
-}: {
-  options: MaintenanceOption[]
-  fabrics: FabricRow[]
-}) {
+/** ERP option values and fabric mappings stay read-only; only portal surcharges are editable. */
+export default function MaintenanceTab({ options, fabrics }: { options: MaintenanceOption[]; fabrics: FabricRow[] }) {
   const router = useRouter()
-  const [pool, setPool] = useState<string>('bedframe_divan_heights')
+  const [pool, setPool] = useState('bedframe_divan_heights')
   const [editing, setEditing] = useState(false)
-  const drafts = useRef<Map<string, string>>(new Map())
-  const [dirty, setDirty] = useState(0)
+  const [drafts, setDrafts] = useState<Drafts>(new Map())
+  // Confirmed saves remain visible while the server refresh catches up, including partial saves.
+  const [savedPrices, setSavedPrices] = useState<{ source: MaintenanceOption[]; values: Prices }>({ source: options, values: new Map() })
   const [saving, startSaving] = useTransition()
+  const saveInFlight = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [fabricQuery, setFabricQuery] = useState('')
-  const [showRetired, setShowRetired] = useState(false)
+  const [query, setQuery] = useState('')
+  const [showRemoved, setShowRemoved] = useState(false)
+  const [sofaTier, setSofaTier] = useState('')
+  const [bedframeTier, setBedframeTier] = useState('')
+  const [limit, setLimit] = useState(PAGE_SIZE)
 
+  const fabricView = pool === FABRICS
+  const section = MAINTENANCE_SECTIONS.find(s => s.pools.some(p => p.pool === pool))
+  const meta = section?.pools.find(p => p.pool === pool)
+  const dirty = [...drafts.values()].reduce((sum, values) => sum + values.size, 0)
+  const dirtyPools = drafts.size
+  useProductDraftGuard(dirty > 0, saving)
   const byPool = useMemo(() => {
-    const m = new Map<string, MaintenanceOption[]>()
-    for (const o of options) {
-      if (o.removed && !showRetired) continue
-      const list = m.get(o.pool) ?? []
-      list.push(o)
-      m.set(o.pool, list)
+    const groups = new Map<string, MaintenanceOption[]>()
+    for (const option of options) {
+      if (option.removed && !showRemoved) continue
+      const list = groups.get(option.pool) ?? []
+      list.push(option)
+      groups.set(option.pool, list)
     }
-    for (const list of m.values()) list.sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value))
-    return m
-  }, [options, showRetired])
-
-  const liveFabrics = useMemo(() => fabrics.filter(f => showRetired || !f.removed), [fabrics, showRetired])
-  const meta = MAINTENANCE_SECTIONS.flatMap(s => s.pools).find(p => p.pool === pool)
+    for (const rows of groups.values()) rows.sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value))
+    return groups
+  }, [options, showRemoved])
   const rows = byPool.get(pool) ?? []
+  const liveFabrics = useMemo(() => fabrics.filter(f => showRemoved || !f.removed), [fabrics, showRemoved])
+  const search = query.trim().toLowerCase()
+  const shownOptions = rows.filter(o => [o.value, o.label].some(v => v.toLowerCase().includes(search)))
+  const shownFabrics = useMemo(() => liveFabrics.filter(f =>
+    [f.code, f.description, f.series, f.category].some(v => (v ?? '').toLowerCase().includes(search)) &&
+    matchesTier(f.sofaTier, f.priceTier, sofaTier) && matchesTier(f.bedframeTier, f.priceTier, bedframeTier),
+  ), [liveFabrics, search, sofaTier, bedframeTier])
+  const count = fabricView ? shownFabrics.length : shownOptions.length
+  const total = fabricView ? liveFabrics.length : rows.length
+  const visibleCount = Math.min(limit, count)
 
   function pick(next: string) {
-    if (editing && dirty > 0 && !window.confirm('Leave without saving these surcharges?')) return
-    drafts.current = new Map()
-    setDirty(0)
+    if (saveInFlight.current) return
+    setPool(next)
+    setQuery('')
+    setLimit(PAGE_SIZE)
+  }
+
+  function touch(value: string, price: string) {
+    if (saveInFlight.current) return
+    setDrafts(previous => {
+      const next = new Map(previous)
+      const values = new Map(next.get(pool))
+      values.set(value, price)
+      next.set(pool, values)
+      return next
+    })
+    setNotice(null)
+  }
+
+  function cancel() {
+    if (saveInFlight.current) return
+    setDrafts(new Map())
     setEditing(false)
     setError(null)
-    setNotice(null)
-    setPool(next)
   }
 
   function save() {
-    const edits = [...drafts.current.entries()].map(([value, price]) => ({ value, price }))
+    if (saveInFlight.current || dirty === 0) return
+    // Validate the entire batch first, before any pool can be written.
+    let pending: Array<{ pool: string; edits: Array<{ value: string; price: string }>; prices: Map<string, number | null> }>
+    try {
+      pending = [...drafts].map(([poolKey, values]) => {
+        const edits = [...values].map(([value, price]) => ({ value, price }))
+        const validated = validateOptionPrices(poolKey, edits)
+        const prices = new Map<string, number | null>(validated.upserts.map(row => [row.value, row.price]))
+        for (const value of validated.clears) prices.set(value, null)
+        return { pool: poolKey, edits, prices }
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Check the surcharge amounts.')
+      return
+    }
+    saveInFlight.current = true
     setError(null)
+    setNotice(null)
     startSaving(async () => {
+      let saved = 0
       try {
-        const r = await saveOptionPrices(pool, edits)
-        drafts.current = new Map()
-        setDirty(0)
+        for (const batch of pending) {
+          const result = await saveOptionPrices(batch.pool, batch.edits)
+          saved += result.saved
+          setSavedPrices(previous => {
+            const next = new Map(previous.source === options ? previous.values : undefined)
+            next.set(batch.pool, new Map([...(next.get(batch.pool) ?? []), ...batch.prices]))
+            return { source: options, values: next }
+          })
+          setDrafts(previous => {
+            const next = new Map(previous)
+            next.delete(batch.pool)
+            return next
+          })
+        }
         setEditing(false)
-        setNotice(`${r.saved} surcharge${r.saved === 1 ? '' : 's'} saved.`)
-        router.refresh()
+        setNotice(`${saved} surcharge${saved === 1 ? '' : 's'} saved.`)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not save the surcharges')
+        setError(e instanceof Error ? e.message : 'Could not save the surcharges.')
+        if (saved > 0) setNotice(`${saved} surcharge${saved === 1 ? '' : 's'} saved. Remaining changes are kept for retry.`)
+      } finally {
+        saveInFlight.current = false
+        if (saved > 0) router.refresh()
       }
     })
   }
 
-  const shownFabrics = useMemo(() => {
-    const q = fabricQuery.trim().toLowerCase()
-    if (!q) return liveFabrics
-    return liveFabrics.filter(f =>
-      [f.code, f.description, f.series, f.category].some(v => (v ?? '').toLowerCase().includes(q)),
-    )
-  }, [liveFabrics, fabricQuery])
+  function optionPrice(option: MaintenanceOption) {
+    const confirmed = savedPrices.source === options ? savedPrices.values.get(option.pool) : undefined
+    return confirmed?.has(option.value) ? confirmed.get(option.value)! : option.price
+  }
 
   return (
-    <section>
-      <Hint>
-        The ERP&apos;s Bedframe and Sofa option pools and its fabric list, kept in step (its{' '}
-        <em>Products Maintenance</em> pools are not mirrored). The values are the ERP&apos;s; the{' '}
-        <strong>RM beside a priced option is the portal&apos;s</strong> — what choosing it adds to the
-        cost a margin is measured against, in the calculator and in the run. An option with no RM
-        adds nothing until one is keyed. Which options each model offers is set on <em>Modular</em>.
-      </Hint>
-
-      <div className="grid grid-cols-1 md:grid-cols-[14rem_1fr] gap-6 mt-6">
-        <nav aria-label="Maintenance pools" className="border border-hairline rounded-md bg-surface p-3 self-start">
-          {MAINTENANCE_SECTIONS.map(s => (
-            <div key={s.section} className="mb-3">
-              <div className="font-mono text-[10.5px] text-muted tracking-wider mb-1">{s.section.toUpperCase()}</div>
-              {s.pools.map(p => {
-                const list = byPool.get(p.pool) ?? []
-                const unpriced = p.priced ? list.filter(o => o.price === null && !o.removed).length : 0
-                return (
-                  <button
-                    key={p.pool}
-                    type="button"
-                    onClick={() => pick(p.pool)}
-                    aria-current={pool === p.pool}
-                    className={`w-full flex items-center justify-between text-left text-sm px-2 py-1.5 rounded-control ${
-                      pool === p.pool ? 'bg-accent text-paper' : 'text-ink hover:bg-surface-2'
-                    }`}
-                  >
-                    <span>{p.label}</span>
-                    <span className="font-mono text-[10.5px] opacity-80">
-                      {p.priced ? 'RM · ' : ''}
-                      {list.length}
-                      {unpriced > 0 ? ` · ${unpriced} ?` : ''}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+    <section className="sku-master maintenance-workspace" aria-label="Maintenance workspace">
+      <div className="sku-filters">
+        <div className="sku-categories" role="group" aria-label="Maintenance sections">
+          {MAINTENANCE_SECTIONS.map(group => (
+            <button key={group.section} type="button" className="sku-chip" aria-pressed={section?.section === group.section}
+              disabled={saving} onClick={() => pick(group.pools[0].pool)}>{group.section}</button>
           ))}
-          <div>
-            <div className="font-mono text-[10.5px] text-muted tracking-wider mb-1">COMMON</div>
-            <button
-              type="button"
-              onClick={() => pick(FABRICS)}
-              aria-current={pool === FABRICS}
-              className={`w-full flex items-center justify-between text-left text-sm px-2 py-1.5 rounded-control ${
-                pool === FABRICS ? 'bg-accent text-paper' : 'text-ink hover:bg-surface-2'
-              }`}
-            >
-              <span>Fabrics</span>
-              <span className="font-mono text-[10.5px] opacity-80">{liveFabrics.filter(f => f.active).length}</span>
-            </button>
+          <button type="button" className="sku-chip" aria-pressed={fabricView} disabled={saving} onClick={() => pick(FABRICS)}>Fabrics</button>
+        </div>
+        {section ? (
+          <div className="maintenance-pools" role="group" aria-label={`${section.section} option pools`}>
+            {section.pools.map(item => (
+              <button key={item.pool} type="button" className="sku-chip" aria-pressed={pool === item.pool} disabled={saving} onClick={() => pick(item.pool)}>
+                {item.label}
+                {drafts.has(item.pool) ? <span className="maintenance-draft-count" aria-label={`${drafts.get(item.pool)!.size} unsaved changes`}>{drafts.get(item.pool)!.size}</span> : null}
+              </button>
+            ))}
           </div>
-          <label className="flex items-center gap-2 text-xs text-graphite mt-3">
-            <input type="checkbox" checked={showRetired} onChange={e => setShowRetired(e.target.checked)} />
-            Include gone from the ERP
+        ) : null}
+        <div className="sku-filter-controls">
+          <label className="sku-search">
+            <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+              <circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" />
+            </svg>
+            <input type="search" value={query} disabled={saving} onChange={e => { setQuery(e.target.value); setLimit(PAGE_SIZE) }}
+              placeholder={fabricView ? 'Search fabric code, series or description…' : 'Search option value or description…'}
+              aria-label={fabricView ? 'Search fabrics' : 'Search maintenance options'} />
           </label>
-        </nav>
+          {fabricView ? <>
+            <TierFilter label="Sofa tier" value={sofaTier} disabled={saving} onChange={value => { setSofaTier(value); setLimit(PAGE_SIZE) }} />
+            <TierFilter label="Bedframe tier" value={bedframeTier} disabled={saving} onChange={value => { setBedframeTier(value); setLimit(PAGE_SIZE) }} />
+          </> : null}
+        </div>
+      </div>
 
-        <div>
-          {pool === FABRICS ? (
-            <>
-              <div className="flex flex-wrap items-baseline justify-between gap-3 mb-3">
-                <h2 className="font-sans text-lg font-medium text-ink">Fabrics</h2>
-                <span className="font-mono text-[10.5px] text-muted">
-                  THE TIER A FABRIC COSTS A SOFA MODULE OR A BED FRAME AT
-                </span>
-              </div>
-              <input
-                value={fabricQuery}
-                onChange={e => setFabricQuery(e.target.value)}
-                placeholder="Search a fabric code, a series or a description"
-                aria-label="Search fabrics"
-                className="w-full border border-hairline rounded-md px-3 py-2 text-sm bg-surface mb-3"
-              />
-              <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>Code</th>
-                      <th>Description</th>
-                      <th>Series</th>
-                      <th>Sofa tier</th>
-                      <th>Bedframe tier</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shownFabrics.slice(0, 400).map(f => (
-                      <tr key={f.erpId} className={!f.active || f.removed ? 'opacity-60' : undefined}>
-                        <td className="font-mono text-xs whitespace-nowrap">{f.code}</td>
-                        <td className="text-sm">{f.description ?? '—'}</td>
-                        <td className="text-xs">{f.series ?? '—'}</td>
-                        <td className="font-mono text-xs">{tierLabel(f.sofaTier)}</td>
-                        <td className="font-mono text-xs">{tierLabel(f.bedframeTier)}</td>
-                        <td className="whitespace-nowrap">
-                          <MirrorFlags isNew={false} active={f.active} removed={f.removed} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-sm text-graphite mt-3 font-serif italic">
-                {Math.min(400, shownFabrics.length).toLocaleString()} of {shownFabrics.length.toLocaleString()} shown. A
-                fabric with no tier costs at Tier 2, the ERP&apos;s own default.
-              </p>
-            </>
+      <div className="sku-actions">
+        <div className="maintenance-pool-heading">
+          <h2>{fabricView ? 'Fabrics' : `${section?.section} · ${meta?.label}`}</h2>
+          <p className="sku-count" aria-live="polite"><strong>{count.toLocaleString()}</strong> {fabricView ? 'fabrics' : 'options'}{count !== total ? ` of ${total.toLocaleString()}` : ''}
+            {!meta?.priced ? <span className="maintenance-readonly">Read only</span> : null}
+          </p>
+        </div>
+        <div className="sku-action-buttons">
+          {editing ? <>
+            <button type="button" className="sku-secondary-button" disabled={saving} onClick={cancel}>Cancel changes</button>
+            <button type="button" className="sku-primary-button" disabled={saving || dirty === 0} onClick={save}>
+              {saving ? 'Saving…' : dirty === 0 ? 'Save changes' : `Save ${dirty} surcharge${dirty === 1 ? '' : 's'}`}
+            </button>
+          </> : meta?.priced ? (
+            <button type="button" className="sku-primary-button" onClick={() => { setEditing(true); setNotice(null) }}>Edit surcharges</button>
+          ) : null}
+        </div>
+      </div>
+      <p className="sku-edit-note">
+        {fabricView ? 'Sofa and Bedframe mappings override the shared ERP tier independently. With neither mapping nor shared tier, P2 is used.' :
+          meta?.priced ? 'Portal surcharge (RM) added to the cost when this option is chosen. Blank adds nothing; 0 is a zero surcharge.' :
+            'ERP choices only. This pool has no surcharge; model availability is set on Modular.'}
+        {editing && dirty > 0 ? ` ${dirty} unsaved change${dirty === 1 ? '' : 's'} across ${dirtyPools} pool${dirtyPools === 1 ? '' : 's'}; Save includes them all.` : ''}
+      </p>
+      {error ? <p className="sku-notice" data-tone="error" role="alert">{error}</p> : null}
+      {notice ? <p className="sku-notice" data-tone="ok" role="status">{notice}</p> : null}
+
+      <div className="sku-table-panel">
+        <div className="sku-table-window table-scroll" role="region" tabIndex={0} aria-label={fabricView ? 'Fabric mappings table' : 'Maintenance options table'}>
+          {fabricView ? (
+            <table className="ledger-table sku-table">
+              <thead><tr>
+                <th scope="col" className="sku-code-column">Fabric code</th><th scope="col">Description</th><th scope="col">Series</th>
+                <th scope="col">Category</th><th scope="col">Sofa tier</th><th scope="col">Bedframe tier</th><th scope="col">Status</th>
+              </tr></thead>
+              <tbody>
+                {shownFabrics.slice(0, limit).map(f => <tr key={f.erpId}>
+                  <td className="sku-code-column">{f.code}</td><td className="sku-description">{f.description ?? '—'}</td>
+                  <td>{f.series ?? '—'}</td><td>{f.category ?? '—'}</td><td>{tierLabel(f.sofaTier, f.priceTier)}</td><td>{tierLabel(f.bedframeTier, f.priceTier)}</td>
+                  <td className="sku-status">{statusLabel(f)}</td>
+                </tr>)}
+                {count === 0 ? <tr><td colSpan={7} className="sku-empty">No fabrics match these filters.</td></tr> : null}
+              </tbody>
+            </table>
           ) : (
-            <>
-              <div className="flex flex-wrap items-baseline justify-between gap-3 mb-3">
-                <h2 className="font-sans text-lg font-medium text-ink">{meta?.label ?? pool}</h2>
-                {meta?.priced ? (
-                  editing ? (
-                    <span className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={save}
-                        disabled={saving || dirty === 0}
-                        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
-                      >
-                        {saving ? 'Saving…' : dirty === 0 ? 'No changes yet' : `Save ${dirty}`}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { drafts.current = new Map(); setDirty(0); setEditing(false) }}
-                        className="font-serif italic text-sm text-graphite hover:text-ink"
-                      >
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => { setEditing(true); setNotice(null) }}
-                      className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
-                    >
-                      Edit surcharges
-                    </button>
-                  )
-                ) : (
-                  <span className="font-mono text-[10.5px] text-muted">NO PRICE — A CHOICE, NOT A SURCHARGE</span>
-                )}
-              </div>
-              {error ? <Notice tone="error">{error}</Notice> : null}
-              {notice ? <Notice tone="ok">{notice}</Notice> : null}
-              {rows.length === 0 ? (
-                <p className="font-serif italic text-sm text-muted">The ERP has sent no options for this list yet.</p>
-              ) : (
-                <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
-                  <table className="ledger-table">
-                    <thead>
-                      <tr>
-                        <th className="w-12">#</th>
-                        <th>Option</th>
-                        {meta?.priced ? <th className="num">Surcharge</th> : null}
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((o, i) => (
-                        <tr key={o.value} className={!o.active || o.removed ? 'opacity-60' : undefined}>
-                          <td className="font-mono text-xs text-muted">{i + 1}</td>
-                          <td className="text-sm">{o.label}</td>
-                          {meta?.priced ? (
-                            <td className="num">
-                              {editing ? (
-                                <input
-                                  defaultValue={drafts.current.get(o.value) ?? (o.price === null ? '' : String(o.price))}
-                                  onChange={e => {
-                                    drafts.current.set(o.value, e.target.value)
-                                    setDirty(drafts.current.size)
-                                  }}
-                                  inputMode="decimal"
-                                  aria-label={`${o.label} surcharge`}
-                                  className={`${MONEY_INPUT} w-24`}
-                                />
-                              ) : o.price === null ? (
-                                <span className="text-graphite" title="No surcharge keyed — adds nothing">—</span>
-                              ) : o.price < 0 ? (
-                                <span className="neg">({formatMoney(Math.abs(o.price))})</span>
-                              ) : (
-                                formatMoney(o.price)
-                              )}
-                            </td>
-                          ) : null}
-                          <td className="whitespace-nowrap space-x-1">
-                            <MirrorFlags isNew={o.isNew} active={o.active} removed={o.removed} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
+            <table className="ledger-table sku-table">
+              <thead><tr>
+                <th scope="col" className="sku-code-column">Option value</th><th scope="col">Description</th>
+                {meta?.priced ? <th scope="col" className="num">Surcharge (RM)</th> : null}<th scope="col">Status</th>
+              </tr></thead>
+              <tbody>
+                {shownOptions.slice(0, limit).map(o => {
+                  const price = optionPrice(o)
+                  return <tr key={o.value}>
+                    <td className="sku-code-column">{o.value}</td><td className="sku-description">{o.label}</td>
+                    {meta?.priced ? <td className="num">
+                      {editing ? <input value={drafts.get(pool)?.get(o.value) ?? (price === null ? '' : String(price))}
+                        onChange={e => touch(o.value, e.target.value)} disabled={saving} inputMode="decimal"
+                        aria-label={`${o.label} surcharge`} className="sku-price-input" /> :
+                        price === null ? <span title="No surcharge keyed — adds nothing">—</span> :
+                          price < 0 ? `(${formatMoney(Math.abs(price))})` : formatMoney(price)}
+                    </td> : null}
+                    <td className="sku-status">{statusLabel(o)}{o.isNew ? ' · New' : ''}</td>
+                  </tr>
+                })}
+                {count === 0 ? <tr><td colSpan={meta?.priced ? 4 : 3} className="sku-empty">No options match these filters.</td></tr> : null}
+              </tbody>
+            </table>
           )}
+        </div>
+        <div className="sku-table-footer">
+          <span>{visibleCount.toLocaleString()} of {count.toLocaleString()} {fabricView ? 'fabrics' : 'options'} shown</span>
+          {visibleCount < count ? <button type="button" className="sku-load-more" disabled={saving} onClick={() => setLimit(value => value + PAGE_SIZE)}>
+            Show {Math.min(PAGE_SIZE, count - visibleCount)} more
+          </button> : null}
+          <label className="sku-catalogue-filter"><span>Catalogue</span>
+            <select value={showRemoved ? 'all' : 'current'} disabled={saving} onChange={e => { setShowRemoved(e.target.value === 'all'); setLimit(PAGE_SIZE) }}>
+              <option value="current">Current records</option><option value="all">Include removed records</option>
+            </select>
+          </label>
         </div>
       </div>
     </section>
   )
 }
 
-function tierLabel(t: string | null): string {
-  if (!t) return '—'
-  const m = /^PRICE_(\d)$/.exec(t)
-  return m ? `Tier ${m[1]}` : t
+function statusLabel(row: { active: boolean; removed: boolean }) {
+  return row.removed ? 'Removed' : row.active ? 'Active' : 'Inactive'
+}
+
+function tierLabel(tier: string | null, shared: string | null) {
+  const effective = tier ?? shared ?? 'PRICE_2'
+  const match = /^PRICE_([123])$/.exec(effective)
+  const label = match ? `P${match[1]}` : effective
+  return tier ? label : `${label} · ${shared ? 'shared' : 'default'}`
+}
+
+function matchesTier(tier: string | null, shared: string | null, filter: string) {
+  if (!filter) return true
+  if (filter === 'unassigned') return !tier
+  return (tier ?? shared ?? 'PRICE_2') === filter
+}
+
+function TierFilter({ label, value, disabled, onChange }: { label: string; value: string; disabled: boolean; onChange: (value: string) => void }) {
+  return <label className="sku-model-filter"><span>{label}</span>
+    <select value={value} disabled={disabled} onChange={e => onChange(e.target.value)}>
+      <option value="">All tiers</option><option value="PRICE_1">P1</option><option value="PRICE_2">P2</option>
+      <option value="PRICE_3">P3</option><option value="unassigned">Unassigned category</option>
+    </select>
+  </label>
 }

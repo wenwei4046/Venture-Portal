@@ -1,389 +1,204 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import { heightKey, valueKey } from '@/lib/catalogue/keys'
-import {
-  CALC_CATEGORIES,
-  calcCategoryOf,
-  defaultGift,
-  erpAllows,
-  isRestricted,
-  isRiderModel,
-  optionKeysOf,
-  RIDER,
-  skuKeyOf,
-  type OptionKey,
-} from '@/lib/catalogue/options'
+import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, optionKeysOf, RIDER, skuKeyOf, type OptionKey } from '@/lib/catalogue/options'
 import { saveModelSettings } from '../../catalogue-actions'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
-import { Notice } from './ui'
-
-/**
- * One model's Modular ticks — what the Revenue calculator may offer of it.
- *
- * THE ERP SAYS WHAT EXISTS, THE PORTAL SAYS WHAT IS OFFERED (user 2026-09-24:
- * "Modular 是独立的"). Every chip here is something the ERP's own Modular tab
- * allows for this model; the tick is the portal's, and only a ticked chip
- * reaches a calculator dropdown. Ten SKUs over there, seven ticked here: the
- * calculator offers seven.
- *
- * Two kinds of chip, because the ERP's allowed options are two kinds of thing:
- * the ones that ARE the model's SKUs (a sofa's compartments, a bed frame's or
- * mattress's sizes) are ticked per SKU, and the ones that are OPTIONS (seat
- * height, leg height, specials, divan / total heights, gaps) are ticked per
- * model. Something the ERP adds later arrives unticked.
- */
+import { useProductDraftGuard } from './ProductWorkspace'
 
 function priceBadge(s: CatalogueModel['skus'][number]) {
-  if (s.price !== null) return <span className="text-num-ink">{formatMoney(s.price)}</span>
-  if (s.grid && s.grid.length > 0) return <span className="text-graphite">grid</span>
-  return <span className="text-danger">no price</span>
+  if (s.grid?.length) return <><span>Matrix price</span>{s.price !== null ? <span className="block">Fallback {formatMoney(s.price)}</span> : null}</>
+  if (s.price !== null) return formatMoney(s.price)
+  return 'No price'
 }
 
-export default function ModelEditor({
-  model,
-  brands,
-  options,
-  onClose,
-}: {
+/** Portal selections remain distinct from the ERP allowlist and from price editing. */
+export default function ModelEditor({ model, brands, options, onClose, onDirtyChange, onSavingChange, onSaved }: {
   model: CatalogueModel
   brands: BrandRef[]
   options: MaintenanceOption[]
   onClose: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  onSavingChange?: (saving: boolean) => void
+  onSaved?: () => void
 }) {
   const router = useRouter()
   const [saving, startSaving] = useTransition()
+  const saveInFlight = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
-
-  const skuKey = skuKeyOf(model.category)
-  const optionKeys = optionKeysOf(model.category)
-
   const [offered, setOffered] = useState(model.offered)
-  const [skuTicks, setSkuTicks] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(model.skus.map(s => [s.erpId, s.offered])),
-  )
+  const [skuTicks, setSkuTicks] = useState<Record<string, boolean>>(() => Object.fromEntries(model.skus.map(s => [s.erpId, s.offered])))
   const [enabled, setEnabled] = useState<Record<string, string[]>>(() => ({ ...model.enabled }))
   const [gift, setGift] = useState<boolean | null>(model.giftOverride)
   const [calc, setCalc] = useState<string | null>(model.calcOverride)
   const [brand, setBrand] = useState<string | null>(model.brandOverride)
-
+  const [initial] = useState(() => JSON.stringify({ offered: model.offered, skuTicks: Object.fromEntries(model.skus.map(s => [s.erpId, s.offered])), enabled: model.enabled, gift: model.giftOverride, calc: model.calcOverride, brand: model.brandOverride }))
+  const dirty = JSON.stringify({ offered, skuTicks, enabled, gift, calc, brand }) !== initial
+  useProductDraftGuard(dirty, saving)
+  const skuKey = skuKeyOf(model.category)
+  const optionKeys = optionKeysOf(model.category)
   const derivedCalc = calcCategoryOf(model.category, model.name ?? model.code)
-  const optionPrice = useMemo(() => {
-    const m = new Map<string, number | null>()
-    for (const o of options) m.set(`${o.pool}\u0000${valueKey(o.value)}`, o.price)
-    return m
-  }, [options])
+  const liveSkus = model.skus.filter(s => !s.removed && s.active)
+  const missingLadder = !isRiderModel(model.category, brand) && !(brand ?? model.derivedBrand)
 
-  /** Each Maintenance pool's live values, in the pool's own order. */
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+
+  const optionPrice = useMemo(() => new Map(options.map(o => [`${o.pool}\u0000${valueKey(o.value)}`, o.price])), [options])
   const poolValues = useMemo(() => {
     const byPool = new Map<string, MaintenanceOption[]>()
-    for (const o of options) {
-      if (o.active && !o.removed) byPool.set(o.pool, [...(byPool.get(o.pool) ?? []), o])
-    }
-    return new Map(
-      [...byPool].map(([pool, list]) => [
-        pool,
-        list.sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value)).map(o => o.value),
-      ]),
-    )
+    for (const o of options) if (o.active && !o.removed) byPool.set(o.pool, [...(byPool.get(o.pool) ?? []), o])
+    return new Map([...byPool].map(([pool, list]) => [pool, list.sort((a, b) => a.sortOrder - b.sortOrder || a.value.localeCompare(b.value)).map(o => o.value)]))
   }, [options])
 
-  /** What the ERP lets this model take for one key — the whole pool when it restricts nothing. */
   function erpFor(o: OptionKey): string[] {
     return erpAllows(model.allowed, o.key, poolValues.get(o.pool) ?? [])
   }
-
-  /** The chips for one option key: what the ERP allows, then anything ticked here the ERP no longer allows. */
   function chipsFor(o: OptionKey): string[] {
     const erp = erpFor(o)
-    const mine = enabled[o.key] ?? []
-    const seen = new Set(erp.map(v => valueKey(v)))
-    return [...erp, ...mine.filter(v => !seen.has(valueKey(v)))]
+    const seen = new Set(erp.map(valueKey))
+    return [...erp, ...(enabled[o.key] ?? []).filter(v => !seen.has(valueKey(v)))]
   }
-
-  function isOn(key: string, value: string): boolean {
-    const k = valueKey(value)
-    return (enabled[key] ?? []).some(v => valueKey(v) === k)
+  function isOn(key: string, value: string) {
+    return (enabled[key] ?? []).some(v => valueKey(v) === valueKey(value))
   }
-
   function toggle(key: string, value: string) {
     setEnabled(prev => {
       const list = prev[key] ?? []
-      const k = valueKey(value)
-      const next = list.some(v => valueKey(v) === k) ? list.filter(v => valueKey(v) !== k) : [...list, value]
-      return { ...prev, [key]: next }
+      return { ...prev, [key]: list.some(v => valueKey(v) === valueKey(value)) ? list.filter(v => valueKey(v) !== valueKey(value)) : [...list, value] }
     })
   }
-
-  function setAll(o: OptionKey, on: boolean) {
-    setEnabled(prev => ({ ...prev, [o.key]: on ? chipsFor(o) : [] }))
-  }
-
-  const liveSkus = model.skus.filter(s => !s.removed)
-
-  /**
-   * Offering a model nobody has configured starts from everything the ERP
-   * allows — every live SKU, every allowed option — so the next step is
-   * unticking what the calculator should not offer, not ticking forty chips.
-   */
   function turnOn(on: boolean) {
     setOffered(on)
-    const untouched =
-      !model.configured && Object.values(skuTicks).every(v => !v) && Object.keys(enabled).length === 0
+    const untouched = !model.configured && Object.values(skuTicks).every(v => !v) && Object.keys(enabled).length === 0
     if (on && untouched) {
       setSkuTicks(Object.fromEntries(model.skus.map(s => [s.erpId, !s.removed && s.active])))
       setEnabled(Object.fromEntries(optionKeys.map(o => [o.key, erpFor(o)])))
-      setNote('Started from everything the ERP allows for this model — untick what the calculator should not offer.')
+      setNote('Selected the current SKUs and allowed options. Untick anything the calculator should not offer.')
     }
   }
-
   function save() {
+    if (saveInFlight.current) return
+    saveInFlight.current = true
+    onSavingChange?.(true)
     setError(null)
-    // Only the keys this category has; a sofa does not carry divan heights.
-    const cleanEnabled = Object.fromEntries(optionKeys.map(o => [o.key, enabled[o.key] ?? []]))
     startSaving(async () => {
       try {
-        await saveModelSettings({
-          erpModelId: model.erpId,
-          offered,
-          enabled: cleanEnabled,
-          gift,
-          calcCategory: calc,
-          brandCode: brand,
-          skuOffered: skuTicks,
-        })
+        await saveModelSettings({ erpModelId: model.erpId, offered, enabled: Object.fromEntries(optionKeys.map(o => [o.key, enabled[o.key] ?? []])), gift, calcCategory: calc, brandCode: brand, skuOffered: skuTicks })
         router.refresh()
+        onSaved?.()
         onClose()
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not save the model')
+      } finally {
+        saveInFlight.current = false
+        onSavingChange?.(false)
       }
     })
   }
 
-  const priceGridHeights = (h: string) =>
-    liveSkus.filter(s => (s.grid ?? []).some(c => heightKey(c.height) === heightKey(h))).length
-
   return (
-    <div className="bg-paper border border-hairline rounded-md p-4 space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="modular-editor" aria-label={`Configure model ${model.code}`} data-product-dirty={dirty} data-product-saving={saving}>
+      <header className="modular-editor-header">
         <div>
-          <div className="font-mono text-xs text-graphite">{model.code}</div>
-          <div className="font-serif text-lg text-ink">{model.name ?? model.code}</div>
-          <div className="text-xs text-graphite mt-1">
-            ERP: {model.category ?? '—'}
-            {model.branding ? ` · branding ${model.branding}` : ''}
-            {!model.active ? ' · inactive over there' : ''}
-            {model.removed ? ' · gone from the ERP' : ''}
-          </div>
+          <h2 className="font-medium">{model.code}{model.name && model.name !== model.code ? ` · ${model.name}` : ''}</h2>
+          <p className="text-xs mt-1">{model.category ?? 'Uncategorised'}{model.branding ? ` · ${model.branding}` : ''}{!model.active ? ' · Inactive in ERP' : ''}</p>
         </div>
-        <label className="flex items-center gap-2 text-sm text-ink font-sans">
-          <input
-            type="checkbox"
-            checked={offered}
-            onChange={e => turnOn(e.target.checked)}
-            className="h-4 w-4 accent-[var(--accent)]"
-          />
-          Offered in the Revenue calculator
-        </label>
-      </div>
-
-      {note ? <Notice tone="ok">{note}</Notice> : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {!isRiderModel(model.category, brand) && !(brand ?? model.derivedBrand) ? (
-        <Notice tone="error">
-          No margin ladder. A {(model.category ?? '').toUpperCase() === 'SOFA' ? 'sofa' : 'mattress'} sells under its
-          brand&rsquo;s ladder, and{' '}
-          {model.branding ? (
-            <>the ERP branding &ldquo;{model.branding}&rdquo; matches no brand the calculator sells.</>
-          ) : (
-            <>the ERP gives this model no branding.</>
-          )}{' '}
-          It is not offered until a Margin ladder is chosen below.
-        </Notice>
-      ) : null}
-
-      <div>
-        <div className="flex items-baseline gap-3 mb-2">
-          <h3 className="font-sans text-sm font-medium text-ink">
-            {skuKey === 'compartments' ? 'Compartments' : skuKey === 'sizes' ? 'Sizes' : 'SKUs'}
-          </h3>
-          <span className="font-mono text-[10.5px] text-muted">
-            {Object.entries(skuTicks).filter(([id, on]) => on && liveSkus.some(s => s.erpId === id)).length}/{liveSkus.length} TICKED
-          </span>
-          <button type="button" className="text-xs text-accent hover:underline" onClick={() => setSkuTicks(Object.fromEntries(model.skus.map(s => [s.erpId, !s.removed])))}>
-            Tick all
-          </button>
-          <button type="button" className="text-xs text-accent hover:underline" onClick={() => setSkuTicks(Object.fromEntries(model.skus.map(s => [s.erpId, false])))}>
-            Untick all
-          </button>
-        </div>
-        {model.skus.length === 0 ? (
-          <p className="font-serif italic text-sm text-muted">The ERP lists no SKU under this model.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {model.skus.map(s => (
-              <label
-                key={s.erpId}
-                title={s.code}
-                className={`inline-flex items-center gap-2 border rounded-full px-3 py-1 text-xs cursor-pointer ${
-                  skuTicks[s.erpId] ? 'border-accent-border bg-accent-bg text-ink' : 'border-hairline bg-surface text-graphite'
-                } ${s.removed ? 'opacity-50' : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={skuTicks[s.erpId] ?? false}
-                  disabled={s.removed}
-                  onChange={e => setSkuTicks(prev => ({ ...prev, [s.erpId]: e.target.checked }))}
-                  className="h-3.5 w-3.5 accent-[var(--accent)]"
-                />
-                <span className="font-mono">{s.optionLabel}</span>
-                <span className="text-[10.5px]">{priceBadge(s)}</span>
-                {s.isNew ? <span className="chip accent">NEW</span> : null}
-              </label>
-            ))}
+        <p className="text-xs mt-2">Select what this model offers in the Revenue calculator.</p>
+      </header>
+      <div className="modular-editor-body">
+        {error ? <p className="sku-notice" data-tone="error" role="alert">{error}</p> : null}
+        {note ? <p className="sku-notice" role="status">{note}</p> : null}
+        {missingLadder ? <p className="sku-notice" data-tone="error">Choose a margin ladder below before this {categoryName(model.category)} can appear in the calculator.</p> : null}
+        <fieldset disabled={saving} className="min-w-0">
+          <legend className="sr-only">Model settings</legend>
+          <div className="modular-editor-section">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={offered} onChange={e => turnOn(e.target.checked)} />
+              Offered in the Revenue calculator
+            </label>
           </div>
-        )}
-      </div>
-
-      {optionKeys.map(o => {
-        const chips = chipsFor(o)
-        const erp = new Set(erpFor(o).map(v => valueKey(v)))
-        const restricted = isRestricted(model.allowed, o.key)
-        return (
-          <div key={o.key}>
-            <div className="flex items-baseline gap-3 mb-2">
-              <h3 className="font-sans text-sm font-medium text-ink">{o.label}</h3>
-              <span className="font-mono text-[10.5px] text-muted">
-                {(enabled[o.key] ?? []).length}/{chips.length} TICKED
-              </span>
-              {chips.length > 0 ? (
-                <>
-                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setAll(o, true)}>
-                    Tick all
-                  </button>
-                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setAll(o, false)}>
-                    Untick all
-                  </button>
-                </>
-              ) : null}
-              {!restricted && chips.length > 0 ? (
-                <span className="text-[10.5px] text-muted">The ERP does not restrict this model: the whole pool</span>
-              ) : null}
+          <section className="modular-editor-section" aria-label="SKU selections">
+            <div className="modular-section-title">
+              <h3 className="text-sm font-medium">{skuKey === 'compartments' ? 'Compartments' : skuKey === 'sizes' ? 'Sizes' : 'SKUs'}</h3>
+              <span className="text-xs">{liveSkus.filter(s => skuTicks[s.erpId]).length} / {liveSkus.length} selected</span>
+              <button type="button" className="sku-grid-link text-xs" onClick={() => setSkuTicks(Object.fromEntries(model.skus.map(s => [s.erpId, !s.removed && s.active])))}>Select all</button>
+              <button type="button" className="sku-grid-link text-xs" onClick={() => setSkuTicks(Object.fromEntries(model.skus.map(s => [s.erpId, false])))}>Clear all</button>
             </div>
-            {chips.length === 0 ? (
-              <p className="font-serif italic text-sm text-muted">
-                {restricted
-                  ? 'The ERP allows none for this model.'
-                  : 'The ERP does not restrict this model, and its Maintenance pool is empty.'}
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {chips.map(v => {
-                  const on = isOn(o.key, v)
-                  const stale = !erp.has(valueKey(v))
-                  const surcharge = o.priced ? optionPrice.get(`${o.pool}\u0000${valueKey(v)}`) : undefined
-                  return (
-                    <label
-                      key={v}
-                      className={`inline-flex items-center gap-2 border rounded-full px-3 py-1 text-xs cursor-pointer ${
-                        on ? 'border-accent-border bg-accent-bg text-ink' : 'border-hairline bg-surface text-graphite'
-                      }`}
-                      title={stale ? 'Ticked here, but the ERP no longer allows it for this model' : undefined}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        onChange={() => toggle(o.key, v)}
-                        className="h-3.5 w-3.5 accent-[var(--accent)]"
-                      />
-                      <span className={stale ? 'line-through' : undefined}>{v}</span>
-                      {o.key === 'sizes' && model.category === 'SOFA' ? (
-                        <span className="text-[10.5px] text-muted">
-                          {priceGridHeights(v)}/{liveSkus.length} priced
-                        </span>
-                      ) : null}
-                      {o.priced ? (
-                        surcharge === undefined || surcharge === null ? (
-                          <span className="text-[10.5px] text-muted">+RM ?</span>
-                        ) : (
-                          <span className="text-[10.5px] text-num-ink">
-                            {surcharge >= 0 ? '+' : '−'}
-                            {formatMoney(Math.abs(surcharge))}
-                          </span>
-                        )
-                      ) : null}
-                    </label>
-                  )
-                })}
+            {model.skus.length === 0 ? <p className="text-xs">No SKUs are linked to this model in the ERP.</p> : (
+              <div className="modular-option-grid">
+                {model.skus.map(s => <label key={s.erpId} className="modular-option" data-selected={skuTicks[s.erpId] ?? false}>
+                  <input type="checkbox" aria-label={`Offer SKU ${s.code}`} checked={skuTicks[s.erpId] ?? false} disabled={(s.removed || !s.active) && !skuTicks[s.erpId]} onChange={e => setSkuTicks(prev => ({ ...prev, [s.erpId]: e.target.checked }))} />
+                  <span><span className="font-medium">{s.optionLabel}</span><span className="block text-xs">{s.code}</span><span className="block text-xs">{priceBadge(s)}{s.removed ? ' · Removed' : !s.active ? ' · Inactive' : s.isNew ? ' · New' : ''}</span></span>
+                </label>)}
               </div>
             )}
-          </div>
-        )
-      })}
-
-      <div className="flex flex-wrap items-end gap-5 border-t border-hairline pt-4">
-        <label className="text-xs font-sans text-graphite">
-          <span className="block mb-1">Calculator section</span>
-          <select
-            value={calc ?? ''}
-            onChange={e => setCalc(e.target.value || null)}
-            className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
-          >
-            <option value="">{derivedCalc} (from the ERP category)</option>
-            {CALC_CATEGORIES.filter(c => c !== derivedCalc).map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs font-sans text-graphite">
-          <span className="block mb-1">Free gift</span>
-          <select
-            value={gift === null ? '' : gift ? 'yes' : 'no'}
-            onChange={e => setGift(e.target.value === '' ? null : e.target.value === 'yes')}
-            className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
-          >
-            <option value="">{defaultGift(calc ?? derivedCalc) ? 'May be a gift (default)' : 'Not a gift (default)'}</option>
-            <option value="yes">May be a gift</option>
-            <option value="no">Not a gift</option>
-          </select>
-        </label>
-        <label className="text-xs font-sans text-graphite">
-          <span className="block mb-1">Margin ladder</span>
-          <select
-            value={brand ?? ''}
-            onChange={e => setBrand(e.target.value || null)}
-            className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
-          >
-            <option value="">
-              {model.derivedBrand
-                ? `${model.derivedBrand} (from the ERP branding)`
-                : isRiderModel(model.category, null)
-                  ? 'Rider (from the ERP category)'
-                  : 'None: the ERP branding matches no brand'}
-            </option>
-            {brands.map(b => (
-              <option key={b.code} value={b.code}>{b.name}</option>
-            ))}
-            <option value={RIDER}>Rider — no brand of its own</option>
-          </select>
-        </label>
-        <div className="flex items-center gap-3 ml-auto">
-          <button type="button" onClick={onClose} disabled={saving} className="font-serif italic text-sm text-graphite hover:text-ink">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
-          >
-            {saving ? 'Saving…' : 'Save model'}
-          </button>
-        </div>
+          </section>
+          {optionKeys.map(o => {
+            const chips = chipsFor(o)
+            const allowed = new Set(erpFor(o).map(valueKey))
+            const restricted = isRestricted(model.allowed, o.key)
+            const label = o.key === 'sizes' && (model.category ?? '').toUpperCase() === 'SOFA' ? 'Seat sizes (inches)' : o.label
+            return <section key={o.key} className="modular-editor-section" aria-label={label}>
+              <div className="modular-section-title">
+                <h3 className="text-sm font-medium">{label}</h3>
+                <span className="text-xs">{chips.filter(v => isOn(o.key, v)).length} / {chips.length} selected</span>
+                {chips.length > 0 ? <>
+                  <button type="button" className="sku-grid-link text-xs" onClick={() => setEnabled(prev => ({ ...prev, [o.key]: erpFor(o) }))}>Select all</button>
+                  <button type="button" className="sku-grid-link text-xs" onClick={() => setEnabled(prev => ({ ...prev, [o.key]: [] }))}>Clear all</button>
+                </> : null}
+              </div>
+              {chips.length === 0 ? <p className="text-xs">{restricted ? 'No options are available for this model.' : 'The Maintenance list is empty.'}</p> : (
+                <div className="modular-option-grid">
+                  {chips.map(v => {
+                    const on = isOn(o.key, v)
+                    const stale = !allowed.has(valueKey(v))
+                    const surcharge = o.priced ? optionPrice.get(`${o.pool}\u0000${valueKey(v)}`) : undefined
+                    return <label key={v} className="modular-option" data-selected={on}>
+                      <input type="checkbox" aria-label={`${label}: ${v}`} checked={on} disabled={stale && !on} onChange={() => toggle(o.key, v)} />
+                      <span><span className="font-medium">{v}</span>
+                        {stale ? <span className="block text-xs">No longer allowed by ERP</span> : null}
+                        {o.key === 'sizes' && (model.category ?? '').toUpperCase() === 'SOFA' ? <span className="block text-xs">{liveSkus.filter(s => (s.grid ?? []).some(c => heightKey(c.height) === heightKey(v))).length} / {liveSkus.length} with matrix price</span> : null}
+                        {o.priced ? <span className="block text-xs">{surcharge === undefined || surcharge === null ? 'No surcharge entered' : `${surcharge < 0 ? '−' : '+'}${formatMoney(Math.abs(surcharge))}`}</span> : null}
+                      </span>
+                    </label>
+                  })}
+                </div>
+              )}
+            </section>
+          })}
+          <section className="modular-overrides" aria-label="Calculator defaults">
+            <h3 className="text-sm font-medium">Calculator defaults</h3>
+            <label><span>Calculator section</span><select value={calc ?? ''} onChange={e => setCalc(e.target.value || null)}>
+              <option value="">{derivedCalc} (ERP default)</option>
+              {CALC_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select></label>
+            <label><span>Free gift</span><select value={gift === null ? '' : gift ? 'yes' : 'no'} onChange={e => setGift(e.target.value === '' ? null : e.target.value === 'yes')}>
+              <option value="">{defaultGift(calc ?? derivedCalc) ? 'May be a gift (default)' : 'Not a gift (default)'}</option><option value="yes">May be a gift</option><option value="no">Not a gift</option>
+            </select></label>
+            <label><span>Margin ladder</span><select value={brand ?? ''} onChange={e => setBrand(e.target.value || null)}>
+              <option value="">{model.derivedBrand ? `${model.derivedBrand} (ERP default)` : isRiderModel(model.category, null) ? 'Rider (ERP default)' : 'Not assigned (ERP default)'}</option>
+              {brand && brand !== RIDER && !brands.some(b => b.code === brand) ? <option value={brand}>{brand} (unavailable)</option> : null}
+              {brands.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+              <option value={RIDER}>Rider — no brand of its own</option>
+            </select></label>
+          </section>
+        </fieldset>
       </div>
-    </div>
+      <footer className="modular-editor-footer">
+        <span className="text-xs" role="status">{saving ? 'Saving model…' : dirty ? 'Unsaved changes' : 'No unsaved changes'}</span>
+        <div className="sku-action-buttons">
+          <button type="button" className="sku-secondary-button" onClick={onClose} disabled={saving}>Cancel</button>
+          <button type="button" className="sku-primary-button" onClick={save} disabled={saving || !dirty}>{saving ? 'Saving…' : 'Save model'}</button>
+        </div>
+      </footer>
+    </section>
   )
+}
+
+function categoryName(category: string | null) {
+  return (category ?? '').toUpperCase() === 'SOFA' ? 'sofa' : 'mattress'
 }

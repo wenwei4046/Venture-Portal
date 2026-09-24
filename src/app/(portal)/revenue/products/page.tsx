@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
-import { formatDate } from '@/lib/utils'
 import { listSubDepartments } from '../_lib/sub-departments'
 import {
   loadCombos,
@@ -17,6 +16,7 @@ import ModularTab from './_components/ModularTab'
 import MaintenanceTab from './_components/MaintenanceTab'
 import ComboPricingTab from './_components/ComboPricingTab'
 import CostingGapsSection from './_components/CostingGapsSection'
+import ProductWorkspace from './_components/ProductWorkspace'
 
 /**
  * Revenue → Product List — the Houzs ERP's catalogue, mirrored item by item,
@@ -56,10 +56,10 @@ const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 
 export default async function ProductListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; q?: string }>
 }) {
   await requirePermission('product_list')
-  const { tab: asked } = await searchParams
+  const { tab: asked, q } = await searchParams
   const tab: ProductTab = (TABS as readonly string[]).includes(asked ?? '') ? (asked as ProductTab) : 'sku'
 
   const gapTo = new Date()
@@ -75,7 +75,7 @@ export default async function ProductListPage({
       .filter(o => o.pool === 'sofa_sizes' && !o.removed)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(o => o.value)
-    body = <SkuMasterTab skus={skus} sofaSizes={sofaSizes} />
+    body = <SkuMasterTab skus={skus} sofaSizes={sofaSizes} initialQuery={q ?? ''} />
   } else if (tab === 'modular') {
     const [{ models, brands }, maintenance] = await Promise.all([loadModels(), loadMaintenance()])
     body = <ModularTab models={models} brands={brands} options={maintenance.options} />
@@ -94,62 +94,34 @@ export default async function ProductListPage({
     )
   }
 
-  const delivered = status.lastDeliveryAt !== null
-
   return (
-    <div>
+    <ProductWorkspace>
       <div className="page-head tabbed">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> REVENUE · PRODUCT LIST
+            <em aria-hidden="true" /> REVENUE / PRODUCTS
           </div>
           <h1 className="page-title">Product List</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-3xl">
-            The Houzs ERP&apos;s catalogue, mirrored item by item — and the prices every margin in
-            the portal is measured against, which are keyed here and nowhere else.
-          </p>
-          <p className="font-mono text-[11px] text-muted mt-2">
-            {delivered ? (
-              <>
-                LAST DELIVERY {formatDate(status.lastDeliveryAt!)} ·{' '}
-                {status.products.toLocaleString()} SKUS · {status.models.toLocaleString()} MODELS ·{' '}
-                {status.options.toLocaleString()} OPTIONS · {status.fabrics.toLocaleString()} FABRICS ·{' '}
-                {status.combos.toLocaleString()} COMBOS
-                {status.lastStatus && status.lastStatus !== 'applied' ? (
-                  <span className="text-danger"> · LAST DELIVERY {status.lastStatus.toUpperCase()}</span>
-                ) : null}
-              </>
-            ) : status.products > 0 ? (
-              <>
-                {status.products.toLocaleString()} SKUS · {status.models.toLocaleString()} MODELS — LOADED
-                ONCE; THE ERP HAS NOT PUSHED A DELIVERY YET
-              </>
-            ) : (
-              <>NO DELIVERY YET — THE ERP PUSHES TO POST /api/erp/v1/products</>
-            )}
-          </p>
         </div>
         {subDepts.length > 0 ? (
           <Link
             href={revenuePath(subDepts[0].slug)}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors self-start"
+            className="product-back-link"
           >
             ← {subDepts[0].name}
           </Link>
         ) : null}
       </div>
 
-      <ProductListTabs
-        active={tab}
-        counts={{
-          sku: status.products,
-          modular: status.models,
-          maintenance: status.options + status.fabrics,
-          combos: status.combos,
-        }}
-      />
+      <ProductListTabs active={tab} />
+
+      {status.lastStatus && status.lastStatus !== 'applied' ? (
+        <p className="product-sync-notice" role="status">
+          Last catalogue delivery: {status.lastStatus}. The list below shows the latest available items.
+        </p>
+      ) : null}
 
       {body}
-    </div>
+    </ProductWorkspace>
   )
 }

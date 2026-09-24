@@ -97,14 +97,9 @@ export async function saveModelSettings(edit: ModelEdit): Promise<SaveSummary> {
   const sb = await client()
   const now = new Date().toISOString()
 
-  const { error: modelError } = await sb
-    .from('catalogue_models')
-    .upsert({ ...model, updated_by: user.id, updated_at: now }, { onConflict: 'erp_model_id' })
-  if (modelError) fail('the model', modelError)
-
   if (skus.length > 0) {
     // Only SKUs that really belong to this model: a tick sent for another
-    // model's SKU is refused rather than quietly applied.
+    // model's SKU is refused before ANY settings are written.
     const { data: owned, error: ownError } = await sb
       .from('erp_products')
       .select('erp_id')
@@ -114,7 +109,14 @@ export async function saveModelSettings(edit: ModelEdit): Promise<SaveSummary> {
     const mine = new Set(((owned ?? []) as Array<{ erp_id: string }>).map(o => o.erp_id))
     const foreign = skus.filter(s => !mine.has(s.erp_product_id))
     if (foreign.length > 0) throw new Error(`${foreign.length} SKU(s) do not belong to this model`)
+  }
 
+  const { error: modelError } = await sb
+    .from('catalogue_models')
+    .upsert({ ...model, updated_by: user.id, updated_at: now }, { onConflict: 'erp_model_id' })
+  if (modelError) fail('the model', modelError)
+
+  if (skus.length > 0) {
     const { error } = await sb.from('catalogue_skus').upsert(
       skus.map(s => ({ ...s, updated_by: user.id, updated_at: now })),
       { onConflict: 'erp_product_id' },

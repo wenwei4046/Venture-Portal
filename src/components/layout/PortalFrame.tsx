@@ -39,6 +39,7 @@ export default function PortalFrame({
   const pathname = usePathname()
   const commissionWorkbench = /^\/revenue\/[^/]+\/\d{4}-\d{2}-01$/.test(pathname ?? '')
   const wide = commissionWorkbench || (pathname?.startsWith('/reports/monthly-') ?? false)
+  const productList = pathname === '/revenue/products'
 
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
@@ -62,7 +63,7 @@ export default function PortalFrame({
   }, [pathname])
 
   return (
-    <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible ${commissionWorkbench ? commissionStyles.theme : ''}`}>
+    <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible ${commissionWorkbench ? commissionStyles.theme : ''}${productList ? ' product-theme' : ''}`}>
       <div className="print:hidden contents">
         <Sidebar viewer={user} navData={navData} />
       </div>
@@ -75,7 +76,9 @@ export default function PortalFrame({
           {/* pb on mobile clears the 54px tab bar + the home-indicator inset,
               so the last row of a ledger is never parked under the chrome. */}
           <div
-            className={`${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto ${commissionWorkbench ? 'p-2.5' : 'px-4 md:px-8 py-6 md:py-10'} pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
+            className={productList
+              ? 'product-content print:p-0'
+              : `${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto ${commissionWorkbench ? 'p-2.5' : 'px-4 md:px-8 py-6 md:py-10'} pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
           >
             {children}
           </div>
