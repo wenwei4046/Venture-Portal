@@ -16,6 +16,7 @@ import ModularTab from './_components/ModularTab'
 import MaintenanceTab from './_components/MaintenanceTab'
 import ComboPricingTab from './_components/ComboPricingTab'
 import CostingGapsSection from './_components/CostingGapsSection'
+import ProductWorkspace from './_components/ProductWorkspace'
 
 /**
  * Revenue → Product List — the Houzs ERP's catalogue, mirrored item by item,
@@ -55,10 +56,10 @@ const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 
 export default async function ProductListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; q?: string }>
 }) {
   await requirePermission('product_list')
-  const { tab: asked } = await searchParams
+  const { tab: asked, q } = await searchParams
   const tab: ProductTab = (TABS as readonly string[]).includes(asked ?? '') ? (asked as ProductTab) : 'sku'
 
   const gapTo = new Date()
@@ -74,7 +75,7 @@ export default async function ProductListPage({
       .filter(o => o.pool === 'sofa_sizes' && !o.removed)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(o => o.value)
-    body = <SkuMasterTab skus={skus} sofaSizes={sofaSizes} />
+    body = <SkuMasterTab skus={skus} sofaSizes={sofaSizes} initialQuery={q ?? ''} />
   } else if (tab === 'modular') {
     const [{ models, brands }, maintenance] = await Promise.all([loadModels(), loadMaintenance()])
     body = <ModularTab models={models} brands={brands} options={maintenance.options} />
@@ -94,7 +95,7 @@ export default async function ProductListPage({
   }
 
   return (
-    <div className={`product-page${tab === 'sku' ? ' product-page-sku' : ''}`}>
+    <ProductWorkspace>
       <div className="page-head tabbed">
         <div>
           <div className="page-eyebrow">
@@ -121,6 +122,6 @@ export default async function ProductListPage({
       ) : null}
 
       {body}
-    </div>
+    </ProductWorkspace>
   )
 }

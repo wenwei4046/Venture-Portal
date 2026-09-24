@@ -3100,7 +3100,7 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   border-radius: 16px;
   background: rgb(var(--surface));
 }
-.product-page.product-page-sku {
+.product-page.product-page-workspace {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -3348,7 +3348,7 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 }
 .sku-description { min-width: 240px; font-weight: 500; }
 .product-page table.sku-table .num { min-width: 112px; white-space: nowrap; }
-.sku-model-name { display: block; margin-top: 2px; font-size: 11px; }
+.sku-model-name { display: block; margin-top: 2px; font-size: 11px; white-space: nowrap; }
 .sku-price-input {
   width: 112px;
   padding: 6px 8px;
@@ -3376,10 +3376,65 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .sku-catalogue-filter { display: flex; align-items: center; gap: 8px; }
 .sku-catalogue-filter select { padding-top: 4px; padding-bottom: 4px; font-size: 11px; }
 .sku-load-more { text-decoration: underline; text-underline-offset: 3px; }
+.product-unsaved-notice, .modular-switch-notice {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid rgb(var(--accent-border));
+  border-radius: 8px;
+  background: rgb(var(--accent-bg));
+  font-size: 12px;
+}
+.modular-workspace { display: grid; flex: 1; min-height: 0; min-width: 0; }
+.modular-workspace.is-editing { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 16px; }
+.modular-model-list { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.modular-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid rgb(var(--product-table-border));
+  border-radius: 9px;
+  overflow: hidden;
+  background: rgb(var(--surface));
+}
+.modular-editor-header, .modular-editor-footer { flex-shrink: 0; padding: 14px 16px; background: rgb(var(--product-filter)); }
+.modular-editor-header { border-bottom: 1px solid rgb(var(--product-divider)); }
+.modular-editor-footer { border-top: 1px solid rgb(var(--product-divider)); }
+.modular-editor-body { flex: 1; min-height: 0; overflow: auto; padding: 16px; scrollbar-width: thin; scrollbar-color: rgb(var(--product-scrollbar)) rgb(var(--product-filter)); }
+.modular-editor-section { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid rgb(var(--product-divider)); }
+.modular-editor-section:last-child { border-bottom: 0; margin-bottom: 0; }
+.modular-section-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.modular-option-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.modular-option { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface)); }
+.modular-option[data-selected="true"] { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
+.product-page input[type="checkbox"] { accent-color: rgb(var(--accent)); }
+.modular-overrides { display: grid; gap: 12px; }
+.modular-overrides label { display: grid; gap: 5px; }
+.modular-overrides select { width: 100%; padding: 8px 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); }
+.modular-model-button { min-height: 24px; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.product-page .modular-table tr[data-selected="true"] { background: rgb(var(--accent-bg)); }
+.maintenance-pools { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 12px; }
+.maintenance-pool-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.maintenance-pool-heading h2 { font-size: 15px; font-weight: 600; }
+.maintenance-readonly, .maintenance-draft-count { display: inline-flex; padding: 3px 7px; border: 1px solid rgb(var(--product-divider)); border-radius: 5px; background: rgb(var(--surface-2)); font-size: 11px; }
+.maintenance-draft-count { background: rgb(var(--accent-bg)); border-color: rgb(var(--accent-border)); }
+.combo-filter-controls { padding-top: 0; }
+.combo-modules { min-width: 300px; max-width: 460px; }
+.combo-slots { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.combo-slot, .combo-tier { white-space: nowrap; }
+.product-section-heading { margin-bottom: 12px; font-size: 12px; }
+.product-section-heading h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.product-gap-next { min-width: 240px; max-width: 330px; }
+.product-gap-next a { text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 767px) {
   .product-content { height: auto; padding: 10px 10px calc(76px + env(safe-area-inset-bottom)); }
   .product-page { padding: 18px 14px; }
-  .product-page.product-page-sku { height: auto; min-height: 0; }
+  .product-page.product-page-workspace { height: auto; min-height: 0; }
   .product-page .page-title { font-size: 30px; }
   .product-tabs { gap: 2px; margin-bottom: 14px; }
   .product-tabs button { padding: 9px 10px; }
@@ -3392,10 +3447,16 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .sku-table-panel { flex: none; height: 460px; }
   .product-page table.sku-table .sku-code-column { min-width: 145px; }
   .sku-description { min-width: 210px; }
+  .modular-workspace.is-editing { grid-template-columns: minmax(0, 1fr); }
+  .modular-workspace.is-editing .sku-table-panel { height: 260px; }
+  .modular-editor { height: 520px; }
+  .sku-action-buttons { flex-wrap: wrap; }
 }
 @media print {
-  .product-content, .product-page.product-page-sku { height: auto; }
+  .product-content, .product-page.product-page-workspace { height: auto; }
   .sku-table-panel { height: auto; overflow: visible; }
   .sku-table-window { overflow: visible; }
   .product-page table.sku-table :is(th, .sku-code-column) { position: static; }
+  .modular-workspace.is-editing { display: block; }
+  .modular-editor, .modular-editor-body { height: auto; overflow: visible; }
 }

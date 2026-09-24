@@ -8,6 +8,7 @@ import { TIERS, type PriceCell } from '@/lib/catalogue/pricing'
 import { saveSkuPrices } from '../../catalogue-actions'
 import type { CatalogueSku } from '../load'
 import { categoryLabel, orderedCategories } from './ui'
+import { useProductDraftGuard } from './ProductWorkspace'
 
 const LIMIT_STEP = 300
 type CellDraft = { height: string; tier: string; price: string }
@@ -27,10 +28,10 @@ function modelKey(sku: CatalogueSku): string {
 }
 
 /** The ERP's SKU rows and matrix shape, with prices owned by the portal. */
-export default function SkuMasterTab({ skus, sofaSizes }: { skus: CatalogueSku[]; sofaSizes: string[] }) {
+export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { skus: CatalogueSku[]; sofaSizes: string[]; initialQuery?: string }) {
   const router = useRouter()
   const [category, setCategory] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const [model, setModel] = useState('')
   const [showGone, setShowGone] = useState(false)
   const [limit, setLimit] = useState(LIMIT_STEP)
@@ -42,6 +43,7 @@ export default function SkuMasterTab({ skus, sofaSizes }: { skus: CatalogueSku[]
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const sofaView = category === 'SOFA'
+  useProductDraftGuard(dirty > 0, saving)
 
   const live = useMemo(() => skus.filter(s => showGone || !s.removed), [skus, showGone])
   const categories = useMemo(() => orderedCategories(live.map(s => s.category)), [live])

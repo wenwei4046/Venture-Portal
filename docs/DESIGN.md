@@ -31,7 +31,7 @@ tokens in `globals.css`; the user's theme preference is not rewritten.
   filter panel (`#F6F6F4`), with a divider between the two rows. Keep the main
   Product List tabs outside this panel.
 - Use a stronger table header (`#EBE7E0`), subtle white / `#F7F7F5` alternating
-  rows, and a footer. The desktop SKU table fills the remaining window and
+  rows, and a footer. Each desktop table fills the remaining window and
   scrolls internally in both directions, with a sticky header and product code.
   Mobile uses a fixed-height scroll window for the editable matrix.
 - SKU Master is for finding SKUs and maintaining prices: omit pricing summary
@@ -41,6 +41,21 @@ tokens in `globals.css`; the user's theme preference is not rewritten.
   a `DEFAULT` matrix column is not the flat fallback.
 - Retain portal-owned price writes, permission checks and existing pricing
   semantics. No ERP source price becomes a portal cost through this restyle.
+- Modular uses a scrollable model list beside an independently scrollable
+  editor, with fixed save/cancel controls. Empty ERP allowlists are unrestricted;
+  empty portal selections mean none. Keep inactive saved selections visible so
+  they can be removed. On phones the list and editor stack in bounded windows.
+- Maintenance keeps the ERP's Bedframe/Sofa pool order and values, with a separate
+  fabric view. Fabrics expose both category tiers, using the shared tier and then
+  P2 when a category mapping is absent. All rows remain reachable with Load more.
+- Combo Pricing retains module slots, alternatives, repeated modules, tiers and
+  effective dates. Match equivalent size keys without losing their raw labels or
+  historical price columns. A blank clears a price; zero remains a stored zero.
+- Preserve drafts across filters and require a keep/discard choice before tab or
+  model switches. Disable competing actions while a save is running. Save errors
+  retain edits, and partially successful maintenance batches retry only failures.
+- Costing gaps is a searchable work list with reason filters and a direct SKU
+  lookup. Sum lines and revenue; do not sum per-code bill counts, which overlap.
 
 The light workspace remains light when opened from a dark-mode route so black
 text retains contrast. The preference still applies when leaving Product List.
@@ -835,25 +850,23 @@ page proves the key. `src/app/(portal)/revenue/_components/ErpLinkPanel.tsx`.
 
 ### Product List — the mirror beside the portal's decisions (2026-09-24 — Revenue › Product List)
 
-The ERP's Products page, mirrored, on the header's rule: a `control`-variant
-`SlidingTabs` rail — *SKU Master* · *Modular* · *Maintenance* · *Combo
-Pricing* (the ERP's own four, with their counts) · *Costing gaps* (the work
-list). Switching is a round trip (`?tab=`): each tab reads a different part of
-a 4,000-row catalogue and the server renders only the one being read. The page
-head's mono meta line is the mirror's pulse (`LAST DELIVERY … · N SKUS · N
-MODELS …`, or that the ERP has not pushed yet).
+The ERP's Products catalogue is presented in the approved light workspace
+defined under Implementation rules above. A plain tab rail contains *SKU
+Master* · *Modular* · *Maintenance* · *Combo Pricing* · *Costing gaps*.
+Switching uses `?tab=`; the server loads the selected tab. Tab counts, summary
+cards and the long mirror introduction are omitted. A short notice reports
+an unsuccessful catalogue delivery when relevant.
 
 THE SPLIT IS VISIBLE: what the ERP says EXISTS is plain text (code, description,
 model, category, the ERP's allowed options as chips); what the portal DECIDES
 is an input — a price (`.num` right-aligned, `MONEY_INPUT`), a tick, a chip that
-toggles. A row carries the mirror's own states as `.chip`s (`MirrorFlags`):
-accent **NEW** (arrived after the first load, last 30 days), plain **INACTIVE**
-(off in the ERP), danger **GONE FROM ERP** (retired, kept because past bills
-sold it). Filters are `FilterChip` pills above the `.ledger-table` in a
-`Toolbar`; summary figures are `Stat` cards. Modular opens a model in
+toggles. Row status uses explicit black text: **New**, **Inactive** (off in
+the ERP), or **Removed from ERP** (retired, retained for historical references).
+Filters sit in the shared gray `.sku-filters` panel above a bounded
+`.ledger-table.sku-table` window. Modular opens a model in
 `ModelEditor` — its SKUs (compartments / sizes) and each option list as tick
 chips, what the ERP allows first and anything ticked here that it no longer
-allows after. Saving says what it moved (`Notice`); a price moves margins only
+allows after. Saving reports the result; a price moves margins only
 from that moment — a landed month waits for Recost.
 `src/app/(portal)/revenue/products/_components/`.
 
