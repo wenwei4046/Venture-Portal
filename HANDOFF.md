@@ -1,11 +1,13 @@
 # HOUZS Venture Portal — Session Handoff
 
-## ACTIVE CHECKPOINT 2026-09-24 (done) — ERP catalogue mirror, items only; every margin at the portal's own prices
+## CHECKPOINT 2026-09-24 (SHIPPED) — ERP catalogue mirror, items only; every margin at the portal's own prices; the catalogue syncs live
 
-Branch `feat/erp-catalogue-mirror` (worktree `.claude/worktrees/sku-master-mirror`),
-**VP PR #147**; ERP side **Houzs-Century/Houzs-ERP#4248** (branch
-`feat/vp-catalogue-push`, worktree `C:\Users\wenwe\houzs-erp-vp-catalogue`).
-Both OPEN, not merged.
+**All merged and deployed.** VP **#147** (`f0f6463`, Vercel prod); ERP
+**Houzs-Century/Houzs-ERP#4248** (`d781d11f`, the catalogue push) and **#4252**
+(`aaaa7b4f`, the push made live). The four VP migrations and both ERP
+migrations are LIVE. The worktrees (`.claude/worktrees/sku-master-mirror`,
+`C:\Users\wenwe\houzs-erp-vp-catalogue`) and their branches were deleted at the
+user's request.
 
 The user's request (2026-09-24, verbatim):
 > 我要你把 SKU Master 做一个镜像过来，通过 API 接过来做同步。
@@ -16,23 +18,40 @@ The user's request (2026-09-24, verbatim):
 > 5. Sofa Combo：同样做同步（synchronize）。这边加了新的 Sofa Combo，Venture Portal 那边就会新增，但价格一样是由我们在 Venture Portal 这边自己调。
 > 不需要拉过来（不需要搬）的内容：Variants、Fabric Converter、Category。
 
-### Migrations — two live, two at deploy
+Later the same day: "i want it live, like current sales order sync, not 5 min" → ERP #4252.
+
+### Migrations — all live
 | mig | state | what |
 |---|---|---|
 | `20260924020000_erp_catalogue_mirror` | LIVE | `erp_*` mirror + `catalogue_*` decisions + `ingest_erp_catalogue` + adoption |
 | `20260924025000_catalogue_adopt_mattress_rule` | LIVE | adoption rule 3: brand + model + size (mattresses, unique both ways) — 275 SKUs, 248 priced |
-| `20260924030000_catalogue_costs_the_margin` | **apply at deploy** | the cost rule (`catalogue_line_cost`, fill trigger, deferred combo trigger, recost re-prices, gaps RPCs), drops the mirror's dead money columns |
-| `20260924040000_member_catalogue` | **apply at deploy, after 030000** | `member_catalogue()` + both member snapshots read it |
+| `20260924030000_catalogue_costs_the_margin` | LIVE 2026-09-24 (recorded as `20260924015438`) | the cost rule (`catalogue_line_cost`, fill trigger, deferred combo trigger, recost re-prices, gaps RPCs), the deep money strip, drops the mirror's dead money columns |
+| `20260924040000_member_catalogue` | LIVE 2026-09-24 (recorded as `20260924015703`) | `member_catalogue()` + both member snapshots read it |
+| ERP `20260923T1843_scm_vp_catalogue_feed` | LIVE (ERP deploy, pg-migrate, 02:32 UTC) | catalogue builder / digest / snapshot / money guard / state table; allowlisted line `variants` on the order feed |
+| ERP `20260924T1100_scm_vp_catalogue_live` | LIVE (ERP deploy, pg-migrate, 05:02 UTC) | statement triggers on the six source tables → `scm.venture_portal_catalogue_changes` |
+
+The two VP migrations went in through MCP `apply_migration` with the files'
+exact text; every function body (28) was then md5-checked against the files.
 
 Mirror data on prod: products 2,350 · models 703 · options 104 · fabrics 950
-(all, digest-verified) · combos 97. Portal prices: 743 SKUs priced, 727 offered
-to the calculator, 248 models offered, **0 option surcharges, 0 combo prices**.
+· combos 97. Portal prices: 743 SKUs priced, 727 offered to the calculator,
+248 models offered, **0 option surcharges, 0 combo prices**.
 
-### DEPLOY ORDER (the user decides when)
-1. Merge the VP PR (Vercel deploys).
-2. Apply 030000 then 040000 (MCP `apply_migration`, names `20260924030000_catalogue_costs_the_margin` / `20260924040000_member_catalogue`). Dry-run on prod inside BEGIN…ROLLBACK, re-run after the PGlite fixes (`cdb333d`): both apply in ~1.3 s (the ALTERs lock `erp_products`, `erp_sofa_combos` and `sales_order_lines` for that long — the ERP feed waits that long); 0 stored rows carry money, `member_catalogue` = 726 products / 44 dropdown models / no price text / 0 brandless mattresses or sofas.
-3. Then merge + deploy ERP #4248: the feed is on for company 1, its first `*/5` run POSTs the catalogue (~1.25 MB, one post). Check `erp_sync_events` where `doc_no = 'catalogue'` → `applied`. Before step 1 the deployed v1 route answers 500 (ingest_erp_products is gone) — harmless retries, but don't deploy the ERP first.
-4. **Do NOT Recost August/September until the Product List is priced.** Dry-run, engine rule (bills with a margin): Jun 3→0, Jul 92→18, **Aug 225→56, Sep 138→48**; re-measured after the fixes as Fair September fully costed bills **95 → 36** (lines with a cost 630 → 498). Blind after: bed frames 487 lines (the ERP's bed frames are unpriced — the old list keyed supplier codes HOK-/NB-/NK-), sofas 311 (8030 SOFFIO RM 161K, 9028 VERANO …), fabric accessories 96, service 164 (not commissionable). 34 sofa builds would match a combo once combos are priced. New lines are priced the new way from the moment 030000 is applied; landed months move only on Recost; then recompute the runs.
+### How it went live (2026-09-24)
+1. VP #147 squash-merged → Vercel prod → 030000 → 040000 applied minutes later (the new code briefly ran on the old schema; no member uses the quote yet).
+2. ERP #4248: the first merge-queue run failed `audit:routes` — the route-capability matrix/summary went stale because #4250 merged first. Regenerated with `backend/scripts/generate-route-capability-matrix.mjs`, committed ONLY `route-capability-matrix.csv` + `route-capability-summary.md` (the ERP rule: `docs/generated/*` only when a check asks), requeued → merged → Deploy success → pg-migrate applied the ERP migration.
+3. First catalogue push, 10:35 MYT: one POST, 1,162,791 bytes, applied — 2,350 products, 703 models, 950 fabrics, 97 combos, 35 specials, 69 maintenance entries; 0 new, 0 retired. The `*/5` cron then pushed real edits at 11:55 and 12:10 (HIPSTER (A) sizes edited 12:06).
+4. Prod smoke as Principal: Costing gaps, Modular (AURORA "no brand"), a member quote (APEX (Q) at RM 5,000 → 69.14% = RM 1,080 ÷ 0.7), the bill drill-down. Live orders are costed from the Product List (the ERP's bed frames `unpriced`, read from `variants`).
+5. ERP #4252 merged + deployed; its migration applied 13:02 MYT.
+
+### The catalogue sync is live (ERP #4252)
+- Statement triggers `vp_catalogue_changed` / `vp_catalogue_changed_upd` on `mfg_products`, `product_models`, `maintenance_config_history`, `special_addons`, `fabric_trackings`, `sofa_combo_pricing` append a row to `scm.venture_portal_catalogue_changes` in the same transaction as the write. An UPDATE counts only when a column the catalogue sends is in its SET list — cost, price, stock, photo and note updates mark nothing.
+- The SCM write kick (`kickVenturePortalDrain(env, ctx, afterDrain)`) runs `pushVenturePortalCatalogueOnChange` after its order drain, in the same task: feed off → nothing; no mark → one read; a mark → the digest-gated push. Every push clears the marks it covers first. The `*/5` cron stays the safety net.
+- **Not yet exercised by a real ERP edit at hand-off** (none since 13:02). The user does NOT want test SKUs in production — verify on the next real edit: the SKU's ERP `updated_at` vs VP `erp_sync_events` (`doc_no = 'catalogue'`) `received_at`. Seconds apart = live; a stamp ~15 s after a :x0 / :x5 minute = the cron.
+
+### Still open
+- **Do NOT Recost August/September until the Product List is priced.** Dry-run, engine rule (bills with a margin): Jun 3→0, Jul 92→18, **Aug 225→56, Sep 138→48**; re-measured as Fair September fully costed bills **95 → 36** (lines with a cost 630 → 498). Blind after: bed frames 487 lines (the ERP's bed frames are unpriced — the old list keyed supplier codes HOK-/NB-/NK-), sofas 311 (8030 SOFFIO RM 161K, 9028 VERANO …), fabric accessories 96, service 164 (not commissionable). 34 sofa builds would match a combo once combos are priced. Landed months move only on Recost; then recompute the runs.
+- New and re-pushed lines are costed at the Product List's prices since 030000: a bill with an unpriced item (e.g. an ERP bed frame) has no margin until it is priced. Costing gaps lists what to price, worth-first.
 
 ### What shipped (VP)
 - Product List = 5 tabs (SKU Master / Modular / Maintenance / Combo Pricing / Costing gaps). E2E: real SKU price save + clear, real Modular save — verified in DB, restored.
@@ -40,7 +59,7 @@ to the calculator, 248 models offered, **0 option surcharges, 0 combo prices**.
 - Order feed keeps allowlisted `variants` per line (`lib/erp-sync/contract.ts lineVariantsOf`) — the ERP WAS sending them all along; our parser dropped them.
 - Bill drill-down + Open Bill queue fixed (PGRST201: `sales_order_shares` made `hr_staff_costs(…)` ambiguous — name `!sales_orders_staff_id_fkey`). Each line's cost now has a provenance caption (`lib/catalogue/provenance.ts`).
 - Twin audit: TS vs SQL run side by side (PGlite); combo slot matching is now the ERP's Kuhn algorithm in BOTH twins; blank price string ≠ RM 0; see commit 9bcde03.
-- PGlite regression `tests/member-sql/validate-catalogue.mjs` (164 checks; the four migrations verbatim; in `npm test --prefix tests/member-sql`). It found four real bugs, all fixed in the two unapplied migrations + their TS twins:
+- PGlite regression `tests/member-sql/validate-catalogue.mjs` (164 checks; the four migrations verbatim; in `npm test --prefix tests/member-sql`). It found four real bugs, all fixed in the two migrations (unapplied at the time) + their TS twins:
   1. nested money survived both portal strips (a special's `option_groups[].choices[].extraSen`) → 030000 §0b: `catalogue_strip_money` goes deep by the ERP's own key pattern (a price TIER excepted), scrubs what 020000 stored, and the ingest strips the whole delivery first; TS `isMoneyKey`/`stripMoney` the same, pinned by test. Live data was already clean (the ERP export allowlists).
   2. recost counted every combo line as "re-priced" every time → counts lines whose final cost/source MOVED.
   3. an EMPTY ERP `allowed_options` list was read as "nothing allowed"; the ERP means "no restriction" (`hasRestriction`) → whole pool, in `catalogue_model_options` and on Modular (`erpAllows`). 1 bed frame model today.
@@ -59,6 +78,10 @@ to the calculator, 248 models offered, **0 option surcharges, 0 combo prices**.
 - A page that selects a column a pending migration adds breaks before the migration: the bill page uses `select('*')` for lines.
 - MCP `execute_sql` with `BEGIN; … SELECT …; ROLLBACK;` returns the last SELECT — the dry-run pattern; a failing statement aborts the whole batch (guard lookups that can be NULL).
 - The ERP repo is `Houzs-Century/Houzs-ERP` now (hello-houzs redirects); its PR body check `scripts/check-completeness-claim.mjs --body-file` runs locally.
+- The ERP merge queue re-runs the checks on main + the PR: a generated file (the route-capability matrix) can go stale when another PR merges first — regenerate, commit only what the failing check names, requeue. Never `--auto` there.
+- A worktree NESTED in the main checkout cannot `next dev` (Next takes the parent as the workspace root → ENOENT `.next/required-server-files.json`); `next build` + `next start` works, sandbox off.
+- JS `s.replace(a, b)` expands `$'` / `$&` inside `b` — SQL such as `'(Sen|RM)$'` duplicated the rest of a file in an edit script. Use `s.replace(a, () => b)`.
+- Tearing down a worktree: delete the `node_modules` JUNCTION first (it points at the main checkout), then `git worktree remove --force`.
 
 ## ACTIVE CHECKPOINT 2026-09-17 — The venue register, and who ran each fair
 
