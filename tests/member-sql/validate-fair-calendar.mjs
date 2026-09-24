@@ -10,7 +10,9 @@
 //
 // The fixture is the August 2026 reconciliation: the Kuching fair ran 28–31
 // August and its bills reached the ERP between 1 and 16 September, which is
-// how RM 674,744 of August's sales came to sit in September's payroll.
+// how RM 674,744 of August's sales came to sit in September's payroll. The
+// last section runs the ERP receiver (20260924050000) verbatim too, because a
+// month the calendar sets is only as good as the next re-send leaves it.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -407,6 +409,123 @@ try {
     ['MVEC Southkey', 0, 0],
     ['Spice Arena', 0, 0],
   ], 'the calendar counts what each fair sold and what is still in the wrong month')
+
+  // ─── the ERP re-sends a bill the calendar placed (20260924050000) ─────────
+  //
+  // The ERP re-sends a whole document on every save, and the receiver used to
+  // re-derive the month from the order date each time — so a bill the
+  // calendar had moved went straight back at its next save. HC13051 was keyed
+  // on 2 September for the 28–31 August fair at MITC, moved to August by the
+  // claim form, and was back in September the morning it was delivered.
+  //
+  // The receiver runs verbatim from the migration; around it, only what it
+  // touches: the feed's columns, the delivery log, and stubs for the brand,
+  // running-order and Open Bill helpers a delivery without lines never needs.
+
+  await db.exec(`
+    ALTER TABLE sales_orders
+      ADD COLUMN source text NOT NULL DEFAULT 'erp_sync', ADD COLUMN debtor_code text,
+      ADD COLUMN customer_name text, ADD COLUMN location text, ADD COLUMN brand_code text,
+      ADD COLUMN balance numeric, ADD COLUMN erp_status text, ADD COLUMN erp_on_hold boolean,
+      ADD COLUMN erp_salesperson_id text, ADD COLUMN erp_company_id bigint,
+      ADD COLUMN erp_snapshot_at timestamptz, ADD COLUMN erp_created_at timestamptz,
+      ADD COLUMN synced_at timestamptz, ADD COLUMN raw jsonb, ADD COLUMN sequence_in_day integer;
+    CREATE TABLE erp_sync_events(
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), doc_no text, period_month date,
+      status text, message text, warnings text[], snapshot_at timestamptz, payload jsonb,
+      replay_of uuid, replayed_at timestamptz, replay_result text);
+    CREATE TABLE erp_feed_settings(sub_department_id uuid PRIMARY KEY, min_order_date date);
+    CREATE TABLE comm_agent_aliases(erp_salesperson_id text, agent_key text, staff_id uuid);
+    CREATE TABLE sales_order_open_bill_tags(order_id uuid, auto_suggested boolean);
+    CREATE FUNCTION erp_sync_sub_department() RETURNS uuid LANGUAGE sql STABLE
+      AS $$ SELECT '${FAIR_SUB}'::uuid $$;
+    CREATE FUNCTION erp_sync_brand_code(text) RETURNS text LANGUAGE sql AS $$ SELECT NULL::text $$;
+    CREATE FUNCTION erp_sync_brand_by_prefix(text) RETURNS text LANGUAGE sql AS $$ SELECT NULL::text $$;
+    CREATE FUNCTION erp_sync_resequence_day(text, date) RETURNS void LANGUAGE plpgsql
+      AS $$ BEGIN NULL; END $$;
+    CREATE FUNCTION erp_sync_suggest_open_bills(uuid, date) RETURNS void LANGUAGE plpgsql
+      AS $$ BEGIN NULL; END $$;
+  `)
+  await productionFunction('20260905010000_erp_live_sync', 'erp_sync_log')
+  await productionFunction('20260911020000_commission_order_sub_departments', 'erp_sync_period_locked')
+  await productionFunction('20260911020000_commission_order_sub_departments', 'lock_commission_order_periods')
+  await productionFunction('20260924050000_erp_resend_keeps_the_fair_month', 'ingest_erp_sales_order')
+
+  await q(`INSERT INTO comm_venues(venue_key,display_name) VALUES
+             ('MITC MELAKA','MITC'), ('KOTA BHARU TRADE CENTRE','KBTC')`)
+  const mitc = await fair('MITC MELAKA', AUG, '2026-08-28', '2026-08-31')
+
+  // Every delivery carries a later snapshot than the one before it, as the
+  // ERP's do — an equal or older one is answered duplicate / stale.
+  let snapshot = 0
+  const deliver = async (docNo, orderDate, venue = 'MITC MELAKA', extra = {}) =>
+    (await q('SELECT ingest_erp_sales_order($1::jsonb) AS r', [JSON.stringify({
+      docNo, orderDate, venue, salespersonName: 'AGENT', total: 2500, lines: [],
+      snapshotAt: `2026-09-24T01:00:${String(++snapshot).padStart(2, '0')}Z`, ...extra,
+    })]))[0].r
+  const placed = async docNo => (await q(
+    `SELECT o.period_month::text AS month, b.period_month::text AS batch,
+            o.fair_event_id AS fair, o.fair_source AS source
+       FROM sales_orders o JOIN sales_import_batches b ON b.id = o.batch_id
+      WHERE o.order_no = $1`, [docNo]))[0]
+
+  check((await deliver('HC13051', '2026-09-02')).status, 'applied',
+    'the ERP sends a bill keyed three days after the fair closed')
+  check(await placed('HC13051'), { month: SEP, batch: SEP, fair: mitc, source: 'venue_match' },
+    "a new bill lands in its order date's month, stamped to the fair that just closed")
+
+  await q(`UPDATE sales_orders SET fair_source='manual' WHERE order_no='HC13051'`)
+  check((await q('SELECT orders_moved FROM revenue_apply_fair_calendar($1, TRUE)', [FAIR_SUB]))[0]
+    .orders_moved, 1, 'the claim form confirms it and the calendar moves it')
+
+  const delivered = await deliver('HC13051', '2026-09-02', 'MITC MELAKA', { status: 'DELIVERED' })
+  check([delivered.status, delivered.periodMonth], ['applied', AUG],
+    'delivered: the ERP sends it again, and the log records the month it is in')
+  check(await placed('HC13051'), { month: AUG, batch: AUG, fair: mitc, source: 'manual' },
+    'a re-sent bill keeps the month the fair calendar gave it, batch and all')
+
+  // A bill the resolver placed, re-dated by the ERP.
+  await deliver('HC13266', '2026-08-30')
+  check(await placed('HC13266'), { month: AUG, batch: AUG, fair: mitc, source: 'venue_match' },
+    "a bill written during the fair is in the fair's month")
+  await deliver('HC13266', '2026-09-03')
+  check(await placed('HC13266'), { month: AUG, batch: AUG, fair: mitc, source: 'venue_match' },
+    "re-dated past month end but still that fair's bill, it stays in the fair's month")
+
+  const mitcSep = await fair('MITC MELAKA', SEP, '2026-09-18', '2026-09-20')
+  await deliver('HC13266', '2026-09-19')
+  check(await placed('HC13266'), { month: AUG, batch: AUG, fair: mitcSep, source: 'venue_match' },
+    'a re-date onto another fair re-stamps the fair and does not move the bill by itself')
+  check((await q(
+    `SELECT from_period::text AS f, to_period::text AS t
+       FROM revenue_fair_calendar_moves($1) WHERE order_no = 'HC13266'`, [FAIR_SUB]))
+    .map(r => [r.f, r.t]), [[AUG, SEP]],
+    'the calendar lists that move for a human to make — two steps, as always')
+
+  // No fair: the order date decides, exactly as before the fair calendar.
+  await deliver('HC13400', '2026-08-05', 'KOTA BHARU TRADE CENTRE')
+  await deliver('HC13400', '2026-09-05', 'KOTA BHARU TRADE CENTRE')
+  check(await placed('HC13400'), { month: SEP, batch: SEP, fair: null, source: null },
+    'a bill no fair claims follows its order date')
+
+  // The locks follow the month a bill lives in, not the one its date points at.
+  await q(`INSERT INTO comm_runs(period_month,status,sub_department_id) VALUES ($1,'applied',$2)`,
+    [SEP, FAIR_SUB])
+  const underSep = await deliver('HC13051', '2026-09-02', 'MITC MELAKA', { status: 'DELIVERED', balance: 0 })
+  check([underSep.status, underSep.periodMonth], ['applied', AUG],
+    "September's paid run does not hold a bill that lives in August")
+  await q(`UPDATE comm_runs SET period_month=$1 WHERE period_month=$2`, [AUG, SEP])
+  const underAug = await deliver('HC13051', '2026-09-02', 'MITC MELAKA', { status: 'DELIVERED', balance: 0 })
+  check([underAug.status, underAug.periodMonth], ['held', AUG],
+    "August's paid run holds it until somebody reopens that run")
+  await q('DELETE FROM comm_runs')
+
+  // (Only the receiver stamps a snapshot; the hand-made orphan above is filed
+  // in a batch of another month on purpose.)
+  check(Number(await one(
+    `SELECT count(*) FROM sales_orders o JOIN sales_import_batches b ON b.id=o.batch_id
+      WHERE o.erp_snapshot_at IS NOT NULL AND b.period_month <> o.period_month`)), 0,
+    'every bill the receiver wrote sits in the batch of its month')
 
   console.log(`fair calendar: ${checks} checks passed`)
 } finally {
