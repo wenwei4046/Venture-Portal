@@ -37,8 +37,10 @@ tokens in `globals.css`; the user's theme preference is not rewritten.
 - SKU Master is for finding SKUs and maintaining prices: omit pricing summary
   cards, calculator labels/filters, category ratios and the long introduction.
   Sofa prices remain the ERP-ordered size columns and P1/P2/P3 tiers, with a
-  model filter. Preserve raw size labels and the separate flat fallback price;
-  a `DEFAULT` matrix column is not the flat fallback.
+  model filter. Preserve raw size labels, but omit the `DEFAULT` size and flat
+  fallback price columns. Omit Status throughout SKU Master. Hidden saved
+  defaults and fallback prices survive edits to visible prices; other product
+  categories retain their ordinary Price column.
 - Retain portal-owned price writes, permission checks and existing pricing
   semantics. No ERP source price becomes a portal cost through this restyle.
 - Modular uses a scrollable model list beside an independently scrollable

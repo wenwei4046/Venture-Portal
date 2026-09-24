@@ -66,16 +66,17 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { s
     })
   }, [live, category, query, sofaView, model])
 
-  // Keep the ERP's order and spelling, followed by historical priced sizes.
+  // Keep visible sizes in ERP order, followed by historical priced sizes.
+  // DEFAULT stays in saved grids but is not an editable size column here.
   const heights = useMemo(() => {
     if (!sofaView) return []
-    const cols = [...sofaSizes]
+    const cols = sofaSizes.filter(h => heightKey(h) !== 'default')
     const have = new Set(cols.map(h => heightKey(h)))
     const extra = new Map<string, string>()
     for (const s of shown) {
       for (const c of s.grid ?? []) {
         const k = heightKey(c.height)
-        if (k !== null && !have.has(k) && !extra.has(k)) extra.set(k, c.height)
+        if (k !== null && k !== 'default' && !have.has(k) && !extra.has(k)) extra.set(k, c.height)
       }
     }
     return [...cols, ...[...extra.values()].sort(compareHeights)]
@@ -214,15 +215,12 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { s
                 <th scope="col">Model</th>
                 {sofaView ? <><th scope="col">Category</th><th scope="col">PRICE_TIER</th></> : <><th scope="col">Size</th><th scope="col">Brand</th></>}
                 {sofaView ? heights.map(h => <th scope="col" key={h} className="num">{h}</th>) : null}
-                <th scope="col" className="num" title={sofaView ? 'Used when no matrix price matches. This is separate from the DEFAULT size.' : undefined}>
-                  {sofaView ? 'Fallback price' : 'Price'}
-                </th>
-                <th scope="col">Status</th>
+                {!sofaView ? <th scope="col" className="num">Price</th> : null}
               </tr>
             </thead>
             <tbody>
               {visible.length === 0 ? (
-                <tr><td colSpan={7 + heights.length} className="sku-empty">No SKUs match these filters.</td></tr>
+                <tr><td colSpan={sofaView ? 5 + heights.length : 6} className="sku-empty">No SKUs match these filters.</td></tr>
               ) : visible.map(s => (
                 <tr key={s.erpId}>
                   <td className="sku-code-column">{s.code}</td>
@@ -256,21 +254,20 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { s
                       </td>
                     )
                   }) : null}
-                  <td className="num">
-                    {editing && (sofaView || !(s.grid && s.grid.length > 0)) ? (
+                  {!sofaView ? <td className="num">
+                    {editing && !(s.grid && s.grid.length > 0) ? (
                       <input
                         key={`${s.erpId}|flat`}
                         defaultValue={drafts.current.get(s.erpId)?.price ?? (s.price === null ? '' : String(s.price))}
                         onChange={e => touch(s.erpId, d => { d.price = e.target.value })}
-                        disabled={saving} inputMode="decimal" aria-label={`${s.code} ${sofaView ? 'fallback price' : 'price'}`} className="sku-price-input"
+                        disabled={saving} inputMode="decimal" aria-label={`${s.code} price`} className="sku-price-input"
                       />
-                    ) : !sofaView && s.grid && s.grid.length > 0 && (s.category ?? '').toUpperCase() === 'SOFA' ? (
+                    ) : s.grid && s.grid.length > 0 && (s.category ?? '').toUpperCase() === 'SOFA' ? (
                       <button type="button" className="sku-grid-link" disabled={saving} onClick={() => { changeCategory('SOFA'); setModel(modelKey(s)) }}>View prices</button>
-                    ) : s.price !== null ? formatMoney(s.price) : !sofaView && s.grid && s.grid.length > 0 ? (
+                    ) : s.price !== null ? formatMoney(s.price) : s.grid && s.grid.length > 0 ? (
                       <span title="A saved price matrix belongs to this SKU">Matrix price</span>
                     ) : '—'}
-                  </td>
-                  <td className="sku-status">{s.removed ? 'Removed' : s.active ? 'Active' : 'Inactive'}</td>
+                  </td> : null}
                 </tr>
               ))}
             </tbody>
