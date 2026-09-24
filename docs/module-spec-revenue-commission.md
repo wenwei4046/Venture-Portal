@@ -825,6 +825,36 @@ sum of its rounded lines, so `Σ lines === total` holds exactly.
 `comm_statements` carries a CHECK that makes a component/total drift impossible
 to store.
 
+### 4.8 Upsales — recorded by HR (2026-09-24)
+
+A customer adds to an order they placed earlier: a protector at the next fair,
+a second mattress, a bedframe upgrade. The first sale's commission was paid
+long ago, so **only the added amount earns** (user 2026-09-24: 跟着 upsells 的
+amount 来算 commission，因为 before that 那个 sales 的 commission 已经算去了).
+
+The ERP cannot say what was added. It has no upsale concept. Of August's eleven
+claim-form upsales, two are their own priced line on the old document, five
+are folded into an existing price and invisible, three old numbers are not in
+the ERP at all, and one raised a new bill. The old documents all came over from
+AutoCount on 2026-08-28, so nothing dates the change. **HR records each upsale
+on the month page's Upsales tab** (`comm_upsales`, user's choice): who sold it,
+the amount added, the day, the fair, and the paper bill it was added to.
+
+The rules, read off the August claim form:
+
+| | |
+|---|---|
+| C1 | the salesperson's own rate × the amount, like their own sales |
+| C4 | counts toward the upline's override — Yuny's override base (RM 158,554) and Louis's (RM 66,144) are their claim totals **with** their upsales |
+| Month | the month it is recorded under; HR records it once paid, so **no deposit gate** |
+| Not a bill | no Open Bill rank, no KPI, not in any margin (no cost), never released, never carried |
+
+The run reads a month's rows and hands each to the engine as a one-line order
+flagged `upsale` (`lib/commission/upsales.ts`). Its statement line reads
+`UPSALE HC5315 · 2026-08-29` and has no `source_order_id`, because that column
+is a foreign key to sales orders. The table refuses changes in a month whose
+run has paid (23RUN), like every other input of a run. Mig `20260924060000`.
+
 ---
 
 ## 5. Tax — Withholding instead of PCB

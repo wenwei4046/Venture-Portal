@@ -32,6 +32,8 @@ function database() {
   const from = vi.fn((table: string) => {
     const data = rows[table] ?? []
     const query = { select:vi.fn().mockReturnThis(), eq:vi.fn().mockReturnThis(), in:vi.fn().mockReturnThis(), order:vi.fn().mockReturnThis(),
+      // The Upsales tab (2026-09-24) reads the fair calendar by date range.
+      not:vi.fn().mockReturnThis(), gte:vi.fn().mockReturnThis(), lte:vi.fn().mockReturnThis(), is:vi.fn().mockReturnThis(),
       maybeSingle:vi.fn().mockResolvedValue({ data:Array.isArray(data) ? data[0] ?? null : data, error:null }),
       then:(resolve: (value: unknown) => unknown) => Promise.resolve(resolve({ data, error:null })),
     }

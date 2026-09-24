@@ -16,9 +16,11 @@ import VenueSection from './_components/VenueSection'
 import PersonSection from './_components/PersonSection'
 import OpenBillSection from './_components/OpenBillSection'
 import MonthBreakdownTabs from './_components/MonthBreakdownTabs'
+import UpsaleSection from './_components/UpsaleSection'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
-import { loadMonthOrders, loadOrderShares } from '../../_lib/month-orders'
+import { loadMonthOrders, loadOrderShares, loadShareTeam } from '../../_lib/month-orders'
+import { loadFairChoices, loadMonthUpsales } from '../../_lib/upsales'
 import { loadOpenBillPaid } from '../../_lib/open-bill'
 import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
@@ -301,6 +303,17 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         ),
       })
     : null
+
+  // ── Upsales ────────────────────────────────────────────────────────────
+  // What HR recorded beside the bills: amounts customers added to earlier
+  // orders, paid in this month's run (`lib/commission/upsales.ts`).
+  const [upsales, upsaleFairs, team, upsaleLock] = await Promise.all([
+    loadMonthUpsales(supabase, subDept.id, period),
+    loadFairChoices(supabase, period),
+    loadShareTeam(supabase, subDept.schemeId),
+    supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDept.id, p_period: period }),
+  ])
+  if (upsaleLock.error) throw new Error(`Could not check the commission run: ${upsaleLock.error.message}`)
 
   const ordersPath = revenuePath(subDept.slug, period, 'orders')
 
@@ -680,7 +693,18 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               venue: venueRows.length,
               person: people.length,
               openBill: openBill?.totals.bills ?? 0,
+              upsales: upsales.length,
             }}
+            upsales={
+              <UpsaleSection
+                subDepartmentId={subDept.id}
+                period={period}
+                upsales={upsales}
+                team={team}
+                fairs={upsaleFairs}
+                locked={Boolean(upsaleLock.data)}
+              />
+            }
             venue={
               <VenueSection
                 rows={venueRows}

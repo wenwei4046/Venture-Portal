@@ -91,6 +91,9 @@ export function classifyLine(
   kpiIndex: Map<string, number>,
   groupIndex: Map<string, boolean>,
 ): LineClass {
+  // An upsale HR recorded is commissionable by definition: it is the amount
+  // the salesperson added, whatever group the scheme would put it in.
+  if (line.upsale) return 'commissionable'
   if (isKpiLine(line.productCode, kpiIndex)) return 'kpi'
   const known = groupIndex.get(normaliseCode(line.itemGroup))
   if (known === undefined) return 'unknown_group'
@@ -103,6 +106,9 @@ function inGoodsScope(
   kpiIndex: Map<string, number>,
   groupIndex: Map<string, boolean>,
 ): boolean {
+  // An upsale carries no cost and is not goods the ERP billed; judging a
+  // margin on it would only block the month's incentive.
+  if (line.upsale) return false
   const cls = classifyLine(line, kpiIndex, groupIndex)
   if (cls === 'commissionable') return true
   // A KPI line is a giveaway from a commissionable group; it belongs to the
@@ -729,7 +735,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
       const opr = orderProductRevenue(order, kpiIndex, groupIndex)
 
-      if (!isDepositMet(order, scheme.depositThresholdPct)) {
+      // An upsale is recorded once the customer has paid for it; the deposit
+      // gate is a question about ERP bills.
+      if (!order.upsale && !isDepositMet(order, scheme.depositThresholdPct)) {
         deferredRevenue = round2(deferredRevenue + opr)
         deferred.push({
           staffId,
@@ -953,7 +961,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
       // C3 — Open Bill: the 1st / 2nd / 3rd bill written on an event day.
       if (scheme.enableOpenBill) {
-        const rank = tagByOrder.get(order.id)
+        // An upsale is not a bill written on the day, so it holds no rank.
+        const rank = order.upsale ? undefined : tagByOrder.get(order.id)
         const pct = rank === undefined ? undefined : openBillPct.get(rank)
         if (rank !== undefined && pct === undefined) {
           warnings.push(

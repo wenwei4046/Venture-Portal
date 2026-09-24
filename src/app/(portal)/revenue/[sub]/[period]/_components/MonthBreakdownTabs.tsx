@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 
-export type MonthTab = 'venue' | 'person' | 'open-bill'
+export type MonthTab = 'venue' | 'person' | 'open-bill' | 'upsales'
 
 /**
  * The three ways to cut the month, on one rail.
@@ -22,28 +22,41 @@ export type MonthTab = 'venue' | 'person' | 'open-bill'
  * Every panel is rendered on the server and handed here as a node: switching
  * is a `pushState` and a re-render, never a round trip, and `?tab=` still
  * opens the month on the view somebody meant to send.
+ *
+ * Upsales (2026-09-24) sit at the end: not a cut of the ERP's bills but what
+ * HR recorded beside them — amounts customers added to earlier orders.
  */
 export default function MonthBreakdownTabs({
   venue,
   person,
   openBill,
+  upsales,
   counts,
 }: {
   venue: ReactNode
   person: ReactNode
   /** Null when the scheme pays no Open Bill bonus — IR has none. */
   openBill: ReactNode | null
-  counts: { venue: number; person: number; openBill: number }
+  /** Absent on a page that does not offer upsales. */
+  upsales?: ReactNode
+  counts: { venue: number; person: number; openBill: number; upsales?: number }
 }) {
   const searchParams = useSearchParams()
   const asked = searchParams.get('tab')
   const tab: MonthTab =
-    asked === 'person' ? 'person' : asked === 'open-bill' && openBill ? 'open-bill' : 'venue'
+    asked === 'person'
+      ? 'person'
+      : asked === 'open-bill' && openBill
+        ? 'open-bill'
+        : asked === 'upsales' && upsales
+          ? 'upsales'
+          : 'venue'
 
   const tabs: TabItem[] = [
     { key: 'venue', label: 'Sales by venue', count: counts.venue },
     { key: 'person', label: 'Sales by person', count: counts.person },
     ...(openBill ? [{ key: 'open-bill', label: 'Open Bill', count: counts.openBill }] : []),
+    ...(upsales ? [{ key: 'upsales', label: 'Upsales', count: counts.upsales ?? 0 }] : []),
   ]
 
   function goTo(key: string) {
@@ -57,7 +70,7 @@ export default function MonthBreakdownTabs({
   return (
     <div>
       <SlidingTabs items={tabs} active={tab} onTabChange={goTo} />
-      {tab === 'venue' ? venue : tab === 'person' ? person : openBill}
+      {tab === 'venue' ? venue : tab === 'person' ? person : tab === 'open-bill' ? openBill : upsales}
     </div>
   )
 }

@@ -21,6 +21,7 @@ import type {
   SalesOrderRow,
   SchemeRow,
 } from '@/lib/commission/run-payload'
+import type { UpsaleRow } from '@/lib/commission/upsales'
 
 /**
  * Computing a month's commission and syncing its clean result to payroll.
@@ -219,6 +220,15 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     supabase.from('sales_order_shares').select('order_id, staff_id, share_pct').in('order_id', chunk),
   )
 
+  // Upsales HR recorded under this month (2026-09-24): amounts customers added
+  // to earlier orders. Read by month and never carried — `lib/commission/upsales.ts`.
+  const { data: upsaleRows, error: upsaleError } = await supabase
+    .from('comm_upsales')
+    .select('id, staff_id, amount, sold_on, original_ref')
+    .eq('sub_department_id', scheme.sub_department_id)
+    .eq('period_month', period)
+  if (upsaleError) throw new Error(`Could not read the month's upsales: ${upsaleError.message}`)
+
   // ── The months before, for the streak gates ────────────────────────────
   // A rung with `personal_sales_threshold` × N months looks back N − 1 months
   // at what those months' runs paid as own revenue. Only months that were
@@ -253,6 +263,7 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     releasedOrderNos,
     priorMonths: rows<PriorMonthRow>(priorRows),
     shares: shareRows,
+    upsales: rows<UpsaleRow>(upsaleRows),
   })
 
   const result = runEngine(input)
