@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), requireSubDepartment: vi.fn() }))
 vi.mock('server-only', () => ({}))
 // The month page now ends in a client tab rail, so the render needs the
@@ -58,6 +58,7 @@ describe('Revenue pages preserve source commission while reading monthly payroll
   it('shows the monthly adjustment in the calculation page without changing the source hero', async () => {
     const { from,rpc } = database()
     const { container } = render(await CommissionPeriodPage({ params:Promise.resolve({ sub:'fair',period:'2026-09-01' }) }))
+    fireEvent.click(screen.getByText('Payroll & source tools · saved run, costs, venues and upsales'))
     expect(container.querySelector('.hero-walnut')).toHaveTextContent('RM 10,000.00')
     expect(container.querySelector('.hero-walnut')).not.toHaveTextContent('RM 12,500.00')
     expect(screen.getByRole('table', { name:'Monthly payroll adjustments by salesperson' })).toHaveTextContent('RM 12,500.00')

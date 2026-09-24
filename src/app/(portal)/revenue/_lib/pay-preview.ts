@@ -1,6 +1,8 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildPayRow, type PayRow, type TaxMode } from '@/lib/revenue-pay'
+import { fetchAllRows } from '@/lib/paginate'
+import { loadPayBeforeRun } from './pay-preview-before-run'
 
 /**
  * The month's pay board: every salesperson in the run, from the commission the
@@ -45,7 +47,7 @@ export interface PayBoard {
   missing: number
 }
 
-interface PreviewRow {
+export interface PreviewRow {
   staff_id: string
   employee_name: string
   employee_code: string | null
@@ -106,29 +108,32 @@ export async function loadPayBoard(
   supabase: SupabaseClient,
   subDepartmentId: string,
   period: string,
+  options: { allowWithoutRun?: boolean; previewStaffIds?: readonly string[] } = {},
 ): Promise<PayBoard> {
-  const { data: runData } = await supabase
+  const { data: runData, error: runError } = await supabase
     .from('comm_runs')
     .select('id, status')
     .eq('sub_department_id', subDepartmentId)
     .eq('period_month', period)
     .maybeSingle()
+  if (runError) throw new Error(`Could not read the commission run: ${runError.message}`)
   const run = runData as { id: string; status: string } | null
-  if (!run) return { runStatus: null, runId: null, rows: [], missing: 0 }
+  if (!run && !options.allowWithoutRun) return { runStatus: null, runId: null, rows: [], missing: 0 }
 
-  const [{ data: previewData, error }, { data: statementData }] = await Promise.all([
-    supabase.rpc('revenue_pay_preview', {
-      p_sub_department_id: subDepartmentId,
-      p_period: period,
-    }),
-    supabase
+  const [savedPreviewData, statementData] = await Promise.all([
+    fetchAllRows<PreviewRow>((from, to) => supabase.rpc('revenue_pay_preview', {
+      p_sub_department_id: subDepartmentId, p_period: period,
+    }).order('commission_here', { ascending: false }).order('employee_name').order('staff_id').range(from, to)),
+    run ? fetchAllRows<StatementRow>((from, to) => supabase
       .from('comm_statements')
       .select(
         'staff_id, rank_key, product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, group_incentive, margin_penalty_withheld, margin_pct',
       )
-      .eq('run_id', run.id),
+      .eq('run_id', run.id).order('id').range(from, to)) : Promise.resolve([]),
   ])
-  if (error) throw new Error(`Could not work out what the month pays: ${error.message}`)
+  const previewData = !run && options.allowWithoutRun
+    ? await loadPayBeforeRun(supabase, subDepartmentId, period, options.previewStaffIds)
+    : savedPreviewData
 
   const statements = new Map(
     ((statementData ?? []) as StatementRow[]).map(s => [
@@ -189,5 +194,5 @@ export async function loadPayBoard(
     components: statements.get(p.staff_id) ?? null,
   }))
 
-  return { runStatus: run.status, runId: run.id, rows, missing: 0 }
+  return { runStatus: run?.status ?? null, runId: run?.id ?? null, rows, missing: 0 }
 }

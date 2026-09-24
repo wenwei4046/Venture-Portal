@@ -24,6 +24,9 @@ import { loadFairChoices, loadMonthUpsales } from '../../_lib/upsales'
 import { loadOpenBillPaid } from '../../_lib/open-bill'
 import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
+import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
+import CommissionWorkbench from './_components/CommissionWorkbench'
+import workbenchStyles from './_components/commission-workbench.module.css'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
@@ -316,9 +319,11 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   if (upsaleLock.error) throw new Error(`Could not check the commission run: ${upsaleLock.error.message}`)
 
   const ordersPath = revenuePath(subDept.slug, period, 'orders')
+  const workbench = batchRow && subDept.schemeId
+    ? await loadCommissionWorkbench(supabase, subDept.id, period, monthOrders, run?.id)
+    : null
 
-  return (
-    <div>
+  const monthHeader = (
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
@@ -363,20 +368,12 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           )}
         </div>
       </div>
-
-      {!batchRow ? (
-        <div className="py-16 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif text-2xl text-ink mb-3">Nothing imported for this month.</p>
-          <p className="font-serif italic text-muted text-sm max-w-lg mx-auto">
-            Import the ERP sales-order export to begin.
-          </p>
-        </div>
-      ) : (
-        <>
-          <section className="mb-10">
-            <div className="grid gap-4 sm:grid-cols-4">
-              <Tile label="Sales value" value={formatMoney(total)} big />
-              <Tile label="Orders" value={String(orders.length)} />
+  )
+  const monthMetrics = (
+          <section className="mb-6">
+            <div className={workbenchStyles.metrics}>
+              <Tile label="Total sales value" value={formatMoney(total)} big />
+              <Tile label="Total orders" value={String(orders.length)} />
               <Tile
                 label="Unmatched agents"
                 value={String(new Set(unmatched.map(o => agentKeyOf(o.agentName))).size)}
@@ -389,6 +386,11 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               />
             </div>
           </section>
+  )
+  const monthTools = (
+          <details className={workbenchStyles.legacy}>
+            <summary>Payroll & source tools · saved run, costs, venues and upsales</summary>
+            <p className={workbenchStyles.notice}>Payroll uses saved Revenue Rules and source orders. Temporary exclusions and preview settings above are for review only. Save Open Bill picks before computing the payroll run.</p>
 
           {(unmatched.length > 0 || linesWithoutCost > 0 || linesWithoutBrand > 0) && (
             <section className="mb-10">
@@ -727,8 +729,22 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               ) : null
             }
           />
-        </>
-      )}
+          </details>
+  )
+
+  return (
+    <div className={workbenchStyles.page}>
+      {workbench ? <CommissionWorkbench key={`${subDept.id}:${period}`} data={workbench}
+        sub={subDept.slug} period={period} runStatus={run?.status ?? null}
+        monthOverview={<>{monthHeader}{monthMetrics}</>}
+        monthTools={monthTools}
+        savedTotals={statements.map(row => ({ staffId: row.staff_id, total: Number(row.total_commission) }))} />
+        : <>{monthHeader}{!batchRow ? (
+          <div className="py-16 text-center border border-hairline rounded-card bg-surface">
+            <p className="font-serif text-2xl text-ink mb-3">Nothing imported for this month.</p>
+            <p className="font-serif italic text-muted text-sm max-w-lg mx-auto">Import the ERP sales-order export to begin.</p>
+          </div>
+        ) : <>{monthMetrics}{monthTools}</>}</>}
     </div>
   )
 }
@@ -745,12 +761,12 @@ function Tile({
   big?: boolean
 }) {
   return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
+    <div className={workbenchStyles.metric}>
+      <div className={workbenchStyles.metricLabel}>{text}</div>
       <div
         className={[
-          'statement-amount',
-          big ? '' : 'compact',
+          workbenchStyles.metricValue,
+          big ? 'whitespace-nowrap' : '',
           warn ? 'text-danger' : 'text-num-ink',
         ].join(' ')}
       >
