@@ -4,7 +4,7 @@ import type { MemberBand, MemberData, QuoteInput } from './types'
 import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberData, loadMemberInsight, loadMemberOrgMap } from './server'
 
 const mocks = vi.hoisted(() => ({
-  getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminFrom: vi.fn(),
+  getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
 }))
 vi.mock('server-only', () => ({}))
 vi.mock('@/lib/auth', () => ({ getUser: mocks.getUser }))
@@ -16,10 +16,14 @@ const productId = '10000000-0000-4000-8000-000000000002'
 const userId = '10000000-0000-4000-8000-000000000003'
 const band: MemberBand = { brand: 'AKEMI', key: 'Tier 1', kind: 'incentive', threshold: 40, multiplier: 1, amount: 100 }
 const quote: QuoteInput = { schemeId, lines: [{ productId, quantity: 1, gift: false }], price: '5000', delivery: '500' }
+// A SKU as `member_catalogue(…, p_priced => true)` answers it: the portal's price rides along.
 const privateProduct = {
-  id: productId, item_code: 'AK-QUEEN', product_name: 'Queen Mattress', brand_code: 'AKEMI',
-  unit_cost: 2000, is_active: true, updated_at: '2026-09-12T00:00:00Z',
-  member_product_options: { category: 'mattress', size: 'Queen', color: '', gift: false, available: true, updated_at: '2026-09-12T00:00:00Z' },
+  id: productId, code: 'AK-QUEEN', name: 'Queen Mattress', brand: 'AKEMI', category: 'Mattress',
+  size: 'Queen', color: '', available: true, gift: false, modelId: null, kind: 'MATTRESS',
+  baseModel: 'AK', moduleCode: null, price: 2000, grid: null, version: '2026-09-12T00:00:00Z:',
+}
+function pricedCatalogue(products: unknown[], extra: Record<string, unknown> = {}) {
+  return { data: { products, models: [], optionPrices: [], combos: [], ...extra }, error: null }
 }
 function user(overrides: Partial<User> = {}): User {
   return { id: userId, name: 'Principal', email: 'principal@example.com', role: 'principal', is_active: true, created_at: '', updated_at: '', permissions: [], ...overrides }
@@ -37,13 +41,8 @@ beforeEach(() => {
   mocks.getUser.mockResolvedValue(user())
   mocks.createClient.mockResolvedValue({ rpc: mocks.rpc })
   mocks.rpc.mockResolvedValue({ data: snapshot(), error: null })
-  mocks.adminFrom.mockImplementation(() => {
-    const response = Promise.resolve({ data: [privateProduct], error: null })
-    const query = { select: vi.fn(), in: vi.fn(), or: vi.fn(), eq: vi.fn(), limit: vi.fn(), then: response.then.bind(response) }
-    for (const method of [query.select, query.in, query.or, query.eq, query.limit]) method.mockReturnValue(query)
-    return query
-  })
-  mocks.adminClient.mockReturnValue({ from: mocks.adminFrom })
+  mocks.adminRpc.mockResolvedValue(pricedCatalogue([privateProduct]))
+  mocks.adminClient.mockReturnValue({ rpc: mocks.adminRpc })
 })
 
 describe('Principal Revenue View server boundary', () => {
@@ -121,9 +120,13 @@ describe('Principal Revenue View server boundary', () => {
     if (!result.ok) throw new Error(result.error)
     expect(result.data.margin).toBe(60)
     expect(result.data).not.toHaveProperty('cost')
-    expect(JSON.stringify(result.data)).not.toContain('unit_cost')
+    expect(JSON.stringify(result.data)).not.toContain('2000')
     expect(result.data.customerText).toContain('Queen Mattress')
-    expect(mocks.adminFrom).toHaveBeenCalledWith('comm_products')
+    // The portal's own prices, read through the service role only after the
+    // session was authorised — just the cart's SKUs and the gift pillows.
+    expect(mocks.adminRpc).toHaveBeenCalledWith('member_catalogue', {
+      p_brands: ['AKEMI'], p_ids: [productId], p_priced: true, p_suggest: 20,
+    })
   })
 
   it('keeps a real member quotation on the member membership authorization path', async () => {
@@ -148,15 +151,10 @@ describe('Principal Revenue View server boundary', () => {
   it('lets a brand-less rider ride the mattress and costs it into the same margin', async () => {
     const riderId = '10000000-0000-4000-8000-000000000004'
     const rider = {
-      ...privateProduct, id: riderId, item_code: 'NB-KHJ50 (Q)', product_name: 'Fenrir bed frame', brand_code: null, unit_cost: 500,
-      member_product_options: { ...privateProduct.member_product_options, category: 'bed frame' },
+      ...privateProduct, id: riderId, code: 'KHJ50-(Q)', name: 'Fenrir bed frame', brand: null,
+      category: 'Bed frame', kind: 'BEDFRAME', baseModel: 'KHJ50', price: 500,
     }
-    mocks.adminFrom.mockImplementation(() => {
-      const response = Promise.resolve({ data: [privateProduct, rider], error: null })
-      const query = { select: vi.fn(), in: vi.fn(), or: vi.fn(), eq: vi.fn(), limit: vi.fn(), then: response.then.bind(response) }
-      for (const method of [query.select, query.in, query.or, query.eq, query.limit]) method.mockReturnValue(query)
-      return query
-    })
+    mocks.adminRpc.mockResolvedValue(pricedCatalogue([privateProduct, rider]))
     mocks.rpc.mockResolvedValue({ data: { bands: [band], costDivisor: 1 }, error: null })
     const result = await calculateMemberQuote({ ...quote, lines: [...quote.lines, { productId: riderId, quantity: 1, gift: false }] })
     expect(result.ok).toBe(true)
@@ -187,5 +185,133 @@ describe('Principal Revenue View server boundary', () => {
   it('does not extend the Principal quote exception to personal member memo acknowledgements', async () => {
     expect((await acknowledgeMemberMemo(productId, true)).ok).toBe(false)
     expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// The calculator sells from the Product List (user 2026-09-24): what Modular
+// ticked, at the portal's own prices — options, specials and combos included.
+describe('the catalogue behind the member calculator', () => {
+  const sofaModel = '10000000-0000-4000-8000-000000000100'
+  const frameModel = '10000000-0000-4000-8000-000000000200'
+  const moduleA = '10000000-0000-4000-8000-000000000101'
+  const moduleB = '10000000-0000-4000-8000-000000000102'
+  const frame = '10000000-0000-4000-8000-000000000201'
+  const zanotti: MemberBand = { brand: 'ZANOTTI', key: 'Tier 1', kind: 'incentive', threshold: 30, multiplier: 1, amount: 100 }
+  const sofaModule = (id: string, module: string, price: number) => ({
+    id, code: `8030-${module}`, name: '8030 SOFFIO', brand: 'ZANOTTI', category: 'Sofa', size: module, color: '',
+    available: true, gift: false, modelId: sofaModel, kind: 'SOFA', baseModel: '8030', moduleCode: module,
+    options: [{ height: '30', tier: 'PRICE_2' }], price: null,
+    grid: [{ height: '30', tier: 'PRICE_2', price }], version: 'v1',
+  })
+  const bedFrame = {
+    id: frame, code: 'Y04-(Q)', name: 'Y04', brand: null, category: 'Bed frame', size: 'Queen', color: '',
+    available: true, gift: false, modelId: frameModel, kind: 'BEDFRAME', baseModel: 'Y04', moduleCode: null,
+    price: 800, grid: null, version: 'v1',
+  }
+  const models = [
+    { id: sofaModel, kind: 'SOFA', options: { leg_heights: ['Default', '4"'], specials: ['Nylon Fabric'] } },
+    { id: frameModel, kind: 'BEDFRAME', options: { divan_heights: ['8"', '10"'], leg_heights: ['No Leg', '4"'], gaps: ['12"'] } },
+  ]
+  const optionPrices = [
+    { pool: 'sofa_leg_heights', value: '4"', price: 30 },
+    { pool: 'sofa_specials', value: 'Nylon Fabric', price: 50 },
+    { pool: 'bedframe_divan_heights', value: '10"', price: 100 },
+    { pool: 'bedframe_leg_heights', value: '4"', price: 20 },
+  ]
+  const sofaQuote = (build: QuoteInput['build'], price = '5000'): QuoteInput => ({
+    schemeId, price, delivery: '0', build,
+    lines: [{ productId: moduleA, quantity: 1, gift: false }, { productId: moduleB, quantity: 1, gift: false }],
+  })
+
+  beforeEach(() => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_quote'] }))
+    mocks.rpc.mockResolvedValue({ data: { bands: [zanotti], costDivisor: 1 }, error: null })
+    mocks.adminRpc.mockResolvedValue(pricedCatalogue(
+      [sofaModule(moduleA, '1A(LHF)', 1000), sofaModule(moduleB, '2NA', 1500), bedFrame],
+      { models, optionPrices },
+    ))
+  })
+
+  it('adds the build options the model was ticked for, at the portal surcharges', async () => {
+    const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', leg: '4"', specials: ['Nylon Fabric'] }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    // (1,000 + 30 + 50) + (1,500 + 30 + 50) = 2,660 → (5,000 − 2,660) ÷ 5,000
+    expect(result.data.margin).toBeCloseTo(46.8, 10)
+    expect(result.data.customerText).toContain('Sofa build: seat height 30 · Tier 2 fabric · leg 4" · Nylon Fabric')
+  })
+
+  it('refuses an option the model was not ticked for', async () => {
+    const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', leg: '6"' }))
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected a refusal')
+    expect(result.error).toContain('leg height')
+  })
+
+  it('costs a sofa that covers a priced combo at the combo, spread over its modules', async () => {
+    mocks.adminRpc.mockResolvedValue(pricedCatalogue(
+      [sofaModule(moduleA, '1A(LHF)', 1000), sofaModule(moduleB, '2NA', 1500)],
+      {
+        models, optionPrices,
+        combos: [{ erpId: 'c1', baseModel: '8030', modules: [['1A(LHF)'], ['2NA']], tier: null, label: 'L-shape',
+          effectiveFrom: '2026-01-01', createdAt: null, priceByHeight: { '30': 2000 } }],
+      },
+    ))
+    const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2' }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    // The set costs RM 2,000, not 1,000 + 1,500 → (5,000 − 2,000) ÷ 5,000
+    expect(result.data.margin).toBeCloseTo(60, 10)
+  })
+
+  it('costs a bed frame with its divan and leg surcharges', async () => {
+    const result = await calculateMemberQuote({
+      schemeId, price: '2000', delivery: '0',
+      lines: [{ productId: frame, quantity: 1, gift: false }],
+      build: { bedframe: { divan: '10"', leg: '4"', gap: '12"' } },
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    // 800 + 100 + 20 = 920 → (2,000 − 920) ÷ 2,000
+    expect(result.data.margin).toBeCloseTo(54, 10)
+    expect(result.data.customerText).toContain('Bed frame build: divan 10" · leg 4" · gap 12"')
+  })
+
+  it('never lets a price or grid reach the snapshot, and keeps only well-formed dropdowns', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_quote'] }))
+    mocks.rpc.mockResolvedValue({
+      data: {
+        ...snapshot(),
+        products: [{ ...sofaModule(moduleA, '1A(LHF)', 1000), cost: 999 }],
+        catalogueModels: [...models, { id: 'x', kind: 'MATTRESS', options: {} }, { kind: 'SOFA' }],
+      },
+      error: null,
+    })
+    const data = await loadMemberData()
+    expect(JSON.stringify(data.products)).not.toMatch(/"(price|grid|cost|costGrid)"/)
+    expect(data.products[0]).toMatchObject({ modelId: sofaModel, kind: 'SOFA', moduleCode: '1A(LHF)' })
+    expect(data.catalogueModels?.map(m => m.id)).toEqual([sofaModel, frameModel])
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('quotes a seat height however the Product List spells it (STD, 75cm, even ?)', async () => {
+    const odd = (id: string, height: string) => ({
+      ...sofaModule(id, '1A(LHF)', 1000), options: [{ height, tier: 'PRICE_2' }],
+      grid: [{ height, tier: 'PRICE_2', price: 1000 }],
+    })
+    for (const height of ['STD', '75cm', '?']) {
+      mocks.adminRpc.mockResolvedValue(pricedCatalogue([odd(moduleA, height)], { models, optionPrices }))
+      const result = await calculateMemberQuote({
+        schemeId, price: '5000', delivery: '0', build: { height, tier: 'PRICE_2' },
+        lines: [{ productId: moduleA, quantity: 1, gift: false }],
+      })
+      expect(result.ok).toBe(true)
+    }
+  })
+
+  it('refuses a malformed build before any cost lookup', async () => {
+    const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', specials: ['<script>'] }))
+    expect(result.ok).toBe(false)
+    expect(mocks.adminClient).not.toHaveBeenCalled()
   })
 })

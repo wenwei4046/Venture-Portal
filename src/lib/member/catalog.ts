@@ -1,4 +1,4 @@
-import type { MemberProduct, QuoteBuild, QuoteLine } from "./types";
+import type { MemberProduct, QuoteLine } from "./types";
 
 export type ProductCategory =
   | "mattress"
@@ -93,31 +93,6 @@ export function compareHeights(a: string, b: string): number {
     y = parseFloat(b);
   if (Number.isFinite(x) && Number.isFinite(y) && x !== y) return x - y;
   return a.localeCompare(b);
-}
-
-/**
- * The cost of one unit for the cart's build. Mirrors the ERP's
- * `resolveSeatHeightSen` (mfg-pricing.ts): the exact (height, tier) cell,
- * else the PRICE_2 cell at that height, else any cell at that height. A
- * product with no grid is its flat unit cost. A grid product whose grid does
- * not know the chosen height resolves to nothing — the caller says so
- * rather than silently costing another height.
- */
-export function resolveUnitCost(
-  product: Pick<MemberProduct, "cost" | "costGrid">,
-  build?: QuoteBuild | null,
-): { cost: number | null; height: string | null; tier: string | null } {
-  const grid = product.costGrid ?? [];
-  if (!grid.length) return { cost: product.cost ?? null, height: null, tier: null };
-  const height = build?.height ?? null;
-  if (!height || !grid.some((cell) => cell.height === height))
-    return { cost: null, height: null, tier: null };
-  const want = build?.tier ?? "PRICE_2";
-  const cell =
-    grid.find((c) => c.height === height && c.tier === want) ??
-    grid.find((c) => c.height === height && c.tier === "PRICE_2") ??
-    grid.find((c) => c.height === height)!;
-  return { cost: cell.cost, height, tier: cell.tier };
 }
 
 /** Only public web images or same-origin file paths may enter the image element. */

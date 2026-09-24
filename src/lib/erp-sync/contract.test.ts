@@ -240,3 +240,42 @@ describe('agentKeyOf', () => {
     expect(agentKeyOf(null)).toBe('(NO SALESPERSON)')
   })
 })
+
+// The line's structured build is what the portal prices its options from
+// (catalogue_line_facts reads raw.variants first) — allowlisted, because the
+// ERP's own `variants` also carries money and free text.
+describe('the line variants the portal keeps', () => {
+  it('keeps the build keys and drops money and free text', () => {
+    const [line] = toCanonicalLines([
+      {
+        line_no: 1, item_code: '8030-1A(LHF)', item_group: 'sofa', qty: 1, total_sen: 400000,
+        variants: {
+          fabricCode: 'BO315-01', seatHeight: 30, legHeight: 'Default', specials: ['Nylon Fabric', ' ', 7],
+          extraAddonAmountRM: 150, remark: 'deliver after 5pm', colourLabel: 'Pearl',
+        },
+      },
+    ])
+    expect(line.variants).toEqual({
+      fabricCode: 'BO315-01', seatHeight: '30', legHeight: 'Default', specials: ['Nylon Fabric'],
+    })
+    expect(JSON.stringify(line)).not.toMatch(/extraAddonAmountRM|remark|colourLabel/)
+  })
+
+  it('reads a bed frame build', () => {
+    const [line] = toCanonicalLines([
+      { line_no: 1, item_code: 'Y04-(Q)', item_group: 'bedframe', qty: 1, total_sen: 0,
+        variants: { divanHeight: '10"', legHeight: 'No Leg', gap: '12"', totalHeight: '24"', size: 'Q', specials: [] } },
+    ])
+    expect(line.variants).toEqual({ divanHeight: '10"', legHeight: 'No Leg', gap: '12"', totalHeight: '24"', size: 'Q' })
+  })
+
+  it('leaves no variants key when the ERP sent none, or nothing usable', () => {
+    const lines = toCanonicalLines([
+      { line_no: 1, item_code: 'A', item_group: 'mattress', qty: 1, total_sen: 100 },
+      { line_no: 2, item_code: 'B', item_group: 'sofa', qty: 1, total_sen: 100, variants: {} },
+      { line_no: 3, item_code: 'C', item_group: 'sofa', qty: 1, total_sen: 100, variants: { remark: 'x', seatHeight: ' ' } },
+    ])
+    for (const line of lines) expect(line).not.toHaveProperty('variants', expect.anything())
+    expect(JSON.parse(JSON.stringify(lines)).some((l: Record<string, unknown>) => 'variants' in l)).toBe(false)
+  })
+})

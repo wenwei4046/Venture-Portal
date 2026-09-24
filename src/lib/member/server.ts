@@ -8,9 +8,10 @@ import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { calculateQuote, cents, customerQuote } from "./calculator";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
+import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
 import type {
-  CostCell,
+  BedframeBuild,
   MemberBand,
   MemberData,
   MemberInsight,
@@ -195,6 +196,11 @@ function publicProduct(
             : [],
         )
       : undefined,
+    // Which build a line takes and whose dropdowns it reads — not money.
+    modelId: typeof p.modelId === "string" ? p.modelId : null,
+    kind: typeof p.kind === "string" ? p.kind : null,
+    baseModel: typeof p.baseModel === "string" ? p.baseModel : null,
+    moduleCode: typeof p.moduleCode === "string" ? p.moduleCode : null,
     imageUrl: productImageUrl(
       p.imageUrl ??
         p.image_url ??
@@ -278,6 +284,7 @@ export async function loadMemberData(): Promise<MemberData> {
       })),
       requests: (data.requests ?? []).map(requestLabels),
       products: (data.products ?? []).map(publicProduct),
+      catalogueModels: catalogueModelsOf(data.catalogueModels),
     };
   } catch (error) {
     return { ...empty, message: message(error) };
@@ -351,34 +358,6 @@ export async function loadMemberOrgMap(context?: Pick<MemberReadContext, "subDep
   });
 }
 
-interface CostRow {
-  id: string;
-  item_code: string;
-  product_name: string | null;
-  brand_code: string | null;
-  unit_cost: number | string | null;
-  is_active: boolean;
-  updated_at: string;
-  cost_grid?: unknown;
-  member_product_options:
-    | {
-        category: string;
-        size: string;
-        color: string;
-        gift: boolean;
-        available: boolean;
-        updated_at: string;
-      }
-    | {
-        category: string;
-        size: string;
-        color: string;
-        gift: boolean;
-        available: boolean;
-        updated_at: string;
-      }[]
-    | null;
-}
 /** Private costs remain inside this server-only module and never enter an RPC response. */
 export async function calculateMemberQuote(
   input: QuoteInput,
@@ -431,70 +410,19 @@ export async function calculateMemberQuote(
     const costDivisor = Number(context.costDivisor ?? 1);
     if (!Number.isFinite(costDivisor) || costDivisor <= 0)
       throw new Error("The cost rule for this department is not configured.");
+    // The portal's own prices (user 2026-09-24): the Product List's catalogue,
+    // priced, for the cart's SKUs plus the pillows a gift suggestion may offer
+    // — never a whole price list. Service role only, after the member's own
+    // session has been authorised above; nothing priced leaves this module.
     const admin = adminClient() as unknown as SupabaseClient;
-    const projection =
-      "id,item_code,product_name,brand_code,unit_cost,cost_grid,is_active,updated_at,member_product_options!inner(category,size,color,gift,available,updated_at)";
-    // The brands this scheme sells, plus riders (bed frames and accessories
-    // carry no brand and ride any cart — user 2026-09-12).
-    const brandFilter = `brand_code.is.null,brand_code.in.(${brands
-      .map((brand) => `"${brand.replace(/["\\,()]/g, "")}"`)
-      .join(",")})`;
-    // Fetch only selected products plus eligible pillow suggestions, never a
-    // whole cost catalogue. Both reads follow successful session authorization.
-    const [chosen, gifts] = await Promise.all([
-      admin
-        .from("comm_products")
-        .select(projection)
-        .in("id", ids)
-        .or(brandFilter),
-      admin
-        .from("comm_products")
-        .select(projection)
-        .or(brandFilter)
-        .eq("is_active", true)
-        .eq("member_product_options.gift", true)
-        .eq("member_product_options.available", true)
-        .in("member_product_options.category", [
-          "枕头",
-          "Pillow",
-          "pillow",
-          "Pillows",
-          "pillows",
-        ])
-        .limit(20),
-    ]);
-    if (chosen.error || gifts.error)
-      throw new Error(chosen.error?.message ?? gifts.error!.message);
-    const rows = new Map<string, CostRow>();
-    for (const row of [
-      ...(chosen.data ?? []),
-      ...(gifts.data ?? []),
-    ] as unknown as CostRow[])
-      rows.set(row.id, row);
-    const products: MemberProduct[] = [...rows.values()].flatMap((row) => {
-      const option = Array.isArray(row.member_product_options)
-        ? row.member_product_options[0]
-        : row.member_product_options;
-      if (!option) return [];
-      const costGrid = costGridOf(row.cost_grid);
-      return [
-        {
-          id: row.id,
-          code: row.item_code,
-          name: row.product_name ?? row.item_code,
-          brand: row.brand_code ?? null,
-          category: option.category,
-          size: option.size,
-          color: option.color,
-          available: row.is_active && option.available,
-          gift: option.gift,
-          cost: row.unit_cost === null ? null : Number(row.unit_cost),
-          costGrid,
-          options: costGrid.map(({ height, tier }) => ({ height, tier })),
-          version: `${row.updated_at}:${option.updated_at}`,
-        },
-      ];
+    const { data: catalogue, error: catalogueError } = await admin.rpc("member_catalogue", {
+      p_brands: brands,
+      p_ids: ids,
+      p_priced: true,
+      p_suggest: 20,
     });
+    if (catalogueError) throw new Error(catalogueError.message);
+    const { products, pricing } = pricedCatalogueOf(catalogue);
     for (const line of input.lines) {
       const product = products.find((p) => p.id === line.productId);
       if (
@@ -525,42 +453,75 @@ export async function calculateMemberQuote(
         "A free gift size does not match a product in this cart. Please select a matching size.",
       );
     const checked: QuoteInput = { ...input, build };
-    const result = calculateQuote(checked, products, context.bands, { costDivisor });
+    const result = calculateQuote(checked, products, context.bands, { costDivisor }, pricing);
     if (!result.valid)
       throw new Error(result.error ?? "The quote could not be calculated.");
     return { ...result, customerText: customerQuote(checked, products, result) };
   });
 }
 
-/** The cart's sofa build, validated: short plain strings or nothing. */
+/**
+ * The cart's builds, validated for SHAPE: short strings or nothing. Whether a
+ * choice is one the cart's models offer is the calculator's check, against
+ * the catalogue it was priced from.
+ */
 function quoteBuild(raw: unknown): QuoteInput["build"] {
   if (raw === undefined || raw === null) return undefined;
-  if (typeof raw !== "object") throw new Error("The sofa build is invalid.");
-  const { height, tier } = raw as { height?: unknown; tier?: unknown };
-  const text = (value: unknown, label: string): string | undefined => {
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new Error("The build is invalid.");
+  // Seat height and tier are plain; an option may carry an inch mark or a
+  // parenthesis (`4"`, `Right Drawer (10")`) but never a control character.
+  const plain = (value: unknown, label: string): string | undefined => {
     if (value === undefined || value === null || value === "") return undefined;
     if (typeof value !== "string" || value.length > 20 || /[^\w .\-/]/.test(value))
       throw new Error(`The sofa ${label} is invalid.`);
     return value;
   };
-  return { height: text(height, "seat height"), tier: text(tier, "fabric tier") };
-}
-
-/** Only well-formed grid cells enter the engine; anything else is ignored. */
-function costGridOf(raw: unknown): CostCell[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((cell) => {
-    if (!cell || typeof cell !== "object") return [];
-    const { height, tier, cost } = cell as Record<string, unknown>;
-    const value = typeof cost === "string" ? Number(cost) : cost;
-    if (
-      typeof height !== "string" || !height || height.length > 20 ||
-      typeof tier !== "string" || !tier || tier.length > 20 ||
-      typeof value !== "number" || !Number.isFinite(value) || value < 0
-    )
-      return [];
-    return [{ height, tier, cost: value }];
-  });
+  const unsafe = (s: string) =>
+    [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127 || ch === "<" || ch === ">");
+  const option = (value: unknown, label: string): string | undefined => {
+    if (value === undefined || value === null || value === "") return undefined;
+    if (typeof value !== "string" || value.length > 80 || unsafe(value))
+      throw new Error(`The ${label} is invalid.`);
+    return value;
+  };
+  const options = (value: unknown, label: string): string[] | undefined => {
+    if (value === undefined || value === null) return undefined;
+    if (!Array.isArray(value) || value.length > 20) throw new Error(`The ${label} are invalid.`);
+    const list = [...new Set(value.map((v) => option(v, label)).filter((v): v is string => !!v))];
+    return list.length ? list : undefined;
+  };
+  const b = raw as Record<string, unknown>;
+  // A seat height is whatever the Product List's grid calls it (`28`, `75cm`,
+  // `STD`, even `?`) and is matched against the SKU's own grid, so it needs
+  // only the options' shape check; the tier is one of three words.
+  const height = option(b.height, "sofa seat height");
+  if (height && height.length > 20) throw new Error("The sofa seat height is invalid.");
+  const build: NonNullable<QuoteInput["build"]> = {
+    height,
+    tier: plain(b.tier, "fabric tier"),
+  };
+  const leg = option(b.leg, "sofa leg height");
+  if (leg) build.leg = leg;
+  const specials = options(b.specials, "sofa specials");
+  if (specials) build.specials = specials;
+  if (b.bedframe !== undefined && b.bedframe !== null) {
+    if (typeof b.bedframe !== "object" || Array.isArray(b.bedframe))
+      throw new Error("The bed frame build is invalid.");
+    const f = b.bedframe as Record<string, unknown>;
+    const frame: BedframeBuild = {};
+    const divan = option(f.divan, "divan height");
+    const frameLeg = option(f.leg, "bed frame leg height");
+    const total = option(f.total, "total height");
+    const gap = option(f.gap, "gap");
+    const frameSpecials = options(f.specials, "bed frame specials");
+    if (divan) frame.divan = divan;
+    if (frameLeg) frame.leg = frameLeg;
+    if (total) frame.total = total;
+    if (gap) frame.gap = gap;
+    if (frameSpecials) frame.specials = frameSpecials;
+    if (Object.keys(frame).length) build.bedframe = frame;
+  }
+  return build;
 }
 
 interface VerifiedInvoice {

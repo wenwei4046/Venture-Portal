@@ -177,11 +177,12 @@ export interface UncostedProduct {
   qty: number
   amount: number
   orders: number
-  listItemCode: string | null
-  listHasCost: boolean
-  /** The ERP's own SKU master carries this code — so the empty cost is ITS
-   *  gap, and filling it there fixes every system at once. */
+  /** The ERP's SKU master carries this code (mirrored onto the Product List). */
   inSkuMaster: boolean
+  /** The Product List has a price for it — the line lacks one only because the month was costed before it. */
+  hasPrice: boolean
+  /** Why nothing priced it: not_in_sku_master / unpriced / no_height / error. */
+  reason: string
 }
 
 export async function loadUncostedProducts(
@@ -204,9 +205,9 @@ export async function loadUncostedProducts(
       qty: number | string
       amount: number | string
       orders: number
-      list_item_code: string | null
-      list_has_cost: boolean | null
       in_sku_master: boolean | null
+      has_price: boolean | null
+      reason: string | null
     }>
   ).map(r => ({
     productCode: r.product_code,
@@ -217,9 +218,9 @@ export async function loadUncostedProducts(
     qty: Number(r.qty),
     amount: Number(r.amount),
     orders: r.orders,
-    listItemCode: r.list_item_code,
-    listHasCost: r.list_has_cost === true,
     inSkuMaster: r.in_sku_master === true,
+    hasPrice: r.has_price === true,
+    reason: r.reason ?? (r.in_sku_master ? 'unpriced' : 'not_in_sku_master'),
   }))
 }
 

@@ -1,4 +1,10 @@
-import type { MemberBand, MemberData, MemberProduct } from "./types";
+import type { QuotePricing } from "./calculator";
+import type {
+  MemberBand,
+  MemberCatalogueModel,
+  MemberData,
+  MemberProduct,
+} from "./types";
 const version = "2026-09-11T06:32:00Z";
 const product = (
   id: string,
@@ -24,7 +30,7 @@ const product = (
   version,
 });
 /** Fictional products, variants and costs for the preview; never used for live quotes. */
-export const demoProducts: MemberProduct[] = [
+const listedProducts: MemberProduct[] = [
   product("cloud-q", "Cloud Support", "Mattress", "Queen", "", 2000),
   product("cloud-k", "Cloud Support", "Mattress", "King", "", 2300),
   product("cloud-ss", "Cloud Support", "Mattress", "Super Single", "", 1550),
@@ -190,6 +196,134 @@ export const demoProducts: MemberProduct[] = [
     product("zan-pillow", "Soft Loft Pillow", "Pillow", "Standard", "", 40, true),
   ].map((item) => ({ ...item, brand: "Zanotti" })),
 ];
+/**
+ * The ERP models behind the preview's sofas and bed frames, and what Product
+ * List › Modular "ticked" for each — the dropdowns, the way
+ * `member_catalogue()` sends them live. The two Zanotti sofas tick different
+ * leg heights and the Akemi frames different heights, so a cart holding both
+ * offers only what they share. Everyday and Lounge have no model: nothing is
+ * offered for them.
+ */
+export const demoCatalogueModels: MemberCatalogueModel[] = [
+  {
+    id: "demo-model-arc",
+    kind: "SOFA",
+    options: {
+      leg_heights: ["No Leg", '4"', '6"'],
+      specials: ["Nylon Fabric", "USB Charger"],
+    },
+  },
+  {
+    id: "demo-model-contour",
+    kind: "SOFA",
+    options: { leg_heights: ['4"', '6"'], specials: ["Nylon Fabric"] },
+  },
+  {
+    id: "demo-model-studio-frame",
+    kind: "BEDFRAME",
+    options: {
+      divan_heights: ['8"', '10"', '12"'],
+      leg_heights: ["No Leg", '2"', '4"'],
+      total_heights: ['14"', '16"', '18"'],
+      gaps: ['4"', '6"'],
+      specials: ["Front Drawer", "Hydraulic"],
+    },
+  },
+  {
+    id: "demo-model-essential-frame",
+    kind: "BEDFRAME",
+    options: {
+      divan_heights: ['10"', '12"'],
+      leg_heights: ['2"', '4"'],
+      total_heights: ['16"', '18"'],
+      gaps: ['6"'],
+      specials: ["Hydraulic"],
+    },
+  },
+  {
+    id: "demo-model-arc-frame",
+    kind: "BEDFRAME",
+    options: {
+      divan_heights: ['10"', '12"'],
+      leg_heights: ["No Leg", '4"'],
+      total_heights: ['16"'],
+      gaps: ['4"'],
+      specials: ["Headboard Only"],
+    },
+  },
+];
+const demoModelOf: Record<string, string> = {
+  "Contour Sofa": "demo-model-contour",
+  "Studio Frame": "demo-model-studio-frame",
+  "Essential Frame": "demo-model-essential-frame",
+  "Arc Frame": "demo-model-arc-frame",
+};
+/** A sofa module, priced by seat height × fabric tier the way the Product List prices one. */
+const arcModule = (
+  id: string,
+  moduleCode: string,
+  prices: Record<string, [tier1: number, tier2: number]>,
+): MemberProduct => {
+  const costGrid = Object.entries(prices).flatMap(([height, [tier1, tier2]]) => [
+    { height, tier: "PRICE_1", cost: tier1 },
+    { height, tier: "PRICE_2", cost: tier2 },
+  ]);
+  return {
+    ...product(id, "Arc Modular Sofa", "Sofa", moduleCode, "", null),
+    code: `ARC-${moduleCode}`,
+    brand: "Zanotti",
+    options: costGrid.map(({ height, tier }) => ({ height, tier })),
+    costGrid,
+    modelId: "demo-model-arc",
+    kind: "SOFA",
+    baseModel: "ARC",
+    moduleCode,
+  };
+};
+export const demoProducts: MemberProduct[] = [
+  ...listedProducts.map((p) =>
+    demoModelOf[p.name] ? { ...p, modelId: demoModelOf[p.name] } : p,
+  ),
+  arcModule("arc-1a-lhf", "1A(LHF)", { "70cm": [620, 750], "75cm": [650, 790] }),
+  arcModule("arc-1a-rhf", "1A(RHF)", { "70cm": [620, 750], "75cm": [650, 790] }),
+  arcModule("arc-2na", "2NA", { "70cm": [900, 1080], "75cm": [940, 1120] }),
+  arcModule("arc-l-lhf", "L(LHF)", { "70cm": [980, 1150], "75cm": [1020, 1200] }),
+  arcModule("arc-l-rhf", "L(RHF)", { "70cm": [980, 1150], "75cm": [1020, 1200] }),
+];
+/**
+ * Fictional option surcharges and an L-shape combo (a 1A of either hand + an
+ * L of either hand), so the preview prices a build the way the live
+ * calculator does: options add to the line, and the combo replaces its
+ * modules' own prices.
+ */
+export const demoPricing: QuotePricing = {
+  options: [
+    { pool: "sofa_leg_heights", value: '6"', price: 40 },
+    { pool: "sofa_specials", value: "Nylon Fabric", price: 80 },
+    { pool: "sofa_specials", value: "USB Charger", price: 120 },
+    { pool: "bedframe_divan_heights", value: '12"', price: 60 },
+    { pool: "bedframe_total_heights", value: '18"', price: 30 },
+    { pool: "bedframe_specials", value: "Hydraulic", price: 150 },
+    { pool: "bedframe_specials", value: "Front Drawer", price: 90 },
+  ],
+  combos: [
+    ["PRICE_1", { "70cm": 1500, "75cm": 1560 }],
+    ["PRICE_2", { "70cm": 1780, "75cm": 1850 }],
+  ].map(([tier, priceByHeight]) => ({
+    erpId: `demo-arc-l-${tier}`,
+    baseModel: "ARC",
+    modules: [
+      ["1A(LHF)", "1A(RHF)"],
+      ["L(LHF)", "L(RHF)"],
+    ],
+    tier: tier as string,
+    label: "Arc L-shape",
+    effectiveFrom: "2026-01-01",
+    createdAt: null,
+    priceByHeight: priceByHeight as Record<string, number>,
+  })),
+  models: demoCatalogueModels,
+};
 export const demoBands: MemberBand[] = ["Akemi", "Zanotti"].flatMap((brand) => [
   {
     brand,
@@ -249,6 +383,8 @@ export function memberDemo(): MemberData {
       salary: 2500,
     },
     products: demoProducts,
+    catalogueModels: demoCatalogueModels,
+    demoPricing,
     bands: demoBands,
     departments: [
       { id: "fair", name: "Fair", capacity: 28, occupied: 28 },

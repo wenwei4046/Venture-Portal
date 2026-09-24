@@ -797,6 +797,30 @@ mono address + Copy; Last delivery — `formatAgo`, ticking), and text actions
 (accent "Replace key", danger "Unlink"). No test button here: the ERP's own
 page proves the key. `src/app/(portal)/revenue/_components/ErpLinkPanel.tsx`.
 
+### Product List — the mirror beside the portal's decisions (2026-09-24 — Revenue › Product List)
+
+The ERP's Products page, mirrored, on the header's rule: a `control`-variant
+`SlidingTabs` rail — *SKU Master* · *Modular* · *Maintenance* · *Combo
+Pricing* (the ERP's own four, with their counts) · *Costing gaps* (the work
+list). Switching is a round trip (`?tab=`): each tab reads a different part of
+a 4,000-row catalogue and the server renders only the one being read. The page
+head's mono meta line is the mirror's pulse (`LAST DELIVERY … · N SKUS · N
+MODELS …`, or that the ERP has not pushed yet).
+
+THE SPLIT IS VISIBLE: what the ERP says EXISTS is plain text (code, description,
+model, category, the ERP's allowed options as chips); what the portal DECIDES
+is an input — a price (`.num` right-aligned, `MONEY_INPUT`), a tick, a chip that
+toggles. A row carries the mirror's own states as `.chip`s (`MirrorFlags`):
+accent **NEW** (arrived after the first load, last 30 days), plain **INACTIVE**
+(off in the ERP), danger **GONE FROM ERP** (retired, kept because past bills
+sold it). Filters are `FilterChip` pills above the `.ledger-table` in a
+`Toolbar`; summary figures are `Stat` cards. Modular opens a model in
+`ModelEditor` — its SKUs (compartments / sizes) and each option list as tick
+chips, what the ERP allows first and anything ticked here that it no longer
+allows after. Saving says what it moved (`Notice`); a price moves margins only
+from that moment — a landed month waits for Recost.
+`src/app/(portal)/revenue/products/_components/`.
+
 ### Revenue member C release (2026-09-16)
 
 The authenticated `/member` workspace now uses the approved white, orange, brown
@@ -1966,7 +1990,8 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
-- **2026-09-17 (latest)** — A rail in the middle of a page. Comm Cal's month ends in one `text`-variant `SlidingTabs` rail instead of three stacked sections: *Sales by venue* · *Sales by person* · **Open Bill**, with the counts on the tabs. The rail is the section heading — the panels dropped the `.sect-head` titles its labels now carry — and every panel is server-rendered and handed to the client rail as a node, so `?tab=` switches with a `pushState` and a re-render. The new Open Bill panel is three `.ledger-table`s (by rank with a `tfoot` total, by salesperson, every picked bill) plus the read-only pick chip in `OpenBillPicker`'s vocabulary: dashed alert for the importer's guess, solid accent for a decision. See "Tabbed pages".
+- **2026-09-24 (latest)** — The Product List mirrors the ERP's Products page item by item (SKU Master / Modular / Maintenance / Combo Pricing + Costing gaps on one `control` rail) and keeps the portal's own prices and ticks as the page's only inputs; see "Product List — the mirror beside the portal's decisions". The member calculator's builder gains the Modular dropdowns in its own editorial vocabulary: a sofa build's *Leg height* select and *Sofa specials* tick list under the seat height and tier, and a *Bed frame build* section (divan / leg / total height / gap selects two a row, specials as ticks) — only what every model of that kind in the cart was ticked for; blank = *Not chosen* (`.optionGrid`, `.specials` in `MemberQuoteCatalog.module.css`). People › Member Services › Product options became a pointer card to Modular.
+- **2026-09-17** — A rail in the middle of a page. Comm Cal's month ends in one `text`-variant `SlidingTabs` rail instead of three stacked sections: *Sales by venue* · *Sales by person* · **Open Bill**, with the counts on the tabs. The rail is the section heading — the panels dropped the `.sect-head` titles its labels now carry — and every panel is server-rendered and handed to the client rail as a node, so `?tab=` switches with a `pushState` and a re-render. The new Open Bill panel is three `.ledger-table`s (by rank with a `tfoot` total, by salesperson, every picked bill) plus the read-only pick chip in `OpenBillPicker`'s vocabulary: dashed alert for the importer's guess, solid accent for a decision. See "Tabbed pages".
 - **2026-09-12** — Director rail. The Revenue chart's directors moved out of the frames (design A, the user's pick from the Director Line artifact): every director once, on a rail above all the sub-department frames under `REVENUE DIRECTORS · REPORTING ONLY`, one dashed line per frame they direct landing on the frame's top edge with a dot — two directors of one frame joined on a bus bar, PETER's second line to IR on a bus of its own — and `Reports to KRIS · PETER` on the frame's header. The row of director cards inside each frame and the fan of one line per team leader (11 teams × 2 directors = 22 lines on Fair, crossing the team frames whatever Tidy did) are gone; the leader cards, the popover's detach row, the footer and the move note keep their "reports to" wording. See `.space-director` under "Org chart canvas (v3.4)".
 - **2026-09-11** — Revenue Director. A title may head its department (People › Roles, a **Head** tick per row): it stands above the commission ladder — never offered on the Title ladder, never a member, `no rank` — and is who a sub-department reports to. Staff Hierarchy's Team tab opens with a **Reports to** section (the directors as chips with Remove, and an add row of the department's heads); the chart draws each director as a card in a row of its own under the sub-department frame's header with a dashed line down to every team leader (`.space-director`, `.space-director-line`), a leader's last row reads `Reports to · KRIS · PETER` instead of `Top of team`, and the footer, the popover's detach row and the move note say the same. People › Hierarchy draws the same dashed line from the home sub-department's directors to the top of every Revenue tree (legend: *Reports to the department's director · no override*), the Table says it under the picker, and a card whose title heads the department carries `· heads the department`. See `.space-director` under "Org chart canvas (v3.4)".
 - **2026-09-10** — Memberships per sub-department. Staff Hierarchy is per sub-department: the HOME one (the department's oldest) is the company chart; every other one (IR) is its own tree with its own title per member. The Team tab there gains an **Add to IR** row (person + title held here), a Title picker per row with the company title in small print beneath when it differs, and a **Remove** per row; the chart's footer and intro say which kind of tree it is. Same `.ledger-table` / `RowForm` vocabulary, nothing new in `globals.css`.

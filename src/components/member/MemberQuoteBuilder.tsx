@@ -19,9 +19,13 @@ import {
   TIERS,
   tierLabel,
 } from "@/lib/member/catalog";
+import { buildChoicesFor, buildKey, pruneBuild } from "@/lib/member/build";
+import { heightKey } from "@/lib/catalogue/keys";
 import type {
+  BedframeBuild,
   MemberData,
   MemberProduct,
+  QuoteBuild,
   QuoteInput,
   QuoteLine,
   QuoteResult,
@@ -30,6 +34,71 @@ import s from "./member.module.css";
 import catalogStyles from "./MemberQuoteCatalog.module.css";
 import SwipeCartRow from "./SwipeCartRow";
 import QuantityStepper from "./QuantityStepper";
+
+/** One of a build's option dropdowns; blank = not chosen, which adds nothing. */
+function OptionSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string | undefined;
+  options: string[];
+  onChange: (value: string | undefined) => void;
+}) {
+  return (
+    <label className={s.field + " " + catalogStyles.selector}>
+      <span>{label}</span>
+      <select
+        aria-label={label}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
+        <option value="">Not chosen</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** A build's specials: tick any the cart's models were all ticked for. */
+function SpecialsPicker({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <fieldset className={catalogStyles.specials}>
+      <legend>{label}</legend>
+      {options.map((option) => {
+        const on = selected.includes(option);
+        return (
+          <label key={option} className={s.check}>
+            <input
+              type="checkbox"
+              checked={on}
+              onChange={() =>
+                onChange(on ? selected.filter((v) => v !== option) : [...selected, option])
+              }
+            />
+            {option}
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
 
 type BuilderProps = {
   data: MemberData;
@@ -467,9 +536,9 @@ export default function MemberQuoteBuilder({
   const localResult = useMemo(
     () =>
       data.demo && input.lines.length && input.price
-        ? calculateQuote(input, data.products, data.bands)
+        ? calculateQuote(input, data.products, data.bands, undefined, data.demoPricing)
         : null,
-    [data.demo, data.products, data.bands, input],
+    [data.demo, data.products, data.bands, data.demoPricing, input],
   );
   const currentResult = data.demo
     ? localResult
@@ -497,7 +566,11 @@ export default function MemberQuoteBuilder({
   // Sofa modules carry a seat height × fabric tier grid; the cart picks one build for all of them.
   const buildChoices = useMemo(() => {
     const options = cartProducts.flatMap((p) => p.options ?? []);
-    const heights = [...new Set(options.map((o) => o.height))].sort(compareHeights);
+    // One entry per seat height however the grids spell it (75cm / 75CM) —
+    // the pricing folds the spellings the same way.
+    const heights = [
+      ...new Map(options.map((o) => [heightKey(o.height) ?? o.height, o.height])).values(),
+    ].sort(compareHeights);
     const tiers = [...new Set(options.map((o) => o.tier))].sort(
       (a, b) =>
         ((TIERS as readonly string[]).indexOf(a) + 1 || 99) -
@@ -505,6 +578,22 @@ export default function MemberQuoteBuilder({
     );
     return { heights, tiers };
   }, [cartProducts]);
+  // What the cart's sofa and bed frame builds may take: only the options every
+  // model of that kind in the cart was ticked for on Product List › Modular.
+  const optionChoices = useMemo(
+    () => buildChoicesFor(cartProducts, data.catalogueModels),
+    [cartProducts, data.catalogueModels],
+  );
+  const sofaOptions =
+    optionChoices.sofa &&
+    (optionChoices.sofa.legs.length > 0 || optionChoices.sofa.specials.length > 0)
+      ? optionChoices.sofa
+      : null;
+  const frameOptions =
+    optionChoices.bedframe &&
+    Object.values(optionChoices.bedframe).some((list) => list.length > 0)
+      ? optionChoices.bedframe
+      : null;
   const mainItems = input.lines
     .filter((l) => !l.gift)
     .reduce((sum, l) => sum + l.quantity, 0);
@@ -834,8 +923,15 @@ export default function MemberQuoteBuilder({
     setInput((q) => ({ ...q, price }));
     setUndo(null);
   }
-  function setBuild(patch: { height?: string; tier?: string }) {
+  function setBuild(patch: Partial<QuoteBuild>) {
     setInput((q) => ({ ...q, build: { ...q.build, ...patch } }));
+    setUndo(null);
+  }
+  function setFrame(patch: Partial<BedframeBuild>) {
+    setInput((q) => ({
+      ...q,
+      build: { ...q.build, bedframe: { ...q.build?.bedframe, ...patch } },
+    }));
     setUndo(null);
   }
   useEffect(() => {
@@ -851,8 +947,15 @@ export default function MemberQuoteBuilder({
         ? input.build.tier
         : buildChoices.tiers[0];
     if (height !== input.build?.height || tier !== input.build?.tier)
-      setInput((q) => ({ ...q, build: { height, tier } }));
+      setInput((q) => ({ ...q, build: { ...q.build, height, tier } }));
   }, [buildChoices, input.build, setInput]);
+  useEffect(() => {
+    // An option the cart no longer offers (its product left the cart, or a
+    // model's ticks changed) is dropped rather than quoted.
+    const pruned = pruneBuild(input.build, optionChoices);
+    if (JSON.stringify(buildKey(pruned)) !== JSON.stringify(buildKey(input.build)))
+      setInput((q) => ({ ...q, build: pruneBuild(q.build, optionChoices) }));
+  }, [optionChoices, input.build, setInput]);
   const hasQuote =
     input.lines.length > 0 || input.price !== "" || Number(input.delivery) !== 0;
   function clearQuote() {
@@ -891,7 +994,7 @@ export default function MemberQuoteBuilder({
       key = JSON.stringify(snapshot);
     try {
       const checked = data.demo
-        ? calculateQuote(snapshot, data.products, data.bands)
+        ? calculateQuote(snapshot, data.products, data.bands, undefined, data.demoPricing)
         : await calculateMemberQuote(snapshot).then((response) => {
             if (!response.ok)
               throw new Error(response.error ?? "Unable to confirm the quote.");
@@ -1472,42 +1575,112 @@ export default function MemberQuoteBuilder({
                 </div>
               </div>
             </section>
-            {buildChoices.heights.length > 0 && (
+            {(buildChoices.heights.length > 0 || sofaOptions) && (
               <section className={s.stack} aria-label="Sofa build">
                 <p className={s.eyebrow}>SOFA BUILD</p>
-                <div className={catalogStyles.selectors}>
-                  <label className={s.field + " " + catalogStyles.selector}>
-                    <span>Seat height</span>
-                    <select
-                      aria-label="Seat height"
-                      value={input.build?.height ?? ""}
-                      onChange={(e) => setBuild({ height: e.target.value })}
-                    >
-                      {buildChoices.heights.map((height) => (
-                        <option key={height} value={height}>
-                          {height}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={s.field + " " + catalogStyles.selector}>
-                    <span>Fabric tier</span>
-                    <select
-                      aria-label="Fabric tier"
-                      value={input.build?.tier ?? ""}
-                      onChange={(e) => setBuild({ tier: e.target.value })}
-                    >
-                      {buildChoices.tiers.map((tier) => (
-                        <option key={tier} value={tier}>
-                          {tierLabel(tier)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                {buildChoices.heights.length > 0 && (
+                  <div className={catalogStyles.selectors}>
+                    <label className={s.field + " " + catalogStyles.selector}>
+                      <span>Seat height</span>
+                      <select
+                        aria-label="Seat height"
+                        value={input.build?.height ?? ""}
+                        onChange={(e) => setBuild({ height: e.target.value })}
+                      >
+                        {buildChoices.heights.map((height) => (
+                          <option key={height} value={height}>
+                            {height}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={s.field + " " + catalogStyles.selector}>
+                      <span>Fabric tier</span>
+                      <select
+                        aria-label="Fabric tier"
+                        value={input.build?.tier ?? ""}
+                        onChange={(e) => setBuild({ tier: e.target.value })}
+                      >
+                        {buildChoices.tiers.map((tier) => (
+                          <option key={tier} value={tier}>
+                            {tierLabel(tier)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+                {sofaOptions && sofaOptions.legs.length > 0 && (
+                  <div className={catalogStyles.optionGrid}>
+                    <OptionSelect
+                      label="Leg height"
+                      value={input.build?.leg}
+                      options={sofaOptions.legs}
+                      onChange={(leg) => setBuild({ leg })}
+                    />
+                  </div>
+                )}
+                {sofaOptions && sofaOptions.specials.length > 0 && (
+                  <SpecialsPicker
+                    label="Sofa specials"
+                    options={sofaOptions.specials}
+                    selected={input.build?.specials ?? []}
+                    onChange={(specials) => setBuild({ specials })}
+                  />
+                )}
                 <p className={s.caption}>
-                  Every sofa module in the cart is costed at this seat height
-                  and fabric tier, the way the ERP prices a sofa.
+                  Every sofa module in the cart is costed at this build, the
+                  way the ERP prices a sofa.
+                </p>
+              </section>
+            )}
+            {frameOptions && (
+              <section className={s.stack} aria-label="Bed frame build">
+                <p className={s.eyebrow}>BED FRAME BUILD</p>
+                <div className={catalogStyles.optionGrid}>
+                  {frameOptions.divans.length > 0 && (
+                    <OptionSelect
+                      label="Divan height"
+                      value={input.build?.bedframe?.divan}
+                      options={frameOptions.divans}
+                      onChange={(divan) => setFrame({ divan })}
+                    />
+                  )}
+                  {frameOptions.legs.length > 0 && (
+                    <OptionSelect
+                      label="Leg height"
+                      value={input.build?.bedframe?.leg}
+                      options={frameOptions.legs}
+                      onChange={(leg) => setFrame({ leg })}
+                    />
+                  )}
+                  {frameOptions.totals.length > 0 && (
+                    <OptionSelect
+                      label="Total height"
+                      value={input.build?.bedframe?.total}
+                      options={frameOptions.totals}
+                      onChange={(total) => setFrame({ total })}
+                    />
+                  )}
+                  {frameOptions.gaps.length > 0 && (
+                    <OptionSelect
+                      label="Gap"
+                      value={input.build?.bedframe?.gap}
+                      options={frameOptions.gaps}
+                      onChange={(gap) => setFrame({ gap })}
+                    />
+                  )}
+                </div>
+                {frameOptions.specials.length > 0 && (
+                  <SpecialsPicker
+                    label="Bed frame specials"
+                    options={frameOptions.specials}
+                    selected={input.build?.bedframe?.specials ?? []}
+                    onChange={(specials) => setFrame({ specials })}
+                  />
+                )}
+                <p className={s.caption}>
+                  Every bed frame in the cart is costed with these options.
                 </p>
               </section>
             )}

@@ -96,6 +96,45 @@ export interface CanonicalLine {
   brand: string | null
   /** Total cost of the line in ringgit; null when the ERP sent none. */
   cost: number | null
+  /**
+   * The line's structured build — what the portal prices its options from
+   * (catalogue_line_facts reads `raw.variants` before it ever parses
+   * description2). Allowlisted: never money (`extraAddonAmountRM`), never free
+   * text. Absent when the ERP sent none.
+   */
+  variants?: LineVariants
+}
+
+/** The ERP item's `variants`, the keys the portal reads and nothing else. */
+export interface LineVariants {
+  fabricCode?: string
+  seatHeight?: string
+  legHeight?: string
+  divanHeight?: string
+  gap?: string
+  totalHeight?: string
+  size?: string
+  specials?: string[]
+}
+
+const VARIANT_KEYS = ['fabricCode', 'seatHeight', 'legHeight', 'divanHeight', 'gap', 'totalHeight', 'size'] as const
+
+/** Allowlist the ERP's `variants`: its option values as text, its specials as a list. */
+export function lineVariantsOf(raw: unknown): LineVariants | undefined {
+  if (!isRow(raw)) return undefined
+  const out: LineVariants = {}
+  for (const key of VARIANT_KEYS) {
+    const v = raw[key]
+    const s = typeof v === 'string' ? v.trim() : typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
+    if (s) out[key] = s
+  }
+  if (Array.isArray(raw.specials)) {
+    const specials = raw.specials
+      .map(s => (typeof s === 'string' ? s.trim() : ''))
+      .filter(Boolean)
+    if (specials.length) out.specials = specials
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 /** What `ingest_erp_sales_order(p_order)` reads. Money in ringgit. */
@@ -225,6 +264,7 @@ export function toCanonicalLines(items: Row[]): CanonicalLine[] {
     amount: senToRinggit(row.total_sen) ?? 0,
     brand: text(row.branding),
     cost: senToRinggit(row.line_cost_sen),
+    variants: lineVariantsOf(row.variants),
   }))
 }
 

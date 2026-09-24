@@ -1,7 +1,10 @@
 import type {
   MemberBand,
+  MemberCatalogueModel,
   MemberProduct,
+  QuoteBuild,
   QuoteInput,
+  QuoteLine,
   QuoteResult,
   QuoteRules,
 } from "./types";
@@ -10,9 +13,16 @@ import {
   isAccessoryProduct,
   isCompatibleGift,
   quoteLineKey,
-  resolveUnitCost,
-  tierLabel,
 } from "./catalog";
+import {
+  lineSurcharge,
+  OptionPrices,
+  unitPrice,
+  type OptionPrice,
+  type PriceCell,
+} from "@/lib/catalogue/pricing";
+import { pickCombo, spreadComboTotal, type PricedCombo } from "@/lib/catalogue/combos";
+import { buildChoicesFor, buildError, buildKey, buildLines, kindOf } from "./build";
 
 /** Decimal money enters the engine as integer cents; tier comparisons use unrounded ratios. */
 export function cents(raw: string): number | null {
@@ -27,20 +37,128 @@ export function teamCostCents(unitCost: number, costDivisor: number): number {
   return Math.round((unitCost / costDivisor) * 100);
 }
 
+/**
+ * What the portal charges beyond each SKU's own price — server-only, read
+ * from the Product List with the SKUs (`member_catalogue`, priced): the
+ * Maintenance surcharges, the combos a sofa build may match, and each model's
+ * dropdowns so a choice outside them is refused. Absent (the demo) = no
+ * options, no combos, no check.
+ */
+export interface QuotePricing {
+  options: OptionPrice[];
+  combos: PricedCombo[];
+  models: MemberCatalogueModel[];
+}
+
 /** Binds a calculation to its inputs; contains no costs and is not an authorization token. */
 function quoteInputKey(input: QuoteInput): string {
   const lines = input.lines
     .map((line) => [quoteLineKey(line), line.quantity] as const)
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   return JSON.stringify([
-    "quote-input-v3",
+    "quote-input-v4",
     input.schemeId,
     lines,
     cents(input.price),
     cents(input.delivery || "0"),
-    input.build?.height ?? null,
-    input.build?.tier ?? null,
+    ...buildKey(input.build),
   ]);
+}
+
+interface CostedLine {
+  line: QuoteLine;
+  product: MemberProduct;
+  /** The SKU's own price at the build (grid cell or flat), RM; null = unpriced. */
+  unit: number | null;
+  /** What the build's options add per unit, RM. */
+  surcharge: number;
+  /** A grid SKU whose grid does not come in the build's seat height. */
+  noHeight: boolean;
+  /** The line at its combo's share, in cents, when a combo matched it. */
+  comboCents: number | null;
+}
+
+function gridOf(product: MemberProduct): PriceCell[] {
+  return (product.costGrid ?? []).map(({ height, tier, cost }) => ({ height, tier, price: cost }));
+}
+
+/**
+ * Every line at the portal's prices, the way the run costs a sales line
+ * (catalogue_line_cost + catalogue_apply_combos, migration 20260924030000):
+ * the SKU's price at the build's seat height and tier, plus its options'
+ * surcharges, times quantity; then each sofa's modules that cover one of its
+ * model's priced combos are costed at the combo's price instead, spread over
+ * the matched lines in proportion to their own costs — the ERP's rule, where
+ * the combo always wins and mixed quantities keep their own costs.
+ */
+function costLines(
+  selected: { line: QuoteLine; product: MemberProduct }[],
+  build: QuoteBuild | undefined,
+  pricing: QuotePricing | undefined,
+): CostedLine[] {
+  const prices = new OptionPrices(pricing?.options ?? []);
+  const lines: CostedLine[] = selected.map(({ line, product }) => {
+    const grid = gridOf(product);
+    const priced = unitPrice(
+      { price: product.cost ?? null, grid },
+      grid.length ? build?.height ?? null : null,
+      grid.length ? build?.tier ?? null : null,
+    );
+    const kind = kindOf(product);
+    const facts =
+      kind === "SOFA"
+        ? { leg: build?.leg ?? null, divan: null, total: null, specials: build?.specials ?? [] }
+        : kind === "BEDFRAME"
+          ? {
+              leg: build?.bedframe?.leg ?? null,
+              divan: build?.bedframe?.divan ?? null,
+              total: build?.bedframe?.total ?? null,
+              specials: build?.bedframe?.specials ?? [],
+            }
+          : null;
+    return {
+      line,
+      product,
+      unit: priced.price,
+      surcharge: facts && pricing ? lineSurcharge(kind, facts, prices).amount : 0,
+      noHeight: grid.length > 0 && priced.how !== "grid",
+      comboCents: null,
+    };
+  });
+
+  if (!pricing?.combos.length || !build?.height || !build?.tier) return lines;
+  const groups = new Map<string, number[]>();
+  lines.forEach((l, i) => {
+    if (kindOf(l.product) !== "SOFA" || !l.product.moduleCode) return;
+    const baseModel = (l.product.baseModel ?? l.product.code.split("-")[0] ?? "").trim().toUpperCase();
+    if (!baseModel) return;
+    groups.set(baseModel, [...(groups.get(baseModel) ?? []), i]);
+  });
+  for (const [baseModel, members] of groups) {
+    const hit = pickCombo(
+      {
+        baseModel,
+        modules: members.map((i) => lines[i].product.moduleCode!),
+        height: build.height,
+        tier: build.tier,
+      },
+      pricing.combos,
+    );
+    if (!hit) continue;
+    const matched = hit.matched.map((k) => members[k]);
+    const quantities = new Set(matched.map((i) => Math.max(1, lines[i].line.quantity)));
+    if (quantities.size !== 1) continue;
+    const sets = [...quantities][0];
+    const own = matched.map((i) => {
+      const l = lines[i];
+      return l.unit === null ? 0 : Math.round((l.unit + l.surcharge) * 100) * l.line.quantity;
+    });
+    const shares = spreadComboTotal(own, Math.round(hit.price * 100) * sets);
+    matched.forEach((i, k) => {
+      lines[i].comboCents = shares[k];
+    });
+  }
+  return lines;
 }
 
 function productVersions(products: MemberProduct[]): string {
@@ -85,16 +203,23 @@ export function bandFor(margin: number | null, bands: MemberBand[]) {
 export const DEFAULT_RULES: QuoteRules = { costDivisor: 1 };
 
 /**
- * Margin = (price − cost) ÷ price, where cost is every line's unit cost ÷
- * the department's divisor. The price that reaches a threshold t is
+ * Margin = (price − cost) ÷ price, where cost is every line's cost ÷ the
+ * department's divisor. The price that reaches a threshold t is
  * cost ÷ (1 − t) — never cost × (1 + t) (user 2026-09-12: 33% on 1,000 is
  * 1,000 ÷ 0.67 = 1,492.54, not 1,330).
+ *
+ * A line's cost is the portal's own price for it (user 2026-09-24: every
+ * margin is measured against the Product List's prices): the SKU's price at
+ * the build's seat height and fabric tier, plus what the build's options add,
+ * with a sofa's matched combo costed as the combo — `costLines`, the twin of
+ * how the run costs the same sale once the ERP books it.
  */
 export function calculateQuote(
   input: QuoteInput,
   products: MemberProduct[],
   allBands: MemberBand[],
   rules: QuoteRules = DEFAULT_RULES,
+  pricing?: QuotePricing,
 ): QuoteResult {
   const invalid = (error: string): QuoteResult => ({
     valid: false,
@@ -196,26 +321,41 @@ export function calculateQuote(
     return invalid(
       "Choose the sofa's seat height and fabric tier to cost its modules.",
     );
-  const costed = selected.map(({ line, product }) => ({
-    line,
-    product: product!,
-    unit: resolveUnitCost(product!, input.build),
-  }));
-  if (costed.some(({ product, unit }) => hasGrid(product) && unit.height === null))
+  if (pricing) {
+    // Only what every model of that kind in the cart was ticked for.
+    const buildProblem = buildError(
+      input.build,
+      buildChoicesFor(selected.map(({ product }) => product!), pricing.models),
+    );
+    if (buildProblem) return invalid(buildProblem);
+  }
+  const costed = costLines(
+    selected.map(({ line, product }) => ({ line, product: product! })),
+    input.build,
+    pricing,
+  );
+  if (costed.some((l) => l.noHeight && l.comboCents === null))
     return invalid(
       "That seat height is not available for a sofa module in the cart. Pick another height.",
     );
+  // A module the portal has not priced is still costed when a priced combo
+  // covers it — the combo is the set's cost, the ERP's rule.
   if (
     costed.some(
-      ({ unit }) =>
-        unit.cost == null || !Number.isFinite(unit.cost) || unit.cost < 0,
+      (l) =>
+        l.comboCents === null &&
+        (l.unit == null || !Number.isFinite(l.unit) || l.unit < 0 || l.unit + l.surcharge < 0),
     )
   )
     return invalid(
       "Product cost is pending a Principal update. Margin cannot be confirmed yet.",
     );
   const cost = costed.reduce(
-    (sum, { line, unit }) => sum + teamCostCents(unit.cost!, divisor) * line.quantity,
+    (sum, l) =>
+      sum +
+      (l.comboCents !== null
+        ? Math.round(l.comboCents / divisor)
+        : teamCostCents(l.unit! + l.surcharge, divisor) * l.line.quantity),
     0,
   );
   if (!Number.isSafeInteger(cost))
@@ -312,10 +452,11 @@ export function customerQuote(
     const name = [p.brand, p.name].filter(Boolean).join(" ");
     return `${l.gift ? "Free gift" : "Product"} · ${name} / ${p.size}${p.color ? " / " + p.color : ""} × ${l.quantity}`;
   });
-  const build =
-    input.build?.height && input.build?.tier && selected.some(hasGrid)
-      ? [`Sofa build: seat height ${input.build.height} · ${tierLabel(input.build.tier)} fabric`]
-      : [];
+  const build = buildLines(input.build, {
+    sofaGrid: selected.some(hasGrid),
+    sofa: selected.some((p) => kindOf(p) === "SOFA"),
+    bedframe: selected.some((p) => kindOf(p) === "BEDFRAME"),
+  });
   return [
     "HOUZS VENTURE · Product quotation",
     ...lines,

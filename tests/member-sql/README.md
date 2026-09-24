@@ -28,6 +28,25 @@ fourth direct line, including people with simultaneous Fair/IR positions;
 opposite reporting lines in separate schemes remain valid. Run only these
 checks with `npm run test:ir-specialist-downlines --prefix tests/member-sql`.
 
+The default command also runs the catalogue regression in
+`validate-catalogue.mjs`. It applies the four catalogue migrations
+(`20260924020000`, `025000`, `030000`, `040000`) verbatim, after the three
+that shaped the tables they reshape, with Supabase's default grants
+reproduced. Its 164 checks cover the items-only mirror (ERP money stripped from
+every `raw` at any depth — the gap 020000 left and 030000 closes, a price tier
+kept as the label it is — in-place re-delivery, `full` retiring only what a
+carried and non-empty section omits, customer and supplier combos skipped), first-sight
+adoption of the old Product List (bridge code, own code, the mattress rule and
+its ambiguity guards) that never overwrites a typed price, the portal's prices
+costing each sales line (grid cell by seat height and fabric tier, option
+surcharges, NULL cost with a reason, `manual` left alone), sofa combos applied
+at commit, recost (counting only the lines whose cost moved) with its 23RUN
+refusal, the Costing gaps reasons, and `member_catalogue`'s offer rules (a
+mattress with no known brand is never a rider; the Rider override is),
+dropdowns (an empty ERP list is the ERP's "no restriction"), pricing and
+service-role-only access. Run only these checks with
+`npm run test:catalogue --prefix tests/member-sql`.
+
 Expected final output:
 
 ```text

@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs",
+    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs",
     "test:director-reporting": "node validate-director-reporting.mjs",
     "test:ir-specialist-downlines": "node validate-ir-specialist-downlines.mjs",
     "test:employee-chart-lifecycle": "node validate-employee-chart-lifecycle.mjs",
-    "test:fair-calendar": "node validate-fair-calendar.mjs"
+    "test:fair-calendar": "node validate-fair-calendar.mjs",
+    "test:catalogue": "node validate-catalogue.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"
