@@ -30,8 +30,7 @@ async function untyped(): Promise<SupabaseClient> {
 type Row = Record<string, unknown>
 
 async function all(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  build: (from: number, to: number) => any,
+  build: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
 ): Promise<Row[]> {
   const out: Row[] = []
   for (let from = 0; ; from += PAGE) {
@@ -73,12 +72,13 @@ export interface BrandRef {
 }
 
 async function loadBrands(sb: SupabaseClient): Promise<BrandRef[]> {
-  const { data, error } = await sb
+  const data = await all((from, to) => sb
     .from('comm_brands')
     .select('code, name, is_active, created_at')
     .eq('is_active', true)
     .order('created_at')
-  if (error) throw new Error(error.message)
+    .order('id')
+    .range(from, to))
   const seen = new Set<string>()
   const out: BrandRef[] = []
   for (const r of (data ?? []) as Row[]) {
@@ -155,6 +155,7 @@ export async function loadMirrorStatus(): Promise<MirrorStatus> {
       .order('received_at', { ascending: false })
       .limit(1),
   ])
+  if (last.error) throw new Error(last.error.message)
   const lastRow = ((last.data ?? []) as Row[])[0]
   return {
     products,
@@ -216,6 +217,7 @@ async function loadSkuTables(sb: SupabaseClient): Promise<SkuTables> {
             'branding, active, removed_at, first_seen_at',
         )
         .order('item_code')
+        .order('erp_id')
         .range(f, t),
     ),
     all((f, t) =>
@@ -337,6 +339,7 @@ export async function loadModels(): Promise<{ models: CatalogueModel[]; brands: 
         .from('erp_product_models')
         .select('erp_id, model_code, name, category, branding, active, allowed_options, removed_at, first_seen_at')
         .order('model_code')
+        .order('erp_id')
         .range(f, tt),
     ),
     all((f, tt) =>
@@ -422,6 +425,8 @@ export interface FabricRow {
   category: string | null
   sofaTier: string | null
   bedframeTier: string | null
+  /** Legacy shared tier used when the category-specific tier is absent. */
+  priceTier: string | null
   active: boolean
   removed: boolean
 }
@@ -436,17 +441,19 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
         .eq('erp_company_id', 1)
         .order('pool')
         .order('sort_order')
+        .order('value')
         .range(f, t),
     ),
     all((f, t) =>
-      sb.from('catalogue_option_prices').select('pool, value, price').eq('erp_company_id', 1).range(f, t),
+      sb.from('catalogue_option_prices').select('pool, value, price').eq('erp_company_id', 1).order('pool').order('value').range(f, t),
     ),
     all((f, t) =>
       sb
         .from('erp_fabrics')
-        .select('erp_id, fabric_code, description, series, category, sofa_tier, bedframe_tier, active, removed_at')
+        .select('erp_id, fabric_code, description, series, category, sofa_tier, bedframe_tier, price_tier, active, removed_at')
         .eq('erp_company_id', 1)
         .order('fabric_code')
+        .order('erp_id')
         .range(f, t),
     ),
   ])
@@ -471,6 +478,7 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
       category: str(f.category),
       sofaTier: str(f.sofa_tier),
       bedframeTier: str(f.bedframe_tier),
+      priceTier: str(f.price_tier),
       active: f.active !== false,
       removed: f.removed_at !== null && f.removed_at !== undefined,
     })),
@@ -507,6 +515,7 @@ export async function loadCombos(): Promise<ComboRow[]> {
         .is('deleted_at', null)
         .is('removed_at', null)
         .order('base_model')
+        .order('erp_id')
         .range(f, t),
     ),
     all((f, t) =>
@@ -514,10 +523,13 @@ export async function loadCombos(): Promise<ComboRow[]> {
         .from('catalogue_combo_prices')
         .select('base_model, slots_key, tier, price_by_height')
         .eq('erp_company_id', 1)
+        .order('base_model')
+        .order('slots_key')
+        .order('tier')
         .range(f, t),
     ),
     all((f, t) =>
-      sb.from('erp_product_models').select('model_code, name, category').eq('category', 'SOFA').range(f, t),
+      sb.from('erp_product_models').select('model_code, name, category').eq('category', 'SOFA').order('model_code').order('erp_id').range(f, t),
     ),
   ])
   const priceOf = new Map(
@@ -536,7 +548,9 @@ export async function loadCombos(): Promise<ComboRow[]> {
       !prev ||
       String(c.effective_from) > String(prev.effective_from) ||
       (String(c.effective_from) === String(prev.effective_from) &&
-        String(c.erp_created_at ?? '') > String(prev.erp_created_at ?? ''))
+        (String(c.erp_created_at ?? '') > String(prev.erp_created_at ?? '') ||
+          (String(c.erp_created_at ?? '') === String(prev.erp_created_at ?? '') &&
+            String(c.erp_id) > String(prev.erp_id))))
     if (newer) latest.set(key, c)
   }
 
