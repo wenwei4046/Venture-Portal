@@ -44,6 +44,13 @@ export interface SalesLine {
    * rather than quietly paying full commission on a bad-margin bill.
    */
   costAmount?: number
+  /**
+   * The one line of an upsale HR recorded by hand (`comm_upsales`, 2026-09-24).
+   * Always commissionable whatever the scheme's item groups say, never a KPI
+   * item, and never part of a margin — it carries no cost and it is not goods
+   * the ERP billed.
+   */
+  upsale?: boolean
 }
 
 export interface SalesOrder {
@@ -75,6 +82,15 @@ export interface SalesOrder {
    * from line costs, so a correction by hand always wins.
    */
   manualMarginPct?: number | null
+  /**
+   * An upsale HR recorded by hand (`comm_upsales`, 2026-09-24), not an ERP
+   * bill: a customer added to an order whose commission was already paid, and
+   * only the added amount earns (user: 跟着 upsells 的 amount 来算). It is paid
+   * in the month it is recorded under — HR records it once it is paid, so the
+   * deposit gate does not ask — and like any sale it counts toward the upline's
+   * override. It is never an Open Bill, never released, and never carried.
+   */
+  upsale?: boolean
   lines: SalesLine[]
 }
 

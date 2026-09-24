@@ -27,6 +27,7 @@
  */
 
 import { splitOrdersByShares } from './shares'
+import { upsalesToOrders, type UpsaleRow } from './upsales'
 import {
   indexItemGroups,
   indexKpiItems,
@@ -196,6 +197,8 @@ export interface RunSourceRows {
   priorMonths: PriorMonthRow[]
   /** `sales_order_shares` for these orders. Absent = nobody shares anything. */
   shares?: OrderShareRow[]
+  /** `comm_upsales` recorded under this month. Absent = none. */
+  upsales?: UpsaleRow[]
 }
 
 /** A `sales_order_shares` row. */
@@ -347,11 +350,15 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     }))
 
   // A shared bill becomes one part per holder, each paid at its holder's rate
-  // and climbing its holder's line (`lib/commission/shares.ts`).
-  const orders = splitOrdersByShares(
-    wholeOrders,
-    (rows.shares ?? []).map(r => ({ orderId: r.order_id, staffId: r.staff_id, pct: num(r.share_pct) })),
-  )
+  // and climbing its holder's line (`lib/commission/shares.ts`). An upsale HR
+  // recorded joins as a one-line order of its own (`lib/commission/upsales.ts`).
+  const orders = [
+    ...splitOrdersByShares(
+      wholeOrders,
+      (rows.shares ?? []).map(r => ({ orderId: r.order_id, staffId: r.staff_id, pct: num(r.share_pct) })),
+    ),
+    ...upsalesToOrders(rows.upsales ?? [], rows.periodMonth),
+  ]
 
   return {
     periodMonth: rows.periodMonth,
@@ -480,6 +487,9 @@ export function releasedOrders(input: EngineInput, result: EngineResult): Releas
   // release names the owner; the revenue is the whole bill's.
   const byOrder = new Map<string, ReleasedOrderDto>()
   for (const o of input.orders) {
+    // An upsale is not an ERP bill: it is read by its own month and never
+    // carried, so there is nothing to close — and it has no sales_orders row.
+    if (o.upsale) continue
     if (o.alreadyReleased || held.has(o.id)) continue
     const revenue = orderProductRevenue(o, kpiIndex, groupIndex)
     const seen = byOrder.get(o.id)
@@ -498,7 +508,12 @@ export function releasedOrders(input: EngineInput, result: EngineResult): Releas
   return [...byOrder.values()]
 }
 
-function toStatementDto(s: Statement): StatementDto {
+/**
+ * `upsaleIds`: an upsale's line points at `comm_upsales`, not at a sales order
+ * — `comm_statement_lines.source_order_id` is a foreign key to sales_orders, so
+ * it is left empty and the note names the upsale instead.
+ */
+function toStatementDto(s: Statement, upsaleIds: ReadonlySet<string>): StatementDto {
   return {
     staff_id: s.staffId,
     rank_title_id: s.rankTitleId,
@@ -534,8 +549,8 @@ function toStatementDto(s: Statement): StatementDto {
     total_commission: s.totalCommission,
     lines: s.lines.map(l => ({
       component: l.component,
-      source_order_id: l.sourceOrderId ?? null,
-      source_line_id: l.sourceLineId ?? null,
+      source_order_id: l.sourceOrderId && !upsaleIds.has(l.sourceOrderId) ? l.sourceOrderId : null,
+      source_line_id: l.sourceLineId && !upsaleIds.has(l.sourceLineId) ? l.sourceLineId : null,
       source_staff_id: l.sourceStaffId ?? null,
       basis_amount: l.basisAmount,
       rate: l.rate,
@@ -559,6 +574,7 @@ function toStatementDto(s: Statement): StatementDto {
 }
 
 export function toRunPayload(input: EngineInput, result: EngineResult): RunPayload {
+  const upsaleIds = new Set(input.orders.filter(o => o.upsale).map(o => o.id))
   return {
     p_period_month: result.periodMonth,
     p_total_commission: result.totalCommission,
@@ -567,7 +583,7 @@ export function toRunPayload(input: EngineInput, result: EngineResult): RunPaylo
     // the hierarchy who simply did not sell this month and earned no override.
     p_statements: result.statements
       .filter(s => s.totalCommission !== 0 || s.productRevenue !== 0 || s.deferredRevenue !== 0)
-      .map(toStatementDto),
+      .map(s => toStatementDto(s, upsaleIds)),
     p_released_orders: releasedOrders(input, result),
     p_deferred_orders: result.deferred,
     p_penalised_orders: result.penalised,

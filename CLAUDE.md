@@ -203,6 +203,22 @@ src/
 │   │   │                              calendar moves it. No fair → `so_date`, as
 │   │   │                              before. New documents still land in their
 │   │   │                              `so_date` month. Mig `20260924050000`.
+│   │   │                              **UPSALES (2026-09-24):** a customer adds to
+│   │   │                              an earlier order and ONLY THE ADDED AMOUNT
+│   │   │                              earns. The ERP has no upsale concept (a new
+│   │   │                              line, a folded-in price or nothing at all),
+│   │   │                              so HR records it on the month page's
+│   │   │                              **Upsales** tab (`comm_upsales`). Own rate,
+│   │   │                              counts toward the upline's override (the
+│   │   │                              claim form's override bases include them),
+│   │   │                              paid in the month recorded, no deposit gate,
+│   │   │                              no Open Bill / KPI / margin, never released.
+│   │   │                              The run hands each to the engine as a
+│   │   │                              one-line order flagged `upsale`
+│   │   │                              (`lib/commission/upsales.ts`); its statement
+│   │   │                              line has no `source_order_id` (FK to
+│   │   │                              sales_orders). Paid month refused (23RUN).
+│   │   │                              Spec §4.8, mig `20260924060000`.
 │   │   │                              **SHARED BILLS (2026-09-24):** a bill can be
 │   │   │                              shared with other team members
 │   │   │                              (`sales_order_shares`, default 50/50; the

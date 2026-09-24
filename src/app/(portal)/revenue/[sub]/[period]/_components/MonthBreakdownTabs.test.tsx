@@ -93,4 +93,30 @@ describe('MonthBreakdownTabs', () => {
     expect(screen.queryByRole('button', { name: /Open Bill/ })).toBeNull()
     expect(screen.getByText('Venue panel')).toBeVisible()
   })
+
+  // Upsales (2026-09-24): what HR recorded beside the bills, last on the rail.
+  it('ends in Upsales with its count, and a link can open it', () => {
+    url.search = 'tab=upsales'
+    render(
+      <MonthBreakdownTabs
+        venue={PANELS.venue}
+        person={PANELS.person}
+        openBill={PANELS.openBill}
+        upsales={<div>Upsales panel</div>}
+        counts={{ ...COUNTS, upsales: 11 }}
+      />,
+    )
+    const tabs = screen.getAllByRole('button').map(b => b.textContent ?? '')
+    expect(tabs.at(-1)).toMatch(/Upsales/)
+    expect(screen.getByRole('button', { name: /Upsales/ })).toHaveTextContent('11')
+    expect(screen.getByText('Upsales panel')).toBeVisible()
+    expect(screen.queryByText('Venue panel')).toBeNull()
+  })
+
+  it('has no Upsales tab on a page that offers none, whatever the URL says', () => {
+    url.search = 'tab=upsales'
+    renderRail()
+    expect(screen.queryByRole('button', { name: /Upsales/ })).toBeNull()
+    expect(screen.getByText('Venue panel')).toBeVisible()
+  })
 })
