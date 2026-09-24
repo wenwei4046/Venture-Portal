@@ -107,6 +107,24 @@
   font-size: 12px;
 }
 .search::placeholder { color: #000; opacity: 0.7; }
+.reviewToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--work-filter));
+}
+.reviewToolbar > .search { grid-column: 1; width: 100%; min-width: 0; }
+.reviewControls { display: contents; font-size: 11px; }
+.reviewControls::details-content { display: contents; }
+.reviewControls > summary { grid-column: 2; cursor: pointer; padding: 6px 0; white-space: nowrap; text-underline-offset: 3px; }
+.reviewControls > summary:focus-visible { outline: 2px solid #000; outline-offset: 3px; }
+.reviewControls > div { grid-column: 1 / -1; min-width: 0; }
+.reviewControls:not([open]) > div { display: none; }
 .chips { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .chip {
   display: inline-flex;
@@ -127,11 +145,35 @@
 .metricLabel { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.055em; }
 .metricValue { margin-top: 7px; font-size: clamp(20px, 2.1vw, 28px); line-height: 1.2; letter-spacing: -0.035em; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .metricNote { margin-top: 6px; font-size: 11px; line-height: 1.5; }
-.overview { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(240px, 1fr); gap: 20px; margin-bottom: 20px; padding: 26px; border-radius: 12px; background: rgb(var(--walnut)); color: #fffaf5; }
-.overviewMain { align-self: center; }
-.overview .sectionHeading { margin-top: 9px; font-size: 25px; color: #fffaf5; }
-.overview .subtitle { color: #e6d7ca; }
-.overview .overviewTotal { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.monthSummary { container: month-summary / inline-size; margin-bottom: 20px; }
+.monthMetrics { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, .75fr) minmax(0, .85fr) minmax(0, 1.1fr) minmax(0, 1fr); gap: 9px; }
+.monthCard {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 158px;
+  padding: 16px 13px 12px;
+  border: 1px solid #e8e1d8;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(90 62 43 / 5.5%);
+}
+.monthCard::before { content: ''; display: block; width: 23px; height: 3px; margin-bottom: 12px; border-radius: 3px; background: #cdb8a2; }
+.monthCardLabel { min-height: 30px; color: #756456; font-size: 10px; font-weight: 500; line-height: 1.5; letter-spacing: .06em; text-transform: uppercase; }
+.monthCardValue { color: #111; font-size: clamp(20px, 2.1cqw, 28px); font-weight: 600; line-height: 1.2; letter-spacing: -.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.monthCardFoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; margin-top: auto; padding-top: 13px; color: #8a7765; font-size: 10px; line-height: 1.45; }
+.monthCardIcon { display: flex; align-items: center; justify-content: center; flex: none; width: 27px; height: 27px; margin-left: auto; border-radius: 8px; background: #f6f2ec; color: #9a8067; }
+.monthCardIcon svg { width: 15px; height: 15px; stroke-width: 1.6; }
+.commissionCard { border: 1.5px solid #86664c; box-shadow: 0 3px 12px rgb(90 62 43 / 9%); }
+.commissionCard::before { width: 38px; background: rgb(var(--walnut)); }
+.commissionCard .monthCardValue { color: rgb(var(--walnut)); }
+.commissionCard .monthCardIcon { background: #efe5d9; color: rgb(var(--walnut)); }
+.costCard::before { background: #c9746d; }
+.costCard .monthCardValue { color: #b02822; }
+.costCard .monthCardIcon { background: #fbefed; color: #b75b50; }
+.unmatchedSummary { margin-top: 12px; color: #8a7765; font-size: 11px; line-height: 1.5; }
+.unmatchedSummary strong { margin-left: 7px; color: #40372f; font-weight: 600; font-variant-numeric: tabular-nums; }
+.unmatchedSummary strong[data-warning='true'] { color: #b02822; }
 .overviewTotal { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 7px; padding: 18px 20px; border: 1px solid rgb(var(--hairline)); border-radius: 10px; background: rgb(var(--surface-2)); font-variant-numeric: tabular-nums; }
 .overviewTotal > span { font-size: 11px; line-height: 1.45; font-weight: 500; }
 .overviewTotal > strong { font-size: clamp(28px, 3vw, 38px); line-height: 1.15; font-weight: 600; letter-spacing: -0.045em; }
@@ -260,9 +302,20 @@
 .legacy > summary { cursor: pointer; font-size: 13px; font-weight: 500; }
 .legacy[open] > summary { margin-bottom: 20px; }
 
+@container month-summary (max-width: 850px) {
+  .monthMetrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .monthCard { padding: 13px 12px 11px; }
+  .monthCardValue { font-size: 22px; }
+}
+
+@container month-summary (max-width: 560px) {
+  .monthMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .monthCard { min-height: 146px; padding: 13px 11px 10px; }
+  .monthCard:first-child .monthCardValue { font-size: clamp(16px, 4.2cqw, 21px); }
+}
+
 @media (max-width: 1000px) {
   .page { padding: 20px; }
-  .overview { grid-template-columns: minmax(0, 1fr); }
   .metrics { gap: 9px; }
   .metric { padding: 13px; }
   .metricValue { font-size: 22px; }
@@ -280,8 +333,8 @@
   .tabs { gap: 2px; margin-bottom: 16px; }
   .tabs > :is(button, a) { padding: 10px; }
   .toolbar { padding: 10px; gap: 8px; }
+  .reviewToolbar { padding: 10px; gap: 8px; }
   .search { flex-basis: 100%; min-width: 0; width: 100%; }
-  .overview { padding: 20px; }
   .overviewTotal { align-items: flex-start; padding: 15px; }
   .overviewTotal > strong { font-size: 30px; }
   .personHeader { padding: 20px; }
@@ -305,6 +358,8 @@
 }
 
 @media (max-width: 599px) {
+  .reviewToolbar { grid-template-columns: minmax(0, 1fr); }
+  .reviewControls > summary { grid-column: 1; justify-self: end; }
   .table .stickyFirst { position: static; }
   .chip { max-width: 100%; white-space: normal; }
   .chip input[type='checkbox'] { flex-shrink: 0; }
@@ -323,5 +378,6 @@
   .table :is(th, td).stickyTotal,
   .table thead th { position: static; }
   .toolbar,
+  .reviewToolbar,
   .columnsMenu { display: none; }
 }

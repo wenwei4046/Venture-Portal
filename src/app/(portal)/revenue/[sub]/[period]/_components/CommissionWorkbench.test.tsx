@@ -82,8 +82,10 @@ function salaryFixture() {
   return data
 }
 
+const monthStats = { salesValue: 3_000, totalOrders: 2, unmatchedAgents: 0, linesWithoutCost: 0 }
+
 function renderBoard(data = fixture(), runStatus: string | null = null, savedTotals: { staffId: string; total: number }[] = []) {
-  return render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={runStatus} savedTotals={savedTotals} />)
+  return render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={runStatus} savedTotals={savedTotals} monthStats={monthStats} />)
 }
 
 function choose(name: string) { fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}$`) })) }
@@ -100,14 +102,16 @@ afterEach(cleanup)
 
 describe('CommissionWorkbench', () => {
   it('opens an agent as a focused page and restores the month overview on return', () => {
-    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
       monthOverview={<><h1>August 2026 overview</h1><p>Total sales value · RM 3,000.00</p></>}
       monthTools={<div>Payroll source controls</div>} />)
     expect(screen.getByRole('heading', { name: 'August 2026 overview' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Monthly commission summary' })).toBeVisible()
     choose('Anthony')
     expect(screen.getByRole('heading', { name: 'Anthony' })).toBeVisible()
     expect(screen.queryByText('August 2026 overview')).toBeNull()
     expect(screen.queryByText('Total sales value · RM 3,000.00')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Monthly commission summary' })).toBeNull()
     expect(screen.queryByRole('tablist', { name: 'Commission views' })).toBeNull()
     expect(screen.queryByText('Review settings')).toBeNull()
     expect(screen.queryByText('Payroll source controls')).toBeNull()
@@ -116,9 +120,44 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByRole('tablist', { name: 'Salesperson commission type' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '← Sales people' }))
     expect(screen.getByRole('heading', { name: 'August 2026 overview' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Monthly commission summary' })).toBeVisible()
     expect(screen.getByRole('tablist', { name: 'Commission views' })).toBeVisible()
     expect(screen.getByText('Payroll source controls')).toBeVisible()
     expect(screen.queryByText('Claims & travel')).toBeNull()
+  })
+
+  it('keeps five month cards above the ledger and recalculates commission independently of search and source sales totals', () => {
+    renderBoard()
+    const summary = () => screen.getByRole('region', { name: 'Monthly commission summary' })
+    const card = (name: string) => within(summary()).getByRole('group', { name, exact: true })
+
+    expect(within(summary()).getAllByRole('group').map(group => group.getAttribute('aria-label'))).toEqual([
+      'Total sales value', 'Total orders', 'Salespeople', 'Total commission', 'Lines without a cost',
+    ])
+    expect(card('Total sales value')).toHaveTextContent('RM 3,000.00')
+    expect(within(card('Total orders')).getByText('2')).toBeVisible()
+    expect(within(card('Salespeople')).getByText('2')).toBeVisible()
+    expect(card('Total commission')).toHaveTextContent('RM 1,313.00')
+    expect(within(card('Lines without a cost')).getByText('0')).toBeVisible()
+    expect(within(summary()).getByText('Unmatched agents')).toHaveTextContent('Unmatched agents 0')
+    expect(screen.queryByRole('heading', { name: 'Salespeople' })).toBeNull()
+    expect(screen.queryByText('Personal sales and downline overriding, together in one view.')).toBeNull()
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search salesperson' }), { target: { value: 'Anthony' } })
+    expect(screen.queryByRole('button', { name: 'Alex' })).toBeNull()
+    expect(within(card('Salespeople')).getByText('2')).toBeVisible()
+    expect(card('Total commission')).toHaveTextContent('RM 1,313.00')
+
+    choose('Anthony')
+    fireEvent.click(within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Exclude' }))
+    fireEvent.click(screen.getByRole('button', { name: '← Sales people' }))
+    expect(card('Total commission')).toHaveTextContent('RM 1,180.00')
+    expect(card('Total commission')).toHaveTextContent('Draft calculation')
+    expect(card('Total sales value')).toHaveTextContent('RM 3,000.00')
+    expect(within(card('Total orders')).getByText('2')).toBeVisible()
+    expect(within(card('Salespeople')).getByText('2')).toBeVisible()
+    expect(within(card('Lines without a cost')).getByText('0')).toBeVisible()
+    expect(saveOpenPicks).not.toHaveBeenCalled()
   })
 
   it('opens on salesperson selection, then shows one personal row per order with a reconcilable total', () => {
@@ -399,7 +438,7 @@ describe('CommissionWorkbench', () => {
     }))
     renderBoard()
     expect(screen.getByText(/Its Open Bill edits were discarded/)).toBeVisible()
-    expect(screen.getByText(/salespeople · Current team preview/)).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' })).toHaveTextContent('Current team preview')
     expect(screen.queryByRole('button', { name: 'Save Open Bill picks' })).toBeNull()
     choose('Anthony')
     expect(within(personalTable()).queryByRole('link', { name: 'SO-two' })).toBeNull()
@@ -412,7 +451,7 @@ describe('CommissionWorkbench', () => {
     openTab()
     fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
     const fresh = { ...data, input: { ...data.input, openBillTags: [{ orderId: 'two', rank: 3 as const }] } }
-    rerender(<CommissionWorkbench data={fresh} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} />)
+    rerender(<CommissionWorkbench data={fresh} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats} />)
     expect(screen.getByRole('alert')).toHaveTextContent('Saved Open Bill picks changed while this draft was open')
     expect(screen.getByRole('button', { name: 'Save Open Bill picks' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Reset draft' }))

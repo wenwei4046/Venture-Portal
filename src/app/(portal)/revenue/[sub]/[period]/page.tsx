@@ -736,7 +736,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     <div className={workbenchStyles.page}>
       {workbench ? <CommissionWorkbench key={`${subDept.id}:${period}`} data={workbench}
         sub={subDept.slug} period={period} runStatus={run?.status ?? null}
-        monthOverview={<>{monthHeader}{monthMetrics}</>}
+        monthOverview={monthHeader}
+        monthStats={{ salesValue: total, totalOrders: orders.length,
+          unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
         monthTools={monthTools}
         savedTotals={statements.map(row => ({ staffId: row.staff_id, total: Number(row.total_commission) }))} />
         : <>{monthHeader}{!batchRow ? (

@@ -9,6 +9,7 @@ import { computeRevenuePay } from '@/lib/revenue-pay'
 import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import { saveOpenBillPicks } from '../../../run-actions'
+import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
 import s from './commission-workbench.module.css'
 
 type Tab = 'sales' | 'kpi' | 'open'
@@ -32,11 +33,12 @@ interface Props {
   period: string
   runStatus: string | null
   savedTotals: { staffId: string; total: number }[]
+  monthStats: CommissionMonthStats
   monthOverview?: ReactNode
   monthTools?: ReactNode
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthOverview, monthTools }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, monthOverview, monthTools }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('sales')
   const [personId, setPersonId] = useState<string | null>(null)
@@ -245,12 +247,17 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   return <section ref={workspaceRef} className={s.workspace} aria-label="Commission workbench">
     {!isPersonView && <>
     {monthOverview}
+    <CommissionMonthSummary stats={monthStats} peopleCount={board.people.length} totalCommission={board.totalCommission}
+      status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : excluded.length || picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Live calculation'} />
     <div className={s.tabs} role="tablist" aria-label="Commission views">
       {([['sales', 'Total Sales Orders'], ['kpi', 'KPI Items'], ['open', 'Open Bill']] as const).map(([key, text]) =>
         <button type="button" role="tab" aria-selected={tab === key} aria-controls={`commission-panel-${key}`} id={`commission-tab-${key}`} key={key}
           onClick={() => navigate(key)} className={tab === key ? s.activeTab : undefined}>{text}<span className={s.badge}>{key === 'sales' ? new Set(data.input.orders.filter(o => !o.upsale && o.periodMonth === period).map(o => o.id)).size : key === 'kpi' ? quantity(totals.kpiQty) : new Set(tags.map(t => t.orderId)).size}</span></button>)}
     </div>
-    <details className={s.monthSettings}><summary>Review settings</summary>
+    <div className={tab === 'sales' ? s.reviewToolbar : undefined}>
+    {tab === 'sales' && <input className={s.search} placeholder="Search salesperson…" aria-label="Search salesperson" value={query} onChange={e => setQuery(e.target.value)} />}
+    <details className={tab === 'sales' ? s.reviewControls : s.monthSettings}><summary>Review settings</summary>
+    <div>
     <div className={s.topLine}><span className={s.badge}>Live calculation · {period.slice(0, 7)}</span><span className={s.muted}>Same Revenue Team rules as Arena</span><Link href={`/revenue/${sub}/rules`}>View rules ↗</Link></div>
     {data.input.hierarchy.length === 0 && !currentTeam && <p className={s.warning}>No team ranks are effective in {period.slice(0, 7)}. Product commission and overriding need an effective rank. Other configured incentives may still apply. You can try the current team below without changing history.</p>}
     <details className={s.rules}><summary>Calculation setup · KPI {effectiveInput.scheme.enableKpi ? 'on' : 'off'} · Open Bill {openEnabled ? 'on' : 'off'} · Margin {effectiveInput.scheme.enableMarginIncentive ? 'on' : 'off'}</summary>
@@ -265,18 +272,15 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </details>
     {(excluded.length > 0 || picks || currentTeam || Object.keys(previewFeatures).length > 0) && <div className={s.notice} role="status"><span>{currentTeam ? 'Current team preview · ' : ''}{Object.keys(previewFeatures).length > 0 ? 'Draft incentive settings · ' : ''}{excluded.length} orders excluded in this draft{picks ? ' · Open Bill picks changed' : ''}. Payroll is unchanged.</span><button className={s.ghostButton} onClick={reset}>Reset draft</button></div>}
     {excluded.length > 0 && <details className={s.rules}><summary>Restore excluded orders ({excluded.length})</summary><div className={s.chips}>{excluded.map(id => <button key={id} className={s.button} onClick={() => exclude(id)}>Restore {data.input.orders.find(o => o.id === id)?.orderNo ?? id}</button>)}</div></details>}
+    </div>
     </details>
+    </div>
     </>}
     {notice && !isPersonView && <p className={s.notice} role="status">{notice}</p>}
     {!isPersonView && feedback}
 
     <div role={isPersonView ? undefined : "tabpanel"} id={`commission-panel-${tab}`} aria-labelledby={isPersonView ? undefined : `commission-tab-${tab}`}>
     {tab === 'sales' && !selected && <>
-      <div className={s.overview}>
-        <div className={s.overviewMain}><div className={s.eyebrow}>MONTHLY COMMISSION REVIEW</div><h2 className={s.sectionHeading}>Salespeople</h2><p className={s.subtitle}>Personal sales and downline overriding, together in one view.</p></div>
-        <div className={s.overviewTotal}><span>Total commission · live calculation</span><strong>{money(board.totalCommission)}</strong><small>{board.people.length} salespeople{currentTeam ? ' · Current team preview' : data.input.hierarchy.length === 0 ? ' · Rank history not set' : ''}</small></div>
-      </div>
-      <div className={s.toolbar}><input className={s.search} placeholder="Search salesperson…" aria-label="Search salesperson" value={query} onChange={e => setQuery(e.target.value)} /><span className={s.muted}>{people.length} salespeople</span></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Salesperson commission summary">
         <thead><tr><th className={s.stickyFirst}>Sales person</th><th>Title / rank</th><th>Orders</th><th>Sales value</th><th>Margin</th><th>Personal</th><th>Overriding</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
         <tbody>{people.map(p => <tr key={p.staffId}><td className={s.stickyFirst}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} <span aria-hidden>↗</span></button></td>
