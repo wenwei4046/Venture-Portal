@@ -4,24 +4,10 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { computeCommissionRun as runEngine, monthsBefore } from '@/lib/commission/engine'
-import { toEngineInput, toRunPayload } from '@/lib/commission/run-payload'
+import { computeCommissionRun as runEngine } from '@/lib/commission/engine'
+import { toRunPayload } from '@/lib/commission/run-payload'
+import { loadCommissionInput } from './_lib/commission-input'
 import { fetchByKeys } from '@/lib/paginate'
-import type {
-  HierarchyRow,
-  ItemGroupRow,
-  KpiItemRow,
-  KpiThresholdRow,
-  MarginBandRow,
-  OpenBillRuleRow,
-  OpenBillTagRow,
-  OrderShareRow,
-  PriorMonthRow,
-  RankRow,
-  SalesOrderRow,
-  SchemeRow,
-} from '@/lib/commission/run-payload'
-import type { UpsaleRow } from '@/lib/commission/upsales'
 
 /**
  * Computing a month's commission and syncing its clean result to payroll.
@@ -36,24 +22,6 @@ import type { UpsaleRow } from '@/lib/commission/upsales'
  */
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
-}
-
-function rows<T>(data: unknown): T[] {
-  return (data ?? []) as T[]
-}
-
-/** Last day of the period, as YYYY-MM-DD. Effective-dated config is read as at
- *  this date, so recomputing an old month uses that month's rules. */
-function periodEnd(period: string): string {
-  const [y, m] = period.split('-').map(Number)
-  const d = new Date(Date.UTC(y, m, 0))
-  return d.toISOString().slice(0, 10)
-}
-
-function assertPeriod(period: string): void {
-  if (!/^\d{4}-\d{2}-01$/.test(period)) {
-    throw new Error('Period must be the first of a month, e.g. 2026-07-01')
-  }
 }
 
 export interface ComputeSummary {
@@ -75,215 +43,26 @@ export interface ComputeSummary {
  */
 export async function computeRun(period: string, subDepartmentId?: string): Promise<ComputeSummary> {
   await requirePermission('revenue')
-  assertPeriod(period)
   const supabase = await client()
-  const asAt = periodEnd(period)
-
-  // ── The scheme ─────────────────────────────────────────────────────────
-  const { data: schemeRows, error: schemeError } = await supabase
-    .from('comm_schemes')
-    .select(
-      'id, sub_department_id, open_bill_basis, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_open_bill, enable_override, enable_margin_penalty, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth, revenue_cost_divisor',
-    )
-    .eq('is_active', true)
-    .is('effective_to', null)
-  if (schemeError) throw new Error(`Could not read the commission scheme: ${schemeError.message}`)
-
-  const schemes = rows<SchemeRow>(schemeRows)
-  if (schemes.length === 0) {
-    throw new Error('No active commission scheme. Set one up under Revenue → Rules first.')
-  }
-
-  const scheme = subDepartmentId
-    ? schemes.find(s => s.sub_department_id === subDepartmentId)
-    : schemes.length === 1
-      ? schemes[0]
-      : undefined
-  if (!scheme) {
-    throw new Error(
-      subDepartmentId
-        ? 'That sub-department has no active commission scheme.'
-        : 'There is more than one sub-department — say which one to run.',
-    )
-  }
-
-  // ── The month's imported sales ─────────────────────────────────────────
-  const { data: batchRow } = await supabase
-    .from('sales_import_batches')
-    .select('id')
-    .eq('sub_department_id', scheme.sub_department_id)
-    .eq('period_month', period)
-    .eq('status', 'committed')
-    .maybeSingle()
-  const batchId = (batchRow as { id: string } | null)?.id ?? null
-  if (!batchId) {
-    throw new Error(`Nothing has been imported for ${period.slice(0, 7)} yet.`)
-  }
-
-  const orderSelect =
-    'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct, sales_order_lines (id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount)'
-
-  // Carry-forward. An order the deposit gate held in an earlier month belongs
-  // in this run once the customer has topped up, so the input is not just this
-  // month's batch: it is every committed order up to and including this month
-  // that no applied run has paid for yet.
-  const [{ data: thisMonth, error: orderError }, { data: releases }] = await Promise.all([
-    supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId).eq('cancelled', false),
-    supabase.from('comm_order_releases').select('order_no').eq('sub_department_id', scheme.sub_department_id),
-  ])
-  if (orderError) throw new Error(`Could not read the sales orders: ${orderError.message}`)
-
-  const releasedOrderNos = rows<{ order_no: string }>(releases).map(r => r.order_no)
-
-  const { data: earlier, error: earlierError } = await supabase
-    .from('sales_orders')
-    .select(`${orderSelect}, sales_import_batches!inner (status, sub_department_id)`)
-    .lt('period_month', period)
-    .eq('cancelled', false)
-    .eq('sales_import_batches.status', 'committed')
-    .eq('sales_import_batches.sub_department_id', scheme.sub_department_id)
-  if (earlierError) throw new Error(`Could not read carried-forward orders: ${earlierError.message}`)
-
-  const releasedSet = new Set(releasedOrderNos)
-  const carried = rows<SalesOrderRow>(earlier).filter(o => !releasedSet.has(o.order_no))
-  const orderRows = [...rows<SalesOrderRow>(thisMonth), ...carried]
-
-  // ── Configuration, read as at the period being computed ────────────────
-  const [
-    ranks,
-    itemGroups,
-    kpiItems,
-    kpiThresholds,
-    openBillRules,
-    marginBands,
-    hierarchy,
-  ] = await Promise.all([
-    supabase
-      .from('comm_ranks')
-      .select('rank_key, title_id, titles (name), label, product_rate, group_incentive_amount, group_subsidy_cap, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order')
-      .eq('scheme_id', scheme.id)
-      .order('sort_order'),
-    supabase
-      .from('comm_item_groups')
-      .select('item_group, commissionable')
-      .eq('scheme_id', scheme.id),
-    supabase
-      .from('comm_kpi_items')
-      .select('product_code, kpi_amount')
-      .eq('scheme_id', scheme.id)
-      .lte('effective_from', asAt)
-      .or(`effective_to.is.null,effective_to.gte.${asAt}`),
-    supabase
-      .from('comm_kpi_thresholds')
-      .select('min_qty, bonus_pct')
-      .eq('scheme_id', scheme.id)
-      .lte('effective_from', asAt)
-      .or(`effective_to.is.null,effective_to.gte.${asAt}`),
-    supabase
-      .from('comm_open_bill_rules')
-      .select('bill_rank, pct')
-      .eq('scheme_id', scheme.id)
-      .lte('effective_from', asAt)
-      .or(`effective_to.is.null,effective_to.gte.${asAt}`),
-    supabase
-      .from('comm_margin_bands')
-      .select('band_key, label, kind, margin_pct, commission_multiplier, monthly_incentive, comm_brands (code)')
-      .eq('scheme_id', scheme.id)
-      .order('sort_order'),
-    // The title they hold HERE rides along: it decides who may recruit and
-    // whether this month's rank would raise it (the ratchet — titles.ts). It
-    // is the membership's own title since 2026-09-10, not the company one.
-    supabase
-      .from('comm_hierarchy')
-      .select('staff_id, upline_staff_id, rate_mode, title_id, comm_ranks (rank_key)')
-      .eq('scheme_id', scheme.id)
-      .lte('effective_from', asAt)
-      .or(`effective_to.is.null,effective_to.gte.${asAt}`),
-  ])
-
-  // Open Bill picks only for the orders actually in this run — CHUNKED.
-  //
-  // The run's orders are this month's PLUS everything carried forward, which
-  // is hundreds of ids, and PostgREST takes its filters in the query string.
-  // Asked for 507 of them at once the request fails outright (`TypeError:
-  // fetch failed`), and this used not to read the error: the run then paid no
-  // Open Bill bonus to anybody and said nothing about it. September 2026 lost
-  // RM 18,677 that way before it was caught.
-  const orderIds = orderRows.map(o => o.id)
-  const tagRows = await fetchByKeys<OpenBillTagRow, string>(orderIds, chunk =>
-    supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank').in('order_id', chunk),
-  )
-
-  // Who else each bill is shared with (2026-09-24). Chunked for the same reason
-  // as the picks above; a shared bill reaches the engine as one part per holder.
-  const shareRows = await fetchByKeys<OrderShareRow, string>(orderIds, chunk =>
-    supabase.from('sales_order_shares').select('order_id, staff_id, share_pct').in('order_id', chunk),
-  )
-
-  // Upsales HR recorded under this month (2026-09-24): amounts customers added
-  // to earlier orders. Read by month and never carried — `lib/commission/upsales.ts`.
-  const { data: upsaleRows, error: upsaleError } = await supabase
-    .from('comm_upsales')
-    .select('id, staff_id, amount, sold_on, original_ref')
-    .eq('sub_department_id', scheme.sub_department_id)
-    .eq('period_month', period)
-  if (upsaleError) throw new Error(`Could not read the month's upsales: ${upsaleError.message}`)
-
-  // ── The months before, for the streak gates ────────────────────────────
-  // A rung with `personal_sales_threshold` × N months looks back N − 1 months
-  // at what those months' runs paid as own revenue. Only months that were
-  // run are passed: an unrun month is unknown, not zero, and the engine will
-  // not let a streak cross it.
-  const rankRows = rows<RankRow>(ranks.data)
-  const lookBack = Math.max(0, ...rankRows.map(r => (r.consecutive_months ?? 1) - 1))
-  const priorPeriods = Array.from({ length: lookBack }, (_, i) => monthsBefore(period, i + 1))
-  const { data: priorRows, error: priorError } =
-    priorPeriods.length > 0
-      ? await supabase
-          .from('comm_runs')
-          .select('period_month, comm_statements (staff_id, product_revenue)')
-          .eq('sub_department_id', scheme.sub_department_id)
-          .in('period_month', priorPeriods)
-      : { data: [], error: null }
-  if (priorError) throw new Error(`Could not read the earlier months: ${priorError.message}`)
-
-  // ── Run it ─────────────────────────────────────────────────────────────
-  const input = toEngineInput({
-    periodMonth: period,
-    scheme,
-    ranks: rankRows,
-    itemGroups: rows<ItemGroupRow>(itemGroups.data),
-    kpiItems: rows<KpiItemRow>(kpiItems.data),
-    kpiThresholds: rows<KpiThresholdRow>(kpiThresholds.data),
-    openBillRules: rows<OpenBillRuleRow>(openBillRules.data),
-    openBillTags: tagRows,
-    marginBands: rows<MarginBandRow>(marginBands.data),
-    hierarchy: rows<HierarchyRow>(hierarchy.data),
-    orders: orderRows,
-    releasedOrderNos,
-    priorMonths: rows<PriorMonthRow>(priorRows),
-    shares: shareRows,
-    upsales: rows<UpsaleRow>(upsaleRows),
-  })
+  const { input, batchId, schemeId, subDepartmentId: resolvedSubDepartmentId, unmatchedOrderNos } =
+    await loadCommissionInput(period, subDepartmentId, supabase)
 
   const result = runEngine(input)
   const payload = toRunPayload(input, result)
 
   // An unmatched agent never reaches the engine (the order pays nobody), so
   // the run would look clean while quietly excluding real sales. Say so here.
-  const unmatched = orderRows.filter(o => o.staff_id === null)
-  if (unmatched.length > 0) {
-    const names = [...new Set(unmatched.map(o => o.order_no))].length
+  if (unmatchedOrderNos.length > 0) {
     payload.p_warnings = [
-      `${names} order(s) carry an agent who is not a salesperson in the portal and were excluded. Match them in the import wizard.`,
+      `${unmatchedOrderNos.length} order(s) carry an agent who is not a salesperson in the portal and were excluded. Match them in the import wizard.`,
       ...payload.p_warnings,
     ]
   }
 
   const { data: runId, error: saveError } = await supabase.rpc('save_commission_run', {
     p_period_month: period,
-    p_sub_department_id: scheme.sub_department_id,
-    p_scheme_id: scheme.id,
+    p_sub_department_id: resolvedSubDepartmentId,
+    p_scheme_id: schemeId,
     p_batch_id: batchId,
     p_total_commission: payload.p_total_commission,
     p_warnings: payload.p_warnings,
@@ -325,6 +104,129 @@ export async function reopenRun(runId: string): Promise<void> {
 
 // ─── Review-board edits ─────────────────────────────────────────────────────
 
+type BillRank = 1 | 2 | 3
+interface OpenBillOrder {
+  id: string
+  staff_id: string | null
+  event_date: string
+  period_month: string
+  cancelled: boolean
+  sales_import_batches: { sub_department_id: string } | { sub_department_id: string }[]
+}
+
+export interface OpenBillPickChange {
+  orderId: string
+  before: BillRank | null
+  after: BillRank | null
+}
+
+function assertBillRank(rank: unknown): asserts rank is BillRank | null {
+  if (rank !== null && rank !== 1 && rank !== 2 && rank !== 3) {
+    throw new Error('Open Bill rank must be 1, 2, 3, or empty.')
+  }
+}
+
+function openBillSub(order: OpenBillOrder): string {
+  const batch = Array.isArray(order.sales_import_batches) ? order.sales_import_batches[0] : order.sales_import_batches
+  if (!batch?.sub_department_id) throw new Error('The sales order has no sub-department.')
+  return batch.sub_department_id
+}
+
+async function readOpenBillOrders(supabase: SupabaseClient, ids: readonly string[]): Promise<OpenBillOrder[]> {
+  return fetchByKeys<OpenBillOrder, string>(ids, chunk => supabase.from('sales_orders')
+    .select('id, staff_id, event_date, period_month, cancelled, sales_import_batches!inner (sub_department_id)')
+    .in('id', chunk) as unknown as PromiseLike<{ data: OpenBillOrder[] | null; error: { message: string } | null }>)
+}
+
+async function assertOpenBillEnabled(supabase: SupabaseClient, subDepartmentId: string): Promise<void> {
+  const { data, error } = await supabase.from('comm_schemes').select('enable_open_bill')
+    .eq('sub_department_id', subDepartmentId).eq('is_active', true).is('effective_to', null).maybeSingle()
+  if (error) throw new Error(`Could not read the Open Bill switch: ${error.message}`)
+  if (!(data as { enable_open_bill: boolean } | null)?.enable_open_bill) {
+    throw new Error('Open Bill is switched off in Rules. Preview settings do not enable saving picks. No picks were changed by this check.')
+  }
+}
+
+/**
+ * Validate the whole draft BEFORE freeing any rank. This prevents a stale
+ * browser, a disabled source switch or a locked carried month from leaving a
+ * half-cleared allocation. The subsequent REST writes are not a transaction;
+ * failures are reported as partial and every single edit rechecks its locks.
+ */
+export async function saveOpenBillPicks(changes: OpenBillPickChange[]): Promise<void> {
+  await requirePermission('revenue')
+  if (!Array.isArray(changes)) throw new Error('Open Bill changes must be a list.')
+  const ids = new Set<string>()
+  for (const change of changes) {
+    if (!change || typeof change.orderId !== 'string' || !change.orderId || ids.has(change.orderId)) {
+      throw new Error('Every Open Bill change must name a different sales order.')
+    }
+    assertBillRank(change.before)
+    assertBillRank(change.after)
+    ids.add(change.orderId)
+  }
+  const edits = changes.filter(change => change.before !== change.after)
+  if (edits.length === 0) return
+  const changedIds = new Set(edits.map(change => change.orderId))
+  const supabase = await client()
+  const orders = await readOpenBillOrders(supabase, edits.map(change => change.orderId))
+  if (orders.length !== edits.length) throw new Error('An Open Bill order is no longer available. Refresh before saving.')
+  const byOrder = new Map(orders.map(order => [order.id, order]))
+  const groups = new Map<string, { sub: string; staffId: string; eventDate: string }>()
+  const periods = new Map<string, { sub: string; period: string }>()
+  const desiredSlots = new Map<string, string>()
+  for (const change of edits) {
+    const order = byOrder.get(change.orderId)!
+    if (!order.staff_id) throw new Error('An Open Bill order no longer has a matched salesperson. Refresh before saving.')
+    if (order.cancelled && change.after !== null) throw new Error('An excluded sales order cannot receive an Open Bill pick.')
+    const sub = openBillSub(order)
+    const groupKey = JSON.stringify([sub, order.staff_id, order.event_date])
+    groups.set(groupKey, { sub, staffId: order.staff_id, eventDate: order.event_date })
+    periods.set(JSON.stringify([sub, order.period_month]), { sub, period: order.period_month })
+    if (change.after !== null) {
+      const slot = JSON.stringify([sub, order.staff_id, order.event_date, change.after])
+      if (desiredSlots.has(slot)) throw new Error('Two orders cannot hold the same Open Bill rank for one salesperson and event day.')
+      desiredSlots.set(slot, order.id)
+    }
+  }
+  await Promise.all([
+    ...[...new Set(orders.map(openBillSub))].map(sub => assertOpenBillEnabled(supabase, sub)),
+    ...[...periods.values()].map(({ sub, period }) => assertRunOpen(supabase, period, sub)),
+  ])
+  const tagGroups = await Promise.all([...groups.values()].map(async group => {
+    const { data, error } = await supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank')
+      .eq('sub_department_id', group.sub).eq('staff_id', group.staffId).eq('event_date', group.eventDate)
+    if (error) throw new Error(`Could not read the current Open Bill picks: ${error.message}`)
+    return { group, tags: (data ?? []) as { order_id: string; bill_rank: BillRank }[] }
+  }))
+  const current = new Map(tagGroups.flatMap(({ tags }) => tags.map(tag => [tag.order_id, tag.bill_rank] as const)))
+  for (const change of edits) {
+    if ((current.get(change.orderId) ?? null) !== change.before) {
+      throw new Error('Open Bill picks changed since this page loaded. Refresh before saving; no picks were changed.')
+    }
+  }
+  const conflicts = tagGroups.flatMap(({ group, tags }) => tags.filter(tag => {
+    const target = desiredSlots.get(JSON.stringify([group.sub, group.staffId, group.eventDate, tag.bill_rank]))
+    return target && target !== tag.order_id && !changedIds.has(tag.order_id)
+  }))
+  if (conflicts.length > 0) {
+    const conflictOrders = await readOpenBillOrders(supabase, conflicts.map(tag => tag.order_id))
+    if (conflictOrders.length !== conflicts.length) throw new Error('An occupied Open Bill rank could not be checked. Refresh before saving.')
+    await Promise.all(conflictOrders.map(order => assertRunOpen(supabase, order.period_month, openBillSub(order))))
+    throw new Error('Another order now holds an Open Bill rank in this draft. Refresh and review that order before saving; no picks were changed.')
+  }
+
+  let completed = 0
+  try {
+    for (const change of edits) if (change.before !== null) { await writeOpenBillRank(change.orderId, null, false, change.before); completed++ }
+    for (const change of edits) if (change.after !== null) { await writeOpenBillRank(change.orderId, change.after, false, null); completed++ }
+  } catch (error) {
+    throw new Error(`${error instanceof Error ? error.message : 'Could not save Open Bill picks.'} ${completed > 0 ? 'Some picks were saved. ' : ''}Refresh before retrying.`)
+  } finally {
+    revalidatePath('/revenue', 'layout')
+  }
+}
+
 /**
  * Set (or clear) which of the day's bills this order is for its salesperson.
  *
@@ -337,52 +239,82 @@ export async function reopenRun(runId: string): Promise<void> {
  * suggestion almost always means swapping two orders.
  */
 export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): Promise<void> {
-  const user = await requirePermission('revenue')
-  const supabase = await client()
+  await writeOpenBillRank(orderId, rank, true)
+}
 
-  const { data: orderRow } = await supabase
-    .from('sales_orders')
-    .select('id, staff_id, event_date, period_month, sales_import_batches!inner (sub_department_id)')
-    .eq('id', orderId)
-    .maybeSingle()
-  const order = orderRow as {
-    staff_id: string | null
-    event_date: string
-    period_month: string
-    sales_import_batches: { sub_department_id: string }
-  } | null
+async function writeOpenBillRank(orderId: string, rank: BillRank | null, allowMove: boolean, expectedRank?: BillRank | null): Promise<void> {
+  const user = await requirePermission('revenue')
+  assertBillRank(rank)
+  const supabase = await client()
+  const [order] = await readOpenBillOrders(supabase, [orderId])
   if (!order) throw new Error('Order not found')
   if (!order.staff_id) throw new Error('That order has no matched salesperson yet.')
+  if (order.cancelled && rank !== null) throw new Error('An excluded sales order cannot receive an Open Bill pick.')
+  const subDepartmentId = openBillSub(order)
+  await Promise.all([
+    assertRunOpen(supabase, order.period_month, subDepartmentId),
+    assertOpenBillEnabled(supabase, subDepartmentId),
+  ])
 
-  await assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id)
+  if (expectedRank !== undefined) {
+    const { data: latest, error } = await supabase.from('sales_order_open_bill_tags')
+      .select('bill_rank').eq('order_id', orderId).maybeSingle()
+    if (error) throw new Error(`Could not check the current Open Bill pick: ${error.message}`)
+    if (((latest as { bill_rank: BillRank } | null)?.bill_rank ?? null) !== expectedRank) {
+      throw new Error('Open Bill picks changed while saving. Refresh before retrying.')
+    }
+  }
 
   if (rank === null) {
-    const { error } = await supabase.from('sales_order_open_bill_tags').delete().eq('order_id', orderId)
+    let removal = supabase.from('sales_order_open_bill_tags').delete().eq('order_id', orderId)
+    if (expectedRank !== undefined && expectedRank !== null) removal = removal.eq('bill_rank', expectedRank)
+    const { data: removed, error } = await removal.select('order_id')
     if (error) throw new Error(error.message)
+    if (expectedRank !== undefined && expectedRank !== null && !removed?.length) {
+      throw new Error('Open Bill picks changed while saving. Refresh before retrying.')
+    }
   } else {
-    // Free the rank if another of that person's orders holds it that day.
-    const { error: freeError } = await supabase
-      .from('sales_order_open_bill_tags')
-      .delete()
-      .eq('sub_department_id', order.sales_import_batches.sub_department_id)
-      .eq('staff_id', order.staff_id)
-      .eq('event_date', order.event_date)
-      .eq('bill_rank', rank)
-    if (freeError) throw new Error(freeError.message)
+    const { data: occupied, error: occupiedError } = await supabase.from('sales_order_open_bill_tags')
+      .select('order_id').eq('sub_department_id', subDepartmentId).eq('staff_id', order.staff_id)
+      .eq('event_date', order.event_date).eq('bill_rank', rank)
+    if (occupiedError) throw new Error(`Could not check the occupied Open Bill rank: ${occupiedError.message}`)
+    const occupiedIds = ((occupied ?? []) as { order_id: string }[]).map(tag => tag.order_id).filter(id => id !== orderId)
+    if (!allowMove && occupiedIds.length > 0) throw new Error('Another order claimed this Open Bill rank while saving. Refresh before retrying.')
+    const occupiedOrders = await readOpenBillOrders(supabase, occupiedIds)
+    if (occupiedOrders.length !== occupiedIds.length) throw new Error('The occupied Open Bill rank could not be checked. Refresh before saving.')
+    await Promise.all(occupiedOrders.map(row => assertRunOpen(supabase, row.period_month, openBillSub(row))))
+    // Only free the occupant we actually checked. A different order claiming
+    // the slot meanwhile must cause a unique-conflict failure, not be deleted.
+    if (occupiedIds.length > 0) {
+      const { error: freeError } = await supabase
+        .from('sales_order_open_bill_tags')
+        .delete()
+        .eq('sub_department_id', subDepartmentId)
+        .eq('staff_id', order.staff_id)
+        .eq('event_date', order.event_date)
+        .eq('bill_rank', rank)
+        .in('order_id', occupiedIds)
+      if (freeError) throw new Error(freeError.message)
+    }
 
-    const { error } = await supabase.from('sales_order_open_bill_tags').upsert(
-      {
-        order_id: orderId,
-        staff_id: order.staff_id,
-        event_date: order.event_date,
-        bill_rank: rank,
-        auto_suggested: false,
-        tagged_by: user.id,
-        tagged_at: new Date().toISOString(),
-      },
-      { onConflict: 'order_id' },
-    )
-    if (error) throw new Error(error.message)
+    const payload = {
+      order_id: orderId,
+      staff_id: order.staff_id,
+      event_date: order.event_date,
+      bill_rank: rank,
+      auto_suggested: false,
+      tagged_by: user.id,
+      tagged_at: new Date().toISOString(),
+    }
+    // A batch expects a vacant order after clearing. INSERT makes a concurrent
+    // pick for that same order a conflict instead of silently overwriting it.
+    const { error } = expectedRank === null
+      ? await supabase.from('sales_order_open_bill_tags').insert(payload)
+      : await supabase.from('sales_order_open_bill_tags').upsert(payload, { onConflict: 'order_id' })
+    if (error) {
+      revalidatePath('/revenue', 'layout')
+      throw new Error(`${error.message} The rank may have been cleared. Refresh before retrying.`)
+    }
   }
 
   revalidatePath('/revenue', 'layout')

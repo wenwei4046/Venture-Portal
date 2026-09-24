@@ -11,6 +11,7 @@ import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
 import MoreSheet from './MoreSheet'
 import BackToTop from '@/components/BackToTop'
+import commissionStyles from '@/app/(portal)/revenue/[sub]/[period]/_components/commission-workbench.module.css'
 
 // Portal shell.
 //
@@ -36,7 +37,8 @@ export default function PortalFrame({
   // Wide data reports (month-matrix P&L / Cash Flow) opt out of the 1280px
   // reading-width cap so the many month columns can use the full content area.
   const pathname = usePathname()
-  const wide = pathname?.startsWith('/reports/monthly-') ?? false
+  const commissionWorkbench = /^\/revenue\/[^/]+\/\d{4}-\d{2}-01$/.test(pathname ?? '')
+  const wide = commissionWorkbench || (pathname?.startsWith('/reports/monthly-') ?? false)
 
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
@@ -60,12 +62,12 @@ export default function PortalFrame({
   }, [pathname])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
+    <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible ${commissionWorkbench ? commissionStyles.theme : ''}`}>
       <div className="print:hidden contents">
         <Sidebar viewer={user} navData={navData} />
       </div>
 
-      <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden print:overflow-visible">
         <div className="print:hidden contents">
           <TopBar user={user} />
         </div>
@@ -73,7 +75,7 @@ export default function PortalFrame({
           {/* pb on mobile clears the 54px tab bar + the home-indicator inset,
               so the last row of a ledger is never parked under the chrome. */}
           <div
-            className={`${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
+            className={`${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto ${commissionWorkbench ? 'p-2.5' : 'px-4 md:px-8 py-6 md:py-10'} pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
           >
             {children}
           </div>
