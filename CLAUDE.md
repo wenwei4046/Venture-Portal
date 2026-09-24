@@ -189,6 +189,20 @@ src/
 │   │   │                              "no fair": a pin is forever and would stop
 │   │   │                              it finding its fair once that is typed.
 │   │   │                              Mig `20260923010000`.
+│   │   │                              **A RE-SEND KEEPS THE MONTH (2026-09-24):**
+│   │   │                              the ERP re-sends a document on every save
+│   │   │                              and `ingest_erp_sales_order` re-derived the
+│   │   │                              month from `so_date` each time, so every
+│   │   │                              calendar move lasted until the bill's next
+│   │   │                              save (4 went back overnight; 221, RM 1.36M,
+│   │   │                              were queued behind them). Now a re-sent bill
+│   │   │                              that HAS A FAIR — the human's pin, else
+│   │   │                              `venue_event_for_order` on its venue and
+│   │   │                              date, exactly what `sales_orders_resolve_
+│   │   │                              fair` stamps — keeps its month; only the
+│   │   │                              calendar moves it. No fair → `so_date`, as
+│   │   │                              before. New documents still land in their
+│   │   │                              `so_date` month. Mig `20260924050000`.
 │   │   │                              **SHARED BILLS (2026-09-24):** a bill can be
 │   │   │                              shared with other team members
 │   │   │                              (`sales_order_shares`, default 50/50; the

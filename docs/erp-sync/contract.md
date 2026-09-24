@@ -625,3 +625,14 @@ dates are not substitutes: `created_at` / `updated_at` are record timestamps,
 typed once per fair forever and cannot know about a fair nobody typed. If the
 feed starts carrying an event date or a populated `venue_id`, say so: the
 resolver gains one step ahead of the calendar and the typing stops.
+
+**A re-sent document keeps its month (2026-09-24).** The ERP re-sends a whole
+document on every save, and until mig `20260924050000` the receiver re-derived
+the month from `so_date` on each one — so a bill the fair calendar had moved
+went back at its next save (four did overnight; a no-change replay of all 584
+Fair bills would have moved 221 of them, RM 1,360,482). Now a NEW document
+still lands in its `so_date` month, but a re-sent one that has a fair (the
+human's pin, else `venue_event_for_order` on the delivery's venue and date)
+keeps the month it is in; if that fair is in another month, the calendar lists
+the move and a human makes it. A document no fair claims follows `so_date` as
+before. The month-lock check follows the month the bill lives in.
