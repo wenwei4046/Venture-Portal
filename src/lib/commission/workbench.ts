@@ -18,6 +18,8 @@ export interface WorkbenchOrderMeta {
   eventName?: string | null
   organizer?: string | null
   location?: string | null
+  /** The fair the calendar placed the bill at, and that fair's own place. */
+  fair?: { id: string; venueKey: string; venueName: string } | null
 }
 
 export interface WorkbenchOptions {

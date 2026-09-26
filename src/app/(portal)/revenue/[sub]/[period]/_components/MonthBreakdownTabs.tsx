@@ -4,16 +4,16 @@ import { useSearchParams } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
 
-export type MonthTab = 'venue' | 'person' | 'open-bill' | 'upsales'
+export type MonthTab = 'open-bill' | 'upsales'
 
 /**
- * The three ways to cut the month, on one rail.
+ * What HR keeps beside the month's bills, on one rail under the saved run.
  *
- * They used to be sections stacked down the page, which meant reading the
- * whole of Sales by venue to reach Sales by person and nothing at all to
- * reach the picks (user 2026-09-17: "不要全部放在同一个页面一直 scroll
- * down"). They are three answers to three different questions about the same
- * set of bills, so only one is ever being read.
+ * It began as three cuts of the bills stacked down the page (user 2026-09-17:
+ * "不要全部放在同一个页面一直 scroll down"); on 2026-09-26 *Sales by venue*
+ * moved up into the workbench's tabs and *Sales by person* went, because the
+ * workbench's own table already is that. What stays is what the picks cost —
+ * read from the saved run's lines — and the upsales and drops HR records.
  *
  * The rail IS the section heading — its labels are the headings those sections
  * carried, so putting a `.sect-head` above them as well would title the same
@@ -22,46 +22,33 @@ export type MonthTab = 'venue' | 'person' | 'open-bill' | 'upsales'
  * Every panel is rendered on the server and handed here as a node: switching
  * is a `pushState` and a re-render, never a round trip, and `?tab=` still
  * opens the month on the view somebody meant to send.
- *
- * Upsales (2026-09-24) sit at the end: not a cut of the ERP's bills but what
- * HR recorded beside them — amounts customers added to earlier orders.
  */
 export default function MonthBreakdownTabs({
-  venue,
-  person,
   openBill,
   upsales,
   counts,
 }: {
-  venue: ReactNode
-  person: ReactNode
-  /** Null when the scheme pays no Open Bill bonus — IR has none. */
+  /** Null when this month pays no Open Bill bonus — IR has none. */
   openBill: ReactNode | null
   /** Absent on a page that does not offer upsales. */
   upsales?: ReactNode
-  counts: { venue: number; person: number; openBill: number; upsales?: number }
+  counts: { openBill: number; upsales?: number }
 }) {
   const searchParams = useSearchParams()
-  const asked = searchParams.get('tab')
-  const tab: MonthTab =
-    asked === 'person'
-      ? 'person'
-      : asked === 'open-bill' && openBill
-        ? 'open-bill'
-        : asked === 'upsales' && upsales
-          ? 'upsales'
-          : 'venue'
 
   const tabs: TabItem[] = [
-    { key: 'venue', label: 'Sales by venue', count: counts.venue },
-    { key: 'person', label: 'Sales by person', count: counts.person },
     ...(openBill ? [{ key: 'open-bill', label: 'Open Bill', count: counts.openBill }] : []),
     ...(upsales ? [{ key: 'upsales', label: 'Upsales & drops', count: counts.upsales ?? 0 }] : []),
   ]
+  if (tabs.length === 0) return null
+
+  const asked = searchParams.get('tab')
+  const first = tabs[0].key as MonthTab
+  const tab: MonthTab = tabs.some(t => t.key === asked) ? (asked as MonthTab) : first
 
   function goTo(key: string) {
     const params = new URLSearchParams(searchParams.toString())
-    if (key === 'venue') params.delete('tab')
+    if (key === first) params.delete('tab')
     else params.set('tab', key)
     const qs = params.toString()
     window.history.pushState(null, '', qs ? `?${qs}` : window.location.pathname)
@@ -70,7 +57,7 @@ export default function MonthBreakdownTabs({
   return (
     <div>
       <SlidingTabs items={tabs} active={tab} onTabChange={goTo} />
-      {tab === 'venue' ? venue : tab === 'person' ? person : tab === 'open-bill' ? openBill : upsales}
+      {tab === 'open-bill' ? openBill : upsales}
     </div>
   )
 }

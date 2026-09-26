@@ -11,6 +11,9 @@ export const COMMISSIONABLE_HINT = 'The part of the bills that earns commission.
 /** Not bills: what was added to, or taken off, bills already settled (2026-09-26). */
 export const UPSELL_HINT = 'Added to bills already settled — paid this month at the salesperson’s own rate'
 export const DROP_HINT = 'Taken off bills already settled — this month’s commission gives it back'
+/** A SALES figure, not pay: what promotion is measured on (moved up from the saved-run table, 2026-09-26). */
+export const GROUP_SALES_HINT = 'Own sales that earn the rate plus the whole downline’s, counting only bills whose deposit has cleared — what promotion is measured on. The below-margin penalty does not reduce it.'
+export const DEPOSIT_HINT = 'The share of the bill the customer must have paid before any of its commission is released'
 
 /** The small line under a Commissionable value: what the bill carries that earns nothing. */
 export default function NoCommission({ amount }: { amount: number }) {

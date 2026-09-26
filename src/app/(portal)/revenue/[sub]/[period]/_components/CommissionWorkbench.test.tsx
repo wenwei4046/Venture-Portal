@@ -60,8 +60,8 @@ function fixture(): CommissionWorkbenchData {
       { staffId: 'leader', name: 'Alex', employeeCode: 'HV002' },
     ],
     orders: [
-      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL' },
-      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL' },
+      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null },
+      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null },
     ],
   }
 }
@@ -210,11 +210,105 @@ describe('CommissionWorkbench', () => {
     const cells = within(within(summary).getByRole('row', { name: /Anthony/ })).getAllByRole('cell')
     expect(cells[2]).toHaveTextContent(/^2$/) // the two bills, not four
     expect(cells[3]).toHaveTextContent('RM 3,000.00')
-    expect(cells[5]).toHaveTextContent('RM 300.00')
-    expect(cells[6]).toHaveTextContent('RM (2,088.00)')
+    expect(cells[6]).toHaveTextContent('RM 300.00')
+    expect(cells[7]).toHaveTextContent('RM (2,088.00)')
     const alex = within(within(summary).getByRole('row', { name: /Alex/ })).getAllByRole('cell')
-    expect(alex[5]).toHaveTextContent('—')
     expect(alex[6]).toHaveTextContent('—')
+    expect(alex[7]).toHaveTextContent('—')
+  })
+
+  // Moved up from the saved run's table, which went (user 2026-09-26).
+  it('shows Group sales between the commissionable value and the upsells', () => {
+    renderBoard()
+    const summary = screen.getByRole('table', { name: 'Salesperson commission summary' })
+    const headers = within(summary).getAllByRole('columnheader').map(h => h.textContent)
+    expect(headers.slice(headers.indexOf('Commissionable value'), headers.indexOf('Upsell') + 1))
+      .toEqual(['Commissionable value', 'Group sales', 'Upsell'])
+    const anthony = within(within(summary).getByRole('row', { name: /Anthony/ })).getAllByRole('cell')
+    expect(anthony[5]).toHaveTextContent('RM 3,000.00')
+    // Alex sold nothing himself; his group is his downline's sales.
+    const alex = within(within(summary).getByRole('row', { name: /Alex/ })).getAllByRole('cell')
+    expect(alex[3]).toHaveTextContent('RM 0.00')
+    expect(alex[5]).toHaveTextContent('RM 3,000.00')
+    expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ }).firstElementChild).toHaveAttribute('colspan', '11')
+  })
+
+  it('lists the bills below deposit across the team with how much is still to collect, and opens a name on theirs', () => {
+    const data = fixture()
+    data.input.orders = [sale('one'), sale('two', 2_000, { paidAmount: 100 })]
+    renderBoard(data)
+    const tab = screen.getByRole('tab', { name: /^Below deposit/ })
+    expect(tab).toHaveTextContent('1')
+    fireEvent.click(tab)
+    expect(screen.getByRole('heading', { name: 'Waiting on a deposit' })).toBeVisible()
+    expect(screen.getByText(/Below 30% of the order total/)).toBeVisible()
+    const table = screen.getByRole('table', { name: 'Orders below deposit' })
+    expect(within(table).queryByText('SO-one')).toBeNull()
+    const row = salesRow(table, 'SO-two')
+    const cells = within(row).getAllByRole('cell')
+    expect(cells[1]).toHaveTextContent('Anthony')
+    expect(cells[4]).toHaveTextContent('RM 2,000.00')
+    expect(cells[6]).toHaveTextContent('RM 100.005% of the bill')
+    expect(cells[7]).toHaveTextContent('RM 600.0030% of the bill')
+    expect(cells[8]).toHaveTextContent('RM 500.00')
+    expect(within(row).getByRole('link', { name: 'SO-two' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders/two')
+    expect(screen.getByText('Still to collect', { selector: 'span' }).parentElement).toHaveTextContent('RM 500.00')
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Anthony' }))
+    expect(screen.getByRole('heading', { name: 'Anthony' })).toBeVisible()
+    expect(screen.getByRole('tab', { name: /^Below deposit/ })).toHaveAttribute('aria-selected', 'true')
+    const mine = screen.getByRole('table', { name: 'Anthony orders below deposit' })
+    expect(within(mine).queryByRole('columnheader', { name: 'Sales person' })).toBeNull()
+    expect(salesRow(mine, 'SO-two')).toHaveTextContent('RM 500.00')
+    expect(within(mine).queryByText('SO-one')).toBeNull()
+  })
+
+  it("adds Below deposit beside Personal and Overriding on a salesperson's page", () => {
+    const data = fixture()
+    data.input.orders = [sale('one'), sale('two', 2_000, { paidAmount: 0 })]
+    renderBoard(data)
+    choose('Anthony')
+    const tabs = within(screen.getByRole('tablist', { name: 'Salesperson commission type' })).getAllByRole('tab')
+    expect(tabs.map(t => t.textContent)).toEqual(['Personal 2', 'Overriding 0', 'Below deposit 1'])
+    // The held bill stays in the personal ledger, where it earns nothing yet.
+    expect(salesRow(personalTable(), 'SO-two')).toHaveTextContent('Deposit pending')
+    fireEvent.click(tabs[2])
+    const table = screen.getByRole('table', { name: 'Anthony orders below deposit' })
+    expect(within(table).getAllByRole('row')).toHaveLength(3) // header, SO-two, subtotal
+    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 600.00')
+    expect(screen.queryByText('Columns', { exact: true })).toBeNull()
+    expect(screen.getByText(/Still to collect · 1 bill below deposit/).parentElement).toHaveTextContent('RM 600.00')
+    choose('← Sales people')
+    choose('Alex')
+    fireEvent.click(screen.getByRole('tab', { name: /^Below deposit/ }))
+    expect(screen.getByText('Every bill has met its deposit.')).toBeVisible()
+  })
+
+  it('shows Sales by venue as a tab in the same table, reading each fair rather than picking one', () => {
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
+      venues={[
+        { key: 'fair:f1', venueKey: 'ARENA', displayName: 'Arena', fairId: 'f1', event: '12–14 Aug', organizer: 'Fair Co', orders: 2, people: 1, total: 3_000, commissionable: 2_800 },
+        { key: 'place:HALL', venueKey: 'HALL', displayName: 'Hall', fairId: null, event: null, organizer: null, orders: 1, people: 1, total: 500, commissionable: 500 },
+      ]} />)
+    const tab = screen.getByRole('tab', { name: /^Sales by venue/ })
+    expect(tab).toHaveTextContent('2')
+    fireEvent.click(tab)
+    const table = screen.getByRole('table', { name: 'Sales by venue' })
+    expect(within(table).getAllByRole('columnheader').map(h => h.textContent))
+      .toEqual(['Venue', 'Event', 'Organizer', 'Salespeople', 'Bills', 'Sales value'])
+    const arena = salesRow(table, 'Arena')
+    expect(arena).toHaveTextContent('12–14 Aug')
+    expect(arena).toHaveTextContent('Fair Co')
+    expect(arena).toHaveTextContent('RM 3,000.00RM 200.00 no commission')
+    expect(within(arena).getByRole('link', { name: 'Arena' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?venue=ARENA')
+    expect(within(salesRow(table, 'Hall')).getAllByText('Not linked')).toHaveLength(2)
+    // Nothing to pick here any more: the fair calendar locates every bill.
+    expect(within(table).queryByRole('combobox')).toBeNull()
+    expect(within(table).queryByText(/same place as/)).toBeNull()
+    expect(salesRow(table, 'All venues')).toHaveTextContent('RM 3,500.00')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search venues' }), { target: { value: 'fair co' } })
+    expect(within(table).queryByText('Hall')).toBeNull()
+    expect(salesRow(table, 'Visible venues')).toHaveTextContent('RM 3,000.00')
   })
 
   it('opens on salesperson selection, then shows one personal row per order with a reconcilable total', () => {

@@ -56,6 +56,7 @@ export async function loadCommissionWorkbench(
       orderId: o.orderId, venue: o.venueGroupName ?? o.venue, location: o.location,
       organizer: fair?.organiserName ?? fair?.erpOrganiserText ?? o.organizer,
       eventName: fair?.startDate ? fairDays(fair.startDate, fair.endDate) : null,
+      fair: fair ? { id: fair.fairId, venueKey: fair.venueKey, venueName: fair.displayName } : null,
     }
   })
   return {

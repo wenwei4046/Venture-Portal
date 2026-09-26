@@ -60,9 +60,14 @@ describe('Revenue pages preserve source commission while reading monthly payroll
   it('shows the monthly adjustment in the calculation page without changing the source hero', async () => {
     const { from,rpc } = database()
     const { container } = render(await CommissionPeriodPage({ params:Promise.resolve({ sub:'fair',period:'2026-09-01' }) }))
-    fireEvent.click(screen.getByText('Payroll & source tools · saved run, costs, venues and upsales'))
+    fireEvent.click(screen.getByText('Payroll & source tools · saved run, costs and upsales'))
     expect(container.querySelector('.hero-walnut')).toHaveTextContent('RM 10,000.00')
     expect(container.querySelector('.hero-walnut')).not.toHaveTextContent('RM 12,500.00')
+    // The saved run's per-person table went on 2026-09-26: the live table at
+    // the top of the page carries every column of it, Group sales included.
+    expect(screen.queryByRole('columnheader', { name:'Source total' })).toBeNull()
+    expect(screen.queryByText('Waiting on a deposit')).toBeNull()
+    expect(screen.queryByRole('button', { name:/Sales by person/ })).toBeNull()
     expect(screen.getByRole('table', { name:'Monthly payroll adjustments by salesperson' })).toHaveTextContent('RM 12,500.00')
     expect(screen.getByText('DN from cancelled sale')).toBeVisible()
     expect(rpc).toHaveBeenCalledWith('revenue_payroll_adjustments',{p_sub_department_id:'sub-id',p_period:'2026-09-01',p_staff_id:null})
