@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ErpFeedChip from './ErpFeedChip'
 
-const { closeMonth, reopenMonth } = vi.hoisted(() => ({ closeMonth: vi.fn(), reopenMonth: vi.fn() }))
+const { closeMonth, reopenMonth, refresh } = vi.hoisted(() => ({ closeMonth: vi.fn(), reopenMonth: vi.fn(), refresh: vi.fn() }))
 vi.mock('../../../sync-actions', () => ({ closeErpMonth: closeMonth, reopenErpMonth: reopenMonth }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 const props = { period: '2026-08-01', subDepartmentId: 'fair', monthLabel: 'August 2026' }
 
@@ -30,6 +31,8 @@ describe('ErpFeedChip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close month' }))
     await waitFor(() => expect(closeMonth).toHaveBeenCalledWith('2026-08-01', 'fair', 'paid from the claim form'))
     expect(await screen.findByRole('status')).toHaveTextContent('August 2026 is closed to the ERP feed.')
+    // The chip's own state is the server's: the page re-renders with it closed.
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 
   it('cancel leaves the month live; Escape and a click outside put the menu away', () => {
@@ -69,5 +72,6 @@ describe('ErpFeedChip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close this month to the ERP feed…' }))
     fireEvent.click(screen.getByRole('button', { name: 'Close month' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Only HR or the Principal')
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

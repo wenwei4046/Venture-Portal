@@ -5,8 +5,9 @@ import type { DoubleClaimBill, DoubleClaimGroup } from '@/lib/commission/double-
 import { groupDoubleClaims } from '@/lib/commission/double-claims'
 import DoubleClaimPanel from './DoubleClaimPanel'
 
-const { dismiss, restore } = vi.hoisted(() => ({ dismiss: vi.fn(), restore: vi.fn() }))
+const { dismiss, restore, refresh } = vi.hoisted(() => ({ dismiss: vi.fn(), restore: vi.fn(), refresh: vi.fn() }))
 vi.mock('../../../double-claim-actions', () => ({ dismissDoubleClaim: dismiss, restoreDoubleClaim: restore }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }))
 
 const bill = (billRef: string, orderNo: string, periodMonth: string, extra: Partial<DoubleClaimBill> = {}): DoubleClaimBill => ({
@@ -55,6 +56,7 @@ describe('DoubleClaimPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Checked — separate sales' }))
     expect(window.confirm).toHaveBeenCalledWith('HC11366: these 2 bills are separate sales, not one bill claimed twice?')
     await waitFor(() => expect(dismiss).toHaveBeenCalledWith('fair', 'HC11366'))
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
   })
 
   it('an answered pair steps aside but can be asked again', async () => {

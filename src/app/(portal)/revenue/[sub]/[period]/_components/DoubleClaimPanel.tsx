@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { formatMoney } from '@/lib/utils'
 import type { CarriedMonth, DoubleClaimGroup } from '@/lib/commission/double-claims'
@@ -36,6 +37,7 @@ function list(words: string[]): string {
  * the second is a decision about months, not bills.
  */
 export default function DoubleClaimPanel({ period, subDepartmentId, basePath, groups, carried, unavailable }: Props) {
+  const router = useRouter()
   const [showChecked, setShowChecked] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -52,6 +54,7 @@ export default function DoubleClaimPanel({ period, subDepartmentId, basePath, gr
     startTransition(async () => {
       try {
         await action()
+        router.refresh()
       } catch (err) {
         const text = err instanceof Error ? err.message : 'That did not save'
         if (!text.includes('NEXT_REDIRECT')) setError(text)

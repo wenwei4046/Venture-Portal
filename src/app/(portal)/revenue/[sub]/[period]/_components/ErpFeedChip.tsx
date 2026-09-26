@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { closeErpMonth, reopenErpMonth } from '../../../sync-actions'
 
 export interface ErpFeedChipProps {
@@ -29,6 +30,7 @@ function when(iso: string): string {
  * a right-click alone is invisible on a phone.
  */
 export default function ErpFeedChip({ period, subDepartmentId, monthLabel, closed, held }: ErpFeedChipProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [note, setNote] = useState('')
@@ -64,6 +66,8 @@ export default function ErpFeedChip({ period, subDepartmentId, monthLabel, close
         setMessage(await action())
         setConfirming(false)
         setNote('')
+        // The chip, the list of months and the held counts are the server's.
+        router.refresh()
       } catch (err) {
         const text = err instanceof Error ? err.message : 'That did not save'
         if (!text.includes('NEXT_REDIRECT')) setError(text)
