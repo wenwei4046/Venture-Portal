@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
 import s from '../../_components/commission-workbench.module.css'
+import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
 import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
 
@@ -26,7 +27,10 @@ export interface BillRow {
   location: string | null
   brands: string[]
   categories: string[]
+  /** Everything on the bill — transport, disposal and every other charge included. */
   orderTotal: number
+  /** The part of the bill that earns commission (every shared part added back). */
+  commissionable: number
   paidAmount: number
   /** The deposit the gate still asks for; null once it is met. */
   depositShort: number | null
@@ -56,16 +60,17 @@ export interface BillRow {
 
 type Column =
   | 'salesperson' | 'date' | 'customer' | 'venue' | 'event' | 'organizer' | 'location' | 'brand'
-  | 'category' | 'sales' | 'paid' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+  | 'category' | 'sales' | 'commissionable' | 'paid' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 
 const COLUMNS: [Column, string][] = [
   ['salesperson', 'Salesperson'], ['date', 'Date'], ['customer', 'Customer'], ['venue', 'Venue'],
   ['event', 'Event'], ['organizer', 'Organizer'], ['location', 'Sales location'], ['brand', 'Brand'],
-  ['category', 'Category'], ['sales', 'Sales value'], ['paid', 'Paid'], ['margin', 'Margin'],
+  ['category', 'Category'], ['sales', 'Sales value'], ['commissionable', 'Commissionable value'],
+  ['paid', 'Paid'], ['margin', 'Margin'],
   ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
   ['incentive', 'Margin incentive'], ['open', 'Open Bill'],
 ]
-const NUMERIC: Column[] = ['sales', 'paid', 'margin', 'product', 'kpi', 'incentive']
+const NUMERIC: Column[] = ['sales', 'commissionable', 'paid', 'margin', 'product', 'kpi', 'incentive']
 const money = formatMoney
 const pct = (n: number | null | undefined) => n == null ? '—' : `${(n * 100).toFixed(1).replace('.0', '')}%`
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
@@ -122,6 +127,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   }, [rows, query, brand, sort, showExcluded])
 
   const subtotalSales = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.orderTotal, 0))
+  const subtotalCommissionable = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.commissionable, 0))
   const subtotalCommission = round2(visible.reduce((a, r) => a + (r.commission?.total ?? 0), 0))
 
   function salesperson(r: BillRow) {
@@ -157,6 +163,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
       case 'brand': return r.brands.join(', ') || 'Unclassified'
       case 'category': return r.categories.join(', ') || '—'
       case 'sales': return money(r.orderTotal)
+      case 'commissionable': return <>{money(r.commissionable)}<NoCommission amount={r.orderTotal - r.commissionable} /></>
       case 'paid': return <>{money(r.paidAmount)}{r.depositShort !== null && <small className="text-danger">needs {money(r.depositShort)}</small>}</>
       case 'margin': return r.marginPct === null
         ? <>—<small className={s.muted}>Cost incomplete</small></>
@@ -213,7 +220,8 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
         <table className={s.table} aria-label="Every bill of the month">
           <thead><tr>
             <th className={s.stickyFirst}>Sales order</th>
-            {columns.map(([key, label]) => <th key={key} className={NUMERIC.includes(key) ? s.numeric : undefined}>{label}</th>)}
+            {columns.map(([key, label]) => <th key={key} className={NUMERIC.includes(key) ? s.numeric : undefined}
+              title={key === 'sales' ? SALES_VALUE_HINT : key === 'commissionable' ? COMMISSIONABLE_HINT : undefined}>{label}</th>)}
             <th className={s.stickyTotal}>Total commission</th>
           </tr></thead>
           <tbody>{visible.map(r => <tr key={r.orderId} className={r.cancelled ? s.excluded : undefined}>
@@ -229,7 +237,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
           </tr>)}</tbody>
           <tfoot><tr>
             <td className={s.stickyFirst}>Visible subtotal</td>
-            <td colSpan={columns.length}>{visible.length} bills · {money(subtotalSales)} sales</td>
+            <td colSpan={columns.length}>{visible.length} bills · {money(subtotalSales)} sales · {money(subtotalCommissionable)} commissionable</td>
             <td className={s.stickyTotal}>{commissionNote ? '—' : money(subtotalCommission)}</td>
           </tr></tfoot>
         </table>

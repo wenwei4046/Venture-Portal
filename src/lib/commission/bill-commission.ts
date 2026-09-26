@@ -5,6 +5,8 @@ export interface BillCommission {
   status: CommissionOrderStatus
   brands: string[]
   categories: string[]
+  /** What on the bill earns commission, every shared part added back. */
+  commissionable: number
   product: number
   kpi: number
   marginIncentive: number
@@ -28,10 +30,11 @@ export function commissionByBill(rows: readonly CommissionOrderRow[], period: st
     if (row.upsale || row.periodMonth !== period) continue
     const bill = out.get(row.originalOrderId) ?? {
       status: row.status, brands: [], categories: [],
-      product: 0, kpi: 0, marginIncentive: 0, openBill: 0, total: 0,
+      commissionable: 0, product: 0, kpi: 0, marginIncentive: 0, openBill: 0, total: 0,
     }
     bill.brands = [...new Set([...bill.brands, ...row.brands])]
     bill.categories = [...new Set([...bill.categories, ...row.categories])]
+    bill.commissionable = round2(bill.commissionable + row.commissionableValue)
     bill.product = round2(bill.product + row.productCommission)
     bill.kpi = round2(bill.kpi + row.kpiBase + row.kpiBonus)
     bill.marginIncentive = round2(bill.marginIncentive + row.marginIncentive)

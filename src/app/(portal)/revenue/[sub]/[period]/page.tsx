@@ -25,7 +25,12 @@ import { loadOpenBillPaid } from '../../_lib/open-bill'
 import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
+import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
+import { loadDoubleClaims } from '../../_lib/double-claims'
+import { carriedFromUnpaidMonths, claimsInMonth } from '@/lib/commission/double-claims'
 import CommissionWorkbench from './_components/CommissionWorkbench'
+import ErpFeedChip from './_components/ErpFeedChip'
+import DoubleClaimPanel from './_components/DoubleClaimPanel'
 import workbenchStyles from './_components/commission-workbench.module.css'
 
 interface PageProps {
@@ -222,6 +227,10 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
 
   const unmatched = orders.filter(o => !o.staffId)
   const total = orders.reduce((a, o) => a + o.orderTotal, 0)
+  // The part of the same bills that earns: every line in a group the scheme
+  // pays on (the RPC's margin base is exactly that sum). Transport, disposal
+  // and other service lines are the difference (user 2026-09-26).
+  const commissionableTotal = Math.round(orders.reduce((a, o) => a + o.marginRevenue, 0) * 100) / 100
 
   // Sales by person and by venue, from the same rows, so the two sections can
   // never disagree about what the month contains.
@@ -323,6 +332,28 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     ? await loadCommissionWorkbench(supabase, subDept.id, period, monthOrders, run?.id)
     : null
 
+  // ── The feed, and bills claimed twice (2026-09-26) ─────────────────────
+  // Whether the ERP may still change this month, and whether any bill here is
+  // on another bill's paper or rides in from a month no run of ours paid.
+  const [feedMonth, doubleClaims, { data: paidRunRows }] = await Promise.all([
+    batchRow ? loadErpFeedMonth(supabase, subDept.id, period) : Promise.resolve(null),
+    batchRow ? loadDoubleClaims(supabase, subDept.id) : Promise.resolve(null),
+    supabase.from('comm_runs').select('period_month')
+      .eq('sub_department_id', subDept.id).in('status', ['applied', 'locked']),
+  ])
+  const paidMonths = new Set(((paidRunRows ?? []) as Array<{ period_month: string }>).map(r => r.period_month))
+  const carriedUnpaid = workbench ? carriedFromUnpaidMonths(workbench.input.orders, period, paidMonths) : []
+  const doubleClaimPanel = doubleClaims ? (
+    <DoubleClaimPanel
+      period={period}
+      subDepartmentId={subDept.id}
+      basePath={revenuePath(subDept.slug)}
+      groups={claimsInMonth(doubleClaims.groups, period)}
+      carried={carriedUnpaid}
+      unavailable={doubleClaims.unavailable}
+    />
+  ) : null
+
   const monthHeader = (
       <div className="page-head">
         <div>
@@ -354,18 +385,23 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               What this pays
             </Link>
           ) : null}
-          {batchRow?.source === 'erp_sync' ? (
-            <span className="font-mono text-[11px] uppercase tracking-[0.02em] text-ledger border border-hairline bg-surface px-3 py-2 rounded-control">
-              Live from ERP
-            </span>
-          ) : (
+          {feedMonth?.fed && (batchRow?.source === 'erp_sync' || feedMonth.closed) ? (
+            <ErpFeedChip
+              period={period}
+              subDepartmentId={subDept.id}
+              monthLabel={label(period)}
+              closed={feedMonth.closed}
+              held={feedMonth.held}
+            />
+          ) : null}
+          {batchRow?.source !== 'erp_sync' ? (
             <Link
               href={revenuePath(subDept.slug, period, 'import')}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
             >
               {batchRow ? 'Re-import' : 'Import sales orders'}
             </Link>
-          )}
+          ) : null}
         </div>
       </div>
   )
@@ -736,8 +772,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     <div className={workbenchStyles.page}>
       {workbench ? <CommissionWorkbench key={`${subDept.id}:${period}`} data={workbench}
         sub={subDept.slug} period={period} runStatus={run?.status ?? null}
-        monthOverview={monthHeader}
-        monthStats={{ salesValue: total, totalOrders: orders.length,
+        monthOverview={<>{monthHeader}{doubleClaimPanel}</>}
+        monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
         monthTools={monthTools}
         savedTotals={statements.map(row => ({ staffId: row.staff_id, total: Number(row.total_commission) }))} />
@@ -746,7 +782,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
             <p className="font-serif text-2xl text-ink mb-3">Nothing imported for this month.</p>
             <p className="font-serif italic text-muted text-sm max-w-lg mx-auto">Import the ERP sales-order export to begin.</p>
           </div>
-        ) : <>{monthMetrics}{monthTools}</>}</>}
+        ) : <>{doubleClaimPanel}{monthMetrics}{monthTools}</>}</>}
     </div>
   )
 }

@@ -192,6 +192,9 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       brands: paid?.brands.length ? paid.brands : o.brandCode ? [o.brandCode] : [],
       categories: paid?.categories ?? [],
       orderTotal: o.orderTotal,
+      // What the live calculation says earns; a bill it never saw (cancelled,
+      // or the calculation failed) falls back to the lines in paying groups.
+      commissionable: paid?.commissionable ?? o.marginRevenue,
       paidAmount: o.paidAmount,
       depositShort: o.depositRequired !== null && !o.depositMet ? o.depositRequired : null,
       marginPct: o.marginPct,

@@ -146,7 +146,7 @@
 .metricValue { margin-top: 7px; font-size: clamp(20px, 2.1vw, 28px); line-height: 1.2; letter-spacing: -0.035em; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .metricNote { margin-top: 6px; font-size: 11px; line-height: 1.5; }
 .monthSummary { container: month-summary / inline-size; margin-bottom: 20px; }
-.monthMetrics { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, .75fr) minmax(0, .85fr) minmax(0, 1.1fr) minmax(0, 1fr); gap: 9px; }
+.monthMetrics { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, .7fr) minmax(0, .8fr) minmax(0, 1.1fr) minmax(0, .95fr); gap: 9px; }
 .monthCard {
   display: flex;
   flex-direction: column;
