@@ -2,18 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatMoney } from '@/lib/utils'
-import { heightKey, valueKey } from '@/lib/catalogue/keys'
+import { valueKey } from '@/lib/catalogue/keys'
 import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, optionKeysOf, RIDER, skuKeyOf, type OptionKey } from '@/lib/catalogue/options'
 import { saveModelSettings } from '../../catalogue-actions'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
 import { useProductDraftGuard } from './ProductWorkspace'
-
-function priceBadge(s: CatalogueModel['skus'][number]) {
-  if (s.grid?.length) return <><span>Matrix price</span>{s.price !== null ? <span className="block">Fallback {formatMoney(s.price)}</span> : null}</>
-  if (s.price !== null) return formatMoney(s.price)
-  return 'No price'
-}
 
 /** Portal selections remain distinct from the ERP allowlist and from price editing. */
 export default function ModelEditor({ model, brands, options, onClose, onDirtyChange, onSavingChange, onSaved }: {
@@ -47,7 +40,6 @@ export default function ModelEditor({ model, brands, options, onClose, onDirtyCh
 
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
-  const optionPrice = useMemo(() => new Map(options.map(o => [`${o.pool}\u0000${valueKey(o.value)}`, o.price])), [options])
   const poolValues = useMemo(() => {
     const byPool = new Map<string, MaintenanceOption[]>()
     for (const o of options) if (o.active && !o.removed) byPool.set(o.pool, [...(byPool.get(o.pool) ?? []), o])
@@ -132,7 +124,7 @@ export default function ModelEditor({ model, brands, options, onClose, onDirtyCh
               <div className="modular-option-grid">
                 {model.skus.map(s => <label key={s.erpId} className="modular-option" data-selected={skuTicks[s.erpId] ?? false}>
                   <input type="checkbox" aria-label={`Offer SKU ${s.code}`} checked={skuTicks[s.erpId] ?? false} disabled={(s.removed || !s.active) && !skuTicks[s.erpId]} onChange={e => setSkuTicks(prev => ({ ...prev, [s.erpId]: e.target.checked }))} />
-                  <span><span className="font-medium">{s.optionLabel}</span><span className="block text-xs">{s.code}</span><span className="block text-xs">{priceBadge(s)}{s.removed ? ' · Removed' : !s.active ? ' · Inactive' : s.isNew ? ' · New' : ''}</span></span>
+                  <span><span className="font-medium">{s.optionLabel}</span><span className="block text-xs">{s.code}</span>{s.removed ? <span className="block text-xs">Removed</span> : !s.active ? <span className="block text-xs">Inactive</span> : s.isNew ? <span className="block text-xs">New</span> : null}</span>
                 </label>)}
               </div>
             )}
@@ -156,13 +148,10 @@ export default function ModelEditor({ model, brands, options, onClose, onDirtyCh
                   {chips.map(v => {
                     const on = isOn(o.key, v)
                     const stale = !allowed.has(valueKey(v))
-                    const surcharge = o.priced ? optionPrice.get(`${o.pool}\u0000${valueKey(v)}`) : undefined
                     return <label key={v} className="modular-option" data-selected={on}>
                       <input type="checkbox" aria-label={`${label}: ${v}`} checked={on} disabled={stale && !on} onChange={() => toggle(o.key, v)} />
                       <span><span className="font-medium">{v}</span>
                         {stale ? <span className="block text-xs">No longer allowed by ERP</span> : null}
-                        {o.key === 'sizes' && (model.category ?? '').toUpperCase() === 'SOFA' ? <span className="block text-xs">{liveSkus.filter(s => (s.grid ?? []).some(c => heightKey(c.height) === heightKey(v))).length} / {liveSkus.length} with matrix price</span> : null}
-                        {o.priced ? <span className="block text-xs">{surcharge === undefined || surcharge === null ? 'No surcharge entered' : `${surcharge < 0 ? '−' : '+'}${formatMoney(Math.abs(surcharge))}`}</span> : null}
                       </span>
                     </label>
                   })}

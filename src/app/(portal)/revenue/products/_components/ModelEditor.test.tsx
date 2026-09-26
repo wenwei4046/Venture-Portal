@@ -39,8 +39,6 @@ describe('Modular model workspace', () => {
     expect(screen.getByRole('checkbox', { name: 'Offer SKU 2376-gone' })).not.toBeChecked()
     expect(within(screen.getByRole('region', { name: 'Seat sizes (inches)' })).getAllByRole('checkbox').map(n => n.getAttribute('aria-label'))).toEqual(['Seat sizes (inches): 24', 'Seat sizes (inches): 27"', 'Seat sizes (inches): DEFAULT'])
     expect(screen.queryByRole('checkbox', { name: 'Leg height: 8"' })).not.toBeInTheDocument()
-    expect(screen.getByText('+RM 0.00')).toBeInTheDocument()
-    expect(screen.getByText('−RM 40.00')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Save model' }))
     await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith({ erpModelId: 'model-a', offered: true, enabled: { sizes: ['24', '27"', 'DEFAULT'], leg_heights: ['6"'], specials: ['No Side Panel'] }, gift: null, calcCategory: null, brandCode: null, skuOffered: { '1S': true, '2S': true, old: false, gone: false } }))
     expect(close).toHaveBeenCalledOnce()
@@ -138,14 +136,14 @@ describe('Modular model workspace', () => {
     expect(saveModelSettings).toHaveBeenCalledOnce()
   })
 
-  it('identifies matrix pricing separately from its flat fallback and keeps a zero flat price visible', () => {
+  it('keeps prices out of the option picker: no price, matrix or surcharge labels', () => {
     render(<ModelEditor model={model({ skus: [
       sku('1S', { grid: [{ height: '24', tier: 'PRICE_2', price: 1300 }], price: 450 }),
       sku('2S', { price: 0 }),
+      sku('3S'),
     ] })} brands={brands} options={options} onClose={vi.fn()} />)
-    expect(screen.getByText('Matrix price')).toBeInTheDocument()
-    expect(screen.getByText('Fallback RM 450.00')).toBeInTheDocument()
-    expect(screen.queryByText('RM 450.00', { exact: true })).not.toBeInTheDocument()
-    expect(screen.getByText('RM 0.00', { exact: true })).toBeInTheDocument()
+    for (const text of [/Matrix price/, /No price/, /Fallback/, /RM /, /with matrix price/, /No surcharge/]) {
+      expect(screen.queryByText(text)).not.toBeInTheDocument()
+    }
   })
 })
