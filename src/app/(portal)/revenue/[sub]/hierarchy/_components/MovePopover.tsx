@@ -12,6 +12,7 @@ import {
 import type { OrgNodeInput } from '@/lib/org-layout'
 import { headsLabel } from '@/lib/department-heads'
 import type { OrgPerson } from './OrgChart'
+import styles from './membership-controls.module.css'
 
 /** Where the popover hangs from — the card's Upline row, or the selection bar's button. */
 export interface PopAnchor {
@@ -175,7 +176,7 @@ export default function MovePopover({ mover, people, graph, anchor, directorName
       ref={ref}
       role="dialog"
       aria-label={`Move ${mover.name}`}
-      className="org-pop font-sans"
+      className={`org-pop font-sans ${styles.movePop}`}
       style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0, visibility: 'hidden' }}
     >
       <div className="ph">
@@ -241,5 +242,6 @@ export default function MovePopover({ mover, people, graph, anchor, directorName
   )
 
   if (typeof document === 'undefined') return null
-  return createPortal(node, document.body)
+  // Portalled outside the sheet: `sheet-theme` brings its palette along.
+  return createPortal(<div className="sheet-theme contents">{node}</div>, document.body)
 }

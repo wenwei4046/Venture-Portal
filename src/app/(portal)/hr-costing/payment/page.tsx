@@ -157,9 +157,9 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
     <div className="pay-board payment-statement">
       <div className="page-head">
         <div>
-          <div className="page-eyebrow">Monthly payment statement</div>
+          <div className="page-eyebrow"><em>I.</em> HR · Monthly payment statement</div>
           <h1 className="page-title">Payment</h1>
-          <p className="payment-period">
+          <p className="text-sm mt-3">
             {periodLabel} · {totals.people > 0 ? `${totals.staffCount} staff + ${totals.directorCount} directors` : 'no payroll yet'}
           </p>
         </div>

@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { setOpenBillRank } from '../../../../run-actions'
 
 export interface BoardOrder {
@@ -113,38 +114,35 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
 
   return (
     <div>
-      <section className="mb-8">
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Tile label="Salesperson-days" value={String(groups.length)} />
-          <Tile label="Bills tagged" value={String(tagged.length)} />
-          <Tile
-            label="Still a suggestion"
-            value={String(suggested.length)}
-            warn={suggested.length > 0}
-          />
-          <Tile
-            label="Needing a look"
-            value={String(groups.filter(g => g.unreviewed).length)}
-            warn={groups.some(g => g.unreviewed)}
-          />
-        </div>
-      </section>
+      {/* The picks that pay are the board's headline — the sheet's one walnut
+          card; the two review counts turn red only while work is left. */}
+      <StatCards label="Open Bill review">
+        <StatCard label="Salesperson-days" value={String(groups.length)} icon="calendar" />
+        <StatCard label="Bills tagged" value={String(tagged.length)} icon="tag" tone="primary" />
+        <StatCard
+          label="Still a suggestion"
+          value={String(suggested.length)}
+          icon="clock"
+          tone={suggested.length > 0 ? 'danger' : undefined}
+        />
+        <StatCard
+          label="Needing a look"
+          value={String(groups.filter(g => g.unreviewed).length)}
+          icon="inbox"
+          tone={groups.some(g => g.unreviewed) ? 'danger' : undefined}
+        />
+      </StatCards>
 
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <label className="flex items-center gap-2 font-serif text-sm text-graphite">
+      <div className="sheet-toolbar">
+        <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={onlyUnreviewed}
             onChange={e => setOnlyUnreviewed(e.target.checked)}
-            className="accent-current"
           />
           Only days still on a suggestion
         </label>
-        <select
-          value={person}
-          onChange={e => setPerson(e.target.value)}
-          className="px-3 py-1.5 bg-paper border border-hairline rounded-control text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
-        >
+        <select value={person} onChange={e => setPerson(e.target.value)}>
           <option value="">Everyone</option>
           {people.map(p => (
             <option key={p} value={p}>
@@ -152,26 +150,26 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
             </option>
           ))}
         </select>
-        <span className="font-mono text-[10.5px] uppercase tracking-wide text-muted">
+        <span className="ml-auto font-mono text-[10.5px] uppercase tracking-wide">
           {shown.length} of {groups.length} shown
         </span>
       </div>
 
       {error ? (
-        <p className="font-serif italic text-danger text-sm mb-4">{error}</p>
+        <p className="text-danger text-sm mb-4">{error}</p>
       ) : null}
 
       {readOnly ? (
-        <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
+        <p className="sheet-notice max-w-3xl">
           The run for this month has already paid. Reopen it before changing the picks — otherwise
           the statements would describe bills that no longer earned what they say they did.
         </p>
       ) : null}
 
       {shown.length === 0 ? (
-        <div className="py-14 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif text-xl text-ink mb-2">Nothing left to review.</p>
-          <p className="font-serif italic text-muted text-sm">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-md font-bold mb-1">Nothing left to review.</p>
+          <p className="text-sm">
             Every salesperson-day has a pick a human has confirmed.
           </p>
         </div>
@@ -179,93 +177,89 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
         <div className="space-y-6">
           {shown.map(g => (
             <div key={g.key}>
-              {/* .ledger-table draws its own surface, border and radius, so the
-                  group heading sits above it rather than inside a second card. */}
-              <div className="flex items-baseline justify-between mb-2">
+              {/* .ledger-table draws its own frame, so the group heading sits
+                  above it rather than inside a second card. */}
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <div>
-                  <span className="font-serif text-[15px] text-ink">{g.staffName}</span>
-                  <span className="font-mono text-[11px] text-graphite ml-3">{g.eventDate}</span>
+                  <span className="text-sm font-bold">{g.staffName}</span>
+                  <span className="font-mono text-[11px] ml-3">{g.eventDate}</span>
                 </div>
-                <span className="font-mono text-[10.5px] uppercase tracking-wide text-muted">
-                  {g.orders.length} bill{g.orders.length === 1 ? '' : 's'}
-                  {g.unreviewed ? ' · unreviewed' : ''}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10.5px] uppercase tracking-wide">
+                    {g.orders.length} bill{g.orders.length === 1 ? '' : 's'}
+                  </span>
+                  {g.unreviewed ? (
+                    <span className="chip alert">
+                      <span className="dot" />
+                      unreviewed
+                    </span>
+                  ) : null}
+                </div>
               </div>
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Order</th>
-                    <th className="right">Value</th>
-                    <th>Open Bill</th>
-                    <th className="right">Bonus rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {g.orders.map(o => (
-                    <tr key={o.id}>
-                      <td>
-                        <div className="font-mono text-xs text-ink">{o.orderNo}</div>
-                        {o.sequenceInDay !== null ? (
-                          <div className="font-mono text-[10.5px] text-muted mt-0.5">
-                            DOC #{o.sequenceInDay} THAT DAY
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="num">{formatMoney(o.orderTotal)}</td>
-                      <td>
-                        <div className="flex items-center gap-1.5">
-                          {([1, 2, 3] as const).map(r => (
-                            <button
-                              key={r}
-                              onClick={() => pick(o, o.rank === r ? null : r)}
-                              disabled={readOnly || isPending}
-                              className={[
-                                'font-mono text-[11px] px-2.5 py-1 rounded-control border transition-colors disabled:opacity-40',
-                                o.rank === r
-                                  ? 'bg-accent border-accent text-white'
-                                  : 'bg-paper border-hairline text-graphite hover:border-accent-border',
-                              ].join(' ')}
-                            >
-                              {r === 1 ? '1st' : r === 2 ? '2nd' : '3rd'}
-                            </button>
-                          ))}
-                          {o.rank !== null && o.autoSuggested ? (
-                            <span className="font-mono text-[10px] uppercase tracking-wide text-alert ml-1">
-                              suggested
-                            </span>
-                          ) : null}
-                          {busyOrder === o.id ? (
-                            <span className="font-serif italic text-muted text-xs ml-1">saving…</span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="num">
-                        {o.rank === null ? '—' : `+${Math.round((rates[o.rank] ?? 0) * 100)}%`}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th className="right">Value</th>
+                      <th>Open Bill</th>
+                      <th className="right">Bonus rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {g.orders.map(o => (
+                      <tr key={o.id}>
+                        <td>
+                          <div className="font-mono text-xs font-medium">{o.orderNo}</div>
+                          {o.sequenceInDay !== null ? (
+                            <div className="font-mono text-[10.5px] mt-0.5">
+                              DOC #{o.sequenceInDay} THAT DAY
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="num">{formatMoney(o.orderTotal)}</td>
+                        <td>
+                          <div className="flex items-center gap-1.5">
+                            {/* The held rank is the sheet's orange action (black
+                                lettering); an open rank is a plain white key. */}
+                            {([1, 2, 3] as const).map(r => (
+                              <button
+                                key={r}
+                                onClick={() => pick(o, o.rank === r ? null : r)}
+                                disabled={readOnly || isPending}
+                                className={[
+                                  'font-mono text-[11px] px-2.5 py-1 rounded-control border transition-colors disabled:opacity-40',
+                                  o.rank === r
+                                    ? 'bg-accent border-accent hover:bg-accent-hover'
+                                    : 'bg-surface border-hairline hover:border-accent',
+                                ].join(' ')}
+                              >
+                                {r === 1 ? '1st' : r === 2 ? '2nd' : '3rd'}
+                              </button>
+                            ))}
+                            {o.rank !== null && o.autoSuggested ? (
+                              <span className="chip alert ml-1">
+                                <span className="dot" />
+                                suggested
+                              </span>
+                            ) : null}
+                            {busyOrder === o.id ? (
+                              <span className="text-xs ml-1">saving…</span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="num">
+                          {o.rank === null ? '—' : `+${Math.round((rates[o.rank] ?? 0) * 100)}%`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-function Tile({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
-  return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{label}</div>
-      <div
-        className={[
-          'num tabular tracking-[-0.01em] text-xl',
-          warn ? 'text-danger' : 'text-num-ink',
-        ].join(' ')}
-      >
-        {value}
-      </div>
     </div>
   )
 }

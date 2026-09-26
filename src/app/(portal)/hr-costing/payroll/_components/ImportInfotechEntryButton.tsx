@@ -12,7 +12,7 @@ export default function ImportInfotechEntryButton({ period }: Props) {
   return (
     <Link
       href={`/hr-costing/payroll/${period}/import`}
-      className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+      className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
     >
       Import InfoTech
     </Link>

@@ -94,13 +94,14 @@ describe('Payment statement tabs and confirmation', () => {
 
   it('keeps reporting visible and shows changes only in Salary', () => {
     render(<PaymentBoard {...boardProps()} />)
-    expect(screen.getByRole('tab', { name: 'Salary' })).toHaveAttribute('aria-selected', 'true')
+    // A tab's name carries its row-count badge ("Salary 1"), like every sheet tab.
+    expect(screen.getByRole('tab', { name: /^Salary/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('heading', { name: 'Changes from July' })).toBeVisible()
-    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Statutory/ }))
     expect(screen.getByText('Total payroll cost')).toBeVisible()
     expect(screen.queryByRole('heading', { name: 'Changes from July' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Statutory PVs' })).toBeVisible()
-    fireEvent.keyDown(screen.getByRole('tab', { name: 'Statutory' }), { key: 'ArrowLeft' })
+    fireEvent.keyDown(screen.getByRole('tab', { name: /^Statutory/ }), { key: 'ArrowLeft' })
     expect(screen.getByRole('heading', { name: 'Changes from July' })).toBeVisible()
     expect(actions.create).not.toHaveBeenCalled()
     expect(actions.statutory).not.toHaveBeenCalled()
@@ -152,7 +153,7 @@ describe('Payment statement tabs and confirmation', () => {
 
   it('retains statutory choices by department and payment date when returning from review', async () => {
     render(<PaymentBoard {...boardProps(true)} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Statutory/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Manual generate' }))
     const panel = screen.getByRole('dialog', { name: 'PERKESO Manual generate' })
     expect(panel).toHaveAttribute('aria-modal', 'true')
@@ -185,7 +186,7 @@ describe('Payment statement tabs and confirmation', () => {
 
   it.each(['Close', 'Escape', 'backdrop'] as const)('dismisses the statutory window with %s and returns focus without generating', (method) => {
     render(<PaymentBoard {...boardProps()} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Statutory/ }))
     const trigger = screen.getByRole('button', { name: 'Manual generate' })
     trigger.focus()
     fireEvent.click(trigger)
@@ -205,7 +206,7 @@ describe('Payment statement tabs and confirmation', () => {
     let finish!: (result: { count: number; people: number; total: number }) => void
     actions.statutory.mockImplementation(() => new Promise(resolve => { finish = resolve }))
     render(<PaymentBoard {...boardProps()} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Statutory/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Manual generate' }))
     const dialog = screen.getByRole('dialog', { name: 'PERKESO Manual generate' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Select Amy' }))
@@ -230,7 +231,7 @@ describe('Payment statement tabs and confirmation', () => {
   it('leaves failed statutory generation reviewable and does not claim success', async () => {
     actions.statutory.mockRejectedValue(new Error('Selection changed. Refresh and review again.'))
     render(<PaymentBoard {...boardProps()} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Statutory' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Statutory/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Generate by Department' }))
     const panel = screen.getByRole('dialog', { name: 'PERKESO Generate by Department' })
     fireEvent.click(within(panel).getByRole('button', { name: 'Review PVs →' }))

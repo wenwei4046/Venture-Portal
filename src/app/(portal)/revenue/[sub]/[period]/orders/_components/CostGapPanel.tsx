@@ -86,14 +86,14 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
         <span className="count">{rows.length} CODES</span>
       </div>
 
-      <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+      <p className="text-sm mb-4 max-w-3xl">
         A bill&apos;s margin is refused the moment one of its commissionable lines has no price, so
         one unpriced product can blind dozens of bills. These are the codes this month has no price
         for — {blinding.length} of them touch the margin, worth {formatMoney(blindingValue)}.
         {pricedSince.length > 0 ? (
           <>
             {' '}
-            <span className="text-ink">{pricedSince.length} have been priced since</span> and reach the
+            <span className="font-bold">{pricedSince.length} have been priced since</span> and reach the
             month on Recost.
           </>
         ) : null}
@@ -106,26 +106,22 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
           type="button"
           onClick={recost}
           disabled={pending || runLocked}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-control transition-colors disabled:opacity-40"
+          className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
         >
           {pending ? 'Re-pricing…' : 'Recost the month from the Product List'}
         </button>
-        <Link href={PRODUCT_LIST_PATH} className="font-serif italic text-sm text-accent hover:underline">
+        <Link href={PRODUCT_LIST_PATH} className="text-sm text-accent hover:underline">
           Open the Product List →
         </Link>
         {runLocked ? (
-          <span className="font-serif italic text-muted text-xs">
+          <span className="text-xs">
             This month has paid — reopen the run before the costs behind it can move.
           </span>
         ) : null}
       </div>
 
-      {error ? <p className="font-serif italic text-danger text-sm mb-4">{error}</p> : null}
-      {done ? (
-        <p className="font-serif italic text-ink text-sm mb-4 border border-hairline rounded-card bg-surface px-4 py-3">
-          {done}
-        </p>
-      ) : null}
+      {error ? <p className="text-danger text-sm mb-4">{error}</p> : null}
+      {done ? <p className="sheet-notice">{done}</p> : null}
 
       <div className="overflow-x-auto">
         <table className="ledger-table">
@@ -143,22 +139,27 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
           <tbody>
             {shown.map(r => (
               <tr key={r.productCode} className={r.commissionable ? undefined : 'opacity-55'}>
-                <td className="font-mono text-xs text-ink">{r.productCode}</td>
-                <td className="m-hide font-serif text-[13px] text-graphite">{r.productName ?? '—'}</td>
-                <td className="m-hide font-mono text-[11px] text-graphite">
+                <td className="font-mono text-xs font-medium">{r.productCode}</td>
+                <td className="m-hide">{r.productName ?? '—'}</td>
+                <td className="m-hide font-mono text-[11px]">
                   {r.itemGroup ?? '—'}
-                  {!r.commissionable ? <div className="text-muted text-[10px]">earns nothing</div> : null}
+                  {!r.commissionable ? <div className="font-sans text-[11px] mt-0.5">earns nothing</div> : null}
                 </td>
                 <td className="num m-hide">{r.lines}</td>
                 <td className="num m-hide">{r.orders}</td>
                 <td className="num">{formatMoney(r.amount)}</td>
                 <td>
+                  {/* A reason is a word on a wash: green once the Product List has
+                      a price Recost will reach, amber while it waits on one, red
+                      when the ERP's own SKU master has never heard of the code. */}
                   {r.hasPrice && r.reason !== 'no_height' ? (
-                    <span className="font-serif italic text-ledger text-xs">priced since — Recost reaches it</span>
+                    <span className="chip ledger">
+                      <span className="dot" />
+                      priced since — Recost reaches it
+                    </span>
                   ) : (
-                    <span
-                      className={`font-serif italic text-xs ${r.inSkuMaster ? 'text-alert' : 'text-danger'}`}
-                    >
+                    <span className={`chip ${r.inSkuMaster ? 'alert' : 'danger'}`}>
+                      <span className="dot" />
                       {WHY[r.reason] ?? r.reason}
                     </span>
                   )}
@@ -173,13 +174,13 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="font-serif italic text-sm text-accent hover:underline mt-3"
+          className="text-sm text-accent hover:underline mt-3"
         >
           Show the other {rows.length - shown.length}
         </button>
       ) : null}
 
-      <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+      <p className="text-xs mt-3 max-w-3xl">
         Greyed rows are lines outside a commissionable group — transport, disposal and the like.
         Their cost never reached a margin, so they cost the month nothing; they are listed because a
         code the portal cannot price is worth knowing about either way.

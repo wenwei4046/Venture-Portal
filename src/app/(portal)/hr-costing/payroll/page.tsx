@@ -56,25 +56,30 @@ export default async function PayrollLandingPage() {
       </div>
 
       {periods.length > 0 && (
-        <section className="mb-12">
+        <section className="mb-10">
           <div className="sect-head">
             <h2>Months with data</h2>
             <span className="rule" aria-hidden />
             <span className="count">{periods.length} PERIOD{periods.length === 1 ? '' : 'S'}</span>
           </div>
-          <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-            {periods.map(([period, info]) => (
+          {/* Each month is one link, the whole row its target — framed like the
+              sheet's tables, with the peach hover of a table row. */}
+          <div className="table-frame divide-y divide-hairline">
+            {periods.map(([period, info], i) => (
               <Link
                 key={period}
                 href={`/hr-costing/payroll/${period}`}
-                className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
+                className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-[14px] py-3 hover:bg-accent-bg transition-colors${i % 2 === 1 ? ' bg-surface-2' : ''}`}
               >
-                <span className="font-serif text-md text-ink">{formatPeriodLabel(period)}</span>
-                <span className="font-mono text-xs text-muted">
+                <span className="text-sm font-medium">{formatPeriodLabel(period)}</span>
+                <span className="flex items-center gap-2 text-xs">
                   {info.count} row{info.count === 1 ? '' : 's'}
-                  {' · '}
-                  {info.drafts > 0 ? `${info.drafts} draft` : 'all submitted'}
-                  {' →'}
+                  {info.drafts > 0 ? (
+                    <span className="chip alert"><span className="dot" />{info.drafts} draft</span>
+                  ) : (
+                    <span className="chip ledger"><span className="dot" />all submitted</span>
+                  )}
+                  <span aria-hidden>→</span>
                 </span>
               </Link>
             ))}
@@ -82,10 +87,11 @@ export default async function PayrollLandingPage() {
         </section>
       )}
 
-      <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-        <p className="font-serif italic text-accent text-sm mb-2">{formattedPeriod}</p>
-        <p className="font-serif text-2xl text-ink mb-3">No payroll for this month yet.</p>
-        <p className="font-serif italic text-muted text-sm mb-8 max-w-md mx-auto">
+      <div className="border border-hairline rounded-card bg-surface-2 px-6 py-12 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] mb-2">{formattedPeriod}</p>
+        {/* `.sheet-heading` owns its margin, so the air sits on its neighbours. */}
+        <h2 className="sheet-heading">No payroll for this month yet.</h2>
+        <p className="text-sm mt-2 mb-6 max-w-md mx-auto">
           Create the period to start from draft rows, or import directly from your InfoTech
           Excel export. Use the period picker above to work on a different month.
         </p>

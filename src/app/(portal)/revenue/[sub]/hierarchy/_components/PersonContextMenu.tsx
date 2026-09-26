@@ -211,7 +211,8 @@ export default function PersonContextMenu({ person, currentDepartment, destinati
     }
   }, [onClose])
 
-  return createPortal(<div ref={boundary} className={styles.layer} onContextMenu={event => event.preventDefault()}>
+  // Portalled outside the sheet: `sheet-theme` brings its palette along.
+  return createPortal(<div ref={boundary} className={`${styles.layer} sheet-theme`} onContextMenu={event => event.preventDefault()}>
     {!startAtDepartments ? <MenuPanel label={`Actions for ${person.name}`} anchor={anchor} focus
       hidden={(!!departmentMenu && departmentsStacked) || (changingTitle && titlesStacked) || (!!removalMenu && removalStacked)}
       onRowHover={collapseBranches} onBack={close} onClose={close}>

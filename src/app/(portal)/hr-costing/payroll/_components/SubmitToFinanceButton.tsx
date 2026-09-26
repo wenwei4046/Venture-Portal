@@ -38,12 +38,13 @@ export default function SubmitToFinanceButton({ period, totalAmount }: Props) {
       <div className="flex flex-col items-end gap-1">
         <button
           disabled
-          className="bg-accent text-white font-serif italic text-sm px-4 py-2 rounded-md opacity-40 cursor-not-allowed"
+          className="bg-accent text-sm px-4 py-2 rounded-control opacity-40 cursor-not-allowed"
           title="Save your edits first"
         >
           Submit to Finance
         </button>
-        <span className="text-xs font-serif italic text-alert">
+        <span className="chip alert">
+          <span className="dot" />
           {dirtyCount} unsaved row{dirtyCount > 1 ? 's' : ''} — save first
         </span>
       </div>
@@ -53,26 +54,27 @@ export default function SubmitToFinanceButton({ period, totalAmount }: Props) {
   if (confirming) {
     return (
       <div className="flex flex-col items-end gap-2">
-        <div className="flex items-center gap-3 bg-surface border border-accent-border rounded-md px-4 py-2">
-          <span className="font-serif italic text-graphite text-sm">
-            Submit payroll · Total CTC RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} to Finance? <em>This is the amount Finance funds (gross + employer statutory). Figures become visible to Finance immediately — money moves later.</em>
+        <div className="flex items-center gap-3 bg-surface border border-accent rounded-lg px-4 py-2.5 max-w-xl">
+          <span className="text-sm">
+            Submit payroll · Total CTC <span className="font-mono tabular-nums font-medium">RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span> to Finance?
+            <span className="block text-xs mt-1">This is the amount Finance funds (gross + employer statutory). Figures become visible to Finance immediately — money moves later.</span>
           </span>
           <button
             onClick={handleConfirm}
             disabled={isPending}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
+            className="bg-accent hover:bg-accent-hover text-sm px-3 py-1.5 rounded-control transition-colors disabled:opacity-50 shrink-0"
           >
             {isPending ? 'Submitting...' : 'Confirm'}
           </button>
           <button
             onClick={() => setConfirming(false)}
             disabled={isPending}
-            className="text-xs font-sans text-muted hover:text-ink"
+            className="text-xs hover:underline underline-offset-2 shrink-0"
           >
             Cancel
           </button>
         </div>
-        {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+        {error && <span className="text-sm text-danger">{error}</span>}
       </div>
     )
   }
@@ -81,11 +83,11 @@ export default function SubmitToFinanceButton({ period, totalAmount }: Props) {
     <div className="flex flex-col items-end gap-2">
       <button
         onClick={() => setConfirming(true)}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
       >
         Submit to Finance
       </button>
-      {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+      {error && <span className="text-sm text-danger">{error}</span>}
     </div>
   )
 }

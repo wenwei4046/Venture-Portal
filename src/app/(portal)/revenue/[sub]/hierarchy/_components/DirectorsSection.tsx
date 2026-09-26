@@ -4,6 +4,9 @@ import { Choice, Hidden, Hint, RowForm, SaveButton, SectionHead } from '@/compon
 import { addDirector, removeDirector } from '../../../hierarchy-actions'
 import type { DirectorRow } from '../../../_components/config/types'
 
+/** A caption or a title in the summary cards' small caps. */
+const CAPTION = 'text-[10px] font-medium uppercase tracking-[0.06em]'
+
 /**
  * Who the sub-department REPORTS TO — its Revenue Director(s) (user,
  * 2026-09-11).
@@ -47,19 +50,21 @@ export default function DirectorsSection({
         set under People › Roles.
       </Hint>
 
-      <div className="border border-hairline rounded-md bg-surface p-4">
+      {/* The sheet's toolbar panel: the directors as white pills on its first
+          line, the form that adds one on the next. */}
+      <div className="sheet-toolbar">
         {directors.length === 0 ? (
-          <p className="font-serif italic text-sm text-muted mb-3">Nobody directs {subDeptName} yet.</p>
+          <p className="w-full text-sm">Nobody directs {subDeptName} yet.</p>
         ) : (
-          <ul className="flex flex-wrap gap-2 mb-3" aria-label={`Directors of ${subDeptName}`}>
+          <ul className="flex w-full flex-wrap gap-2" aria-label={`Directors of ${subDeptName}`}>
             {directors.map(d => (
               <li
                 key={d.staff_id}
-                className="inline-flex items-center gap-3 border border-hairline rounded-control bg-paper px-3 py-1.5 text-sm"
+                className="inline-flex items-center gap-3 border border-hairline rounded-control bg-surface py-1.5 pl-3 pr-1.5 text-xs"
               >
-                <span className="text-ink">{d.employee_name}</span>
+                <span className="font-medium">{d.employee_name}</span>
                 {d.title_name ? (
-                  <span className="font-mono text-[10px] uppercase tracking-wide text-muted">{d.title_name}</span>
+                  <span className={CAPTION}>{d.title_name}</span>
                 ) : null}
                 <RowForm
                   action={removeDirector}
@@ -83,12 +88,11 @@ export default function DirectorsSection({
             result, and a refusal here is a returned note, not a throw. */}
         <RowForm action={addDirector} onDone={onDone}>
           {({ pending }) => (
-            <div className="flex flex-wrap items-end gap-3">
+            // The Add button stands as tall as the toolbar's select.
+            <div className="flex flex-1 flex-wrap items-end gap-3 [&_button]:min-h-[36px]">
               <Hidden name="sub_department_id" value={subDepartmentId} />
               <label className="flex flex-col gap-1">
-                <span className="font-mono text-mono-xs text-muted uppercase tracking-wide">
-                  {subDeptName} reports to
-                </span>
+                <span className={CAPTION}>{subDeptName} reports to</span>
                 <Choice
                   name="staff_id"
                   defaultValue=""
@@ -107,7 +111,7 @@ export default function DirectorsSection({
               </label>
               <SaveButton pending={pending} label="Add" />
               {candidates.length === 0 ? (
-                <span className="font-serif italic text-xs text-muted">
+                <span className="text-xs">
                   {directors.length > 0
                     ? 'Every head of the department already directs it.'
                     : 'Nobody in the department holds a title that heads it — tick "Heads the department" on the title under People › Roles.'}

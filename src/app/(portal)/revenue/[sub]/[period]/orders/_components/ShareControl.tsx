@@ -90,11 +90,11 @@ export default function ShareControl({
   return (
     <div className="mt-1">
       {shares.length > 0 ? (
-        <div className="font-mono text-[10.5px] text-graphite leading-snug">
-          <div className="text-muted">{ownerName} {pctLabel(1 - given)}</div>
+        <div className="font-mono text-[10.5px] leading-snug">
+          <div>{ownerName} {pctLabel(1 - given)}</div>
           {shares.map(s => (
             <div key={s.staffId} className="flex items-center gap-1">
-              <span className="text-accent">+ {s.name} {pctLabel(s.pct)}</span>
+              <span className="font-bold">+ {s.name} {pctLabel(s.pct)}</span>
               {disabled ? null : (
                 <button
                   type="button"
@@ -122,7 +122,7 @@ export default function ShareControl({
             value={staffId}
             onChange={e => setStaffId(e.target.value)}
             aria-label="Share with"
-            className="px-1.5 py-1 bg-paper border border-hairline rounded text-xs text-ink max-w-[10rem]"
+            className="px-1.5 py-1 bg-surface border border-hairline rounded text-xs text-ink max-w-[10rem]"
           >
             <option value="">Share with…</option>
             {offered.map(m => (
@@ -139,14 +139,14 @@ export default function ShareControl({
             value={pct}
             onChange={e => setPct(e.target.value)}
             aria-label="Their part, percent"
-            className="w-14 px-1.5 py-1 bg-paper border border-hairline rounded text-xs text-ink text-right"
+            className="w-14 px-1.5 py-1 bg-surface border border-hairline rounded text-xs text-ink text-right"
           />
-          <span className="text-xs text-muted">%</span>
+          <span className="text-xs">%</span>
           <button
             type="button"
             onClick={save}
             disabled={isPending}
-            className="font-mono text-[10px] px-2 py-1 rounded-control bg-accent text-white disabled:opacity-40"
+            className="font-mono text-[10px] px-2 py-1 rounded-control bg-accent hover:bg-accent-hover transition-colors disabled:opacity-40"
           >
             {isPending ? '…' : 'Share'}
           </button>
@@ -156,7 +156,7 @@ export default function ShareControl({
               setOpen(false)
               setError(null)
             }}
-            className="font-mono text-[10px] px-1.5 py-1 text-muted hover:text-ink"
+            className="font-mono text-[10px] px-1.5 py-1 hover:underline"
           >
             Cancel
           </button>
@@ -175,7 +175,7 @@ export default function ShareControl({
           Share…
         </button>
       )}
-      {error ? <div className="font-serif italic text-danger text-[11px] mt-0.5">{error}</div> : null}
+      {error ? <div className="text-danger text-[11px] mt-0.5">{error}</div> : null}
     </div>
   )
 }

@@ -34,6 +34,7 @@ import {
 } from '../actions'
 import DashboardViews from './DashboardViews'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function MoneyInput({
       key={String(value ?? '')}
       defaultValue={value ?? ''}
       placeholder={placeholder}
-      className={`border border-hairline rounded bg-surface px-2 py-1 font-mono text-[12.5px] text-right text-ink tabular focus:outline-none focus:border-accent ${className}`}
+      className={`border border-hairline rounded-control bg-surface px-2 py-1 font-mono text-[12px] text-right text-ink tabular focus:outline-none focus:border-accent ${className}`}
       onBlur={(e) => {
         const v = e.target.value === '' ? null : Number(e.target.value)
         onCommit(v != null && Number.isNaN(v) ? null : v)
@@ -110,6 +111,20 @@ export function TopUpHint({ d }: { d: Pick<DirectorMonthResult, 'salKpiGB' | 'al
   )
 }
 
+/** The cell of a month's band row inside a ledger table (All Months views):
+ *  the header band's tone — chrome at half strength lands on the sheet's
+ *  235 231 224 band — with the label in the band's small caps. Painted on
+ *  the cell, not the row, so the zebra and the hover wash cannot cover it. */
+export const MONTH_BAND = 'bg-chrome/50 text-[10px] font-semibold uppercase tracking-[0.06em]'
+
+/** A month pill — the workbench's filter chip: hairline on white, the pick
+ *  in a peach wash with an orange edge. Shared by the director pills too. */
+export function pillClass(active: boolean): string {
+  return `rounded-full border px-3 py-1.5 text-xs transition-colors ${
+    active ? 'border-accent bg-accent-bg font-semibold' : 'border-hairline bg-surface hover:border-accent'
+  }`
+}
+
 export function MonthTabs({
   months,
   value,
@@ -127,12 +142,9 @@ export function MonthTabs({
         <button
           key={m.id}
           type="button"
+          aria-pressed={value === m.id}
           onClick={() => onChange(m.id)}
-          className={`px-3.5 py-1 rounded-full border text-xs font-medium transition-colors ${
-            value === m.id
-              ? 'border-accent text-accent bg-surface'
-              : 'border-hairline text-graphite hover:text-ink bg-surface'
-          }`}
+          className={pillClass(value === m.id)}
         >
           {m.name}
         </button>
@@ -140,12 +152,9 @@ export function MonthTabs({
       {allowAll && (
         <button
           type="button"
+          aria-pressed={value === '__all__'}
           onClick={() => onChange('__all__')}
-          className={`px-3.5 py-1 rounded-full border border-dashed text-[11px] font-medium transition-colors ${
-            value === '__all__'
-              ? 'border-accent text-accent bg-surface'
-              : 'border-hairline text-graphite hover:text-ink bg-surface'
-          }`}
+          className={`${pillClass(value === '__all__')} border-dashed`}
         >
           All Months
         </button>
@@ -491,39 +500,41 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
 
   return (
     <div>
-      {/* Main tabs + manual save */}
-      <div className="flex flex-wrap gap-2 mb-6 items-center">
-        {(
-          [
-            ['calc', 'Calculator'],
-            ['dash', 'Dashboard'],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setMainTab(key)}
-            className={`px-5 py-2 rounded-md border text-sm font-medium transition-colors ${
-              mainTab === key
-                ? 'border-accent text-accent bg-surface'
-                : 'border-hairline text-graphite hover:text-ink bg-surface'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-        <div className="ml-auto flex items-center gap-3">
+      {/* Main tabs + manual save. The rail is the month's tab rail; the save
+          cluster rides at its right end (outside the tablist, which may hold
+          only tabs) and wraps under it on a phone. Its mb-5 matches the
+          rail's own 20px so the two centre on each other. */}
+      <div className="flex flex-wrap items-center gap-x-4">
+        <div className="sheet-tabs flex-auto" role="tablist" aria-label="Director Pool views">
+          {(
+            [
+              ['calc', 'Calculator'],
+              ['dash', 'Dashboard'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={mainTab === key}
+              onClick={() => setMainTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto mb-5 flex items-center gap-3">
           {pendingCount > 0 && (
-            <span className="font-mono text-xs text-alert">● {pendingCount} 项未保存</span>
+            <span className="chip alert"><span className="dot" />{pendingCount} 项未保存</span>
           )}
           <button
             type="button"
             onClick={saveAll}
             disabled={pendingCount === 0 || saving}
-            className={`px-5 py-2 rounded-md border text-sm font-medium transition-colors ${
+            className={`px-5 py-2 rounded-control border text-sm font-medium transition-colors ${
               pendingCount > 0 && !saving
-                ? 'border-accent text-paper bg-accent hover:opacity-90'
-                : 'border-hairline text-graphite bg-surface opacity-50 cursor-not-allowed'
+                ? 'border-accent bg-accent hover:bg-accent-hover hover:border-accent-hover'
+                : 'border-hairline bg-surface opacity-50 cursor-not-allowed'
             }`}
           >
             {saving ? 'Saving…' : '💾 Save'}
@@ -615,12 +626,14 @@ interface CalcProps {
   ) => void
 }
 
+/** The portal's section head (title · rule · mono counter), spaced for a
+ *  stack of numbered sections. */
 function SectHead({ n: counter, title }: { n: string; title: string }) {
   return (
-    <div className="flex items-center gap-3 mb-4 mt-10 first:mt-0">
-      <h2 className="font-serif italic text-xl text-ink whitespace-nowrap">{title}</h2>
-      <div className="flex-1 border-t border-hairline" />
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-graphite">{counter}</span>
+    <div className="sect-head mt-10 first:mt-0">
+      <h2>{title}</h2>
+      <span className="rule" aria-hidden />
+      <span className="count">{counter}</span>
     </div>
   )
 }
@@ -672,11 +685,11 @@ function CalculatorTab(p: CalcProps) {
             ] as const
           ).map(([label, value, commit]) => (
             <div key={label}>
-              <div className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-graphite mb-1">{label}</div>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.06em]">{label}</div>
               <MoneyInput value={value} onCommit={(v) => commit(v ?? 0)} className="w-full py-1.5" />
             </div>
           ))}
-          <p className="font-serif italic text-xs text-graphite leading-relaxed border-l-2 border-accent pl-3">
+          <p className="sheet-notice">
             Balance × {gb}% = Gross Balance (Director pay)
             <br />
             Balance × {r2(100 - gb)}% = Billing Invoice (statutory by user)
@@ -695,7 +708,7 @@ function CalculatorTab(p: CalcProps) {
               {p.directors.map((d) => (
                 <tr key={d.id}>
                   <td className="w-8"><Dot color={d.color} /></td>
-                  <td className="font-mono text-sm text-ink">{d.code}</td>
+                  <td className="font-medium">{d.code}</td>
                   <td className="num">
                     <MoneyInput value={d.weight} onCommit={(v) => p.onWeight(d.id, v ?? 0)} className="w-24" />
                   </td>
@@ -703,9 +716,11 @@ function CalculatorTab(p: CalcProps) {
               ))}
             </tbody>
           </table>
-          <p className="font-mono text-xs mt-2 text-graphite">
+          {/* Whether the weights add up is a state — a word on a wash. */}
+          <p className="text-xs mt-2">
             Total Weight ={' '}
-            <span className={Math.abs(p.totalWeight - p.weightTarget) < 0.1 ? 'text-ledger' : 'text-danger'}>
+            <span className={`chip ${Math.abs(p.totalWeight - p.weightTarget) < 0.1 ? 'ledger' : 'danger'}`}>
+              <span className="dot" />
               {p.totalWeight.toFixed(2)}%
             </span>{' '}
             (target {p.weightTarget}% — 平均每人 100%)
@@ -715,7 +730,7 @@ function CalculatorTab(p: CalcProps) {
 
       {/* ── Monthly input ── */}
       <SectHead n="NO. 02" title="Monthly Input" />
-      <p className="font-serif italic text-xs text-graphite mb-3">
+      <p className="sheet-subtitle mb-3">
         每个公司填写各自的 Salary / KPI / Allowance（RM）。Salary + KPI 需扣 Statutory（Billing Invoice
         自己填）；Allowance 不扣 Statutory 但可抵消 Advance。
       </p>
@@ -728,7 +743,7 @@ function CalculatorTab(p: CalcProps) {
         <button
           type="button"
           onClick={p.onAddMonth}
-          className="px-3.5 py-1 rounded-full border border-dashed border-hairline text-xs text-graphite hover:text-accent hover:border-accent transition-colors"
+          className="rounded-full border border-dashed border-hairline bg-surface px-3 py-1.5 text-xs hover:border-accent transition-colors"
         >
           ＋ Add Month
         </button>
@@ -737,14 +752,14 @@ function CalculatorTab(p: CalcProps) {
             <button
               type="button"
               onClick={() => p.onClearMonth(m.id)}
-              className="px-3 py-1 rounded border border-hairline text-xs text-graphite hover:text-alert hover:border-alert transition-colors"
+              className="bg-surface hover:bg-alert-bg border border-hairline hover:border-alert text-xs px-3 py-1.5 rounded-control transition-colors"
             >
               🧹 Clear This Month
             </button>
             <button
               type="button"
               onClick={() => p.onDeleteMonth(m.id)}
-              className="px-3 py-1 rounded border border-hairline text-xs text-graphite hover:text-danger hover:border-danger transition-colors"
+              className="bg-surface hover:bg-danger-bg border border-hairline hover:border-danger hover:text-danger text-xs px-3 py-1.5 rounded-control transition-colors"
             >
               Remove This Month
             </button>
@@ -753,25 +768,28 @@ function CalculatorTab(p: CalcProps) {
       </div>
 
       {!m ? (
-        <div className="py-10 text-center border border-hairline rounded-md bg-surface">
-          <p className="font-serif italic text-muted">点击 ＋ Add Month 开始添加月份</p>
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">点击 ＋ Add Month 开始添加月份</p>
         </div>
       ) : (
         <div>
-          <div className="flex flex-wrap items-center gap-4 mb-3">
-            <label className="flex items-center gap-2 font-mono text-xs text-graphite">
+          {/* The picked month's own settings — the filter panel above its
+              table. The flags are the workbench's chip toggles: a pick is a
+              wash, Full Payout's amber because it changes how the month pays. */}
+          <div className="sheet-toolbar">
+            <label className="flex items-center gap-2 text-xs">
               Month:
               <input
                 type="month"
                 key={m.month}
                 defaultValue={m.month.slice(0, 7)}
                 onBlur={(e) => e.target.value && p.onMonthDate(m.id, `${e.target.value}-01`)}
-                className="border border-hairline rounded bg-surface px-2 py-1 text-xs text-ink focus:outline-none focus:border-accent"
+                className="border border-hairline rounded-control bg-surface px-2 py-1 text-xs text-ink focus:outline-none focus:border-accent"
               />
             </label>
             <label
-              className={`flex items-center gap-2 px-3 py-1.5 rounded border text-xs font-medium cursor-pointer select-none ${
-                m.fullPayout ? 'border-alert text-alert' : 'border-hairline text-graphite'
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs cursor-pointer select-none transition-colors ${
+                m.fullPayout ? 'border-alert bg-alert-bg font-semibold' : 'border-hairline bg-surface hover:border-accent'
               }`}
             >
               <input
@@ -782,12 +800,12 @@ function CalculatorTab(p: CalcProps) {
               💯 Full Payout Month（100% — 不算 75/25 Billing）
             </label>
             <label
-              className={`flex items-center gap-2 px-3 py-1.5 rounded border text-xs font-medium select-none ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs select-none transition-colors ${
                 m.fullPayout
-                  ? 'border-hairline text-graphite opacity-40 pointer-events-none'
+                  ? 'border-hairline bg-surface opacity-40 pointer-events-none'
                   : m.includeBilling
-                    ? 'border-accent text-accent cursor-pointer'
-                    : 'border-hairline text-graphite cursor-pointer'
+                    ? 'border-accent bg-accent-bg font-semibold cursor-pointer'
+                    : 'border-hairline bg-surface hover:border-accent cursor-pointer'
               }`}
             >
               <input
@@ -798,7 +816,7 @@ function CalculatorTab(p: CalcProps) {
               />
               📥 Include Billing（25% Bill Invoice 算进 Total Pay）
             </label>
-            <span className="font-serif italic text-xs text-graphite">
+            <span className="text-xs">
               {m.fullPayout
                 ? 'This month: Balance (95%) fully paid out. No Billing Invoice.'
                 : m.includeBilling
@@ -826,7 +844,7 @@ function CalculatorTab(p: CalcProps) {
                   }
                   return (
                     <LedgerRow key={c.id}>
-                      <td className="font-serif text-sm text-ink whitespace-nowrap">{c.name}</td>
+                      <td className="font-medium whitespace-nowrap">{c.name}</td>
                       {(['salary', 'kpi', 'allowance'] as const).map((f) => (
                         <td key={f} className="num m-hide" data-label={FIELD_LABEL[f]}>
                           <MoneyInput
@@ -840,15 +858,17 @@ function CalculatorTab(p: CalcProps) {
                     </LedgerRow>
                   )
                 })}
-                <tr className="border-t border-hairline">
-                  <td className="font-serif italic text-ink">Total</td>
-                  <td className="num font-medium m-hide">{fmt(totSal)}</td>
-                  <td className="num font-medium m-hide">{fmt(totKpi)}</td>
-                  <td className="num font-medium m-hide">{fmt(totAllow)}</td>
-                  <td className="num font-medium text-num-ink">{fmt(r2(totSal + totKpi + totAllow))}</td>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Total</td>
+                  <td className="num m-hide">{fmt(totSal)}</td>
+                  <td className="num m-hide">{fmt(totKpi)}</td>
+                  <td className="num m-hide">{fmt(totAllow)}</td>
+                  <td className="num font-bold">{fmt(r2(totSal + totKpi + totAllow))}</td>
                   <td className="lt-toggle" />
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -856,221 +876,237 @@ function CalculatorTab(p: CalcProps) {
 
       {p.results.length > 0 && (
         <>
-          {/* ── KPI cards ── */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-8">
-            {(
-              [
-                [`Total Pool (${p.kpi.kpiLabel})`, p.kpi.kTotal, 'Salary + KPI + Allowance'],
-                ['Sal+KPI Gross Balance', p.kpi.kGB, `${gb}% of ${r2(100 - p.settings.savingPct)}% Sal+KPI`],
-                // Was mislabelled "Gross Allowance / Allowance × weight" — the
-                // figure has always been the paid-out slice, same shape as the
-                // Sal+KPI card next to it (user-spotted 2026-09-18).
-                [`${gb}% Allowance`, p.kpi.kAllow, `${gb}% of ${r2(100 - p.settings.savingPct)}% Allowance`],
-                [`Billing Invoice (${p.kpi.kpiLabel})`, p.kpi.kBI, `${r2(100 - gb)}% invoice + 手填 statutory`],
-                [`Saving (${p.settings.savingPct}%)`, p.kpi.kSave, 'Sal+KPI + Allowance saving'],
-                [`Advance (${p.kpi.kpiLabel})`, p.kpi.kAdvMonth, 'This month only'],
-              ] as const
-            ).map(([label, value, sub]) => (
-              <div key={label} className="border border-hairline rounded-md bg-surface p-4">
-                <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-graphite mb-1">{label}</div>
-                <div className={`font-serif text-lg tabular ${Number(value) < 0 ? 'text-danger' : 'text-ink'}`}>
-                  {Number(value) < 0 ? `-RM ${fmt(Math.abs(Number(value)))}` : `RM ${fmt(Number(value))}`}
-                </div>
-                <div className="font-mono text-[10px] text-graphite mt-0.5">{sub}</div>
-              </div>
-            ))}
+          {/* ── KPI cards ── The selected result month in six figures. The
+              pool is what the calculator splits, so it is the sheet's one
+              walnut card; any figure below zero reads red, as before. */}
+          <div className="mt-8">
+            <StatCards label={`Director Pool figures for ${p.kpi.kpiLabel}`}>
+              {(
+                [
+                  [`Total Pool (${p.kpi.kpiLabel})`, p.kpi.kTotal, 'Salary + KPI + Allowance', 'coin'],
+                  ['Sal+KPI Gross Balance', p.kpi.kGB, `${gb}% of ${r2(100 - p.settings.savingPct)}% Sal+KPI`, 'wallet'],
+                  // Was mislabelled "Gross Allowance / Allowance × weight" — the
+                  // figure has always been the paid-out slice, same shape as the
+                  // Sal+KPI card next to it (user-spotted 2026-09-18).
+                  [`${gb}% Allowance`, p.kpi.kAllow, `${gb}% of ${r2(100 - p.settings.savingPct)}% Allowance`, 'gift'],
+                  [`Billing Invoice (${p.kpi.kpiLabel})`, p.kpi.kBI, `${r2(100 - gb)}% invoice + 手填 statutory`, 'receipt'],
+                  [`Saving (${p.settings.savingPct}%)`, p.kpi.kSave, 'Sal+KPI + Allowance saving', 'bank'],
+                  [`Advance (${p.kpi.kpiLabel})`, p.kpi.kAdvMonth, 'This month only', 'clock'],
+                ] as const
+              ).map(([label, value, sub, icon], i) => (
+                <StatCard
+                  key={label}
+                  label={label}
+                  value={Number(value) < 0 ? `-RM ${fmt(Math.abs(Number(value)))}` : `RM ${fmt(Number(value))}`}
+                  icon={icon}
+                  note={sub}
+                  tone={Number(value) < 0 ? 'danger' : i === 0 ? 'primary' : undefined}
+                />
+              ))}
+            </StatCards>
           </div>
 
           {/* ── Distribution results ── */}
           <SectHead n="NO. 03" title="Distribution Results" />
-          <div className="mb-3">
+          <div className="sheet-toolbar">
             <MonthTabs months={p.results} value={p.resultMonth} onChange={p.setResultMonth} allowAll />
           </div>
           {!showAll && p.visibleResults[0] && (
-            <p className="font-mono text-xs text-accent mb-3">
-              {p.visibleResults[0].name}
+            <p className="text-xs mb-3">
+              <span className="font-semibold">{p.visibleResults[0].name}</span>
               {p.visibleResults[0].fullPayout && ' · 💯 FULL PAYOUT'}
               {p.visibleResults[0].includeBilling && ' · 📥 INCL. BILLING'}
-              {' · '}Salary Pool: <span className="text-ink">{fmtRM(p.visibleResults[0].poolSal)}</span>
-              {' · '}KPI Pool: <span className="text-ink">{fmtRM(p.visibleResults[0].poolKpi)}</span>
-              {' · '}Allowance Pool: <span className="text-ink">{fmtRM(p.visibleResults[0].poolAllow)}</span>
+              {' · '}Salary Pool: <span className="font-semibold tabular-nums">{fmtRM(p.visibleResults[0].poolSal)}</span>
+              {' · '}KPI Pool: <span className="font-semibold tabular-nums">{fmtRM(p.visibleResults[0].poolKpi)}</span>
+              {' · '}Allowance Pool: <span className="font-semibold tabular-nums">{fmtRM(p.visibleResults[0].poolAllow)}</span>
             </p>
           )}
-          <div className="overflow-x-auto border border-hairline rounded-md">
-            {/* The widest table in the portal — 22 columns of calculator. The
-                min-width is desktop-only: on a phone the fold keeps Director +
-                Total Pay and stacks the other twenty (inputs included) in the
-                row's panel, which beats scrolling 2100px sideways. */}
-            <table className="ledger-table text-[12px] md:min-w-[2100px]">
-              <thead>
-                <tr>
-                  <th>Director</th>
-                  <th className="m-hide">Weight</th>
-                  <th className="right m-hide">Gross (Sal+KPI)</th>
-                  <th className="right m-hide">Allow Gross</th>
-                  <th className="right m-hide">Sal+KPI Saving</th>
-                  <th className="right m-hide">Allow Saving</th>
-                  <th className="right m-hide">Total Saving</th>
-                  <th className="right m-hide">Sal+KPI Bal (95%)</th>
-                  <th className="right m-hide">Allow Bal (95%)</th>
-                  <th className="right m-hide">{gb}% Gross Balance</th>
-                  <th className="right m-hide">{gb}% Allowance</th>
-                  <th className="right m-hide">Statutory (Allow 自己填)</th>
-                  <th className="right m-hide">{r2(100 - gb)}% Bill Inv (Sal)</th>
-                  <th className="right m-hide">{r2(100 - gb)}% Statutory (自己填)</th>
-                  <th className="right m-hide">{r2(100 - gb)}% Bill Inv (Allow)</th>
-                  {anyAllowStat && <th className="right m-hide">{r2(100 - gb)}% Statutory (Allow 自己填)</th>}
-                  <th className="right m-hide">Total {r2(100 - gb)}% Bill Inv</th>
-                  <th className="right">Total Pay</th>
-                  <th className="right m-hide">Vr KPI</th>
-                  <th className="right m-hide">Adv This Month</th>
-                  <th className="right m-hide">Adv Statutory (自己填)</th>
-                  <th className="right m-hide">Accum. Advance</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {p.visibleResults.map((mr) => {
-                  const sas = showAllowStat(mr.month, { allowStatUntil: p.allowStatUntil })
-                  return [
-                    showAll ? (
-                      <tr key={`${mr.id}-hdr`} className="row-sect">
-                        <td colSpan={anyAllowStat ? 22 : 21} className="font-serif italic text-accent">
-                          {mr.name}
-                          {mr.fullPayout && ' · 💯 Full Payout'}
-                          {mr.includeBilling && ' · 📥 Incl. Billing'}
-                          {'  —  '}Salary {fmtRM(mr.poolSal)} · KPI {fmtRM(mr.poolKpi)} · Allowance {fmtRM(mr.poolAllow)}
-                        </td>
-                      </tr>
-                    ) : null,
-                    ...mr.dirRes.map((d) => {
-                      const inp = p.dirInputs[d.statKey] ?? {}
-                      const total25 = r2(
-                        d.salKpiBillInv + (inp.billingStat ?? 0) + d.allowBillInv + (sas ? (inp.allowBillingStat ?? 0) : 0),
-                      )
-                      return (
-                        <LedgerRow key={`${mr.id}-${d.id}`}>
-                          <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
-                          <td className="font-mono text-xs text-graphite m-hide" data-label="Weight">{d.weight}%</td>
-                          <td className="num font-medium m-hide" data-label="Gross (Sal+KPI)">{fmt(d.salKpiGross)}</td>
-                          <td className="num m-hide" data-label="Allow Gross">{d.allowGross > 0 ? fmt(d.allowGross) : '—'}</td>
-                          <td className="num m-hide" data-label="Sal+KPI Saving">{fmt(d.salKpiSaving)}</td>
-                          <td className="num m-hide" data-label="Allow Saving">{d.allowGross > 0 ? fmt(d.allowSaving) : '—'}</td>
-                          <td className="num font-medium m-hide" data-label="Total Saving">{fmt(d.totalSaving)}</td>
-                          <td className="num m-hide" data-label="Sal+KPI Bal">{fmt(d.salKpiBalance)}</td>
-                          <td className="num m-hide" data-label="Allow Bal">{d.allowGross > 0 ? fmt(d.allowBalance) : '—'}</td>
-                          <td className="num font-medium m-hide" data-label={`${gb}% Gross Balance`}>{mr.fullPayout ? '—' : fmt(d.salKpiGB)}</td>
-                          <td className="num m-hide" data-label={`${gb}% Allowance`}>{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowGB) : '—'}</td>
-                          <td className="num m-hide" data-label="Statutory (Allow)">
-                            {mr.fullPayout ? '—' : (
-                              <>
-                                <MoneyInput
-                                  value={inp.allowPayStat ?? null}
-                                  placeholder="填写"
-                                  onCommit={(v) => p.onDirInput(mr.id, d.id, 'allowPayStat', v)}
-                                  className="w-24"
-                                />
-                                <TopUpHint d={d} />
-                              </>
-                            )}
+          <div className="table-frame">
+            <div className="table-frame-scroll">
+              {/* The widest table in the portal — 22 columns of calculator. The
+                  min-width is desktop-only: on a phone the fold keeps Director +
+                  Total Pay and stacks the other twenty (inputs included) in the
+                  row's panel, which beats scrolling 2100px sideways. */}
+              <table className="ledger-table md:min-w-[2100px]">
+                <thead>
+                  <tr>
+                    <th>Director</th>
+                    <th className="right m-hide">Weight</th>
+                    <th className="right m-hide">Gross (Sal+KPI)</th>
+                    <th className="right m-hide">Allow Gross</th>
+                    <th className="right m-hide">Sal+KPI Saving</th>
+                    <th className="right m-hide">Allow Saving</th>
+                    <th className="right m-hide">Total Saving</th>
+                    <th className="right m-hide">Sal+KPI Bal (95%)</th>
+                    <th className="right m-hide">Allow Bal (95%)</th>
+                    <th className="right m-hide">{gb}% Gross Balance</th>
+                    <th className="right m-hide">{gb}% Allowance</th>
+                    <th className="right m-hide">Statutory (Allow 自己填)</th>
+                    <th className="right m-hide">{r2(100 - gb)}% Bill Inv (Sal)</th>
+                    <th className="right m-hide">{r2(100 - gb)}% Statutory (自己填)</th>
+                    <th className="right m-hide">{r2(100 - gb)}% Bill Inv (Allow)</th>
+                    {anyAllowStat && <th className="right m-hide">{r2(100 - gb)}% Statutory (Allow 自己填)</th>}
+                    <th className="right m-hide">Total {r2(100 - gb)}% Bill Inv</th>
+                    <th className="right">Total Pay</th>
+                    <th className="right m-hide">Vr KPI</th>
+                    <th className="right m-hide">Adv This Month</th>
+                    <th className="right m-hide">Adv Statutory (自己填)</th>
+                    <th className="right m-hide">Accum. Advance</th>
+                    <th className="lt-toggle" aria-hidden />
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.visibleResults.map((mr) => {
+                    const sas = showAllowStat(mr.month, { allowStatUntil: p.allowStatUntil })
+                    return [
+                      showAll ? (
+                        <tr key={`${mr.id}-hdr`}>
+                          <td colSpan={anyAllowStat ? 22 : 21} className={MONTH_BAND}>
+                            {mr.name}
+                            {mr.fullPayout && ' · 💯 Full Payout'}
+                            {mr.includeBilling && ' · 📥 Incl. Billing'}
+                            {'  —  '}Salary {fmtRM(mr.poolSal)} · KPI {fmtRM(mr.poolKpi)} · Allowance {fmtRM(mr.poolAllow)}
                           </td>
-                          <td className="num m-hide" data-label={`${r2(100 - gb)}% Bill Inv (Sal)`}>{mr.fullPayout ? '—' : fmt(d.salKpiBillInv)}</td>
-                          <td className="num m-hide" data-label={`${r2(100 - gb)}% Statutory`}>
-                            {mr.fullPayout ? '—' : (
-                              <MoneyInput
-                                value={inp.billingStat ?? null}
-                                placeholder="填写"
-                                onCommit={(v) => p.onDirInput(mr.id, d.id, 'billingStat', v)}
-                                className="w-28"
-                              />
-                            )}
-                          </td>
-                          <td className="num m-hide" data-label={`${r2(100 - gb)}% Bill Inv (Allow)`}>{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowBillInv) : '—'}</td>
-                          {anyAllowStat && (
-                            <td className="num m-hide" data-label={`${r2(100 - gb)}% Statutory (Allow)`}>
-                              {mr.fullPayout || !sas ? '—' : (
+                        </tr>
+                      ) : null,
+                      ...mr.dirRes.map((d) => {
+                        const inp = p.dirInputs[d.statKey] ?? {}
+                        const total25 = r2(
+                          d.salKpiBillInv + (inp.billingStat ?? 0) + d.allowBillInv + (sas ? (inp.allowBillingStat ?? 0) : 0),
+                        )
+                        return (
+                          <LedgerRow key={`${mr.id}-${d.id}`}>
+                            <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-medium">{d.code}</span></td>
+                            <td className="num m-hide" data-label="Weight">{d.weight}%</td>
+                            <td className="num font-medium m-hide" data-label="Gross (Sal+KPI)">{fmt(d.salKpiGross)}</td>
+                            <td className="num m-hide" data-label="Allow Gross">{d.allowGross > 0 ? fmt(d.allowGross) : '—'}</td>
+                            <td className="num m-hide" data-label="Sal+KPI Saving">{fmt(d.salKpiSaving)}</td>
+                            <td className="num m-hide" data-label="Allow Saving">{d.allowGross > 0 ? fmt(d.allowSaving) : '—'}</td>
+                            <td className="num font-medium m-hide" data-label="Total Saving">{fmt(d.totalSaving)}</td>
+                            <td className="num m-hide" data-label="Sal+KPI Bal">{fmt(d.salKpiBalance)}</td>
+                            <td className="num m-hide" data-label="Allow Bal">{d.allowGross > 0 ? fmt(d.allowBalance) : '—'}</td>
+                            <td className="num font-medium m-hide" data-label={`${gb}% Gross Balance`}>{mr.fullPayout ? '—' : fmt(d.salKpiGB)}</td>
+                            <td className="num m-hide" data-label={`${gb}% Allowance`}>{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowGB) : '—'}</td>
+                            <td className="num m-hide" data-label="Statutory (Allow)">
+                              {mr.fullPayout ? '—' : (
+                                <>
+                                  <MoneyInput
+                                    value={inp.allowPayStat ?? null}
+                                    placeholder="填写"
+                                    onCommit={(v) => p.onDirInput(mr.id, d.id, 'allowPayStat', v)}
+                                    className="w-24"
+                                  />
+                                  <TopUpHint d={d} />
+                                </>
+                              )}
+                            </td>
+                            <td className="num m-hide" data-label={`${r2(100 - gb)}% Bill Inv (Sal)`}>{mr.fullPayout ? '—' : fmt(d.salKpiBillInv)}</td>
+                            <td className="num m-hide" data-label={`${r2(100 - gb)}% Statutory`}>
+                              {mr.fullPayout ? '—' : (
                                 <MoneyInput
-                                  value={inp.allowBillingStat ?? null}
+                                  value={inp.billingStat ?? null}
                                   placeholder="填写"
-                                  onCommit={(v) => p.onDirInput(mr.id, d.id, 'allowBillingStat', v)}
-                                  className="w-24"
+                                  onCommit={(v) => p.onDirInput(mr.id, d.id, 'billingStat', v)}
+                                  className="w-28"
                                 />
                               )}
                             </td>
-                          )}
-                          <td className="num font-semibold m-hide" data-label={`Total ${r2(100 - gb)}% Bill Inv`}>{mr.fullPayout ? '—' : fmt(total25)}</td>
-                          <td className="num font-semibold text-num-ink">{fmt(d.totalPay)}</td>
-                          <td className="num m-hide" data-label="Vr KPI">
-                            {Math.abs(d.vrKpi) < 0.005 ? '—' : (
-                              <span className={d.vrKpi < 0 ? 'text-danger' : 'text-ledger'}>
-                                {fmt(d.vrKpi)}{' '}
-                                <em className="font-serif text-[10px]">{d.vrKpi < 0 ? 'Advance' : 'Surplus'}</em>
-                              </span>
+                            <td className="num m-hide" data-label={`${r2(100 - gb)}% Bill Inv (Allow)`}>{mr.fullPayout ? '—' : d.allowGross > 0 ? fmt(d.allowBillInv) : '—'}</td>
+                            {anyAllowStat && (
+                              <td className="num m-hide" data-label={`${r2(100 - gb)}% Statutory (Allow)`}>
+                                {mr.fullPayout || !sas ? '—' : (
+                                  <MoneyInput
+                                    value={inp.allowBillingStat ?? null}
+                                    placeholder="填写"
+                                    onCommit={(v) => p.onDirInput(mr.id, d.id, 'allowBillingStat', v)}
+                                    className="w-24"
+                                  />
+                                )}
+                              </td>
                             )}
-                          </td>
-                          <td className="num m-hide" data-label="Adv This Month">
-                            {d.advThisMonth < 0 ? <span className="text-danger">({fmt(Math.abs(d.advThisMonth))})</span> : '—'}
-                          </td>
-                          <td className="num m-hide" data-label="Adv Statutory">
-                            {d.advThisMonth < 0 ? (
-                              <MoneyInput
-                                value={inp.advStat ?? null}
-                                placeholder="填写"
-                                onCommit={(v) => p.onDirInput(mr.id, d.id, 'advStat', v)}
-                                className="w-24"
-                              />
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="num font-medium m-hide" data-label="Accum. Advance">
-                            {Math.abs(d.accumulated) < 0.005 ? '—' : (
-                              <span className={d.accumulated < 0 ? 'text-danger' : 'text-ledger'}>
-                                {d.accumulated < 0 ? `(${fmt(Math.abs(d.accumulated))})` : fmt(d.accumulated)}
-                              </span>
-                            )}
-                          </td>
-                        </LedgerRow>
-                      )
-                    }),
-                  ]
-                })}
-                <tr className="border-t border-hairline">
-                  <td colSpan={2} className="font-serif italic text-ink">Total{showAll ? ' (All Months)' : ''}</td>
-                  <td className="num font-medium m-hide">{fmt(tot.salKpi)}</td>
-                  <td className="num m-hide">{fmt(tot.allow)}</td>
-                  <td className="num m-hide">{fmt(tot.skSave)}</td>
-                  <td className="num m-hide">{fmt(tot.alSave)}</td>
-                  <td className="num font-medium m-hide">{fmt(tot.totSave)}</td>
-                  <td className="num m-hide">{fmt(tot.bal)}</td>
-                  <td className="num m-hide">{fmt(tot.alBal)}</td>
-                  <td className="num font-medium m-hide">{fmt(tot.gbAmt)}</td>
-                  <td className="num m-hide">{fmt(tot.alGB)}</td>
-                  <td className="num m-hide">{tot.alPayStat > 0 ? fmt(tot.alPayStat) : '—'}</td>
-                  <td className="num m-hide">{fmt(tot.skBI)}</td>
-                  <td className="num m-hide">{fmt(tot.statSal)}</td>
-                  <td className="num m-hide">{tot.alBI > 0 ? fmt(tot.alBI) : '—'}</td>
-                  {anyAllowStat && <td className="num m-hide">{fmt(tot.statAl)}</td>}
-                  <td className="num font-semibold m-hide">{fmt(r2(tot.skBI + tot.statSal + tot.alBI + tot.statAl))}</td>
-                  <td className="num font-semibold text-num-ink">{fmt(tot.pay)}</td>
-                  <td className="num m-hide">
-                    <span className={tot.vr < 0 ? 'text-danger' : tot.vr > 0 ? 'text-ledger' : ''}>{fmt(tot.vr)}</span>
-                  </td>
-                  <td className="num m-hide">{tot.advThis < 0 ? <span className="text-danger">({fmt(Math.abs(tot.advThis))})</span> : '—'}</td>
-                  <td className="num m-hide">{tot.advStat > 0 ? <span className="text-danger">{fmt(tot.advStat)}</span> : '—'}</td>
-                  <td className="num m-hide">
-                    {tot.accum < 0 ? <span className="text-danger">({fmt(Math.abs(tot.accum))})</span> : tot.accum > 0 ? fmt(tot.accum) : '—'}
-                  </td>
-                  <td className="lt-toggle" />
-                </tr>
-              </tbody>
-            </table>
+                            <td className="num font-semibold m-hide" data-label={`Total ${r2(100 - gb)}% Bill Inv`}>{mr.fullPayout ? '—' : fmt(total25)}</td>
+                            <td className="num font-semibold">{fmt(d.totalPay)}</td>
+                            <td className="num m-hide" data-label="Vr KPI">
+                              {/* The signed figure keeps its red / green; what
+                                  it means is a state, so it rides as a chip. */}
+                              {Math.abs(d.vrKpi) < 0.005 ? '—' : (
+                                <span className="whitespace-nowrap">
+                                  <span className={d.vrKpi < 0 ? 'text-danger' : 'text-ledger'}>{fmt(d.vrKpi)}</span>{' '}
+                                  <span className={`chip ${d.vrKpi < 0 ? 'danger' : 'ledger'}`}>
+                                    <span className="dot" />
+                                    {d.vrKpi < 0 ? 'Advance' : 'Surplus'}
+                                  </span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="num m-hide" data-label="Adv This Month">
+                              {d.advThisMonth < 0 ? <span className="text-danger">({fmt(Math.abs(d.advThisMonth))})</span> : '—'}
+                            </td>
+                            <td className="num m-hide" data-label="Adv Statutory">
+                              {d.advThisMonth < 0 ? (
+                                <MoneyInput
+                                  value={inp.advStat ?? null}
+                                  placeholder="填写"
+                                  onCommit={(v) => p.onDirInput(mr.id, d.id, 'advStat', v)}
+                                  className="w-24"
+                                />
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="num font-medium m-hide" data-label="Accum. Advance">
+                              {Math.abs(d.accumulated) < 0.005 ? '—' : (
+                                <span className={d.accumulated < 0 ? 'text-danger' : 'text-ledger'}>
+                                  {d.accumulated < 0 ? `(${fmt(Math.abs(d.accumulated))})` : fmt(d.accumulated)}
+                                </span>
+                              )}
+                            </td>
+                          </LedgerRow>
+                        )
+                      }),
+                    ]
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={2}>Total{showAll ? ' (All Months)' : ''}</td>
+                    <td className="num m-hide">{fmt(tot.salKpi)}</td>
+                    <td className="num m-hide">{fmt(tot.allow)}</td>
+                    <td className="num m-hide">{fmt(tot.skSave)}</td>
+                    <td className="num m-hide">{fmt(tot.alSave)}</td>
+                    <td className="num m-hide">{fmt(tot.totSave)}</td>
+                    <td className="num m-hide">{fmt(tot.bal)}</td>
+                    <td className="num m-hide">{fmt(tot.alBal)}</td>
+                    <td className="num m-hide">{fmt(tot.gbAmt)}</td>
+                    <td className="num m-hide">{fmt(tot.alGB)}</td>
+                    <td className="num m-hide">{tot.alPayStat > 0 ? fmt(tot.alPayStat) : '—'}</td>
+                    <td className="num m-hide">{fmt(tot.skBI)}</td>
+                    <td className="num m-hide">{fmt(tot.statSal)}</td>
+                    <td className="num m-hide">{tot.alBI > 0 ? fmt(tot.alBI) : '—'}</td>
+                    {anyAllowStat && <td className="num m-hide">{fmt(tot.statAl)}</td>}
+                    <td className="num m-hide">{fmt(r2(tot.skBI + tot.statSal + tot.alBI + tot.statAl))}</td>
+                    <td className="num font-bold">{fmt(tot.pay)}</td>
+                    <td className="num m-hide">
+                      <span className={tot.vr < 0 ? 'text-danger' : tot.vr > 0 ? 'text-ledger' : ''}>{fmt(tot.vr)}</span>
+                    </td>
+                    <td className="num m-hide">{tot.advThis < 0 ? <span className="text-danger">({fmt(Math.abs(tot.advThis))})</span> : '—'}</td>
+                    <td className="num m-hide">{tot.advStat > 0 ? <span className="text-danger">{fmt(tot.advStat)}</span> : '—'}</td>
+                    <td className="num m-hide">
+                      {tot.accum < 0 ? <span className="text-danger">({fmt(Math.abs(tot.accum))})</span> : tot.accum > 0 ? fmt(tot.accum) : '—'}
+                    </td>
+                    <td className="lt-toggle" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div className="table-frame-foot">
+              <p className="leading-relaxed">
+                ★ {p.settings.savingPct}% Saving 适用于 Salary+KPI 和 Allowance（分开计算）。 ★ {gb}/{r2(100 - gb)} Split
+                两条流都切。 ★ Full Payout Month：100% Balance 直接给 Director，无 Billing Invoice。 ★ Advance：Total Pay
+                &lt; Fixed Salary → 差额累计；盈余先抵消累计 Advance；Adv Statutory 与 75% Allow Statutory 也加入欠款。
+              </p>
+            </div>
           </div>
-          <p className="font-serif italic text-xs text-graphite mt-3 leading-relaxed">
-            ★ {p.settings.savingPct}% Saving 适用于 Salary+KPI 和 Allowance（分开计算）。 ★ {gb}/{r2(100 - gb)} Split
-            两条流都切。 ★ Full Payout Month：100% Balance 直接给 Director，无 Billing Invoice。 ★ Advance：Total Pay
-            &lt; Fixed Salary → 差额累计；盈余先抵消累计 Advance；Adv Statutory 与 75% Allow Statutory 也加入欠款。
-          </p>
 
           <HvPayoutSection
             month={m}
@@ -1126,17 +1162,20 @@ function HvPayoutSection({
   return (
     <>
       <SectHead n="NO. 04" title={`${company.name} Allowance · 15号过账`} />
-      <p className="font-mono text-xs text-graphite mb-3 leading-relaxed">
-        月头那笔（Sal+KPI ＋ 其他公司 allowance）已经过了 —— 这里只算 <span className="text-ink">{company.name}</span> 15
+      <p className="sheet-subtitle mb-3">
+        月头那笔（Sal+KPI ＋ 其他公司 allowance）已经过了 —— 这里只算 <span className="font-semibold">{company.name}</span> 15
         号进来的那笔，每个 director 要另外过多少。照常扣 {settings.savingPct}% saving，默认走 {gb}/{r2(100 - gb)} split。
       </p>
 
-      {/* HV's own Full Payout — independent of the month's flag (2026-09-18) */}
+      {/* HV's own Full Payout — independent of the month's flag (2026-09-18).
+          The same chip toggle as the month's Full Payout above. */}
       <label
-        className={`inline-flex items-center gap-2 px-3 py-2 mb-4 rounded-md border text-xs font-medium select-none ${
+        className={`inline-flex items-center gap-2 px-3 py-1.5 mb-4 rounded-full border text-xs select-none transition-colors ${
           month.fullPayout
-            ? 'border-hairline text-graphite bg-surface opacity-60 cursor-not-allowed'
-            : 'border-hairline text-ink bg-surface cursor-pointer hover:border-accent'
+            ? 'border-hairline bg-surface opacity-60 cursor-not-allowed'
+            : month.allowExclFullPayout === true
+              ? 'border-alert bg-alert-bg font-semibold cursor-pointer'
+              : 'border-hairline bg-surface cursor-pointer hover:border-accent'
         }`}
       >
         <input
@@ -1147,21 +1186,23 @@ function HvPayoutSection({
           onChange={(e) => onFlag(month.id, 'allowExclFullPayout', e.target.checked)}
         />
         💯 Full Payout（100% — {r2(100 - gb)}% Billing 扣回出来）
-        {month.fullPayout && <span className="text-graphite">· 整个月已经是 Full Payout</span>}
+        {month.fullPayout && <span>· 整个月已经是 Full Payout</span>}
       </label>
 
       {hvAmount <= 0 ? (
-        <p className="font-serif italic text-sm text-graphite border border-dashed border-hairline rounded-md p-4">
-          这个月还没 key {company.name} 的 allowance —— 填进上面 NO. 02 那行，这里就会算出来。
-        </p>
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">
+            这个月还没 key {company.name} 的 allowance —— 填进上面 NO. 02 那行，这里就会算出来。
+          </p>
+        </div>
       ) : (
-        <>
-          <div className="overflow-x-auto border border-hairline rounded-md">
-            <table className="ledger-table text-[12px]">
+        <div className="table-frame">
+          <div className="table-frame-scroll">
+            <table className="ledger-table">
               <thead>
                 <tr>
                   <th>Director</th>
-                  <th className="m-hide">Weight</th>
+                  <th className="right m-hide">Weight</th>
                   <th className="right m-hide">Allow Gross</th>
                   <th className="right m-hide">Saving ({settings.savingPct}%)</th>
                   <th className="right m-hide">Balance ({r2(100 - settings.savingPct)}%)</th>
@@ -1175,47 +1216,51 @@ function HvPayoutSection({
                   <LedgerRow key={d.id}>
                     <td className="whitespace-nowrap">
                       <Dot color={d.color} />
-                      <span className="font-mono text-sm text-ink">{d.code}</span>
+                      <span className="font-medium">{d.code}</span>
                     </td>
-                    <td className="font-mono text-xs text-graphite m-hide" data-label="Weight">{d.weight}%</td>
+                    <td className="num m-hide" data-label="Weight">{d.weight}%</td>
                     <td className="num m-hide" data-label="Allow Gross">{fmt(d.allowExcl.gross)}</td>
                     <td className="num m-hide" data-label="Saving">{fmt(d.allowExcl.saving)}</td>
                     <td className="num m-hide" data-label="Balance">{fmt(d.allowExcl.balance)}</td>
-                    <td className="num font-semibold text-num-ink" data-label="要过的钱">{fmt(d.allowExcl.gb)}</td>
+                    <td className="num font-semibold" data-label="要过的钱">{fmt(d.allowExcl.gb)}</td>
                     <td className="num m-hide" data-label="Bill Inv">
                       {d.allowExcl.billInv > 0 ? fmt(d.allowExcl.billInv) : '—'}
                     </td>
                   </LedgerRow>
                 ))}
-                <tr className="border-t border-hairline">
-                  <td colSpan={2} className="font-serif italic text-ink">Total</td>
-                  <td className="num font-medium m-hide">{fmt(totalGross)}</td>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={2}>Total</td>
+                  <td className="num m-hide">{fmt(totalGross)}</td>
                   <td className="num m-hide">{fmt(totalSaving)}</td>
                   <td className="num m-hide">{fmt(totalBalance)}</td>
-                  <td className="num font-semibold text-num-ink">{fmt(totalPayout)}</td>
+                  <td className="num font-bold">{fmt(totalPayout)}</td>
                   <td className="num m-hide">{totalBill > 0 ? fmt(totalBill) : '—'}</td>
                   <td className="lt-toggle" />
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
           </div>
-          <p className="font-serif italic text-xs text-graphite mt-3 leading-relaxed">
-            ★ 这笔不进 Director Salary —— Director Salary 只记 Sal+KPI（2026-09-18 定）。 ★ 这笔<span className="text-ink">不进
-            Total Pay</span>，所以 NO. 03 的 Vr KPI / Adv This Month / Accum. Advance 完全不受它影响 —— 跟没有这笔时一模一样。
-            ★ 但它有算进 NO. 03 的「{gb}% Allowance」和 Saving：月头过的 ＋ 这里 15 号过的 ＝ 那一栏的总数。
-            {hvFull ? (
-              <>
-                ★ <span className="text-ink">💯 Full Payout 开着</span> —— 这笔 {r2(100 - gb)}% Billing
-                已经扣回出来，director 实收整条 {r2(100 - settings.savingPct)}% Balance，上面 Billing Invoice 那张卡也不含它。
-              </>
-            ) : (
-              <>
-                ★ 右上角的「{r2(100 - gb)}% Bill Inv」<span className="text-ink">已经算进</span> Billing Invoice 那张卡 ——
-                过钱分两次，invoice 还是一个月一张。
-              </>
-            )}
-          </p>
-        </>
+          <div className="table-frame-foot">
+            <p className="leading-relaxed">
+              ★ 这笔不进 Director Salary —— Director Salary 只记 Sal+KPI（2026-09-18 定）。 ★ 这笔<span className="font-semibold">不进
+              Total Pay</span>，所以 NO. 03 的 Vr KPI / Adv This Month / Accum. Advance 完全不受它影响 —— 跟没有这笔时一模一样。
+              ★ 但它有算进 NO. 03 的「{gb}% Allowance」和 Saving：月头过的 ＋ 这里 15 号过的 ＝ 那一栏的总数。
+              {hvFull ? (
+                <>
+                  ★ <span className="font-semibold">💯 Full Payout 开着</span> —— 这笔 {r2(100 - gb)}% Billing
+                  已经扣回出来，director 实收整条 {r2(100 - settings.savingPct)}% Balance，上面 Billing Invoice 那张卡也不含它。
+                </>
+              ) : (
+                <>
+                  ★ 右上角的「{r2(100 - gb)}% Bill Inv」<span className="font-semibold">已经算进</span> Billing Invoice 那张卡 ——
+                  过钱分两次，invoice 还是一个月一张。
+                </>
+              )}
+            </p>
+          </div>
+        </div>
       )}
     </>
   )

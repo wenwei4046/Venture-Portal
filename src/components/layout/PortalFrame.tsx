@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
 import { logPageView } from '@/lib/page-view'
+import { isSheetRoute } from '@/lib/sheet-routes'
 import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
@@ -36,9 +37,13 @@ export default function PortalFrame({
   // Wide data reports (month-matrix P&L / Cash Flow) opt out of the 1280px
   // reading-width cap so the many month columns can use the full content area.
   const pathname = usePathname()
-  const commissionWorkbench = /^\/revenue\/[^/]+\/\d{4}-\d{2}-01$/.test(pathname ?? '')
-  const wide = commissionWorkbench || (pathname?.startsWith('/reports/monthly-') ?? false)
+  const wide = pathname?.startsWith('/reports/monthly-') ?? false
   const productList = pathname === '/revenue/products'
+  // The white sheet (DESIGN.md › "Sheet theme"): HR's pages sit on one rounded
+  // panel in the Comm Cal month's tone, the shell around it unchanged. Drawn
+  // here rather than by each page, so it stays put while one of these pages
+  // replaces another and the loading skeleton lands on it too.
+  const sheet = isSheetRoute(pathname)
 
   // A list's checkbox selection outlives the drill-down into a row's detail
   // page (it lives in lib/selection-store.ts, not in the unmounted list), so
@@ -81,9 +86,11 @@ export default function PortalFrame({
           <div
             className={productList
               ? 'route-surface product-content print:p-0'
-              : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto ${commissionWorkbench ? 'p-2.5' : 'px-4 md:px-8 py-6 md:py-10'} pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
+              : sheet
+                ? 'route-surface sheet-frame page-enter print:p-0'
+                : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
           >
-            {children}
+            {sheet ? <div className="sheet-theme sheet">{children}</div> : children}
           </div>
         </main>
       </div>

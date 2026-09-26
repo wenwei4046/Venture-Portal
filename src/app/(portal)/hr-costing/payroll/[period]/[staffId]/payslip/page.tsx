@@ -23,6 +23,19 @@ function roundProrataRatio(ratio: number): number {
   return Math.round(ratio * 1_000_000) / 1_000_000
 }
 
+// The slip's lettering, in the sheet's tone: small caps for a fact's label
+// and for a section's head, upright throughout.
+const FACT_LABEL = 'text-[10px] font-medium uppercase tracking-[0.08em]'
+const SECTION_HEAD = 'text-[11px] font-bold uppercase tracking-[0.1em]'
+
+// A row's status as a word on a wash: amber while HR can still edit it, grey
+// once submitted (read only), green once paid.
+const STATUS_TONE: Record<string, string> = {
+  draft: 'alert',
+  submitted: 'info',
+  paid: 'ledger',
+}
+
 export default async function PayslipPage({ params }: PageProps) {
   await requirePermission('hr_costing')
   const { period, staffId } = await params
@@ -75,47 +88,49 @@ export default async function PayslipPage({ params }: PageProps) {
     <div className="payslip-container max-w-3xl mx-auto p-8 print:p-0 print:max-w-full">
       <PrintButton />
 
-      <div className="border-2 border-ink rounded-none p-8 print:border print:p-6 bg-paper">
+      {/* A document on the sheet: a hairline card on screen; on paper the
+          same thin ink frame and square corners it always printed with. */}
+      <div className="border border-hairline rounded-card p-8 print:border print:border-ink print:rounded-none print:p-6 bg-surface">
         {/* Company header */}
         <div className="text-center mb-6 pb-4 border-b border-hairline">
-          <div className="font-serif text-xl text-ink tracking-wide">HOUZS VENTURE SDN BHD</div>
-          <div className="font-serif italic text-graphite text-sm mt-1">Payslip · {formatPeriodLabel(period)}</div>
+          <div className="text-lg font-bold tracking-[0.06em]">HOUZS VENTURE SDN BHD</div>
+          <div className="text-sm mt-1">Payslip · {formatPeriodLabel(period)}</div>
         </div>
 
         {/* Employee block */}
         <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Employee</div>
-            <div className="font-serif text-md text-ink mt-0.5">{staff.employee_name}</div>
+            <div className={FACT_LABEL}>Employee</div>
+            <div className="text-md font-medium mt-0.5">{staff.employee_name}</div>
             {staff.employee_code && (
-              <div className="font-mono text-xs text-graphite">Code: {staff.employee_code}</div>
+              <div className="font-mono text-xs">Code: {staff.employee_code}</div>
             )}
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Department</div>
-            <div className="font-serif text-md text-ink mt-0.5">{deptName}</div>
+            <div className={FACT_LABEL}>Department</div>
+            <div className="text-md font-medium mt-0.5">{deptName}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Period</div>
+            <div className={FACT_LABEL}>Period</div>
             <div className="font-mono text-sm text-ink mt-0.5">{row.period_month}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-graphite">Days Worked</div>
+            <div className={FACT_LABEL}>Days Worked</div>
             <div className="font-mono text-sm text-ink mt-0.5">{prorated}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-graphite">EPF Part</div>
+            <div className={FACT_LABEL}>EPF Part</div>
             <div className="font-mono text-sm text-ink mt-0.5">{staff.epf_category}</div>
           </div>
           <div>
-            <div className="font-sans text-xs uppercase tracking-wide text-graphite">SOCSO Cat</div>
+            <div className={FACT_LABEL}>SOCSO Cat</div>
             <div className="font-mono text-sm text-ink mt-0.5">{staff.socso_category}</div>
           </div>
         </div>
 
         {/* Earnings */}
         <section className="mb-5">
-          <div className="font-serif italic text-graphite text-sm uppercase tracking-wide mb-2 pb-1 border-b border-hairline">
+          <div className={`${SECTION_HEAD} mb-2 pb-1 border-b border-hairline`}>
             Earnings
           </div>
           <div className="space-y-1 text-sm">
@@ -133,22 +148,22 @@ export default async function PayslipPage({ params }: PageProps) {
               <Line label="Deduction" value={-Number(row.deduction_amount)} />
             )}
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
-              <span className="font-serif text-ink">Gross Pay</span>
-              <span className="num text-num-ink font-semibold">{formatMoney(Number(row.gross))}</span>
+              <span className="font-bold">Gross Pay</span>
+              <span className="num text-num-ink font-bold">{formatMoney(Number(row.gross))}</span>
             </div>
           </div>
         </section>
 
         {split && (
-          <section className="mb-5 border border-hairline p-4">
-            <h2 className="font-serif text-ink mb-2">Revenue pay split</h2>
+          <section className="mb-5 border border-hairline rounded-lg p-4 print:rounded-none">
+            <h2 className={`${SECTION_HEAD} mb-2`}>Revenue pay split</h2>
             <div className="space-y-1 text-sm">
               <Line label="Gross commission · after adjustments" value={row.commission_amount} />
               <Line label={netBasicSplit ? 'Net basic · salary PV' : 'Basic pay'} value={split.basicPay} />
               <Line label="Commission balance" value={split.commissionBalance} />
               {netBasicSplit && <Line label="Total to employee" value={split.totalPayout} />}
             </div>
-            {netBasicSplit ? <RevenuePayoutBreakdown row={row} /> : <p className="text-xs text-muted mt-3">
+            {netBasicSplit ? <RevenuePayoutBreakdown row={row} /> : <p className="text-xs mt-3">
               Commission balance = gross commission − basic pay − employer EPF − employee EPF.
               Employee EPF is included in this split once. Other allowances, deductions and tax are reflected in Net Pay below.
             </p>}
@@ -159,42 +174,42 @@ export default async function PayslipPage({ params }: PageProps) {
 
         {/* Deductions */}
         <section className="mb-5">
-          <div className="font-serif italic text-graphite text-sm uppercase tracking-wide mb-2 pb-1 border-b border-hairline">
+          <div className={`${SECTION_HEAD} mb-2 pb-1 border-b border-hairline`}>
             Deductions
           </div>
           <div className="space-y-1 text-sm">
             <div className="flex items-baseline justify-between">
-              <span className="font-serif">EPF (Employee)</span>
+              <span>EPF (Employee)</span>
               <EditableStatLine payrollId={row.id} field="epf_ee" value={Number(row.epf_ee)} readOnly={row.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif">SOCSO (Employee)</span>
+              <span>SOCSO (Employee)</span>
               <EditableStatLine payrollId={row.id} field="socso_ee" value={Number(row.socso_ee)} readOnly={row.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif">EIS (Employee)</span>
+              <span>EIS (Employee)</span>
               <EditableStatLine payrollId={row.id} field="eis_ee" value={Number(row.eis_ee)} readOnly={row.status !== 'draft'} />
             </div>
             {withholding > 0 ? (
               <div className="flex items-baseline justify-between">
-                <span className="font-serif">Withholding Tax</span>
+                <span>Withholding Tax</span>
                 <span className="num">{formatMoney(withholding)}</span>
               </div>
             ) : (
               <div className="flex items-baseline justify-between">
-                <span className="font-serif">PCB ({staff.pcb_category})</span>
+                <span>PCB ({staff.pcb_category})</span>
                 <EditableStatLine payrollId={row.id} field="pcb" value={Number(row.pcb)} readOnly={row.status !== 'draft'} />
               </div>
             )}
             {Number(row.skbbk_amount ?? 0) > 0 && (
               <div className="flex items-baseline justify-between">
-                <span className="font-serif">SKBBK</span>
+                <span>SKBBK</span>
                 <span className="num">{formatMoney(Number(row.skbbk_amount))}</span>
               </div>
             )}
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
-              <span className="font-serif text-ink">Total Deductions</span>
-              <span className="num text-num-ink font-semibold">{formatMoney(totalDeductions)}</span>
+              <span className="font-bold">Total Deductions</span>
+              <span className="num text-num-ink font-bold">{formatMoney(totalDeductions)}</span>
             </div>
             {row.status === 'draft' && row.statutory_overridden_at ? (
               <ResetStaffStatutoryButton
@@ -206,51 +221,52 @@ export default async function PayslipPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Net pay */}
+        {/* Net pay — the figure the slip is for, under the document's one
+            heavy rule (it prints). */}
         <section className="mb-6 pt-3 border-t-2 border-ink">
           <div className="flex justify-between items-baseline">
-            <span className="font-serif text-lg text-ink">Net Pay</span>
-            <span className="num text-num-ink text-2xl font-semibold tracking-[-0.01em]">
+            <span className="text-lg font-bold">Net Pay</span>
+            <span className="num text-num-ink text-2xl font-bold tracking-[-0.01em]">
               {formatMoney(Number(row.net))}
             </span>
           </div>
-          <div className="font-serif italic text-graphite text-xs mt-1">
+          <div className="text-xs mt-1">
             Credited to the employee&apos;s bank account on payroll approval.
           </div>
         </section>
 
         {/* Employer contributions (informational) */}
         <section className="mb-6 pt-3 border-t border-hairline">
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide mb-2">
-            Employer Contributions <span className="italic normal-case">{split ? '(employer EPF funded from gross commission)' : '(paid on your behalf, not deducted from you)'}</span>
+          <div className={`${SECTION_HEAD} mb-2`}>
+            Employer Contributions <span className="font-normal normal-case tracking-normal">{split ? '(employer EPF funded from gross commission)' : '(paid on your behalf, not deducted from you)'}</span>
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <div className="text-xs text-graphite">EPF ER</div>
+              <div className="text-xs">EPF ER</div>
               <div><EditableStatLine payrollId={row.id} field="epf_er" value={Number(row.epf_er)} readOnly={row.status !== 'draft'} /></div>
             </div>
             <div>
-              <div className="text-xs text-graphite">SOCSO ER</div>
+              <div className="text-xs">SOCSO ER</div>
               <div><EditableStatLine payrollId={row.id} field="socso_er" value={Number(row.socso_er)} readOnly={row.status !== 'draft'} /></div>
             </div>
             <div>
-              <div className="text-xs text-graphite">EIS ER</div>
+              <div className="text-xs">EIS ER</div>
               <div><EditableStatLine payrollId={row.id} field="eis_er" value={Number(row.eis_er)} readOnly={row.status !== 'draft'} /></div>
             </div>
           </div>
           <div className="mt-2 pt-2 border-t border-hairline flex justify-between">
-            <span className="text-xs text-graphite">Total Employer Contribution</span>
-            <span className="num text-graphite text-sm">{formatMoney(totalEr)}</span>
+            <span className="text-xs">Total Employer Contribution</span>
+            <span className="num text-sm">{formatMoney(totalEr)}</span>
           </div>
         </section>
 
         {/* Footer */}
         <div className="text-center pt-4 border-t border-hairline">
-          <div className="font-serif italic text-muted text-xs">
-            Status: <span className="uppercase tracking-wide">{row.status}</span>
+          <div className="text-xs">
+            Status: <span className={`chip ${STATUS_TONE[row.status] ?? ''}`}><span className="dot" />{row.status}</span>
             {row.status === 'paid' && ' · This payslip is final.'}
           </div>
-          <div className="font-mono text-xs text-muted mt-1">
+          <div className="font-mono text-xs mt-1">
             Generated {new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
             {' · '}HOUZS Venture Portal
           </div>
@@ -260,11 +276,13 @@ export default async function PayslipPage({ params }: PageProps) {
   )
 }
 
+// A muted line (unpaid leave, shown for the record at 0.00) steps down a size
+// rather than turning grey: the sheet's lettering is black throughout.
 function Line({ label, value, muted }: { label: string; value: number | string | null; muted?: boolean }) {
   return (
-    <div className="flex justify-between">
-      <span className={`font-sans ${muted ? 'text-muted italic' : 'text-graphite'}`}>{label}</span>
-      <span className={`num ${muted ? 'text-muted' : ''}`}>{formatMoney(Number(value ?? 0))}</span>
+    <div className={`flex justify-between${muted ? ' text-xs' : ''}`}>
+      <span>{label}</span>
+      <span className={`num${muted ? ' text-xs font-normal' : ''}`}>{formatMoney(Number(value ?? 0))}</span>
     </div>
   )
 }

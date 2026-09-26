@@ -71,19 +71,20 @@ export default function HierarchyTabs({
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()}
           </div>
           <h1 className="page-title">Staff Hierarchy</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          {/* Nothing on the sheet is italic: a stressed word is bold. */}
+          <p className="text-sm mt-3 max-w-2xl">
             {tab === 'team' ? (
               subDept.isHome ? (
                 <>
                   Who {subDept.name} reports to, then everyone on it: the title they hold, the
-                  rank they are paid from, and who they report to. Only the <em>rank</em> is set
+                  rank they are paid from, and who they report to. Only the <strong>rank</strong> is set
                   here — a title gives its rank on its own, and who somebody reports to is moved
                   on the chart.
                 </>
               ) : (
                 <>
                   Who {subDept.name} reports to, then who is in it: the title each holds{' '}
-                  <em>here</em>, the rank they are paid from, and who they earn under. Titles,
+                  <strong>here</strong>, the rank they are paid from, and who they earn under. Titles,
                   ranks and membership are set here; who earns under whom is moved on the chart.
                   None of it touches People.
                 </>
@@ -133,9 +134,9 @@ export default function HierarchyTabs({
 
 function NobodyYet({ isHome }: { isHome: boolean }) {
   return (
-    <div className="py-16 text-center border border-hairline rounded-card bg-surface">
-      <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
-      <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
+    <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+      <p className="text-md font-bold mb-2">Nobody to chart yet.</p>
+      <p className="text-sm max-w-md mx-auto">
         {isHome
           ? 'Add salespeople under People Management with a commission department and a ladder title; they appear here with the rank their title gives.'
           : 'Add members on the Team tab — anybody in the department, with the title they hold here.'}

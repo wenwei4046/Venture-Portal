@@ -48,33 +48,33 @@ export default function PaysFromControl({ subDepartmentId, cutover }: Props) {
   }
 
   return (
-    <section aria-label="When the portal starts paying" className="mb-8 border border-hairline rounded-card bg-surface px-4 py-3">
+    <section aria-label="When the portal starts paying" className="mb-8 border border-hairline rounded-card bg-surface-2 px-4 py-3">
       {editing ? (
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
-            <span className="block font-mono text-[10.5px] uppercase tracking-[0.02em] text-graphite mb-1">The portal pays from</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.045em] mb-1">The portal pays from</span>
             <input
               type="month"
               value={month}
               onChange={e => setMonth(e.target.value)}
               aria-label="First month the portal pays"
-              className="px-2 py-1.5 bg-paper border border-hairline rounded-control text-sm text-ink"
+              className="px-2 py-1.5 bg-surface border border-hairline rounded-control text-sm text-ink"
             />
           </label>
           <label className="block flex-1 min-w-[14rem]">
-            <span className="block font-mono text-[10.5px] uppercase tracking-[0.02em] text-graphite mb-1">Why (optional)</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.045em] mb-1">Why (optional)</span>
             <input
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="e.g. June–August paid from the claim forms"
-              className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-control text-sm text-ink"
+              className="w-full px-2 py-1.5 bg-surface border border-hairline rounded-control text-sm text-ink"
             />
           </label>
           <button
             type="button"
             disabled={pending || !/^\d{4}-\d{2}$/.test(month)}
             onClick={() => run(() => setFirstPaidMonth(subDepartmentId, `${month}-01`, note))}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
+            className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
           >
             {pending ? 'Saving…' : 'Save'}
           </button>
@@ -87,7 +87,7 @@ export default function PaysFromControl({ subDepartmentId, cutover }: Props) {
                   run(() => clearFirstPaidMonth(subDepartmentId))
                 }
               }}
-              className="font-mono text-[10.5px] uppercase tracking-wide text-muted hover:text-danger px-2 py-2"
+              className="text-xs hover:text-danger hover:underline underline-offset-2 px-2 py-2"
             >
               Pay every month
             </button>
@@ -95,7 +95,7 @@ export default function PaysFromControl({ subDepartmentId, cutover }: Props) {
           <button
             type="button"
             onClick={() => { setEditing(false); setError(null) }}
-            className="font-serif italic text-sm text-graphite hover:text-ink px-2 py-2"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Cancel
           </button>
@@ -104,19 +104,19 @@ export default function PaysFromControl({ subDepartmentId, cutover }: Props) {
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           {cutover ? (
             <>
-              <span className="font-serif text-[15px] text-ink">
+              <span className="text-sm">
                 The portal pays from <strong className="font-semibold">{monthName(cutover.firstPaidMonth)}</strong>
               </span>
-              <span className="font-serif italic text-sm text-graphite">
+              <span className="text-xs">
                 Earlier months were settled by hand: their bills never carry into a run, and a change
                 the ERP makes to one is a drop or an upsell to confirm.
               </span>
-              <span className="font-mono text-[10.5px] text-muted">
+              <span className="text-[11px]">
                 {cutover.setByName ? `${cutover.setByName} · ` : ''}{day(cutover.setAt)}{cutover.note ? ` · “${cutover.note}”` : ''}
               </span>
             </>
           ) : (
-            <span className="font-serif italic text-sm text-graphite">
+            <span className="text-xs">
               The portal pays every month: a bill of an earlier month rides into the next run until a
               run pays it. If earlier months were paid by hand, set the first month the portal pays.
             </span>
@@ -124,13 +124,13 @@ export default function PaysFromControl({ subDepartmentId, cutover }: Props) {
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="font-mono text-[10.5px] uppercase tracking-wide text-accent hover:underline ml-auto"
+            className="ml-auto bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors"
           >
             {cutover ? 'Change' : 'Set the first month…'}
           </button>
         </div>
       )}
-      {error ? <p role="alert" className="font-serif italic text-sm text-danger mt-2">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-danger mt-2">{error}</p> : null}
     </section>
   )
 }

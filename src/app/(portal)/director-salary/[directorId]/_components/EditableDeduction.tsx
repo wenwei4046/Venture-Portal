@@ -75,7 +75,7 @@ export default function EditableDeduction({ payoutId, field, value, kind, readOn
 
   if (readOnly) {
     return (
-      <span className={kind === 'payroll' ? 'num text-graphite' : 'num text-graphite'}>
+      <span className="num">
         {kind === 'payroll' ? `(${fmt(value)})` : fmt(value)}
       </span>
     )
@@ -102,23 +102,23 @@ export default function EditableDeduction({ payoutId, field, value, kind, readOn
             }
           }}
           disabled={isPending}
-          className="w-24 px-2 py-0.5 bg-paper border border-accent-border rounded font-mono tabular text-right text-sm text-ink focus:outline-none disabled:opacity-50"
+          className="w-24 px-2 py-0.5 bg-paper border border-accent-border rounded-control font-mono tabular text-right text-[12px] text-ink focus:outline-none disabled:opacity-50"
         />
         {error ? (
-          <span className="text-danger text-xs font-sans">{error}</span>
+          <span className="text-danger text-xs">{error}</span>
         ) : null}
       </span>
     )
   }
 
+  // Editable: a dashed underline says "click me"; the peach wash on hover is
+  // the sheet's row-hover tone.
   return (
     <button
       type="button"
       onClick={() => setEditing(true)}
       title="Click to override"
-      className={
-        'num text-graphite hover:text-accent hover:bg-accent/5 rounded px-1 -mx-1 transition-colors cursor-text'
-      }
+      className="num border-b border-dashed border-hairline hover:border-accent-border hover:bg-accent-bg rounded-t-sm px-1 -mx-1 transition-colors cursor-text"
     >
       {kind === 'payroll' ? `(${fmt(value)})` : fmt(value)}
     </button>

@@ -78,6 +78,8 @@ export default function OpenBillPicker({
     <div className="flex items-center gap-1">
       {([1, 2, 3] as const).map(r => {
         const held = rank === r
+        // A decision is the sheet's orange action (black lettering), a
+        // suggestion a dashed amber wash, an open rank a plain white key.
         return (
           <button
             key={r}
@@ -94,17 +96,17 @@ export default function OpenBillPicker({
             className={[
               'font-mono text-[10px] leading-none px-1.5 py-1 rounded-control border transition-colors disabled:opacity-40',
               held && !suggested
-                ? 'bg-accent border-accent text-white'
+                ? 'bg-accent border-accent hover:bg-accent-hover'
                 : held
                   ? 'border-dashed border-alert text-alert bg-alert-bg font-semibold'
-                  : 'bg-paper border-hairline text-muted hover:border-accent-border hover:text-graphite',
+                  : 'bg-surface border-hairline hover:border-accent',
             ].join(' ')}
           >
             {LABELS[r]}
           </button>
         )
       })}
-      {error ? <span className="font-serif italic text-danger text-[11px] ml-1">{error}</span> : null}
+      {error ? <span className="text-danger text-[11px] ml-1">{error}</span> : null}
     </div>
   )
 }

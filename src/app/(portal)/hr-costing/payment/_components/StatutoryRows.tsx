@@ -10,7 +10,7 @@ export default function StatutoryRows({ rows, today, busy, staffFunded, onGenera
   const outstanding = round2(rows.reduce((sum, row) => sum + Math.max(0, row.total - row.paidAmount), 0))
   return <>
     <div className="pay-table-wrap"><table className="pay-statement-table pay-statutory-table">
-      <thead><tr><th>Institution</th><th className="num">Amount · RM</th><th>Due</th><th>Status</th><th className="right">Generate PVs</th></tr></thead>
+      <thead><tr><th>Institution</th><th className="right">Amount · RM</th><th>Due</th><th>Status</th><th className="right">Generate PVs</th></tr></thead>
       <tbody>{BODIES.map(body => {
         const schemes = rows.filter(row => row.body === body.key)
         if (!schemes.length) return null
@@ -25,7 +25,7 @@ export default function StatutoryRows({ rows, today, busy, staffFunded, onGenera
           <td><button type="button" className="pay-text-button" onClick={() => onOpen(body.key)}>{body.name}</button><small>{body.key === 'PERKESO' ? 'SOCSO + EIS' : body.key === 'KWSP' ? 'EPF' : body.key === 'LHDN' ? 'PCB / MTD' : 'Employee deduction'}</small></td>
           <td className="num">{formatMoneyBare(total)}{remaining > 0 && vouchers.length > 0 ? <small>{formatMoneyBare(remaining)} to generate</small> : null}</td>
           <td className={due < today && !allPaid && total > 0 ? 'pay-change-notable' : undefined}>{shortDate(due)}</td>
-          <td><span className={`pay-status${allPaid ? ' paid' : pending ? ' pending' : ''}`}>{status}</span>{vouchers.length > 0 ? <small><button type="button" className="pay-text-button" onClick={() => onOpen(body.key)}>{vouchers.length} PV{vouchers.length === 1 ? '' : 's'} ↗</button></small> : null}</td>
+          <td><span className={`chip${allPaid ? ' ledger' : pending ? ' alert' : ''}`}><span className="dot" />{status}</span>{vouchers.length > 0 ? <small><button type="button" className="pay-text-button" onClick={() => onOpen(body.key)}>{vouchers.length} PV{vouchers.length === 1 ? '' : 's'} ↗</button></small> : null}</td>
           <td><div className="pay-row-actions">{remaining > 0 ? <>
             <button type="button" className="pay-btn sec" disabled={busy != null || !staffFunded} title={!staffFunded ? 'Payroll funding is not complete yet' : undefined} onClick={() => onGenerate(body.key, 'department')}>Generate by Department</button>
             <button type="button" className="pay-btn sec" disabled={busy != null || !staffFunded} title={!staffFunded ? 'Payroll funding is not complete yet' : undefined} onClick={() => onGenerate(body.key, 'employee')}>Manual generate</button>

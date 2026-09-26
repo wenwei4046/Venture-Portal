@@ -25,6 +25,7 @@ import DirectorPayrollActualGrid, {
 } from './_components/DirectorPayrollActualGrid'
 import DirectorPeriodPicker from './_components/DirectorPeriodPicker'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 interface Props {
   searchParams: Promise<{ period?: string; tab?: string }>
@@ -144,13 +145,15 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
   const tabHref = (t: 'calculation' | 'submission') =>
     `/director-salary?period=${dayjs(period).format('YYYY-MM')}${t === 'submission' ? '&tab=submission' : ''}`
 
+  const companyCount = companies?.length ?? 0
+
   return (
     <div>
-      {/* Header */}
+      {/* Header — the month rides in the eyebrow; the picker moves it. */}
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> DIRECTOR · SALARY ENGINE
+            <em>I.</em> DIRECTOR · SALARY ENGINE · {periodLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Director Salary</h1>
         </div>
@@ -161,27 +164,34 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
         />
       </div>
 
-      {/* Tabs — Calculation | Director Payroll Submission */}
-      <div className="flex items-center gap-6 border-b border-hairline mb-10">
-        <TabLink href={tabHref('calculation')} active={tab === 'calculation'}>
+      {/* Tabs — Calculation | Director Payroll Submission. They are links
+          (?tab=), so the rail is a <nav> and the pick is aria-current. */}
+      <nav className="sheet-tabs" aria-label="Director Salary views">
+        <Link href={tabHref('calculation')} aria-current={tab === 'calculation' ? 'page' : undefined}>
           Calculation
-        </TabLink>
-        <TabLink href={tabHref('submission')} active={tab === 'submission'}>
+        </Link>
+        <Link href={tabHref('submission')} aria-current={tab === 'submission' ? 'page' : undefined}>
           Director Payroll Submission
           {submission ? (
-            <span className="ml-2 font-mono text-[10px] text-ledger uppercase tracking-wider">submitted</span>
+            <span className="chip ledger"><span className="dot" />submitted</span>
           ) : null}
-        </TabLink>
-      </div>
+        </Link>
+      </nav>
 
       {tab === 'calculation' ? (
         <>
           {/* CTC Input Section — billing side */}
-          <section className="mb-16">
-            <h2 className="font-serif text-2xl text-ink mb-1">Pool Breakdown (Billing)</h2>
-            <p className="font-serif italic text-graphite text-sm mb-4">
+          <section className="mb-12">
+            <div className="sect-head">
+              <h2>Pool Breakdown (Billing)</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                {companyCount} COMPAN{companyCount === 1 ? 'Y' : 'IES'}
+              </span>
+            </div>
+            <p className="text-sm -mt-2 mb-4">
               What Finance bills each subsidiary · Save here, then submit on the{' '}
-              <Link href={tabHref('submission')} className="text-accent hover:text-accent-hover not-italic">
+              <Link href={tabHref('submission')} className="text-accent hover:text-accent-hover">
                 Submission tab →
               </Link>
             </p>
@@ -215,23 +225,24 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           </section>
 
           {/* Director Payroll (InfoTech actual) — payroll side */}
-          <section className="mb-16">
-            <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3 mb-6">
-              <div>
-                <h2 className="font-serif text-2xl text-ink mb-1">Director Payroll (InfoTech)</h2>
-                <p className="font-serif italic text-graphite text-sm">
-                  Actual payroll run imported from InfoTech ·{' '}
-                  <Link
-                    href={tabHref('submission')}
-                    className="text-accent hover:text-accent-hover not-italic"
-                  >
-                    {submission ? 'View submission →' : 'Submit to Finance →'}
-                  </Link>
-                </p>
-              </div>
+          <section className="mb-12">
+            <div className="sect-head">
+              <h2>Director Payroll (InfoTech)</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                {actualRows.length} DIRECTOR{actualRows.length === 1 ? '' : 'S'}
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 -mt-2 mb-5">
+              <p className="text-sm">
+                Actual payroll run imported from InfoTech ·{' '}
+                <Link href={tabHref('submission')} className="text-accent hover:text-accent-hover">
+                  {submission ? 'View submission →' : 'Submit to Finance →'}
+                </Link>
+              </p>
               <Link
                 href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
-                className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors shrink-0"
+                className="self-start sm:self-auto shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
               >
                 Import InfoTech →
               </Link>
@@ -276,29 +287,6 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
         />
       )}
     </div>
-  )
-}
-
-function TabLink({
-  href,
-  active,
-  children,
-}: {
-  href: string
-  active: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      href={href}
-      className={
-        active
-          ? 'font-serif italic text-base text-ink border-b-2 border-accent pb-2 -mb-px'
-          : 'font-serif italic text-base text-graphite hover:text-ink border-b-2 border-transparent pb-2 -mb-px transition-colors'
-      }
-    >
-      {children}
-    </Link>
   )
 }
 
@@ -419,43 +407,32 @@ function SubmissionTab({
 
   return (
     <div>
-      {/* Status + CTA strip */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-10">
-        <div>
-          <div className="font-serif italic text-accent text-base mb-1">
-            {periodLabel}
-          </div>
+      {/* Status + CTA strip. The month is in the page eyebrow above. */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+        <div className="min-w-0">
           {submitted ? (
             <>
-              <div className="font-serif text-2xl text-ink">
-                Submitted to Finance
-              </div>
-              <div className="font-mono text-xs text-muted mt-1">
+              <h2 className="sheet-heading">Submitted to Finance</h2>
+              <p className="sheet-subtitle">
                 {dayjs(submission.submitted_at).format('D MMM YYYY HH:mm')} ·{' '}
                 {totals?.directors} director{totals?.directors === 1 ? '' : 's'} · Finance sees
                 these totals + the per-subsidiary split on Billing
-              </div>
+              </p>
               {fundingRequest ? (
-                <div className="font-mono text-xs mt-1">
-                  <span className="text-graphite">Funding request {formatMoney(Number(fundingRequest.amount))} · </span>
-                  {fundingRequest.status === 'submitted' ? (
-                    <span className="text-alert">awaiting Finance</span>
-                  ) : fundingRequest.status === 'pv_generated' ? (
-                    <span className="text-info">PV generated — awaiting Principal</span>
-                  ) : (
-                    <span className="text-ledger">completed — funds staged</span>
-                  )}
-                </div>
+                <p className="sheet-subtitle flex flex-wrap items-center gap-2">
+                  <span>Funding request {formatMoney(Number(fundingRequest.amount))}</span>
+                  <FundingRequestStatus status={fundingRequest.status} />
+                </p>
               ) : null}
             </>
           ) : (
             <>
-              <div className="font-serif text-2xl text-ink">Not submitted yet</div>
-              <div className="font-mono text-xs text-muted mt-1">
+              <h2 className="sheet-heading">Not submitted yet</h2>
+              <p className="sheet-subtitle">
                 {missing.length === 0
                   ? 'Preview below — submitting sends the InfoTech payroll totals + per-subsidiary CTC split to Finance immediately'
                   : `To submit: ${missing.join(' · ')}`}
-              </div>
+              </p>
             </>
           )}
         </div>
@@ -473,74 +450,46 @@ function SubmissionTab({
         </div>
       </div>
 
-      {/* Totals strip — payroll side (InfoTech actuals) */}
+      {/* Totals — payroll side (InfoTech actuals). Total gross is what
+          Submit sends, so it is the row's one walnut card. */}
       {totals && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 border-y border-hairline py-6">
-          <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross (InfoTech)</div>
-            <div className="statement-amount text-num-ink mt-1">{formatMoney(totals.gross)}</div>
-          </div>
-          <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Net to Directors</div>
-            <div className="statement-amount compact text-num-ink mt-1">{formatMoney(totals.payrollNet)}</div>
-          </div>
-          <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Employer Statutory</div>
-            <div className="statement-amount compact text-graphite mt-1">{formatMoney(totals.statutoryEr)}</div>
-          </div>
-          <div>
-            <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Directors</div>
-            <div className="statement-amount compact text-graphite mt-1">{totals.directors}</div>
-          </div>
-        </div>
+        <StatCards label={`Director payroll totals for ${periodLabel}`}>
+          <StatCard
+            label="Total gross (InfoTech)"
+            value={formatMoney(totals.gross)}
+            icon="coin"
+            tone="primary"
+            note={submitted ? 'As submitted to Finance' : 'Live preview'}
+          />
+          <StatCard label="Net to directors" value={formatMoney(totals.payrollNet)} icon="bank" />
+          <StatCard label="Employer statutory" value={formatMoney(totals.statutoryEr)} icon="shield" note="EPF + SOCSO + EIS" />
+          <StatCard label="Directors" value={String(totals.directors)} icon="people" />
+        </StatCards>
       )}
 
       {/* Billing vs Payroll reconciliation — the two lines never tally, and
           this is where the difference goes. Derived live from the figures
           above (rates from dp_settings); nothing is persisted. */}
       {gap && (
-        <section className="mb-16">
+        <section className="mb-12">
           <div className="sect-head">
             <h2>Billing vs Payroll — Where the Difference Went</h2>
             <span className="rule" aria-hidden />
             <span className="count">NOT STORED</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8 border-y border-hairline py-6">
-            <div>
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-                Billed to Subsidiaries
-              </div>
-              <div className="statement-amount text-num-ink mt-1">
-                {formatMoney(gap.ctcTotal)}
-              </div>
-              <div className="font-mono text-[11px] text-muted mt-1">
-                gross {formatMoney(gap.ctcGross)} + ER stat
-              </div>
-            </div>
-            <div>
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-                Actually Paid Out
-              </div>
-              <div className="statement-amount text-num-ink mt-1">
-                {formatMoney(gap.cashOut)}
-              </div>
-              <div className="font-mono text-[11px] text-muted mt-1">
-                InfoTech gross + ER stat
-              </div>
-            </div>
-            <div>
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-                Difference
-              </div>
-              <div className="statement-amount text-accent mt-1">
-                {formatMoney(gap.gap)}
-              </div>
-              <div className="font-mono text-[11px] text-muted mt-1">
-                stays in the HV account
-              </div>
-            </div>
-          </div>
+          {/* The difference is what this section explains, so it is the
+              row's walnut card. */}
+          <StatCards label="Billing against payroll">
+            <StatCard
+              label="Billed to subsidiaries"
+              value={formatMoney(gap.ctcTotal)}
+              icon="receipt"
+              note={`Gross ${formatMoney(gap.ctcGross)} + ER stat`}
+            />
+            <StatCard label="Actually paid out" value={formatMoney(gap.cashOut)} icon="wallet" note="InfoTech gross + ER stat" />
+            <StatCard label="Difference" value={formatMoney(gap.gap)} icon="swap" tone="primary" note="Stays in the HV account" />
+          </StatCards>
 
           <div className="overflow-x-auto">
             <table className="ledger-table [&_td.num]:whitespace-nowrap">
@@ -553,26 +502,20 @@ function SubmissionTab({
               </thead>
               <tbody>
                 <tr>
-                  <td className="font-serif text-[15px] text-ink">
+                  <td className="font-medium">
                     {gap.saving > 0 ? `${gapSettings.savingPct}% Saving` : 'Saving'}
                   </td>
-                  <td className="font-sans text-xs text-graphite">
-                    Held back on the directors&rsquo; behalf — never left HV
-                  </td>
+                  <td>Held back on the directors&rsquo; behalf — never left HV</td>
                   <td className="num">{formatMoney(gap.saving)}</td>
                 </tr>
                 <tr>
-                  <td className="font-serif text-[15px] text-ink">
-                    {100 - gapSettings.gbPct}% Billing Invoice
-                  </td>
-                  <td className="font-sans text-xs text-graphite">
-                    Accrues on the outsource side — not part of this payroll
-                  </td>
+                  <td className="font-medium">{100 - gapSettings.gbPct}% Billing Invoice</td>
+                  <td>Accrues on the outsource side — not part of this payroll</td>
                   <td className="num">{formatMoney(gap.billing25)}</td>
                 </tr>
                 <tr>
-                  <td className="font-serif text-[15px] text-ink">Advance fronted by HV</td>
-                  <td className="font-sans text-xs text-graphite">
+                  <td className="font-medium">Advance fronted by HV</td>
+                  <td>
                     Payroll ran above the pool&rsquo;s {gapSettings.gbPct}% share (
                     {formatMoney(gap.totalPay75)}) — HV covered the shortfall
                   </td>
@@ -581,29 +524,31 @@ function SubmissionTab({
                   </td>
                 </tr>
                 <tr>
-                  <td className="font-serif text-[15px] text-ink">Employer Statutory Surplus</td>
-                  <td className="font-sans text-xs text-graphite">
-                    ER statutory billed to subsidiaries exceeded what payroll actually paid
-                  </td>
+                  <td className="font-medium">Employer Statutory Surplus</td>
+                  <td>ER statutory billed to subsidiaries exceeded what payroll actually paid</td>
                   <td className="num">{formatMoney(gap.statutorySurplus)}</td>
                 </tr>
+              </tbody>
+              <tfoot>
                 <tr>
-                  <td className="font-serif italic text-accent">Accounted for</td>
+                  <td className="font-bold">Accounted for</td>
                   <td />
-                  <td className="num font-semibold">
+                  <td className="num font-bold">
                     {formatMoney(
                       gap.saving + gap.billing25 - gap.advanceCash + gap.statutorySurplus,
                     )}
                   </td>
                 </tr>
+                {/* The residual between the buckets and the difference — a
+                    quiet line under the total, not a second total. */}
                 {Math.abs(gap.residual) >= 0.01 && (
                   <tr>
-                    <td className="font-serif italic text-graphite">Rounding</td>
+                    <td><span className="font-normal">Rounding</span></td>
                     <td />
-                    <td className="num text-graphite">{formatMoney(gap.residual)}</td>
+                    <td className="num"><span className="font-normal">{formatMoney(gap.residual)}</span></td>
                   </tr>
                 )}
-              </tbody>
+              </tfoot>
             </table>
           </div>
 
@@ -624,9 +569,9 @@ function SubmissionTab({
               <tbody>
                 {gap.perDirector.map(d => (
                   <LedgerRow key={d.code}>
-                    <td className="font-serif text-[15px] text-ink">{d.code}</td>
+                    <td className="font-medium">{d.code}</td>
                     <td className="num">{formatMoney(d.totalPay)}</td>
-                    <td className="num text-graphite m-hide" data-label="Fixed salary">{formatMoney(d.fixed)}</td>
+                    <td className="num m-hide" data-label="Fixed salary">{formatMoney(d.fixed)}</td>
                     <td className="num m-hide" data-label="Vr KPI">
                       {d.vrKpi < 0 ? (
                         <span className="neg">({formatMoney(Math.abs(d.vrKpi))})</span>
@@ -634,47 +579,49 @@ function SubmissionTab({
                         <span className="text-ledger">{formatMoney(d.vrKpi)}</span>
                       )}
                     </td>
-                    <td className="num text-graphite m-hide" data-label={`${100 - gapSettings.gbPct}% Billing`}>{formatMoney(d.billing25)}</td>
+                    <td className="num m-hide" data-label={`${100 - gapSettings.gbPct}% Billing`}>{formatMoney(d.billing25)}</td>
                   </LedgerRow>
                 ))}
+              </tbody>
+              <tfoot>
                 <tr>
-                  <td className="font-serif italic text-accent">Total</td>
-                  <td className="num font-semibold">{formatMoney(gap.totalPay75)}</td>
-                  <td className="num font-semibold text-graphite m-hide">
+                  <td className="font-bold">Total</td>
+                  <td className="num font-bold">{formatMoney(gap.totalPay75)}</td>
+                  <td className="num m-hide">
                     {formatMoney(gap.perDirector.reduce((s, d) => s + d.fixed, 0))}
                   </td>
-                  <td className="num font-semibold m-hide">
+                  <td className="num m-hide">
                     <span className="neg">({formatMoney(gap.advanceLedger)})</span>
                   </td>
-                  <td className="num font-semibold text-graphite m-hide">
-                    {formatMoney(gap.billing25)}
-                  </td>
-                  <td className="lt-toggle" />
+                  <td className="num m-hide">{formatMoney(gap.billing25)}</td>
+                  <td className="lt-toggle" aria-hidden />
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
           </div>
 
-          <p className="font-sans text-xs text-muted mt-3">
-            Two advance views: <strong>{formatMoney(gap.advanceLedger)}</strong> is the ledger
-            figure — debt booked against only the directors who fell short.{' '}
-            <strong>{formatMoney(gap.advanceCash)}</strong> is the cash figure used in the table
-            above, which nets off directors whose share ran above their fixed salary, so the
-            buckets tally against the difference.
-          </p>
-          <p className="font-sans text-xs text-muted mt-2">
-            Computed on the fly from this period&rsquo;s figures at the rates in Director Pool
-            settings ({gapSettings.savingPct}% saving · {gapSettings.gbPct}/
-            {100 - gapSettings.gbPct} split). <strong>Nothing here is written to the database</strong> —
-            these buckets have no ledger of their own yet, so the difference simply sits in the HV
-            bank account.
-          </p>
+          <div className="sheet-notice">
+            <p>
+              Two advance views: <strong>{formatMoney(gap.advanceLedger)}</strong> is the ledger
+              figure — debt booked against only the directors who fell short.{' '}
+              <strong>{formatMoney(gap.advanceCash)}</strong> is the cash figure used in the table
+              above, which nets off directors whose share ran above their fixed salary, so the
+              buckets tally against the difference.
+            </p>
+            <p className="mt-2">
+              Computed on the fly from this period&rsquo;s figures at the rates in Director Pool
+              settings ({gapSettings.savingPct}% saving · {gapSettings.gbPct}/
+              {100 - gapSettings.gbPct} split). <strong>Nothing here is written to the database</strong> —
+              these buckets have no ledger of their own yet, so the difference simply sits in the HV
+              bank account.
+            </p>
+          </div>
         </section>
       )}
 
       {/* Director Payroll (InfoTech) — per-director detail. Shown here for
           HR/Principal; the snapshot Finance receives stays aggregate-only. */}
-      <section className="mb-16">
+      <section className="mb-12">
         <div className="sect-head">
           <h2>Director Payroll (InfoTech)</h2>
           <span className="rule" aria-hidden />
@@ -683,74 +630,80 @@ function SubmissionTab({
           </span>
         </div>
         {payrollRows.length === 0 ? (
-          <p className="font-serif italic text-graphite text-sm">
-            No InfoTech payroll imported for this period yet — import on the Calculation tab.
-          </p>
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">
+              No InfoTech payroll imported for this period yet — import on the Calculation tab.
+            </p>
+          </div>
         ) : (
           <>
             {submitted && totals &&
               (Math.abs(livePayrollTotals.gross - totals.gross) > 0.01 ||
                 Math.abs(livePayrollTotals.net - totals.payrollNet) > 0.01) && (
-                <div className="mb-4 rounded-md border border-alert bg-alert-bg px-3 py-2">
-                  <p className="font-serif italic text-alert text-sm">
-                    ⚠ The InfoTech figures changed after this submission — Reopen for edits and
-                    submit again so Finance sees the current numbers.
-                  </p>
+                <div className="sheet-warning">
+                  ⚠ The InfoTech figures changed after this submission — Reopen for edits and
+                  submit again so Finance sees the current numbers.
                 </div>
               )}
-            <div className="overflow-x-auto">
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Director</th>
-                    <th className="right m-hide">Gross</th>
-                    <th className="right m-hide">EPF ER</th>
-                    <th className="right m-hide">SOCSO+EIS ER</th>
-                    <th className="right m-hide">PCB</th>
-                    <th className="right">Net</th>
-                    <th className="lt-toggle" aria-hidden />
-                  </tr>
-                </thead>
-                <tbody>
-                  {payrollRows.map(r => (
-                    <LedgerRow key={r.id}>
-                      <td>
-                        <div className="font-serif text-[15px] text-ink">{r.director_code ?? r.employee_name}</div>
-                        <div className="font-mono text-[11px] text-graphite mt-0.5">{r.employee_name}</div>
+            <div className="table-frame">
+              <div className="table-frame-scroll">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Director</th>
+                      <th className="right m-hide">Gross</th>
+                      <th className="right m-hide">EPF ER</th>
+                      <th className="right m-hide">SOCSO+EIS ER</th>
+                      <th className="right m-hide">PCB</th>
+                      <th className="right">Net</th>
+                      <th className="lt-toggle" aria-hidden />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payrollRows.map(r => (
+                      <LedgerRow key={r.id}>
+                        <td>
+                          <div className="font-medium">{r.director_code ?? r.employee_name}</div>
+                          <div className="text-[11px] mt-0.5">{r.employee_name}</div>
+                        </td>
+                        <td className="num m-hide" data-label="Gross">{formatMoney(r.gross)}</td>
+                        <td className="num m-hide" data-label="EPF ER">{formatMoney(r.epf_er)}</td>
+                        <td className="num m-hide" data-label="SOCSO+EIS ER">{formatMoney(r.socso_er + r.eis_er)}</td>
+                        <td className="num m-hide" data-label="PCB">{formatMoney(r.pcb)}</td>
+                        <td className="num font-bold">{formatMoney(r.net)}</td>
+                      </LedgerRow>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="font-bold">Total</td>
+                      <td className="num m-hide">{formatMoney(livePayrollTotals.gross)}</td>
+                      <td className="num m-hide">
+                        {formatMoney(payrollRows.reduce((s, r) => s + r.epf_er, 0))}
                       </td>
-                      <td className="num m-hide" data-label="Gross">{formatMoney(r.gross)}</td>
-                      <td className="num m-hide" data-label="EPF ER">{formatMoney(r.epf_er)}</td>
-                      <td className="num m-hide" data-label="SOCSO+EIS ER">{formatMoney(r.socso_er + r.eis_er)}</td>
-                      <td className="num m-hide" data-label="PCB">{formatMoney(r.pcb)}</td>
-                      <td className="num font-semibold">{formatMoney(r.net)}</td>
-                    </LedgerRow>
-                  ))}
-                  <tr>
-                    <td className="font-serif italic text-accent">Total</td>
-                    <td className="num font-semibold m-hide">{formatMoney(livePayrollTotals.gross)}</td>
-                    <td className="num font-semibold m-hide">
-                      {formatMoney(payrollRows.reduce((s, r) => s + r.epf_er, 0))}
-                    </td>
-                    <td className="num font-semibold m-hide">
-                      {formatMoney(payrollRows.reduce((s, r) => s + r.socso_er + r.eis_er, 0))}
-                    </td>
-                    <td className="num font-semibold m-hide">{formatMoney(livePayrollTotals.pcb)}</td>
-                    <td className="num font-semibold">{formatMoney(livePayrollTotals.net)}</td>
-                    <td className="lt-toggle" />
-                  </tr>
-                </tbody>
-              </table>
+                      <td className="num m-hide">
+                        {formatMoney(payrollRows.reduce((s, r) => s + r.socso_er + r.eis_er, 0))}
+                      </td>
+                      <td className="num m-hide">{formatMoney(livePayrollTotals.pcb)}</td>
+                      <td className="num font-bold">{formatMoney(livePayrollTotals.net)}</td>
+                      <td className="lt-toggle" aria-hidden />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div className="table-frame-foot">
+                <span>
+                  Per-director detail is visible to HR and Principal only — Finance receives the
+                  aggregate totals above, never individual salaries.
+                </span>
+              </div>
             </div>
-            <p className="font-sans text-xs text-muted mt-3">
-              Per-director detail is visible to HR and Principal only — Finance receives the
-              aggregate totals above, never individual salaries.
-            </p>
           </>
         )}
       </section>
 
       {/* Per-subsidiary contribution — what Finance bills each company */}
-      <section className="mb-16">
+      <section>
         <div className="sect-head">
           <h2>Per-Subsidiary Contribution</h2>
           <span className="rule" aria-hidden />
@@ -759,61 +712,81 @@ function SubmissionTab({
           </span>
         </div>
         {byCompany.length === 0 ? (
-          <p className="font-serif italic text-graphite text-sm">
-            No CTC entered for this period yet — fill the Pool Breakdown grid on the Calculation tab.
-          </p>
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">
+              No CTC entered for this period yet — fill the Pool Breakdown grid on the Calculation tab.
+            </p>
+            <p className="text-xs mt-2">{BILLING_NOTE}</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Subsidiary</th>
-                  <th className="right m-hide">Basic</th>
-                  <th className="right m-hide">KPI</th>
-                  <th className="right m-hide">Allowance</th>
-                  <th className="right m-hide">EPF ER</th>
-                  <th className="right m-hide">SOCSO ER</th>
-                  <th className="right m-hide">EIS ER</th>
-                  <th className="right">Total</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {byCompany.map(r => (
-                  <LedgerRow key={r.company_id}>
-                    <td>
-                      <div className="font-serif text-[15px] text-ink">{r.company_short_code}</div>
-                      <div className="font-mono text-[11px] text-graphite mt-0.5">{r.company_name}</div>
-                    </td>
-                    <td className="num m-hide" data-label="Basic">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
-                    <td className="num m-hide" data-label="KPI">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
-                    <td className="num m-hide" data-label="Allowance">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
-                    <td className="num m-hide" data-label="EPF ER">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
-                    <td className="num m-hide" data-label="SOCSO ER">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
-                    <td className="num m-hide" data-label="EIS ER">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
-                    <td className="num font-semibold">{formatMoney(r.total_ctc)}</td>
-                  </LedgerRow>
-                ))}
-                <tr>
-                  <td className="font-serif italic text-accent">Total</td>
-                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.basic)}</td>
-                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.kpi)}</td>
-                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.allowance)}</td>
-                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.epf_er)}</td>
-                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.socso_er)}</td>
-                  <td className="num font-semibold m-hide">{sumOrDash(byCompany, r => r.eis_er)}</td>
-                  <td className="num font-semibold">{formatMoney(byCompanyTotal)}</td>
-                  <td className="lt-toggle" />
-                </tr>
-              </tbody>
-            </table>
+          <div className="table-frame">
+            <div className="table-frame-scroll">
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Subsidiary</th>
+                    <th className="right m-hide">Basic</th>
+                    <th className="right m-hide">KPI</th>
+                    <th className="right m-hide">Allowance</th>
+                    <th className="right m-hide">EPF ER</th>
+                    <th className="right m-hide">SOCSO ER</th>
+                    <th className="right m-hide">EIS ER</th>
+                    <th className="right">Total</th>
+                    <th className="lt-toggle" aria-hidden />
+                  </tr>
+                </thead>
+                <tbody>
+                  {byCompany.map(r => (
+                    <LedgerRow key={r.company_id}>
+                      <td>
+                        <div className="font-medium">{r.company_short_code}</div>
+                        <div className="text-[11px] mt-0.5">{r.company_name}</div>
+                      </td>
+                      <td className="num m-hide" data-label="Basic">{r.basic == null ? '—' : formatMoney(r.basic)}</td>
+                      <td className="num m-hide" data-label="KPI">{r.kpi == null ? '—' : formatMoney(r.kpi)}</td>
+                      <td className="num m-hide" data-label="Allowance">{r.allowance == null ? '—' : formatMoney(r.allowance)}</td>
+                      <td className="num m-hide" data-label="EPF ER">{r.epf_er == null ? '—' : formatMoney(r.epf_er)}</td>
+                      <td className="num m-hide" data-label="SOCSO ER">{r.socso_er == null ? '—' : formatMoney(r.socso_er)}</td>
+                      <td className="num m-hide" data-label="EIS ER">{r.eis_er == null ? '—' : formatMoney(r.eis_er)}</td>
+                      <td className="num font-bold">{formatMoney(r.total_ctc)}</td>
+                    </LedgerRow>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="font-bold">Total</td>
+                    <td className="num m-hide">{sumOrDash(byCompany, r => r.basic)}</td>
+                    <td className="num m-hide">{sumOrDash(byCompany, r => r.kpi)}</td>
+                    <td className="num m-hide">{sumOrDash(byCompany, r => r.allowance)}</td>
+                    <td className="num m-hide">{sumOrDash(byCompany, r => r.epf_er)}</td>
+                    <td className="num m-hide">{sumOrDash(byCompany, r => r.socso_er)}</td>
+                    <td className="num m-hide">{sumOrDash(byCompany, r => r.eis_er)}</td>
+                    <td className="num font-bold">{formatMoney(byCompanyTotal)}</td>
+                    <td className="lt-toggle" aria-hidden />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div className="table-frame-foot">
+              <span>{BILLING_NOTE}</span>
+            </div>
           </div>
         )}
-        <p className="font-sans text-xs text-muted mt-3">
-          Finance bills each subsidiary via Create Invoice → Director attribution; the
-          modal auto-fills from these amounts.
-        </p>
       </section>
     </div>
   )
+}
+
+const BILLING_NOTE =
+  'Finance bills each subsidiary via Create Invoice → Director attribution; the modal auto-fills from these amounts.'
+
+// A funding request's state is a word on a wash, in the colour its words
+// always carried: amber while Finance has it, neutral while the PV waits on
+// Principal, green once the funds are staged.
+function FundingRequestStatus({ status }: { status: string }) {
+  if (status === 'submitted')
+    return <span className="chip alert"><span className="dot" />awaiting Finance</span>
+  if (status === 'pv_generated')
+    return <span className="chip info"><span className="dot" />PV generated — awaiting Principal</span>
+  return <span className="chip ledger"><span className="dot" />completed — funds staged</span>
 }

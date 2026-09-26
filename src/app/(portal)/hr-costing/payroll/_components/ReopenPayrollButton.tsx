@@ -36,25 +36,25 @@ export default function ReopenPayrollButton({ period }: Props) {
     return (
       <div className="flex flex-col items-end gap-1">
         <div className="flex items-center gap-2">
-          <span className="font-serif italic text-graphite text-xs">
+          <span className="text-xs">
             Pull figures back for edits? Finance loses sight of them until you resubmit.
           </span>
           <button
             onClick={handleConfirm}
             disabled={isPending}
-            className="text-xs font-serif italic text-danger hover:underline disabled:opacity-50"
+            className="text-xs font-medium text-danger hover:underline underline-offset-2 disabled:opacity-50"
           >
             {isPending ? 'Reopening…' : 'Confirm reopen'}
           </button>
           <button
             onClick={() => setConfirming(false)}
             disabled={isPending}
-            className="text-xs font-sans text-muted hover:text-ink"
+            className="text-xs hover:underline underline-offset-2"
           >
             Cancel
           </button>
         </div>
-        {error && <span className="text-xs font-serif italic text-danger">{error}</span>}
+        {error && <span className="text-xs text-danger">{error}</span>}
       </div>
     )
   }
@@ -63,11 +63,11 @@ export default function ReopenPayrollButton({ period }: Props) {
     <div className="flex flex-col items-end gap-1">
       <button
         onClick={() => setConfirming(true)}
-        className="text-xs font-serif italic text-graphite hover:text-accent transition-colors"
+        className="text-xs hover:underline underline-offset-2 transition-colors"
       >
         Reopen for edits
       </button>
-      {error && <span className="text-xs font-serif italic text-danger">{error}</span>}
+      {error && <span className="text-xs text-danger">{error}</span>}
     </div>
   )
 }

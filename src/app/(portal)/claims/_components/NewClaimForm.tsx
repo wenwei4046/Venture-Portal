@@ -26,7 +26,7 @@ export default function NewClaimForm() {
     return (
       <button
         onClick={() => setShowForm(true)}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        className="bg-accent hover:bg-accent-hover text-sm font-medium px-4 py-2 rounded-control transition-colors"
       >
         + New Claim
       </button>
@@ -48,31 +48,33 @@ export default function NewClaimForm() {
   }
 
   return (
-    <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-6 max-w-lg">
-      <h3 className="font-serif text-lg text-ink mb-4">New Claim</h3>
+    // The sheet's form panel: white fields on a tinted card. The effect above
+    // toggles `shake-once` on the node itself, so className stays constant.
+    <form ref={formRef} action={handleSubmit} className="bg-surface-2 border border-hairline rounded-card p-6 max-w-lg">
+      <h3 className="text-md font-bold mb-4">New Claim</h3>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Type</label>
+          <label className="block text-sm font-medium mb-1.5">Type</label>
           <select
             name="claim_type"
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           >
             <option value="benefit">Benefit Claim</option>
             <option value="project">Pool Claim</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Claimant Name</label>
+          <label className="block text-sm font-medium mb-1.5">Claimant Name</label>
           <input
             name="claimant_name"
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Amount <span className="text-xs text-muted ml-1 font-normal">(RM)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Amount <span className="text-xs ml-1 font-normal">(RM)</span>
           </label>
           <input
             name="amount"
@@ -80,27 +82,27 @@ export default function NewClaimForm() {
             step="0.01"
             min="0.01"
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono tabular font-medium focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Description</label>
+          <label className="block text-sm font-medium mb-1.5">Description</label>
           <input
             name="description"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
             placeholder="Car park, medical, event expense..."
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          <label className="block text-sm font-medium mb-1.5">
             Source pool
-            <span className="text-xs text-muted ml-1 font-normal">(which pool to deduct from)</span>
+            <span className="text-xs ml-1 font-normal">(which pool to deduct from)</span>
           </label>
           <select
             name="source_pool"
             defaultValue="venture_pool"
             required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           >
             <option value="venture_pool">Venture Pool</option>
             <option value="dept_pool_director">Director Pool</option>
@@ -112,7 +114,7 @@ export default function NewClaimForm() {
         </div>
       </div>
       {error && (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-2 mt-3 text-xs font-sans">
+        <div className="bg-danger-bg border border-danger/50 text-danger rounded-md p-2 mt-3 text-xs">
           {error}
         </div>
       )}
@@ -120,14 +122,14 @@ export default function NewClaimForm() {
         <button
           type="submit"
           disabled={isPending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-sm font-medium px-4 py-2 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? 'Submitting...' : 'Submit'}
         </button>
         <button
           type="button"
           onClick={() => setShowForm(false)}
-          className="text-sm text-graphite hover:text-ink font-sans"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
         >
           Cancel
         </button>

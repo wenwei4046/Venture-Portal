@@ -32,11 +32,11 @@ export default function CopyFromLastMonthButton({ period }: Props) {
       <button
         onClick={handleClick}
         disabled={isPending}
-        className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors disabled:opacity-50"
+        className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors disabled:opacity-50"
       >
         {isPending ? 'Copying...' : 'Copy from last month'}
       </button>
-      {status && <span className="text-xs font-serif italic text-graphite">{status}</span>}
+      {status && <span className="text-xs">{status}</span>}
     </div>
   )
 }

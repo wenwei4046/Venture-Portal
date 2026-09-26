@@ -6,6 +6,7 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import SubmitHRCostButton from './_components/SubmitHRCostButton'
 import { executeHrCosting } from './actions'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 interface DeptSummary {
   department_id: string
@@ -81,28 +82,30 @@ export default async function HRCostingPage() {
   const canSubmit = user.role === 'hr' || user.role === 'principal'
   const canExecute = user.role === 'finance' || user.role === 'principal'
 
+  const monthLabel = dayjs(currentPeriod).format('MMMM YYYY')
+
   return (
     <div>
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> HR · MONTHLY COSTING
+            <em>I.</em> HR · MONTHLY COSTING · {monthLabel.toUpperCase()}
           </div>
           <h1 className="page-title">HR Costing</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/team/people"
-            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Manage Staff
           </Link>
           {/* Monthly Payroll is navigation, not a decision. Keep it as an
-              outline button so the single rust accent stays reserved for the
+              outline button so the one orange action stays reserved for the
               Submit button below (the terminal decision in this flow). */}
           <Link
             href="/hr-costing/payroll"
-            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Monthly Payroll
           </Link>
@@ -112,46 +115,34 @@ export default async function HRCostingPage() {
         </div>
       </div>
 
-      {/* ───────── Current period hero ───────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7">
-          <div className="font-serif italic text-accent text-base mb-1">
-            {currentSubmission ? 'Submitted period' : 'Live preview'}
-          </div>
-          <div className="font-serif text-[30px] sm:text-[44px] md:text-hero text-num-ink leading-none tracking-[-0.01em]">
-            {dayjs(currentPeriod).format('MMMM YYYY')}
-          </div>
-          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium">
-            {currentSubmission
-              ? `SNAPSHOTTED ${dayjs(currentSubmission.submitted_at).format('D MMM HH:mm').toUpperCase()} BY ${(submitterName.get(currentSubmission.submitted_by) ?? '—').toUpperCase()}`
-              : `${liveTotals.staff_count} ACTIVE STAFF · ${liveRowList.length} DEPARTMENTS`}
-          </div>
-        </div>
-
-        <div className="lg:col-span-5 space-y-2">
-          <div className="flex items-baseline justify-between font-mono text-sm">
-            <em className="font-serif text-md text-graphite">basic</em>
-            <span className="text-num-ink tabular font-medium">{formatMoney(liveTotals.total_basic)}</span>
-          </div>
-          <div className="flex items-baseline justify-between font-mono text-sm">
-            <em className="font-serif text-md text-graphite">statutory</em>
-            <span className="text-num-ink tabular font-medium">{formatMoney(liveTotals.total_statutory)}</span>
-          </div>
-          <div className="flex items-baseline justify-between font-mono text-sm">
-            <em className="font-serif text-md text-graphite">allowance</em>
-            <span className="text-num-ink tabular font-medium">{formatMoney(liveTotals.total_allowance)}</span>
-          </div>
-          <div className="flex items-baseline justify-between font-mono text-sm border-t border-hairline pt-2 mt-2">
-            <em className="font-serif text-md text-ink">total CTC</em>
-            <span className="statement-amount compact text-num-ink">
-              {formatMoney(liveTotals.total_ctc)}
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* ───────── The month in five figures ─────────
+          Total CTC is the figure the page is opened for, so it is the sheet's
+          one walnut card — the sum of the three before it. */}
+      <StatCards label={`HR cost for ${monthLabel}`}>
+        <StatCard label="Basic" value={formatMoney(liveTotals.total_basic)} icon="wallet" note="Contract basic pay" />
+        <StatCard label="Statutory" value={formatMoney(liveTotals.total_statutory)} icon="shield" note="Employer EPF · SOCSO · EIS" />
+        <StatCard label="Allowance" value={formatMoney(liveTotals.total_allowance)} icon="gift" />
+        <StatCard
+          label="Total CTC"
+          value={formatMoney(liveTotals.total_ctc)}
+          icon="coin"
+          tone="primary"
+          note={
+            currentSubmission
+              ? `Snapshotted ${dayjs(currentSubmission.submitted_at).format('D MMM HH:mm')} by ${submitterName.get(currentSubmission.submitted_by) ?? '—'}`
+              : `Live preview · ${monthLabel}`
+          }
+        />
+        <StatCard
+          label="Active staff"
+          value={String(liveTotals.staff_count)}
+          icon="people"
+          note={`${liveRowList.length} ${liveRowList.length === 1 ? 'department' : 'departments'}`}
+        />
+      </StatCards>
 
       {/* ───────── Live aggregate by department (HR + Principal only) ───────── */}
-      <section className="mb-12">
+      <section className="mb-10">
         <div className="sect-head">
           <h2>By department</h2>
           <span className="rule" aria-hidden />
@@ -159,8 +150,8 @@ export default async function HRCostingPage() {
         </div>
 
         {liveRowList.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">
               No active staff on record. Add your first employee from the Staff page.
             </p>
           </div>
@@ -181,24 +172,35 @@ export default async function HRCostingPage() {
               <tbody>
                 {liveRowList.map((row) => (
                   <LedgerRow key={row.department_id ?? row.department_name ?? 'unknown'}>
-                    <td className="font-serif text-[15px] text-ink">
+                    <td className="font-medium">
                       {row.department_name ?? '—'}
                     </td>
                     <td className="num m-hide" data-label="Staff">{row.staff_count ?? 0}</td>
                     <td className="num m-hide" data-label="Basic">{formatMoney(Number(row.total_basic ?? 0))}</td>
                     <td className="num m-hide" data-label="Statutory">{formatMoney(Number(row.total_statutory ?? 0))}</td>
                     <td className="num m-hide" data-label="Allowance">{formatMoney(Number(row.total_allowance ?? 0))}</td>
-                    <td className="num font-semibold">{formatMoney(Number(row.total_ctc ?? 0))}</td>
+                    <td className="num font-bold">{formatMoney(Number(row.total_ctc ?? 0))}</td>
                   </LedgerRow>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td>All departments</td>
+                  <td className="num m-hide">{liveTotals.staff_count}</td>
+                  <td className="num m-hide">{formatMoney(liveTotals.total_basic)}</td>
+                  <td className="num m-hide">{formatMoney(liveTotals.total_statutory)}</td>
+                  <td className="num m-hide">{formatMoney(liveTotals.total_allowance)}</td>
+                  <td className="num font-bold">{formatMoney(liveTotals.total_ctc)}</td>
+                  <td className="lt-toggle" aria-hidden />
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
       </section>
 
       {/* ───────── Submission history ───────── */}
-      <section className="mb-12">
+      <section>
         <div className="sect-head">
           <h2>Submission history</h2>
           <span className="rule" aria-hidden />
@@ -206,8 +208,8 @@ export default async function HRCostingPage() {
         </div>
 
         {submissionList.length === 0 ? (
-          <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-            <p className="font-serif italic text-muted text-sm">
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">
               No submissions yet.
             </p>
           </div>
@@ -242,30 +244,30 @@ export default async function HRCostingPage() {
                   const state = s.execution_state ?? 'approved_for_execution'
                   return (
                     <LedgerRow key={s.id}>
-                      <td className="font-serif text-[15px] text-ink">
+                      <td className="font-medium">
                         {dayjs(s.period_month).format('MMMM YYYY')}
                       </td>
-                      <td className="font-serif italic text-graphite m-hide" data-label="Submitted by">
+                      <td className="m-hide" data-label="Submitted by">
                         {submitterName.get(s.submitted_by) ?? '—'}
                       </td>
                       <td className="m-hide" data-label="State">
                         <StateBadge state={state} />
                       </td>
                       <td className="num m-hide" data-label="Basic">{formatMoney(totalBasic)}</td>
-                      <td className="num font-semibold">{formatMoney(totalCtc)}</td>
+                      <td className="num font-bold">{formatMoney(totalCtc)}</td>
                       <td className="right m-hide">
                         {canExecute && state === 'approved_for_execution' ? (
                           <form action={executeHrCosting}>
                             <input type="hidden" name="id" value={s.id} />
                             <button
                               type="submit"
-                              className="text-sm text-accent hover:text-accent-hover font-serif italic transition-colors"
+                              className="bg-accent hover:bg-accent-hover text-xs font-medium px-3 py-1.5 rounded-control transition-colors"
                             >
                               Execute transfers
                             </button>
                           </form>
                         ) : (
-                          <span className="text-xs font-mono text-muted">—</span>
+                          <span className="text-xs">—</span>
                         )}
                       </td>
                     </LedgerRow>
@@ -280,12 +282,15 @@ export default async function HRCostingPage() {
   )
 }
 
+// A state is a word on a wash (the sheet never says a thing in coloured
+// lettering alone): amber waits on somebody, orange is ready to act on,
+// green is done.
 function StateBadge({ state }: { state: string }) {
   if (state === 'pending')
-    return <em className="font-serif italic text-alert text-xs">awaiting Principal</em>
+    return <span className="chip alert"><span className="dot" />awaiting Principal</span>
   if (state === 'approved_for_execution')
-    return <em className="font-serif italic text-accent text-xs">ready to execute</em>
+    return <span className="chip accent"><span className="dot" />ready to execute</span>
   if (state === 'executed')
-    return <em className="font-serif italic text-ledger text-xs">executed</em>
-  return <em className="font-serif italic text-muted text-xs">{state}</em>
+    return <span className="chip ledger"><span className="dot" />executed</span>
+  return <span className="chip"><span className="dot" />{state}</span>
 }

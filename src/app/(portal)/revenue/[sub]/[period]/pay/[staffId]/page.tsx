@@ -106,6 +106,14 @@ export default async function StaffPayPage({ params }: PageProps) {
         ['Group incentive', c.groupIncentive, 'One fixed reward per qualifying direct-line group'],
       ].filter(([, v]) => Number(v) !== 0) as Array<[string, number, string | null]>
     : []
+  // The person header's second line: the rung they are paid at.
+  const rankLine = [
+    rankName,
+    c ? ratePct(c.productRate) : null,
+    row.employmentType === 'commission_eligible' ? 'fully commissioned' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <div>
@@ -114,58 +122,83 @@ export default async function StaffPayPage({ params }: PageProps) {
           <div className="page-eyebrow">
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · {label(period).toUpperCase()}
           </div>
-          <h1 className="page-title">{row.employeeName}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {row.employeeCode ? `${row.employeeCode} · ` : ''}
-            {row.designation ?? 'no title'}
-            {rankName ? ` · ${rankName}` : ''}
-            {c ? ` · ${ratePct(c.productRate)}` : ''}
-            {row.employmentType === 'commission_eligible' ? ' · fully commissioned' : ''}
-          </p>
+          <h1 className="page-title">Payslip</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href={`${revenuePath(subDept.slug, period, 'orders')}?staff=${row.staffId}`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Their bills
           </Link>
           <Link
             href={revenuePath(subDept.slug, period, 'pay')}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             ← The board
           </Link>
         </div>
       </div>
 
-      {/* The page's one dark object — .hero-walnut in globals.css. */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-        <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
-          <div className="font-serif italic text-accent text-base mb-1">Net pay · {label(period)}</div>
-          <div className="statement-amount text-num-ink">{formatMoney(pay.net)}</div>
-          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
-            {formatMoney(row.commission)} COMMISSION ·{' '}
-            {pay.ratio < 1 ? `${row.input.daysWorked}/${row.input.daysInMonth} DAYS · ` : ''}
-            {row.payrollExists ? `PAYROLL ${String(row.payrollStatus).toUpperCase()}` : 'NOT IN PAYROLL YET'}
+      {/* The page's one dark object: the salesperson's person header, as the
+          month's ledger draws it (CommissionWorkbench) — the month and the
+          payroll state on top, then who they are, and what reaches the bank
+          on the right. .hero-walnut re-lights the tokens inside it, so ink,
+          graphite and hairline read light on the walnut. */}
+      <section className="hero-walnut text-ink px-5 pt-5 pb-6 md:px-7 md:pt-6 md:pb-7 mb-4" aria-label={`${row.employeeName} · payslip`}>
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-5 md:pb-6 text-graphite">
+          <span className="text-[10px] font-medium uppercase tracking-[0.09em]">Payslip · {label(period)}</span>
+          <span className="text-[10px] px-2 py-1 border border-muted/70 rounded-sm text-ink">
+            {row.payrollExists ? `Payroll ${String(row.payrollStatus)}` : 'Not in payroll yet'}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div
+            aria-hidden
+            className="grid place-items-center shrink-0 w-[52px] h-[52px] rounded-lg border border-hairline bg-surface text-lg font-medium"
+          >
+            {row.employeeName.slice(0, 2)}
           </div>
-          {row.differsFromPayroll ? (
-            <p className="font-serif italic text-alert text-sm mt-3">
-              Payroll holds {formatMoney(row.payrollNet ?? 0)} for this month. Either it was keyed there, or
-              the run was recomputed after it was synced — re-sync the run, or record the difference as a
-              reviewed adjustment.
+          <div className="flex-1 min-w-[160px]">
+            <h2 className="text-[25px] md:text-[28px] leading-[1.3] font-medium tracking-[-0.03em] text-num-ink">
+              {row.employeeName}
+            </h2>
+            <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-graphite">
+              <span>
+                {row.employeeCode ? `${row.employeeCode} · ` : ''}
+                {row.designation ?? 'no title'}
+              </span>
+              {rankLine ? <span className="text-ink">{rankLine}</span> : null}
             </p>
-          ) : null}
-          {pay.shortfall > 0 ? (
-            <p className="font-serif italic text-danger text-sm mt-3">
-              The commission does not cover the basic and the employer&apos;s contributions —{' '}
-              {formatMoney(pay.shortfall)} short. Settle it before payroll goes out.
-            </p>
-          ) : null}
+          </div>
+          <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-[7px] mt-[3px] md:mt-0 pt-[18px] md:pt-0 md:pl-6 border-t md:border-t-0 md:border-l border-hairline">
+            <span className="text-xs text-graphite">Net pay</span>
+            <strong className="text-[30px] md:text-[clamp(30px,3vw,42px)] leading-[1.15] font-medium tracking-[-0.045em] tabular-nums text-num-ink">
+              {formatMoney(pay.net)}
+            </strong>
+            <small className="text-[10px] text-graphite">
+              {formatMoney(row.commission)} commission
+              {pay.ratio < 1 ? ` · ${row.input.daysWorked}/${row.input.daysInMonth} days` : ''}
+            </small>
+          </div>
         </div>
       </section>
 
-      <section className="mb-10">
+      {row.differsFromPayroll ? (
+        <p className="sheet-warning">
+          Payroll holds {formatMoney(row.payrollNet ?? 0)} for this month. Either it was keyed there, or
+          the run was recomputed after it was synced — re-sync the run, or record the difference as a
+          reviewed adjustment.
+        </p>
+      ) : null}
+      {pay.shortfall > 0 ? (
+        <p className="sheet-warning">
+          The commission does not cover the basic and the employer&apos;s contributions —{' '}
+          <strong>{formatMoney(pay.shortfall)} short</strong>. Settle it before payroll goes out.
+        </p>
+      ) : null}
+
+      <section className="mt-8 mb-10">
         <div className="sect-head">
           <h2>Earnings</h2>
           <span className="rule" aria-hidden />
@@ -184,60 +217,47 @@ export default async function StaffPayPage({ params }: PageProps) {
             <tbody>
               {earnings.map(([name, amount, rule]) => (
                 <LedgerRow key={name}>
-                  <td>
-                    <span className="font-serif text-[14px] text-ink">{name}</span>
-                  </td>
-                  <td className="m-hide" data-label="The rule">
-                    <em className="font-serif text-graphite text-sm">{rule}</em>
-                  </td>
+                  <td className="font-medium">{name}</td>
+                  <td className="m-hide" data-label="The rule">{rule}</td>
                   <td className="num">{formatMoney(amount)}</td>
                 </LedgerRow>
               ))}
               {c && c.marginPenaltyWithheld > 0 ? (
                 <LedgerRow>
-                  <td>
-                    <span className="font-serif text-[14px] text-ink">Withheld for margin</span>
-                  </td>
+                  <td className="font-medium">Withheld for margin</td>
                   <td className="m-hide" data-label="The rule">
-                    <em className="font-serif text-graphite text-sm">
-                      Already taken off the lines above — the bills that fell below their band
-                      {c.marginPct !== null ? `, at ${pct(c.marginPct)} overall` : ''}
-                    </em>
+                    Already taken off the lines above — the bills that fell below their band
+                    {c.marginPct !== null ? `, at ${pct(c.marginPct)} overall` : ''}
                   </td>
                   <td className="num neg">({formatMoney(c.marginPenaltyWithheld)})</td>
                 </LedgerRow>
               ) : null}
               {row.commissionElsewhere > 0 ? (
                 <LedgerRow>
-                  <td>
-                    <span className="font-serif text-[14px] text-ink">Another programme</span>
-                  </td>
+                  <td className="font-medium">Another programme</td>
                   <td className="m-hide" data-label="The rule">
-                    <em className="font-serif text-graphite text-sm">
-                      Runs already applied for this month outside {subDept.name}
-                    </em>
+                    Runs already applied for this month outside {subDept.name}
                   </td>
                   <td className="num">{formatMoney(row.commissionElsewhere)}</td>
                 </LedgerRow>
               ) : null}
               {row.payrollAdjustment !== 0 ? (
                 <LedgerRow>
-                  <td>
-                    <span className="font-serif text-[14px] text-ink">Reviewed payroll adjustment</span>
-                  </td>
-                  <td className="m-hide" data-label="The rule">
-                    <em className="font-serif text-graphite text-sm">Keyed against the payroll row</em>
-                  </td>
+                  <td className="font-medium">Reviewed payroll adjustment</td>
+                  <td className="m-hide" data-label="The rule">Keyed against the payroll row</td>
                   <td className="num">{formatMoney(row.payrollAdjustment)}</td>
                 </LedgerRow>
               ) : null}
-              <tr>
-                <td colSpan={2}>
-                  <strong className="font-serif text-ink text-[15px]">Gross commission</strong>
-                </td>
-                <td className="num font-semibold">{formatMoney(row.commission)}</td>
-              </tr>
             </tbody>
+            {/* The sum of the lines above — the peach total band. */}
+            <tfoot>
+              <tr>
+                <td>Gross commission</td>
+                <td className="m-hide" />
+                <td className="num">{formatMoney(row.commission)}</td>
+                <td className="lt-toggle" aria-hidden />
+              </tr>
+            </tfoot>
           </table>
         </div>
       </section>
@@ -249,7 +269,7 @@ export default async function StaffPayPage({ params }: PageProps) {
           <span className="rule" aria-hidden />
           <span className="count">{formatMoney(c?.openBillBonus ?? 0)}</span>
         </div>
-        <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+        <p className="text-sm mb-4 max-w-3xl">
           The first bills of an event day earn an uplift on top of their ordinary commission —
           {rules.length > 0
             ? ` ${rules.map(r => `${ordinal(r.bill_rank)} +${Math.round(Number(r.pct) * 100)}%`).join(', ')}`
@@ -276,12 +296,12 @@ export default async function StaffPayPage({ params }: PageProps) {
                       {l.source_order_id ? (
                         <Link
                           href={revenuePath(subDept.slug, period, 'orders', l.source_order_id)}
-                          className="font-serif text-[14px] text-ink hover:text-accent"
+                          className="font-medium"
                         >
                           {l.note ?? '—'}
                         </Link>
                       ) : (
-                        <span className="font-serif text-[14px] text-ink">{l.note ?? '—'}</span>
+                        <span className="font-medium">{l.note ?? '—'}</span>
                       )}
                     </td>
                     <td className="num m-hide" data-label="Commissionable">
@@ -297,10 +317,12 @@ export default async function StaffPayPage({ params }: PageProps) {
             </table>
           </div>
         ) : (
-          <p className="font-serif italic text-muted text-sm">
-            No bill of theirs was tagged as an Open Bill this month
-            {c && c.openBillBonus !== 0 ? ', yet the statement carries a bonus — recompute the run.' : '.'}
-          </p>
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">
+              No bill of theirs was tagged as an Open Bill this month
+              {c && c.openBillBonus !== 0 ? ', yet the statement carries a bonus — recompute the run.' : '.'}
+            </p>
+          </div>
         )}
       </section>
 
@@ -359,18 +381,21 @@ export default async function StaffPayPage({ params }: PageProps) {
                 />
               ) : null}
               {row.input.skbbkAmount > 0 ? <Step name="Less SKBBK" value={-row.input.skbbkAmount} /> : null}
-              <Step name="Net pay" value={pay.net} strong />
             </tbody>
+            {/* Where the walk ends — the peach total band. */}
+            <tfoot>
+              <Step name="Net pay" value={pay.net} strong />
+            </tfoot>
           </table>
         </div>
         {pay.basicPayNet !== 0 ? (
-          <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+          <p className="text-xs mt-3 max-w-3xl">
             Paid as two salary lines: net basic {formatMoney(pay.basicPayNet)} and a commission balance of{' '}
             {formatMoney(pay.commissionBalance)}. The basic is carved out of the commission, not added to it,
             so the two add back to the net above.
           </p>
         ) : (
-          <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+          <p className="text-xs mt-3 max-w-3xl">
             No basic is set on this record, so the whole net is the commission balance — one salary line.
           </p>
         )}
@@ -381,7 +406,7 @@ export default async function StaffPayPage({ params }: PageProps) {
           <h2>What the statutory figures are read from</h2>
           <span className="rule" aria-hidden />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <dl className="grid gap-2.5 grid-cols-2 lg:grid-cols-4">
           <Fact label="Statutory wage" value={formatMoney(pay.statutoryWages)} note="Basic + statutory allowance, pro-rated" />
           <Fact
             label="Days worked"
@@ -407,8 +432,8 @@ export default async function StaffPayPage({ params }: PageProps) {
                 : undefined
             }
           />
-        </div>
-        <p className="font-serif italic text-muted text-xs mt-4 max-w-3xl">
+        </dl>
+        <p className="text-xs mt-4 max-w-3xl">
           Every contribution is a schedule lookup, never a percentage: EPF from the Third Schedule, SOCSO from
           Act 4, EIS from Act 800, PCB from the Jadual. This page reads the same tables the payroll trigger
           reads, so what it shows is what payroll will write.
@@ -436,24 +461,25 @@ function Step({
   return (
     <tr>
       <td>
-        <span className={strong ? 'font-serif text-ink text-[15px] font-semibold' : 'font-serif text-[14px] text-graphite'}>
-          {name}
-        </span>
-        {note ? <div className="font-serif italic text-muted text-xs mt-0.5">{note}</div> : null}
+        <span className={strong ? 'font-bold' : undefined}>{name}</span>
+        {note ? <div className="text-[11px] mt-0.5">{note}</div> : null}
       </td>
-      <td className={strong ? 'num font-semibold' : 'num'}>
+      <td className={strong ? 'num font-bold' : 'num'}>
         {value < 0 ? <span className="neg">({formatMoney(Math.abs(value))})</span> : formatMoney(value)}
       </td>
     </tr>
   )
 }
 
+/** One input the statutory lookups read — the month ledger's compact summary
+ *  cell (quieter than a summary card: these explain the payslip, they are not
+ *  what it is opened for). */
 function Fact({ label: text, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
-      <div className="num tabular tracking-[-0.01em] text-lg text-num-ink">{value}</div>
-      {note ? <div className="font-serif italic text-muted text-xs mt-1.5">{note}</div> : null}
+    <div className="min-w-0 border border-hairline rounded-md bg-surface-2 px-4 py-3">
+      <dt className="text-[10px] font-medium uppercase tracking-[0.06em]">{text}</dt>
+      <dd className="mt-1.5 text-[19px] leading-tight font-bold tabular-nums tracking-[-0.025em]">{value}</dd>
+      {note ? <dd className="mt-1.5 text-[11px] leading-[1.5]">{note}</dd> : null}
     </div>
   )
 }

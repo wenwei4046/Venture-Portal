@@ -44,6 +44,9 @@ import type { CommissionSettingsData, SchemeRow } from './types'
  */
 const NEW_BRAND = '+new'
 
+/** A brand chip's shape; the caller adds its rim and wash. */
+const PILL = 'px-3 py-1.5 rounded-full border text-xs transition-colors'
+
 /**
  * One sub-department's Rules page.
  *
@@ -106,15 +109,17 @@ export default function CommissionSection({
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()}
           </div>
           <h1 className="page-title">Rules</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             What {subDept.name} pays, and to whom. <em>Every figure a run produces comes from
             here.</em>
           </p>
         </div>
+        {/* Navigation into a side form, not a decision: an outline button, so
+            the orange stays with each table's Save. */}
         <button
           type="button"
           onClick={() => setShowNewSub(v => !v)}
-          className="text-sm text-accent hover:text-accent-hover font-serif italic whitespace-nowrap sm:mb-3"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap sm:mb-3"
         >
           {showNewSub ? 'Cancel' : '+ Generate new sub-department'}
         </button>
@@ -123,7 +128,7 @@ export default function CommissionSection({
       {scheme ? <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" /> : null}
 
       {showNewSub ? (
-        <section className="mb-12">
+        <section className="mb-10">
           <SectionHead title="New sub-department" count={`${data.subDepartments.length} SO FAR`} />
           <Hint>
             Each sub-department calculates differently, so every rule on this page belongs to{' '}
@@ -137,7 +142,9 @@ export default function CommissionSection({
       ) : null}
 
       {!scheme ? (
-        <Hint>{subDept.name} has no scheme yet.</Hint>
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">{subDept.name} has no scheme yet.</p>
+        </div>
       ) : tab === 'scheme' ? (
         <SchemeRules scheme={scheme} />
       ) : tab === 'ladder' ? (
@@ -193,7 +200,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="product_revenue">
         <td>Product revenue commission</td>
         <td><Tick name="enable_product_revenue" defaultChecked={scheme.enable_product_revenue} /></td>
-        <td className="text-muted font-serif italic text-xs">
+        <td>
           the salesperson&apos;s rate × their commissionable revenue
         </td>
       </tr>
@@ -202,7 +209,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="kpi">
         <td>KPI item allowance</td>
         <td><Tick name="enable_kpi" defaultChecked={scheme.enable_kpi} /></td>
-        <td className="text-muted font-serif italic text-xs">
+        <td>
           flat RM per unit; that item&apos;s revenue leaves the commission base
         </td>
       </tr>
@@ -228,7 +235,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="override">
         <td>Hierarchy override</td>
         <td><Tick name="enable_override" defaultChecked={scheme.enable_override} /></td>
-        <td className="font-sans text-xs text-graphite">
+        <td>
           <label className="inline-flex items-center gap-2">
             <Tick name="override_includes_kpi" defaultChecked={scheme.override_includes_kpi} ariaLabel="override includes KPI revenue" />
             include KPI revenue in the override base
@@ -240,7 +247,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="margin_penalty">
         <td>Below-margin penalty</td>
         <td><Tick name="enable_margin_penalty" defaultChecked={scheme.enable_margin_penalty} /></td>
-        <td className="text-muted font-serif italic text-xs">
+        <td>
           per bill — also cuts every upline&apos;s override on it
         </td>
       </tr>
@@ -249,7 +256,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="group_incentive">
         <td>Group incentive package</td>
         <td><Tick name="enable_group_incentive" defaultChecked={scheme.enable_group_incentive ?? false} /></td>
-        <td className="text-muted font-serif italic text-xs">
+        <td>
           monthly fixed pay per qualifying direct group, replacing percentage commission; amounts are set in Ranks
         </td>
       </tr>
@@ -258,7 +265,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="group_sales_depth">
         <td>Group sales layers</td>
         <td><IrParameter /></td>
-        <td className="font-sans text-xs text-graphite">
+        <td>
           <Field name="group_sales_depth" type="number" step="1" width="w-20" defaultValue={scheme.group_sales_depth ?? ''} ariaLabel="Group sales layers" />
           <span className="ml-2">2 = directs and their directs; blank = all layers</span>
         </td>
@@ -268,7 +275,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="override_depth">
         <td>Override layers</td>
         <td><IrParameter /></td>
-        <td className="font-sans text-xs text-graphite">
+        <td>
           <Field name="override_depth" type="number" step="1" width="w-20" defaultValue={scheme.override_depth ?? ''} ariaLabel="Override layers" />
           <span className="ml-2">2 = at most two layers; blank = all layers</span>
         </td>
@@ -278,7 +285,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="direct_line_limit">
         <td>Direct-line limit</td>
         <td><IrParameter /></td>
-        <td className="font-sans text-xs text-graphite">
+        <td>
           <Field name="direct_line_limit" type="number" step="1" width="w-20" defaultValue={scheme.direct_line_limit ?? ''} ariaLabel="Direct-line limit" />
           <span className="ml-2">Base 3 for group packages. Full Spec permits a fourth line that month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.</span>
         </td>
@@ -288,7 +295,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="margin_incentive">
         <td>Monthly margin incentive</td>
         <td><Tick name="enable_margin_incentive" defaultChecked={scheme.enable_margin_incentive} /></td>
-        <td className="text-muted font-serif italic text-xs">
+        <td>
           every brand sold must clear the tier
         </td>
       </tr>
@@ -297,7 +304,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       <tr key="deposit_gate">
         <td>Deposit gate</td>
         <td><Tick name="deposit_gate_on" defaultChecked={scheme.deposit_threshold_pct !== null} /></td>
-        <td className="font-sans text-xs text-graphite">
+        <td>
           <Field name="deposit_threshold_pct" type="number" step="0.01" width="w-20" defaultValue={toPct(scheme.deposit_threshold_pct)} ariaLabel="deposit threshold percent" />
           <span className="ml-2">% of the order total before any of it pays</span>
         </td>
@@ -306,8 +313,8 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
     cost_divisor: (
       <tr key="cost_divisor">
         <td>Revenue Team cost basis</td>
-        <td className="text-muted font-serif italic text-xs">—</td>
-        <td className="font-sans text-xs text-graphite">
+        <td>—</td>
+        <td>
           <span className="mr-2">unit cost ÷</span>
           <Field
             name="revenue_cost_divisor"
@@ -327,7 +334,7 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
     default_rate_mode: (
       <tr key="default_rate_mode">
         <td>Default rate mode</td>
-        <td className="text-muted font-serif italic text-xs">—</td>
+        <td>—</td>
         <td>
           <select
             name="default_rate_mode"
@@ -355,19 +362,21 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
       </Hint>
       <ActionForm action={updateScheme}>
         {({ pending }) => (
-          <div className="border border-hairline rounded-md bg-surface overflow-hidden">
+          <div className="table-frame">
             <Hidden name="scheme_id" value={scheme.id} />
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Rule</th>
-                  <th className="w-24">On</th>
-                  <th>Setting</th>
-                </tr>
-              </thead>
-              <tbody>{orderSchemeRules(scheme).map(k => rows[k])}</tbody>
-            </table>
-            <div className="px-4 py-3 border-t border-hairline">
+            <div className="table-frame-scroll">
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Rule</th>
+                    <th className="w-24">On</th>
+                    <th>Setting</th>
+                  </tr>
+                </thead>
+                <tbody>{orderSchemeRules(scheme).map(k => rows[k])}</tbody>
+              </table>
+            </div>
+            <div className="table-frame-foot">
               <SaveButton pending={pending} label="Save scheme rules" />
             </div>
           </div>
@@ -431,7 +440,9 @@ function TitleLadder({
     })
 
   const RanksTab = (
-    <button type="button" onClick={onRanks} className="not-italic font-sans text-xs text-accent hover:underline">
+    // A link inside a sentence: black like the words around it, so the
+    // underline is what says it can be pressed (the sheet's `a.text-accent`).
+    <button type="button" onClick={onRanks} className="text-accent underline underline-offset-[3px]">
       Ranks tab
     </button>
   )
@@ -455,7 +466,7 @@ function TitleLadder({
         blank for a percentage rung nobody can reach on volume alone. A group package uses the monthly
         group-sales target for each eligible direct line, including the leader&apos;s own sales.
       </Hint>
-      <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
+      <div className="overflow-x-auto table-scroll">
         <table className="ledger-table">
           <thead>
             <tr>
@@ -478,8 +489,8 @@ function TitleLadder({
                       <td>
                         <Hidden name="id" value={r.id} />
                         <Hidden name="scheme_id" value={scheme.id} />
-                        <span className="text-ink whitespace-nowrap" title={r.rank_key}>
-                          {titleById.get(r.title_id) ?? <span className="text-muted">(inactive title)</span>}
+                        <span className="font-medium whitespace-nowrap" title={r.rank_key}>
+                          {titleById.get(r.title_id) ?? <span className="font-normal">(inactive title)</span>}
                         </span>
                       </td>
                       <td>
@@ -488,7 +499,7 @@ function TitleLadder({
                         </Choice>
                       </td>
                       <td className="num">
-                        <span className="font-mono text-sm text-num-ink" title="Set on the Ranks tab">
+                        <span title="Set on the Ranks tab">
                           {rankPayLabelOf(rank ?? r)}
                         </span>
                       </td>
@@ -498,9 +509,9 @@ function TitleLadder({
                       </td>
                       <td className="num whitespace-nowrap">
                         <Field name="personal_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.personal_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} personal sales target`} />
-                        <span className="mx-1 text-xs text-muted">×</span>
+                        <span className="mx-1 text-xs">×</span>
                         <Field name="consecutive_months" type="number" step="1" width="w-14" defaultValue={r.consecutive_months ?? ''} placeholder="—" ariaLabel={`${r.rank_key} months running`} />
-                        <span className="ml-1 text-xs text-muted">mths</span>
+                        <span className="ml-1 text-xs">mths</span>
                       </td>
                       <td><SaveButton pending={pending} /></td>
                     </tr>
@@ -522,7 +533,7 @@ function TitleLadder({
                     </Choice>
                   </td>
                   <td className="num">
-                    <span className="font-serif italic text-xs text-muted whitespace-nowrap">follows the rank</span>
+                    <span className="font-sans text-xs whitespace-nowrap">follows the rank</span>
                   </td>
                   <td><Tick name="can_recruit" defaultChecked ariaLabel="new rung can recruit" /></td>
                   <td className="num">
@@ -530,9 +541,9 @@ function TitleLadder({
                   </td>
                   <td className="num whitespace-nowrap">
                     <Field name="personal_sales_threshold" type="number" step="1" width="w-28" placeholder="—" ariaLabel="new rung personal sales target" />
-                    <span className="mx-1 text-xs text-muted">×</span>
+                    <span className="mx-1 text-xs">×</span>
                     <Field name="consecutive_months" type="number" step="1" width="w-14" placeholder="—" ariaLabel="new rung months running" />
-                    <span className="ml-1 text-xs text-muted">mths</span>
+                    <span className="ml-1 text-xs">mths</span>
                   </td>
                   <td><SaveButton pending={pending} label="Add" /></td>
                 </tr>
@@ -542,7 +553,7 @@ function TitleLadder({
         </table>
       </div>
       {catalogue.length === 0 ? (
-        <p className="mt-3 font-serif italic text-sm text-alert">
+        <p className="sheet-warning">
           No ranks yet — add them on the {RanksTab} first; a rung needs one to pay.
         </p>
       ) : null}
@@ -582,7 +593,7 @@ function RankCatalogue({
       <SectionHead title="IX. Ranks" count={`${catalogue.length} RANKS`} />
       <Hint>
         Set each rank&apos;s percentage or group package here. The{' '}
-        <button type="button" onClick={onLadder} className="not-italic font-sans text-xs text-accent hover:underline">
+        <button type="button" onClick={onLadder} className="text-accent underline underline-offset-[3px]">
           Title ladder
         </button>{' '}
         picks a rank for each title. A positive group incentive replaces percentage commission
@@ -592,7 +603,7 @@ function RankCatalogue({
         <em>B</em> … . Changing pay affects future calculations; a month already computed keeps
         its saved amounts. Set the monthly group target on the title ladder.
       </Hint>
-      <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
+      <div className="overflow-x-auto table-scroll">
         <table className="ledger-table">
           <thead>
             <tr>
@@ -639,7 +650,7 @@ function RankCatalogue({
                 <tr className="bg-surface-2/40">
                   <td>
                     <Hidden name="scheme_id" value={scheme.id} />
-                    <span className="font-serif italic text-xs text-muted whitespace-nowrap">lettered by its pay</span>
+                    <span className="whitespace-nowrap">lettered by its pay</span>
                   </td>
                   <td className="num">
                     <Field name="product_rate" type="number" step="0.01" width="w-20" placeholder="11" required ariaLabel="new rank rate" />
@@ -699,7 +710,7 @@ function ItemGroups({ data, scheme }: { data: CommissionSettingsData; scheme: Sc
         is treated as <strong>not</strong> commissionable and raises a warning on the run, so
         a new group coming out of the ERP can never quietly start or stop paying.
       </Hint>
-      <div className="border border-hairline rounded-md bg-surface">
+      <div className="overflow-x-auto">
         <table className="ledger-table">
           <thead>
             <tr>
@@ -757,7 +768,7 @@ function KpiItems({ data, scheme }: { data: CommissionSettingsData; scheme: Sche
         base</em> — the allowance already paid for it. Most are bundled free in the ERP
         (quantity, zero price), which is exactly the case this exists to reward.
       </Hint>
-      <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
+      <div className="overflow-x-auto table-scroll">
         <table className="ledger-table">
           <thead>
             <tr>
@@ -782,15 +793,20 @@ function KpiItems({ data, scheme }: { data: CommissionSettingsData; scheme: Sche
                     </td>
                     <td><Field name="product_name" defaultValue={k.product_name} /></td>
                     <td className="num"><Field name="kpi_amount" type="number" step="0.01" width="w-24" defaultValue={k.kpi_amount} /></td>
-                    <td className="font-mono text-xs text-muted">{k.effective_from}</td>
-                    <td className="flex items-center gap-3">
-                      <SaveButton pending={pending} />
-                      <ActionButton
-                        run={() => deleteKpiItem(k.id)}
-                        label="Remove"
-                        danger
-                        confirm={`Stop paying a KPI allowance on ${k.product_code}?`}
-                      />
+                    <td className="font-mono text-xs">{k.effective_from}</td>
+                    {/* The flex lives inside the cell: a `display: flex` <td>
+                        stops being a table cell, and its rule and zebra no
+                        longer reach the row's full height. */}
+                    <td className="whitespace-nowrap">
+                      <span className="inline-flex items-center gap-3">
+                        <SaveButton pending={pending} />
+                        <ActionButton
+                          run={() => deleteKpiItem(k.id)}
+                          label="Remove"
+                          danger
+                          confirm={`Stop paying a KPI allowance on ${k.product_code}?`}
+                        />
+                      </span>
                     </td>
                   </tr>
                 )}
@@ -827,7 +843,7 @@ function KpiThresholds({ data, scheme }: { data: CommissionSettingsData; scheme:
         Sell this many KPI units in the month and the <em>whole</em> KPI amount is uplifted.
         The highest rung reached applies — the rungs do not add up.
       </Hint>
-      <div className="border border-hairline rounded-md bg-surface">
+      <div className="overflow-x-auto">
         <table className="ledger-table">
           <thead>
             <tr>
@@ -850,9 +866,11 @@ function KpiThresholds({ data, scheme }: { data: CommissionSettingsData; scheme:
                     </td>
                     <td className="num"><Field name="min_qty" type="number" step="1" width="w-24" defaultValue={t.min_qty} /></td>
                     <td className="num"><Field name="bonus_pct" type="number" step="0.01" width="w-24" defaultValue={toPct(t.bonus_pct)} /></td>
-                    <td className="flex items-center gap-3">
-                      <SaveButton pending={pending} />
-                      <ActionButton run={() => deleteKpiThreshold(t.id)} label="Remove" danger />
+                    <td className="whitespace-nowrap">
+                      <span className="inline-flex items-center gap-3">
+                        <SaveButton pending={pending} />
+                        <ActionButton run={() => deleteKpiThreshold(t.id)} label="Remove" danger />
+                      </span>
                     </td>
                   </tr>
                 )}
@@ -888,7 +906,7 @@ function OpenBillRates({ data }: { data: CommissionSettingsData }) {
         The 1st, 2nd and 3rd bill a salesperson writes on an event day. The bonus follows the
         person&apos;s <em>current</em> rate, so a promotion lifts it too.
       </Hint>
-      <div className="border border-hairline rounded-md bg-surface max-w-lg">
+      <div className="max-w-lg overflow-x-auto">
         <table className="ledger-table">
           <thead>
             <tr>
@@ -954,16 +972,20 @@ function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData; scheme
         first run.
       </Hint>
 
+      {/* A picker, so pills rather than tabs — the month workbench's chip: a
+          white pill, and the one being read on a peach wash with an orange
+          rim. The state is said by `aria-pressed` as well as the wash. */}
       <div className="flex flex-wrap gap-2 mb-4">
         {brands.map(b => (
           <button
             key={b.id}
             type="button"
             onClick={() => setBrandCode(b.code)}
+            aria-pressed={b.id === activeBrand?.id}
             className={
               b.id === activeBrand?.id
-                ? 'px-3 py-1 rounded-md bg-accent text-white font-serif italic text-sm'
-                : 'px-3 py-1 rounded-md bg-surface border border-hairline text-ink font-serif italic text-sm hover:bg-surface-2'
+                ? `${PILL} border-accent bg-accent-bg font-semibold`
+                : `${PILL} border-hairline bg-surface hover:bg-surface-2`
             }
           >
             {b.name}
@@ -973,10 +995,11 @@ function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData; scheme
         <button
           type="button"
           onClick={() => setBrandCode(NEW_BRAND)}
+          aria-pressed={addingBrand}
           className={
             addingBrand
-              ? 'px-3 py-1 rounded-md bg-accent text-white font-serif italic text-sm'
-              : 'px-3 py-1 rounded-md bg-surface border border-dashed border-hairline text-graphite font-serif italic text-sm hover:bg-surface-2 hover:text-ink'
+              ? `${PILL} border-accent bg-accent-bg font-semibold`
+              : `${PILL} border-dashed border-hairline bg-surface hover:bg-surface-2`
           }
         >
           + Add brand
@@ -989,19 +1012,19 @@ function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData; scheme
           onto another. */}
       <ActionForm key={activeBrand?.id ?? NEW_BRAND} action={saveBrand} className="mb-4">
         {({ pending }) => (
-          <div className="border border-hairline rounded-md bg-surface p-4 flex flex-wrap items-end gap-4">
+          <div className="border border-hairline rounded-card bg-surface-2 p-4 flex flex-wrap items-end gap-4">
             <Hidden name="scheme_id" value={scheme.id} />
             {activeBrand ? <Hidden name="id" value={activeBrand.id} /> : null}
-            <label className="text-xs font-sans text-graphite">
-              <span className="block mb-1">Code</span>
+            <label className="text-xs">
+              <span className="block mb-1 font-medium">Code</span>
               <Field name="code" defaultValue={activeBrand?.code} width="w-28" required />
             </label>
-            <label className="text-xs font-sans text-graphite">
-              <span className="block mb-1">Name</span>
+            <label className="text-xs">
+              <span className="block mb-1 font-medium">Name</span>
               <Field name="name" defaultValue={activeBrand?.name} width="w-40" required />
             </label>
-            <label className="text-xs font-sans text-graphite flex-1 min-w-[16rem]">
-              <span className="block mb-1">Item code prefixes (comma separated)</span>
+            <label className="text-xs flex-1 min-w-[16rem]">
+              <span className="block mb-1 font-medium">Item code prefixes (comma separated)</span>
               <Field
                 name="item_code_prefixes"
                 defaultValue={activeBrand?.item_code_prefixes.join(', ')}
@@ -1014,7 +1037,7 @@ function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData; scheme
       </ActionForm>
 
       {activeBrand ? (
-        <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
+        <div className="overflow-x-auto table-scroll">
           <table className="ledger-table">
             <thead>
               <tr>
@@ -1056,9 +1079,11 @@ function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData; scheme
                         <td className="num"><Field name="margin_pct" type="number" step="0.01" width="w-20" defaultValue={toPct(b.margin_pct)} /></td>
                         <td className="num"><Field name="commission_multiplier" type="number" step="0.01" width="w-20" defaultValue={b.commission_multiplier} /></td>
                         <td className="num"><Field name="monthly_incentive" type="number" step="0.01" width="w-24" defaultValue={b.monthly_incentive} /></td>
-                        <td className="flex items-center gap-3">
-                          <SaveButton pending={pending} />
-                          <ActionButton run={() => deleteMarginBand(b.id)} label="Remove" danger />
+                        <td className="whitespace-nowrap">
+                          <span className="inline-flex items-center gap-3">
+                            <SaveButton pending={pending} />
+                            <ActionButton run={() => deleteMarginBand(b.id)} label="Remove" danger />
+                          </span>
                         </td>
                       </tr>
                     )}

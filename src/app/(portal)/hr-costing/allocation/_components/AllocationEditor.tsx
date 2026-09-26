@@ -144,14 +144,14 @@ function StaffCard({
   const usedCompanyIds = new Set(rows.map((r) => r.companyId).filter(Boolean))
 
   return (
-    <div className="border border-hairline rounded-md bg-surface px-5 py-4">
+    <div className="border border-hairline rounded-card bg-surface px-5 py-4">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
-          <span className="font-serif text-[15px] text-ink">{staff.name}</span>
-          <span className="font-mono text-[11px] text-graphite ml-3">{staff.dept}</span>
+          <span className="text-sm font-bold">{staff.name}</span>
+          <span className="text-[11px] ml-3">{staff.dept}</span>
         </div>
-        <div className="font-mono text-xs text-muted">
-          Employer cost <span className="num text-num-ink text-sm ml-1">{formatMoney(staff.employerCost)}</span>
+        <div className="text-xs">
+          Employer cost <span className="num text-num-ink text-sm font-bold ml-1">{formatMoney(staff.employerCost)}</span>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ function StaffCard({
                   value={r.companyId}
                   onChange={(e) => patchRow(r.uid, { companyId: e.target.value })}
                   disabled={readOnly}
-                  className="px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border min-w-[180px]"
+                  className="px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent min-w-[180px]"
                 >
                   <option value="">Company…</option>
                   {companies.map((c) => (
@@ -195,12 +195,12 @@ function StaffCard({
                     value={r.pct}
                     onChange={(e) => patchRow(r.uid, { pct: e.target.value })}
                     disabled={readOnly}
-                    className="w-24 px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono text-ink text-right focus:outline-none focus:border-accent-border"
+                    className="w-24 px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm font-mono text-ink text-right focus:outline-none focus:border-accent"
                     placeholder="0.00"
                   />
-                  <span className="font-mono text-xs text-muted">%</span>
+                  <span className="text-xs">%</span>
                 </div>
-                <span className="num text-sm text-graphite min-w-[100px]">
+                <span className="num text-sm min-w-[100px]">
                   {amt !== null ? formatMoney(amt) : '—'}
                 </span>
                 {!readOnly && (
@@ -208,7 +208,7 @@ function StaffCard({
                     type="button"
                     onClick={() => removeRow(r.uid)}
                     aria-label="Remove row"
-                    className="text-muted hover:text-danger text-sm px-1 transition-colors"
+                    className="hover:text-danger text-sm px-1 transition-colors"
                   >
                     ✕
                   </button>
@@ -221,41 +221,41 @@ function StaffCard({
               rows. Not stored, not billed; Finance sees the same figure on the
               Billing page. */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="px-3 py-1.5 bg-surface-2/60 border border-dashed border-hairline rounded-md text-sm font-serif italic text-graphite min-w-[180px]">
+            <div className="px-3 py-1.5 bg-surface-2 border border-dashed border-hairline rounded-control text-sm min-w-[180px]">
               HV — HOUZS Venture
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-24 px-3 py-1.5 bg-surface-2/60 border border-dashed border-hairline rounded-md text-sm font-mono text-graphite text-right">
+              <div className="w-24 px-3 py-1.5 bg-surface-2 border border-dashed border-hairline rounded-control text-sm font-mono text-right">
                 {remainder !== null ? remainder.toFixed(2) : '—'}
               </div>
-              <span className="font-mono text-xs text-muted">%</span>
+              <span className="text-xs">%</span>
             </div>
-            <span className="num text-sm text-graphite min-w-[100px]">
+            <span className="num text-sm min-w-[100px]">
               {preview ? formatMoney(preview.hvAmount) : '—'}
             </span>
-            <span className="font-mono text-[11px] text-muted">
+            <span className="text-[11px]">
               auto · own share · not billed
             </span>
           </div>
         </div>
 
       <div className="flex items-center justify-between gap-4 flex-wrap mt-3 pt-3 border-t border-hairline">
-        <div className="font-mono text-xs text-muted">
+        <div className="text-xs">
           {preview && (
             <>
               Billed to subsidiaries{' '}
-              <span className="num text-ink">{formatMoney(preview.billedTotal)}</span>
+              <span className="num text-ink font-bold">{formatMoney(preview.billedTotal)}</span>
             </>
           )}
           {error && <span className="text-danger ml-2">{error}</span>}
-          {savedNote && !dirty && <em className="font-serif italic text-ledger ml-2">Saved.</em>}
+          {savedNote && !dirty && <span className="chip ledger ml-2"><span className="dot" />Saved.</span>}
         </div>
         {!readOnly && (
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={addRow}
-              className="bg-paper hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-1.5 rounded-md transition-colors"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-1.5 rounded-control transition-colors"
             >
               + Company
             </button>
@@ -263,7 +263,7 @@ function StaffCard({
               type="button"
               onClick={save}
               disabled={isPending || !dirty}
-              className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-white font-serif italic text-sm px-4 py-1.5 rounded-md transition-colors"
+              className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-sm px-4 py-1.5 rounded-control transition-colors"
             >
               {isPending ? 'Saving…' : 'Save'}
             </button>

@@ -29,6 +29,17 @@ describe('RouteSkeleton', () => {
     expect(container.querySelector('.sect-head')).not.toBeNull()
   })
 
+  it('opens a page on the white sheet with summary cards, like the page itself', () => {
+    nav.pathname = '/hr-costing'
+    const { container } = render(<RouteSkeleton />)
+    expect(container.querySelectorAll('.stat-card').length).toBeGreaterThan(0)
+  })
+
+  it('keeps the figure strip everywhere else', () => {
+    const { container } = render(<RouteSkeleton />)
+    expect(container.querySelector('.stat-card')).toBeNull()
+  })
+
   it('counts itself in for as long as it is on screen', () => {
     const before = visibleSkeletons()
     const { unmount } = render(<RouteSkeleton />)

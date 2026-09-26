@@ -32,11 +32,11 @@ export default function CopyAllocationsButton({ period }: { period: string }) {
         type="button"
         onClick={run}
         disabled={isPending}
-        className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors disabled:opacity-40"
+        className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors disabled:opacity-40"
       >
         {isPending ? 'Copying…' : 'Copy from last month'}
       </button>
-      {note && <span className="font-mono text-[11px] text-muted max-w-[260px] text-right">{note}</span>}
+      {note && <span className="text-[11px] max-w-[260px] text-right">{note}</span>}
     </div>
   )
 }

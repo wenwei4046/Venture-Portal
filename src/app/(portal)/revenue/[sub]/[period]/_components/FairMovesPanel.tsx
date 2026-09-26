@@ -81,21 +81,22 @@ export default function FairMovesPanel({ period, subDepartmentId, moves }: Props
   return (
     <section aria-label="Bills of another month's fair" className="mb-6 border border-hairline rounded-card bg-surface px-4 py-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
-        <h2 className="font-serif text-[17px] text-ink">Bills of another month&apos;s fair</h2>
-        <span className="font-mono text-[11px] uppercase tracking-[0.02em] text-alert">
+        <h2 className="text-[17px] font-bold tracking-[-0.015em]">Bills of another month&apos;s fair</h2>
+        <span className="chip alert">
+          <span className="dot" />
           {leaving.length > 0 ? `${leaving.length} belong elsewhere` : null}
           {leaving.length > 0 && arriving.length > 0 ? ' · ' : null}
           {arriving.length > 0 ? `${arriving.length} belong here` : null}
         </span>
       </div>
-      <p className="font-serif italic text-sm text-graphite mb-3 max-w-3xl">
+      <p className="text-sm mb-3 max-w-3xl">
         The ERP names the fair each bill was written at, and the fair decides the payroll. These sit in a
         different month from their fair — keyed after it closed, or before it was placed. Moving puts each
         bill in its fair&apos;s month; the runs of both months must then be computed again. A month whose run
         has paid, or that is closed to the feed, keeps its bills.
         {settled > 0 ? ` ${settled} more belong to a settled month's fair and stay where they are.` : ''}
       </p>
-      <div className="border border-hairline rounded-card bg-paper overflow-x-auto">
+      <div className="overflow-x-auto">
         <table className="ledger-table">
           <thead>
             <tr>
@@ -111,19 +112,22 @@ export default function FairMovesPanel({ period, subDepartmentId, moves }: Props
               <tr key={m.orderId}>
                 <td>
                   <span className="font-mono text-xs text-ink">{m.orderNo}</span>
-                  <small className="block font-mono text-[10px] text-muted">keyed {m.orderDate}</small>
+                  <small className="block font-mono text-[10px] mt-0.5">keyed {m.orderDate}</small>
                 </td>
                 <td className="m-hide" data-label="Salesperson">{m.salesperson}</td>
                 <td className="m-hide" data-label="Fair">
                   {m.venue ?? '—'}
-                  <small className="block font-serif italic text-[11px] text-graphite">
+                  <small className="block text-[11px] mt-0.5">
                     {[days(m.fairStart, m.fairEnd), m.organiser].filter(Boolean).join(' · ')}
                   </small>
                 </td>
                 <td className="whitespace-nowrap">
                   {monthName(m.fromPeriod)} → {monthName(m.toPeriod)}
-                  <small className={`block font-mono text-[10px] uppercase ${m.confirmed ? 'text-ledger' : 'text-alert'}`}>
-                    {m.confirmed ? 'Confirmed' : 'Guessed — stays'}
+                  <small className="block mt-1">
+                    <span className={`chip ${m.confirmed ? 'ledger' : 'alert'}`}>
+                      <span className="dot" />
+                      {m.confirmed ? 'Confirmed' : 'Guessed — stays'}
+                    </span>
                   </small>
                 </td>
                 <td className="num">{formatMoney(m.orderTotal)}</td>
@@ -139,16 +143,16 @@ export default function FairMovesPanel({ period, subDepartmentId, moves }: Props
           onClick={() => {
             if (window.confirm(`Move ${movable.length} confirmed bill${movable.length === 1 ? '' : 's'} into their fair's month (${months.map(monthName).join(', ')})? Compute those runs again afterwards.`)) move()
           }}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
+          className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
         >
           {isPending ? 'Moving…' : `Move the ${movable.length} confirmed`}
         </button>
         {movable.length !== here.filter(m => m.confirmed).length ? (
-          <span className="font-serif italic text-xs text-graphite">Includes bills of other months shown on their own pages.</span>
+          <span className="text-xs">Includes bills of other months shown on their own pages.</span>
         ) : null}
-        {done ? <span role="status" className="font-serif italic text-sm text-ledger">{done}</span> : null}
+        {done ? <span role="status" className="text-sm text-ledger">{done}</span> : null}
       </div>
-      {error ? <p role="alert" className="font-serif italic text-sm text-danger mt-3">{error}</p> : null}
+      {error ? <p role="alert" className="sheet-danger">{error}</p> : null}
     </section>
   )
 }

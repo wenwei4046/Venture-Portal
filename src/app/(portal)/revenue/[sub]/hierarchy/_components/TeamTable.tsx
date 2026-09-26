@@ -24,6 +24,11 @@ import {
 } from '@/components/RowForm'
 import type { DirectorRow, MemberCandidate, RankRow, SalespersonRow, TitleRow } from '../../../_components/config/types'
 
+/** A refusal: `.sheet-notice`'s geometry on the danger wash. */
+const DANGER_NOTE = 'my-3.5 rounded-md border border-danger/50 bg-danger-bg px-3.5 py-[11px] text-[12px] leading-[1.65] text-danger'
+/** A field's caption, in the summary cards' small caps. */
+const CAPTION = 'text-[10px] font-medium uppercase tracking-[0.06em]'
+
 /**
  * The Team table — one row per member of this sub-department.
  *
@@ -132,12 +137,12 @@ export default function TeamTable({
 
   return (
     <section>
+      {/* A saved change's note is the sheet's peach notice in black; a refusal
+          keeps the danger wash. */}
       {note?.note ? (
         <div
           role={note.ok ? 'status' : 'alert'}
-          className={`rounded-md p-3 mb-4 text-sm font-sans border ${
-            note.ok ? 'bg-accent-bg border-accent-border text-accent' : 'bg-danger-bg border-danger/50 text-danger'
-          }`}
+          className={note.ok ? 'sheet-notice' : DANGER_NOTE}
         >
           {note.note}
         </div>
@@ -168,7 +173,7 @@ export default function TeamTable({
           </>
         ) : (
           <>
-            {subDeptName} is its own world. <strong>Title</strong> is the title held <em>here</em>,
+            {subDeptName} is its own world. <strong>Title</strong> is the title held <strong>here</strong>,
             which may differ from the company title beneath it; it only ever goes up — an applied
             run raises it. <strong>Rank</strong> follows that title and only a raise is set here.{' '}
             <strong>Upline</strong> is who they earn under here, moved on the chart. Add members
@@ -182,15 +187,16 @@ export default function TeamTable({
       </Hint>
 
       {candidates.length > 0 ? (
-        <div className="border border-hairline rounded-md bg-surface p-4 mb-4">
+        <div className="sheet-toolbar">
           {/* RowForm rather than ActionForm: its `onDone` carries the action's
               result, and a refusal here is a returned note, not a throw. */}
           <RowForm action={addMember} onDone={done}>
             {({ pending }) => (
-              <div className="flex flex-wrap items-end gap-3">
+              // The Add button stands as tall as the toolbar's selects.
+              <div className="flex flex-1 flex-wrap items-end gap-3 [&_button]:min-h-[36px]">
                 <Hidden name="scheme_id" value={schemeId} />
                 <label className="flex flex-col gap-1">
-                  <span className="font-mono text-mono-xs text-muted uppercase tracking-wide">Add to {subDeptName}</span>
+                  <span className={CAPTION}>Add to {subDeptName}</span>
                   <Choice name="staff_id" defaultValue="" required ariaLabel={`Person to add to ${subDeptName}`} width="w-56">
                     <option value="">— pick somebody —</option>
                     {candidates.map(c => (
@@ -202,7 +208,7 @@ export default function TeamTable({
                   </Choice>
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="font-mono text-mono-xs text-muted uppercase tracking-wide">Title here</span>
+                  <span className={CAPTION}>Title here</span>
                   <Choice name="title_id" defaultValue="" required ariaLabel={`Title held in ${subDeptName}`} width="w-52">
                     <option value="">— pick a title —</option>
                     {holdableTitles.map(t => (
@@ -212,9 +218,9 @@ export default function TeamTable({
                 </label>
                 <SaveButton pending={pending} label="Add" />
                 {candidates.length === 0 ? (
-                  <span className="font-serif italic text-xs text-muted">Everybody in the department is already here.</span>
+                  <span className="text-xs">Everybody in the department is already here.</span>
                 ) : holdableTitles.length === 0 ? (
-                  <span className="font-serif italic text-xs text-muted">
+                  <span className="text-xs">
                     No title has a rung on this ladder yet — set the Title ladder under Rules first.
                   </span>
                 ) : null}
@@ -225,16 +231,17 @@ export default function TeamTable({
       ) : null}
 
       {people.length === 0 ? (
-        <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-          <p className="font-serif text-lg text-ink mb-2">No members yet.</p>
-          <p className="font-serif italic text-muted text-sm">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-md font-bold mb-2">No members yet.</p>
+          <p className="text-sm">
             {isHome
               ? 'Add salespeople under People Management with a commission department and a ladder title.'
               : `Add the first member of ${subDeptName} above.`}
           </p>
         </div>
       ) : (
-        <div className="border border-hairline rounded-md bg-surface overflow-x-auto table-scroll">
+        // The table is its own framed well on the sheet; the wrapper only scrolls.
+        <div className="overflow-x-auto table-scroll">
           <table className="ledger-table">
             <thead>
               <tr>
@@ -257,12 +264,12 @@ export default function TeamTable({
                 return (
                   <tr key={p.staff_id}>
                     <td>
-                      <span className="text-ink">{p.employee_name}</span>
+                      <span className="font-medium">{p.employee_name}</span>
                       {p.employee_code ? (
-                        <span className="ml-2 font-mono text-xs text-muted">{p.employee_code}</span>
+                        <span className="ml-2 font-mono text-[11px]">{p.employee_code}</span>
                       ) : null}
                       {p.direct_line_limit != null ? (
-                        <div className="font-mono text-[10px] text-muted mt-1">
+                        <div className="text-[11px] mt-0.5">
                           {p.direct_line_count ?? 0}/{p.direct_line_limit} DIRECTS{p.expansion_earned_at ? ' · SDL EARNED' : ''}
                         </div>
                       ) : null}
@@ -270,16 +277,16 @@ export default function TeamTable({
                     <RowForm action={setStaffRank} onDone={done}>
                       {({ pending }) => (
                         <>
-                          <td className="font-serif italic text-sm text-graphite">
+                          <td>
                             <Hidden name="staff_id" value={p.staff_id} />
                             <Hidden name="scheme_id" value={schemeId} />
                             {p.based_here ? (
                               <>
-                                {p.title_name ?? <span className="text-muted">— none yet —</span>}
+                                {p.title_name ?? <span>— none yet —</span>}
                                 {/* The rung — the rows are in its order. */}
                                 {p.title_level_rank !== null ? (
                                   <span
-                                    className="ml-2 font-mono not-italic text-[10px] text-muted"
+                                    className="ml-2 font-mono text-[10px]"
                                     title={`Level ${p.title_level_rank} · ${p.title_level_name}`}
                                   >
                                     L{p.title_level_rank}
@@ -300,7 +307,7 @@ export default function TeamTable({
                                   ))}
                                 </Choice>
                                 {p.company_title_name && p.company_title_name !== p.title_name ? (
-                                  <div className="font-serif italic text-xs text-muted mt-1">
+                                  <div className="text-[11px] mt-0.5">
                                     {p.company_title_name} on People
                                   </div>
                                 ) : null}
@@ -321,7 +328,7 @@ export default function TeamTable({
                               ))}
                             </Choice>
                             {liftedTo ? (
-                              <div className="font-serif italic text-xs text-muted mt-1">
+                              <div className="text-[11px] mt-0.5">
                                 paid from {labelOf(liftedTo.id)} — earned by title
                               </div>
                             ) : null}
@@ -342,21 +349,20 @@ export default function TeamTable({
                         </>
                       )}
                     </RowForm>
-                    <td className="font-serif italic text-sm whitespace-nowrap">
+                    <td className="whitespace-nowrap">
                       {p.upline_staff_id ? (
-                        <span className="text-graphite">{nameOf.get(p.upline_staff_id) ?? 'somebody not on this chart'}</span>
+                        <span>{nameOf.get(p.upline_staff_id) ?? 'somebody not on this chart'}</span>
                       ) : reportsTo ? (
                         <span
-                          className="text-muted"
                           title="The top of a tree reports to the sub-department's director — a reporting line only, no override."
                         >
                           top of a tree · reports to {reportsTo}
                         </span>
                       ) : (
-                        <span className="text-muted">top of a tree</span>
+                        <span>top of a tree</span>
                       )}
                       {p.placed_since ? (
-                        <span className="ml-2 font-mono not-italic text-[10px] text-muted">since {p.placed_since}</span>
+                        <span className="ml-2 font-mono text-[10px]">since {p.placed_since}</span>
                       ) : null}
                     </td>
                     <td>
@@ -366,14 +372,15 @@ export default function TeamTable({
                             <Hidden name="staff_id" value={p.staff_id} />
                             <Tick name="withholding" defaultChecked={p.tax_mode === 'withholding'} ariaLabel={`${p.employee_name} withholding`} />
                             <Field name="withholding_rate" type="number" step="0.01" width="w-16" defaultValue={toPct(p.withholding_rate)} ariaLabel="withholding rate" />
-                            <span className="text-xs text-muted">%</span>
+                            <span className="text-xs">%</span>
                             <SaveButton pending={pending} label="✓" />
                           </div>
                         )}
                       </ActionForm>
                     </td>
                     <td>
-                      <button type="button" className="text-xs text-accent hover:underline whitespace-nowrap"
+                      {/* A link-button: underlined at rest, as a link in a sheet table is. */}
+                      <button type="button" className="text-xs underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink whitespace-nowrap"
                         aria-label={`Add ${p.employee_name} to department`} aria-haspopup="menu"
                         onClick={event => {
                           const rect = event.currentTarget.getBoundingClientRect()

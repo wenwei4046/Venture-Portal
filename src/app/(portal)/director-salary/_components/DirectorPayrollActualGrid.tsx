@@ -9,7 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { formatMoneyBare } from '@/lib/utils'
+import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import {
   updateDirectorPayrollRow,
   deleteDirectorPayrollRows,
@@ -159,61 +160,48 @@ function DirectorPayrollActualGridBody({ rows, period }: Props) {
 
   return (
     <div>
-      {/* Summary band — same anatomy as the HR payroll page */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6 mb-6 border-y border-hairline py-6">
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total CTC</div>
-          <div className="statement-amount compact whitespace-nowrap text-num-ink mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totalCtc)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.gross)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Net</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.net)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">EPF ER</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.epf_er)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">SOCSO+EIS ER</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1">
-            <span className="unit">RM</span>{' '}{formatMoneyBare(totals.socso_er + totals.eis_er)}
-          </div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total PCB</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.pcb)}</div>
-        </div>
-      </div>
+      {/* Summary cards — same anatomy as the HR payroll page. Total CTC is
+          the row's walnut card: gross + employer statutory, what the
+          directors cost HV this month. */}
+      <StatCards label="Director payroll totals">
+        <StatCard label="Total CTC" value={formatMoney(totalCtc)} icon="coin" tone="primary" note="Gross + employer statutory" />
+        <StatCard
+          label="Total gross"
+          value={formatMoney(totals.gross)}
+          icon="wallet"
+          note={`${rows.length} director${rows.length === 1 ? '' : 's'}`}
+        />
+        <StatCard label="Total net" value={formatMoney(totals.net)} icon="bank" note="To the directors" />
+        <StatCard label="EPF ER" value={formatMoney(totals.epf_er)} icon="shield" note="Employer" />
+        <StatCard label="SOCSO + EIS ER" value={formatMoney(totals.socso_er + totals.eis_er)} icon="layers" note="Employer" />
+        <StatCard label="Total PCB" value={formatMoney(totals.pcb)} icon="receipt" note="Tax withheld" />
+      </StatCards>
 
-      <div className="flex items-center justify-between mb-3 gap-4 min-h-[1.75rem]">
+      <div className="flex flex-wrap items-center justify-between mb-3 gap-x-4 gap-y-2 min-h-[1.75rem]">
         {someSelected ? (
-          <span className="font-serif italic text-graphite text-xs">{selected.size} selected</span>
+          <span className="text-xs font-medium">{selected.size} selected</span>
         ) : (
-          <p className="font-serif italic text-graphite text-xs">
+          <p className="text-xs">
             All values in RM · imported verbatim from InfoTech · click the row arrow for the EE
             breakdown.
           </p>
         )}
         {someSelected && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {deleteError && (
-              <span className="font-serif italic text-danger text-xs">{deleteError}</span>
+              <span className="text-danger text-xs">{deleteError}</span>
             )}
             <button
               onClick={handleDelete}
               disabled={isPending}
-              className="text-xs font-sans font-medium text-danger bg-danger/10 hover:bg-danger/15 px-2.5 py-1 rounded transition-colors disabled:opacity-50"
+              className="text-xs font-medium text-danger bg-danger-bg border border-danger/40 hover:bg-danger/15 px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
             >
               {isPending ? 'Deleting…' : `Delete ${selected.size}`}
             </button>
             <button
               onClick={() => setSelected(new Set())}
               disabled={isPending}
-              className="text-xs font-sans text-muted hover:text-ink disabled:opacity-50"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
             >
               Clear
             </button>
@@ -221,72 +209,76 @@ function DirectorPayrollActualGridBody({ rows, period }: Props) {
         )}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-              <th className="py-4 pl-2 pr-2 w-8">
-                <input
-                  type="checkbox"
-                  aria-label="Select all rows"
-                  checked={allChecked}
-                  disabled={rows.length === 0 || isPending}
-                  onChange={toggleAll}
-                  className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
+      <div className="table-frame">
+        <div className="table-frame-scroll">
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th className="w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all rows"
+                    checked={allChecked}
+                    disabled={rows.length === 0 || isPending}
+                    onChange={toggleAll}
+                    className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
+                  />
+                </th>
+                <th>Name</th>
+                <th>Dept</th>
+                <th className="right">Basic</th>
+                <th className="right">Stat.</th>
+                <th className="right">Non-Stat.</th>
+                <th className="right">OT</th>
+                <th className="right">Comm.</th>
+                <th className="right">Unpaid</th>
+                <th className="right">Deduct</th>
+                <th className="right" title="Net-only employee deduction — gross and statutory are unaffected">SKBBK</th>
+                <th className="right">EPF&nbsp;ER</th>
+                <th className="right">SOCSO&nbsp;ER</th>
+                <th className="right">EIS&nbsp;ER</th>
+                <th className="right">Gross</th>
+                <th className="right">Net</th>
+                <th className="right w-14"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <DirectorPayrollRow
+                  key={r.id}
+                  row={r}
+                  period={period}
+                  registerRow={registerRow}
+                  expanded={expandedId === r.id}
+                  onToggleExpand={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                  selected={selected.has(r.id)}
+                  onToggleSelect={() => toggleRow(r.id)}
+                  selectDisabled={isPending}
                 />
-              </th>
-              <th className="text-left py-4 pr-4 font-medium">Name</th>
-              <th className="text-left py-4 pr-4 font-medium">Dept</th>
-              <th className="text-right py-4 pr-4 font-medium">Basic</th>
-              <th className="text-right py-4 pr-4 font-medium">Stat.</th>
-              <th className="text-right py-4 pr-4 font-medium">Non-Stat.</th>
-              <th className="text-right py-4 pr-4 font-medium">OT</th>
-              <th className="text-right py-4 pr-4 font-medium">Comm.</th>
-              <th className="text-right py-4 pr-4 font-medium">Unpaid</th>
-              <th className="text-right py-4 pr-4 font-medium">Deduct</th>
-              <th className="text-right py-4 pr-4 font-medium" title="Net-only employee deduction — gross and statutory are unaffected">SKBBK</th>
-              <th className="text-right py-4 pr-4 font-medium">EPF&nbsp;ER</th>
-              <th className="text-right py-4 pr-4 font-medium">SOCSO&nbsp;ER</th>
-              <th className="text-right py-4 pr-4 font-medium">EIS&nbsp;ER</th>
-              <th className="text-right py-4 pr-4 font-medium">Gross</th>
-              <th className="text-right py-4 pr-4 font-medium">Net</th>
-              <th className="text-right py-4 pr-2 font-medium w-14"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <DirectorPayrollRow
-                key={r.id}
-                row={r}
-                period={period}
-                registerRow={registerRow}
-                expanded={expandedId === r.id}
-                onToggleExpand={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                selected={selected.has(r.id)}
-                onToggleSelect={() => toggleRow(r.id)}
-                selectDisabled={isPending}
-              />
-            ))}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="table-frame-foot">
+          <span>
+            Edit values inline — figures stick as typed (no recompute; the InfoTech file is the
+            source of truth). Statutory, PCB, Gross and Net are edited in the expanded panel (▾).
+          </span>
+        </div>
       </div>
-      <p className="font-serif italic text-muted text-xs mt-4">
-        Edit values inline — figures stick as typed (no recompute; the InfoTech file is the
-        source of truth). Statutory, PCB, Gross and Net are edited in the expanded panel (▾).
-      </p>
 
       {/* Staff-payroll-style flow: Save flushes every dirty row, then lands on
           the Submission tab where Submit to Finance is. */}
-      <div className="mt-6 flex items-center gap-4">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           onClick={handleSaveAll}
           disabled={isPending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saveAllState === 'saving' ? 'Saving...' : 'Save'}
         </button>
         {saveAllError && (
-          <span className="text-sm font-serif italic text-danger">{saveAllError}</span>
+          <span className="text-sm text-danger">{saveAllError}</span>
         )}
       </div>
     </div>
@@ -379,14 +371,14 @@ function DirectorPayrollRow({
       value={edit[name] ?? 0}
       disabled={isPending}
       onChange={e => setEdit({ ...edit, [name]: parseFloat(e.target.value) || 0 })}
-      className={`${w} text-right font-mono tabular text-sm bg-transparent border-b border-transparent focus:border-accent-border focus:outline-none px-1 py-1 disabled:text-muted disabled:cursor-not-allowed`}
+      className={`${w} text-right font-mono tabular text-[12px] bg-transparent border-b border-transparent focus:border-accent-border focus:outline-none px-1 py-1 disabled:opacity-50 disabled:cursor-not-allowed`}
     />
   )
 
   return (
     <>
-      <tr className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
-        <td className="py-5 pl-2 pr-2 w-8">
+      <tr>
+        <td className="w-8">
           <input
             type="checkbox"
             aria-label={`Select ${row.employee_name}`}
@@ -396,70 +388,60 @@ function DirectorPayrollRow({
             className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
           />
         </td>
-        <td className="py-5 pr-4">
-          <div className="font-serif text-md text-ink">{row.employee_name}</div>
-          <div className="font-mono text-[11px] text-graphite mt-0.5">
-            {row.director_code ?? (
-              <span className="font-serif italic text-alert">unmatched</span>
+        <td>
+          <div className="font-medium">{row.employee_name}</div>
+          <div className="text-[11px] mt-0.5 flex flex-wrap items-center gap-1.5">
+            {row.director_code ? (
+              <span className="font-mono">{row.director_code}</span>
+            ) : (
+              <span className="chip alert"><span className="dot" />unmatched</span>
             )}
             {row.source === 'manual' && (
-              <span className="ml-2 font-serif italic text-alert not-italic">edited</span>
+              <span className="chip alert"><span className="dot" />edited</span>
             )}
           </div>
         </td>
-        <td className="py-5 pr-4 font-serif italic text-graphite text-sm">
-          {row.dept_name || '—'}
-        </td>
-        <td className="py-5 pr-4 text-right">{cell('basic_salary')}</td>
-        <td className="py-5 pr-4 text-right">{cell('statutory_allowance')}</td>
-        <td className="py-5 pr-4 text-right">{cell('non_statutory_allowance')}</td>
-        <td className="py-5 pr-4 text-right">{cell('ot_amount')}</td>
-        <td className="py-5 pr-4 text-right">{cell('commission_amount')}</td>
-        <td className="py-5 pr-4 text-right">{cell('no_pay_amount')}</td>
-        <td className="py-5 pr-4 text-right">{cell('deduction_amount')}</td>
-        <td className="py-5 pr-4 text-right">{cell('skbbk_amount')}</td>
-        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">
-          {formatMoneyBare(row.epf_er)}
-        </td>
-        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">
-          {formatMoneyBare(row.socso_er)}
-        </td>
-        <td className="py-5 pr-4 text-right font-mono tabular text-graphite">
-          {formatMoneyBare(row.eis_er)}
-        </td>
-        <td className="py-5 pr-4 text-right font-mono tabular font-medium text-ink">
-          {formatMoneyBare(row.gross)}
-        </td>
-        <td className="py-5 pr-4 text-right font-mono tabular font-semibold text-ink">
-          {formatMoneyBare(row.net)}
-        </td>
-        <td className="py-5 pr-2 text-right">
+        <td>{row.dept_name || '—'}</td>
+        <td className="right">{cell('basic_salary')}</td>
+        <td className="right">{cell('statutory_allowance')}</td>
+        <td className="right">{cell('non_statutory_allowance')}</td>
+        <td className="right">{cell('ot_amount')}</td>
+        <td className="right">{cell('commission_amount')}</td>
+        <td className="right">{cell('no_pay_amount')}</td>
+        <td className="right">{cell('deduction_amount')}</td>
+        <td className="right">{cell('skbbk_amount')}</td>
+        <td className="num">{formatMoneyBare(row.epf_er)}</td>
+        <td className="num">{formatMoneyBare(row.socso_er)}</td>
+        <td className="num">{formatMoneyBare(row.eis_er)}</td>
+        <td className="num">{formatMoneyBare(row.gross)}</td>
+        <td className="num font-bold">{formatMoneyBare(row.net)}</td>
+        <td className="right">
           <div className="flex items-center gap-2 justify-end">
             {dirty && (
               <button
                 onClick={handleSave}
                 disabled={isPending}
-                className="text-xs font-sans text-accent hover:text-accent-hover disabled:opacity-50"
+                className="bg-accent hover:bg-accent-hover text-xs font-medium px-2.5 py-1 rounded-control transition-colors disabled:opacity-50"
               >
                 {isPending ? '...' : 'Save'}
               </button>
             )}
-            {saved && <span className="text-xs font-serif italic text-ledger">✓</span>}
+            {saved && <span className="text-xs text-ledger">✓</span>}
             {error && (
-              <span className="text-xs font-serif italic text-danger" title={error}>
+              <span className="text-xs font-semibold text-danger" title={error}>
                 !
               </span>
             )}
             <a
               href={`/director-salary/payslip/${row.id}`}
-              className="text-xs font-sans text-muted hover:text-accent"
+              className="text-xs"
               title="Open payslip"
             >
               Payslip
             </a>
             <button
               onClick={onToggleExpand}
-              className="text-xs text-muted hover:text-accent"
+              className="text-xs px-1 hover:bg-surface-2 rounded-control"
               aria-label="Toggle details"
             >
               {expanded ? '▴' : '▾'}
@@ -468,9 +450,11 @@ function DirectorPayrollRow({
         </td>
       </tr>
       {expanded && (
-        <tr className="border-b border-hairline bg-surface-2/30">
-          <td colSpan={17} className="py-4 px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-8 gap-y-4 text-sm">
+        <tr>
+          {/* The panel's wash sits on the cell, so the zebra and the row
+              hover underneath do not change it. */}
+          <td colSpan={17} className="bg-surface-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-8 gap-y-4">
               <ExpandedPair label="EPF ER / EE">
                 {cell('epf_er', 'w-20')} / {cell('epf_ee', 'w-20')}
               </ExpandedPair>
@@ -486,11 +470,12 @@ function DirectorPayrollRow({
               </ExpandedPair>
               {!row.director_id && (
                 <div>
-                  <div className="text-xs uppercase tracking-wide text-muted font-sans">
+                  <div className="text-[10px] font-medium uppercase tracking-[0.06em]">
                     Director link
                   </div>
-                  <div className="font-serif italic text-alert mt-1 text-xs">
-                    Unmatched — fix the name in InfoTech (or Settings → Directors) and re-import
+                  <div className="mt-1 text-xs">
+                    <span className="chip alert"><span className="dot" />Unmatched</span>{' '}
+                    fix the name in InfoTech (or Settings → Directors) and re-import
                   </div>
                 </div>
               )}
@@ -505,7 +490,7 @@ function DirectorPayrollRow({
 function ExpandedPair({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wide text-muted font-sans">{label}</div>
+      <div className="text-[10px] font-medium uppercase tracking-[0.06em]">{label}</div>
       <div className="mt-1 flex items-center gap-1 font-mono tabular text-ink">{children}</div>
     </div>
   )
@@ -513,13 +498,13 @@ function ExpandedPair({ label, children }: { label: string; children: React.Reac
 
 export function DirectorPayrollEmptyState({ period }: { period: string }) {
   return (
-    <div className="py-8 text-center border border-hairline rounded-md bg-surface">
-      <p className="font-serif italic text-muted mb-3">
+    <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+      <p className="text-sm mb-3">
         No director payroll imported for this month yet.
       </p>
       <Link
         href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
-        className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
       >
         Import InfoTech →
       </Link>

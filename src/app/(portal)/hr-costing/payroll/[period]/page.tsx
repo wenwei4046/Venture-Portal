@@ -1,8 +1,9 @@
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { formatMoney } from '@/lib/utils'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { round2 } from '@/lib/payroll-funding'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
@@ -18,6 +19,7 @@ import RequestPayrollPaymentButton, {
   type RequestState,
 } from '../_components/RequestPayrollPaymentButton'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -176,9 +178,6 @@ export default async function PayrollGridPage({ params }: PageProps) {
               <em>I.</em> HR · PAYROLL · {formatPeriodLabel(period).toUpperCase()}
             </div>
             <h1 className="page-title">{formatPeriodLabel(period)}</h1>
-            <p className="font-serif italic text-graphite text-base mt-3">
-              <em>No staff rows for this period yet.</em>
-            </p>
           </div>
           <div className="flex flex-col items-end gap-3">
             <PeriodPicker period={period} />
@@ -186,15 +185,19 @@ export default async function PayrollGridPage({ params }: PageProps) {
         </div>
         {/* Act on THIS month directly — create draft rows from the staff
             master, or import the InfoTech file for this period. The picker
-            above switches months. */}
-        <div className="flex items-center gap-3 flex-wrap mb-12">
-          <CreatePeriodButton period={period} />
-          <Link
-            href={`/hr-costing/payroll/${period}/import`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            Import InfoTech →
-          </Link>
+            above switches months. The sheet's empty state: the line that
+            says so, then the two ways out. */}
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center mb-12">
+          <p className="text-sm mb-4">No staff rows for this period yet.</p>
+          <div className="flex items-start justify-center gap-3 flex-wrap">
+            <CreatePeriodButton period={period} />
+            <Link
+              href={`/hr-costing/payroll/${period}/import`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+            >
+              Import InfoTech →
+            </Link>
+          </div>
         </div>
         {hasDirectorPayouts && (
           <DirectorSalarySection rows={directorPayouts} period={period} />
@@ -373,15 +376,16 @@ export default async function PayrollGridPage({ params }: PageProps) {
   return (
     <PayrollDraftProvider>
     <div>
-      {/* Reopened notice — HR pulled the figures back via Reopen (mig 278). */}
+      {/* Reopened notice — HR pulled the figures back via Reopen (mig 278).
+          The sheet's peach note: something to know, nothing wrong. */}
       {showReopenedNote ? (
-        <div className="bg-surface border border-hairline rounded-md p-4 mb-6 flex items-start gap-3">
-          <span className="font-serif italic text-accent text-xl leading-none">↺</span>
+        <div className="sheet-notice flex items-start gap-3">
+          <span className="text-lg leading-none" aria-hidden>↺</span>
           <div className="flex-1 min-w-0">
-            <p className="font-serif text-ink text-base">
+            <p className="text-sm font-bold">
               Reopened for edits
               {lastRejected?.rejected_at ? (
-                <span className="font-mono text-xs text-muted ml-2">
+                <span className="font-mono text-xs font-normal ml-2">
                   · {new Date(lastRejected.rejected_at).toLocaleString('en-MY', {
                     day: 'numeric',
                     month: 'short',
@@ -392,24 +396,24 @@ export default async function PayrollGridPage({ params }: PageProps) {
                 </span>
               ) : null}
             </p>
-            <p className="font-sans text-xs text-muted mt-2">
+            <p className="text-xs mt-1">
               Finance can&apos;t see this period&apos;s figures until you click{' '}
-              <em className="font-serif">Submit to Finance</em> again.
+              <strong className="font-bold">Submit to Finance</strong> again.
             </p>
           </div>
         </div>
       ) : null}
 
       {/* Legacy rejection banner — runs rejected by Principal under the old
-          approval flow (pre-mig 278). */}
+          approval flow (pre-mig 278). A rejection keeps the red wash. */}
       {showLegacyRejectedNote ? (
-        <div className="bg-danger-bg border border-danger rounded-md p-4 mb-6 flex items-start gap-3">
-          <span className="font-serif italic text-danger text-xl leading-none">✕</span>
+        <div className="bg-danger-bg border border-danger/40 rounded-lg px-[14px] py-3 mb-6 flex items-start gap-3">
+          <span className="text-danger text-lg leading-none" aria-hidden>✕</span>
           <div className="flex-1 min-w-0">
-            <p className="font-serif text-danger text-base">
+            <p className="text-sm font-bold text-danger">
               Rejected by Principal
               {lastRejected?.rejected_at ? (
-                <span className="font-mono text-xs text-muted ml-2">
+                <span className="font-mono text-xs font-normal text-ink ml-2">
                   · {new Date(lastRejected.rejected_at).toLocaleString('en-MY', {
                     day: 'numeric',
                     month: 'short',
@@ -421,16 +425,16 @@ export default async function PayrollGridPage({ params }: PageProps) {
               ) : null}
             </p>
             {lastRejected?.rejection_reason ? (
-              <p className="font-serif text-sm text-graphite mt-1 whitespace-pre-wrap">
+              <p className="text-sm mt-1 whitespace-pre-wrap">
                 {lastRejected.rejection_reason}
               </p>
             ) : (
-              <p className="font-serif italic text-muted text-sm mt-1">
+              <p className="text-sm mt-1">
                 No reason provided.
               </p>
             )}
-            <p className="font-sans text-xs text-muted mt-2">
-              Fix the rows below, then click <em className="font-serif">Submit to Finance</em> again.
+            <p className="text-xs mt-2">
+              Fix the rows below, then click <strong className="font-bold">Submit to Finance</strong> again.
             </p>
           </div>
         </div>
@@ -443,7 +447,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
             <em>I.</em> HR · PAYROLL · {formatPeriodLabel(period).toUpperCase()}
           </div>
           <h1 className="page-title">{formatPeriodLabel(period)}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             {totals.staff} staff
             {totals.directors > 0 ? ` · ${totals.directors} director${totals.directors > 1 ? 's' : ''}` : ''}
             {' · '}
@@ -469,7 +473,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
         <div className="flex items-center gap-2">
           <Link
             href={`/hr-costing/payroll/${period}/import`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
           >
             Import InfoTech
           </Link>
@@ -478,7 +482,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
           )}
           <Link
             href={`/hr-costing/allocation/${period}`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
             title="Split each employee's cost across subsidiaries for billing"
           >
             Billing Allocation
@@ -523,37 +527,23 @@ export default async function PayrollGridPage({ params }: PageProps) {
         />
       </div>
 
-      {/* Summary band — staff paycheck figures + director 75% payroll portion.
-          Total CTC leads: it's HV's full cost (gross + employer statutory) and
-          the recharge basis to subsidiaries; gross/net are components. */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-6 mb-10 border-y border-hairline py-6">
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total CTC</div>
-          <div className="statement-amount compact whitespace-nowrap text-num-ink mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totalCtc)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Gross</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.gross)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total Net</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.net)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">EPF ER</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.epf_er)}</div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">SOCSO+EIS ER</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1">
-            <span className="unit">RM</span>{' '}{formatMoneyBare(totals.socso_er + totals.eis_er)}
-          </div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">Total PCB</div>
-          <div className="statement-amount compact whitespace-nowrap text-graphite mt-1"><span className="unit">RM</span>{' '}{formatMoneyBare(totals.pcb)}</div>
-        </div>
-      </div>
+      {/* Summary cards — staff paycheck figures + director 75% payroll portion.
+          Total CTC leads, as the sheet's one walnut card: it's HV's full cost
+          (gross + employer statutory) and the recharge basis to subsidiaries;
+          gross/net are components. */}
+      <StatCards label={`Payroll totals for ${formatPeriodLabel(period)}`}>
+        <StatCard label="Total CTC" value={formatMoney(totalCtc)} icon="coin" tone="primary" note="Gross + employer statutory" />
+        <StatCard
+          label="Total gross"
+          value={formatMoney(totals.gross)}
+          icon="wallet"
+          note={`${totals.staff} staff${totals.directors > 0 ? ` · ${totals.directors} director${totals.directors > 1 ? 's' : ''}` : ''}`}
+        />
+        <StatCard label="Total net" value={formatMoney(totals.net)} icon="bank" note="To the bank" />
+        <StatCard label="EPF ER" value={formatMoney(totals.epf_er)} icon="shield" note="Employer" />
+        <StatCard label="SOCSO + EIS ER" value={formatMoney(totals.socso_er + totals.eis_er)} icon="layers" note="Employer" />
+        <StatCard label="Total PCB" value={formatMoney(totals.pcb)} icon="receipt" note="Tax withheld" />
+      </StatCards>
 
       <PayrollGrid rows={gridRows} period={period} />
 
@@ -573,21 +563,18 @@ function DirectorSalarySection({
   period: string
 }) {
   return (
-    <section className="mt-16">
-      <div className="flex items-baseline justify-between mb-4">
-        <div>
-          <h2 className="font-serif text-2xl text-ink">Director Salary</h2>
-          <p className="font-serif italic text-graphite text-sm mt-1">
-            75% payroll portion · read-only here · edited via{' '}
-            <Link
-              href={`/director-salary?period=${period}`}
-              className="text-accent hover:text-accent-hover not-italic"
-            >
-              Director Salary →
-            </Link>
-          </p>
-        </div>
+    <section className="mt-12">
+      <div className="sect-head">
+        <h2>Director Salary</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">75% PAYROLL PORTION · READ-ONLY HERE</span>
       </div>
+      <p className="text-sm -mt-2 mb-4">
+        Edited via{' '}
+        <Link href={`/director-salary?period=${period}`} className="text-accent hover:text-accent-hover">
+          Director Salary →
+        </Link>
+      </p>
       <div className="overflow-x-auto">
         <table className="ledger-table">
           <thead>
@@ -608,32 +595,25 @@ function DirectorSalarySection({
             {rows.map(d => (
               <LedgerRow key={d.id}>
                 <td>
-                  <div className="font-serif text-[15px] text-ink">{d.director_code}</div>
-                  <div className="font-mono text-[11px] text-graphite mt-0.5">{d.director_name}</div>
+                  <div className="font-medium">{d.director_code}</div>
+                  <div className="text-[11px] mt-0.5">{d.director_name}</div>
                 </td>
                 <td className="num m-hide" data-label="Pool Slice">{formatMoney(d.gross_amount)}</td>
                 <td className="num m-hide" data-label="Gross (75%)">{formatMoney(d.payroll_gross)}</td>
                 <td className="num m-hide" data-label="EPF ER">{formatMoney(d.payroll_epf_er)}</td>
                 <td className="num m-hide" data-label="SOCSO+EIS ER">{formatMoney(d.payroll_socso_er + d.payroll_eis_er)}</td>
                 <td className="num m-hide" data-label="PCB">{formatMoney(d.payroll_pcb)}</td>
-                <td className="num font-semibold">{formatMoney(d.payroll_net)}</td>
+                <td className="num font-bold">{formatMoney(d.payroll_net)}</td>
                 <td className="m-hide" data-label="Status">
-                  <em
-                    className={`font-serif italic text-sm not-italic ${
-                      d.status === 'draft'
-                        ? 'text-alert'
-                        : d.status === 'confirmed'
-                        ? 'text-ledger'
-                        : 'text-graphite'
-                    }`}
-                  >
+                  <span className={`chip ${d.status === 'draft' ? 'alert' : d.status === 'confirmed' ? 'ledger' : ''}`}>
+                    <span className="dot" />
                     {d.status}
-                  </em>
+                  </span>
                 </td>
                 <td className="right m-hide">
                   <Link
                     href={`/director-salary/${d.director_id}?period=${period}`}
-                    className="text-sm text-accent hover:text-accent-hover font-serif italic"
+                    className="text-sm text-accent hover:text-accent-hover"
                   >
                     Detail
                   </Link>
@@ -659,22 +639,32 @@ function PhaseLabel({
     | 'completed'
     | 'legacy-paid'
 }) {
-  switch (phase) {
-    case 'drafting':
-      return <em>Drafts editable inline</em>
-    case 'awaiting-approval':
-      return <em>Rows submitted — no live run (legacy state)</em>
-    case 'approved-no-request':
-      return <em>Submitted to Finance — request payroll payment next</em>
-    case 'request-submitted':
-      return <em>Payment request sent to Finance</em>
-    case 'request-pv-generated':
-      return <em>PV generated by Finance — awaiting Principal approval</em>
-    case 'completed':
-      return <em>HR Pool funded · ready to pay staff</em>
-    case 'legacy-paid':
-      return <em>Completed under the old flow</em>
-  }
+  // Where the month stands, as a word on a wash: orange while the next step
+  // is HR's, amber while it waits on Finance or Principal, green once done.
+  const [tone, text] = ((): [string, string] => {
+    switch (phase) {
+      case 'drafting':
+        return ['accent', 'Drafts editable inline']
+      case 'awaiting-approval':
+        return ['alert', 'Rows submitted — no live run (legacy state)']
+      case 'approved-no-request':
+        return ['accent', 'Submitted to Finance — request payroll payment next']
+      case 'request-submitted':
+        return ['alert', 'Payment request sent to Finance']
+      case 'request-pv-generated':
+        return ['alert', 'PV generated by Finance — awaiting Principal approval']
+      case 'completed':
+        return ['ledger', 'HR Pool funded · ready to pay staff']
+      case 'legacy-paid':
+        return ['ledger', 'Completed under the old flow']
+    }
+  })()
+  return (
+    <span className={`chip ${tone}`}>
+      <span className="dot" />
+      {text}
+    </span>
+  )
 }
 
 function PhaseCta({
@@ -711,12 +701,9 @@ function PhaseCta({
   }
   if (phase === 'awaiting-approval') {
     return (
-      <div className="bg-surface border border-hairline rounded-md px-4 py-2 text-right">
-        <em className="font-serif italic text-accent text-sm">Submitted</em>
-        <div className="font-mono text-xs text-muted mt-0.5">
-          RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-        </div>
-      </div>
+      <PhaseStatus tone="alert" word="Submitted">
+        RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+      </PhaseStatus>
     )
   }
   if (
@@ -738,7 +725,7 @@ function PhaseCta({
             instead of a button, for as long as the run is still reopenable
             (no funding PV yet). */}
         {(phase === 'approved-no-request' || phase === 'request-submitted') && (
-          <p className="font-serif italic text-graphite text-xs text-right max-w-xs">
+          <p className="text-xs text-right max-w-xs">
             要改数字？请 Finance 在 Payroll Requests 页「打回 HR 重做」— 打回后这里会回到 draft。
           </p>
         )}
@@ -747,13 +734,28 @@ function PhaseCta({
   }
   if (phase === 'legacy-paid') {
     return (
-      <div className="bg-surface border border-ledger/40 rounded-md px-4 py-2 text-right">
-        <em className="font-serif italic text-ledger text-sm">Completed</em>
-        <div className="font-mono text-xs text-muted mt-0.5">
-          RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-        </div>
-      </div>
+      <PhaseStatus tone="ledger" word="Completed">
+        RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+      </PhaseStatus>
     )
   }
   return null
+}
+
+// A settled phase in the header's action slot: the state as a chip over the
+// amount it settled, where a button stands while there is something to do.
+function PhaseStatus({ tone, word, children }: {
+  tone: 'alert' | 'ledger'
+  word: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex flex-col items-end gap-1 bg-surface border border-hairline rounded-lg px-3 py-2">
+      <span className={`chip ${tone}`}>
+        <span className="dot" />
+        {word}
+      </span>
+      <span className="font-mono text-xs tabular-nums">{children}</span>
+    </div>
+  )
 }

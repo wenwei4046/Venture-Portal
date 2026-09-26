@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/utils'
 import PeriodPicker from '../../payroll/_components/PeriodPicker'
 import AllocationEditor, { type StaffAllocationData } from '../_components/AllocationEditor'
 import CopyAllocationsButton from '../_components/CopyAllocationsButton'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 interface PageProps {
   params: Promise<{ period: string }>
@@ -83,7 +84,7 @@ export default async function AllocationPage({ params }: PageProps) {
     <div>
       <Link
         href={`/hr-costing/payroll/${period}`}
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+        className="text-sm hover:text-accent transition-colors"
       >
         ← Back to Payroll
       </Link>
@@ -93,14 +94,14 @@ export default async function AllocationPage({ params }: PageProps) {
             <em>II.</em> HR · BILLING ALLOCATION · {formatPeriodLabel(period).toUpperCase()}
           </div>
           <h1 className="page-title">Billing Allocation</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             {staff.length === 0 ? (
-              <em>No payroll rows for this period.</em>
+              'No payroll rows for this period.'
             ) : (
-              <em>
+              <>
                 {staffWithAlloc} of {staff.length} staff allocated · unallocated share stays
                 with HV
-              </em>
+              </>
             )}
           </p>
         </div>
@@ -111,53 +112,52 @@ export default async function AllocationPage({ params }: PageProps) {
       </div>
 
       {staff.length === 0 ? (
-        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-          <p className="font-serif text-2xl text-ink mb-3">
+        <div className="border border-hairline rounded-card bg-surface-2 px-6 py-12 text-center">
+          {/* `.sheet-heading` owns its margin, so the air sits on its neighbours. */}
+          <h2 className="sheet-heading">
             Nothing to allocate for {formatPeriodLabel(period)}.
-          </p>
-          <p className="font-serif italic text-muted text-sm mb-8 max-w-md mx-auto">
+          </h2>
+          <p className="text-sm mt-2 mb-6 max-w-md mx-auto">
             The allocation splits each employee&apos;s payroll cost across subsidiaries, so
             it needs the month&apos;s payroll rows first.
           </p>
           <Link
             href={`/hr-costing/payroll/${period}`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Go to Payroll →
           </Link>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10 border-y border-hairline py-6">
-            <div>
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-                Total Employer Cost
-              </div>
-              <div className="statement-amount text-num-ink mt-1">
-                {formatMoney(totalCost)}
-              </div>
-            </div>
-            <div>
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-                Staff Allocated
-              </div>
-              <div className="statement-amount compact text-graphite mt-1">
-                {staffWithAlloc} / {staff.length}
-              </div>
-            </div>
-            <div>
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-                Billed to Subsidiaries
-              </div>
-              <div className="statement-amount compact text-graphite mt-1">{formatMoney(billedTotal)}</div>
-            </div>
-            <div>
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">
-                HV — Venture Own Share
-              </div>
-              <div className="statement-amount compact text-graphite mt-1">{formatMoney(hvTotal)}</div>
-            </div>
-          </div>
+          {/* The month in four figures. The employer cost is what the page
+              splits, so it is the sheet's one walnut card; the last two are
+              where that cost goes. */}
+          <StatCards label={`Billing allocation for ${formatPeriodLabel(period)}`}>
+            <StatCard
+              label="Total employer cost"
+              value={formatMoney(totalCost)}
+              icon="coin"
+              tone="primary"
+              note="Gross + employer statutory"
+            />
+            <StatCard
+              label="Staff allocated"
+              value={`${staffWithAlloc} / ${staff.length}`}
+              icon="people"
+            />
+            <StatCard
+              label="Billed to subsidiaries"
+              value={formatMoney(billedTotal)}
+              icon="building"
+            />
+            <StatCard
+              label="HV — Venture own share"
+              value={formatMoney(hvTotal)}
+              icon="briefcase"
+              note="Not billed"
+            />
+          </StatCards>
 
           <AllocationEditor
             period={period}

@@ -280,9 +280,9 @@ export default function PayrollRow({
               {isPending ? '…' : 'Save'}
             </button>
           )}
-          {saved && <span className="text-xs font-serif italic text-ledger mr-1">✓</span>}
+          {saved && <span className="text-xs font-bold text-ledger mr-1">✓</span>}
           {error && (
-            <span className="text-xs font-serif italic text-danger mr-1" title={error}>
+            <span className="text-xs font-bold text-danger mr-1" title={error}>
               !
             </span>
           )}

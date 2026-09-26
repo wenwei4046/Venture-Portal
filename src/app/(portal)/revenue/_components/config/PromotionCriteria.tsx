@@ -46,9 +46,11 @@ export default function PromotionCriteria({
       </Hint>
 
       {steps.length === 0 ? (
-        <p className="font-serif italic text-muted text-sm">
-          The ladder is empty — add ranks in section II first.
-        </p>
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">
+            The ladder is empty — add ranks in section II first.
+          </p>
+        </div>
       ) : (
         <div className="space-y-7">
           {steps.map((step, i) => (
@@ -77,23 +79,26 @@ function StepBlock({
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
-        <span className="font-mono text-[11px] text-muted tracking-[0.04em]">{index}.</span>
-        <h3 className="m-0 text-base font-semibold text-ink">
-          {step.fromLabel} <span className="font-normal text-muted">→</span> {step.toLabel}
+        <span className="font-mono text-[11px] tracking-[0.04em]">{index}.</span>
+        <h3 className="m-0 text-[15px] font-semibold">
+          {step.fromLabel} <span className="font-normal">→</span> {step.toLabel}
         </h3>
         {/* The rank keys used to sit here (rs_5 → rs_6); the user had them
             taken out on 2026-09-05 — the letters say it. Only the anomaly
-            still speaks. */}
+            still speaks — as a word on a wash. */}
         {step.onLadder ? null : (
-          <span className="font-mono text-[11px] text-muted">not two adjacent rungs</span>
+          <span className="chip alert">
+            <span className="dot" />
+            not two adjacent rungs
+          </span>
         )}
-        <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.04em] text-muted">
+        <span className="ml-auto text-[10px] font-semibold uppercase tracking-[0.045em]">
           {stepLogic(step)}
         </span>
       </div>
 
       {step.routes.length === 0 ? (
-        <p className="m-0 border border-dashed border-hairline rounded-md px-4 py-3 font-serif italic text-muted text-sm">
+        <p className="m-0 border border-dashed border-hairline rounded-card bg-surface-2 px-4 py-3 text-sm">
           Nothing recorded yet.
         </p>
       ) : (
@@ -128,15 +133,21 @@ function StepBlock({
                     <td>
                       {CRITERION_LABEL[rule.criterion]}
                       {isLadderGate(step, rule) ? (
-                        <span className="chip ledger ml-2 whitespace-nowrap">LIVE · LADDER GATE</span>
+                        <span className="chip ledger ml-2 whitespace-nowrap">
+                          <span className="dot" />
+                          LIVE · LADDER GATE
+                        </span>
                       ) : null}
                       {rule.is_enforced ? (
-                        <span className="chip accent ml-2 whitespace-nowrap">ENFORCED</span>
+                        <span className="chip accent ml-2 whitespace-nowrap">
+                          <span className="dot" />
+                          ENFORCED
+                        </span>
                       ) : null}
                     </td>
                     <td className="num">{threshold(rule, bandLabel)}</td>
                     {noted ? (
-                      <td className="font-serif italic text-xs text-muted">{rule.note}</td>
+                      <td>{rule.note}</td>
                     ) : null}
                   </tr>
                 )),

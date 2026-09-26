@@ -8,6 +8,7 @@ import { revenuePath } from '@/lib/revenue'
 import { ratePct } from '@/lib/commission/ranks'
 import type { IrGroup } from '@/lib/commission/ir-groups'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { readRevenuePayrollAdjustments } from '../../../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../../../_components/PayrollAdjustmentPanel'
@@ -216,6 +217,21 @@ export default async function CommissionStatementPage({ params }: PageProps) {
 
   const total = Number(s.total_commission)
   const withheld = Number(s.margin_penalty_withheld)
+  const runSynced = run.status === 'applied' || run.status === 'locked'
+  const personName = me?.employee_name ?? staffId
+  // The person header's two lines: where they sit, then the rung they are paid at.
+  const placeLine = [
+    oneOf(s.rank_title)?.name ?? null,
+    s.upline_staff_id ? `under ${staff.get(s.upline_staff_id)?.employee_name ?? 'an upline'}` : 'top of a tree',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const rankLine = [
+    rankNameOf(s.rank_key) ?? 'no rank',
+    Number(s.group_incentive) > 0 ? 'Group package' : ratePct(Number(s.product_rate)),
+    s.rate_mode === 'fixed' ? 'Manual rate' : 'Scheme rate',
+  ].join(' · ')
+  const qualifies = Boolean(s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key)
 
   return (
     <div>
@@ -224,117 +240,152 @@ export default async function CommissionStatementPage({ params }: PageProps) {
           <div className="page-eyebrow">
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · {label(period).toUpperCase()}
           </div>
-          <h1 className="page-title">{me?.employee_name ?? staffId}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {oneOf(s.rank_title)?.name ? `${oneOf(s.rank_title)!.name} · ` : ''}
-            {rankNameOf(s.rank_key) ?? 'no rank'} · {Number(s.group_incentive) > 0 ? 'Group package' : ratePct(Number(s.product_rate))}
-            {s.rate_mode === 'fixed' ? ' · Manual rate' : ' · Scheme rate'}
-            {s.upline_staff_id
-              ? ` · under ${staff.get(s.upline_staff_id)?.employee_name ?? 'an upline'}`
-              : ' · top of a tree'}
-          </p>
+          <h1 className="page-title">Commission statement</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href={`${revenuePath(subDept.slug, period, 'orders')}?staff=${staffId}`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Their bills
           </Link>
           <Link
             href={revenuePath(subDept.slug, period, 'pay', staffId)}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             What this pays
           </Link>
           <Link
             href={revenuePath(subDept.slug, period)}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             ← The run
           </Link>
         </div>
       </div>
 
-      {/* The page's one dark object — .hero-walnut in globals.css. */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-        <div className="lg:col-span-7 hero-walnut px-6 py-6 md:px-8 md:py-7">
-          <div className="font-serif italic text-accent text-base mb-1">Source commission · {subDept.name}</div>
-          <div className="statement-amount text-num-ink">
-            {formatMoney(total)}
-          </div>
-          <div className="font-mono text-[11.5px] text-graphite mt-3 tracking-[0.02em] font-medium uppercase">
-            {lines.length} LINES · {label(period).toUpperCase()}
-          </div>
-          {s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key ? (
-            <p className="font-serif italic text-accent text-sm mt-3">
-              Group sales clear <strong>{rankNameOf(s.qualifies_for_rank_key)}</strong>
-              {s.rate_mode === 'fixed'
-                ? ' — a promotion to consider, not applied, because their rate is set manually.'
-                : ' — already applied this month.'}
-            </p>
-          ) : null}
-          {s.promotes_to_title_id ? (
-            <p className="font-serif italic text-accent text-sm mt-3">
-              {run.status === 'applied' || run.status === 'locked' ? 'Title raised to ' : 'Syncing this run raises their title to '}
-              <strong>{oneOf(s.promotes_to)?.name ?? 'a higher title'}</strong>
-              {run.status === 'applied'
-                ? ' — and it stays there: a title only ever goes up.'
-                : ' — the rank paid this month sits above the title they hold.'}
-            </p>
-          ) : null}
+      {/* The page's one dark object: the salesperson's person header, as the
+          month's ledger draws it (CommissionWorkbench) — the month and the
+          run's state on top, then who they are, and the source commission on
+          the right. .hero-walnut re-lights the tokens inside it, so ink,
+          graphite, hairline and the chips read light on the walnut. */}
+      <section className="hero-walnut text-ink px-5 pt-5 pb-6 md:px-7 md:pt-6 md:pb-7 mb-8" aria-label={`${personName} · commission statement`}>
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-5 md:pb-6 text-graphite">
+          <span className="text-[10px] font-medium uppercase tracking-[0.09em]">Commission · {label(period)}</span>
+          <span className="text-[10px] px-2 py-1 border border-muted/70 rounded-sm text-ink">Run {run.status}</span>
         </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div
+            aria-hidden
+            className="grid place-items-center shrink-0 w-[52px] h-[52px] rounded-lg border border-hairline bg-surface text-lg font-medium"
+          >
+            {personName.slice(0, 2)}
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <h2 className="text-[25px] md:text-[28px] leading-[1.3] font-medium tracking-[-0.03em] text-num-ink">{personName}</h2>
+            <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-graphite">
+              <span>{placeLine}</span>
+              <span className="text-ink">{rankLine}</span>
+            </p>
+          </div>
+          <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-[7px] mt-[3px] md:mt-0 pt-[18px] md:pt-0 md:pl-6 border-t md:border-t-0 md:border-l border-hairline">
+            <span className="text-xs text-graphite">Source commission · {subDept.name}</span>
+            <strong className="text-[30px] md:text-[clamp(30px,3vw,42px)] leading-[1.15] font-medium tracking-[-0.045em] tabular-nums text-num-ink">
+              {formatMoney(total)}
+            </strong>
+            <small className="text-[10px] text-graphite">{lines.length} lines</small>
+          </div>
+        </div>
+        {/* A promotion is a state, so it is a word on a wash: green once it
+            has landed, orange while it waits on a decision or a sync. */}
+        {qualifies || s.promotes_to_title_id ? (
+          <div className="mt-5 pt-4 border-t border-hairline space-y-2 text-xs text-graphite">
+            {qualifies ? (
+              <p>
+                <span className={`chip ${s.rate_mode === 'fixed' ? 'accent' : 'ledger'}`}>
+                  <span className="dot" />
+                  Group sales clear <strong>{rankNameOf(s.qualifies_for_rank_key)}</strong>
+                </span>
+                {s.rate_mode === 'fixed'
+                  ? ' — a promotion to consider, not applied, because their rate is set manually.'
+                  : ' — already applied this month.'}
+              </p>
+            ) : null}
+            {s.promotes_to_title_id ? (
+              <p>
+                <span className={`chip ${runSynced ? 'ledger' : 'accent'}`}>
+                  <span className="dot" />
+                  {runSynced ? 'Title raised to ' : 'Syncing this run raises their title to '}
+                  <strong>{oneOf(s.promotes_to)?.name ?? 'a higher title'}</strong>
+                </span>
+                {run.status === 'applied'
+                  ? ' — and it stays there: a title only ever goes up.'
+                  : ' — the rank paid this month sits above the title they hold.'}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <PayrollAdjustmentPanel read={payrollAdjustments} periodLabel={label(period)}
         staffNames={new Map([[staffId, me?.employee_name ?? staffId]])} statement
         runSynced={run.status === 'applied' || run.status === 'locked'} />
 
+      {/* The month's inputs to the statement. No card here is primary: the
+          figure this page is opened for is the source commission in the
+          person header above — the sheet keeps one dark object. The two
+          memo figures turn red only while money is actually held back. */}
       <section className="mb-10">
         <div className="sect-head">
           <h2>The month in figures</h2>
           <span className="rule" aria-hidden />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Fig label="Own commissionable revenue" value={formatMoney(Number(s.product_revenue))} />
-          <Fig
+        <StatCards label="The month in figures">
+          <StatCard label="Own commissionable revenue" value={formatMoney(Number(s.product_revenue))} icon="sales" />
+          <StatCard
             label="Group sales"
             value={formatMoney(Number(s.group_revenue))}
+            icon="people"
             note={(s.group_breakdown ?? []).length > 0 ? 'Own plus two downline layers, each person counted once. Individual group targets below may reuse own sales.' : 'Own plus the scheme’s qualifying downline layers. A sales figure — the margin penalty does not reduce it.'}
           />
-          <Fig
+          <StatCard
             label="Held by the deposit gate"
             value={formatMoney(Number(s.deferred_revenue))}
+            icon="clock"
             note="Pays in the month the deposit clears."
-            warn={Number(s.deferred_revenue) > 0}
+            tone={Number(s.deferred_revenue) > 0 ? 'danger' : undefined}
           />
-          <Fig
+          <StatCard
             label="Not commissionable"
             value={formatMoney(Number(s.excluded_revenue))}
+            icon="tag"
             note="Transport, disposal and anything in an unclassified item group."
           />
-          <Fig
+          <StatCard
             label="Penalty-weighted revenue"
             value={formatMoney(Number(s.penalty_weighted_revenue))}
+            icon="tree"
             note="What the upline overrides on, so a bill cut for margin cuts the override too."
           />
-          <Fig label="KPI units" value={Number(s.kpi_qty).toLocaleString()} />
-          <Fig
+          <StatCard label="KPI units" value={Number(s.kpi_qty).toLocaleString()} icon="gift" />
+          <StatCard
             label="KPI base"
             value={formatMoney(Number(s.kpi_base))}
+            icon="coin"
             note={
               Number(s.kpi_threshold_pct) > 0
                 ? `Uplifted ${pct(s.kpi_threshold_pct, 0)} for clearing the quantity ladder.`
                 : undefined
             }
           />
-          <Fig
+          <StatCard
             label="Commission withheld for margin"
             value={formatMoney(withheld)}
+            icon="percent"
             note="Memo — the lines below are already net of it."
-            warn={withheld > 0}
+            tone={withheld > 0 ? 'danger' : undefined}
           />
-        </div>
+        </StatCards>
       </section>
 
       {brands.length > 0 ? (
@@ -346,8 +397,8 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               {s.margin_band_key ? s.margin_band_key.toUpperCase() : 'NO TIER CLEARED'}
             </span>
           </div>
-          <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
-            The incentive is the highest tier that <em>every</em> brand they sold clears — three
+          <p className="text-sm mb-4 max-w-3xl">
+            The incentive is the highest tier that <strong>every</strong> brand they sold clears — three
             weekends of one brand at Tier 2 and a fourth of another below it is a Tier 1 month. A
             brand with no cost data, or no ladder, blocks the incentive entirely rather than paying
             on the ones that can be judged.
@@ -365,7 +416,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               <tbody>
                 {brands.map(b => (
                   <tr key={b.brand_code}>
-                    <td className="font-mono text-[11px] text-graphite">{b.brand_code}</td>
+                    <td className="font-mono text-[11px] font-medium">{b.brand_code}</td>
                     <td className="num">{formatMoney(Number(b.revenue))}</td>
                     <td className="num">{formatMoney(Number(b.cost))}</td>
                     <td className={b.margin_pct === null ? 'num neg' : 'num'}>
@@ -373,17 +424,18 @@ export default async function CommissionStatementPage({ params }: PageProps) {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+              {/* Every brand together — the peach total band. */}
+              <tfoot>
                 <tr>
-                  <td>
-                    <em className="font-serif text-ink text-sm">All brands</em>
-                  </td>
+                  <td>All brands</td>
                   <td className="num">{formatMoney(Number(s.margin_revenue))}</td>
                   <td className="num">{formatMoney(Number(s.margin_cost))}</td>
                   <td className={s.margin_pct === null ? 'num neg' : 'num'}>
                     {s.margin_pct === null ? 'no cost' : pct(s.margin_pct)}
                   </td>
                 </tr>
-              </tbody>
+              </tfoot>
             </table>
           </div>
         </section>
@@ -396,7 +448,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
             <span className="rule" aria-hidden />
             <span className="count">{s.group_breakdown.filter(g => g.qualifies).length} QUALIFIED</span>
           </div>
-          <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+          <p className="text-sm mb-4 max-w-3xl">
             Your personal sales count in every direct group. Each group includes its direct and that person&apos;s immediate reports; deeper layers are excluded. These overlapping targets are assessed separately and should not be added together as actual revenue.
           </p>
           <div className="overflow-x-auto">
@@ -409,18 +461,33 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               </tr></thead>
               <tbody>{s.group_breakdown.map(g => (
                 <LedgerRow key={g.directStaffId}>
-                  <td>{staff.get(g.directStaffId)?.employee_name ?? g.directStaffId}</td>
+                  <td className="font-medium">{staff.get(g.directStaffId)?.employee_name ?? g.directStaffId}</td>
                   <td className="num m-hide" data-label="Your sales (reused)">{formatMoney(g.leaderPersonalRevenue)}</td>
                   <td className="num m-hide" data-label="Direct sales">{formatMoney(g.directPersonalRevenue)}</td>
                   <td className="num m-hide" data-label="Second layer">{formatMoney(g.secondLayerRevenue)}</td>
                   <td className="num">{formatMoney(g.totalRevenue)}</td>
-                  <td className="m-hide" data-label="Result">{g.qualifies ? 'Qualified' : 'Below target'}{g.targetRevenue ? ` · ${formatMoney(g.targetRevenue)}` : ''}</td>
+                  <td className="m-hide" data-label="Result">
+                    {/* The result is a state: green once the group clears its target. */}
+                    <span className={g.qualifies ? 'chip ledger' : 'chip'}>
+                      <span className="dot" />
+                      {g.qualifies ? 'Qualified' : 'Below target'}
+                    </span>
+                    {g.targetRevenue ? ` · ${formatMoney(g.targetRevenue)}` : ''}
+                  </td>
                 </LedgerRow>
               ))}</tbody>
             </table>
           </div>
-          {s.full_spec ? <p className="font-serif italic text-accent text-sm mt-3">Full Spec achieved: three qualifying groups, each with three immediate reports. {Number(s.group_incentive) > 0 ? 'Syncing this package run permits opening a fourth line in this month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.' : 'The current manual percentage rank must be changed to the group package before the SDL qualification can be awarded.'}</p> : null}
-          {Number(s.group_subsidy_cap) > 0 ? <p className="font-serif italic text-graphite text-sm mt-3">Car/property subsidy cap: <strong>{formatMoney(Number(s.group_subsidy_cap))}</strong>. This is a separate non-cash Claims benefit, subject to the registered instalment. It is excluded from the cash commission total.</p> : null}
+          {s.full_spec ? (
+            <p className="text-sm mt-3">
+              <span className="chip ledger">
+                <span className="dot" />
+                Full Spec achieved
+              </span>{' '}
+              three qualifying groups, each with three immediate reports. {Number(s.group_incentive) > 0 ? 'Syncing this package run permits opening a fourth line in this month. Each further line requires all existing groups to qualify in its opening month. Opened slots are retained; unused permission expires.' : 'The current manual percentage rank must be changed to the group package before the SDL qualification can be awarded.'}
+            </p>
+          ) : null}
+          {Number(s.group_subsidy_cap) > 0 ? <p className="text-sm mt-3">Car/property subsidy cap: <strong>{formatMoney(Number(s.group_subsidy_cap))}</strong>. This is a separate non-cash Claims benefit, subject to the registered instalment. It is excluded from the cash commission total.</p> : null}
         </section>
       ) : null}
 
@@ -432,7 +499,7 @@ export default async function CommissionStatementPage({ params }: PageProps) {
             <span className="count">{formatMoney(group.subtotal)}</span>
           </div>
           {COMPONENT_NOTE[group.component] ? (
-            <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+            <p className="text-sm mb-4 max-w-3xl">
               {COMPONENT_NOTE[group.component]}
             </p>
           ) : null}
@@ -452,13 +519,13 @@ export default async function CommissionStatementPage({ params }: PageProps) {
                 {group.rows.map(l => (
                   <LedgerRow key={l.id}>
                     <td>
-                      <div className="font-serif text-[14px] text-ink">
+                      <div className="font-medium">
                         {l.source_staff_id
                           ? (staff.get(l.source_staff_id)?.employee_name ?? l.source_staff_id)
                           : (l.note ?? '—')}
                       </div>
                       {l.source_staff_id && l.note ? (
-                        <div className="font-mono text-[10.5px] text-graphite mt-0.5">{l.note}</div>
+                        <div className="font-mono text-[11px] mt-0.5">{l.note}</div>
                       ) : null}
                     </td>
                     <td className="num m-hide" data-label="Basis">{formatMoney(Number(l.basis_amount))}</td>
@@ -487,18 +554,17 @@ export default async function CommissionStatementPage({ params }: PageProps) {
               <Sum name="Override" value={Number(s.override_commission)} />
               <Sum name="Margin incentive" value={Number(s.margin_incentive)} />
               {Number(s.group_incentive) > 0 ? <Sum name="Group incentive" value={Number(s.group_incentive)} /> : null}
-              <tr>
-                <td>
-                  <strong className="font-serif text-ink text-[15px]">
-                    Source commission · {subDept.name}
-                  </strong>
-                </td>
-                <td className="num font-semibold text-lg">{formatMoney(total)}</td>
-              </tr>
             </tbody>
+            {/* The sum of the components — the peach total band. */}
+            <tfoot>
+              <tr>
+                <td>Source commission · {subDept.name}</td>
+                <td className="num">{formatMoney(total)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
-        <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+        <p className="text-xs mt-3 max-w-3xl">
           This sub-department&apos;s source commission forms part of the monthly payroll total.
           Any payroll adjustment is shown in the monthly reconciliation above. Payroll deductions
           are calculated there. Any car/property subsidy is handled separately through Claims.
@@ -508,39 +574,10 @@ export default async function CommissionStatementPage({ params }: PageProps) {
   )
 }
 
-function Fig({
-  label: text,
-  value,
-  note,
-  warn,
-}: {
-  label: string
-  value: string
-  note?: string
-  warn?: boolean
-}) {
-  return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
-      <div
-        className={[
-          'num tabular tracking-[-0.01em] text-xl',
-          warn ? 'text-danger' : 'text-num-ink',
-        ].join(' ')}
-      >
-        {value}
-      </div>
-      {note ? <div className="font-serif italic text-muted text-xs mt-1.5">{note}</div> : null}
-    </div>
-  )
-}
-
 function Sum({ name, value }: { name: string; value: number }) {
   return (
     <tr>
-      <td>
-        <span className="font-serif text-[14px] text-graphite">{name}</span>
-      </td>
+      <td>{name}</td>
       <td className="num">{formatMoney(value)}</td>
     </tr>
   )

@@ -22,9 +22,11 @@ export default async function DirectorPoolPage() {
           </div>
           <h1 className="page-title">Director Pool</h1>
         </div>
+        {/* Navigation, not a decision — an outline button, so the one orange
+            action on the sheet stays the calculator's 💾 Save. */}
         <Link
           href="/director-pool/import"
-          className="px-4 py-2 rounded-md border border-hairline text-sm text-graphite hover:text-accent hover:border-accent transition-colors"
+          className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
         >
           📂 Import JSON
         </Link>

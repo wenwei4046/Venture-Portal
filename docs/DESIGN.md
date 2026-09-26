@@ -1,9 +1,9 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version:** 3.3
-**Last updated:** 2026-09-24
+**Version:** 3.9
+**Last updated:** 2026-09-27
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.3 (Shared statement typography / Walnut palette / approved Product List workspace) — single source of truth for all UI work
+**Status:** v3.9 (Sheet theme on HR's view / Walnut shell / approved Product List workspace) — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -11,12 +11,94 @@
 
 ## Implementation rules — read this first
 
+### Sheet theme — the portal's new tone, HR's view first (v3.9, 2026-09-27)
+
+Comm Cal's month (#151 → #162) is the reference for how the portal now looks,
+and the user asked for every page to follow it "so that the software is all
+sync with the tone" — starting with the pages HR reads: **HR Costing** (Overview,
+Payroll, Payment, Allocation, payslips, import), **Director Salary**, **Director
+Pool**, **Revenue** (Comm Cal and every page under a month, Staff Hierarchy,
+Rules — not the Product List, which keeps its own workspace) and
+**Claims**. `lib/sheet-routes.ts` lists the prefixes; extending the tone to the
+rest of the portal is adding a prefix there and converting the page (below).
+
+**What it is.** PortalFrame draws, for those routes, the content column inset
+10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline
+border, 24px padding) that stays put while one of these pages replaces another;
+the loading skeleton lands on it too. The shell — sidebar rail, greeting bar and
+the plaster around the sheet — keeps the Walnut/Harbour palette and follows the
+user's theme (#152: the user wanted the shell's colours preserved). Inside the
+sheet `.sheet-theme` declares the Comm Cal month's tokens:
+
+- **Lettering is black** (`--ink`, `--num-ink`, `--graphite`, `--muted` are all
+  0 0 0). Hierarchy comes from size, weight and surfaces. No italics — `em` and
+  `.italic` stand upright on the sheet.
+- **Orange `#E99A53` is a surface, never lettering** (2.2:1 on white). It paints
+  primary buttons, the active tab's 3px underline over a peach wash
+  (`--accent-bg` `#FFF4E7`), the page-head rule, the eyebrow numeral, checkbox
+  ticks. `text-accent` renders black (links underline), `hover:text-accent`
+  underlines, and anything painted orange carries black lettering even where the
+  markup still says `text-white`.
+- **Walnut is the one dark object**: the page's primary summary card
+  (`tone="primary"`), a salesperson's / statement's person header, dark
+  popovers (`bg-ink` renders walnut on the sheet).
+- Semantics keep their meaning and their light values in both themes: red
+  negatives and errors, green done / increases, amber waiting. A status is a
+  **word on a wash** (`.chip alert|ledger|danger|info|accent` with its dot),
+  never coloured words alone.
+- The sheet is light in both themes, like the Product List: black lettering
+  needs a light ground. Components with their own palettes (`.org-canvas`,
+  `.pay-board`, `.hero-walnut`) stay at their light values on it.
+
+**How a page is built on it** (reference: `hr-costing/page.tsx`,
+`hr-costing/payroll/[period]/page.tsx`, and the month itself):
+
+1. `.page-head` as everywhere (eyebrow `<em>I.</em> SECTION · PAGE`, Georgia
+   title); on the sheet the rule is orange and the eyebrow 10px.
+2. **Summary cards** (`components/sheet/StatCard.tsx`) instead of a hero, a
+   figure strip or tiles: `<StatCards label>` of `<StatCard label value icon
+   note tone href?>` — a short bar, the label in small caps, the figure, a note
+   and a line icon (`SheetIcon`) at the foot. Exactly one `primary` per row, the
+   figure the page is opened for; `danger` / `alert` only while the problem
+   holds. A month shown as a hero moves into the eyebrow/title; its status line
+   becomes the primary card's note.
+3. Sections: `.sect-head` (17px/600 title over the same rule and mono count), or
+   `.sheet-heading` + `.sheet-subtitle` for a heading with one sentence.
+4. Tables: every `.ledger-table` becomes the month's table automatically — a
+   framed well (`216 210 200`, 10px radius), an uppercase 10px/600 header band
+   (`235 231 224` over a `207 197 183` rule), white / `#F7F7F5` zebra, peach
+   hover, 12px text with 12px `.num` figures, and a peach `<tfoot>` for the
+   total. Put a closing total in `<tfoot>`. The payroll grid keeps its own
+   geometry and takes only the lettering and the light department bands
+   (`.group-btn` is the header band's tone with a walnut marker on the sheet).
+   `.table-frame` › `.table-frame-scroll` + `.table-frame-foot` when a table
+   needs the month's footer strip.
+5. Tabs: `SlidingTabs` renders the month's tabs on the sheet by itself (a
+   tinted, underlined pick; counts in boxed badges). A hand-built rail uses
+   `.sheet-tabs` with `aria-selected` / `aria-current` and `.sheet-count`.
+6. `.sheet-toolbar` for a search / filter panel above a table,
+   `.sheet-notice` (peach) / `.sheet-warning` (amber) / `.sheet-danger` (red)
+   for a callout. A salesperson's payslip or statement opens on the walnut
+   person header, as the workbench's person view does (`.hero-walnut`, 12px on
+   the sheet): eyebrow row with a status tag, initials, name, title · rank,
+   the total on the right.
+7. Overlays portalled to `<body>` (PaycheckWindow, the commission editor, the
+   hierarchy's Move popover and context menu) carry `sheet-theme` on their
+   portal root, because they render outside the sheet.
+
+Every sheet override in `globals.css` is written `:where(.sheet-theme) <base
+selector>`, so it has exactly the specificity of the rule it replaces: a page's
+own utilities keep the power they had. Don't add a sheet rule with more weight
+than its base.
+
 ### Product List workspace — approved 2026-09-24
 
 The user's approved Product List design supersedes the older restrictions on
 white surfaces and warm accents **within `/revenue/products` and its visible
-shell**. Other routes retain the existing palette. `.product-theme` scopes the
-tokens in `globals.css`; the user's theme preference is not rewritten.
+shell**. Since 2026-09-27 the same tokens are the sheet theme's (above) on HR's
+view; the Product List is the one route that also re-tones the shell.
+`.product-theme` scopes the tokens in `globals.css`; the user's theme preference
+is not rewritten.
 
 - Keep the existing light brown sidebar and greeting bar (`#DED7CA`), on a
   light neutral gray base (`#F3F3F1`). The content panel and inputs are white.
@@ -111,7 +193,9 @@ When you're not sure how a pattern looks in code, copy from one of these — the
 | Hero number + side stats | `src/app/(portal)/director-salary/page.tsx` |
 | Section-grouped tables | `src/app/(portal)/statements/page.tsx`, `src/app/(portal)/overdue/page.tsx` |
 | Tab rail on the header's rule (`.page-head.tabbed` + `SlidingTabs`) | `src/app/(portal)/revenue/_components/config/CommissionSection.tsx`, `src/app/(portal)/revenue/[sub]/hierarchy/_components/HierarchyTabs.tsx` |
-| Hero + dept totals + history | `src/app/(portal)/hr-costing/page.tsx` |
+| **Sheet page: summary cards + ledger table with `tfoot` + status chips** | `src/app/(portal)/hr-costing/page.tsx` |
+| Sheet page with a working grid under its cards | `src/app/(portal)/hr-costing/payroll/[period]/page.tsx` |
+| The design source of the sheet (cards, rail, framed tables, person header) | `src/app/(portal)/revenue/[sub]/[period]/_components/CommissionWorkbench.tsx`, `CommissionMonthSummary.tsx` |
 | Pure read-only ledger | `src/app/(portal)/audit-log/page.tsx` |
 | Monthly payment statement + Salary / Statutory tabs + department tables | `src/app/(portal)/hr-costing/payment/page.tsx`, `_components/Overview.tsx`, `_components/DeptRows.tsx` |
 | Sidebar (roman numerals + dot markers) | `src/components/layout/Sidebar.tsx` |
@@ -690,6 +774,15 @@ shape), and the ground is the only non-paper surface — everything around it
 (toolbar, note, selection bar, popover) is still in the portal's own tokens.
 
 ### Payment statement (v3.7, 2026-09-11 — HR › Payment)
+
+> **On the sheet since v3.9 (2026-09-27).** The information architecture below
+> stands; its LOOK follows "Sheet theme": the three headline figures are summary
+> cards (Total payroll cost the walnut one), reconciliation / funding / dates sit
+> in one framed panel with the next action in its footer strip, Salary /
+> Statutory are `.sheet-tabs` with counts, the statement tables are the sheet's
+> tables, and the current month on the rail is an orange underline on a peach
+> wash. Where this section says ink top rule, grey totals band, square tables,
+> Georgia override or Walnut/Harbour, read the sheet's equivalent.
 
 The approved combination uses concept A's reporting and concept B's table hierarchy.
 Payment inherits the same Plaster/Walnut/Harbour palette, sidebar and topbar as
@@ -2064,9 +2157,10 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
-- **2026-09-26 (later)** — Comm Cal's month in one table design. *Below deposit* and *Sales by venue* join the workbench's rail (Total Sales Orders · KPI Items · Open Bill · Below deposit · Sales by venue), both in the workbench table (`.tableFrame` / `.table`, sticky first and answer columns, `tfoot`, `.tableFooter`); a salesperson's page gains *Below deposit* beside Personal / Overriding; the Total Sales Orders table gains *Group sales* between Commissionable value and Upsell, with the run's promotion preview as `.badge` tags under the rank. The saved run's `.ledger-table`, the *Waiting on a deposit* section and *Sales by person* are gone, and Sales by venue lost its organiser dropdown and *same place as…*. See "Tabbed pages".
+- **2026-09-27 v3.9 (latest)** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".
 - **2026-09-27** — Revenue › Venues removed: the ERP names every bill's fair (venue, organiser, days), so there is nothing left to type. The one person's step it held — moving bills into their fair's month — is a panel on the month page, *Bills of another month's fair* (`FairMovesPanel`), in the same bordered-surface vocabulary as *Drops and upsells the ERP found*: a serif heading with a mono alert count, an italic explanation, one `.ledger-table` (Bill · Salesperson · Fair · Move · Sales value, the move's status as a small mono label), and one accent button *Move the N confirmed*.
-- **2026-09-26 v3.8 (latest)** — Navigation feedback. A click inside a section used to leave the page frozen for 0.2–1.4 s (only a change of top-level section showed a skeleton). Now every route folder with child routes has a `loading.tsx`, and every navigation answers in four steps: the clicked row lights up with a sweep, the skeleton of the page that is coming (ledger / record / form / chart, real `.page-head` and `.sect-head`, one viewport-pinned shimmer), a 2 px accent progress line with a glowing head, and the page settling in (rise 6px, blocks 45ms apart). A kept page dims while it is being replaced. The line replaced `nextjs-toploader`, which stopped when a skeleton moved the URL and still wore the rust accent. See "Navigation feedback (v3.8)". Later the same day: `WarmLink` brings the sidebar's warm and sweep to the month links inside Comm Cal and HR › Payment.
+- **2026-09-26 (later)** — Comm Cal's month in one table design. *Below deposit* and *Sales by venue* join the workbench's rail (Total Sales Orders · KPI Items · Open Bill · Below deposit · Sales by venue), both in the workbench table (`.tableFrame` / `.table`, sticky first and answer columns, `tfoot`, `.tableFooter`); a salesperson's page gains *Below deposit* beside Personal / Overriding; the Total Sales Orders table gains *Group sales* between Commissionable value and Upsell, with the run's promotion preview as `.badge` tags under the rank. The saved run's `.ledger-table`, the *Waiting on a deposit* section and *Sales by person* are gone, and Sales by venue lost its organiser dropdown and *same place as…*. See "Tabbed pages".
+- **2026-09-26 v3.8** — Navigation feedback. A click inside a section used to leave the page frozen for 0.2–1.4 s (only a change of top-level section showed a skeleton). Now every route folder with child routes has a `loading.tsx`, and every navigation answers in four steps: the clicked row lights up with a sweep, the skeleton of the page that is coming (ledger / record / form / chart, real `.page-head` and `.sect-head`, one viewport-pinned shimmer), a 2 px accent progress line with a glowing head, and the page settling in (rise 6px, blocks 45ms apart). A kept page dims while it is being replaced. The line replaced `nextjs-toploader`, which stopped when a skeleton moved the URL and still wore the rust accent. See "Navigation feedback (v3.8)". Later the same day: `WarmLink` brings the sidebar's warm and sweep to the month links inside Comm Cal and HR › Payment.
 - **2026-09-24** — The Product List mirrors the ERP's Products page item by item (SKU Master / Modular / Maintenance / Combo Pricing + Costing gaps on one `control` rail) and keeps the portal's own prices and ticks as the page's only inputs; see "Product List — the mirror beside the portal's decisions". The member calculator's builder gains the Modular dropdowns in its own editorial vocabulary: a sofa build's *Leg height* select and *Sofa specials* tick list under the seat height and tier, and a *Bed frame build* section (divan / leg / total height / gap selects two a row, specials as ticks) — only what every model of that kind in the cart was ticked for; blank = *Not chosen* (`.optionGrid`, `.specials` in `MemberQuoteCatalog.module.css`). People › Member Services › Product options became a pointer card to Modular.
 - **2026-09-17** — A rail in the middle of a page. Comm Cal's month ends in one `text`-variant `SlidingTabs` rail instead of three stacked sections: *Sales by venue* · *Sales by person* · **Open Bill**, with the counts on the tabs. The rail is the section heading — the panels dropped the `.sect-head` titles its labels now carry — and every panel is server-rendered and handed to the client rail as a node, so `?tab=` switches with a `pushState` and a re-render. The new Open Bill panel is three `.ledger-table`s (by rank with a `tfoot` total, by salesperson, every picked bill) plus the read-only pick chip in `OpenBillPicker`'s vocabulary: dashed alert for the importer's guess, solid accent for a decision. See "Tabbed pages".
 - **2026-09-12** — Director rail. The Revenue chart's directors moved out of the frames (design A, the user's pick from the Director Line artifact): every director once, on a rail above all the sub-department frames under `REVENUE DIRECTORS · REPORTING ONLY`, one dashed line per frame they direct landing on the frame's top edge with a dot — two directors of one frame joined on a bus bar, PETER's second line to IR on a bus of its own — and `Reports to KRIS · PETER` on the frame's header. The row of director cards inside each frame and the fan of one line per team leader (11 teams × 2 directors = 22 lines on Fair, crossing the team frames whatever Tidy did) are gone; the leader cards, the popover's detach row, the footer and the move note keep their "reports to" wording. See `.space-director` under "Org chart canvas (v3.4)".

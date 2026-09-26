@@ -71,7 +71,7 @@ export default function MoreActionsDropdown({ actions, dangerAction }: Props) {
         onClick={() => setOpen(v => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2"
+        className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors flex items-center gap-2"
       >
         More actions
         <span className={`text-[10px] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
@@ -79,7 +79,7 @@ export default function MoreActionsDropdown({ actions, dangerAction }: Props) {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 w-64 bg-surface border border-hairline rounded-md shadow-sm z-10 py-1"
+          className="absolute right-0 top-full mt-1 w-64 bg-surface border border-hairline rounded-lg shadow-dropdown z-10 py-1"
         >
           {actions.map((a, i) => (
             <a
@@ -88,7 +88,7 @@ export default function MoreActionsDropdown({ actions, dangerAction }: Props) {
               title={a.title}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="block px-4 py-2 font-serif italic text-sm text-ink hover:bg-surface-2 transition-colors"
+              className="block px-4 py-2 text-sm text-ink hover:bg-accent-bg transition-colors"
             >
               {a.label}
             </a>
@@ -101,12 +101,12 @@ export default function MoreActionsDropdown({ actions, dangerAction }: Props) {
                 role="menuitem"
                 onClick={handleDanger}
                 disabled={isPending}
-                className="block w-full text-left px-4 py-2 font-serif italic text-sm text-danger hover:bg-surface-2 transition-colors disabled:opacity-50"
+                className="block w-full text-left px-4 py-2 text-sm text-danger hover:bg-danger-bg transition-colors disabled:opacity-50"
               >
                 {isPending ? 'Deleting…' : dangerAction.label}
               </button>
               {error ? (
-                <p className="px-4 py-2 text-xs font-sans text-danger">{error}</p>
+                <p className="px-4 py-2 text-xs text-danger">{error}</p>
               ) : null}
             </>
           ) : null}

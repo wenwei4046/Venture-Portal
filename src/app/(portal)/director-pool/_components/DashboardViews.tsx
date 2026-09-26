@@ -34,11 +34,23 @@ import {
   type DpSettings,
 } from '@/lib/director-pool-engine'
 import type { DpCompany } from '@/lib/director-pool-data'
-import { fmt, fmtRM, Money, MoneyInput, MonthTabs, Dot, TopUpHint } from './DirectorPoolClient'
+import { fmt, fmtRM, Money, MoneyInput, MonthTabs, Dot, TopUpHint, MONTH_BAND, pillClass } from './DirectorPoolClient'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 // Chart-series palette for companies (data colours, mirrors the HTML tool)
 const CO_COLORS = ['#4a9eff', '#f5a623', '#2ec4b6', '#e74c3c', '#9b8dd9', '#20b2aa', '#b39ddb']
+
+// The charts' own chrome in the sheet's tone — black lettering, hairline
+// rules. The series keep their data colours (CO_COLORS, the directors' own).
+const INK = 'rgb(var(--ink))'
+const HAIRLINE = 'rgb(var(--hairline))'
+const X_TICK = { fontSize: 11, fill: INK }
+const Y_TICK = { fontSize: 10, fill: INK }
+const TOOLTIP_STYLE = { border: `1px solid ${HAIRLINE}`, borderRadius: 8, fontSize: 12 }
+const TOOLTIP_LABEL = { color: INK, fontWeight: 600 }
+/** Recharts letters each legend entry in its series colour; the sheet's are black. */
+const legendText = (value: string) => <span style={{ color: INK }}>{value}</span>
 
 type DirInputField =
   | 'billingStat'
@@ -79,8 +91,8 @@ export default function DashboardViews(p: DashProps) {
 
   if (!p.results.length) {
     return (
-      <div className="py-10 text-center border border-hairline rounded-md bg-surface">
-        <p className="font-serif italic text-muted">No data yet — add months in the Calculator tab first.</p>
+      <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+        <p className="text-sm">No data yet — add months in the Calculator tab first.</p>
       </div>
     )
   }
@@ -88,17 +100,14 @@ export default function DashboardViews(p: DashProps) {
   return (
     <div>
       <DashKpis {...p} />
-      <div className="flex flex-wrap gap-1.5 mb-6">
+      <div className="sheet-tabs" role="tablist" aria-label="Dashboard views">
         {TABS.map(([key, label]) => (
           <button
             key={key}
             type="button"
+            role="tab"
+            aria-selected={tab === key}
             onClick={() => setTab(key)}
-            className={`px-3.5 py-1 rounded-full border text-xs font-medium transition-colors ${
-              tab === key
-                ? 'border-accent text-accent bg-surface'
-                : 'border-hairline text-graphite hover:text-ink bg-surface'
-            }`}
           >
             {label}
           </button>
@@ -118,20 +127,26 @@ export default function DashboardViews(p: DashProps) {
 
 // ── Shared bits ─────────────────────────────────────────────────────────────
 
+/** A view's own figure card — the sheet's card (white, hairline, 12px
+ *  radius) in the summary cards' lettering, compact because these sit under
+ *  the dashboard's StatCards and often carry a director's colour dot in the
+ *  label, which a StatCard's string label cannot. */
 function Card({ label, value, sub, danger }: { label: React.ReactNode; value: React.ReactNode; sub?: React.ReactNode; danger?: boolean }) {
   return (
-    <div className="border border-hairline rounded-md bg-surface p-4">
-      <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-graphite mb-1">{label}</div>
-      <div className={`font-serif text-lg tabular ${danger ? 'text-danger' : 'text-ink'}`}>{value}</div>
-      {sub != null && <div className="font-mono text-[10px] text-graphite mt-0.5">{sub}</div>}
+    <div className="border border-hairline rounded-card bg-surface px-4 py-3.5">
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.06em]">{label}</div>
+      <div className={`text-lg font-bold tabular-nums tracking-[-0.02em] ${danger ? 'text-danger' : ''}`}>{value}</div>
+      {sub != null && <div className="mt-1 text-[11px] leading-snug">{sub}</div>}
     </div>
   )
 }
 
+/** A month's band row in an All Months table — the header band's tone,
+ *  its label in small caps (see MONTH_BAND). */
 function MonthHeadRow({ m, colSpan, extra }: { m: MonthResult; colSpan: number; extra?: React.ReactNode }) {
   return (
-    <tr className="row-sect">
-      <td colSpan={colSpan} className="font-serif italic text-accent">
+    <tr>
+      <td colSpan={colSpan} className={MONTH_BAND}>
         {m.name}
         {m.fullPayout && ' · 💯 Full Payout'}
         {m.includeBilling && ' · 📥 Incl. Billing'}
@@ -166,19 +181,22 @@ function DashKpis({ results }: DashProps) {
     })
   })
   const latestAdv = r2(results[results.length - 1].dirRes.reduce((s, d) => s + d.accumulated, 0))
+  // The pool across every month is what the dashboard is opened for — the
+  // sheet's one walnut card. An outstanding advance reads red while it holds.
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-      <Card label="Total Pool (All Months)" value={fmtRM(r2(totalPool))} sub={`${results.length} month(s)`} />
-      <Card label="Total Saving" value={fmtRM(r2(totalSaving))} sub="Sal+KPI + Allowance saving" />
-      <Card label="Total Gross Balance" value={fmtRM(r2(totalGB))} sub="Paid to directors (Sal+KPI)" />
-      <Card label="Total Allowance Pool" value={fmtRM(r2(totalAllow))} sub="Across all months" />
-      <Card
+    <StatCards label="Director Pool across all months">
+      <StatCard label="Total Pool (All Months)" value={fmtRM(r2(totalPool))} icon="coin" tone="primary" note={`${results.length} month(s)`} />
+      <StatCard label="Total Saving" value={fmtRM(r2(totalSaving))} icon="bank" note="Sal+KPI + Allowance saving" />
+      <StatCard label="Total Gross Balance" value={fmtRM(r2(totalGB))} icon="wallet" note="Paid to directors (Sal+KPI)" />
+      <StatCard label="Total Allowance Pool" value={fmtRM(r2(totalAllow))} icon="gift" note="Across all months" />
+      <StatCard
         label="Outstanding Advance"
         value={<Money v={latestAdv} dash="RM 0.00" />}
-        sub="Accumulated (latest month)"
-        danger={latestAdv < 0}
+        icon="clock"
+        tone={latestAdv < 0 ? 'danger' : undefined}
+        note="Accumulated (latest month)"
       />
-    </div>
+    </StatCards>
   )
 }
 
@@ -200,30 +218,30 @@ function OverviewView({ results, directors }: DashProps) {
   })
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="border border-hairline rounded-md bg-surface p-4">
-        <h3 className="font-serif text-sm text-ink mb-3">Monthly Pool Trend 月度薪资池</h3>
+      <div className="border border-hairline rounded-card bg-surface p-4">
+        <h3 className="text-sm font-bold mb-3">Monthly Pool Trend 月度薪资池</h3>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={poolData}>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
-            <Tooltip formatter={(v) => fmtRM(Number(v))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={HAIRLINE} />
+            <XAxis dataKey="name" tick={X_TICK} stroke={HAIRLINE} />
+            <YAxis tick={Y_TICK} stroke={HAIRLINE} tickFormatter={(v: number) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
+            <Tooltip formatter={(v) => fmtRM(Number(v))} contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} />
+            <Legend wrapperStyle={{ fontSize: 11 }} formatter={legendText} />
             <Bar dataKey="Salary" stackId="a" fill={CO_COLORS[0]} radius={[0, 0, 0, 0]} />
             <Bar dataKey="KPI" stackId="a" fill={CO_COLORS[2]} />
             <Bar dataKey="Allowance" stackId="a" fill={CO_COLORS[1]} radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="border border-hairline rounded-md bg-surface p-4">
-        <h3 className="font-serif text-sm text-ink mb-3">Director Total Pay Comparison (per Month)</h3>
+      <div className="border border-hairline rounded-card bg-surface p-4">
+        <h3 className="text-sm font-bold mb-3">Director Total Pay Comparison (per Month)</h3>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={payData}>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
-            <Tooltip formatter={(v) => fmtRM(Number(v))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={HAIRLINE} />
+            <XAxis dataKey="name" tick={X_TICK} stroke={HAIRLINE} />
+            <YAxis tick={Y_TICK} stroke={HAIRLINE} tickFormatter={(v: number) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
+            <Tooltip formatter={(v) => fmtRM(Number(v))} contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} />
+            <Legend wrapperStyle={{ fontSize: 11 }} formatter={legendText} />
             {directors.map((d) => (
               <Bar key={d.id} dataKey={d.code} fill={d.color} radius={[3, 3, 0, 0]} />
             ))}
@@ -249,22 +267,22 @@ function CompanyView({ results, companies }: DashProps) {
   let gS = 0, gK = 0, gA = 0, gT = 0
   return (
     <div>
-      <div className="border border-hairline rounded-md bg-surface p-4 mb-6">
-        <h3 className="font-serif text-sm text-ink mb-3">Company Contribution per Month 各公司月度贡献</h3>
+      <div className="border border-hairline rounded-card bg-surface p-4 mb-6">
+        <h3 className="text-sm font-bold mb-3">Company Contribution per Month 各公司月度贡献</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
-            <Tooltip formatter={(v) => fmtRM(Number(v))} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={HAIRLINE} />
+            <XAxis dataKey="name" tick={X_TICK} stroke={HAIRLINE} />
+            <YAxis tick={Y_TICK} stroke={HAIRLINE} tickFormatter={(v: number) => (v >= 1000 ? `${v / 1000}k` : String(v))} />
+            <Tooltip formatter={(v) => fmtRM(Number(v))} contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL} />
+            <Legend wrapperStyle={{ fontSize: 11 }} formatter={legendText} />
             {companies.map((c, i) => (
               <Bar key={c.id} dataKey={c.name} stackId="a" fill={CO_COLORS[i % CO_COLORS.length]} />
             ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="mb-3">
+      <div className="sheet-toolbar">
         <MonthTabs months={results} value={pick.value} onChange={pick.setPicked} allowAll />
       </div>
       <div className="overflow-x-auto">
@@ -290,8 +308,8 @@ function CompanyView({ results, companies }: DashProps) {
                 gS += co?.salary ?? 0; gK += co?.kpi ?? 0; gA += co?.allowance ?? 0; gT += t
                 return (
                   <LedgerRow key={`${m.id}-${c.id}`}>
-                    <td className="font-mono text-xs text-graphite">{m.name}</td>
-                    <td className="font-serif text-sm text-ink">{c.name}</td>
+                    <td className="font-mono text-xs">{m.name}</td>
+                    <td className="font-medium">{c.name}</td>
                     <td className="num m-hide" data-label="Salary">{co?.salary ? fmt(co.salary) : '—'}</td>
                     <td className="num m-hide" data-label="KPI">{co?.kpi ? fmt(co.kpi) : '—'}</td>
                     <td className="num m-hide" data-label="Allowance">{co?.allowance ? fmt(co.allowance) : '—'}</td>
@@ -300,15 +318,17 @@ function CompanyView({ results, companies }: DashProps) {
                 )
               }),
             ])}
-            <tr className="border-t border-hairline">
-              <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium m-hide">{fmt(r2(gS))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(gK))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(gA))}</td>
-              <td className="num font-medium text-num-ink">{fmt(r2(gT))}</td>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={2}>Total</td>
+              <td className="num m-hide">{fmt(r2(gS))}</td>
+              <td className="num m-hide">{fmt(r2(gK))}</td>
+              <td className="num m-hide">{fmt(r2(gA))}</td>
+              <td className="num font-bold">{fmt(r2(gT))}</td>
               <td className="lt-toggle" />
             </tr>
-          </tbody>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -322,7 +342,7 @@ function DirectorView({ results }: DashProps) {
   const g = { skg: 0, ag: 0, save: 0, gb: 0, ab: 0, pay: 0 }
   return (
     <div>
-      <div className="mb-3">
+      <div className="sheet-toolbar">
         <MonthTabs months={results} value={pick.value} onChange={pick.setPicked} allowAll />
       </div>
       <div className="overflow-x-auto">
@@ -351,8 +371,8 @@ function DirectorView({ results }: DashProps) {
                 g.gb += d.salKpiGB; g.ab += d.allowBalance; g.pay += d.totalPay
                 return (
                   <LedgerRow key={`${m.id}-${d.id}`}>
-                    <td className="font-mono text-xs text-graphite">{m.name}</td>
-                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
+                    <td className="font-mono text-xs">{m.name}</td>
+                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-medium">{d.code}</span></td>
                     <td className="num m-hide" data-label="Weight">{d.weight}%</td>
                     <td className="num m-hide" data-label="Sal+KPI Gross">{fmt(d.salKpiGross)}</td>
                     <td className="num m-hide" data-label="Allow Gross">{d.allowGross > 0 ? fmt(d.allowGross) : '—'}</td>
@@ -376,18 +396,20 @@ function DirectorView({ results }: DashProps) {
                 )
               }),
             ])}
-            <tr className="border-t border-hairline">
-              <td colSpan={3} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.skg))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.ag))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.save))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.gb))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.ab))}</td>
-              <td className="num font-medium text-num-ink">{fmt(r2(g.pay))}</td>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={3}>Total</td>
+              <td className="num m-hide">{fmt(r2(g.skg))}</td>
+              <td className="num m-hide">{fmt(r2(g.ag))}</td>
+              <td className="num m-hide">{fmt(r2(g.save))}</td>
+              <td className="num m-hide">{fmt(r2(g.gb))}</td>
+              <td className="num m-hide">{fmt(r2(g.ab))}</td>
+              <td className="num font-bold">{fmt(r2(g.pay))}</td>
               <td colSpan={2} className="m-hide" />
               <td className="lt-toggle" />
             </tr>
-          </tbody>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -420,11 +442,11 @@ function AdvanceView(p: DashProps) {
   const g = { pay: 0, fixed: 0, vr: 0, adv: 0, advStat: 0, allowStat: 0 }
   return (
     <div>
-      <p className="font-serif italic text-xs text-graphite mb-4 border-l-2 border-accent pl-3">
+      <p className="sheet-notice">
         当 Total Pay &lt; Fixed Salary 时，差额作为 Salary Advance（预支）累计。KPI 盈余抵消累计
         Advance；Adv Statutory 与 75% Allow Statutory 都会加入欠款。
       </p>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card label="Total Accumulated Advance" value={<Money v={adjTotal} dash="RM 0.00" />} sub={`All directors (${latest.name})`} danger={adjTotal < 0} />
         {cards.map(({ d, adjAccum, adj, totStat }) => (
           <Card
@@ -442,92 +464,100 @@ function AdvanceView(p: DashProps) {
           />
         ))}
       </div>
-      <div className="mb-3">
+      <div className="sheet-toolbar">
         <MonthTabs months={results} value={pick.value} onChange={pick.setPicked} allowAll />
       </div>
-      <div className="overflow-x-auto">
-        <table className="ledger-table">
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Director</th>
-              <th className="right">Total Pay</th>
-              <th className="right m-hide">Fixed Salary</th>
-              <th className="right m-hide">Vr KPI</th>
-              <th className="right m-hide">Adv This Month</th>
-              <th className="right m-hide">Adv Stat</th>
-              <th className="right m-hide">Allow Stat</th>
-              <th className="right m-hide">Prev. Accum</th>
-              <th className="right m-hide">Accum. Advance</th>
-              <th className="right m-hide">✏️ Override Adv</th>
-              <th className="right m-hide">✏️ Override Accum.</th>
-              <th className="lt-toggle" aria-hidden />
-            </tr>
-          </thead>
-          <tbody>
-            {pick.visible.map((m) => [
-              <MonthHeadRow key={`${m.id}-h`} m={m} colSpan={12} />,
-              ...m.dirRes.map((d) => {
-                const inp = dirInputs[d.statKey] ?? {}
-                g.pay += d.totalPay; g.fixed += d.dirFixed; g.vr += d.vrKpi; g.adv += d.advThisMonth
-                g.advStat += d.advStatAmount; g.allowStat += d.allowStatAmount
-                return (
-                  <LedgerRow key={`${m.id}-${d.id}`} className={d.hasOverride ? 'row-summary-strong' : undefined}>
-                    <td className="font-mono text-xs text-graphite">{m.name}</td>
-                    <td className="whitespace-nowrap">
-                      <Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span>
-                      {d.hasOverride && <em className="font-serif text-[10px] text-alert ml-1">✏️</em>}
-                    </td>
-                    <td className="num">{fmt(d.totalPay)}</td>
-                    <td className="num m-hide" data-label="Fixed Salary">{fmt(d.dirFixed)}</td>
-                    <td className="num m-hide" data-label="Vr KPI">
-                      {Math.abs(d.vrKpi) < 0.005 ? '—' : <span className={d.vrKpi < 0 ? 'text-danger' : 'text-ledger'}>{fmt(d.vrKpi)}</span>}
-                    </td>
-                    <td className="num m-hide" data-label="Adv This Month">{d.advThisMonth < 0 ? <span className="text-danger">({fmt(Math.abs(d.advThisMonth))})</span> : '—'}</td>
-                    <td className="num m-hide" data-label="Adv Stat">{d.advStatAmount > 0 ? <span className="text-danger">{fmt(d.advStatAmount)}</span> : '—'}</td>
-                    <td className="num m-hide" data-label="Allow Stat">{d.allowStatAmount > 0 ? <span className="text-alert">{fmt(d.allowStatAmount)}</span> : '—'}</td>
-                    <td className="num m-hide" data-label="Prev. Accum">
-                      {Math.abs(d.prevAccum) < 0.005 ? '—' : (
-                        <span className={d.prevAccum < 0 ? 'text-danger' : ''}>
-                          {d.prevAccum < 0 ? `(${fmt(Math.abs(d.prevAccum))})` : fmt(d.prevAccum)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="num font-medium m-hide" data-label="Accum. Advance">
-                      {Math.abs(d.accumulated) < 0.005 ? '—' : (
-                        <span className={d.accumulated < 0 ? 'text-danger' : ''}>
-                          {d.accumulated < 0 ? `(${fmt(Math.abs(d.accumulated))})` : fmt(d.accumulated)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="num m-hide" data-label="✏️ Override Adv">
-                      <MoneyInput value={inp.advOverrideThis ?? null} placeholder="—" onCommit={(v) => p.onDirInput(m.id, d.id, 'advOverrideThis', v)} className="w-24" />
-                    </td>
-                    <td className="num m-hide" data-label="✏️ Override Accum.">
-                      <MoneyInput value={inp.advOverrideAccum ?? null} placeholder="—" onCommit={(v) => p.onDirInput(m.id, d.id, 'advOverrideAccum', v)} className="w-24" />
-                    </td>
-                  </LedgerRow>
-                )
-              }),
-            ])}
-            <tr className="border-t border-hairline">
-              <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium">{fmt(r2(g.pay))}</td>
-              <td className="num m-hide">{fmt(r2(g.fixed))}</td>
-              <td className="num m-hide"><span className={g.vr < 0 ? 'text-danger' : 'text-ledger'}>{fmt(r2(g.vr))}</span></td>
-              <td className="num m-hide">{g.adv < 0 ? <span className="text-danger">({fmt(Math.abs(r2(g.adv)))})</span> : '—'}</td>
-              <td className="num m-hide">{g.advStat > 0 ? <span className="text-danger">{fmt(r2(g.advStat))}</span> : '—'}</td>
-              <td className="num m-hide">{g.allowStat > 0 ? <span className="text-alert">{fmt(r2(g.allowStat))}</span> : '—'}</td>
-              <td colSpan={4} className="m-hide" />
-              <td className="lt-toggle" />
-            </tr>
-          </tbody>
-        </table>
+      <div className="table-frame">
+        <div className="table-frame-scroll">
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Director</th>
+                <th className="right">Total Pay</th>
+                <th className="right m-hide">Fixed Salary</th>
+                <th className="right m-hide">Vr KPI</th>
+                <th className="right m-hide">Adv This Month</th>
+                <th className="right m-hide">Adv Stat</th>
+                <th className="right m-hide">Allow Stat</th>
+                <th className="right m-hide">Prev. Accum</th>
+                <th className="right m-hide">Accum. Advance</th>
+                <th className="right m-hide">✏️ Override Adv</th>
+                <th className="right m-hide">✏️ Override Accum.</th>
+                <th className="lt-toggle" aria-hidden />
+              </tr>
+            </thead>
+            <tbody>
+              {pick.visible.map((m) => [
+                <MonthHeadRow key={`${m.id}-h`} m={m} colSpan={12} />,
+                ...m.dirRes.map((d) => {
+                  const inp = dirInputs[d.statKey] ?? {}
+                  g.pay += d.totalPay; g.fixed += d.dirFixed; g.vr += d.vrKpi; g.adv += d.advThisMonth
+                  g.advStat += d.advStatAmount; g.allowStat += d.allowStatAmount
+                  return (
+                    // A hand-overridden month stands out: a peach wash and bold
+                    // figures, painted on the cells so the zebra cannot cover it.
+                    <LedgerRow key={`${m.id}-${d.id}`} className={d.hasOverride ? '[&>td]:bg-accent-bg [&>td]:font-bold' : undefined}>
+                      <td className="font-mono text-xs">{m.name}</td>
+                      <td className="whitespace-nowrap">
+                        <Dot color={d.color} /><span className="font-medium">{d.code}</span>
+                        {d.hasOverride && <em className="text-[10px] ml-1">✏️</em>}
+                      </td>
+                      <td className="num">{fmt(d.totalPay)}</td>
+                      <td className="num m-hide" data-label="Fixed Salary">{fmt(d.dirFixed)}</td>
+                      <td className="num m-hide" data-label="Vr KPI">
+                        {Math.abs(d.vrKpi) < 0.005 ? '—' : <span className={d.vrKpi < 0 ? 'text-danger' : 'text-ledger'}>{fmt(d.vrKpi)}</span>}
+                      </td>
+                      <td className="num m-hide" data-label="Adv This Month">{d.advThisMonth < 0 ? <span className="text-danger">({fmt(Math.abs(d.advThisMonth))})</span> : '—'}</td>
+                      <td className="num m-hide" data-label="Adv Stat">{d.advStatAmount > 0 ? <span className="text-danger">{fmt(d.advStatAmount)}</span> : '—'}</td>
+                      <td className="num m-hide" data-label="Allow Stat">{d.allowStatAmount > 0 ? <span className="text-alert">{fmt(d.allowStatAmount)}</span> : '—'}</td>
+                      <td className="num m-hide" data-label="Prev. Accum">
+                        {Math.abs(d.prevAccum) < 0.005 ? '—' : (
+                          <span className={d.prevAccum < 0 ? 'text-danger' : ''}>
+                            {d.prevAccum < 0 ? `(${fmt(Math.abs(d.prevAccum))})` : fmt(d.prevAccum)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="num font-medium m-hide" data-label="Accum. Advance">
+                        {Math.abs(d.accumulated) < 0.005 ? '—' : (
+                          <span className={d.accumulated < 0 ? 'text-danger' : ''}>
+                            {d.accumulated < 0 ? `(${fmt(Math.abs(d.accumulated))})` : fmt(d.accumulated)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="num m-hide" data-label="✏️ Override Adv">
+                        <MoneyInput value={inp.advOverrideThis ?? null} placeholder="—" onCommit={(v) => p.onDirInput(m.id, d.id, 'advOverrideThis', v)} className="w-24" />
+                      </td>
+                      <td className="num m-hide" data-label="✏️ Override Accum.">
+                        <MoneyInput value={inp.advOverrideAccum ?? null} placeholder="—" onCommit={(v) => p.onDirInput(m.id, d.id, 'advOverrideAccum', v)} className="w-24" />
+                      </td>
+                    </LedgerRow>
+                  )
+                }),
+              ])}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2}>Total</td>
+                <td className="num font-bold">{fmt(r2(g.pay))}</td>
+                <td className="num m-hide">{fmt(r2(g.fixed))}</td>
+                <td className="num m-hide"><span className={g.vr < 0 ? 'text-danger' : 'text-ledger'}>{fmt(r2(g.vr))}</span></td>
+                <td className="num m-hide">{g.adv < 0 ? <span className="text-danger">({fmt(Math.abs(r2(g.adv)))})</span> : '—'}</td>
+                <td className="num m-hide">{g.advStat > 0 ? <span className="text-danger">{fmt(r2(g.advStat))}</span> : '—'}</td>
+                <td className="num m-hide">{g.allowStat > 0 ? <span className="text-alert">{fmt(r2(g.allowStat))}</span> : '—'}</td>
+                <td colSpan={4} className="m-hide" />
+                <td className="lt-toggle" />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div className="table-frame-foot">
+          <p className="leading-relaxed">
+            ✏️ Manual Override：填入负数代表 Advance（如 -1950.79）。留空则使用系统自动计算。Adv Stat（25%）与 Allow
+            Stat（75% Allowance）都会加入 Accumulated Advance。
+          </p>
+        </div>
       </div>
-      <p className="font-serif italic text-xs text-graphite mt-3">
-        ✏️ Manual Override：填入负数代表 Advance（如 -1950.79）。留空则使用系统自动计算。Adv Stat（25%）与 Allow
-        Stat（75% Allowance）都会加入 Accumulated Advance。
-      </p>
     </div>
   )
 }
@@ -563,7 +593,7 @@ function BillingView(p: DashProps) {
   const g = { salSys: 0, statSal: 0, alSys: 0, statAl: 0, total: 0, advDeduct: 0, net: 0 }
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card label="25% Invoice (Salary Pay)" value={fmtRM(r2(sSal))} sub={label} />
         <Card label="25% Invoice (Allowance)" value={fmtRM(r2(sAl))} sub={label} />
         <Card label="Statutory (Sal+KPI)" value={fmtRM(r2(sStatSal))} sub={label} />
@@ -571,16 +601,18 @@ function BillingView(p: DashProps) {
         <Card label="Total 25% Billing Invoice" value={fmtRM(r2(sSal + sAl + sStatSal + sStatAl))} sub={label} />
       </div>
 
+      {/* Contra moves money between two ledgers — an amber-edged outline,
+          not the sheet's orange (that stays the one 💾 Save). */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h3 className="font-serif text-sm text-ink">
-          Accumulated Total 25% Billing Invoice <span className="text-graphite">(as of {lastVis.name})</span>
+        <h3 className="text-sm font-bold">
+          Accumulated Total 25% Billing Invoice <span className="font-normal">(as of {lastVis.name})</span>
         </h3>
         <div className="flex gap-2">
           {contra.length > 0 && (
             <button
               type="button"
               onClick={p.onResetContra}
-              className="px-3 py-1.5 rounded border border-danger/40 text-xs text-danger hover:bg-danger/5 transition-colors"
+              className="bg-surface hover:bg-danger-bg border border-danger/40 hover:border-danger text-danger text-xs px-3 py-1.5 rounded-control transition-colors"
             >
               ✕ Reset Contra
             </button>
@@ -588,13 +620,13 @@ function BillingView(p: DashProps) {
           <button
             type="button"
             onClick={p.onContra}
-            className="px-3 py-1.5 rounded border border-alert text-xs font-medium text-alert hover:bg-alert/5 transition-colors"
+            className="bg-surface hover:bg-alert-bg border border-alert text-xs font-medium px-3 py-1.5 rounded-control transition-colors"
           >
             ⚡ Contra Billing vs Advance
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {accumCards.map(({ dir, shown, off }) => (
           <Card
             key={dir.id}
@@ -610,7 +642,7 @@ function BillingView(p: DashProps) {
         />
       </div>
 
-      <div className="mb-3">
+      <div className="sheet-toolbar">
         <MonthTabs months={results} value={pick.value} onChange={pick.setPicked} allowAll />
       </div>
       <div className="overflow-x-auto">
@@ -632,9 +664,11 @@ function BillingView(p: DashProps) {
           </thead>
           <tbody>
             {pick.visible.map((m) => [
-              <tr key={`${m.id}-h`} className="row-sect">
-                <td colSpan={10}>
-                  <span className="font-serif italic text-accent">
+              <tr key={`${m.id}-h`}>
+                <td colSpan={10} className="bg-chrome/50">
+                  {/* The band's label in its small caps; the toggle beside it
+                      keeps its sentence case, a chip that washes when on. */}
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.06em]">
                     {m.name}
                     {m.fullPayout && ' · 💯 Full Payout'}
                     {m.includeBilling && ' · 📥 Incl. Billing'}
@@ -642,11 +676,12 @@ function BillingView(p: DashProps) {
                   {!m.fullPayout && (
                     <button
                       type="button"
+                      aria-pressed={m.billingDeductAdv}
                       onClick={() => p.onFlag(m.id, 'billingDeductAdv', !m.billingDeductAdv)}
-                      className={`ml-3 px-2.5 py-0.5 rounded border text-[10.5px] font-medium transition-colors ${
+                      className={`ml-3 px-2.5 py-0.5 rounded-full border text-[10.5px] transition-colors ${
                         m.billingDeductAdv
-                          ? 'border-alert text-alert'
-                          : 'border-hairline text-graphite hover:text-ink'
+                          ? 'border-accent bg-accent-bg font-semibold'
+                          : 'border-hairline bg-surface hover:border-accent'
                       }`}
                     >
                       {m.billingDeductAdv ? '✅' : '⬜'} Billing Deduct Advance
@@ -670,8 +705,8 @@ function BillingView(p: DashProps) {
                 const dash = <span className="text-graphite">—</span>
                 return (
                   <LedgerRow key={`${m.id}-${d.id}`}>
-                    <td className="font-mono text-xs text-graphite">{m.name}</td>
-                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
+                    <td className="font-mono text-xs">{m.name}</td>
+                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-medium">{d.code}</span></td>
                     <td className="num m-hide" data-label="25% Invoice (Salary)">{m.fullPayout ? dash : fmt(row.salSys)}</td>
                     <td className="num m-hide" data-label="25% Statutory">
                       {m.fullPayout ? dash : (
@@ -696,25 +731,28 @@ function BillingView(p: DashProps) {
                     </td>
                     <td className="num font-medium m-hide" data-label="Net 25% Billing">{m.fullPayout || !m.billingDeductAdv ? dash : <span className="text-alert">{fmt(net)}</span>}</td>
                     <td className="num m-hide" data-label="Include Billing?">
-                      {m.fullPayout ? <span className="text-graphite">N/A</span> : m.includeBilling ? <span className="text-ledger">✅ Yes</span> : <span className="text-graphite">No</span>}
+                      {/* A yes / no answer — a word on a wash, green when it is in. */}
+                      {m.fullPayout ? <span className="chip">N/A</span> : m.includeBilling ? <span className="chip ledger">✅ Yes</span> : <span className="chip">No</span>}
                     </td>
                   </LedgerRow>
                 )
               }),
             ])}
-            <tr className="border-t border-hairline">
-              <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.salSys))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.statSal))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.alSys))}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.statAl))}</td>
-              <td className="num font-semibold text-num-ink">{fmt(r2(g.total))}</td>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={2}>Total</td>
+              <td className="num m-hide">{fmt(r2(g.salSys))}</td>
+              <td className="num m-hide">{fmt(r2(g.statSal))}</td>
+              <td className="num m-hide">{fmt(r2(g.alSys))}</td>
+              <td className="num m-hide">{fmt(r2(g.statAl))}</td>
+              <td className="num font-bold">{fmt(r2(g.total))}</td>
               <td className="num m-hide">{g.advDeduct > 0 ? <span className="text-danger">({fmt(r2(g.advDeduct))})</span> : '—'}</td>
-              <td className="num font-medium m-hide">{g.net > 0 ? <span className="text-alert">{fmt(r2(g.net))}</span> : '—'}</td>
+              <td className="num m-hide">{g.net > 0 ? <span className="text-alert">{fmt(r2(g.net))}</span> : '—'}</td>
               <td className="m-hide" />
               <td className="lt-toggle" />
             </tr>
-          </tbody>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -740,7 +778,7 @@ function SavingView(p: DashProps) {
   const g = { sk: 0, al: 0, tot: 0, wd: 0 }
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {cards.map(({ dir, net, wd }) => (
           <Card
             key={dir.id}
@@ -751,7 +789,7 @@ function SavingView(p: DashProps) {
         ))}
         <Card label="Total Saving" value={fmtRM(r2(grand))} sub={directors.map((d) => d.code).join(' + ')} />
       </div>
-      <div className="mb-3">
+      <div className="sheet-toolbar">
         <MonthTabs months={results} value={pick.value} onChange={pick.setPicked} allowAll />
       </div>
       <div className="overflow-x-auto">
@@ -777,8 +815,8 @@ function SavingView(p: DashProps) {
                 g.sk += d.salKpiSaving; g.al += d.allowSaving; g.tot += d.totalSaving; g.wd += wd ?? 0
                 return (
                   <LedgerRow key={`${m.id}-${d.id}`}>
-                    <td className="font-mono text-xs text-graphite">{m.name}</td>
-                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
+                    <td className="font-mono text-xs">{m.name}</td>
+                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-medium">{d.code}</span></td>
                     <td className="num m-hide" data-label="Sal+KPI Saving">{fmt(d.salKpiSaving)}</td>
                     <td className="num m-hide" data-label="Allowance Saving">{d.allowGross > 0 ? fmt(d.allowSaving) : '—'}</td>
                     <td className="num font-medium m-hide" data-label="Total Saving">{fmt(d.totalSaving)}</td>
@@ -790,16 +828,18 @@ function SavingView(p: DashProps) {
                 )
               }),
             ])}
-            <tr className="border-t border-hairline">
-              <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.sk))}</td>
-              <td className="num font-medium m-hide">{g.al > 0 ? fmt(r2(g.al)) : '—'}</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.tot))}</td>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={2}>Total</td>
+              <td className="num m-hide">{fmt(r2(g.sk))}</td>
+              <td className="num m-hide">{g.al > 0 ? fmt(r2(g.al)) : '—'}</td>
+              <td className="num m-hide">{fmt(r2(g.tot))}</td>
               <td className="num m-hide">{g.wd > 0 ? <span className="text-danger">({fmt(r2(g.wd))})</span> : '—'}</td>
-              <td className="num font-medium text-ledger">{fmt(r2(g.tot - g.wd))}</td>
+              <td className="num font-bold text-ledger">{fmt(r2(g.tot - g.wd))}</td>
               <td className="lt-toggle" />
             </tr>
-          </tbody>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -823,7 +863,7 @@ function AllowStatView(p: DashProps) {
   const g = { allow: 0, stat: 0 }
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {cards.map(({ dir, acc }) => (
           <Card
             key={dir.id}
@@ -834,7 +874,7 @@ function AllowStatView(p: DashProps) {
         ))}
         <Card label="Total Statutory" value={grand > 0 ? fmtRM(r2(grand)) : '—'} sub="All directors" />
       </div>
-      <div className="mb-3">
+      <div className="sheet-toolbar">
         <MonthTabs months={results} value={pick.value} onChange={pick.setPicked} allowAll />
       </div>
       <div className="overflow-x-auto">
@@ -857,8 +897,8 @@ function AllowStatView(p: DashProps) {
                 g.allow += d.allowGB; g.stat += inp.allowPayStat ?? 0
                 return (
                   <LedgerRow key={`${m.id}-${d.id}`}>
-                    <td className="font-mono text-xs text-graphite">{m.name}</td>
-                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-mono text-sm text-ink">{d.code}</span></td>
+                    <td className="font-mono text-xs">{m.name}</td>
+                    <td className="whitespace-nowrap"><Dot color={d.color} /><span className="font-medium">{d.code}</span></td>
                     <td className="num m-hide" data-label="75% Allowance">{m.fullPayout ? '—' : fmt(d.allowGB)}</td>
                     <td className="num m-hide" data-label="Statutory">
                       <MoneyInput value={inp.allowPayStat ?? null} placeholder="填写" onCommit={(v) => p.onDirInput(m.id, d.id, 'allowPayStat', v)} className="w-24" />
@@ -871,14 +911,16 @@ function AllowStatView(p: DashProps) {
                 )
               }),
             ])}
-            <tr className="border-t border-hairline">
-              <td colSpan={2} className="font-serif italic text-ink">Total</td>
-              <td className="num font-medium m-hide">{fmt(r2(g.allow))}</td>
-              <td className="num font-medium m-hide">{g.stat > 0 ? fmt(r2(g.stat)) : '—'}</td>
-              <td className="num font-medium text-ledger">{g.stat > 0 ? fmt(r2(g.stat)) : '—'}</td>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={2}>Total</td>
+              <td className="num m-hide">{fmt(r2(g.allow))}</td>
+              <td className="num m-hide">{g.stat > 0 ? fmt(r2(g.stat)) : '—'}</td>
+              <td className="num font-bold text-ledger">{g.stat > 0 ? fmt(r2(g.stat)) : '—'}</td>
               <td className="lt-toggle" />
             </tr>
-          </tbody>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -891,9 +933,9 @@ function FlowBox({ label, value }: { label: string; value: string; tone?: 'ink' 
   // User ruling 2026-07-26: the Flow view renders plain ink like the PDF —
   // the tone prop is kept for call-site compatibility but no longer colours.
   return (
-    <div className="border border-hairline rounded-md bg-surface px-4 py-3 text-center min-w-[130px] flex-1">
-      <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-graphite mb-1.5">{label}</div>
-      <div className="font-serif text-base tabular text-ink">{value}</div>
+    <div className="border border-hairline rounded-card bg-surface px-4 py-3 text-center min-w-[130px] flex-1">
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.06em]">{label}</div>
+      <div className="text-md font-bold tabular-nums">{value}</div>
     </div>
   )
 }
@@ -951,9 +993,11 @@ export function allowanceStreamRows(
 function FlowStream({ title, rows }: { title: string; rows: FlowRow[] }) {
   // Plain ink except the muted section separators — synced with the PDF
   const toneCls = { danger: 'text-ink', ledger: 'text-ink', alert: 'text-ink', muted: 'text-graphite' }
+  // A two-column ledger in the month's table dress: the title on the header
+  // band in small caps, 12px rows, a bold line on a light band.
   return (
-    <div className="border border-hairline rounded-md overflow-hidden mb-4">
-      <div className="px-4 py-2 bg-surface border-b border-hairline font-serif italic text-sm text-accent">{title}</div>
+    <div className="border border-hairline rounded-card bg-surface overflow-hidden mb-4">
+      <div className="px-4 py-2.5 bg-chrome/50 border-b border-hairline text-[10px] font-semibold uppercase tracking-[0.06em]">{title}</div>
       <div>
         {rows.map(([label, value, bold, tone], i) =>
           tone === 'muted' && !value ? (
@@ -963,9 +1007,9 @@ function FlowStream({ title, rows }: { title: string; rows: FlowRow[] }) {
           ) : (
             <div
               key={i}
-              className={`flex justify-between items-center px-4 py-2 border-b border-hairline last:border-0 text-[13px] ${bold ? 'font-medium bg-surface' : ''}`}
+              className={`flex justify-between items-center px-4 py-2 border-b border-hairline last:border-0 text-[12px] ${bold ? 'font-bold bg-surface-2' : ''}`}
             >
-              <span className={`font-serif ${tone ? toneCls[tone] : 'text-ink'}`}>{label}</span>
+              <span className={tone ? toneCls[tone] : 'text-ink'}>{label}</span>
               <span className={`font-mono tabular ${tone ? toneCls[tone] : 'text-ink'}`}>{value}</span>
             </div>
           ),
@@ -1018,58 +1062,60 @@ function FlowView(p: DashProps) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-3">
-        <span className="font-mono text-xs text-graphite">Month:</span>
-        <MonthTabs months={results} value={monthId} onChange={setMonthId} />
-      </div>
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        <span className="font-mono text-xs text-graphite">Director:</span>
-        <div className="flex gap-1.5">
-          {directors.map((x) => (
-            <button
-              key={x.id}
-              type="button"
-              onClick={() => setDirId(x.id)}
-              className={`px-3.5 py-1 rounded-full border text-xs font-medium transition-colors ${
-                x.id === dirId ? 'border-accent text-accent bg-surface' : 'border-hairline text-graphite hover:text-ink bg-surface'
-              }`}
-            >
-              <Dot color={x.color} />
-              {x.code}
-            </button>
-          ))}
+      {/* Which month and whose flow — the filter panel, two rows of pills. */}
+      <div className="sheet-toolbar">
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.06em]">Month:</span>
+          <MonthTabs months={results} value={monthId} onChange={setMonthId} />
         </div>
-        <div className="ml-auto flex gap-2">
-          <a
-            href={`/print/director-pool?month=${m.month}&director=${dir.code}`}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3.5 py-1 rounded border border-hairline text-xs text-graphite hover:text-accent hover:border-accent transition-colors"
-          >
-            📄 PDF — {dir.code} ({m.name})
-          </a>
-          <a
-            href={`/print/director-pool?month=${m.month}`}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3.5 py-1 rounded border border-hairline text-xs text-graphite hover:text-accent hover:border-accent transition-colors"
-          >
-            📄 PDF — All Directors
-          </a>
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.06em]">Director:</span>
+          <div className="flex gap-1.5">
+            {directors.map((x) => (
+              <button
+                key={x.id}
+                type="button"
+                aria-pressed={x.id === dirId}
+                onClick={() => setDirId(x.id)}
+                className={pillClass(x.id === dirId)}
+              >
+                <Dot color={x.color} />
+                {x.code}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex gap-2">
+            <a
+              href={`/print/director-pool?month=${m.month}&director=${dir.code}`}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors"
+            >
+              📄 PDF — {dir.code} ({m.name})
+            </a>
+            <a
+              href={`/print/director-pool?month=${m.month}`}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors"
+            >
+              📄 PDF — All Directors
+            </a>
+          </div>
         </div>
       </div>
 
       {/* Header */}
-      <div className="border border-hairline rounded-md bg-surface px-5 py-4 mb-4 flex items-center gap-4">
+      <div className="border border-hairline rounded-card bg-surface px-5 py-4 mb-4 flex items-center gap-4">
         <div
-          className="w-11 h-11 rounded-full flex items-center justify-center font-serif text-lg text-paper"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold text-paper"
           style={{ backgroundColor: dir.color }}
         >
           {dir.code.charAt(0)}
         </div>
         <div>
-          <div className="font-serif text-lg text-ink">{dir.code}</div>
-          <div className="font-mono text-[11px] text-graphite">
+          <div className="text-lg font-bold">{dir.code}</div>
+          <div className="text-[11px] mt-0.5">
             Weight: {d.weight}% · Fixed Salary: RM {fmt(d.dirFixed)}/month · {m.name}
             {m.fullPayout && ' (Full Payout)'}
             {m.includeBilling && ' (Incl. Billing)'}

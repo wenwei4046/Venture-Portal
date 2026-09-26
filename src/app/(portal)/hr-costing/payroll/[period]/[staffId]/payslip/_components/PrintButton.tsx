@@ -11,13 +11,13 @@ export default function PrintButton() {
     <div className="flex items-center justify-between mb-4 print:hidden">
       <Link
         href={backUrl}
-        className="text-sm text-muted hover:text-accent font-sans"
+        className="text-sm hover:underline underline-offset-4"
       >
         ← Back to payroll grid
       </Link>
       <button
         onClick={() => window.print()}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md"
+        className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
       >
         Print / Save as PDF
       </button>

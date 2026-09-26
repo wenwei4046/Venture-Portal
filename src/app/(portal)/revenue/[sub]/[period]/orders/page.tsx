@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { formatMoney, formatDate } from '@/lib/utils'
+import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
 import { buildCommissionWorkbench } from '@/lib/commission/workbench'
@@ -19,6 +19,7 @@ import {
 } from '../../../_lib/month-orders'
 import { loadCommissionWorkbench } from '../../../_lib/commission-workbench'
 import { openBillOnFor } from '../../../_lib/open-bill-month'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import workbenchStyles from '../_components/commission-workbench.module.css'
 import CostGapPanel from './_components/CostGapPanel'
 import AllBillsTable, { type BillRow } from './_components/AllBillsTable'
@@ -251,7 +252,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               (staffFilter === 'unmatched' ? 'Unmatched bills' : venueName ?? 'Sales orders')}
           </h1>
           {filtered ? (
-            <p className="font-serif italic text-graphite text-base mt-3">
+            <p className="text-sm mt-3">
               {person || shares.some(sh => sh.staffId === staffFilter)
                 ? `${person?.employeeCode ? person.employeeCode + ' · ' : ''}every bill of theirs this month, and every bill shared with them`
                 : null}
@@ -260,46 +261,49 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
             </p>
           ) : null}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {filtered ? (
             <Link
               href={show === 'all' ? `${base}?show=all` : base}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
             >
               All bills
             </Link>
           ) : null}
           <Link
             href={revenuePath(subDept.slug, period)}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             ← The month
           </Link>
         </div>
       </div>
 
-      <section className="mb-10">
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Tile label="Sales value" value={formatMoney(total)} big />
-          <Tile label="Bills" value={String(rows.length)} />
-          <Tile
-            label="Waiting on a deposit"
-            value={formatMoney(heldValue)}
-            note={held.length > 0 ? `${held.length} bill${held.length === 1 ? '' : 's'}` : undefined}
-            warn={held.length > 0}
-          />
-          <Tile
-            label="Bills with no margin"
-            value={String(blind.length)}
-            note={
-              blind.length > 0
-                ? `${formatMoney(blindValue)} · ${noCost} line${noCost === 1 ? '' : 's'} without a cost`
-                : undefined
-            }
-            warn={blind.length > 0}
-          />
-        </div>
-      </section>
+      {/* What the bills in view add up to. The sales value is the figure the
+          page is opened for — the sheet's one walnut card; the two problem
+          counts turn red only while they hold. */}
+      <StatCards label="What these bills add up to">
+        <StatCard label="Sales value" value={formatMoney(total)} icon="sales" tone="primary" />
+        <StatCard label="Bills" value={String(rows.length)} icon="receipt" />
+        <StatCard
+          label="Waiting on a deposit"
+          value={formatMoney(heldValue)}
+          icon="clock"
+          note={held.length > 0 ? `${held.length} bill${held.length === 1 ? '' : 's'}` : undefined}
+          tone={held.length > 0 ? 'danger' : undefined}
+        />
+        <StatCard
+          label="Bills with no margin"
+          value={String(blind.length)}
+          icon="file-alert"
+          note={
+            blind.length > 0
+              ? `${formatMoney(blindValue)} · ${noCost} line${noCost === 1 ? '' : 's'} without a cost`
+              : undefined
+          }
+          tone={blind.length > 0 ? 'danger' : undefined}
+        />
+      </StatCards>
 
       <section>
         <div className="sect-head">
@@ -307,7 +311,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           <span className="rule" aria-hidden />
           <span className="count">{rows.length} BILLS</span>
         </div>
-        <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+        <p className="text-sm mb-4 max-w-3xl">
           In the order the day wrote them — the running number is what the Open Bill bonus reads.
           {openBillPaid ? (
             <>
@@ -315,7 +319,11 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               {tagged.length} of {live.length} carry a pick
               {stillSuggested > 0 ? (
                 <>
-                  , <span className="text-alert">{stillSuggested} still the importer&apos;s guess</span>
+                  ,{' '}
+                  <span className="chip alert">
+                    <span className="dot" />
+                    {stillSuggested} still the importer&apos;s guess
+                  </span>
                 </>
               ) : null}
               .
@@ -324,8 +332,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         </p>
 
         {base0.length === 0 ? (
-          <div className="py-12 text-center border border-hairline rounded-card bg-surface">
-            <p className="font-serif text-xl text-ink">No bills match.</p>
+          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+            <p className="text-sm">No bills match.</p>
           </div>
         ) : (
           <AllBillsTable
@@ -337,7 +345,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           />
         )}
 
-        <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+        <p className="text-xs mt-3 max-w-3xl">
           &quot;Total commission&quot; is the live calculation&apos;s personal commission on the bill —
           every shared part added together, overriding left to the upline — from the same rules as
           the month&apos;s salesperson ledger, without its review drafts. A held bill pays in the
@@ -345,7 +353,11 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           {openBillPaid ? (
             <>
               {' '}
-              An Open Bill pick in a <span className="text-alert">dashed outline</span> is still the
+              {/* Drawn the way the picker draws a suggestion, so the words point
+                  at the thing on the row rather than at a colour. */}
+              An Open Bill pick in a{' '}
+              <span className="px-1 border border-dashed border-alert bg-alert-bg rounded-sm">dashed outline</span>{' '}
+              is still the
               importer&apos;s guess from the document number; click it to agree, click another to move
               it, click a solid one to clear it. Ranks are held per salesperson per event day, so
               claiming a taken rank moves it off the bill that held it.{' '}
@@ -370,30 +382,6 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         rows={uncosted}
         runLocked={runLocked}
       />
-    </div>
-  )
-}
-
-function Tile({
-  label: text,
-  value,
-  note,
-  warn,
-  big,
-}: {
-  label: string
-  value: string
-  note?: string
-  warn?: boolean
-  big?: boolean
-}) {
-  return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
-      <div className={['statement-amount', big ? '' : 'compact', warn ? 'text-danger' : 'text-num-ink'].join(' ')}>
-        {value}
-      </div>
-      {note ? <div className="font-serif italic text-muted text-xs mt-1.5">{note}</div> : null}
     </div>
   )
 }

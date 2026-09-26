@@ -23,11 +23,11 @@ export default async function DirectorPayrollImportPage({ searchParams }: Props)
             <em>I.</em> DIRECTOR · PAYROLL IMPORT · {periodLabel.toUpperCase()}
           </div>
           <h1 className="page-title">Import Director Payroll</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             InfoTech director-only export · verbatim import ·{' '}
             <Link
               href={`/director-salary?period=${dayjs(period).format('YYYY-MM')}`}
-              className="text-accent hover:text-accent-hover not-italic"
+              className="text-accent hover:text-accent-hover"
             >
               ← back to Director Salary
             </Link>

@@ -242,17 +242,28 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
 
   return (
     <div>
-      {/* CTC Input Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      {/* CTC Input Table.
+          The ER popover has to spill past the table's bottom edge for the last
+          rows, but a sheet `.ledger-table` clips its content (overflow hidden
+          is what rounds its frame). So the popover's containing block is this
+          wrapper (`relative`), OUTSIDE the table — overflow does not clip an
+          absolute box whose containing block lies beyond it — and it keeps
+          its place under the button through its static position: the button
+          and the popover share an inline-flex column that is `items-end` +
+          `justify-end`, which pins the popover's right edge to the button's
+          and its bottom to the button's bottom, then `translate-y` drops it
+          just below. Same spot as the old `right-0 top-full mt-1`, and it
+          still scrolls with the table inside this wrapper. */}
+      <div className="relative overflow-x-auto">
+        <table className="ledger-table">
           <thead>
-            <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-              <th className="text-left py-3 pr-4 font-medium">Company</th>
-              <th className="text-right py-3 pr-4 font-medium">Basic</th>
-              <th className="text-right py-3 pr-4 font-medium">KPI</th>
-              <th className="text-right py-3 pr-4 font-medium">Allowance</th>
-              <th className="text-right py-3 pr-4 font-medium">ER Statutory</th>
-              <th className="text-right py-3 pr-4 font-medium">Total</th>
+            <tr>
+              <th>Company</th>
+              <th className="right">Basic</th>
+              <th className="right">KPI</th>
+              <th className="right">Allowance</th>
+              <th className="right">ER Statutory</th>
+              <th className="right">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -266,13 +277,13 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
               const editable = er.total > 0 || manual || b + k > 0
               const isOpen = openEr === comp.id
               return (
-                <tr key={comp.id} className="border-b border-hairline last:border-0">
-                  <td className="py-3 pr-4">
-                    <div className="font-serif text-md text-ink">{comp.name}</div>
-                    <div className="font-mono text-xs text-muted">{comp.short_code}</div>
+                <tr key={comp.id}>
+                  <td>
+                    <div className="font-medium">{comp.name}</div>
+                    <div className="font-mono text-[11px] mt-0.5">{comp.short_code}</div>
                   </td>
                   {(['basic', 'kpi', 'allowance'] as const).map(field => (
-                    <td key={field} className="py-3 pr-4 text-right">
+                    <td key={field} className="right">
                       <input
                         type="number"
                         step="0.01"
@@ -281,23 +292,27 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                         value={getValue(comp.id, field) || ''}
                         onChange={e => setValue(comp.id, field, parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
-                        className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink text-right focus:outline-none focus:border-accent-border"
+                        className="w-28 px-2 py-1.5 bg-paper border border-hairline rounded-control text-[12px] font-mono tabular font-medium text-ink text-right focus:outline-none focus:border-accent-border"
                       />
                     </td>
                   ))}
-                  <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite">
+                  <td className="num">
                     {editable ? (
-                      <span className="relative inline-block">
+                      <span className="inline-flex flex-col items-end justify-end">
                         <button
                           type="button"
                           onClick={() => setOpenEr(isOpen ? null : comp.id)}
-                          className={`border-b border-dashed cursor-pointer font-mono tabular font-medium ${
-                            manual ? 'text-alert border-alert/60' : 'text-graphite border-hairline'
-                          } hover:border-accent-border`}
+                          className="group inline-flex items-center gap-1.5 cursor-pointer font-mono tabular font-medium text-ink"
                           title={manual ? 'Manually keyed — click to edit' : 'Auto from B+K — click to override'}
                         >
-                          {formatMoneyBare(er.total)}
-                          {manual ? <span className="ml-1 font-sans text-[10px] uppercase tracking-wide">M</span> : null}
+                          <span
+                            className={`border-b border-dashed group-hover:border-accent-border ${
+                              manual ? 'border-alert/60' : 'border-hairline'
+                            }`}
+                          >
+                            {formatMoneyBare(er.total)}
+                          </span>
+                          {manual ? <span className="chip alert"><span className="dot" />M</span> : null}
                         </button>
                         {isOpen ? (
                           <>
@@ -306,8 +321,8 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                               className="fixed inset-0 z-20 cursor-default"
                               onClick={() => setOpenEr(null)}
                             />
-                            <span className="absolute right-0 top-full mt-1 z-30 w-64 bg-ink text-paper text-xs font-sans rounded-md shadow-lg p-3 text-left space-y-2 block">
-                              <span className="block border-b border-white/10 pb-1 font-serif italic text-paper/70">
+                            <span className="absolute z-30 w-64 translate-y-[calc(100%_+_4px)] bg-surface text-ink border border-hairline rounded-card shadow-dropdown text-xs font-sans p-3 text-left space-y-2 block">
+                              <span className="block border-b border-hairline pb-1.5 font-semibold">
                                 {manual ? 'Manually keyed' : <>Auto · based on B+K = {formatMoney(b + k)}</>}
                               </span>
                               {(
@@ -318,7 +333,7 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                                 ] as const
                               ).map(([field, label]) => (
                                 <span key={field} className="flex items-center justify-between gap-2">
-                                  <span className="text-paper/70">{label}</span>
+                                  <span>{label}</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -326,11 +341,11 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                                     value={er[field] || ''}
                                     onChange={e => setErField(comp.id, field, parseFloat(e.target.value) || 0)}
                                     placeholder="0.00"
-                                    className="w-24 px-2 py-1 bg-paper/10 border border-white/20 rounded text-xs font-mono tabular text-paper text-right focus:outline-none focus:border-accent"
+                                    className="w-24 px-2 py-1 bg-paper border border-hairline rounded-control text-xs font-mono tabular text-ink text-right focus:outline-none focus:border-accent-border"
                                   />
                                 </span>
                               ))}
-                              <span className="flex justify-between border-t border-white/10 pt-1 font-semibold">
+                              <span className="flex justify-between border-t border-hairline pt-1.5 font-semibold">
                                 <span>Total</span>
                                 <span className="font-mono tabular">{formatMoney(er.total)}</span>
                               </span>
@@ -339,7 +354,7 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                                   <button
                                     type="button"
                                     onClick={() => resetEr(comp.id)}
-                                    className="px-2 py-1 rounded border border-white/20 text-paper/80 hover:text-paper hover:border-white/40 font-sans text-xs"
+                                    className="px-2.5 py-1 rounded-control border border-hairline bg-surface hover:bg-surface-2 text-ink text-xs transition-colors"
                                   >
                                     ↺ Auto
                                   </button>
@@ -347,7 +362,7 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                                 <button
                                   type="button"
                                   onClick={() => setOpenEr(null)}
-                                  className="px-2 py-1 rounded bg-accent hover:bg-accent-hover text-white font-sans text-xs"
+                                  className="px-2.5 py-1 rounded-control bg-accent hover:bg-accent-hover text-xs font-medium transition-colors"
                                 >
                                   Done
                                 </button>
@@ -360,50 +375,42 @@ function CTCInputGridBody({ directors, companies, existingCTC, period }: Props) 
                       '—'
                     )}
                   </td>
-                  <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink">
+                  <td className="num">
                     {rowTotal > 0 ? formatMoneyBare(rowTotal) : '—'}
                   </td>
                 </tr>
               )
             })}
-            {/* Total row */}
-            <tr className="border-t-2 border-hairline">
-              <td className="py-3 pr-4 font-serif italic text-accent text-base">Director Pool Total</td>
-              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                {formatMoneyBare(totalBasic)}
-              </td>
-              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                {formatMoneyBare(totalKpi)}
-              </td>
-              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-ink font-semibold">
-                {formatMoneyBare(totalAllow)}
-              </td>
-              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-graphite font-semibold">
-                {formatMoneyBare(totalER)}
-              </td>
-              <td className="py-3 pr-4 text-right font-mono tabular font-medium text-accent font-semibold">
-                {formatMoneyBare(grandTotal)}
-              </td>
-            </tr>
           </tbody>
+          <tfoot>
+            <tr>
+              <td className="font-bold">Director Pool Total</td>
+              <td className="num">{formatMoneyBare(totalBasic)}</td>
+              <td className="num">{formatMoneyBare(totalKpi)}</td>
+              <td className="num">{formatMoneyBare(totalAllow)}</td>
+              <td className="num">{formatMoneyBare(totalER)}</td>
+              <td className="num font-bold">{formatMoneyBare(grandTotal)}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
       {/* Save + Error */}
-      <div className="mt-6 flex items-center gap-4">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {status === 'saving' ? 'Saving...' : 'Save'}
         </button>
         {status === 'done' && (
-          <span className="text-sm font-serif italic text-ledger">
-            Saved — submit to Finance on the Submission tab.
+          <span className="flex items-center gap-2 text-sm">
+            <span className="chip ledger"><span className="dot" />Saved</span>
+            submit to Finance on the Submission tab.
           </span>
         )}
-        {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+        {error && <span className="text-sm text-danger">{error}</span>}
       </div>
     </div>
   )

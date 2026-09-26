@@ -171,9 +171,9 @@ function NoScheme({ subDept }: { subDept: SubDepartment }) {
         </div>
       </div>
 
-      <div className="py-16 text-center border border-hairline rounded-card bg-surface">
-        <p className="font-serif text-2xl text-ink mb-3">{subDept.name} has no scheme yet.</p>
-        <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
+      <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+        <p className="text-md font-bold mb-2">{subDept.name} has no scheme yet.</p>
+        <p className="text-sm max-w-md mx-auto">
           A rank belongs to a scheme and a position points at a rank, so there is nothing to place
           anyone into. Set the scheme up under{' '}
           <Link href={revenuePath(subDept.slug, 'rules')} className="text-accent hover:underline">

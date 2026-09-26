@@ -19,7 +19,7 @@ export default function FirstSubDepartment({ data }: { data: CommissionSettingsD
             <em>I.</em> REVENUE · SETUP
           </div>
           <h1 className="page-title">Revenue Department</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          <p className="text-sm mt-3 max-w-2xl">
             The department splits into sub-departments and each one calculates differently —{' '}
             <em>Fair</em>, the roadshow team, is the first. Every rule, rank and salesperson belongs
             to one of them, so the first one has to exist before anything else can.
