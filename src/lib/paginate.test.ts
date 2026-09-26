@@ -88,4 +88,34 @@ describe('fetchByKeys', () => {
       fetchByKeys(['a'], () => Promise.resolve({ data: null, error: { message: 'fetch failed' } })),
     ).rejects.toThrow(/fetch failed/)
   })
+
+  it('keeps four chunks in flight and still answers in key order', async () => {
+    // 2026-09-26: one chunk after another cost a round trip each — 15 in a row
+    // on the month page. Chunks now overlap; the answer must not reorder.
+    let inFlight = 0
+    let most = 0
+    const keys = Array.from({ length: 950 }, (_, i) => i)
+    const rows = await fetchByKeys(keys, async chunk => {
+      inFlight++
+      most = Math.max(most, inFlight)
+      // Later chunks answer FIRST, the way a busy server can.
+      await new Promise(resolve => setTimeout(resolve, 30 - chunk[0] / 50))
+      inFlight--
+      return { data: chunk.map(k => ({ k })), error: null }
+    })
+    expect(most).toBe(4)
+    expect(rows.map(r => r.k)).toEqual(keys)
+  })
+
+  it('fails when any chunk fails, even with others still in flight', async () => {
+    const keys = Array.from({ length: 450 }, (_, i) => i)
+    await expect(
+      fetchByKeys(keys, async chunk => {
+        await new Promise(resolve => setTimeout(resolve, 5))
+        return chunk[0] === 200
+          ? { data: null, error: { message: 'TypeError: fetch failed' } }
+          : { data: chunk.map(k => ({ k })), error: null }
+      }),
+    ).rejects.toThrow(/fetch failed/)
+  })
 })

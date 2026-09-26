@@ -44,18 +44,32 @@ export async function fetchAllRows<T>(
 // Open Bill bonus at all — RM 18,677 missing from one month, silently.)
 //
 // So: chunk the keys, and let a failure be a failure.
+//
+// The chunks go CHUNKS_IN_FLIGHT at a time (2026-09-26). One after another,
+// every chunk was a full round trip in a row: the month page asked for ~1,500
+// bills' fairs in 15 of them and waited 0.2–3.2 s. Four at once hides most of
+// that without flooding PostgREST, and the rows still come back in key order.
 const KEY_CHUNK = 100
+const CHUNKS_IN_FLIGHT = 4
 
 export async function fetchByKeys<T, K extends string | number>(
   keys: readonly K[],
   buildChunk: (chunk: K[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
 ): Promise<T[]> {
   if (keys.length === 0) return []
-  const out: T[] = []
-  for (let i = 0; i < keys.length; i += KEY_CHUNK) {
-    const { data, error } = await buildChunk(keys.slice(i, i + KEY_CHUNK) as K[])
-    if (error) throw new Error(`fetchByKeys: ${error.message}`)
-    if (data) out.push(...data)
+  const chunks: K[][] = []
+  for (let i = 0; i < keys.length; i += KEY_CHUNK) chunks.push(keys.slice(i, i + KEY_CHUNK) as K[])
+
+  const results: T[][] = new Array(chunks.length)
+  let next = 0
+  const worker = async () => {
+    while (next < chunks.length) {
+      const index = next++
+      const { data, error } = await buildChunk(chunks[index])
+      if (error) throw new Error(`fetchByKeys: ${error.message}`)
+      results[index] = data ?? []
+    }
   }
-  return out
+  await Promise.all(Array.from({ length: Math.min(CHUNKS_IN_FLIGHT, chunks.length) }, worker))
+  return results.flat()
 }
