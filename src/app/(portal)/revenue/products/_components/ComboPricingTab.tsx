@@ -43,7 +43,16 @@ export default function ComboPricingTab({ combos }: { combos: ComboRow[] }) {
         .some(v => (v ?? '').toLowerCase().includes(q))
     })
   }, [combos, model, query, tier])
-  const heights = useMemo(() => comboHeightColumns(shown), [shown])
+  const groups = useMemo(() => {
+    const byModel = new Map<string, { baseModel: string; modelName: string | null; combos: ComboRow[] }>()
+    for (const c of shown) {
+      const group = byModel.get(c.baseModel) ?? { baseModel: c.baseModel, modelName: null, combos: [] }
+      if (!group.modelName && c.modelName && c.modelName !== c.baseModel) group.modelName = c.modelName
+      group.combos.push(c)
+      byModel.set(c.baseModel, group)
+    }
+    return [...byModel.values()]
+  }, [shown])
 
   function touch(c: ComboRow, height: string, value: string) {
     const key = comboKey(c)
@@ -137,51 +146,53 @@ export default function ComboPricingTab({ combos }: { combos: ComboRow[] }) {
       {error ? <p className="sku-notice" data-tone="error" role="alert">{error}</p> : null}
       {notice ? <p className="sku-notice" data-tone="ok" role="status">{notice}</p> : null}
 
-      <div className="sku-table-panel">
-        <div className="sku-table-window table-scroll" tabIndex={0} role="region" aria-label="Combo prices table">
-          <table className="ledger-table sku-table">
-            <thead><tr>
-              <th scope="col" className="sku-code-column">Combo</th>
-              <th scope="col">Model</th>
-              <th scope="col">Tier</th>
-              <th scope="col">Modules in one set</th>
-              {heights.map(h => <th scope="col" key={h} className="num">{h}</th>)}
-              <th scope="col">Effective from</th>
-            </tr></thead>
-            <tbody>
-              {shown.length === 0 ? <tr><td colSpan={5 + heights.length} className="sku-empty">No combos match these filters.</td></tr> : shown.map(c => {
-                const key = comboKey(c)
-                const available = new Set(comboHeightColumns([c]).map(heightKey))
-                return <tr key={key}>
-                  <td className="sku-code-column"><strong>{c.label ?? 'Unnamed combo'}</strong>{c.isNew ? <span className="chip ml-2">New</span> : null}</td>
-                  <td>{c.baseModel}{c.modelName && c.modelName !== c.baseModel ? <span className="sku-model-name">{c.modelName}</span> : null}</td>
-                  <td className="combo-tier">{c.tier ? c.tier.replace('PRICE_', 'P') : 'Any tier'}</td>
-                  <td className="combo-modules">
+      <div className="sku-table-panel combo-panel">
+        <div className="sku-table-window combo-window" tabIndex={0} role="region" aria-label="Combo prices">
+          {shown.length === 0 ? <p className="sku-empty combo-empty">No combos match these filters.</p> : groups.map(group => (
+            <section key={group.baseModel} className="combo-group" aria-label={`Model ${group.baseModel}`}>
+              <h3 className="combo-group-head">
+                <strong>{group.baseModel}</strong>
+                {group.modelName ? <span className="combo-group-name">{group.modelName}</span> : null}
+                <span className="combo-group-count">{group.combos.length} combo{group.combos.length === 1 ? '' : 's'}</span>
+              </h3>
+              <div className="combo-grid">
+                {group.combos.map(c => {
+                  const key = comboKey(c)
+                  const name = c.label ?? 'Unnamed combo'
+                  return <article key={key} className="combo-card" aria-label={`${c.baseModel} ${name} ${c.tier ? c.tier.replace('PRICE_', 'P') : 'any tier'}`}>
+                    <header className="combo-card-head">
+                      <span className="combo-model-chip">{c.baseModel}</span>
+                      <strong className="combo-card-title">{name}</strong>
+                      {c.isNew ? <span className="chip accent">New</span> : null}
+                      <span className="combo-tier-badge">{c.tier ? `Fabric tier ${c.tier.replace('PRICE_', '')}` : 'Any tier'}</span>
+                    </header>
                     <div className="combo-slots" aria-label={`${c.slots.length} module${c.slots.length === 1 ? '' : 's'} in one set`}>
                       {c.slots.map((slot, index) => <span key={index} className="combo-slot">{index > 0 ? <span aria-hidden="true"> + </span> : null}{slot.join(' or ')}</span>)}
                       {c.slots.length === 0 ? 'No modules defined' : null}
                     </div>
-                  </td>
-                  {heights.map(h => {
-                    const current = comboPriceAt(c, h)
-                    const supported = available.has(heightKey(h))
-                    const rawHeight = c.heights.find(value => heightKey(value) === heightKey(h))
-                      ?? Object.keys(c.prices).find(value => heightKey(value) === heightKey(h)) ?? h
-                    const historical = !c.heights.some(value => heightKey(value) === heightKey(h))
-                    return <td key={h} className="num" title={!supported ? 'This seat size is not defined for this combo' : historical ? 'Previously priced seat size; no longer listed by the ERP' : undefined}>
-                      {editing && supported ? <input
-                        value={drafts.get(key)?.[heightKey(h)!]?.value ?? (current === null ? '' : String(current))}
-                        onChange={e => touch(c, rawHeight, e.target.value)}
-                        disabled={saving} inputMode="decimal" className="sku-price-input"
-                        aria-label={`${c.baseModel} ${c.label ?? 'Unnamed combo'} ${c.tier ?? 'any tier'} at ${rawHeight}`}
-                      /> : current === null ? '—' : formatMoney(current)}
-                    </td>
-                  })}
-                  <td className="sku-status">{c.effectiveFrom}</td>
-                </tr>
-              })}
-            </tbody>
-          </table>
+                    <div className="combo-heights">
+                      {comboHeightColumns([c]).map(h => {
+                        const current = comboPriceAt(c, h)
+                        const historical = !c.heights.some(value => heightKey(value) === heightKey(h))
+                        const draft = drafts.get(key)?.[heightKey(h)!]
+                        return <div key={h} className="combo-cell" data-priced={current !== null || undefined} data-edited={draft ? true : undefined} data-historical={historical || undefined}
+                          title={historical ? 'Previously priced seat size; no longer listed by the ERP' : undefined}>
+                          <span className="combo-cell-height">{h}</span>
+                          {editing ? <input
+                            value={draft?.value ?? (current === null ? '' : String(current))}
+                            onChange={e => touch(c, h, e.target.value)}
+                            disabled={saving} inputMode="decimal" className="sku-price-input combo-price-input"
+                            aria-label={`${c.baseModel} ${name} ${c.tier ?? 'any tier'} at ${h}`}
+                          /> : <span className="combo-cell-price num">{current === null ? '—' : formatMoney(current)}</span>}
+                        </div>
+                      })}
+                    </div>
+                    <footer className="combo-card-foot">Effective <time dateTime={c.effectiveFrom}>{c.effectiveFrom}</time></footer>
+                  </article>
+                })}
+              </div>
+            </section>
+          ))}
         </div>
         <div className="sku-table-footer">
           <span>{shown.length.toLocaleString()} of {combos.length.toLocaleString()} combos shown</span>

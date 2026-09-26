@@ -43,9 +43,10 @@ describe('Combo Pricing workspace', () => {
     render(<ComboPricingTab combos={fixtures} />)
     chooseModel('2376')
     fireEvent.click(screen.getByRole('button', { name: 'P2' }))
-    expect(screen.getAllByRole('columnheader').map(h => h.textContent)).toEqual([
-      'Combo', 'Model', 'Tier', 'Modules in one set', 'DEFAULT', '24', '30', '75CM', 'Effective from',
-    ])
+    const card = screen.getByRole('article', { name: '2376 L set P2' })
+    expect([...card.querySelectorAll('.combo-cell-height')].map(h => h.textContent)).toEqual(['DEFAULT', '24', '30', '75CM'])
+    expect(within(card).getByText('RM 1,500.00')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /2376.*1 combo/ })).toBeInTheDocument()
     expect(screen.queryByText('Compact')).not.toBeInTheDocument()
     expect(screen.queryByText('L set P1')).not.toBeInTheDocument()
     expect(screen.getByLabelText('3 modules in one set')).toHaveTextContent('1A(LHF) or 1A(RHF) + 1S + 1S')
@@ -58,7 +59,7 @@ describe('Combo Pricing workspace', () => {
     chooseModel('')
     fireEvent.click(screen.getByRole('button', { name: 'All' }))
     fireEvent.click(screen.getByRole('button', { name: 'Edit Prices' }))
-    const compactRow = screen.getByText('Compact').closest('tr')!
+    const compactRow = screen.getByRole('article', { name: '9999 Compact any tier' })
     expect(within(compactRow).getAllByRole('textbox')).toHaveLength(1)
     expect(within(compactRow).getByRole('textbox')).toHaveAccessibleName('9999 Compact any tier at 27"')
     fireEvent.click(screen.getByRole('button', { name: 'Any' }))
