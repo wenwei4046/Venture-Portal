@@ -550,6 +550,17 @@ html[data-nav-pending] .route-surface {
   background-size: 200% 100%;
   animation: nav-pending-sweep 1.1s linear infinite;
 }
+/* The same sweep over a WarmLink (a month on Comm Cal or HR › Payment). The
+   link is the overlay's containing block; the overlay never takes a click. */
+.warm-link {
+  position: relative;
+}
+.warm-link-pending {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
 @keyframes nav-marker-grow {
   from { scale: 1 0; }
   to   { scale: 1 1; }

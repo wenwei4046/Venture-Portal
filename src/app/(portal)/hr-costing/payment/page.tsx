@@ -26,9 +26,6 @@ import './payment-statement.css'
 
 /** HR Payment: a monthly statement above separate Salary and Statutory tabs. */
 export default async function HRPaymentPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
-  await requirePermission('hr_costing')
-  const supabase = await createClient()
-
   // ?period=YYYY-MM-01 — a payroll cycle often finishes in the FOLLOWING
   // calendar month (August's payout ran on 5 September).
   const { period: periodParam } = await searchParams
@@ -36,33 +33,46 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
   const railFrom = dayjs(period).subtract(4, 'month').format('YYYY-MM-01')
   const railTo = dayjs(period).add(1, 'month').format('YYYY-MM-01')
 
-  const [cycleRes, runsRes] = await Promise.all([
+  // The cycle and the rail's runs are asked for while the permission is
+  // checked (payment_cycle refuses a reader without it on its own); nothing is
+  // read from them unless the check passes (2026-09-26: one round trip fewer).
+  const supabase = await createClient()
+  const firstReads = Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.rpc as any)('payment_cycle', { p_period: period }) as Promise<{ data: unknown; error: { message: string } | null }>,
     supabase.from('payroll_runs').select('id, period_month, status').gte('period_month', railFrom).lte('period_month', railTo),
   ])
+  firstReads.catch(() => {})
+  await requirePermission('hr_costing')
+  const [cycleRes, runsRes] = await firstReads
   if (cycleRes.error) throw new Error(cycleRes.error.message)
   const runs = (runsRes.data ?? []).map((r) => ({ id: String(r.id), period_month: String(r.period_month), status: String(r.status) }))
-  const fundRes = runs.length
-    ? await supabase
-        .from('payroll_payment_requests')
-        .select('payroll_run_id, status')
-        .in(
-          'payroll_run_id',
-          runs.map((r) => r.id),
-        )
-    : { data: [] as Array<{ payroll_run_id: string | null; status: string }> }
-  const statRes = runs.length
-    ? await supabase
-        .from('payment_vouchers')
-        .select('reference_id, status')
-        .eq('reference_type', 'payroll_statutory')
-        .in(
-          'reference_id',
-          runs.map((r) => r.id),
-        )
-    : { data: [] as Array<{ reference_id: string | null; status: string }> }
+  const runIds = runs.map((r) => r.id)
   const cycle = normaliseCycle(cycleRes.data)
+  const fs = cycle.funding.staff
+  const fd = cycle.funding.directors
+
+  // The requests, the statutory PVs and what the funding PVs paid depend only
+  // on the runs and the cycle, not on each other: one round trip, not three.
+  const [fundRes, statRes, fundingPaid] = await Promise.all([
+    runIds.length
+      ? supabase.from('payroll_payment_requests').select('payroll_run_id, status').in('payroll_run_id', runIds)
+      : Promise.resolve({ data: [] as Array<{ payroll_run_id: string | null; status: string }> }),
+    runIds.length
+      ? supabase
+          .from('payment_vouchers')
+          .select('reference_id, status')
+          .eq('reference_type', 'payroll_statutory')
+          .in('reference_id', runIds)
+      : Promise.resolve({ data: [] as Array<{ reference_id: string | null; status: string }> }),
+    // A request can be funded by several PVs. The same aggregate RPC covers
+    // partial staff AND director funding; pending vouchers never count as cash.
+    Promise.all([fs, fd].filter((funding) => funding != null).map(async (funding) => {
+      const { data, error } = await supabase.rpc('get_payroll_funding_paid', { p_request_id: funding.id })
+      if (error) throw new Error(error.message)
+      return Number(data ?? 0)
+    })),
+  ])
   const rail = monthRail(
     period,
     runs,
@@ -95,15 +105,6 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
 
   // Funding and reporting facts use the same payroll rows as the PV tables.
   const run = cycle.run
-  const fs = cycle.funding.staff
-  const fd = cycle.funding.directors
-  // A request can be funded by several PVs. The same aggregate RPC covers
-  // partial staff AND director funding; pending vouchers never count as cash.
-  const fundingPaid = await Promise.all([fs, fd].filter((funding) => funding != null).map(async (funding) => {
-    const { data, error } = await supabase.rpc('get_payroll_funding_paid', { p_request_id: funding.id })
-    if (error) throw new Error(error.message)
-    return Number(data ?? 0)
-  }))
   const staffGroups = groups.filter((g) => g.scope === 'staff' && g.headcount > 0)
   const dirGroups = groups.filter((g) => g.scope === 'directors' && g.headcount > 0)
   const staffPaid = staffGroups.length > 0 && staffGroups.every((g) => g.stage === 'paid')

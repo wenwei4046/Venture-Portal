@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import WarmLink from '@/components/layout/WarmLink'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -150,12 +151,14 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
                   return (
                     <LedgerRow key={b.id}>
                       <td>
-                        <Link
+                        {/* Rendered while the pointer rests on it: a month is
+                            the heaviest page in the department (2026-09-26). */}
+                        <WarmLink
                           href={revenuePath(subDept.slug, b.period_month)}
                           className="text-ink hover:text-accent"
                         >
                           {label(b.period_month)}
-                        </Link>
+                        </WarmLink>
                         {claimsByMonth.get(b.period_month) ? (
                           <div className="font-mono text-[10.5px] text-danger mt-0.5">
                             {claimsByMonth.get(b.period_month)} POSSIBLE DOUBLE CLAIM{claimsByMonth.get(b.period_month) === 1 ? '' : 'S'}
