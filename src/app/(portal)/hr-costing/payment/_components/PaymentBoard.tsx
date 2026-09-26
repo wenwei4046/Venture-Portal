@@ -121,6 +121,8 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
   const openBody = win?.kind === 'body' ? win.key : null
   const salaryAction = headline.action.kind === 'generate-salary'
   const statutoryAction = headline.action.kind === 'generate-statutory'
+  // Each tab's badge counts the rows its table lists: departments, institutions.
+  const tabCount = { salary: groups.length, statutory: new Set(rows.map(row => row.body)).size }
 
   return <div>
     <Overview
@@ -138,7 +140,7 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
     />
     {error && !win ? <div className="pay-err" role="alert">{error}</div> : null}
     {phase !== 'no-payroll' && phase !== 'drafts-pending' ? <>
-      <div className="payment-tabs" role="tablist" aria-label="Payment type">
+      <div className="sheet-tabs payment-tabs" role="tablist" aria-label="Payment type">
         {(['salary', 'statutory'] as const).map((name, index) => <button
           key={name} ref={node => { tabs.current[index] = node }} type="button" role="tab"
           id={`payment-${name}-tab`} aria-controls={`payment-${name}-panel`} aria-selected={tab === name}
@@ -150,11 +152,11 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
             setTab(next ? 'statutory' : 'salary')
             tabs.current[next]?.focus()
           }}
-        >{name === 'salary' ? 'Salary' : 'Statutory'}</button>)}
+        >{name === 'salary' ? 'Salary' : 'Statutory'}<span className="sheet-count">{tabCount[name]}</span></button>)}
       </div>
       <div id="payment-salary-panel" role="tabpanel" aria-labelledby="payment-salary-tab" hidden={tab !== 'salary'}>
         <section className="payment-section" aria-label="Salary PVs">
-          <h2>Salary PVs</h2>
+          <div className="sect-head"><h2>Salary PVs</h2><span className="rule" aria-hidden /><span className="count">By department · MYR</span></div>
           <DeptRows period={period} groups={groups} prevMonthName={prevMonthName} today={today}
             dates={dates} fundedFor={fundedFor} busy={busy} payoutBank={payoutBank}
             onGenerate={openSalary} onOpen={key => { const g = groups.find(group => group.key === key); if (g) openSalary(g, 'view') }} />
@@ -164,7 +166,7 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
       </div>
       <div id="payment-statutory-panel" role="tabpanel" aria-labelledby="payment-statutory-tab" hidden={tab !== 'statutory'}>
         <section className="payment-section" aria-label="Statutory PVs">
-          <div className="pay-section-toolbar"><h2>Statutory PVs</h2><span className="pay-muted">Contributions &amp; deductions · MYR</span></div>
+          <div className="sect-head"><h2>Statutory PVs</h2><span className="rule" aria-hidden /><span className="count">Contributions &amp; deductions · MYR</span></div>
           <StatutoryRows rows={rows} today={today} busy={busy} staffFunded={staffFunded}
             onGenerate={openStatutory} onOpen={body => { setError(null); setWin({ kind: 'body', key: body }) }} />
         </section>

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import PCBInput from './_components/PCBInput'
 import EditableDeduction from './_components/EditableDeduction'
 import ResetStatutoryButton from './_components/ResetStatutoryButton'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 interface Props {
   params: Promise<{ directorId: string }>
@@ -39,8 +40,8 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
 
   if (!director) {
     return (
-      <div className="py-16 text-center">
-        <p className="font-serif italic text-danger">Director not found.</p>
+      <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+        <p className="text-sm text-danger">Director not found.</p>
       </div>
     )
   }
@@ -48,7 +49,7 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
   if (!payout) {
     return (
       <div>
-        <Link href={`/director-salary?period=${period}`} className="text-sm text-muted hover:text-accent font-sans transition-colors">
+        <Link href={`/director-salary?period=${period}`} className="inline-block mb-3 text-sm hover:text-accent transition-colors">
           ← Back to Director Salary
         </Link>
         <div className="page-head">
@@ -57,16 +58,14 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
               <em>I.</em> DIRECTOR · PAYOUT · {periodLabel.toUpperCase()}
             </div>
             <h1 className="page-title">Director {director.code}</h1>
-            <p className="font-serif italic text-graphite text-base mt-3">
-              <em>Payout not yet calculated for this period.</em>
-            </p>
+            <p className="text-sm mt-3">Payout not yet calculated for this period.</p>
           </div>
         </div>
-        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-          <p className="font-serif italic text-graphite text-lg mb-1">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-md font-medium mb-1">
             尚未计算。
           </p>
-          <p className="font-serif italic text-muted text-sm">
+          <p className="text-sm">
             先在主页触发计算。
           </p>
         </div>
@@ -107,9 +106,13 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
     ? dayjs(payout.statutory_overridden_at).format('D MMM YYYY HH:mm')
     : ''
 
+  const statusChip =
+    payout.status === 'draft' ? 'alert' : payout.status === 'confirmed' ? 'ledger' : ''
+  const surplus = n(payout.statutory_surplus)
+
   return (
     <div>
-      <Link href={`/director-salary?period=${period}`} className="text-sm text-muted hover:text-accent font-sans transition-colors">
+      <Link href={`/director-salary?period=${period}`} className="inline-block mb-3 text-sm hover:text-accent transition-colors">
         ← Back to Director Salary
       </Link>
 
@@ -119,11 +122,9 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
             <em>I.</em> DIRECTOR · PAYOUT · {periodLabel.toUpperCase()}
           </div>
           <h1 className="page-title">{director.name} — {director.code}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Payout detail. <em className={`font-serif text-sm ${
-              payout.status === 'draft' ? 'text-alert' :
-              payout.status === 'confirmed' ? 'text-ledger' : 'text-graphite'
-            }`}>{payout.status}</em>
+          <p className="text-sm mt-3 flex flex-wrap items-center gap-2">
+            Payout detail.
+            <span className={`chip ${statusChip}`}><span className="dot" />{payout.status}</span>
           </p>
         </div>
         <Link
@@ -135,88 +136,119 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* The payout in six figures, read off the cards below. Net to director
+          is what the page is opened for — the walnut card; the stored figure,
+          so it moves when Save PCB or a deduction override lands. */}
+      <StatCards label={`Payout for ${director.code}, ${periodLabel}`}>
+        <StatCard
+          label="Gross allocation"
+          value={formatMoney(n(payout.gross_amount))}
+          icon="coin"
+          note={`After saving ${formatMoney(n(payout.after_saving))}`}
+        />
+        <StatCard label="Payroll gross (75%)" value={formatMoney(n(payout.payroll_gross))} icon="wallet" />
+        <StatCard
+          label="Net to director"
+          value={formatMoney(n(payout.payroll_net))}
+          icon="bank"
+          tone="primary"
+          note={`After PCB ${formatMoney(n(payout.payroll_pcb))}`}
+        />
+        <StatCard label="Invoice total (25%)" value={formatMoney(n(payout.invoice_total))} icon="receipt" note="Base + employer statutory" />
+        <StatCard
+          label="Statutory surplus"
+          value={formatMoney(surplus)}
+          icon="shield"
+          tone={surplus >= 0 ? 'ledger' : 'danger'}
+          note="ER in − ER out"
+        />
+        <StatCard label="Advance balance" value={formatMoney(n(payout.advance_balance))} icon="clock" />
+      </StatCards>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left column — Calculation summary */}
         <div className="space-y-6">
           {/* Gross + Saving */}
-          <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
+          <div className="border border-hairline rounded-card bg-surface p-5 space-y-3">
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">Gross Allocation</span>
-              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.gross_amount))}</span>
+              <span className="text-sm">Gross Allocation</span>
+              <span className="num font-semibold">{formatMoney(n(payout.gross_amount))}</span>
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">5% Saving</span>
+              <span className="text-sm">5% Saving</span>
               <span className="num neg">({formatMoneyBare(n(payout.saving_amount))})</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-              <span className="font-serif italic text-sm text-accent">After Saving</span>
-              <span className="num text-num-ink">{formatMoney(n(payout.after_saving))}</span>
+              <span className="text-sm font-semibold">After Saving</span>
+              <span className="num">{formatMoney(n(payout.after_saving))}</span>
             </div>
           </div>
 
           {/* 75% Payroll */}
-          <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif italic text-ink text-md mb-2">75% Payroll</h3>
+          <div className="border border-hairline rounded-card bg-surface p-5 space-y-3">
+            <h3 className="text-[10px] font-medium uppercase tracking-[0.06em] mb-2">75% Payroll</h3>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">Calculated (75%)</span>
-              <span className="num text-graphite">{formatMoney(n(payout.payroll_calc))}</span>
+              <span className="text-sm">Calculated (75%)</span>
+              <span className="num">{formatMoney(n(payout.payroll_calc))}</span>
             </div>
             {n(payout.advance_amount) > 0 && (
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-alert">Advance (below min RM {formatMoneyBare(director.min_payout)})</span>
+                <span className="text-sm">Advance <span className="text-xs">(below min RM {formatMoneyBare(director.min_payout)})</span></span>
                 <span className="num text-alert">+{formatMoneyBare(n(payout.advance_amount))}</span>
               </div>
             )}
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-              <span className="font-serif italic text-sm text-accent">Payroll Gross</span>
-              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.payroll_gross))}</span>
+              <span className="text-sm font-semibold">Payroll Gross</span>
+              <span className="num font-semibold">{formatMoney(n(payout.payroll_gross))}</span>
             </div>
 
             {/* Phase 11.2: Earnings breakdown — display only, sums to payroll_gross */}
             <div className="pt-3 border-t border-hairline space-y-2">
-              <p className="font-sans text-xs uppercase tracking-wide text-graphite">Earnings breakdown</p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.06em]">Earnings breakdown</p>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">Basic <span className="text-muted">(min RM {formatMoneyBare(minPayout)})</span></span>
-                <span className="num text-num-ink">{formatMoney(basicLine)}</span>
+                <span className="text-sm">Basic <span className="text-xs">(min RM {formatMoneyBare(minPayout)})</span></span>
+                <span className="num">{formatMoney(basicLine)}</span>
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">KPI <span className="text-muted">(EPF-able)</span></span>
-                <span className="num text-num-ink">{formatMoney(kpiLine)}</span>
+                <span className="text-sm">KPI <span className="text-xs">(EPF-able)</span></span>
+                <span className="num">{formatMoney(kpiLine)}</span>
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">Allowance <span className="text-muted">(non-EPF)</span></span>
-                <span className="num text-num-ink">{formatMoney(allowanceLine)}</span>
+                <span className="text-sm">Allowance <span className="text-xs">(non-EPF)</span></span>
+                <span className="num">{formatMoney(allowanceLine)}</span>
               </div>
             </div>
 
             <div className="pt-3 border-t border-hairline space-y-2">
-              <p className="font-sans text-xs uppercase tracking-wide text-graphite">Deductions <span className="text-muted normal-case font-serif italic">— click any value to override</span></p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.06em]">
+                Deductions <span className="normal-case tracking-normal font-normal">— click any value to override</span>
+              </p>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">EPF ER</span>
+                <span className="text-sm">EPF ER</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_epf_er" value={n(payout.payroll_epf_er)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">EPF EE</span>
+                <span className="text-sm">EPF EE</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_epf_ee" value={n(payout.payroll_epf_ee)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">SOCSO ER</span>
+                <span className="text-sm">SOCSO ER</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_socso_er" value={n(payout.payroll_socso_er)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">SOCSO EE</span>
+                <span className="text-sm">SOCSO EE</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_socso_ee" value={n(payout.payroll_socso_ee)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">EIS ER</span>
+                <span className="text-sm">EIS ER</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_eis_er" value={n(payout.payroll_eis_er)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">EIS EE</span>
+                <span className="text-sm">EIS EE</span>
                 <EditableDeduction payoutId={payout.id} field="payroll_eis_ee" value={n(payout.payroll_eis_ee)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               <div className="flex items-baseline justify-between">
-                <span className="font-serif italic text-sm text-graphite">SKBBK <span className="text-muted">(EE, net-only)</span></span>
+                <span className="text-sm">SKBBK <span className="text-xs">(EE, net-only)</span></span>
                 <EditableDeduction payoutId={payout.id} field="payroll_skbbk" value={n(payout.payroll_skbbk)} kind="payroll" readOnly={payout.status !== 'draft'} />
               </div>
               {payout.status === 'draft' && isOverridden ? (
@@ -242,67 +274,67 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
         {/* Right column — Invoice + Surplus + Advance */}
         <div className="space-y-6">
           {/* 25% Invoice */}
-          <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif italic text-ink text-md mb-2">25% Invoice</h3>
+          <div className="border border-hairline rounded-card bg-surface p-5 space-y-3">
+            <h3 className="text-[10px] font-medium uppercase tracking-[0.06em] mb-2">25% Invoice</h3>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">Base</span>
+              <span className="text-sm">Base</span>
               <span className="num">{formatMoney(n(payout.invoice_base))}</span>
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">+ EPF ER</span>
+              <span className="text-sm">+ EPF ER</span>
               <EditableDeduction payoutId={payout.id} field="invoice_epf_er" value={n(payout.invoice_epf_er)} kind="invoice" readOnly={payout.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">+ SOCSO ER</span>
+              <span className="text-sm">+ SOCSO ER</span>
               <EditableDeduction payoutId={payout.id} field="invoice_socso_er" value={n(payout.invoice_socso_er)} kind="invoice" readOnly={payout.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">+ EIS ER</span>
+              <span className="text-sm">+ EIS ER</span>
               <EditableDeduction payoutId={payout.id} field="invoice_eis_er" value={n(payout.invoice_eis_er)} kind="invoice" readOnly={payout.status !== 'draft'} />
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-              <span className="font-serif italic text-sm text-accent">Invoice Total</span>
-              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.invoice_total))}</span>
+              <span className="text-sm font-semibold">Invoice Total</span>
+              <span className="num font-semibold">{formatMoney(n(payout.invoice_total))}</span>
             </div>
           </div>
 
           {/* Statutory Surplus */}
-          <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif italic text-ink text-md mb-2">Statutory Surplus</h3>
+          <div className="border border-hairline rounded-card bg-surface p-5 space-y-3">
+            <h3 className="text-[10px] font-medium uppercase tracking-[0.06em] mb-2">Statutory Surplus</h3>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">ER IN (share)</span>
+              <span className="text-sm">ER IN (share)</span>
               <span className="num">{formatMoney(n(payout.statutory_er_in))}</span>
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">ER OUT (75%+25%)</span>
+              <span className="text-sm">ER OUT (75%+25%)</span>
               <span className="num">{formatMoney(n(payout.statutory_er_out))}</span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-              <span className="font-serif italic text-sm text-accent">Surplus</span>
-              <span className={`num font-semibold ${n(payout.statutory_surplus) >= 0 ? 'text-ledger' : 'neg'}`}>
-                {formatMoney(n(payout.statutory_surplus))}
+              <span className="text-sm font-semibold">Surplus</span>
+              <span className={`num font-semibold ${surplus >= 0 ? 'text-ledger' : 'neg'}`}>
+                {formatMoney(surplus)}
               </span>
             </div>
           </div>
 
           {/* Advance Tracking */}
-          <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-            <h3 className="font-serif italic text-ink text-md mb-2">Advance Tracking</h3>
+          <div className="border border-hairline rounded-card bg-surface p-5 space-y-3">
+            <h3 className="text-[10px] font-medium uppercase tracking-[0.06em] mb-2">Advance Tracking</h3>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">This month advance</span>
+              <span className="text-sm">This month advance</span>
               <span className="num text-alert">
                 {n(payout.advance_amount) > 0 ? `+${formatMoneyBare(n(payout.advance_amount))}` : '—'}
               </span>
             </div>
             <div className="flex items-baseline justify-between">
-              <span className="font-serif italic text-sm text-graphite">Repaid</span>
+              <span className="text-sm">Repaid</span>
               <span className="num text-ledger">
                 {n(payout.advance_repaid) > 0 ? `-${formatMoneyBare(n(payout.advance_repaid))}` : '—'}
               </span>
             </div>
             <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-              <span className="font-serif italic text-sm text-accent">Balance</span>
-              <span className="num text-num-ink font-semibold">{formatMoney(n(payout.advance_balance))}</span>
+              <span className="text-sm font-semibold">Balance</span>
+              <span className="num font-semibold">{formatMoney(n(payout.advance_balance))}</span>
             </div>
           </div>
         </div>

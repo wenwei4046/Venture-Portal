@@ -127,7 +127,8 @@ function RevenueCommissionDialog({
   const difference = roundMoney(requestedGross - snapshot.gross)
   const locked = pending || disabled || sourceChanged || !propsValid
 
-  return createPortal(<>
+  // Portalled outside the sheet: `sheet-theme` brings its palette along.
+  return createPortal(<div className="sheet-theme contents">
       <div className="pg-scrim" style={{ zIndex: 70 }} onClick={close} aria-hidden="true" />
       <div ref={dialogRef} className="pg-win" style={{ maxWidth: 560, zIndex: 71 }} role="dialog" aria-modal="true"
         aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} onKeyDown={onKeyDown}>
@@ -136,9 +137,9 @@ function RevenueCommissionDialog({
           <div className="nav"><button type="button" className="icon-btn solid" onClick={close} disabled={pending} aria-label="Close commission editor">×</button></div>
         </div>
         <form onSubmit={save} noValidate className="p-4 sm:p-6">
-          <p id={descriptionId} className="text-sm text-graphite mb-4">This changes the payroll amount. Revenue keeps its calculated commission; future syncs retain the payroll adjustment.</p>
+          <p id={descriptionId} className="text-sm mb-4">This changes the payroll amount. Revenue keeps its calculated commission; future syncs retain the payroll adjustment.</p>
           <table className="ledger-table w-full mb-4" aria-label="Commission adjustment summary">
-            <thead><tr><th>Amount</th><th className="num">RM</th></tr></thead>
+            <thead><tr><th>Amount</th><th className="right">RM</th></tr></thead>
             <tbody>
               <tr><td>Synced from Revenue</td><td className="num">{formatMoneyBare(snapshot.base)}</td></tr>
               <tr><td>Current Gross Commission</td><td className="num">{formatMoneyBare(snapshot.gross)}</td></tr>
@@ -147,7 +148,7 @@ function RevenueCommissionDialog({
               <tr><td>Payroll adjustment to Revenue source</td><td className={cn('num', adjustment < 0 && 'neg')}>{inputError ? '—' : signedMoney(adjustment)}</td></tr>
             </tbody>
           </table>
-          <label className="block text-sm text-ink mb-3">
+          <label className="block text-sm font-medium mb-3">
             Requested Gross Commission · RM
             <span className="block mt-1" onChangeCapture={event => {
               // AmountInput deliberately ignores invalid keystrokes. Track them here so
@@ -161,14 +162,14 @@ function RevenueCommissionDialog({
               <AmountInput value={requested} onChange={setRequested} disabled={locked} dirty={requestedGross !== roundMoney(snapshot.gross)} aria-label="Requested Gross Commission" className="w-full" />
             </span>
           </label>
-          <button type="button" className="text-xs text-accent underline underline-offset-2 mb-4 disabled:text-muted" disabled={locked}
+          <button type="button" className="text-xs text-accent underline underline-offset-2 mb-4 disabled:opacity-50" disabled={locked}
             onClick={() => { setRequested(roundMoney(snapshot.base)); setInputError(null); setError(null) }}>Reset to Revenue source</button>
-          <label className="block text-sm text-ink">Reason <span className="text-muted">(required)</span>
+          <label className="block text-sm font-medium">Reason <span className="font-normal">(required)</span>
             <textarea value={reason} onChange={event => { setReason(event.target.value); setError(null) }} disabled={locked} required rows={3} maxLength={1000}
               aria-label="Adjustment reason" placeholder="For example: DN adjustment or dropped sales"
-              className="block w-full rounded border border-hairline bg-surface text-ink px-3 py-2 mt-1" />
+              className="block w-full rounded-control border border-hairline bg-surface text-ink font-normal px-3 py-2 mt-1" />
           </label>
-          <p className="text-xs text-muted mt-2">Resetting to the source removes the payroll adjustment and also requires a reason.</p>
+          <p className="text-xs mt-2">Resetting to the source removes the payroll adjustment and also requires a reason.</p>
           {(sourceChanged || disabled || inputError || error || !propsValid) && <p role="alert" className="text-sm text-danger mt-3">
             {sourceChanged ? 'Revenue or payroll amounts changed while this editor was open. Cancel and reopen to review the latest amounts.'
               : disabled ? 'Commission editing is no longer available. Cancel to return to payroll.'
@@ -180,5 +181,5 @@ function RevenueCommissionDialog({
           </div>
         </form>
       </div>
-    </>, document.body)
+    </div>, document.body)
 }

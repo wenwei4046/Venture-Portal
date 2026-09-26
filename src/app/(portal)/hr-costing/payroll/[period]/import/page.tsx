@@ -22,7 +22,7 @@ export default async function ImportPage({ params }: PageProps) {
     <div>
       <Link
         href={`/hr-costing/payroll/${period}`}
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+        className="text-sm hover:text-accent transition-colors"
       >
         ← Back to {formatPeriodLabel(period)}
       </Link>
@@ -33,8 +33,8 @@ export default async function ImportPage({ params }: PageProps) {
             <em>I.</em> HR · PAYROLL IMPORT · {formatPeriodLabel(period).toUpperCase()}
           </div>
           <h1 className="page-title">Import InfoTech</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            Importing into <em>{formatPeriodLabel(period)}</em> — switch the period to import a different month.
+          <p className="text-sm mt-3">
+            Importing into <strong className="font-bold">{formatPeriodLabel(period)}</strong> — switch the period to import a different month.
           </p>
         </div>
         {/* suffix keeps you on the import page while changing the target month */}

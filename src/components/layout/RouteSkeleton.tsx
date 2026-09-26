@@ -4,6 +4,7 @@ import { useLayoutEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { skeletonHidden, skeletonShown } from '@/lib/nav-progress'
 import { skeletonVariantFor, type SkeletonVariant } from '@/lib/route-skeleton'
+import { isSheetRoute } from '@/lib/sheet-routes'
 
 // What every loading.tsx in the portal renders (2026-09-26).
 //
@@ -22,6 +23,8 @@ import { skeletonVariantFor, type SkeletonVariant } from '@/lib/route-skeleton'
 export default function RouteSkeleton() {
   const pathname = usePathname() ?? ''
   const variant = skeletonVariantFor(pathname)
+  // On the white sheet a page opens with summary cards, so its skeleton does.
+  const sheet = isSheetRoute(pathname)
 
   // Counted while on screen so the top progress line keeps running until the
   // page itself has landed (lib/nav-progress.ts). A layout effect, so the count
@@ -34,12 +37,12 @@ export default function RouteSkeleton() {
   return (
     <div className="route-skeleton" data-variant={variant} role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">Loading…</span>
-      <Body variant={variant} />
+      <Body variant={variant} sheet={sheet} />
     </div>
   )
 }
 
-function Body({ variant }: { variant: SkeletonVariant }) {
+function Body({ variant, sheet }: { variant: SkeletonVariant; sheet: boolean }) {
   switch (variant) {
     case 'detail':
       return <DetailBody />
@@ -48,7 +51,7 @@ function Body({ variant }: { variant: SkeletonVariant }) {
     case 'board':
       return <BoardBody />
     default:
-      return <LedgerBody />
+      return <LedgerBody sheet={sheet} />
   }
 }
 
@@ -111,6 +114,27 @@ function Rows({ rows, cols = 5 }: { rows: number; cols?: number }) {
   )
 }
 
+// The sheet's summary cards (components/sheet/StatCard.tsx), empty: the card,
+// its short bar and its icon tile are real, only the words are loading.
+function Cards({ count = 5 }: { count?: number }) {
+  return (
+    <div className="stat-cards" aria-hidden>
+      <div className="stat-cards-grid">
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="stat-card">
+            <Bar className="h-[9px] w-20 mb-[21px]" />
+            <Bar className={`h-7 ${i === 0 ? 'w-[78%]' : 'w-[62%]'}`} />
+            <div className="stat-card-foot">
+              <Bar className="h-[9px] w-16" />
+              <span className="stat-card-icon" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Figures({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6 mb-10">
@@ -124,11 +148,11 @@ function Figures({ count = 4 }: { count?: number }) {
   )
 }
 
-function LedgerBody() {
+function LedgerBody({ sheet }: { sheet: boolean }) {
   return (
     <>
       <Head />
-      <Figures />
+      {sheet ? <Cards /> : <Figures />}
       <SectHead />
       <Rows rows={8} />
     </>

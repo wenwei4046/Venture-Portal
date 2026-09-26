@@ -1,93 +1,126 @@
-/* Preserve the statement layout while inheriting the portal's shared theme. */
+/* HR › Payment on the sheet (v3.9, 2026-09-27 — DESIGN.md › "Sheet theme").
+   The statement keeps v3.7's report — the three totals, the reconciliation,
+   the contribution breakdown, funding and payment dates — and takes the
+   sheet's tone: summary cards over one framed report, black lettering, orange
+   only for the one action and the markers. The page head is the sheet's own;
+   nothing here restyles it. */
 .pay-board.payment-statement { --pay-card: var(--surface); --pay-well: var(--chrome); }
 .payment-statement { font-size: 13px; line-height: 1.5; }
-.payment-statement .page-head { align-items: flex-end; gap: 18px; margin-bottom: 20px; }
-.payment-statement .page-eyebrow { color: rgb(var(--muted)); font-size: 11px; letter-spacing: .13em; }
-.payment-statement .page-title { font: 36px/1.18 Georgia, 'Times New Roman', serif; letter-spacing: -.025em; margin-top: 5px; }
-.payment-statement .payment-period { color: rgb(var(--muted)); font-size: 12px; margin-top: 7px; }
-.payment-statement .pay-rail { gap: 0; border-bottom: 1px solid rgb(var(--hairline)); flex-wrap: nowrap; overflow-x: auto; }
-.payment-statement .pay-rail a { min-width: 48px; padding: 5px 10px 8px; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; text-align: center; }
-.payment-statement .pay-rail a.cur { background: transparent; border-bottom-color: rgb(var(--accent)); box-shadow: none; }
-.payment-statement .pay-rail a b { font-size: 12px; font-weight: 500; }
-.payment-statement .pay-rail a i { font-size: 10px; font-style: normal; color: rgb(var(--muted)); }
-.payment-statement .payment-overview { container: payment-report / inline-size; background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-top: 2px solid rgb(var(--ink)); border-radius: 6px; }
-.payment-statement .payment-summary { display: grid; grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr) minmax(0, 1fr); padding: 20px 24px; margin: 0; background: rgb(var(--surface-2)); border-bottom: 1px solid rgb(var(--hairline)); border-radius: 5px 5px 0 0; }
-.payment-statement .payment-summary > div + div { border-left: 1px solid rgb(var(--hairline)); padding-left: 22px; }
-.payment-statement .payment-label { color: rgb(var(--graphite)); font-size: 11px; margin-bottom: 5px; }
-.payment-statement .payment-amount { font-size: 26px; letter-spacing: -.025em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.payment-statement .payment-amount small { font-size: 11px; font-weight: 400; letter-spacing: 0; margin-right: 5px; }
-.payment-statement .payment-under { font-size: 11px; color: rgb(var(--muted)); margin-top: 5px; }
-.payment-statement .good { color: rgb(var(--ledger)); }
-.payment-statement .pending { color: rgb(var(--alert)); }
-.payment-statement .payment-allocation { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; padding: 22px 24px; }
-.payment-statement .payment-allocation > div { min-width: 0; }
-.payment-statement .payment-allocation > div + div { padding-left: 24px; border-left: 1px solid rgb(var(--hairline)); }
-.payment-statement .payment-allocation h3 { font-size: 12px; font-weight: 500; margin: 0 0 9px; }
-.payment-statement .payment-metric { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 4px 0; font-size: 12px; }
-.payment-statement .payment-metric > :last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.payment-statement .payment-metric.total { border-top: 1px solid rgb(var(--hairline)); margin-top: 5px; padding-top: 8px; font-weight: 500; }
-.payment-statement .payment-contributions { margin-top: 6px; }
-.payment-statement .payment-contributions summary { cursor: pointer; color: rgb(var(--graphite)); font-size: 11px; padding: 4px 0; width: fit-content; }
-.payment-statement .payment-contrib-table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 11px; font-variant-numeric: tabular-nums; }
-.payment-statement .payment-contrib-table th { text-align: left; font-weight: 400; color: rgb(var(--graphite)); }
-.payment-statement .payment-contrib-table thead,
-.payment-statement .payment-contrib-table tfoot { background: rgb(var(--surface-2)); }
-.payment-statement .payment-contrib-table td,
-.payment-statement .payment-contrib-table th { padding: 6px 8px; border-bottom: 1px solid rgb(var(--hairline)); }
-.payment-statement .payment-contrib-table td,
-.payment-statement .payment-contrib-table th + th { text-align: right; white-space: nowrap; }
-.payment-statement .payment-contrib-table tfoot th,
-.payment-statement .payment-contrib-table tfoot td { font-weight: 500; color: rgb(var(--ink)); border-bottom: 0; }
-.payment-statement .payment-funding-received { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgb(var(--hairline)); color: rgb(var(--muted)); }
-.payment-statement .payment-funding-received .payment-metric { font-size: 11px; }
-.payment-statement .payment-funding-received p { font-size: 10px; margin-top: 3px; overflow-wrap: anywhere; }
-.payment-statement .payment-funding { padding: 10px 12px; border-left: 2px solid rgb(var(--ledger)); background: rgb(var(--ledger-bg)); margin-bottom: 15px; }
-.payment-statement .payment-funding.gap { border-left-color: rgb(var(--alert)); background: rgb(var(--alert-bg)); }
-.payment-statement .payment-funding h3 { margin-bottom: 5px; }
-.payment-statement .payment-funding .payment-metric { padding: 2px 0; font-size: 11px; }
-.payment-statement .payment-funding .total { padding-top: 5px; }
-.payment-statement .payment-funding strong { font-weight: 500; }
-.payment-statement .payment-dates { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.payment-statement .payment-dates li { display: grid; grid-template-columns: 49px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 11px; }
-.payment-statement .payment-dates time,
-.payment-statement .payment-date-empty { color: rgb(var(--muted)); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.payment-statement .payment-date-state { font-size: 10px; color: rgb(var(--muted)); }
-.payment-statement .done .payment-date-state { color: rgb(var(--ledger)); }
-.payment-statement .next .payment-date-state,
-.payment-statement .late .payment-date-state { color: rgb(var(--alert)); }
-.payment-statement .payment-bank { font-size: 10px; color: rgb(var(--muted)); margin: 10px 0 0; }
-.payment-statement .payment-next-action { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 24px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2) / .4); border-radius: 0 0 5px 5px; }
-.payment-statement .payment-next-action strong { font-size: 12px; font-weight: 500; }
-.payment-statement .payment-next-action p { font-size: 11px; color: rgb(var(--muted)); margin-top: 2px; }
-.payment-statement .payment-report-confirm { padding: 12px 24px 18px; }
-.payment-statement .pay-btn,
-.payment-statement .pay-cta { font-family: inherit; font-size: 11px; font-style: normal; font-weight: 500; border-radius: 3px; box-shadow: none; padding: 7px 10px; min-height: 32px; }
-.payment-statement .pay-btn.pri { border-color: rgb(var(--accent)); }
-.payment-statement .pay-btn.sec { background: rgb(var(--surface)); color: rgb(var(--ink)); border-color: rgb(var(--hairline)); }
-.payment-statement .pay-btn:hover:not(:disabled),
-.payment-statement .pay-cta:hover:not(:disabled) { filter: brightness(.96); text-decoration: none; }
-.payment-statement button:focus-visible,
-.payment-statement a:focus-visible,
-.payment-statement summary:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
 
+/* The month rail rides the header's right edge; between phone and desktop it
+   wraps under the title rather than squeezing it. */
 @media (max-width: 1000px) {
   .payment-statement .page-head { align-items: flex-start; flex-wrap: wrap; }
-  .payment-statement .payment-summary > div + div { padding-left: 14px; }
-  .payment-statement .payment-amount { font-size: 23px; }
+}
+
+/* ── The month rail — a tab-like pick: the month on screen carries the
+   orange 3px underline over a peach wash (the `.sheet-tabs` pick); how far
+   each month got is a word in black after a coloured dot. ── */
+.payment-statement .pay-rail { gap: 2px; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: thin; border-bottom: 1px solid rgb(var(--sheet-divider)); }
+.payment-statement .pay-rail a { min-width: 50px; padding: 6px 10px 7px; border: 0; border-bottom: 3px solid transparent; border-radius: 6px 6px 0 0; background: transparent; color: rgb(var(--ink)); text-align: center; transition: background 120ms ease-out; }
+.payment-statement .pay-rail a:not(.cur):hover { background: rgb(var(--surface-2)); border-bottom-color: transparent; }
+.payment-statement .pay-rail a.cur { background: rgb(var(--accent-bg)); border-bottom-style: solid; border-bottom-color: rgb(var(--accent)); box-shadow: none; }
+.payment-statement .pay-rail a b,
+.payment-statement .pay-rail a.none b { color: rgb(var(--ink)); font-size: 12px; font-weight: 500; }
+.payment-statement .pay-rail a.none b { font-weight: 400; }
+.payment-statement .pay-rail a.cur b { font-weight: 600; }
+.payment-statement .pay-rail a i,
+.payment-statement .pay-rail a:is(.none, .drafts, .submitted, .funded, .closed) i { --rail-mark: rgb(var(--ink) / 0.28); display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; color: rgb(var(--ink)); font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 9.5px; font-style: normal; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
+.payment-statement .pay-rail a i::before { content: ''; flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--rail-mark); }
+.payment-statement .pay-rail a.closed i { --rail-mark: rgb(var(--ledger)); }
+.payment-statement .pay-rail a.funded i { --rail-mark: rgb(var(--accent)); }
+.payment-statement .pay-rail a:is(.drafts, .submitted) i { --rail-mark: rgb(var(--alert)); }
+
+/* ── The report under the summary cards ──
+   One framed panel: reconciliation + contributions on the left, funding and
+   payment dates on the right (a vertical hairline that turns horizontal when
+   the report is narrow), and the next action in the footer strip. */
+.payment-statement .payment-overview { container: payment-report / inline-size; }
+.payment-statement .payment-report { border: 1px solid rgb(var(--sheet-table-border)); border-radius: 12px; background: rgb(var(--surface)); }
+.payment-statement .payment-allocation { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; padding: 20px 24px 22px; }
+.payment-statement .payment-allocation > div { min-width: 0; }
+.payment-statement .payment-allocation > div + div { padding-left: 24px; border-left: 1px solid rgb(var(--hairline)); }
+.payment-statement .payment-allocation h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: -0.005em; }
+.payment-statement .payment-metric { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 4px 0; font-size: 12px; }
+.payment-statement .payment-metric > :last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.payment-statement .payment-metric.total { margin-top: 6px; padding-top: 8px; border-top: 1px solid rgb(var(--sheet-table-rule)); font-weight: 600; }
+
+/* The expandable employee / employer contributions: a small framed ledger
+   with the sheet's header band and a peach total. */
+.payment-statement .payment-contributions { margin-top: 10px; }
+.payment-statement .payment-contributions > summary,
+.payment-statement .pay-employee-changes > summary { width: fit-content; padding: 5px 0; cursor: pointer; font-size: 12px; font-weight: 500; }
+.payment-statement .payment-contrib-table { width: 100%; margin-top: 8px; border: 1px solid rgb(var(--sheet-table-border)); border-radius: 8px; border-collapse: separate; border-spacing: 0; overflow: hidden; background: rgb(var(--surface)); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.payment-statement .payment-contrib-table :is(th, td) { padding: 7px 10px; border-bottom: 1px solid rgb(var(--hairline)); }
+.payment-statement .payment-contrib-table th { text-align: left; font-weight: 500; }
+.payment-statement .payment-contrib-table :is(td, th + th) { text-align: right; white-space: nowrap; }
+.payment-statement .payment-contrib-table thead th { background: rgb(var(--sheet-table-head)); border-bottom-color: rgb(var(--sheet-table-rule)); font-size: 10px; font-weight: 600; letter-spacing: 0.045em; text-transform: uppercase; }
+.payment-statement .payment-contrib-table tbody tr:nth-child(even) { background: rgb(var(--surface-2)); }
+.payment-statement .payment-contrib-table tbody tr:last-child > :is(th, td) { border-bottom: 0; }
+.payment-statement .payment-contrib-table tfoot :is(th, td) { background: rgb(var(--accent-bg)); border-top: 1px solid rgb(var(--sheet-table-rule)); border-bottom: 0; font-weight: 600; }
+
+.payment-statement .payment-funding-received { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgb(var(--hairline)); }
+.payment-statement .payment-funding-received p { margin-top: 3px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; overflow-wrap: anywhere; }
+
+/* Funding: a green wash while the pool covers what is left, the amber
+   warning while it does not. The sentence sits on its own wash. */
+.payment-statement .payment-funding { margin-bottom: 16px; padding: 12px 14px; border: 1px solid rgb(var(--ledger) / 0.3); border-radius: 8px; background: rgb(var(--ledger-bg) / 0.6); }
+.payment-statement .payment-funding.gap { border-color: rgb(var(--card-alert-bar)); background: rgb(var(--card-alert-icon-bg)); }
+.payment-statement .payment-funding h3 { margin-bottom: 6px; }
+.payment-statement .payment-funding .payment-metric { padding: 2px 0; }
+.payment-statement .payment-funding .payment-metric.total { padding-top: 6px; border-top-color: rgb(var(--ink) / 0.14); }
+.payment-statement .payment-funding strong { font-weight: 600; }
+.payment-statement .payment-under { margin-top: 6px; font-size: 12px; }
+.payment-statement .good { color: rgb(var(--ledger)); font-weight: 500; }
+
+/* Payment dates: the date, what it is, and its state as a chip. */
+.payment-statement .payment-dates { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.payment-statement .payment-dates li { display: grid; grid-template-columns: 50px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; font-size: 12px; }
+.payment-statement .payment-dates time,
+.payment-statement .payment-date-empty { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.payment-statement .payment-date-state { justify-self: end; white-space: nowrap; }
+.payment-statement .payment-bank { margin: 12px 0 0; font-size: 11px; }
+
+/* The next action: the footer strip of the report, holding the page's one
+   orange button. */
+.payment-statement .payment-next-action { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 24px; border-top: 1px solid rgb(var(--sheet-table-border)); background: rgb(var(--sheet-foot)); }
+.payment-statement .payment-next-action strong { font-size: 13px; font-weight: 600; }
+.payment-statement .payment-next-action p { margin-top: 2px; font-size: 12px; }
+.payment-statement .payment-report-confirm { padding: 12px 24px 18px; }
+.payment-statement .payment-report > :last-child { border-radius: 0 0 11px 11px; }
+
+/* An error is a word on the danger wash, upright. */
+.payment-statement .pay-err,
+.payment-statement .pay-win .err { padding: 10px 14px; border: 1px solid rgb(var(--danger) / 0.35); border-radius: 8px; background: rgb(var(--danger-bg)); color: rgb(var(--danger)); font-size: 12px; font-style: normal; }
+.payment-statement .payment-overview + .pay-err { margin-top: 16px; }
+
+/* ── Buttons: orange carries black lettering (the page's one action is the
+   report's `.pay-cta`; a window's is `.pay-btn.pri`), outlines are white. ── */
+.payment-statement .pay-btn,
+.payment-statement .pay-cta { min-height: 32px; padding: 7px 12px; border-radius: 6px; box-shadow: none; font-family: inherit; font-size: 12px; font-style: normal; font-weight: 500; line-height: 1.3; }
+.payment-statement .pay-cta { border: 1px solid rgb(var(--accent)); background: rgb(var(--accent)); color: rgb(var(--ink)); font-weight: 600; }
+.payment-statement .pay-cta:hover:not(:disabled) { border-color: rgb(var(--accent-hover)); background: rgb(var(--accent-hover)); opacity: 1; text-decoration: none; }
+.payment-statement .pay-btn.pri { border-color: rgb(var(--accent)); background: rgb(var(--accent)); color: rgb(var(--ink)); font-weight: 600; }
+.payment-statement .pay-btn.pri:hover:not(:disabled) { border-color: rgb(var(--accent-hover)); background: rgb(var(--accent-hover)); text-decoration: none; }
+.payment-statement .pay-btn.sec { border-color: rgb(var(--hairline)); background: rgb(var(--surface)); color: rgb(var(--ink)); }
+.payment-statement .pay-btn.sec:hover:not(:disabled) { background: rgb(var(--surface-2)); text-decoration: none; }
+.payment-statement .pay-btn.text { padding-inline: 2px; border-color: transparent; background: transparent; color: rgb(var(--ink)); text-decoration: underline; text-decoration-color: rgb(var(--ink) / 0.35); text-underline-offset: 3px; }
+.payment-statement .pay-btn.text:hover:not(:disabled) { text-decoration-color: rgb(var(--ink)); }
+/* Focus is a black ring — orange on white is too faint to find. The two
+   rails scroll sideways and would clip a ring drawn outside, so theirs is
+   drawn inside. */
+.payment-statement :is(button, a, summary, input, select):focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 3px; }
+.payment-statement :is(.payment-tabs button, .pay-rail a):focus-visible { outline-offset: -3px; }
+
+@media (max-width: 1000px) {
   .payment-statement .payment-allocation { gap: 20px; }
   .payment-statement .payment-allocation > div + div { padding-left: 20px; }
 }
 @media (max-width: 680px) {
-  .payment-statement .page-title { font-size: 30px; }
-  .payment-statement .pay-rail { max-width: 100%; }
-  .payment-statement .pay-rail a { padding-inline: 8px; min-width: 43px; }
+  .payment-statement .pay-rail a { min-width: 43px; padding-inline: 8px; }
 }
 /* The pinned sidebar can narrow the report before the viewport is phone-sized. */
 @container payment-report (max-width: 680px) {
-  .payment-statement .payment-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 17px 14px; }
-  .payment-statement .payment-summary > div:first-child { grid-column: 1 / -1; padding-bottom: 12px; border-bottom: 1px solid rgb(var(--hairline)); }
-  .payment-statement .payment-summary > div:nth-child(2) { padding-left: 0; border-left: 0; }
-  .payment-statement .payment-amount { font-size: 21px; }
   .payment-statement .payment-allocation { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 18px 14px; }
   .payment-statement .payment-allocation > div + div { padding-left: 0; padding-top: 18px; border-left: 0; border-top: 1px solid rgb(var(--hairline)); }
   .payment-statement .payment-next-action { align-items: flex-start; flex-wrap: wrap; padding: 14px; }

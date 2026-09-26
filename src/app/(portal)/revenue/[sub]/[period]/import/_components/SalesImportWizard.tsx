@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatMoney } from '@/lib/utils'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import {
   parseErpSalesOrders,
   selectPeriod,
@@ -126,13 +127,15 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
     return (
       <div>
         <ErrorBox error={error} />
-        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-          <p className="font-serif text-2xl text-ink mb-3">Choose the sales-order export.</p>
-          <p className="font-serif italic text-muted text-sm mb-8 max-w-lg mx-auto">
+        <div className="border border-hairline rounded-card bg-surface-2 px-6 py-10 text-center">
+          <p className="text-md font-bold mb-2">Choose the sales-order export.</p>
+          <p className="text-sm mb-5 max-w-lg mx-auto">
             The whole file is read here in your browser first. Nothing is written until you have
             seen which month it covers, what will be dropped, and who every agent is.
           </p>
-          <label className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md cursor-pointer transition-colors">
+          {/* The page's one primary action — a label, so the file picker it
+              wraps opens on a click anywhere on the button. */}
+          <label className="inline-block bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control cursor-pointer transition-colors">
             Select file
             <input
               type="file"
@@ -153,27 +156,30 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
   if (stage === 'done' && result) {
     return (
       <div className="space-y-6">
-        <div className="border border-hairline rounded-md bg-surface p-8">
-          <p className="font-serif text-2xl text-ink mb-4">
-            {result.orderCount} orders imported.
-          </p>
-          <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2 max-w-2xl font-sans text-sm">
-            <Stat label="Order lines" value={String(result.lineCount)} />
-            <Stat label="Open Bill picks suggested" value={String(result.openBillsSuggested)} />
-            <Stat
+        <div>
+          {/* What the import wrote. The orders it brought in are the figure the
+              page ends on — the sheet's one walnut card; the two gaps turn red
+              only while lines are missing a cost or a brand. */}
+          <StatCards label="What the import wrote">
+            <StatCard label="Orders imported" value={String(result.orderCount)} icon="receipt" tone="primary" />
+            <StatCard label="Order lines" value={String(result.lineCount)} icon="layers" />
+            <StatCard label="Open Bill picks suggested" value={String(result.openBillsSuggested)} icon="tag" />
+            <StatCard
               label="Lines without a cost"
               value={String(result.linesWithoutCost)}
-              warn={result.linesWithoutCost > 0}
+              icon="file-alert"
+              tone={result.linesWithoutCost > 0 ? 'danger' : undefined}
             />
-            <Stat
+            <StatCard
               label="Lines without a brand"
               value={String(result.linesWithoutBrand)}
-              warn={result.linesWithoutBrand > 0}
+              icon="alert"
+              tone={result.linesWithoutBrand > 0 ? 'danger' : undefined}
             />
-          </dl>
+          </StatCards>
 
           {result.linesWithoutCost > 0 ? (
-            <p className="font-serif italic text-graphite text-sm mt-5 max-w-2xl">
+            <p className="sheet-warning max-w-2xl">
               Those lines have no cost, so their bills have no margin and the below-margin penalty
               will be skipped on them. Fill the gaps in{' '}
               <Link href={PRODUCT_LIST_PATH} className="text-accent hover:underline">
@@ -184,17 +190,17 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
           ) : null}
 
           {result.unmatchedAgents.length > 0 ? (
-            <p className="font-serif italic text-danger text-sm mt-4 max-w-2xl">
+            <p className="sheet-warning max-w-2xl">
               {result.unmatchedAgents.length} agent(s) are still unmatched, so their orders carry no
               salesperson and will not pay commission: {result.unmatchedAgents.join(', ')}.
             </p>
           ) : null}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Link
             href={revenuePath(subDeptSlug, period)}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors"
+            className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
           >
             Go to the {period.slice(0, 7)} run →
           </Link>
@@ -205,7 +211,7 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
               setParsed(null)
               setResult(null)
             }}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-5 py-2 rounded-md transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Import another file
           </button>
@@ -227,19 +233,22 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
           <span className="rule" aria-hidden />
           <span className="count">{fileName}</span>
         </div>
-        <div className="grid gap-4 sm:grid-cols-4 mb-4">
-          <Tile label="Orders in file" value={String(parsed.orders.length)} />
-          <Tile
+        {/* What the file holds, and what of it this month keeps — the kept
+            count is the figure the review turns on: the sheet's walnut card. */}
+        <StatCards label="What the file contains">
+          <StatCard label="Orders in file" value={String(parsed.orders.length)} icon="upload" />
+          <StatCard
             label={`Kept for ${period.slice(0, 7)}`}
             value={String(selection.selected.length)}
-            accent
+            icon="check"
+            tone="primary"
           />
-          <Tile label="Other months" value={String(selection.outOfPeriod)} />
-          <Tile label="Cancelled" value={String(selection.cancelled)} />
-        </div>
+          <StatCard label="Other months" value={String(selection.outOfPeriod)} icon="calendar" />
+          <StatCard label="Cancelled" value={String(selection.cancelled)} icon="file-alert" />
+        </StatCards>
 
         {parsed.periods.length > 1 ? (
-          <p className="font-serif italic text-graphite text-sm mb-3">
+          <p className="sheet-notice">
             This export spans {parsed.periods.map(p => p.periodMonth.slice(0, 7)).join(', ')} — a
             date range, not a month. Only {period.slice(0, 7)} is being imported; switch the period
             above to bring in the rest.
@@ -258,7 +267,7 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
           </div>
         ) : null}
 
-        <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="ledger-table">
             <thead>
               <tr>
@@ -290,13 +299,13 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
             {agentsInPeriod.length - unmatched.length} / {agentsInPeriod.length} MATCHED
           </span>
         </div>
-        <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+        <p className="text-sm mb-4 max-w-3xl">
           The export names the salesperson in free text with no code, and the names are not always
           clean. An agent left unmatched still imports, but their orders carry no salesperson and
           pay nobody — so the list below is worth finishing.
         </p>
 
-        <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="ledger-table">
             <thead>
               <tr>
@@ -308,11 +317,14 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
             </thead>
             <tbody>
               {agentsInPeriod.map(a => (
-                <tr key={a.key} className={agentMap[a.key] ? '' : 'bg-danger-bg/30'}>
+                // An unmatched agent's row keeps its red wash. `!` because the
+                // table's zebra and hover rules outrank a plain utility, which
+                // would otherwise wash out every other unmatched row.
+                <tr key={a.key} className={agentMap[a.key] ? '' : '!bg-danger-bg/30'}>
                   <td>
-                    <span className="text-ink">{a.name}</span>
+                    <span className="font-medium">{a.name}</span>
                     {a.name !== a.key ? (
-                      <span className="ml-2 font-mono text-[0.6rem] text-muted">{a.key}</span>
+                      <span className="ml-2 font-mono text-[10px]">{a.key}</span>
                     ) : null}
                   </td>
                   <td className="num">{a.orders}</td>
@@ -324,7 +336,7 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
                         setAgentMap(m => ({ ...m, [a.key]: e.target.value }))
                       }
                       aria-label={`Match ${a.name}`}
-                      className="w-full px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
+                      className="w-full px-2 py-1 bg-surface border border-hairline rounded-control text-sm text-ink"
                     >
                       <option value="">— not a salesperson / skip —</option>
                       {staff.map(s => (
@@ -342,7 +354,7 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
         </div>
 
         {staff.length === 0 ? (
-          <p className="font-serif italic text-danger text-sm mt-3">
+          <p className="sheet-warning">
             There are no salespeople to match against yet. Add them under HR → Staff with a
             commission department first.
           </p>
@@ -351,38 +363,38 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
 
       <section>
         <div className="flex flex-wrap items-center gap-6 mb-5">
-          <label className="inline-flex items-center gap-2 text-sm font-sans text-graphite">
+          <label className="inline-flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={saveAliases}
               onChange={e => setSaveAliases(e.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-4 w-4"
             />
             Remember these matches for next month
           </label>
-          {enableOpenBill ? <label className="inline-flex items-center gap-2 text-sm font-sans text-graphite">
+          {enableOpenBill ? <label className="inline-flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={suggestOpenBills}
               onChange={e => setSuggestOpenBills(e.target.checked)}
-              className="h-4 w-4 accent-[var(--accent)]"
+              className="h-4 w-4"
             />
             Suggest the 1st/2nd/3rd bill of each day from the document numbers
           </label> : null}
         </div>
 
         {unmatched.length > 0 ? (
-          <p className="font-serif italic text-danger text-sm mb-3">
+          <p className="sheet-warning">
             {unmatched.length} agent(s) still unmatched: {unmatched.map(a => a.name).join(', ')}.
           </p>
         ) : null}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={commit}
             disabled={pending || selection.selected.length === 0}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
+            className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
           >
             {pending
               ? 'Importing…'
@@ -394,12 +406,12 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
               setStage('upload')
               setParsed(null)
             }}
-            className="text-sm font-sans text-muted hover:text-ink"
+            className="text-sm hover:underline"
           >
             Choose a different file
           </button>
         </div>
-        <p className="font-serif italic text-muted text-xs mt-3 max-w-2xl">
+        <p className="text-xs mt-3 max-w-2xl">
           Importing replaces whatever was imported for this month before — the previous batch is
           retired, not merged.
         </p>
@@ -443,23 +455,5 @@ function ErrorBox({ error }: { error: string | null }) {
     <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
       {error}
     </div>
-  )
-}
-
-function Tile({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="border border-hairline rounded-md bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{label}</div>
-      <div className={`num text-xl ${accent ? 'text-accent' : 'text-num-ink'}`}>{value}</div>
-    </div>
-  )
-}
-
-function Stat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
-  return (
-    <>
-      <dt className="text-graphite">{label}</dt>
-      <dd className={`num ${warn ? 'text-danger' : 'text-num-ink'}`}>{value}</dd>
-    </>
   )
 }

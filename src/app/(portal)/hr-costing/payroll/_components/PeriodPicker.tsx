@@ -34,12 +34,12 @@ export default function PeriodPicker({
 
   return (
     <div className="flex items-center gap-2">
-      <label className="font-sans text-xs uppercase tracking-wide text-muted mr-1">Period</label>
+      <label className="text-[10px] font-medium uppercase tracking-[0.08em] mr-1">Period</label>
       <button
         type="button"
         aria-label="Previous month"
         onClick={() => go(shiftMonth(ym, -1))}
-        className="px-2 py-2 bg-paper border border-hairline rounded-md text-sm text-graphite hover:text-accent hover:border-accent-border transition-colors"
+        className="px-2.5 py-2 bg-surface border border-hairline rounded-control text-sm text-ink hover:bg-surface-2 hover:border-accent transition-colors"
       >
         ‹
       </button>
@@ -48,13 +48,13 @@ export default function PeriodPicker({
         key={ym}
         defaultValue={ym}
         onChange={e => go(e.target.value)}
-        className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+        className="px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono text-ink focus:outline-none focus:border-accent"
       />
       <button
         type="button"
         aria-label="Next month"
         onClick={() => go(shiftMonth(ym, 1))}
-        className="px-2 py-2 bg-paper border border-hairline rounded-md text-sm text-graphite hover:text-accent hover:border-accent-border transition-colors"
+        className="px-2.5 py-2 bg-surface border border-hairline rounded-control text-sm text-ink hover:bg-surface-2 hover:border-accent transition-colors"
       >
         ›
       </button>

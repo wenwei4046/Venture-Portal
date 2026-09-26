@@ -32,19 +32,26 @@ function periodLabel(period: string): string {
   })
 }
 
-function outcomeClass(status: string): string {
+/**
+ * A delivery's outcome as a word on a wash: green applied, amber held (it
+ * waits on somebody reopening the month), red refused, grey for the rest.
+ */
+function outcomeChip(status: string): string {
   switch (status) {
     case 'applied':
-      return 'text-ledger'
+      return 'chip ledger'
     case 'held':
-      return 'text-alert'
+      return 'chip alert'
     case 'rejected':
     case 'error':
-      return 'text-danger'
+      return 'chip danger'
     default:
-      return 'text-muted'
+      return 'chip info'
   }
 }
+
+/** A sub-block's heading inside the feed's section. */
+const SUBHEAD = 'text-sm font-semibold mb-2'
 
 export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
   const [now, setNow] = useState(() => Date.now())
@@ -59,7 +66,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
   const [notes, setNotes] = useState<Record<string, string>>({})
 
   return (
-    <section className="mb-12">
+    <section className="mb-10">
       <div className="sect-head">
         <h2>ERP live feed</h2>
         <span className="rule" aria-hidden />
@@ -78,11 +85,11 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
 
       {/* Outside both tables: answering the last name empties the list the
           note was living in, and the answer is exactly what wants reading. */}
-      {matchNote ? <p className="font-serif italic text-sm text-graphite mb-3">{matchNote}</p> : null}
+      {matchNote ? <p className="sheet-notice">{matchNote}</p> : null}
 
       {data.unmatched.length > 0 ? (
         <div className="mb-8">
-          <h3 className="font-serif italic text-sm text-graphite mb-2">
+          <h3 className={SUBHEAD}>
             Salespeople the feed could not place
           </h3>
           <Hint>
@@ -94,7 +101,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
             <em>Not ours</em> says so: their bills leave the month, and the next delivery under that
             name arrives already out.
           </Hint>
-          <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="ledger-table tight">
               <thead>
                 <tr>
@@ -117,9 +124,9 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
                     {({ pending }) => (
                       <LedgerRow>
                         <td>
-                          <span className="text-ink">{u.agentName}</span>
+                          <span className="font-medium">{u.agentName}</span>
                           {u.erpSalespersonId ? (
-                            <span className="ml-2 font-mono text-[11px] text-muted">
+                            <span className="ml-2 font-mono text-[11px]">
                               {u.erpSalespersonId.slice(0, 8)}
                             </span>
                           ) : null}
@@ -197,13 +204,13 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
 
       {data.ignored.length > 0 ? (
         <div className="mb-8">
-          <h3 className="font-serif italic text-sm text-graphite mb-2">Not our salespeople</h3>
+          <h3 className={SUBHEAD}>Not our salespeople</h3>
           <Hint>
             The ERP keeps naming these, and every bill of theirs is out of the month — out of the
             sales, out of the venue and person breakdowns, out of the engine. Put one back and its
             bills go back to whatever the ERP says about them.
           </Hint>
-          <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="ledger-table tight">
               <thead>
                 <tr>
@@ -219,14 +226,14 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
                 {data.ignored.map(g => (
                   <LedgerRow key={g.agentKey}>
                     <td>
-                      <span className="text-muted">{g.agentName}</span>
+                      <span className="font-medium">{g.agentName}</span>
                       {g.erpSalespersonId ? (
-                        <span className="ml-2 font-mono text-[11px] text-muted">
+                        <span className="ml-2 font-mono text-[11px]">
                           {g.erpSalespersonId.slice(0, 8)}
                         </span>
                       ) : null}
                     </td>
-                    <td className="m-hide font-serif italic text-sm text-graphite" data-label="Why">
+                    <td className="m-hide" data-label="Why">
                       {g.note ?? '—'}
                     </td>
                     <td className="num m-hide" data-label="Bills">{g.orders}</td>
@@ -255,13 +262,13 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
 
       {data.held.length > 0 ? (
         <div className="mb-8">
-          <h3 className="font-serif italic text-sm text-graphite mb-2">Held deliveries</h3>
+          <h3 className={SUBHEAD}>Held deliveries</h3>
           <Hint>
             The ERP changed these orders after the month&apos;s run was applied, while the month was
             closed to the feed, or after the month was imported from a file. Nothing was written.
             Reopen the run or the month, then replay.
           </Hint>
-          <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="ledger-table tight">
               <thead>
                 <tr>
@@ -273,7 +280,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
               <tbody>
                 {data.held.map(h => (
                   <tr key={h.period}>
-                    <td>{periodLabel(h.period)}</td>
+                    <td className="font-medium">{periodLabel(h.period)}</td>
                     <td className="num">{h.count}</td>
                     <td>
                       {/^\d{4}-\d{2}-01$/.test(h.period) ? (
@@ -295,15 +302,15 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
             </table>
           </div>
           {replayNote ? (
-            <p className="font-serif italic text-sm text-graphite mt-2">{replayNote}</p>
+            <p className="sheet-notice">{replayNote}</p>
           ) : null}
         </div>
       ) : null}
 
       {data.events.length > 0 ? (
         <div>
-          <h3 className="font-serif italic text-sm text-graphite mb-2">Recent deliveries</h3>
-          <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
+          <h3 className={SUBHEAD}>Recent deliveries</h3>
+          <div className="overflow-x-auto">
             <table className="ledger-table tight">
               <thead>
                 <tr>
@@ -317,15 +324,18 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
               <tbody>
                 {data.events.map(e => (
                   <LedgerRow key={e.id}>
-                    <td className="font-mono text-xs text-muted whitespace-nowrap">{formatAgo(e.receivedAt, now)}</td>
+                    <td className="font-mono text-[11px] whitespace-nowrap">{formatAgo(e.receivedAt, now)}</td>
                     <td className="font-mono text-xs">{e.docNo ?? '—'}</td>
-                    <td className={`font-mono text-[11px] uppercase tracking-[0.02em] ${outcomeClass(e.status)}`}>
-                      {e.status}
+                    <td>
+                      <span className={outcomeChip(e.status)}>
+                        <span className="dot" />
+                        {e.status}
+                      </span>
                     </td>
-                    <td className="m-hide font-serif italic text-sm text-graphite" data-label="Note">
+                    <td className="m-hide" data-label="Note">
                       {e.message ?? ''}
                       {e.warnings.length > 0 ? (
-                        <span className="ml-2 font-mono text-[11px] text-alert">{e.warnings.join(' · ')}</span>
+                        <span className="chip alert ml-2">{e.warnings.join(' · ')}</span>
                       ) : null}
                     </td>
                   </LedgerRow>

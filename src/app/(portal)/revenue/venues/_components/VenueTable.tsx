@@ -100,8 +100,8 @@ export default function VenueTable({
                       <tr>
                         <td>
                           <Hidden name="venue" value={v.venueKey} />
-                          <span className="font-serif text-[14px] text-ink">{v.displayName}</span>
-                          <div className="font-serif italic text-muted text-xs mt-0.5">
+                          <span className="font-medium">{v.displayName}</span>
+                          <div className="text-[11px] mt-0.5">
                             is the same place as
                           </div>
                         </td>
@@ -128,7 +128,7 @@ export default function VenueTable({
                             <button
                               type="button"
                               onClick={() => setMerging(null)}
-                              className="text-xs font-sans text-graphite hover:underline"
+                              className="text-xs hover:underline"
                             >
                               Cancel
                             </button>
@@ -144,14 +144,16 @@ export default function VenueTable({
                     <td>
                       <VenueCell venue={v} onMerge={() => setMerging(v.venueKey)} />
                     </td>
-                    <td className="font-mono text-[11px] text-muted">—</td>
-                    <td colSpan={4} className="font-serif italic text-muted text-[13px]">
+                    <td className="font-mono text-[11px]">—</td>
+                    <td colSpan={4}>
                       no bills at this venue yet
                     </td>
                   </tr>
                 ) : (
                   v.months.map((fair, i) => (
-                    <tr key={fair.periodMonth}>
+                    // A place can hold two fairs in one month (or one per
+                    // sub-department), so the month alone is not a key.
+                    <tr key={`${fair.periodMonth}|${fair.subDepartmentId ?? ''}|${i}`}>
                       <td>
                         {i === 0 ? (
                           <VenueCell venue={v} onMerge={() => setMerging(v.venueKey)} />
@@ -159,7 +161,7 @@ export default function VenueTable({
                           // The name is printed once over the group; this is
                           // what keeps the second month reading as the same
                           // venue rather than as a nameless row.
-                          <span className="font-mono text-[11px] text-muted pl-1" aria-hidden>
+                          <span className="font-mono text-[11px] pl-1" aria-hidden>
                             &#8627;
                           </span>
                         )}
@@ -192,7 +194,7 @@ export default function VenueTable({
 
             {venues.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-muted font-serif italic">
+                <td colSpan={6} className="text-center">
                   No venues yet — they register themselves as the ERP delivers orders.
                 </td>
               </tr>
@@ -235,17 +237,17 @@ function VenueCell({
 
   return (
     <div>
-      <span className="font-serif text-[14px] text-ink">{venue.displayName}</span>
+      <span className="font-medium">{venue.displayName}</span>
       <div className="mt-0.5">
         {aliases.map(s => (
-          <span key={s} className="font-mono text-[10.5px] text-muted mr-2 whitespace-nowrap">
+          <span key={s} className="font-mono text-[10.5px] mr-2 whitespace-nowrap">
             + {s}
             <button
               type="button"
               onClick={() => unmerge(s)}
               disabled={pending}
               title={`Stop treating ${s} as the same place`}
-              className="ml-1 text-graphite hover:text-danger disabled:opacity-40"
+              className="ml-1 hover:text-danger disabled:opacity-40"
             >
               ✕
             </button>
@@ -254,12 +256,12 @@ function VenueCell({
         <button
           type="button"
           onClick={onMerge}
-          className="font-serif italic text-[11px] text-graphite hover:text-accent"
+          className="text-[11px] underline decoration-ink/35 underline-offset-[3px] hover:decoration-ink"
         >
           same place as…
         </button>
       </div>
-      {error ? <div className="font-serif italic text-danger text-[11px]">{error}</div> : null}
+      {error ? <div className="text-danger text-[11px]">{error}</div> : null}
     </div>
   )
 }

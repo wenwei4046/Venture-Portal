@@ -93,12 +93,15 @@ export function SlidingTabs({ items, active, onTabChange, variant = 'text' }: Sl
           key={item.key}
           type="button"
           data-tab-key={item.key}
+          // Read by the sheet theme (globals.css › "Tab rails"), which draws
+          // the pick as a tinted, underlined tab instead of the sliding bar.
+          data-active={item.key === active || undefined}
           onClick={() => onTabChange(item.key)}
           className={item.key === active ? TAB[variant].active : TAB[variant].idle}
         >
           <span data-tab-label>
             {item.label}
-            {item.count !== undefined ? <span className={COUNT[variant]}>{item.count}</span> : null}
+            {item.count !== undefined ? <span data-tab-count className={COUNT[variant]}>{item.count}</span> : null}
           </span>
         </button>
       ))}

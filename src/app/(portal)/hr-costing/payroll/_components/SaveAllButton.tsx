@@ -49,7 +49,7 @@ export default function SaveAllButton() {
   if (dirtyCount === 0) {
     if (saved) {
       return (
-        <span className="font-serif italic text-ledger text-sm px-2 py-2">
+        <span className="chip ledger self-center">
           ✓ Saved
         </span>
       )
@@ -57,17 +57,19 @@ export default function SaveAllButton() {
     return null
   }
 
+  // Outline, not orange: Submit to Finance is the view's one primary action.
+  // The orange edge marks it as the step that must come first.
   return (
     <div className="flex flex-col items-end gap-1">
       <button
         onClick={handleSave}
         disabled={isPending}
-        className="bg-surface hover:bg-surface-2 border border-accent-border text-accent font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+        className="bg-surface hover:bg-surface-2 border border-accent text-ink text-sm font-medium px-4 py-2 rounded-control transition-colors disabled:opacity-50"
       >
         {isPending ? 'Saving…' : `Save ${dirtyCount} row${dirtyCount > 1 ? 's' : ''}`}
       </button>
       {error && (
-        <span className="text-xs font-serif italic text-danger max-w-xs text-right">
+        <span className="text-xs text-danger max-w-xs text-right">
           {error}
         </span>
       )}

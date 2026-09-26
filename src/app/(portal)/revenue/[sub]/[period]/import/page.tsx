@@ -41,13 +41,13 @@ export default async function SalesImportPage({ params }: PageProps) {
             <em>I.</em> REVENUE · IMPORT · {label(period).toUpperCase()}
           </div>
           <h1 className="page-title">Import sales orders</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             {label(period)} · {subDept.name}&apos;s sales orders.
           </p>
         </div>
         <Link
           href={revenuePath(subDept.slug, period)}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
         >
           ← Back to the run
         </Link>

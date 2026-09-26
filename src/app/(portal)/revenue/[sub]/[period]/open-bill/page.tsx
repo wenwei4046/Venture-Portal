@@ -130,27 +130,27 @@ export default async function OpenBillPage({ params }: PageProps) {
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · OPEN BILL · {label(period).toUpperCase()}
           </div>
           <h1 className="page-title">Open Bill</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             The 1st, 2nd and 3rd bill of an event day earn{' '}
-            <em>
+            <strong>
               +{Math.round((rates[1] ?? 0) * 100)} / {Math.round((rates[2] ?? 0) * 100)} /{' '}
               {Math.round((rates[3] ?? 0) * 100)}%
-            </em>{' '}
+            </strong>{' '}
             on top of that bill&apos;s commission, at the salesperson&apos;s current rate.
           </p>
         </div>
         <Link
           href={revenuePath(subDept.slug, period)}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
         >
           ← The run
         </Link>
       </div>
 
       {!batchId ? (
-        <div className="py-16 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif text-2xl text-ink mb-3">Nothing imported for this month.</p>
-          <p className="font-serif italic text-muted text-sm max-w-lg mx-auto">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-md font-bold mb-2">Nothing imported for this month.</p>
+          <p className="text-sm max-w-lg mx-auto">
             Import the ERP sales-order export first — the picks are seeded from it.
           </p>
         </div>

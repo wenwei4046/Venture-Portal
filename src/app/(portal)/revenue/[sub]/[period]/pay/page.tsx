@@ -7,6 +7,7 @@ import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { payTotals } from '@/lib/revenue-pay'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
 import { loadPayBoard } from '../../../_lib/pay-preview'
 
@@ -56,7 +57,7 @@ export default async function MonthPayPage({ params }: PageProps) {
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · {label(period).toUpperCase()}
           </div>
           <h1 className="page-title">What this month pays</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             {synced
               ? 'Synced to payroll — these are the figures payroll holds.'
               : 'A preview from the computed run. Payroll is written when the run is synced.'}
@@ -64,66 +65,66 @@ export default async function MonthPayPage({ params }: PageProps) {
         </div>
         <Link
           href={revenuePath(subDept.slug, period)}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
         >
           ← The month
         </Link>
       </div>
 
       {board.rows.length === 0 ? (
-        <div className="py-16 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif text-2xl text-ink mb-3">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-md font-bold mb-2">
             {board.runStatus ? 'The run paid nobody.' : 'Nothing has been computed yet.'}
           </p>
-          <p className="font-serif italic text-muted text-sm max-w-lg mx-auto mb-8">
+          <p className="text-sm max-w-lg mx-auto mb-5">
             {board.runStatus
               ? 'Every order was either unmatched or held by the deposit gate, so there is no salary to work out.'
               : 'Compute the month’s commission first — this page turns the result into salaries, statutory contributions and net pay.'}
           </p>
           <Link
             href={revenuePath(subDept.slug, period)}
-            className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors"
+            className="inline-block bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
           >
             Go to the run
           </Link>
         </div>
       ) : (
         <>
-          <section className="mb-10">
-            <div className="grid gap-4 sm:grid-cols-4">
-              <Tile label="Net to employees" value={formatMoney(totals.net)} big />
-              <Tile label="Gross commission" value={formatMoney(totals.commission)} />
-              <Tile
-                label="To EPF / SOCSO / EIS"
-                value={formatMoney(totals.employerContributions + totals.employeeContributions)}
-                note={`${formatMoney(totals.employerContributions)} employer · ${formatMoney(totals.employeeContributions)} employee`}
-              />
-              <Tile label="PCB / withholding" value={formatMoney(totals.tax)} />
-            </div>
-          </section>
+          {/* What reaches the bank is the figure the board is opened for — the
+              sheet's one walnut card; the rest is what it is carved from. */}
+          <StatCards label={`What ${label(period)} pays`}>
+            <StatCard label="Net to employees" value={formatMoney(totals.net)} icon="bank" tone="primary" />
+            <StatCard label="Gross commission" value={formatMoney(totals.commission)} icon="coin" />
+            <StatCard
+              label="To EPF / SOCSO / EIS"
+              value={formatMoney(totals.employerContributions + totals.employeeContributions)}
+              icon="shield"
+              note={`${formatMoney(totals.employerContributions)} employer · ${formatMoney(totals.employeeContributions)} employee`}
+            />
+            <StatCard label="PCB / withholding" value={formatMoney(totals.tax)} icon="receipt" />
+          </StatCards>
 
           {disagreeing.length > 0 || shortfalls.length > 0 ? (
-            <section className="mb-10">
-              <div className="sect-head">
-                <h2>Before this month can be paid</h2>
-                <span className="rule" aria-hidden />
+            <section className="mb-8">
+              <div className="sheet-warning">
+                <h2 className="text-sm font-bold mb-1.5">Before this month can be paid</h2>
+                <ul className="space-y-1.5 list-disc pl-5">
+                  {shortfalls.length > 0 ? (
+                    <li>
+                      <strong>{shortfalls.length} salesperson(s)</strong> earned less
+                      commission than their basic and the employer&apos;s contributions cost. The balance is
+                      negative — settle it before payroll goes out rather than paying a negative line.
+                    </li>
+                  ) : null}
+                  {disagreeing.length > 0 ? (
+                    <li>
+                      <strong>{disagreeing.length} payroll row(s)</strong> no longer
+                      match this run — either the figures were keyed in payroll, or the run was recomputed
+                      after it was synced. Re-sync the run, or key the difference as a reviewed adjustment.
+                    </li>
+                  ) : null}
+                </ul>
               </div>
-              <ul className="space-y-2 font-serif text-sm text-graphite">
-                {shortfalls.length > 0 ? (
-                  <li>
-                    <strong className="text-danger">{shortfalls.length} salesperson(s)</strong> earned less
-                    commission than their basic and the employer&apos;s contributions cost. The balance is
-                    negative — settle it before payroll goes out rather than paying a negative line.
-                  </li>
-                ) : null}
-                {disagreeing.length > 0 ? (
-                  <li>
-                    <strong className="text-danger">{disagreeing.length} payroll row(s)</strong> no longer
-                    match this run — either the figures were keyed in payroll, or the run was recomputed
-                    after it was synced. Re-sync the run, or key the difference as a reviewed adjustment.
-                  </li>
-                ) : null}
-              </ul>
             </section>
           ) : null}
 
@@ -158,23 +159,31 @@ export default async function MonthPayPage({ params }: PageProps) {
                       <td>
                         <Link
                           href={revenuePath(subDept.slug, period, 'pay', r.staffId)}
-                          className="font-serif text-[15px] text-ink hover:text-accent"
+                          className="font-medium"
                         >
                           {r.employeeName}
                         </Link>
-                        <div className="font-mono text-[10.5px] text-muted mt-0.5">
+                        <div className="text-[11px] mt-0.5">
                           {r.employeeCode ?? '—'}
                           {r.pay.proratedBasic > 0 ? ` · basic ${formatMoney(r.pay.proratedBasic)}` : ''}
                           {r.pay.ratio < 1 ? ` · ${r.input.daysWorked}/${r.input.daysInMonth} days` : ''}
                         </div>
+                        {/* Two flags a row can carry, each a word on a wash: grey
+                            for a fact to know, red for a figure payroll disputes. */}
                         {r.commissionElsewhere > 0 ? (
-                          <div className="font-mono text-[10.5px] text-accent mt-0.5">
-                            INCLUDES {formatMoney(r.commissionElsewhere)} FROM ANOTHER PROGRAMME
+                          <div className="mt-1">
+                            <span className="chip info">
+                              <span className="dot" />
+                              INCLUDES {formatMoney(r.commissionElsewhere)} FROM ANOTHER PROGRAMME
+                            </span>
                           </div>
                         ) : null}
                         {r.differsFromPayroll ? (
-                          <div className="font-mono text-[10.5px] text-danger mt-0.5">
-                            PAYROLL HOLDS {formatMoney(r.payrollNet ?? 0)}
+                          <div className="mt-1">
+                            <span className="chip danger">
+                              <span className="dot" />
+                              PAYROLL HOLDS {formatMoney(r.payrollNet ?? 0)}
+                            </span>
                           </div>
                         ) : null}
                       </td>
@@ -210,31 +219,34 @@ export default async function MonthPayPage({ params }: PageProps) {
                           ? '—'
                           : formatMoney(r.pay.pcb + r.pay.withholdingTax)}
                       </td>
-                      <td className={r.pay.shortfall > 0 ? 'num neg font-semibold' : 'num font-semibold'}>
+                      <td className={r.pay.shortfall > 0 ? 'num neg font-bold' : 'num font-bold'}>
                         {formatMoney(r.pay.net)}
                       </td>
                     </LedgerRow>
                   ))}
+                </tbody>
+                {/* The board's totals — the peach band. The chevron cell keeps
+                    the band on the same grid as the rows on a phone. */}
+                <tfoot>
                   <tr>
-                    <td>
-                      <strong className="font-serif text-ink text-[15px]">{board.rows.length} people</strong>
-                    </td>
+                    <td>{board.rows.length} people</td>
                     <td className="num m-hide" />
                     <td className="num m-hide" />
                     <td className="num m-hide" />
                     <td className="num m-hide" />
                     <td className="num m-hide" />
                     <td className="num m-hide" />
-                    <td className="num font-semibold">{formatMoney(totals.commission)}</td>
+                    <td className="num">{formatMoney(totals.commission)}</td>
                     <td className="num m-hide">{formatMoney(totals.employerContributions)}</td>
                     <td className="num m-hide">{formatMoney(totals.employeeContributions)}</td>
                     <td className="num m-hide">{formatMoney(totals.tax)}</td>
-                    <td className="num font-semibold">{formatMoney(totals.net)}</td>
+                    <td className="num">{formatMoney(totals.net)}</td>
+                    <td className="lt-toggle" aria-hidden />
                   </tr>
-                </tbody>
+                </tfoot>
               </table>
             </div>
-            <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+            <p className="text-xs mt-3 max-w-3xl">
               Gross commission is the whole month&apos;s — every programme that has applied a run, plus any
               reviewed payroll adjustment. The employer&apos;s EPF, SOCSO and EIS are funded from it, which is
               why gross pay is lower than gross commission. Open a name for the payslip and the rules behind
@@ -243,26 +255,6 @@ export default async function MonthPayPage({ params }: PageProps) {
           </section>
         </>
       )}
-    </div>
-  )
-}
-
-function Tile({
-  label: text,
-  value,
-  note,
-  big,
-}: {
-  label: string
-  value: string
-  note?: string
-  big?: boolean
-}) {
-  return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
-      <div className={['statement-amount', big ? '' : 'compact', 'text-num-ink'].join(' ')}>{value}</div>
-      {note ? <div className="font-serif italic text-muted text-xs mt-1.5">{note}</div> : null}
     </div>
   )
 }

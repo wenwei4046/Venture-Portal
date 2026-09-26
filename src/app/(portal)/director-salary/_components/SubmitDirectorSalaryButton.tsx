@@ -46,12 +46,12 @@ export default function SubmitDirectorSalaryButton({
         <button
           disabled
           title={disabledHint}
-          className="bg-accent/40 text-white/70 font-serif italic text-sm px-4 py-2 rounded-md cursor-not-allowed"
+          className="bg-accent/40 text-sm px-4 py-2 rounded-control cursor-not-allowed"
         >
           Submit to Finance
         </button>
         {disabledHint && (
-          <span className="font-serif italic text-xs text-graphite">{disabledHint}</span>
+          <span className="text-xs text-right">{disabledHint}</span>
         )}
       </div>
     )
@@ -60,26 +60,29 @@ export default function SubmitDirectorSalaryButton({
   if (confirming) {
     return (
       <div className="flex flex-col items-end gap-2">
-        <div className="flex items-center gap-3 bg-surface border border-accent-border rounded-md px-4 py-2">
-          <span className="font-serif italic text-graphite text-sm">
-            Submit director salary (RM {totalGross.toLocaleString('en-MY', { minimumFractionDigits: 2 })}) to Finance? <em>Totals + per-subsidiary contributions become visible to Finance immediately, and a funding request (gross + employer statutory) is filed in Finance&apos;s payroll queue.</em>
+        <div className="flex items-center gap-3 bg-surface border border-accent-border rounded-card px-4 py-2.5">
+          <span className="text-sm max-w-md">
+            Submit director salary (RM {totalGross.toLocaleString('en-MY', { minimumFractionDigits: 2 })}) to Finance?
+            <span className="block mt-1 text-xs">
+              Totals + per-subsidiary contributions become visible to Finance immediately, and a funding request (gross + employer statutory) is filed in Finance&apos;s payroll queue.
+            </span>
           </span>
           <button
             onClick={handleConfirm}
             disabled={isPending}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-3 py-1.5 rounded-md disabled:opacity-50"
+            className="shrink-0 bg-accent hover:bg-accent-hover text-sm px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
           >
             {isPending ? 'Submitting...' : 'Confirm'}
           </button>
           <button
             onClick={() => setConfirming(false)}
             disabled={isPending}
-            className="text-xs font-sans text-muted hover:text-ink"
+            className="shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
         </div>
-        {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+        {error && <span className="text-sm text-danger">{error}</span>}
       </div>
     )
   }
@@ -88,11 +91,11 @@ export default function SubmitDirectorSalaryButton({
     <div className="flex flex-col items-end gap-2">
       <button
         onClick={() => setConfirming(true)}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
       >
         Submit to Finance
       </button>
-      {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+      {error && <span className="text-sm text-danger">{error}</span>}
     </div>
   )
 }

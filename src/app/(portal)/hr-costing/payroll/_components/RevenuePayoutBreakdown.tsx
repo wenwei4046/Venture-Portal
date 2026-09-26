@@ -15,29 +15,36 @@ export default function RevenuePayoutBreakdown({ row }: { row: RevenuePayrollRow
     ['Employee EPF + SOCSO + EIS · statutory PVs', employee],
     ['PCB · tax PV', pcb],
     ['Employer EPF + SOCSO + EIS · statutory PVs', employer],
-    ['Commission balance · salary PV', split.commissionBalance],
   ]
+  // What is left once every allocation above is paid — the table's result
+  // line, so it sits in the footer band.
+  const balance: [string, number] = ['Commission balance · salary PV', split.commissionBalance]
   return (
     <div className="mt-4" aria-label="Commission allocation">
       {row.commission_synced_amount != null && (
-        <div className="mb-3 border border-hairline rounded px-3 py-2 text-xs" aria-label="Commission adjustment">
+        <div className="mb-3 rounded-lg border border-hairline bg-surface-2 px-3 py-2 text-xs" aria-label="Commission adjustment">
           <p>Synced commission: RM {formatMoneyBare(row.commission_synced_amount)}</p>
           <p>Adjustment: RM {(row.commission_adjustment_amount ?? 0) > 0 ? '+' : ''}{formatMoneyBare(row.commission_adjustment_amount ?? 0)}</p>
           <p>Gross commission: RM {formatMoneyBare(row.commission_amount)}</p>
-          {row.commission_adjustment_reason && <p className="mt-1 text-graphite">Reason: {row.commission_adjustment_reason}</p>}
+          {row.commission_adjustment_reason && <p className="mt-1">Reason: {row.commission_adjustment_reason}</p>}
         </div>
       )}
-      <table className="w-full text-xs" aria-label="Commission allocation breakdown">
-        <thead><tr className="border-b border-hairline text-graphite"><th className="text-left py-2 font-normal">Allocation</th><th className="text-right py-2 font-normal">RM</th></tr></thead>
-        <tbody>{lines.map(([label, amount], index) => <tr key={label} className={index === lines.length - 1 ? 'border-t border-hairline font-semibold' : undefined}>
-          <td className="py-1.5 pr-3">{label}</td><td className="py-1.5 text-right num whitespace-nowrap">{formatMoneyBare(amount)}</td>
-        </tr>)}</tbody>
-      </table>
-      <p className="text-xs text-graphite mt-3">
+      <div className="overflow-x-auto">
+        <table className="ledger-table" aria-label="Commission allocation breakdown">
+          <thead><tr><th>Allocation</th><th className="right">RM</th></tr></thead>
+          <tbody>{lines.map(([label, amount]) => <tr key={label}>
+            <td>{label}</td><td className="num whitespace-nowrap">{formatMoneyBare(amount)}</td>
+          </tr>)}</tbody>
+          <tfoot><tr>
+            <td>{balance[0]}</td><td className="num whitespace-nowrap">{formatMoneyBare(balance[1])}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <p className="text-xs mt-3">
         Basic salary {formatMoneyBare(split.basicGross)} − employee contributions {formatMoneyBare(employee)} − PCB {formatMoneyBare(pcb)} = net basic {formatMoneyBare(split.basicPay)}.
         {' '}Basic and commission are separate salary payments. Statutory PVs pay the institutions separately.
       </p>
-      <p className="text-xs text-muted mt-2">PCB uses the basic salary after employee EPF. A manual PCB amount stays until reset.</p>
+      <p className="text-xs mt-2">PCB uses the basic salary after employee EPF. A manual PCB amount stays until reset.</p>
     </div>
   )
 }

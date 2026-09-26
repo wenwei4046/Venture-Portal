@@ -93,17 +93,17 @@ export default function FairOrganiserPicker({
           </option>
         ))}
       </select>
-      {pending ? <span className="font-serif italic text-muted text-[11px]">Saving…</span> : null}
+      {pending ? <span className="text-[11px]">Saving…</span> : null}
       {erpOrganiserText ? (
         <span
-          className="font-mono text-[10px] text-muted whitespace-nowrap"
+          className="font-mono text-[10px] whitespace-nowrap"
           title="What the ERP delivery called the organiser"
         >
           ERP: {erpOrganiserText}
           {organiserId ? '' : ' — not registered'}
         </span>
       ) : null}
-      {error ? <span className="font-serif italic text-danger text-[11px]">{error}</span> : null}
+      {error ? <span className="text-danger text-[11px]">{error}</span> : null}
     </div>
   )
 }

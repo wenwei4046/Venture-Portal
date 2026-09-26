@@ -217,8 +217,9 @@ export default function PayrollGrid({ rows, period }: Props) {
 
   return (
     <div className="mb-12">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <label className="flex items-center gap-2 text-sm text-graphite">
+      {/* The month's filter panel: which department, and how many are shown. */}
+      <div className="sheet-toolbar">
+        <label className="flex items-center gap-2 text-xs font-medium">
           Department
           <select
             value={department}
@@ -228,16 +229,16 @@ export default function PayrollGrid({ rows, period }: Props) {
               setSelected(new Set())
               setDeleteError(null)
             }}
-            className="rounded border border-hairline bg-surface px-3 py-2 text-ink"
+            className="text-ink"
           >
             <option value="">All departments</option>
             {groups.map(group => <option key={group.dept} value={group.dept}>{group.dept}</option>)}
           </select>
         </label>
-        <span className="text-xs text-muted">{visibleRows.length} staff</span>
+        <span className="sheet-count ml-auto">{visibleRows.length} staff</span>
       </div>
       {showRevenueSplit && (
-        <p className="text-xs text-graphite mb-3">
+        <p className="sheet-notice">
           Revenue: Gross Commission is the total before allocations; Balance under Earnings is the remaining commission payment.
           {' '}Net basic + Balance = Net to bank.
           {' '}Basic follows normal payroll deductions; both employee and employer statutory are funded from the commission total.
@@ -246,11 +247,11 @@ export default function PayrollGrid({ rows, period }: Props) {
       )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3 min-h-[1.75rem]">
         {someSelected ? (
-          <span className="font-serif italic text-graphite text-xs">
+          <span className="text-xs font-bold">
             {selected.size} selected
           </span>
         ) : (
-          <p className="font-serif italic text-graphite text-xs">
+          <p className="text-xs">
             All values in RM · edit in the row, or open a name for the paycheck ·
             Name and the payout stay put, the working scrolls.
           </p>
@@ -258,19 +259,19 @@ export default function PayrollGrid({ rows, period }: Props) {
         {someSelected ? (
           <div className="flex items-center gap-3">
             {deleteError && (
-              <span className="font-serif italic text-danger text-xs">{deleteError}</span>
+              <span className="text-danger text-xs">{deleteError}</span>
             )}
             <button
               onClick={handleDelete}
               disabled={isPending}
-              className="text-xs font-sans font-medium text-danger bg-danger/10 hover:bg-danger/15 px-2.5 py-1 rounded transition-colors disabled:opacity-50"
+              className="text-xs font-medium text-danger bg-danger-bg hover:bg-danger/15 border border-danger/40 px-2.5 py-1 rounded-control transition-colors disabled:opacity-50"
             >
               {isPending ? 'Deleting…' : `Delete ${selected.size}`}
             </button>
             <button
               onClick={() => setSelected(new Set())}
               disabled={isPending}
-              className="text-xs font-sans text-muted hover:text-ink disabled:opacity-50"
+              className="text-xs hover:underline underline-offset-2 disabled:opacity-50"
             >
               Clear
             </button>
@@ -468,10 +469,10 @@ export default function PayrollGrid({ rows, period }: Props) {
         </div>
       </div>
 
-      <p className="font-serif italic text-muted text-xs mt-4">
+      <p className="text-xs mt-4">
         Edit values in the row and click Save, or open a name for the paycheck — same
         figures either way. Statutory re-computes automatically. Tick draft rows and{' '}
-        <em>Delete</em> to drop staff who shouldn&apos;t be on this month&apos;s payroll.
+        <strong className="font-bold">Delete</strong> to drop staff who shouldn&apos;t be on this month&apos;s payroll.
       </p>
     </div>
   )

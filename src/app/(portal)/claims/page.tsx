@@ -2,11 +2,21 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import dayjs from 'dayjs'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import NewClaimForm from './_components/NewClaimForm'
 import ClaimActions from './_components/ClaimActions'
 
 interface Props {
   searchParams: Promise<{ tab?: string }>
+}
+
+// A status is a word on a wash (DESIGN.md › "Sheet theme"): amber waits on
+// an approver, green is approved, red was refused, grey is paid and closed.
+const STATUS_CHIP: Record<string, string> = {
+  pending: 'chip alert',
+  approved: 'chip ledger',
+  rejected: 'chip danger',
+  paid: 'chip info',
 }
 
 export default async function ClaimsPage({ searchParams }: Props) {
@@ -26,6 +36,20 @@ export default async function ClaimsPage({ searchParams }: Props) {
   const benefitCount = (await supabase.from('claims').select('id', { count: 'exact', head: true }).eq('claim_type', 'benefit')).count ?? 0
   const projectCount = (await supabase.from('claims').select('id', { count: 'exact', head: true }).eq('claim_type', 'project')).count ?? 0
 
+  // The summary cards are read off the claims already on the page — the
+  // latest 50 of this type — and say so when there are more than that.
+  const shown = claims ?? []
+  const byStatus = (status: string) => {
+    const rows = shown.filter(c => c.status === status)
+    return { count: rows.length, amount: rows.reduce((sum, c) => sum + Number(c.amount), 0) }
+  }
+  const pending = byStatus('pending')
+  const approved = byStatus('approved')
+  const paid = byStatus('paid')
+  const typeName = activeTab === 'project' ? 'Pool' : 'Benefit'
+  const typeTotal = activeTab === 'project' ? projectCount : benefitCount
+  const countOf = (n: number) => `${n} ${n === 1 ? 'claim' : 'claims'}`
+
   return (
     <div>
       <div className="page-head">
@@ -38,88 +62,80 @@ export default async function ClaimsPage({ searchParams }: Props) {
         <NewClaimForm />
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-6 border-b border-hairline mb-8 overflow-x-auto">
-        <a
-          href="/claims?tab=benefit"
-          className={
-            activeTab === 'benefit'
-              ? 'pb-3 -mb-px font-serif italic text-accent border-b-2 border-accent transition-colors'
-              : 'pb-3 -mb-px font-serif text-graphite hover:text-ink transition-colors'
-          }
-        >
-          Benefit Claims <span className="font-mono text-xs text-muted ml-1">{benefitCount}</span>
+      {/* Tabs — plain links, so a switch is a full page load as before. */}
+      <nav className="sheet-tabs" aria-label="Claim type">
+        <a href="/claims?tab=benefit" aria-current={activeTab === 'benefit' ? 'page' : undefined}>
+          Benefit Claims <span className="sheet-count">{benefitCount}</span>
         </a>
-        <a
-          href="/claims?tab=project"
-          className={
-            activeTab === 'project'
-              ? 'pb-3 -mb-px font-serif italic text-accent border-b-2 border-accent transition-colors'
-              : 'pb-3 -mb-px font-serif text-graphite hover:text-ink transition-colors'
-          }
-        >
-          Pool Claims <span className="font-mono text-xs text-muted ml-1">{projectCount}</span>
+        <a href="/claims?tab=project" aria-current={activeTab === 'project' ? 'page' : undefined}>
+          Pool Claims <span className="sheet-count">{projectCount}</span>
         </a>
-      </div>
+      </nav>
 
       {/* Claims table */}
       {(!claims || claims.length === 0) ? (
-        <div className="py-16 text-center border border-hairline rounded-md bg-surface">
-          <p className="font-serif italic text-ledger text-lg mb-1">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-md font-bold mb-1">
             大家都很自律。
           </p>
-          <p className="font-serif italic text-muted text-sm">
+          <p className="text-sm">
             No {activeTab} claims pending.
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans">
-                <th className="text-left py-3 pr-4 font-medium">Claimant</th>
-                <th className="text-left py-3 pr-4 font-medium">Description</th>
-                <th className="text-right py-3 pr-4 font-medium">Amount</th>
-                <th className="text-left py-3 pr-4 font-medium">Status</th>
-                <th className="text-left py-3 pr-4 font-medium">Date</th>
-                <th className="py-3 text-right"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {claims.map(c => (
-                <tr key={c.id} className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
-                  <td className="py-4 pr-4">
-                    <div className="font-serif text-md text-ink">{c.claimant_name}</div>
-                  </td>
-                  <td className="py-4 pr-4 font-sans text-sm text-graphite">{c.description ?? '—'}</td>
-                  <td className="py-4 pr-4 text-right font-mono tabular font-medium text-ink">{formatMoney(c.amount)}</td>
-                  <td className="py-4 pr-4">
-                    <em className={`font-serif text-sm ${
-                      c.status === 'approved' ? 'text-ledger' :
-                      c.status === 'rejected' ? 'text-danger' :
-                      c.status === 'paid' ? 'text-graphite' : 'text-alert'
-                    }`}>
-                      {c.status}
-                    </em>
-                  </td>
-                  <td className="py-4 pr-4 font-mono text-xs text-muted">
-                    {dayjs(c.created_at).format('D MMM YYYY')}
-                  </td>
-                  <td className="py-4 text-right">
-                    {(c.status === 'pending' || c.status === 'approved') && (
-                      <ClaimActions
-                        claimId={c.id}
-                        claimType={c.claim_type as 'project' | 'benefit'}
-                        claimStatus={c.status}
-                        userRole={user.role}
-                      />
-                    )}
-                  </td>
+        <>
+          <StatCards
+            label={`${typeName} claims by status`}
+            note={shown.length < typeTotal ? `Latest ${shown.length} of ${typeTotal} ${typeName.toLowerCase()} claims` : undefined}
+          >
+            <StatCard label="Awaiting approval" value={formatMoney(pending.amount)} icon="clock" tone="primary" note={countOf(pending.count)} />
+            <StatCard label="Approved, to pay" value={formatMoney(approved.amount)} icon="check" note={countOf(approved.count)} />
+            <StatCard label="Paid" value={formatMoney(paid.amount)} icon="wallet" note={countOf(paid.count)} />
+          </StatCards>
+
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Claimant</th>
+                  <th>Description</th>
+                  <th className="right">Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th className="right"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {claims.map(c => (
+                  <tr key={c.id}>
+                    <td className="font-medium">{c.claimant_name}</td>
+                    <td>{c.description ?? '—'}</td>
+                    <td className="num">{formatMoney(c.amount)}</td>
+                    <td>
+                      <span className={STATUS_CHIP[c.status] ?? 'chip'}>
+                        <span className="dot" />
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="font-mono text-xs">
+                      {dayjs(c.created_at).format('D MMM YYYY')}
+                    </td>
+                    <td className="right">
+                      {(c.status === 'pending' || c.status === 'approved') && (
+                        <ClaimActions
+                          claimId={c.id}
+                          claimType={c.claim_type as 'project' | 'benefit'}
+                          claimStatus={c.status}
+                          userRole={user.role}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )

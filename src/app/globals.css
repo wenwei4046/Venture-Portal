@@ -605,28 +605,30 @@ html[data-nav-pending] .route-surface {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-.route-surface > :not(.cf-scope),
-.route-surface > .cf-scope > * {
+/* The sheet (`.sheet`, PortalFrame) is the same kind of wrapper as `.cf-scope`:
+   it stays put across a navigation and the page inside it settles in. */
+.route-surface > :not(.cf-scope):not(.sheet),
+.route-surface > :is(.cf-scope, .sheet) > * {
   animation: route-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
-.route-surface > :not(.cf-scope):not(.route-skeleton) > *,
-.route-surface > .cf-scope > :not(.route-skeleton) > * {
+.route-surface > :not(.cf-scope):not(.sheet):not(.route-skeleton) > *,
+.route-surface > :is(.cf-scope, .sheet) > :not(.route-skeleton) > * {
   animation: route-fade 320ms ease-out backwards;
 }
-.route-surface > :not(.cf-scope):not(.route-skeleton) > :nth-child(2),
-.route-surface > .cf-scope > :not(.route-skeleton) > :nth-child(2) {
+.route-surface > :not(.cf-scope):not(.sheet):not(.route-skeleton) > :nth-child(2),
+.route-surface > :is(.cf-scope, .sheet) > :not(.route-skeleton) > :nth-child(2) {
   animation-delay: 45ms;
 }
-.route-surface > :not(.cf-scope):not(.route-skeleton) > :nth-child(3),
-.route-surface > .cf-scope > :not(.route-skeleton) > :nth-child(3) {
+.route-surface > :not(.cf-scope):not(.sheet):not(.route-skeleton) > :nth-child(3),
+.route-surface > :is(.cf-scope, .sheet) > :not(.route-skeleton) > :nth-child(3) {
   animation-delay: 90ms;
 }
-.route-surface > :not(.cf-scope):not(.route-skeleton) > :nth-child(4),
-.route-surface > .cf-scope > :not(.route-skeleton) > :nth-child(4) {
+.route-surface > :not(.cf-scope):not(.sheet):not(.route-skeleton) > :nth-child(4),
+.route-surface > :is(.cf-scope, .sheet) > :not(.route-skeleton) > :nth-child(4) {
   animation-delay: 135ms;
 }
-.route-surface > :not(.cf-scope):not(.route-skeleton) > :nth-child(n + 5),
-.route-surface > .cf-scope > :not(.route-skeleton) > :nth-child(n + 5) {
+.route-surface > :not(.cf-scope):not(.sheet):not(.route-skeleton) > :nth-child(n + 5),
+.route-surface > :is(.cf-scope, .sheet) > :not(.route-skeleton) > :nth-child(n + 5) {
   animation-delay: 180ms;
 }
 
@@ -3747,4 +3749,579 @@ dialog.modular-win:focus-visible { outline: none; }
   .sku-table-panel { height: auto; overflow: visible; }
   .sku-table-window { overflow: visible; }
   .product-page table.sku-table :is(th, .sku-code-column) { position: static; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sheet theme (v3.9, 2026-09-27 — HR's view first)
+
+   docs/DESIGN.md › "Sheet theme". Comm Cal's month (#151 → #162) set the
+   portal's new tone and the user asked for everything to follow it, starting
+   with the pages HR reads: HR Costing, Director Salary, Director Pool,
+   Revenue and Claims (`lib/sheet-routes.ts`). PortalFrame draws the sheet for
+   those routes:
+
+     .sheet-frame   the content column, inset 10px around one sheet
+     .sheet         one white, rounded panel — the page sits on it
+     .sheet-theme   the palette for everything inside it
+
+   The shell — sidebar, greeting bar, the plaster around the sheet — keeps the
+   portal's own colours (#152, user 2026-09-25). Inside the sheet the tokens
+   are the Comm Cal month's: lettering black, the lighter orange (#E99A53)
+   for actions, active tabs and markers only, walnut for the one dark object.
+
+   Two rules make most pages follow without touching their markup:
+   · Every override is written `:where(.sheet-theme) <the base selector>`, so
+     it has the SAME specificity as the rule it replaces and wins only by
+     coming later. A page's own utilities keep exactly the power they had.
+   · Orange is a surface, never lettering: #E99A53 on white is 2.2:1. So
+     `text-accent` reads black, `hover:text-accent` underlines, and anything
+     painted orange (`bg-accent`, `.btn-seal`, `.pay-btn.pri`) carries black
+     text — never white.
+   The sheet is light in both themes, like the Product List: black lettering
+   needs a light ground, and dark mode still applies the moment you leave.
+   ═══════════════════════════════════════════════════════════════════════ */
+.sheet-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 10px;
+  /* Clears the phone's 54px tab bar and the home-indicator inset. */
+  padding-bottom: calc(54px + 10px + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .sheet-frame { padding-bottom: 10px; }
+}
+
+.sheet-theme {
+  color-scheme: light;
+  --paper: 243 243 241;
+  --surface: 255 255 255;
+  --surface-2: 247 247 245;
+  --hairline: 229 228 223;
+  --chrome: 222 215 202;
+  --ink: 0 0 0;
+  --num-ink: 0 0 0;
+  --graphite: 0 0 0;
+  --muted: 0 0 0;
+  --accent: 233 154 83;
+  --accent-hover: 221 139 66;
+  --accent-bg: 255 244 231;
+  --accent-border: 233 154 83;
+  /* Semantics restated at their light values: on a dark-mode route they would
+     otherwise arrive as dark washes on the white sheet. */
+  --ledger: 21 110 78;
+  --ledger-bg: 222 240 232;
+  --alert: 150 100 12;
+  --alert-bg: 249 238 214;
+  --danger: 176 40 34;
+  --danger-bg: 250 228 224;
+  --info: 108 104 98;
+  --info-bg: 238 235 231;
+  --walnut: 90 62 43;
+  --band: 110 76 54;
+  --band-ink: 246 238 230;
+  --scrim: 90 62 43;
+  /* The sheet's furniture, named from the Comm Cal month's. */
+  --sheet-filter: 246 246 244;       /* toolbar and filter panels */
+  --sheet-divider: 226 224 218;      /* tab rails, section rules */
+  --sheet-table-head: 235 231 224;   /* a table's header band */
+  --sheet-table-rule: 207 197 183;   /* the rule under that band */
+  --sheet-table-border: 216 210 200; /* a table's frame */
+  --sheet-row-hover: 255 245 233;
+  --sheet-foot: 251 251 250;         /* a table's footer strip */
+  /* Summary cards (StatCard). */
+  --card-border: 232 225 216;
+  --card-bar: 205 184 162;
+  --card-label: 117 100 86;
+  --card-note: 138 119 101;
+  --card-icon: 154 128 103;
+  --card-icon-bg: 246 242 236;
+  --card-primary-border: 134 102 76;
+  --card-primary-icon-bg: 239 229 217;
+  --card-danger-bar: 201 116 109;
+  --card-danger-icon: 183 91 80;
+  --card-danger-icon-bg: 251 239 237;
+  --card-alert-bar: 222 178 104;
+  --card-alert-icon-bg: 250 241 222;
+  color: rgb(var(--ink));
+}
+
+.sheet {
+  flex: 1 0 auto;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 16px;
+  background: rgb(var(--surface));
+  font-size: 13px;
+}
+@media (max-width: 1000px) {
+  .sheet { padding: 20px; }
+}
+@media (max-width: 767px) {
+  .sheet { padding: 18px 12px; border-radius: 12px; }
+}
+@media print {
+  .sheet-frame { display: block; min-height: 0; padding: 0; }
+  .sheet { padding: 0; border: 0; border-radius: 0; }
+}
+
+/* ── Lettering: upright, black, orange never a text colour ── */
+:where(.sheet-theme) :is(em, .italic) { font-style: normal; }
+:where(.sheet-theme) .text-accent { color: rgb(var(--ink)); }
+:where(.sheet-theme) .hover\:text-accent:hover {
+  color: rgb(var(--ink));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+:where(.sheet-theme) a.text-accent { text-decoration: underline; text-underline-offset: 3px; }
+:where(.sheet-theme) .hover\:text-accent-hover:hover { color: rgb(var(--ink)); }
+/* Anything painted orange carries black lettering. */
+:where(.sheet-theme) :is(.bg-accent, .bg-accent\/40, .btn-seal, .hover\:bg-accent:hover, .pay-btn.pri) {
+  color: rgb(var(--ink));
+}
+/* The one dark object is walnut, not black. */
+:where(.sheet-theme) .bg-ink { background-color: rgb(var(--walnut)); }
+:where(.sheet-theme) input[type='checkbox'],
+:where(.sheet-theme) input[type='radio'] { accent-color: rgb(var(--accent)); }
+:where(.sheet-theme) ::placeholder { color: rgb(var(--ink) / 0.55); }
+/* With every grey now black, a disabled control is told apart by fading it —
+   the month's `.page button:disabled` rule. A control's own
+   `disabled:opacity-*` still decides how far. */
+:where(.sheet-theme) :is(button, input, select, textarea):disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Page header ── */
+:where(.sheet-theme) .page-head { margin-bottom: 22px; }
+:where(.sheet-theme) .page-eyebrow { font-size: 10px; letter-spacing: 0.14em; }
+
+/* ── Section head: the month's heading weight over the same rule ── */
+:where(.sheet-theme) .sect-head h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.015em; }
+:where(.sheet-theme) .sect-head .rule { background: rgb(var(--sheet-divider)); }
+:where(.sheet-theme) .sect-head .count { font-size: 10px; letter-spacing: 0.08em; }
+
+/* ── Buttons ── */
+:where(.sheet-theme) .btn-secondary { background: rgb(var(--surface)); color: rgb(var(--ink)); }
+
+/* ── Chips: the wash keeps its colour, the word stays black on orange ── */
+:where(.sheet-theme) .chip.accent { color: rgb(var(--ink)); }
+:where(.sheet-theme) .chip.accent .dot { background: rgb(var(--accent)); }
+
+/* ── Tables: the month's table — a framed well, uppercase header band,
+   white / 247 zebra, peach hover. Borders move from the rows to the cells
+   because `separate` is what lets the frame's corners round. ── */
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgb(var(--sheet-table-border));
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgb(var(--surface));
+  font-size: 12px;
+}
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) thead th {
+  height: 42px;
+  padding: 10px 14px;
+  background: rgb(var(--sheet-table-head));
+  border-bottom: 1px solid rgb(var(--sheet-table-rule));
+  color: rgb(var(--ink));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+/* The band is painted on the row as well as the cells: with `separate`
+   borders a cell's fractional width leaves a hairline seam between two
+   header cells, and the row behind it has to be the same colour. */
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) thead tr { background: rgb(var(--sheet-table-head)); }
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) tfoot tr { background: rgb(var(--accent-bg)); }
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) tbody tr { border-bottom: 0; }
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) td {
+  padding: 11px 14px;
+  border-bottom: 1px solid rgb(var(--hairline));
+  vertical-align: middle;
+}
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) tbody tr:last-child > td { border-bottom: 0; }
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) tbody tr:nth-child(even) { background: rgb(var(--surface-2)); }
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) tbody tr:hover { background: rgb(var(--sheet-row-hover)); }
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) tfoot :is(td, th) {
+  padding: 11px 14px;
+  background: rgb(var(--accent-bg));
+  border-top: 1px solid rgb(var(--sheet-table-rule));
+  font-weight: 600;
+}
+/* A link in a cell reads as one by its underline, the month's way. */
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) td a:not([class*='border']):not([class*='bg-']) {
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--ink) / 0.35);
+  text-underline-offset: 3px;
+}
+:where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) td a:not([class*='border']):not([class*='bg-']):hover {
+  text-decoration-color: rgb(var(--ink));
+}
+/* A row's own Save (RowForm's SaveButton, joined to its row by `form=`) is
+   an action on one row among many, like the month's per-row Exclude: an
+   orange edge at rest, filled on hover — a column of solid orange ✓s shouts
+   louder than the page's one primary action. */
+:where(.sheet-theme) table.ledger-table td button[type='submit'][form].bg-accent {
+  background: rgb(var(--surface));
+  box-shadow: inset 0 0 0 1px rgb(var(--accent));
+}
+:where(.sheet-theme) table.ledger-table td button[type='submit'][form].bg-accent:hover:not(:disabled) {
+  background: rgb(var(--accent));
+}
+@media (max-width: 767px) {
+  :where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) thead th { padding: 10px; }
+  :where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) td { padding: 10px; }
+}
+@layer components {
+  /* Figures in the table face, a step down to sit with 12px text. `:where`
+     keeps this at `.num`'s own weight, so a page's utilities still win. */
+  :where(.sheet-theme) .num { font-size: 12px; }
+}
+
+/* A department band inside a roster or the payroll grid: the header band's
+   tone with a walnut marker, not a full walnut bar — the sheet keeps its one
+   dark object for the figure that matters. */
+:where(.sheet-theme) .group-btn {
+  border-left-color: rgb(var(--walnut));
+  background: rgb(var(--sheet-table-head));
+  color: rgb(var(--ink));
+}
+:where(.sheet-theme) .group-btn:hover { background: rgb(var(--sheet-table-rule) / 0.55); }
+:where(.sheet-theme) .group-btn .chev,
+:where(.sheet-theme) .group-btn .count { color: rgb(var(--ink) / 0.7); }
+:where(.sheet-theme) .group-btn .count em { color: rgb(var(--alert)); }
+
+/* The payroll grid keeps its own geometry — fixed columns, frozen panes,
+   36px rows — and takes only the month's lettering and bands. */
+:where(.sheet-theme) table.payroll-grid thead th {
+  background: rgb(var(--sheet-table-head));
+  color: rgb(var(--ink));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+:where(.sheet-theme) table.payroll-grid thead tr.pg-grp th {
+  letter-spacing: 0.16em;
+  border-bottom-color: rgb(var(--sheet-table-rule) / 0.6);
+}
+:where(.sheet-theme) table.payroll-grid thead tr.pg-cols th { border-bottom: 1px solid rgb(var(--sheet-table-rule)); }
+:where(.sheet-theme) table.payroll-grid tbody tr.pg-band td { background: rgb(var(--sheet-table-head)); }
+:where(.sheet-theme) table.payroll-grid tbody tr.pg-band td.sub { color: rgb(var(--ink)); font-weight: 600; }
+:where(.sheet-theme) table.payroll-grid tbody tr.pg-band .group-btn .tag { color: rgb(var(--alert)); }
+:where(.sheet-theme) table.payroll-grid tfoot td {
+  background: rgb(var(--accent-bg));
+  border-top: 1px solid rgb(var(--sheet-table-rule));
+}
+:where(.sheet-theme) table.payroll-grid td.derived a { color: rgb(var(--ink)); }
+:where(.sheet-theme) .pg-name-btn:hover { color: rgb(var(--ink)); text-decoration: underline; text-underline-offset: 3px; }
+/* The paycheck window's captions stand upright like everything else here. */
+:where(.sheet-theme) .pg-slip .f label small,
+:where(.sheet-theme) .pg-slip .kv small { font-style: normal; }
+:where(.sheet-theme) .pg-slip .foot .meta { font-style: normal; }
+/* A row's Save and a window's primary action are orange with black
+   lettering, like every other action on the sheet. */
+:where(.sheet-theme) .pg-save,
+:where(.sheet-theme) .pg-btn.pri {
+  border-color: rgb(var(--accent));
+  background: rgb(var(--accent));
+  color: rgb(var(--ink));
+}
+:where(.sheet-theme) .pg-btn.pri:hover { background: rgb(var(--accent-hover)); opacity: 1; }
+
+/* ── Tab rails ──
+   SlidingTabs (both variants) and a hand-built rail (`.sheet-tabs`) become
+   the month's tabs: a tinted, underlined pick with a count badge. */
+:where(.sheet-theme) nav[data-variant] {
+  gap: 6px;
+  align-items: stretch;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgb(var(--sheet-divider));
+}
+:where(.sheet-theme) nav[data-variant] > .tab-indicator { display: none; }
+:where(.sheet-theme) nav[data-variant] > button[data-tab-key],
+.sheet-tabs > :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: rgb(var(--ink));
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+:where(.sheet-theme) nav[data-variant] > button[data-tab-key]:hover,
+.sheet-tabs > :is(a, button):hover { background: rgb(var(--surface-2)); }
+/* A rail scrolls sideways, which clips anything drawn outside a tab — so the
+   focus ring is drawn inside it. */
+:where(.sheet-theme) nav[data-variant] > button[data-tab-key]:focus-visible,
+.sheet-tabs > :is(a, button):focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: -2px; }
+:where(.sheet-theme) nav[data-variant] > button[data-tab-key][data-active],
+.sheet-tabs > :is([aria-selected='true'], [aria-current='page'], [data-active]) {
+  font-weight: 600;
+  background: rgb(var(--accent-bg));
+  border-bottom-color: rgb(var(--accent));
+}
+:where(.sheet-theme) nav[data-variant] [data-tab-count],
+.sheet-count {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  vertical-align: 1px;
+  padding: 3px 7px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 5px;
+  background: rgb(var(--surface-2));
+  color: rgb(var(--ink));
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+/* SlidingTabs keeps the count inside the label's span, out of the flex gap. */
+:where(.sheet-theme) nav[data-variant] [data-tab-count] { margin-left: 8px; }
+.sheet-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgb(var(--sheet-divider));
+}
+@media (max-width: 767px) {
+  :where(.sheet-theme) nav[data-variant] { gap: 2px; margin-bottom: 16px; }
+  :where(.sheet-theme) nav[data-variant] > button[data-tab-key],
+  .sheet-tabs > :is(a, button) { padding: 10px; }
+  .sheet-tabs { gap: 2px; margin-bottom: 16px; }
+}
+
+/* ── Summary cards (components/sheet/StatCard.tsx) — the month's cards ── */
+.stat-cards { container: stat-cards / inline-size; margin-bottom: 22px; }
+/* StatCards sets the column counts from how many cards it holds: all of them
+   up to six, then two even rows; three at most on a tablet, two on a phone. */
+.stat-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--stat-cols, 4), minmax(0, 1fr));
+  gap: 9px;
+}
+@container stat-cards (max-width: 850px) {
+  .stat-cards-grid { grid-template-columns: repeat(var(--stat-cols-md, 3), minmax(0, 1fr)); }
+}
+.stat-card {
+  /* Its own width sets the figure's size, so a row of eight narrower cards
+     keeps "RM 68,552.00" on one line. */
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 150px;
+  padding: 16px 13px 12px;
+  border: 1px solid rgb(var(--card-border));
+  border-radius: 12px;
+  background: rgb(var(--surface));
+  box-shadow: 0 3px 12px rgb(var(--walnut) / 5.5%);
+  color: rgb(var(--ink));
+  text-decoration: none;
+}
+.stat-card::before {
+  content: '';
+  display: block;
+  width: 23px;
+  height: 3px;
+  margin-bottom: 12px;
+  border-radius: 3px;
+  background: rgb(var(--card-bar));
+}
+a.stat-card { transition: border-color 120ms ease-out, box-shadow 120ms ease-out; }
+a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb(var(--walnut) / 9%); }
+.stat-card-label {
+  min-height: 30px;
+  color: rgb(var(--card-label));
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.stat-card-value {
+  color: rgb(var(--ink));
+  font-size: clamp(16px, 11.5cqw, 28px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.stat-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  margin-top: auto;
+  padding-top: 13px;
+  color: rgb(var(--card-note));
+  font-size: 10px;
+  line-height: 1.45;
+}
+.stat-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 27px;
+  height: 27px;
+  margin-left: auto;
+  border-radius: 8px;
+  background: rgb(var(--card-icon-bg));
+  color: rgb(var(--card-icon));
+}
+.stat-card-icon svg { width: 15px; height: 15px; }
+.stat-card[data-tone='primary'] {
+  border: 1.5px solid rgb(var(--card-primary-border));
+  box-shadow: 0 3px 12px rgb(var(--walnut) / 9%);
+}
+.stat-card[data-tone='primary']::before { width: 38px; background: rgb(var(--walnut)); }
+.stat-card[data-tone='primary'] .stat-card-value { color: rgb(var(--walnut)); }
+.stat-card[data-tone='primary'] .stat-card-icon { background: rgb(var(--card-primary-icon-bg)); color: rgb(var(--walnut)); }
+.stat-card[data-tone='danger']::before { background: rgb(var(--card-danger-bar)); }
+.stat-card[data-tone='danger'] .stat-card-value { color: rgb(var(--danger)); }
+.stat-card[data-tone='danger'] .stat-card-icon { background: rgb(var(--card-danger-icon-bg)); color: rgb(var(--card-danger-icon)); }
+.stat-card[data-tone='alert']::before { background: rgb(var(--card-alert-bar)); }
+.stat-card[data-tone='alert'] .stat-card-value { color: rgb(var(--alert)); }
+.stat-card[data-tone='alert'] .stat-card-icon { background: rgb(var(--card-alert-icon-bg)); color: rgb(var(--alert)); }
+.stat-card[data-tone='ledger'] .stat-card-value { color: rgb(var(--ledger)); }
+.stat-cards-note { margin-top: 12px; color: rgb(var(--card-note)); font-size: 11px; line-height: 1.5; }
+.stat-cards-note strong { margin-left: 7px; color: rgb(var(--ink)); font-weight: 600; font-variant-numeric: tabular-nums; }
+@container stat-cards (max-width: 560px) {
+  .stat-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-card { min-height: 138px; padding: 13px 11px 10px; }
+}
+
+/* ── The month's furniture, for any page on the sheet ── */
+/* In the components layer, like `.num`: a page's own utilities (a margin, a
+   gap) still win over these defaults. */
+@layer components {
+  /* A filter / search panel above a table. */
+  .sheet-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 14px;
+    border: 1px solid rgb(var(--hairline));
+    border-radius: 10px;
+    background: rgb(var(--sheet-filter));
+  }
+  .sheet-toolbar :is(input:not([type='checkbox']):not([type='radio']), select) {
+    min-height: 36px;
+    padding: 7px 11px;
+    border: 1px solid rgb(var(--hairline));
+    border-radius: 6px;
+    background: rgb(var(--surface));
+    font-size: 12px;
+  }
+  .sheet-toolbar :is(input:not([type='checkbox']):not([type='radio']), select):focus { border-color: rgb(var(--accent)); }
+  /* A table in a frame with a footer strip under it (the month's
+     `.tableFrame` / `.tableFooter`): the table inside drops its own frame. */
+  .table-frame {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgb(var(--sheet-table-border));
+    border-radius: 10px;
+    background: rgb(var(--surface));
+  }
+  .table-frame > .table-frame-scroll { overflow-x: auto; }
+  .table-frame-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 11px 14px;
+    border-top: 1px solid rgb(var(--sheet-table-border));
+    background: rgb(var(--sheet-foot));
+    font-size: 11px;
+  }
+  /* A heading and its line of explanation, the month's `.sectionHeading`. */
+  .sheet-heading { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; letter-spacing: -0.015em; }
+  .sheet-subtitle { margin-top: 5px; max-width: 850px; font-size: 12px; line-height: 1.65; }
+  /* A peach note and an amber warning, the month's `.notice` / `.warning`. */
+  .sheet-notice,
+  .sheet-warning {
+    margin: 14px 0;
+    padding: 11px 14px;
+    border: 1px solid rgb(var(--hairline));
+    border-radius: 8px;
+    background: rgb(var(--accent-bg));
+    font-size: 12px;
+    line-height: 1.65;
+  }
+  .sheet-warning { border-color: rgb(var(--card-alert-bar)); background: rgb(var(--card-alert-icon-bg)); }
+  /* Something failed or was refused — the same shape in the danger wash. */
+  .sheet-danger {
+    margin: 14px 0;
+    padding: 11px 14px;
+    border: 1px solid rgb(var(--danger) / 0.45);
+    border-radius: 8px;
+    background: rgb(var(--danger-bg));
+    font-size: 12px;
+    line-height: 1.65;
+  }
+}
+/* Outside the layer: it has to beat the sheet's own table frame. */
+:where(.sheet-theme) .table-frame table.ledger-table { border: 0; border-radius: 0; }
+
+/* ── Components that keep their own palettes ──
+   Their dark-mode variants are keyed off the page theme; on the sheet they
+   stay at their light values, with the specificity to beat those variants. */
+.sheet-theme .pay-board.pay-board.pay-board { --pay-card: 255 255 255; --pay-well: var(--chrome); }
+.sheet-theme .org-canvas.org-canvas.org-canvas {
+  --cv-ground: 220 227 234;
+  --cv-grid: 196 208 220;
+  --cv-card: 255 255 255;
+  --cv-border: 195 206 217;
+  --cv-border-hover: 120 140 160;
+  --cv-ink: 31 41 51;
+  --cv-graphite: 82 97 111;
+  --cv-muted: 124 139 153;
+  --cv-chip: 238 242 246;
+  --cv-chip-border: 211 220 229;
+  --cv-line: 91 111 132;
+  --cv-target: 214 228 243;
+  --cv-shelf: 104 122 140;
+  --cv-lift: 15 25 35;
+}
+.sheet-theme .hero-walnut.hero-walnut.hero-walnut {
+  border-radius: 12px;
+  --paper: 90 62 43;
+  --surface: 104 74 52;
+  --surface-2: 118 86 62;
+  --hairline: 132 100 76;
+  --ink: 246 238 230;
+  --graphite: 214 194 173;
+  --muted: 176 150 121;
+  --num-ink: 250 246 242;
+  --accent: 206 170 132;
+  --accent-bg: 104 74 52;
+  --accent-border: 132 100 76;
+  --accent-hover: 222 190 156;
 }

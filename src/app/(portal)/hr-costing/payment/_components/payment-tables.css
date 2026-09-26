@@ -1,106 +1,169 @@
-.payment-statement .payment-tabs { display:flex; gap:28px; border-bottom:1px solid rgb(var(--hairline)); margin-top:28px; }
-.payment-statement .payment-tabs button { padding:11px 2px; border:0; border-bottom:2px solid transparent; background:transparent; color:rgb(var(--graphite)); font:inherit; font-size:14px; cursor:pointer; }
-.payment-statement .payment-tabs button[aria-selected="true"] { border-bottom-color:rgb(var(--accent)); color:rgb(var(--accent)); font-weight:500; }
-.payment-statement [role="tabpanel"][hidden] { display:none; }
-.payment-statement .payment-section { margin-top:24px; }
-.payment-statement .payment-section + .payment-section { margin-top:32px; }
-.payment-statement .payment-section h2 { font-size:18px; font-weight:500; margin:0 0 12px; }
-.payment-statement h3 { font-size:15px; font-weight:500; }
-.payment-statement .pay-section-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px 18px; flex-wrap:wrap; margin-bottom:12px; }
-.payment-statement .pay-section-toolbar h2 { margin:0; }
-.payment-statement .pay-table-wrap { width:100%; max-width:100%; overflow-x:auto; }
-.payment-statement .pay-statement-table { width:100%; border-collapse:collapse; font-size:13px; border-radius:0; background:rgb(var(--surface)); }
-.payment-statement .pay-statement-table th, .payment-statement .pay-statement-table td { text-align:left; border-bottom:1px solid rgb(var(--hairline)); padding:13px 10px; vertical-align:middle; }
-.payment-statement .pay-statement-table thead th { background:rgb(var(--surface-2)); border-top:1px solid rgb(var(--hairline)); font-size:11px; font-weight:400; color:rgb(var(--graphite)); padding:9px 10px; white-space:nowrap; }
-.payment-statement .pay-statement-table tbody th { background:transparent; font-weight:500; }
-.payment-statement .pay-statement-table tfoot td, .payment-statement .pay-statement-table tfoot th { background:rgb(var(--surface-2)); padding:10px; font-weight:500; }
-.payment-statement .pay-statement-table .num, .payment-statement .pay-statement-table .right { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.payment-statement .pay-statement-table small { display:block; color:rgb(var(--graphite)); font-size:11px; font-weight:400; margin-top:4px; }
-.payment-statement .pay-statement-table .pay-status { display:inline-block; overflow:visible; white-space:nowrap; border:0; border-radius:0; margin:0; background:none; font-size:12px; padding:0; color:rgb(var(--graphite)); }
-.payment-statement .pay-statement-table .pay-status.paid { color:rgb(var(--ledger)); }
-.payment-statement .pay-statement-table .pay-status.pending, .payment-statement .pay-change-notable { color:rgb(var(--alert)); }
-.payment-statement .pay-delta.up, .payment-statement .pay-change.up { color:rgb(var(--ledger)); }
-.payment-statement .pay-delta.down, .payment-statement .pay-change.down { color:rgb(var(--danger)); }
-.payment-statement .pay-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
-.payment-statement .pay-text-button { border:0; background:transparent; color:rgb(var(--accent)); cursor:pointer; padding:2px 0; font:inherit; font-size:12px; text-align:inherit; }
-.payment-statement .pay-text-button:hover { text-decoration:underline; text-underline-offset:3px; }
-.payment-statement .pay-text-button:disabled { opacity:.5; cursor:wait; }
-.payment-statement .pay-muted { color:rgb(var(--graphite)); font-size:12px; }
-.payment-statement .pay-salary-table { min-width:650px; }
-.payment-statement .pay-statutory-table { min-width:690px; }
-.payment-statement .pay-statutory-table .pay-row-actions { flex-wrap:nowrap; }
-.payment-statement .pay-employee-changes { margin-top:12px; }
-.payment-statement .pay-employee-changes summary { cursor:pointer; font-size:12px; color:rgb(var(--graphite)); padding:5px 0; }
-.payment-statement .pay-employee-changes table { margin-top:10px; }
-.payment-statement .pay-generation-grid { display:grid; grid-template-columns:150px minmax(0,1fr); gap:20px; }
-.payment-statement .pay-department-picker { display:flex; flex-direction:column; gap:2px; }
-.payment-statement .pay-department-picker button { border:0; background:transparent; text-align:left; padding:9px; font:inherit; font-size:12px; cursor:pointer; }
-.payment-statement .pay-department-picker button[aria-pressed="true"] { background:rgb(var(--accent-bg)); color:rgb(var(--accent)); }
-.payment-statement .pay-department-picker small { display:block; color:rgb(var(--graphite)); font-size:11px; margin-top:2px; }
-.payment-statement .pay-generation-people { min-width:0; }
-.payment-statement .pay-generation-fields { display:flex; gap:20px; align-items:flex-start; justify-content:space-between; font-size:12px; margin-bottom:14px; flex-wrap:wrap; }
-.payment-statement .pay-generation-fields label, .payment-statement .pay-generation-fields strong { display:flex; flex-direction:column; gap:4px; }
-.payment-statement .pay-generation-fields strong { margin-top:4px; font-weight:500; }
-.payment-statement .pay-generation-window table td { padding:11px 9px; }
-.payment-statement input[type="checkbox"] { accent-color:rgb(var(--accent)); width:16px; height:16px; cursor:pointer; }
-.payment-statement input[type="checkbox"]:disabled { cursor:default; }
-.payment-statement .pay-generation-footer { width:100%; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:12px; }
-.payment-statement .pay-generation-footer strong { display:block; font-variant-numeric:tabular-nums; font-size:22px; font-weight:500; margin-top:3px; }
-.payment-statement .pay-generation-result { padding:10px 0; }
-.payment-statement .pay-generation-result p { margin:8px 0 15px; }
-.payment-statement .pay-win { border-radius:3px; width:min(1080px,calc(100vw - 32px)); }
-.payment-statement .pay-win .wh { background:rgb(var(--surface-2)); }
-.payment-statement .pay-win .tiles .tile { border-radius:2px; }
-.payment-statement .pay-win .pay-people-table .state-cell, .payment-statement .pay-win .pay-state { white-space:nowrap; }
-.payment-statement .pay-win.pay-generation-window { inset:0; margin:auto; width:min(1120px,calc(100vw - 48px)); max-width:none; height:fit-content; max-height:min(840px,calc(100dvh - 48px)); padding:0; color:rgb(var(--ink)); border-radius:8px; }
-.payment-statement .pay-win.pay-generation-window[data-step="selection"] { height:min(840px,calc(100dvh - 48px)); }
-.payment-statement .pay-generation-window:not([open]) { display:none; }
-.payment-statement .pay-generation-window::backdrop { background:rgb(var(--scrim) / .45); }
-.payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { flex-shrink:0; }
-.payment-statement .pay-generation-window .wh h3 { margin:0 0 6px; font-size:18px; font-weight:500; }
-.payment-statement .pay-generation-window .wh p { margin:0; }
-.payment-statement .pay-generation-window .x { min-width:36px; min-height:36px; }
-.payment-statement .pay-generation-window .x:disabled { opacity:.5; cursor:wait; }
-.payment-statement .pay-generation-window .wb { min-height:0; padding:20px; background:rgb(var(--paper)); overscroll-behavior:contain; scrollbar-gutter:stable; }
-.payment-statement .pay-generation-window[data-step="selection"] .wb { overflow:hidden; scrollbar-gutter:auto; }
-.payment-statement .pay-generation-window .wb h3 { margin:0; }
-.payment-statement .pay-generation-window .wf { flex-direction:column; align-items:stretch; gap:6px; background:rgb(var(--surface-2)); }
-.payment-statement .pay-generation-window .wf > .pay-muted { margin:0; font-size:11px; }
-.payment-statement .pay-generation-window .pay-generation-grid { flex:1; min-height:0; grid-template-columns:174px minmax(0,1fr); grid-template-rows:minmax(0,1fr); gap:0; overflow:hidden; background:rgb(var(--surface-2)); border:1px solid rgb(var(--hairline)); border-radius:4px; }
-.payment-statement .pay-generation-window .pay-department-picker { min-height:0; align-self:stretch; position:static; overflow:auto; overscroll-behavior:contain; padding:10px; }
-.payment-statement .pay-generation-window .pay-department-picker button { border-radius:2px; }
-.payment-statement .pay-generation-window .pay-department-picker button[aria-pressed="true"] { box-shadow:inset 3px 0 0 rgb(var(--accent)); }
-.payment-statement .pay-generation-window .pay-generation-people { min-height:0; display:flex; flex-direction:column; overflow:hidden; padding:18px; background:rgb(var(--surface)); border-left:1px solid rgb(var(--hairline)); border-radius:0 3px 3px 0; }
-.payment-statement .pay-generation-window .pay-generation-fields { flex-shrink:0; }
-.payment-statement .pay-generation-window .pay-generation-people > .pay-table-wrap { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
-.payment-statement .pay-generation-window .pay-generation-people .pay-statement-table thead th { position:sticky; top:0; z-index:1; box-shadow:0 1px 0 rgb(var(--hairline)); }
-.payment-statement .pay-generation-window .pay-table-wrap { border:1px solid rgb(var(--hairline)); border-radius:3px; background:rgb(var(--surface)); }
-.payment-statement .pay-generation-window .pay-statement-table { min-width:520px; }
-.payment-statement .pay-generation-window .pay-statement-table thead th { border-top:0; }
-.payment-statement .pay-generation-window .pay-statement-table tbody tr:last-child td { border-bottom:0; }
-.payment-statement .pay-generation-window .pay-statement-table tbody tr:nth-child(even) { background:rgb(var(--surface-2) / .3); }
-.payment-statement .pay-generation-window .pay-statement-table tbody tr:has(input:checked) { background:rgb(var(--accent-bg)); }
-.payment-statement .pay-generation-window .pay-statement-table tbody tr:has(input:checked) td:first-child { box-shadow:inset 3px 0 0 rgb(var(--accent)); }
-@media(max-width:700px) {
-  .payment-statement .pay-generation-grid { grid-template-columns:minmax(0,1fr); gap:14px; }
-  .payment-statement .pay-department-picker { flex-direction:row; flex-wrap:wrap; }
-  .payment-statement .pay-win { width:100vw; }
-  .payment-statement .pay-win.pay-generation-window { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
-  .payment-statement .pay-win.pay-generation-window[data-step="selection"] { height:calc(100dvh - 16px); }
-  .payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { padding:12px 14px; }
-  .payment-statement .pay-generation-window .wb { padding:14px; }
-  .payment-statement .pay-generation-window .pay-generation-grid { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
-  .payment-statement .pay-generation-window .pay-department-picker { flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding:8px; }
-  .payment-statement .pay-generation-window .pay-department-picker button { flex:none; white-space:nowrap; }
-  .payment-statement .pay-generation-window .pay-generation-people { padding:12px; border-left:0; border-top:1px solid rgb(var(--hairline)); border-radius:0 0 3px 3px; }
-  .payment-statement .pay-generation-footer { align-items:flex-start; }
+/* HR › Payment's tables, tabs and windows on the sheet (v3.9, 2026-09-27 —
+   DESIGN.md › "Sheet theme"). The layout is v3.7's; the look is Comm Cal's
+   month: the tab rail is the global `.sheet-tabs`, every statement table is a
+   framed well with an uppercase header band, zebra rows, a peach hover and a
+   peach total, and orange paints only the actions and the markers. */
+
+/* ── Tabs: `.sheet-tabs` draws them; this only places the rail ── */
+.payment-statement .payment-tabs { margin: 28px 0 0; }
+.payment-statement [role="tabpanel"][hidden] { display: none; }
+
+.payment-statement .payment-section { margin-top: 24px; }
+.payment-statement .payment-section + .payment-section { margin-top: 32px; }
+.payment-statement h3 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.payment-statement .pay-muted { font-size: 12px; }
+
+/* A filter / action row. Above a table it is also a `.sheet-toolbar` (the
+   grey panel); in a window it is only the row. */
+.payment-statement .pay-section-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px 18px; flex-wrap: wrap; margin-bottom: 14px; }
+.payment-statement .pay-win .pay-section-toolbar { margin-bottom: 0; }
+
+/* Department filters stay pills — a filter, not a tab — in the month's chip
+   look: white, orange-framed peach when picked, the count in a boxed badge. */
+.payment-statement .pay-filt { gap: 7px; }
+.payment-statement .pay-filt button { gap: 7px; padding: 5px 11px; border: 1px solid rgb(var(--hairline)); border-radius: 999px; background: rgb(var(--surface)); color: rgb(var(--ink)); font-size: 12px; line-height: 1.4; }
+.payment-statement .pay-filt button:hover { border-color: rgb(var(--accent)); }
+.payment-statement .pay-filt button[aria-pressed="true"] { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); color: rgb(var(--ink)); font-weight: 600; }
+.payment-statement .pay-filt button b,
+.payment-statement .pay-filt button[aria-pressed="true"] b { padding: 2px 6px; border: 1px solid rgb(var(--hairline)); border-radius: 5px; background: rgb(var(--surface-2)); color: rgb(var(--ink)); font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 10px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.payment-statement .pay-filt button[aria-pressed="true"] b { background: rgb(var(--surface)); }
+
+/* ── Statement tables ──
+   The frame lives on the scroll wrapper, not the table: it clips the rounded
+   corners without `overflow: hidden` on the table, which would stop the
+   generation window's header from sticking. Borders sit on the cells
+   (`separate`) so a sticky header keeps the rule under it. */
+.payment-statement .pay-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid rgb(var(--sheet-table-border)); border-radius: 10px; background: rgb(var(--surface)); }
+.payment-statement .pay-statement-table { width: 100%; margin: 0; border: 0; border-collapse: separate; border-spacing: 0; background: rgb(var(--surface)); font-size: 12px; }
+.payment-statement .pay-statement-table :is(th, td) { padding: 11px 14px; border-bottom: 1px solid rgb(var(--hairline)); text-align: left; vertical-align: middle; }
+/* The band is painted on the row too, so no seam shows between two cells. */
+.payment-statement .pay-statement-table thead tr { background: rgb(var(--sheet-table-head)); }
+.payment-statement .pay-statement-table thead th { height: 42px; padding: 10px 14px; background: rgb(var(--sheet-table-head)); border-bottom-color: rgb(var(--sheet-table-rule)); color: rgb(var(--ink)); font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.045em; text-transform: uppercase; white-space: nowrap; }
+.payment-statement .pay-statement-table tbody th { font-weight: 500; }
+.payment-statement .pay-statement-table tbody tr:nth-child(even) { background: rgb(var(--surface-2)); }
+.payment-statement .pay-statement-table tbody tr:hover { background: rgb(var(--sheet-row-hover)); }
+.payment-statement .pay-statement-table tbody tr:last-child > :is(td, th) { border-bottom: 0; }
+.payment-statement .pay-statement-table tfoot :is(td, th) { padding: 11px 14px; background: rgb(var(--accent-bg)); border-top: 1px solid rgb(var(--sheet-table-rule)); border-bottom: 0; font-weight: 600; }
+.payment-statement .pay-statement-table :is(.num, .right) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.payment-statement .pay-statement-table small { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; line-height: 1.4; }
+.payment-statement .pay-statement-table .chip { white-space: nowrap; }
+.payment-statement .pay-statement-table td.empty { padding: 22px 14px; text-align: center; }
+.payment-statement .pay-salary-table { min-width: 650px; }
+.payment-statement .pay-statutory-table { min-width: 690px; }
+.payment-statement .pay-statutory-table .pay-row-actions { flex-wrap: nowrap; }
+
+/* Salary movement colours stay (DESIGN.md › Payment statement): green up, red
+   down; a notable move keeps its weight, a statutory due date that has passed
+   unpaid keeps its amber. */
+.payment-statement .pay-delta.up, .payment-statement .pay-change.up { color: rgb(var(--ledger)); }
+.payment-statement .pay-delta.down, .payment-statement .pay-change.down { color: rgb(var(--danger)); }
+.payment-statement .pay-change-notable { color: rgb(var(--alert)); font-weight: 600; }
+
+.payment-statement .pay-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+/* A text action reads as a link: black, underlined. */
+.payment-statement .pay-text-button { padding: 2px 0; border: 0; background: transparent; color: rgb(var(--ink)); font: inherit; font-size: 12px; text-align: inherit; text-decoration: underline; text-decoration-color: rgb(var(--ink) / 0.35); text-underline-offset: 3px; cursor: pointer; }
+.payment-statement .pay-text-button:hover { text-decoration-color: rgb(var(--ink)); }
+.payment-statement .pay-text-button:disabled { opacity: 0.5; cursor: wait; }
+.payment-statement .pay-statement-table td:first-child > .pay-text-button:first-child { font-weight: 500; }
+
+.payment-statement .pay-employee-changes { margin-top: 14px; }
+.payment-statement .pay-employee-changes > .pay-table-wrap { margin-top: 10px; }
+
+/* ── Windows ──
+   The department / body drawer (PayWindow) and the generation dialog keep
+   their behaviour; their header is the sheet's filter band, their foot the
+   table footer's strip, the lettering black. */
+.payment-statement .pay-win { width: min(1080px, calc(100vw - 32px)); border-color: rgb(var(--sheet-table-border)); border-radius: 12px; background: rgb(var(--surface)); color: rgb(var(--ink)); }
+.payment-statement .pay-win .wh { padding: 14px 20px 13px; background: rgb(var(--sheet-filter)); border-bottom: 1px solid rgb(var(--sheet-divider)); }
+.payment-statement .pay-win .wh h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; color: rgb(var(--ink)); }
+.payment-statement .pay-win .wh h3 span { font-size: 13px; font-weight: 400; color: rgb(var(--ink)); }
+.payment-statement .pay-win .x { border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); color: rgb(var(--ink)); }
+.payment-statement .pay-win .x:hover:not(:disabled) { background: rgb(var(--surface-2)); }
+.payment-statement .pay-win .wf { background: rgb(var(--sheet-foot)); border-top: 1px solid rgb(var(--sheet-table-border)); }
+/* The drawer's three figures, in the summary card's lettering. */
+.payment-statement .pay-win .tiles { gap: 9px; }
+.payment-statement .pay-win .tiles .tile { padding: 11px 13px 12px; border: 1px solid rgb(var(--card-border)); border-radius: 10px; background: rgb(var(--surface)); }
+.payment-statement .pay-win .tiles .tile .l { color: rgb(var(--card-label)); font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
+.payment-statement .pay-win .tiles .tile .v { margin-top: 6px; color: rgb(var(--ink)); font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.payment-statement .pay-win .tiles .tile .v.txt { font-size: 12.5px; font-weight: 500; letter-spacing: 0; }
+.payment-statement .pay-win .pay-people-table .state-cell, .payment-statement .pay-win .pay-state { white-space: nowrap; }
+.payment-statement .pay-selection { border-color: rgb(var(--hairline)); border-radius: 8px; }
+.payment-statement .pay-selection h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.payment-statement .pay-selection > span { color: rgb(var(--ink)); }
+.payment-statement .pay-date { min-height: 32px; padding: 5px 9px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); color: rgb(var(--ink)); }
+.payment-statement .pay-date:focus { border-color: rgb(var(--ink) / 0.55); }
+.payment-statement input[type="checkbox"] { accent-color: rgb(var(--accent)); width: 16px; height: 16px; cursor: pointer; }
+.payment-statement input[type="checkbox"]:disabled { cursor: default; }
+
+/* The generation dialog (native <dialog>, centred): department rail on the
+   left, the employee pane on white, one frame around both. */
+.payment-statement .pay-generation-grid { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 20px; }
+.payment-statement .pay-department-picker { display: flex; flex-direction: column; gap: 2px; }
+.payment-statement .pay-department-picker button { padding: 9px; border: 0; border-radius: 6px; background: transparent; color: rgb(var(--ink)); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.payment-statement .pay-department-picker button:hover:not([aria-pressed="true"]):not(:disabled) { background: rgb(var(--surface)); }
+.payment-statement .pay-department-picker button[aria-pressed="true"] { background: rgb(var(--accent-bg)); color: rgb(var(--ink)); font-weight: 600; }
+.payment-statement .pay-department-picker small { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; }
+.payment-statement .pay-generation-people { min-width: 0; }
+.payment-statement .pay-generation-fields { display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px; }
+.payment-statement .pay-generation-fields label, .payment-statement .pay-generation-fields strong { display: flex; flex-direction: column; gap: 4px; }
+.payment-statement .pay-generation-fields strong { margin-top: 4px; font-weight: 600; }
+.payment-statement .pay-generation-window table td { padding: 11px 12px; }
+.payment-statement .pay-generation-footer { width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; }
+.payment-statement .pay-generation-footer strong { display: block; margin-top: 3px; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.payment-statement .pay-generation-result { padding: 10px 0; }
+.payment-statement .pay-generation-result p { margin: 8px 0 15px; }
+.payment-statement .pay-win.pay-generation-window { inset: 0; margin: auto; width: min(1120px, calc(100vw - 48px)); max-width: none; height: fit-content; max-height: min(840px, calc(100dvh - 48px)); padding: 0; color: rgb(var(--ink)); border-radius: 12px; }
+.payment-statement .pay-win.pay-generation-window[data-step="selection"] { height: min(840px, calc(100dvh - 48px)); }
+.payment-statement .pay-generation-window:not([open]) { display: none; }
+.payment-statement .pay-generation-window::backdrop { background: rgb(var(--scrim) / 0.45); }
+.payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { flex-shrink: 0; }
+.payment-statement .pay-generation-window .wh h3 { margin: 0 0 6px; }
+.payment-statement .pay-generation-window .wh p { margin: 0; }
+.payment-statement .pay-generation-window .x { min-width: 36px; min-height: 36px; }
+.payment-statement .pay-generation-window .x:disabled { opacity: 0.5; cursor: wait; }
+.payment-statement .pay-generation-window .wb { min-height: 0; padding: 20px; background: rgb(var(--paper)); overscroll-behavior: contain; scrollbar-gutter: stable; }
+.payment-statement .pay-generation-window[data-step="selection"] .wb { overflow: hidden; scrollbar-gutter: auto; }
+.payment-statement .pay-generation-window .wb h3 { margin: 0; }
+.payment-statement .pay-generation-window .wf { flex-direction: column; align-items: stretch; gap: 6px; }
+.payment-statement .pay-generation-window .wf > .pay-muted { margin: 0; font-size: 11px; }
+.payment-statement .pay-generation-window .pay-generation-grid { flex: 1; min-height: 0; grid-template-columns: 174px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 0; overflow: hidden; background: rgb(var(--surface-2)); border: 1px solid rgb(var(--sheet-table-border)); border-radius: 10px; }
+.payment-statement .pay-generation-window .pay-department-picker { min-height: 0; align-self: stretch; position: static; overflow: auto; overscroll-behavior: contain; padding: 10px; }
+.payment-statement .pay-generation-window .pay-department-picker button { border-radius: 0 6px 6px 0; }
+.payment-statement .pay-generation-window .pay-department-picker button[aria-pressed="true"] { box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+.payment-statement .pay-generation-window .pay-generation-people { min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 18px; background: rgb(var(--surface)); border-left: 1px solid rgb(var(--hairline)); }
+.payment-statement .pay-generation-window .pay-generation-fields { flex-shrink: 0; }
+.payment-statement .pay-generation-window .pay-generation-people > .pay-table-wrap { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.payment-statement .pay-generation-window .pay-generation-people .pay-statement-table thead th { position: sticky; top: 0; z-index: 1; }
+.payment-statement .pay-generation-window .pay-statement-table { min-width: 520px; }
+.payment-statement .pay-generation-window .pay-statement-table tbody tr:has(input:checked) { background: rgb(var(--accent-bg)); }
+.payment-statement .pay-generation-window .pay-statement-table tbody tr:has(input:checked) td:first-child { box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+
+@media (max-width: 700px) {
+  .payment-statement .pay-generation-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .payment-statement .pay-department-picker { flex-direction: row; flex-wrap: wrap; }
+  .payment-statement .pay-win { width: 100vw; }
+  .payment-statement .pay-win.pay-generation-window { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .payment-statement .pay-win.pay-generation-window[data-step="selection"] { height: calc(100dvh - 16px); }
+  .payment-statement .pay-generation-window .wh, .payment-statement .pay-generation-window .wf { padding: 12px 14px; }
+  .payment-statement .pay-generation-window .wb { padding: 14px; }
+  .payment-statement .pay-generation-window .pay-generation-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .payment-statement .pay-generation-window .pay-department-picker { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 8px; }
+  .payment-statement .pay-generation-window .pay-department-picker button { flex: none; white-space: nowrap; border-radius: 6px 6px 0 0; }
+  .payment-statement .pay-generation-window .pay-department-picker button[aria-pressed="true"] { box-shadow: inset 0 -3px 0 rgb(var(--accent)); }
+  .payment-statement .pay-generation-window .pay-generation-people { padding: 12px; border-left: 0; border-top: 1px solid rgb(var(--hairline)); }
+  .payment-statement .pay-generation-footer { align-items: flex-start; }
 }
-@media(max-height:560px) {
-  .payment-statement .pay-generation-window .pay-generation-people { display:block; overflow:auto; overscroll-behavior:contain; }
-  .payment-statement .pay-generation-window .pay-generation-people > .pay-table-wrap { overscroll-behavior:auto; scrollbar-gutter:auto; }
+/* The drawer goes full-screen on a phone (globals.css › Payment board): no
+   rounded corners against the screen's edge. The dialog stays inset. */
+@media (max-width: 640px) {
+  .payment-statement .pay-win:not(.pay-generation-window) { border-radius: 0; }
 }
-@media(pointer:coarse) {
-  .payment-statement .payment-tabs button, .payment-statement .pay-row-actions button, .payment-statement .pay-department-picker button { min-height:44px; }
-  .payment-statement .pay-date { font-size:16px; min-height:44px; }
-  .payment-statement .pay-generation-window .x { min-width:44px; min-height:44px; }
+@media (max-height: 560px) {
+  .payment-statement .pay-generation-window .pay-generation-people { display: block; overflow: auto; overscroll-behavior: contain; }
+  .payment-statement .pay-generation-window .pay-generation-people > .pay-table-wrap { overscroll-behavior: auto; scrollbar-gutter: auto; }
+}
+@media (pointer: coarse) {
+  .payment-statement .payment-tabs button, .payment-statement .pay-row-actions button, .payment-statement .pay-department-picker button { min-height: 44px; }
+  .payment-statement .pay-date { font-size: 16px; min-height: 44px; }
+  .payment-statement .pay-generation-window .x { min-width: 44px; min-height: 44px; }
 }

@@ -52,7 +52,7 @@ export default function DeptRows({
 
   return (
     <div>
-      <div className="pay-section-toolbar">
+      <div className="sheet-toolbar pay-section-toolbar">
         <div className="pay-filt" role="group" aria-label="Filter departments">
           {filters.filter(([key]) => key === 'all' || counts[key] > 0).map(([key, label]) => (
             <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}>
@@ -64,80 +64,82 @@ export default function DeptRows({
           All staff generated PVs · includes paid
         </Link>
       </div>
-      <div className="pay-table-wrap">
-        <table className="pay-statement-table pay-salary-table" aria-label="Salary vouchers by department">
-          <thead>
-            <tr>
-              <th scope="col">Department</th>
-              <th scope="col" className="right">People</th>
-              <th scope="col" className="right">Net salary · RM</th>
-              <th scope="col">Status</th>
-              <th scope="col" className="right">vs {prevMonthName}</th>
-              <th scope="col" className="right">PV records</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.length === 0 ? <tr><td colSpan={6} className="empty">No department in this state.</td></tr> : null}
-            {visible.map((g) => {
-              const funded = fundedFor(g)
-              const date = g.scope === 'directors' ? dates.directors : dates.staff
-              const timeline = deptTimeline(g, funded, date, today)
-              const difference = delta(g.net, g.prev_net)
-              const remaining = remainingOf(g)
-              const canGenerate = funded && remaining > 0 && (g.scope === 'directors' || !!g.dept_id)
-              const reason = !funded ? 'Funding is not complete yet' : !g.dept_id && g.scope === 'staff' ? 'Assign a department on the People page first' : undefined
-              const paidDates = Array.from(new Set(g.vouchers.map((v) => v.payment_date)))
-              const status = g.headcount === 0 ? 'No salary due'
-                : g.stage === 'paid' ? `Paid${paidDates.length === 1 && paidDates[0] ? ` · ${shortDate(paidDates[0])}` : ''}`
-                  : g.stage === 'pending' ? 'Awaiting Principal'
-                    : g.stage === 'approved' ? 'Approved'
-                      : g.stage === 'partial' ? `${g.generated} of ${g.headcount} generated`
-                        : funded ? 'Not generated' : 'Awaiting funding'
-              return (
-                <tr key={g.key}>
-                  <th scope="row">
-                    {g.name}
-                    {g.blockers > 0 && g.stage !== 'paid' ? <small className="pay-muted">{g.blockers} bank detail{g.blockers === 1 ? '' : 's'} to check</small> : null}
-                  </th>
-                  <td className="num">{g.people.length}</td>
-                  <td className="num">{formatMoneyBare(g.net)}</td>
-                  <td>
-                    <span className={`pay-status ${timeline.tone}`} title={timeline.sentence}>{status}</span>
-                    {g.stage !== 'paid' && g.headcount > 0 ? <small className="pay-muted">{timeline.caption}</small> : null}
-                  </td>
-                  <td className="num">
-                    {difference ? (
-                      <span className={`pay-delta ${difference.dir}${isNotableMove(difference) ? ' notable' : ''}`} title={varianceLabel(difference, prevMonthName) ?? undefined}>
-                        {difference.dir === 'flat' ? '—' : difference.pct == null ? `${difference.dir === 'up' ? '+' : ''}${formatMoneyBare(difference.abs)}` : `${difference.pct > 0 ? '+' : ''}${difference.pct.toFixed(1)}%`}
-                      </span>
-                    ) : <span className="pay-muted">—</span>}
-                  </td>
-                  <td>
-                    <div className="pay-row-actions">
-                      <button type="button" className="pay-btn text" onClick={() => onOpen(g.key)}>
-                        {g.vouchers.length > 0 ? `${g.vouchers.length} PV${g.vouchers.length === 1 ? '' : 's'} · View` : 'View employees'}
-                      </button>
-                      {remaining > 0 ? <>
-                        <button type="button" className="pay-btn sec" onClick={() => onGenerate(g, 'department')} disabled={!canGenerate || busy != null} title={reason}>Generate by Department</button>
-                        <button type="button" className="pay-btn sec" onClick={() => onGenerate(g, 'employee')} disabled={!canGenerate || busy != null} title={reason}>Manual generate</button>
-                      </> : null}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot>
-            <tr>
-              <th scope="row">{filter === 'all' ? 'Total' : 'Filtered total'}</th>
-              <td className="num">{totalPeople}</td>
-              <td className="num">{formatMoneyBare(totalNet)}</td>
-              <td colSpan={3} className="right">{visible.length} groups · {totalVouchers} PV{totalVouchers === 1 ? '' : 's'}</td>
-            </tr>
-          </tfoot>
-        </table>
+      <div className="table-frame">
+        <div className="table-frame-scroll">
+          <table className="pay-statement-table pay-salary-table" aria-label="Salary vouchers by department">
+            <thead>
+              <tr>
+                <th scope="col">Department</th>
+                <th scope="col" className="right">People</th>
+                <th scope="col" className="right">Net salary · RM</th>
+                <th scope="col">Status</th>
+                <th scope="col" className="right">vs {prevMonthName}</th>
+                <th scope="col" className="right">PV records</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.length === 0 ? <tr><td colSpan={6} className="empty">No department in this state.</td></tr> : null}
+              {visible.map((g) => {
+                const funded = fundedFor(g)
+                const date = g.scope === 'directors' ? dates.directors : dates.staff
+                const timeline = deptTimeline(g, funded, date, today)
+                const difference = delta(g.net, g.prev_net)
+                const remaining = remainingOf(g)
+                const canGenerate = funded && remaining > 0 && (g.scope === 'directors' || !!g.dept_id)
+                const reason = !funded ? 'Funding is not complete yet' : !g.dept_id && g.scope === 'staff' ? 'Assign a department on the People page first' : undefined
+                const paidDates = Array.from(new Set(g.vouchers.map((v) => v.payment_date)))
+                const status = g.headcount === 0 ? 'No salary due'
+                  : g.stage === 'paid' ? `Paid${paidDates.length === 1 && paidDates[0] ? ` · ${shortDate(paidDates[0])}` : ''}`
+                    : g.stage === 'pending' ? 'Awaiting Principal'
+                      : g.stage === 'approved' ? 'Approved'
+                        : g.stage === 'partial' ? `${g.generated} of ${g.headcount} generated`
+                          : funded ? 'Not generated' : 'Awaiting funding'
+                return (
+                  <tr key={g.key}>
+                    <th scope="row">
+                      {g.name}
+                      {g.blockers > 0 && g.stage !== 'paid' ? <small className="pay-muted">{g.blockers} bank detail{g.blockers === 1 ? '' : 's'} to check</small> : null}
+                    </th>
+                    <td className="num">{g.people.length}</td>
+                    <td className="num">{formatMoneyBare(g.net)}</td>
+                    <td>
+                      <span className={`chip${timeline.tone === 'muted' ? '' : ` ${timeline.tone}`}`} title={timeline.sentence}><span className="dot" />{status}</span>
+                      {g.stage !== 'paid' && g.headcount > 0 ? <small className="pay-muted">{timeline.caption}</small> : null}
+                    </td>
+                    <td className="num">
+                      {difference ? (
+                        <span className={`pay-delta ${difference.dir}${isNotableMove(difference) ? ' notable' : ''}`} title={varianceLabel(difference, prevMonthName) ?? undefined}>
+                          {difference.dir === 'flat' ? '—' : difference.pct == null ? `${difference.dir === 'up' ? '+' : ''}${formatMoneyBare(difference.abs)}` : `${difference.pct > 0 ? '+' : ''}${difference.pct.toFixed(1)}%`}
+                        </span>
+                      ) : <span className="pay-muted">—</span>}
+                    </td>
+                    <td>
+                      <div className="pay-row-actions">
+                        <button type="button" className="pay-btn text" onClick={() => onOpen(g.key)}>
+                          {g.vouchers.length > 0 ? `${g.vouchers.length} PV${g.vouchers.length === 1 ? '' : 's'} · View` : 'View employees'}
+                        </button>
+                        {remaining > 0 ? <>
+                          <button type="button" className="pay-btn sec" onClick={() => onGenerate(g, 'department')} disabled={!canGenerate || busy != null} title={reason}>Generate by Department</button>
+                          <button type="button" className="pay-btn sec" onClick={() => onGenerate(g, 'employee')} disabled={!canGenerate || busy != null} title={reason}>Manual generate</button>
+                        </> : null}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">{filter === 'all' ? 'Total' : 'Filtered total'}</th>
+                <td className="num">{totalPeople}</td>
+                <td className="num">{formatMoneyBare(totalNet)}</td>
+                <td colSpan={3} className="right">{visible.length} groups · {totalVouchers} PV{totalVouchers === 1 ? '' : 's'}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div className="table-frame-foot">Generate by Department groups remaining payments by department and component. Manual generate creates one PV per selected payment. Payments already covered by a PV are excluded.</div>
       </div>
-      <p className="pay-muted">Generate by Department groups remaining payments by department and component. Manual generate creates one PV per selected payment. Payments already covered by a PV are excluded.</p>
     </div>
   )
 }

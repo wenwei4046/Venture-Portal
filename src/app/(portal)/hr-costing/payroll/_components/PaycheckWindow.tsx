@@ -121,8 +121,10 @@ export default function PaycheckWindow({
   else if (dirty) chip = { cls: 'alert', text: 'Unsaved changes' }
   else chip = { cls: 'info', text: 'No unsaved changes' }
 
+  // Portalled to <body>, outside the sheet, so it carries the sheet's palette
+  // itself (`sheet-theme` on a box-less wrapper).
   return createPortal(
-    <>
+    <div className="sheet-theme contents">
       <div className="pg-scrim" onClick={onClose} aria-hidden />
       <div
         ref={dialogRef}
@@ -171,30 +173,27 @@ export default function PaycheckWindow({
           {split && (
             <section className="col-span-full mb-5" aria-label="Revenue payout split">
               <h4>Revenue payout <span>{split.basicPay === 0 ? 'Full commission · RM' : 'RM'}</span></h4>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-graphite mb-1">{netBasicSplit ? 'Net basic · salary PV' : 'Basic pay'}</p>
-                  <p className="statement-amount compact text-num-ink">{formatMoneyBare(split.basicPay)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-graphite mb-1">Commission balance</p>
-                  <p className={cn('statement-amount compact text-num-ink', split.shortfall > 0 && 'neg')}>
-                    {formatMoneyBare(split.commissionBalance)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-graphite mb-1">{netBasicSplit ? 'Total to employee' : 'Total before other adjustments'}</p>
-                  <p className="statement-amount compact text-num-ink">{formatMoneyBare(split.totalPayout)}</p>
-                </div>
+              {/* One person's three payout figures — the workbench's summary
+                  boxes (a person's ledger), not a page's summary cards. */}
+              <div className="grid gap-2.5 sm:grid-cols-3">
+                <PayoutFigure label={netBasicSplit ? 'Net basic · salary PV' : 'Basic pay'}>
+                  {formatMoneyBare(split.basicPay)}
+                </PayoutFigure>
+                <PayoutFigure label="Commission balance" negative={split.shortfall > 0}>
+                  {formatMoneyBare(split.commissionBalance)}
+                </PayoutFigure>
+                <PayoutFigure label={netBasicSplit ? 'Total to employee' : 'Total before other adjustments'}>
+                  {formatMoneyBare(split.totalPayout)}
+                </PayoutFigure>
               </div>
-              {netBasicSplit ? <RevenuePayoutBreakdown row={row} /> : <p className="text-xs text-graphite mt-3">
+              {netBasicSplit ? <RevenuePayoutBreakdown row={row} /> : <p className="text-xs mt-3">
                 Gross commission {formatMoneyBare(row.commission_amount)} − basic pay {formatMoneyBare(split.basicPay)}
                 {' '}− EPF ER {formatMoneyBare(row.epf_er)} − EPF EE {formatMoneyBare(row.epf_ee)}
                 {' '}= commission balance {formatMoneyBare(split.commissionBalance)}.
                 {' '}Basic pay is paid in full; both EPF shares are taken from the commission balance.
                 {' '}Allowances, other deductions and tax are reflected in Net to bank.
               </p>}
-              {dirty && <p className="text-xs text-alert mt-2">These are saved amounts. Save changes to recalculate the payout and statutory contributions.</p>}
+              {dirty && <p className="sheet-warning">These are saved amounts. Save changes to recalculate the payout and statutory contributions.</p>}
               {split.shortfall > 0 && (
                 <p className="text-xs text-danger mt-2">Commission is short by RM {formatMoneyBare(split.shortfall)}. Review the basic pay before settlement.</p>
               )}
@@ -280,7 +279,7 @@ export default function PaycheckWindow({
             {kv(tax[0], netBasicSplit && row.withholding_tax === 0
               ? <EditableStatLine payrollId={row.id} field="pcb" value={row.pcb} readOnly={locked || dirty || isPending} />
               : formatMoneyBare(tax[1]), { zero: tax[1] === 0 })}
-            {netBasicSplit && row.pcb_override_amount != null && <div className="text-xs text-graphite mt-2">
+            {netBasicSplit && row.pcb_override_amount != null && <div className="text-xs mt-2">
               Manual PCB amount
               {!locked && !dirty && !isPending && <ResetStaffStatutoryButton payrollId={row.id} overridden />}
             </div>}
@@ -290,9 +289,12 @@ export default function PaycheckWindow({
           </section>
 
           <div className="foot">
-            <span className="meta">
+            {/* A plain span, not `.meta`: that class sets the slip's old
+                italic caption, and the sheet's lettering is upright. */}
+            <span className="text-[12px]">
               Source {row.source} · status {row.status}
-              <span className={`chip ${chip.cls}`} title={error ?? undefined}>
+              <span className={`chip ${chip.cls} ml-2`} title={error ?? undefined}>
+                <span className="dot" />
                 {chip.text}
               </span>
             </span>
@@ -318,8 +320,19 @@ export default function PaycheckWindow({
           </div>
         </div>
       </div>
-    </>,
+    </div>,
     document.body,
+  )
+}
+
+function PayoutFigure({ label, negative, children }: { label: string; negative?: boolean; children: ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-hairline bg-surface-2 px-[15px] py-[13px]">
+      <p className="text-[11px] leading-normal">{label}</p>
+      <p className={cn('mt-[5px] text-[19px] font-bold leading-tight tracking-[-0.025em] tabular-nums', negative && 'text-danger')}>
+        {children}
+      </p>
+    </div>
   )
 }
 

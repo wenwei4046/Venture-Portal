@@ -48,6 +48,20 @@ describe('SlidingTabs', () => {
     expect(active.closest('nav')?.getAttribute('data-variant')).toBe('control')
   })
 
+  it('marks the picked tab and its count for the sheet theme to draw', () => {
+    render(
+      <SlidingTabs
+        items={[{ key: 'chart', label: 'Hierarchy' }, { key: 'team', label: 'Team', count: 26 }]}
+        active="team"
+        onTabChange={() => {}}
+      />
+    )
+    const picked = screen.getByRole('button', { name: 'Team 26' })
+    expect(picked).toHaveAttribute('data-active', 'true')
+    expect(screen.getByRole('button', { name: 'Hierarchy' })).not.toHaveAttribute('data-active')
+    expect(screen.getByText('26')).toHaveAttribute('data-tab-count')
+  })
+
   it('defaults to the text variant', () => {
     render(<SlidingTabs items={tabs} active="treasury" onTabChange={() => {}} />)
     const active = screen.getByRole('button', { name: 'Treasury' })

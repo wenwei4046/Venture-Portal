@@ -42,7 +42,7 @@ export default function OrganiserSection({
   const running = organisers.filter(o => o.fairs > 0).length
 
   return (
-    <section className="mb-12">
+    <section className="mb-10">
       <SectionHead
         title="Organisers"
         count={`${organisers.length} ORGANISER${organisers.length === 1 ? '' : 'S'}`}
@@ -120,13 +120,13 @@ export default function OrganiserSection({
                       />
                     </td>
                     <td className="num m-hide" data-label="Fairs">
-                      {o.fairs || <span className="text-muted">—</span>}
+                      {o.fairs || '—'}
                     </td>
                     <td className="num m-hide" data-label="Bills">
-                      {o.bills || <span className="text-muted">—</span>}
+                      {o.bills || '—'}
                     </td>
                     <td className="num">
-                      {o.total > 0 ? formatMoney(o.total) : <span className="text-muted">—</span>}
+                      {o.total > 0 ? formatMoney(o.total) : '—'}
                     </td>
                     <td>
                       <Tick
@@ -135,14 +135,19 @@ export default function OrganiserSection({
                         ariaLabel={`${o.name} active`}
                       />
                     </td>
-                    <td className="flex items-center gap-3">
-                      <SaveButton pending={pending} label="✓" />
-                      <ActionButton
-                        run={() => deleteOrganiser(o.id)}
-                        label="Remove"
-                        danger
-                        confirm={`Remove ${o.name} from the organiser register?`}
-                      />
+                    {/* The flex lives inside the cell: a `display: flex` <td>
+                        stops being a table cell, and its rule and zebra no
+                        longer reach the row's full height. */}
+                    <td className="whitespace-nowrap">
+                      <span className="inline-flex items-center gap-3">
+                        <SaveButton pending={pending} label="✓" />
+                        <ActionButton
+                          run={() => deleteOrganiser(o.id)}
+                          label="Remove"
+                          danger
+                          confirm={`Remove ${o.name} from the organiser register?`}
+                        />
+                      </span>
                     </td>
                   </tr>
                 )}
@@ -151,7 +156,7 @@ export default function OrganiserSection({
 
             {organisers.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-muted font-serif italic">
+                <td colSpan={7} className="text-center">
                   No organisers yet — the venue table below has nothing to offer until there is one.
                 </td>
               </tr>

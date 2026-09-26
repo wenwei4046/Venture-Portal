@@ -53,7 +53,7 @@ export default async function VenueRegisterPage() {
             <em>I.</em> REVENUE · VENUES
           </div>
           <h1 className="page-title">Venues &amp; organisers</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          <p className="text-sm mt-3 max-w-2xl">
             Every place the ERP has named, and who ran the fair there each month.{' '}
             <em>The organiser is the one thing the feed never carries</em> — so it is picked here,
             per month, from a register typed once.
@@ -62,7 +62,7 @@ export default async function VenueRegisterPage() {
         {subDepts.length > 0 ? (
           <Link
             href={revenuePath(subDepts[0].slug)}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
           >
             ← {subDepts[0].name}
           </Link>

@@ -41,6 +41,17 @@ type DropTarget = { id: string; reason: string | null; armed: boolean; unchanged
 type ArrangeOptions = { keepVisible?: boolean; alignMembers?: boolean; origin?: ManualLayout }
 const nodeTypes = { person: HierarchyPersonCard }
 const edgeTypes = { line: ReportingLine }
+// The furniture around the canvas, in the sheet's tone (DESIGN.md › "Sheet
+// theme"). Written here rather than through the shared `.space-jumps` /
+// `.space-tidy` / `.space-memberships` rules, which give a hovered or picked
+// button orange lettering — and orange is never lettering on the sheet. The
+// canvas itself keeps its own palette.
+/** A department pill: the sheet's filter chip, white, the picked one peach. */
+const JUMP_PILL = 'inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 text-xs transition-colors hover:border-accent aria-pressed:border-accent aria-pressed:bg-accent-bg aria-pressed:font-bold max-[700px]:min-h-[44px]'
+/** A small outline button. */
+const TOOL_BUTTON = 'inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-3 py-[7px] text-xs transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 max-[700px]:min-h-[44px]'
+/** A refusal: `.sheet-notice`'s geometry on the danger wash. */
+const DANGER_NOTE = 'my-3.5 rounded-md border border-danger/50 bg-danger-bg px-3.5 py-[11px] text-[12px] leading-[1.65] text-danger'
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 const layoutStorage = () => { try { return window.localStorage } catch { return null } }
 const duration = (ms: number) => reducedMotion() ? 0 : ms
@@ -682,13 +693,15 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
         }
       }
     }}>
-      {error ? <div role="alert" className="mb-3 rounded-control border border-danger/50 bg-danger-bg p-3 text-sm text-danger">{error}</div> : null}
-      {note ? <p role="status" className="mb-3 text-sm text-graphite">{note}</p> : null}
-      <div className="space-toolbar">
-        <div className="space-jumps" aria-label="Jump to a sub-department">
-          <button type="button" aria-pressed={activeDepartment === null} onClick={() => focusDepartment(null)}>All departments</button>
+      {error ? <div role="alert" className={DANGER_NOTE}>{error}</div> : null}
+      {note ? <p role="status" className="sheet-notice">{note}</p> : null}
+      {/* The sheet's toolbar panel (`.sheet-toolbar`'s look, spelled out so the
+          search keeps its own 16px face on a phone). */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hairline bg-surface-2 p-3.5">
+        <div className="flex flex-wrap items-center gap-[7px]" aria-label="Jump to a sub-department">
+          <button type="button" className={JUMP_PILL} aria-pressed={activeDepartment === null} onClick={() => focusDepartment(null)}>All departments</button>
           {departments.map((department, index) => <button
-            type="button" key={department.id} aria-pressed={activeDepartment === department.id}
+            type="button" key={department.id} className={JUMP_PILL} aria-pressed={activeDepartment === department.id}
             onClick={() => focusDepartment(department.id)} title={`Jump to ${department.name}${index < 9 ? ` · ${index + 1}` : ''}`}
           >{department.name}<span className="space-shortcut">{index < 9 ? index + 1 : ''}</span></button>)}
         </div>
@@ -703,7 +716,7 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
               </button>) : <p>No matching person.</p>}
             </div> : null}
           </div>
-          <button type="button" className="space-tidy" disabled={pending} onClick={() => { if (menuPendingRef.current) return; interruptCamera(); arrange(undefined, { keepVisible: true, alignMembers: true }) }} title="Align members and separate overlapping teams; keep team locations">Tidy</button>
+          <button type="button" className={`${TOOL_BUTTON} font-medium`} disabled={pending} onClick={() => { if (menuPendingRef.current) return; interruptCamera(); arrange(undefined, { keepVisible: true, alignMembers: true }) }} title="Align members and separate overlapping teams; keep team locations">Tidy</button>
           <div className="org-zoom">
             <button type="button" onClick={() => { interruptCamera(); void zoomOut({ duration: duration(250) }) }} aria-label="Zoom out">−</button>
             <button type="button" className="lv" onClick={() => focusDepartment(null)} aria-label="Fit all departments"><ZoomReadout /></button>
@@ -807,8 +820,12 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
             </ViewportPortal>
           </ReactFlow>
           {dropTarget && dropPerson ? <div className={`space-drop-notice${dropTarget.reason ? ' refused' : ''}`} role="status">
-            {dropTarget.reason ?? (dropTarget.unchanged ? `Already under ${dropPerson.person.name} · release to align`
-              : `${dropTarget.armed ? 'Release' : 'Hold here'} to move under ${dropPerson.person.name} · ${dropPerson.department.name}`)}
+            {/* The notice paints its words orange; on the sheet they are ink,
+                with the orange left to its frame. A refusal keeps its danger. */}
+            <strong className={`font-medium${dropTarget.reason ? '' : ' text-ink'}`}>
+              {dropTarget.reason ?? (dropTarget.unchanged ? `Already under ${dropPerson.person.name} · release to align`
+                : `${dropTarget.armed ? 'Release' : 'Hold here'} to move under ${dropPerson.person.name} · ${dropPerson.department.name}`)}
+            </strong>
             {!dropTarget.reason && !dropTarget.unchanged && carriedCount > 0 ? <span>Includes {carriedCount} downline{carriedCount === 1 ? '' : 's'} · titles and ranks stay the same</span> : null}
           </div> : null}
         </div>
@@ -819,11 +836,11 @@ function SpaceChart({ departments: serverDepartments, initialDepartmentId, membe
           <strong>{selectedRecord ? `${selectedRecord.person.name} · ${selectedRecord.department.name}` : 'Sub-department → Team → Member'}</strong>
           <span>{selectedRecord ? `${selectedRecord.person.titleName ?? 'No title'} · ${selectedRecord.person.rankLabel ?? 'No rank yet'}${selectedReportsTo ? ` · reports to ${selectedReportsTo}` : ''}` : 'Drag a team border or heading to move it · Members align inside · Hold over a person to change team'}</span>
         </div>
-        {selectedRecord ? <div className="space-memberships" aria-label="This person's other memberships">
+        {selectedRecord ? <div className="flex flex-wrap gap-1.5" aria-label="This person's other memberships">
           {records.filter(record => record.person.staffId === selectedRecord.person.staffId && record.id !== selectedRecord.id).map(record =>
-            <button type="button" key={record.id} onClick={() => reveal(record.id)}>{record.department.name} · {record.person.titleName ?? 'No title'} ↗</button>)}
-          <button type="button" disabled={pending} aria-haspopup="menu" onClick={event => beginAdd(selectedRecord.id, event.currentTarget)}>Add to department</button>
-          <button type="button" disabled={pending} data-org-open onClick={event => {
+            <button type="button" key={record.id} className={TOOL_BUTTON} onClick={() => reveal(record.id)}>{record.department.name} · {record.person.titleName ?? 'No title'} ↗</button>)}
+          <button type="button" className={TOOL_BUTTON} disabled={pending} aria-haspopup="menu" onClick={event => beginAdd(selectedRecord.id, event.currentTarget)}>Add to department</button>
+          <button type="button" className={TOOL_BUTTON} disabled={pending} data-org-open onClick={event => {
             const rect = event.currentTarget.getBoundingClientRect()
             openUpline(selectedRecord.id, { left: rect.left, top: rect.top, bottom: rect.bottom })
           }}>Change upline</button>

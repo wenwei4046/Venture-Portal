@@ -9,6 +9,7 @@ import { venueKey } from '@/lib/venues'
 import { classifyLine, normaliseCode, type LineClass } from '@/lib/commission/engine'
 import { costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 
 interface PageProps {
@@ -32,6 +33,16 @@ const CLASS_LABEL: Record<LineClass, string> = {
   kpi: 'KPI item',
   excluded_group: 'Not commissionable',
   unknown_group: 'Group not classified',
+}
+
+/** A line's class as a word on a wash — KPI giveaways in the sheet's orange,
+ *  groups that earn nothing grey, an unclassified group red (the run refuses
+ *  to pay the month until somebody classifies it). */
+const CLASS_CHIP: Record<LineClass, string> = {
+  commissionable: '',
+  kpi: 'accent',
+  excluded_group: 'info',
+  unknown_group: 'danger',
 }
 
 interface LineRow {
@@ -243,7 +254,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
             <em>I.</em> REVENUE · {subDept.name.toUpperCase()} · {label(period).toUpperCase()}
           </div>
           <h1 className="page-title">{order.order_no}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
+          <p className="text-sm mt-3">
             {order.customer_name ?? 'no customer name'} ·{' '}
             {order.hr_staff_costs?.employee_name ?? `${order.agent_name} (unmatched)`} ·{' '}
             {formatDate(order.order_date)}
@@ -252,14 +263,14 @@ export default async function OrderDetailPage({ params }: PageProps) {
         </div>
         <Link
           href={revenuePath(subDept.slug, period, 'orders')}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-control transition-colors"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
         >
           ← All bills
         </Link>
       </div>
 
       {order.cancelled ? (
-        <div className="bg-surface-2 border border-hairline text-graphite rounded-md p-4 mb-8 text-sm font-sans">
+        <div className="sheet-warning">
           This bill earns nothing:{' '}
           <strong>
             {order.erp_on_hold ? 'it is on hold in the ERP' : `its ERP status is ${order.erp_status}`}
@@ -268,64 +279,74 @@ export default async function OrderDetailPage({ params }: PageProps) {
         </div>
       ) : null}
 
-      <section className="mb-10">
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Fig label="Bill total" value={formatMoney(total)} big />
-          <Fig label="Commissionable" value={formatMoney(commissionable)} note="Product lines only" />
-          <Fig
-            label="Paid"
-            value={formatMoney(paid)}
-            note={
-              required === null
-                ? 'No deposit gate on this scheme'
-                : depositMet
-                  ? `Clears the ${formatMoney(required)} gate`
-                  : `${formatMoney(required)} needed before it pays`
-            }
-            warn={!depositMet}
-          />
-          <Fig
-            label="Margin"
-            value={margin === null ? 'no cost' : pct(margin)}
-            note={
-              manualMargin !== null
-                ? 'Keyed by hand — it wins over the line costs'
-                : baseMissing > 0
-                  ? `${baseMissing} of ${marginBase.length} commissionable lines have no cost, so the bill cannot be judged`
-                  : 'Every commissionable line carries a cost'
-            }
-            warn={margin === null}
-          />
-        </div>
-      </section>
+      {/* The bill in four figures. Its total is what the page is opened for —
+          the sheet's one walnut card; Paid and Margin turn red only while the
+          deposit gate holds the bill or a missing cost blinds its margin. */}
+      <StatCards label={`Bill ${order.order_no} in figures`}>
+        <StatCard label="Bill total" value={formatMoney(total)} icon="receipt" tone="primary" />
+        <StatCard label="Commissionable" value={formatMoney(commissionable)} icon="coin" note="Product lines only" />
+        <StatCard
+          label="Paid"
+          value={formatMoney(paid)}
+          icon="wallet"
+          note={
+            required === null
+              ? 'No deposit gate on this scheme'
+              : depositMet
+                ? `Clears the ${formatMoney(required)} gate`
+                : `${formatMoney(required)} needed before it pays`
+          }
+          tone={depositMet ? undefined : 'danger'}
+        />
+        <StatCard
+          label="Margin"
+          value={margin === null ? 'no cost' : pct(margin)}
+          icon="percent"
+          note={
+            manualMargin !== null
+              ? 'Keyed by hand — it wins over the line costs'
+              : baseMissing > 0
+                ? `${baseMissing} of ${marginBase.length} commissionable lines have no cost, so the bill cannot be judged`
+                : 'Every commissionable line carries a cost'
+          }
+          tone={margin === null ? 'danger' : undefined}
+        />
+      </StatCards>
 
       <section className="mb-10">
         <div className="sect-head">
           <h2>The bill</h2>
           <span className="rule" aria-hidden />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <dl className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Venue">
             {order.venue ? (
               <Link
                 href={`${revenuePath(subDept.slug, period, 'orders')}?venue=${encodeURIComponent(venueKey(order.venue) ?? '')}`}
-                className="text-ink hover:text-accent"
+                className="text-accent hover:text-accent-hover"
               >
                 {order.venue}
               </Link>
             ) : (
-              <span className="text-muted">the ERP sent none</span>
+              <span>the ERP sent none</span>
             )}
           </Fact>
           <Fact label="Organiser">
-            {organiser ?? <span className="text-muted">not recorded</span>}
+            {organiser ?? <span>not recorded</span>}
           </Fact>
           <Fact label="Warehouse">{order.location ?? '—'}</Fact>
-          <Fact label="Brand">{order.brand_code ?? <span className="text-danger">none resolved</span>}</Fact>
+          <Fact label="Brand">
+            {order.brand_code ?? (
+              <span className="chip danger">
+                <span className="dot" />
+                none resolved
+              </span>
+            )}
+          </Fact>
           <Fact label="Customer">
             {order.customer_name ?? '—'}
             {order.debtor_code ? (
-              <span className="font-mono text-xs text-muted"> · {order.debtor_code}</span>
+              <span className="font-mono text-xs"> · {order.debtor_code}</span>
             ) : null}
           </Fact>
           <Fact label="Event day">{formatDate(order.event_date)}</Fact>
@@ -333,21 +354,21 @@ export default async function OrderDetailPage({ params }: PageProps) {
             {tag ? (
               <>
                 bill {tag.bill_rank} of the day
-                <span className="font-mono text-xs text-muted">
+                <span className="font-mono text-xs">
                   {tag.auto_suggested ? ' · suggested' : ' · set by hand'}
                 </span>
               </>
             ) : (
-              <span className="text-muted">not tagged</span>
+              <span>not tagged</span>
             )}
           </Fact>
           <Fact label="ERP status">
             {order.erp_status ?? '—'}
             {order.synced_at ? (
-              <div className="font-mono text-[11px] text-muted">synced {formatDate(order.synced_at)}</div>
+              <div className="font-mono text-[11px] mt-0.5">synced {formatDate(order.synced_at)}</div>
             ) : null}
           </Fact>
-        </div>
+        </dl>
       </section>
 
       <section className="mb-10">
@@ -357,7 +378,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
           <span className="count">{lines.length} LINES</span>
         </div>
         {unknownGroups.length > 0 ? (
-          <p className="font-serif text-sm text-danger mb-4 max-w-3xl">
+          <p className="sheet-warning max-w-3xl">
             Item group{unknownGroups.length === 1 ? '' : 's'} {unknownGroups.join(', ')}{' '}
             {unknownGroups.length === 1 ? 'is' : 'are'} not classified in{' '}
             <Link href={revenuePath(subDept.slug, 'rules')} className="text-accent hover:underline">
@@ -389,27 +410,20 @@ export default async function OrderDetailPage({ params }: PageProps) {
                 const lineMargin = lineCost === null || amount === 0 ? null : (amount - lineCost) / amount
                 return (
                   <LedgerRow key={l.id}>
-                    <td className="font-mono text-xs text-muted">{l.line_no}</td>
+                    <td className="font-mono text-xs">{l.line_no}</td>
                     <td className="m-hide" data-label="Item">
-                      <div className="font-serif text-[14px] text-ink">{l.product_name ?? l.product_code}</div>
-                      <div className="font-mono text-[10.5px] text-muted mt-0.5">
+                      <div className="font-medium">{l.product_name ?? l.product_code}</div>
+                      <div className="font-mono text-[11px] mt-0.5">
                         {l.product_code}
                         {l.brand_code ? ` · ${l.brand_code}` : ''}
                       </div>
                     </td>
-                    <td className="font-mono text-[11px] text-graphite m-hide" data-label="Group">{l.item_group}</td>
+                    <td className="font-mono text-[11px] m-hide" data-label="Group">{l.item_group}</td>
                     <td className="m-hide" data-label="Counts as">
-                      <em
-                        className={[
-                          'font-serif text-sm',
-                          cls === 'commissionable' ? 'text-ink' : '',
-                          cls === 'kpi' ? 'text-accent' : '',
-                          cls === 'excluded_group' ? 'text-muted' : '',
-                          cls === 'unknown_group' ? 'text-danger' : '',
-                        ].join(' ')}
-                      >
+                      <span className={`chip ${CLASS_CHIP[cls]}`}>
+                        <span className="dot" />
                         {CLASS_LABEL[cls]}
-                      </em>
+                      </span>
                     </td>
                     <td className="num m-hide" data-label="Qty">{Number(l.qty).toLocaleString()}</td>
                     <td className="num m-hide" data-label="Unit">{formatMoney(Number(l.unit_price))}</td>
@@ -422,7 +436,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
                         const p = costProvenance(l.cost_source, l.cost_detail, lineCost !== null)
                         return (
                           <div
-                            className={`font-sans text-[10.5px] mt-0.5 whitespace-normal ${p.missing ? 'text-danger' : 'text-muted'}`}
+                            className={`font-sans text-[11px] mt-0.5 whitespace-normal ${p.missing ? 'text-danger' : ''}`}
                           >
                             {p.label}
                           </div>
@@ -433,18 +447,23 @@ export default async function OrderDetailPage({ params }: PageProps) {
                   </LedgerRow>
                 )
               })}
+            </tbody>
+            {/* The bill's own figures under its lines — the peach total band.
+                The label sits in the # column and the columns a phone folds
+                away share one m-hide cell, so the band lines up at both widths. */}
+            <tfoot>
               <tr>
-                <td colSpan={6}>
-                  <strong className="font-serif text-ink text-[15px]">Bill</strong>
-                </td>
-                <td className="num font-semibold">{formatMoney(Number(order.order_total))}</td>
+                <td>Bill</td>
+                <td className="m-hide" colSpan={5} />
+                <td className="num">{formatMoney(Number(order.order_total))}</td>
                 <td className="num m-hide">{baseMissing > 0 ? '—' : formatMoney(cost)}</td>
                 <td className="num m-hide">{pct(margin)}</td>
+                <td className="lt-toggle" aria-hidden />
               </tr>
-            </tbody>
+            </tfoot>
           </table>
         </div>
-        <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+        <p className="text-xs mt-3 max-w-3xl">
           Commissionable {formatMoney(commissionable)} · KPI {formatMoney(kpiRevenue)} · not commissionable{' '}
           {formatMoney(excluded)}. A KPI line pays its flat allowance instead of a rate, which is the point
           when it is given away; transport and disposal earn nothing either way.
@@ -458,7 +477,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
             <span className="rule" aria-hidden />
             <span className="count">{formatMoney(paid)} PAID</span>
           </div>
-          <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
+          <p className="text-sm mb-4 max-w-3xl">
             As the ERP recorded them. What the deposit gate measures is the total against{' '}
             {required === null ? 'no threshold' : formatMoney(required)}.
           </p>
@@ -475,13 +494,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
               <tbody>
                 {payments.map((p, i) => (
                   <tr key={i}>
-                    <td className="font-mono text-xs text-graphite">
+                    <td className="font-mono text-xs">
                       {typeof p.paid_at === 'string' ? formatDate(p.paid_at) : '—'}
                     </td>
                     <td className="m-hide" data-label="Method">
                       {typeof p.method === 'string' ? p.method : '—'}
                       {typeof p.merchant_provider === 'string' && p.merchant_provider ? (
-                        <span className="font-mono text-[11px] text-muted"> · {p.merchant_provider}</span>
+                        <span className="font-mono text-[11px]"> · {p.merchant_provider}</span>
                       ) : null}
                     </td>
                     <td className="m-hide" data-label="Deposit">{p.is_deposit === true ? 'yes' : '—'}</td>
@@ -499,35 +518,13 @@ export default async function OrderDetailPage({ params }: PageProps) {
   )
 }
 
-function Fig({
-  label: text,
-  value,
-  note,
-  warn,
-  big,
-}: {
-  label: string
-  value: string
-  note?: string
-  warn?: boolean
-  big?: boolean
-}) {
-  return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
-      <div className={['statement-amount', big ? '' : 'compact', warn ? 'text-danger' : 'text-num-ink'].join(' ')}>
-        {value}
-      </div>
-      {note ? <div className="font-serif italic text-muted text-xs mt-1.5">{note}</div> : null}
-    </div>
-  )
-}
-
+/** One fact about the bill: a compact definition cell in the sheet's tone,
+ *  quieter than the summary cards above it. */
 function Fact({ label: text, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="border border-hairline rounded-card bg-surface px-4 py-3">
-      <div className="font-mono text-[0.6rem] tracking-wide text-muted uppercase mb-1">{text}</div>
-      <div className="font-serif text-sm text-ink">{children}</div>
+    <div className="min-w-0 border border-hairline rounded-md bg-surface-2 px-4 py-3">
+      <dt className="text-[10px] font-medium uppercase tracking-[0.06em] mb-1">{text}</dt>
+      <dd className="text-sm break-words">{children}</dd>
     </div>
   )
 }

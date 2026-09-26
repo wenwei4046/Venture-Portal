@@ -17,8 +17,9 @@ export default function ResetStaffStatutoryButton({ payrollId, overridden, overr
   if (!overridden) return null
 
   return (
-    <div className="flex items-baseline justify-between text-xs mt-2">
-      <span className="font-serif italic text-alert">
+    <div className="flex items-center justify-between gap-2 text-xs mt-2">
+      <span className="chip alert">
+        <span className="dot" />
         Manually overridden{overriddenLabel ? ` · ${overriddenLabel}` : ''}
       </span>
       <button
@@ -34,7 +35,7 @@ export default function ResetStaffStatutoryButton({ payrollId, overridden, overr
             }
           })
         }
-        className="text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
+        className="font-medium underline underline-offset-2 hover:no-underline disabled:opacity-50"
       >
         {isPending ? 'Resetting…' : 'Reset to JADUAL'}
       </button>

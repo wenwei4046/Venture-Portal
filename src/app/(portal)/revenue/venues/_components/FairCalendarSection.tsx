@@ -80,7 +80,7 @@ export default function FairCalendarSection({
   const pickable = organisers.filter(o => o.isActive)
 
   return (
-    <section className="mb-12">
+    <section className="mb-10">
       <SectionHead
         title="Fair calendar"
         count={`${summary.dated} FAIR${summary.dated === 1 ? '' : 'S'} DATED`}
@@ -95,17 +95,14 @@ export default function FairCalendarSection({
       </Hint>
 
       {summary.billsToMove > 0 ? (
-        <div className="border border-hairline bg-alert-bg/40 border-l-[3px] border-l-alert px-4 py-3 mb-4 flex flex-wrap items-baseline justify-between gap-3">
-          <p className="text-sm text-ink m-0">
+        <div className="sheet-warning flex flex-wrap items-baseline justify-between gap-3">
+          <p className="text-sm m-0">
             <strong className="font-semibold">
               {summary.billsToMove} bill{summary.billsToMove === 1 ? '' : 's'}
             </strong>{' '}
             worth <span className="num">{formatMoney(summary.valueToMove)}</span> are sitting in a
-            month their fair disagrees with.{' '}
-            <span className="text-graphite">
-              Moving them changes what each run pays, so every run over a month this touches has to
-              be computed again.
-            </span>
+            month their fair disagrees with. Moving them changes what each run pays, so every run
+            over a month this touches has to be computed again.
           </p>
           <span className="inline-flex flex-wrap items-center gap-3">
             {summary.confirmedToMove > 0 && guessed > 0 ? (
@@ -132,10 +129,10 @@ export default function FairCalendarSection({
             />
           </span>
           {guessed > 0 ? (
-            <p className="basis-full text-sm text-graphite m-0">
+            <p className="basis-full text-sm m-0">
               {summary.confirmedToMove > 0 ? (
                 <>
-                  <strong className="font-semibold text-ink">{summary.confirmedToMove}</strong> of
+                  <strong className="font-semibold">{summary.confirmedToMove}</strong> of
                   them (<span className="num">{formatMoney(summary.confirmedValueToMove)}</span>)
                   were placed at their fair by a person — from the month&rsquo;s claim form or by
                   hand. The other{' '}
@@ -143,7 +140,7 @@ export default function FairCalendarSection({
               ) : (
                 <>All </>
               )}
-              <strong className="font-semibold text-ink">{guessed}</strong> are the
+              <strong className="font-semibold">{guessed}</strong> are the
               calendar&rsquo;s guess: the last fair at that hall within 45 days. While next
               month&rsquo;s fairs are not typed, that guess reaches back into this month and takes
               next month&rsquo;s bills with it — type those fairs first
@@ -151,8 +148,8 @@ export default function FairCalendarSection({
             </p>
           ) : null}
           {staying.bills > 0 ? (
-            <p className="basis-full text-sm text-graphite m-0">
-              <strong className="font-semibold text-ink">
+            <p className="basis-full text-sm m-0">
+              <strong className="font-semibold">
                 {staying.bills} bill{staying.bills === 1 ? '' : 's'}
               </strong>{' '}
               worth <span className="num">{formatMoney(staying.value)}</span> already in{' '}
@@ -209,7 +206,7 @@ export default function FairCalendarSection({
                       ))}
                     </Choice>
                   </td>
-                  <td className="m-hide text-muted font-serif italic text-xs">
+                  <td className="m-hide">
                     the month it opens
                   </td>
                   <td className="num m-hide" />
@@ -234,11 +231,11 @@ export default function FairCalendarSection({
                         <Hidden name="venue" value={f.venueKey} />
                         <span className="font-medium">{f.displayName}</span>
                         {f.startDate === null ? (
-                          <span className="block text-muted font-serif italic text-xs mt-0.5">
+                          <span className="block text-[11px] mt-0.5">
                             no days yet — names {fairMonthLabel(f.periodMonth)}&rsquo;s organiser only
                           </span>
                         ) : (
-                          <span className="block text-graphite font-mono text-[11px] mt-0.5">
+                          <span className="block font-mono text-[11px] mt-0.5">
                             {fairWindowLabel(f.startDate, f.endDate)}
                           </span>
                         )}
@@ -278,8 +275,11 @@ export default function FairCalendarSection({
                           ))}
                         </Choice>
                         {f.erpOrganiserText && !f.organiserId ? (
-                          <span className="block text-alert font-mono text-[11px] mt-0.5">
-                            ERP said “{f.erpOrganiserText}”
+                          <span className="block mt-1">
+                            <span className="chip alert">
+                              <span className="dot" />
+                              ERP said “{f.erpOrganiserText}”
+                            </span>
                           </span>
                         ) : null}
                       </td>
@@ -300,33 +300,39 @@ export default function FairCalendarSection({
                         ) : (
                           <>
                             <Hidden name="period_month" value={f.periodMonth} />
-                            <span className="text-graphite">{fairMonthLabel(f.periodMonth)}</span>
+                            <span>{fairMonthLabel(f.periodMonth)}</span>
                           </>
                         )}
                       </td>
                       <td className="num m-hide" data-label="Bills">
-                        {f.bills || <span className="text-muted">—</span>}
+                        {f.bills || '—'}
                       </td>
                       <td className="num">
-                        {f.total > 0 ? formatMoney(f.total) : <span className="text-muted">—</span>}
+                        {f.total > 0 ? formatMoney(f.total) : '—'}
                       </td>
                       <td className="num m-hide" data-label="To move">
                         {f.billsToMove > 0 ? (
-                          <span className="text-alert">
+                          <span className="chip alert whitespace-nowrap">
+                            <span className="dot" />
                             {f.billsToMove} · {formatMoney(f.valueToMove)}
                           </span>
                         ) : (
-                          <span className="text-muted">—</span>
+                          '—'
                         )}
                       </td>
-                      <td className="flex items-center gap-3">
-                        <SaveButton pending={pending} label="✓" />
-                        <ActionButton
-                          run={() => deleteFair(f.fairId)}
-                          label="Remove"
-                          danger
-                          confirm={`Remove the fair at ${f.displayName}? Its ${f.bills} bill${f.bills === 1 ? '' : 's'} fall back to the month of their order date.`}
-                        />
+                      {/* The flex lives inside the cell: a `display: flex` <td>
+                          stops being a table cell, and its rule and zebra no
+                          longer reach the row's full height. */}
+                      <td className="whitespace-nowrap">
+                        <span className="inline-flex items-center gap-3">
+                          <SaveButton pending={pending} label="✓" />
+                          <ActionButton
+                            run={() => deleteFair(f.fairId)}
+                            label="Remove"
+                            danger
+                            confirm={`Remove the fair at ${f.displayName}? Its ${f.bills} bill${f.bills === 1 ? '' : 's'} fall back to the month of their order date.`}
+                          />
+                        </span>
                       </td>
                     </tr>
                   )}
@@ -336,7 +342,7 @@ export default function FairCalendarSection({
 
             {fairs.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-muted font-serif italic">
+                <td colSpan={9} className="text-center">
                   No fairs on record — every bill is still filed by the day the ERP opened its
                   document. The list below is where to start.
                 </td>
@@ -383,24 +389,27 @@ export default function FairCalendarSection({
                     <td>
                       <span className="font-medium">{g.displayName}</span>
                       {gapLooksLikeSeveralFairs(g) ? (
-                        <span className="block text-alert font-serif italic text-xs mt-0.5">
-                          looks like more than one fair
+                        <span className="block mt-1">
+                          <span className="chip alert">
+                            <span className="dot" />
+                            looks like more than one fair
+                          </span>
                         </span>
                       ) : null}
                     </td>
-                    <td className="text-graphite">{fairMonthLabel(g.periodMonth)}</td>
+                    <td>{fairMonthLabel(g.periodMonth)}</td>
                     <td className="num">{g.bills}</td>
                     <td className="num">{formatMoney(g.total)}</td>
-                    <td className="m-hide font-mono text-[11px] text-graphite">
+                    <td className="m-hide font-mono text-[11px]">
                       {g.firstOrder} → {g.lastOrder}
                     </td>
                     <td className="num m-hide">
                       {g.spreadDays === 0 ? (
-                        <span className="text-muted">same day</span>
+                        <span>same day</span>
+                      ) : gapLooksLikeSeveralFairs(g) ? (
+                        <span className="chip alert">{g.spreadDays}d</span>
                       ) : (
-                        <span className={gapLooksLikeSeveralFairs(g) ? 'text-alert' : undefined}>
-                          {g.spreadDays}d
-                        </span>
+                        <span>{g.spreadDays}d</span>
                       )}
                     </td>
                   </tr>

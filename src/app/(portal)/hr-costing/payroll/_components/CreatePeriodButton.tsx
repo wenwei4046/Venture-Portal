@@ -34,11 +34,11 @@ export default function CreatePeriodButton({ period }: Props) {
       <button
         onClick={handleClick}
         disabled={isPending}
-        className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+        className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
       >
         {isPending ? 'Creating...' : `+ Create ${label} period`}
       </button>
-      {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+      {error && <span className="text-sm text-danger">{error}</span>}
     </div>
   )
 }

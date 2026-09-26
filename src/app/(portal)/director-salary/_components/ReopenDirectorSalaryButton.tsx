@@ -36,40 +36,40 @@ export default function ReopenDirectorSalaryButton({ period }: Props) {
 
   if (confirming) {
     return (
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-2">
-          <span className="font-serif italic text-graphite text-xs">
+      <div className="flex flex-col items-end gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-xs">
             Pull figures back for edits? Finance loses sight of them until you resubmit.
           </span>
           <button
             onClick={handleConfirm}
             disabled={isPending}
-            className="text-xs font-serif italic text-danger hover:underline disabled:opacity-50"
+            className="text-xs font-medium text-danger bg-danger-bg border border-danger/40 hover:bg-danger/15 px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
           >
             {isPending ? 'Reopening…' : 'Confirm reopen'}
           </button>
           <button
             onClick={() => setConfirming(false)}
             disabled={isPending}
-            className="text-xs font-sans text-muted hover:text-ink"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
         </div>
-        {error && <span className="text-xs font-serif italic text-danger">{error}</span>}
+        {error && <span className="text-xs text-danger">{error}</span>}
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-end gap-1.5">
       <button
         onClick={() => setConfirming(true)}
-        className="text-xs font-serif italic text-graphite hover:text-accent transition-colors"
+        className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
       >
         Reopen for edits
       </button>
-      {error && <span className="text-xs font-serif italic text-danger">{error}</span>}
+      {error && <span className="text-xs text-danger">{error}</span>}
     </div>
   )
 }

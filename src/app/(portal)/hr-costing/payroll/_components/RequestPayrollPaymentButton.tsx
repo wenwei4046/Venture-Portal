@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { requestPayrollPayment, cancelPayrollPaymentRequest } from '../actions'
 
@@ -65,31 +65,31 @@ export default function RequestPayrollPaymentButton({
   if (state.kind === 'cancelled' || state.kind === 'none') {
     if (mode === 'confirmRequest') {
       return (
-        <div className="flex flex-col items-end gap-2 bg-surface border border-accent-border rounded-md p-4 max-w-md">
-          <p className="font-serif text-sm text-ink">
-            Request payment of <strong>RM {fmt(totalAmount)}</strong> from Finance?
+        <div className="flex flex-col items-end gap-2 bg-surface border border-accent rounded-lg p-4 max-w-md">
+          <p className="text-sm">
+            Request payment of <strong className="font-bold">RM {fmt(totalAmount)}</strong> from Finance?
           </p>
-          <p className="font-serif italic text-graphite text-xs mb-1">
+          <p className="text-xs mb-1">
             Finance will generate a Payment Voucher, then Principal approves it.
             The money moves from the HV bank account into the HR Pool.
           </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleRequest}
               disabled={isPending}
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50"
+              className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
             >
               {isPending ? 'Requesting…' : 'Confirm request'}
             </button>
             <button
               onClick={() => setMode('idle')}
               disabled={isPending}
-              className="text-xs font-sans text-muted hover:text-ink px-2"
+              className="text-xs hover:underline underline-offset-2 px-2"
             >
               Cancel
             </button>
           </div>
-          {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+          {error && <span className="text-sm text-danger">{error}</span>}
         </div>
       )
     }
@@ -97,11 +97,11 @@ export default function RequestPayrollPaymentButton({
       <div className="flex flex-col items-end gap-2">
         <button
           onClick={() => setMode('confirmRequest')}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+          className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
         >
           Request for Payroll Payment
         </button>
-        {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+        {error && <span className="text-sm text-danger">{error}</span>}
       </div>
     )
   }
@@ -110,22 +110,22 @@ export default function RequestPayrollPaymentButton({
   if (state.kind === 'submitted') {
     if (mode === 'confirmCancel') {
       return (
-        <div className="flex flex-col items-stretch gap-2 bg-surface border border-hairline rounded-md p-4 max-w-md">
-          <label className="font-serif text-sm text-ink">
-            Cancel request · <span className="text-xs text-muted italic">(reason required)</span>
+        <div className="flex flex-col items-stretch gap-2 bg-surface border border-hairline rounded-lg p-4 max-w-md">
+          <label className="text-sm font-medium">
+            Cancel request · <span className="text-xs font-normal">(reason required)</span>
           </label>
           <textarea
             value={cancelReason}
             onChange={e => setCancelReason(e.target.value)}
             rows={3}
             placeholder="e.g. Wrong period selected — will re-submit after correction"
-            className="px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="px-3 py-2 bg-surface border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent"
           />
-          <div className="flex gap-2 justify-end">
+          <div className="flex items-center gap-2 justify-end">
             <button
               onClick={() => handleCancel(state.requestId)}
               disabled={isPending || cancelReason.trim().length === 0}
-              className="bg-danger hover:bg-danger-hover text-white font-serif italic text-sm px-4 py-2 rounded-md disabled:opacity-50"
+              className="bg-danger hover:bg-danger/90 text-white text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
             >
               {isPending ? 'Cancelling…' : 'Cancel request'}
             </button>
@@ -135,26 +135,23 @@ export default function RequestPayrollPaymentButton({
                 setCancelReason('')
               }}
               disabled={isPending}
-              className="text-xs font-sans text-muted hover:text-ink px-2"
+              className="text-xs hover:underline underline-offset-2 px-2"
             >
               Keep request
             </button>
           </div>
-          {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+          {error && <span className="text-sm text-danger">{error}</span>}
         </div>
       )
     }
     return (
       <div className="flex flex-col items-end gap-1">
-        <div className="bg-surface border border-accent-border rounded-md px-4 py-2">
-          <em className="font-serif italic text-accent text-sm">Submitted to Finance</em>
-          <span className="font-mono text-xs text-muted ml-2">
-            RM {fmt(totalAmount)}
-          </span>
-        </div>
+        <StatusBox tone="alert" word="Submitted to Finance">
+          RM {fmt(totalAmount)}
+        </StatusBox>
         <button
           onClick={() => setMode('confirmCancel')}
-          className="text-xs font-sans text-muted hover:text-danger transition-colors"
+          className="text-xs hover:text-danger hover:underline underline-offset-2 transition-colors"
         >
           Cancel request
         </button>
@@ -166,16 +163,11 @@ export default function RequestPayrollPaymentButton({
   if (state.kind === 'pv_generated') {
     return (
       <div className="flex flex-col items-end gap-1">
-        <div className="bg-surface border border-accent-border rounded-md px-4 py-2">
-          <em className="font-serif italic text-accent text-sm">
-            PV generated · awaiting Principal
-          </em>
-          <span className="font-mono text-xs text-muted ml-2">
-            {state.paidAmount > 0
-              ? `已付 ${fmt(state.paidAmount)} / 总额 ${fmt(totalAmount)}`
-              : `RM ${fmt(totalAmount)}`}
-          </span>
-        </div>
+        <StatusBox tone="alert" word="PV generated · awaiting Principal">
+          {state.paidAmount > 0
+            ? `已付 ${fmt(state.paidAmount)} / 总额 ${fmt(totalAmount)}`
+            : `RM ${fmt(totalAmount)}`}
+        </StatusBox>
       </div>
     )
   }
@@ -183,14 +175,28 @@ export default function RequestPayrollPaymentButton({
   // ─── Completed — HR Pool funded ───────────────────────────────────────────
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="bg-surface border border-ledger/40 rounded-md px-4 py-2">
-        <em className="font-serif italic text-ledger text-sm">
-          ✓ HR Pool funded
-        </em>
-        <span className="font-mono text-xs text-muted ml-2">
-          RM {fmt(totalAmount)}
-        </span>
-      </div>
+      <StatusBox tone="ledger" word="✓ HR Pool funded">
+        RM {fmt(totalAmount)}
+      </StatusBox>
+    </div>
+  )
+}
+
+// Where the request stands: the state as a word on a wash (amber while it
+// waits on Finance or Principal, green once the HR Pool is funded), the sum
+// beside it in figures.
+function StatusBox({ tone, word, children }: {
+  tone: 'alert' | 'ledger'
+  word: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 bg-surface border border-hairline rounded-lg px-3 py-2">
+      <span className={`chip ${tone}`}>
+        {tone === 'alert' ? <span className="dot" /> : null}
+        {word}
+      </span>
+      <span className="font-mono text-xs tabular-nums">{children}</span>
     </div>
   )
 }

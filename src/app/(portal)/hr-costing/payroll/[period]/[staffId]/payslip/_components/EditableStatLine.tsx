@@ -86,10 +86,10 @@ export default function EditableStatLine({ payrollId, field, value, readOnly }: 
             }
           }}
           disabled={isPending}
-          className="w-24 px-2 py-0.5 bg-paper border border-accent-border rounded font-mono tabular text-right text-sm text-ink focus:outline-none disabled:opacity-50"
+          className="w-24 px-2 py-0.5 bg-surface border border-accent rounded-control font-mono tabular text-right text-sm text-ink focus:outline-none disabled:opacity-50"
         />
         {error ? (
-          <span className="text-danger text-xs font-sans">{error}</span>
+          <span className="text-danger text-xs">{error}</span>
         ) : null}
       </span>
     )
@@ -101,7 +101,7 @@ export default function EditableStatLine({ payrollId, field, value, readOnly }: 
       aria-label={`Edit ${field.toUpperCase()}`}
       onClick={() => setEditing(true)}
       title="Click to override"
-      className="num hover:text-accent hover:bg-accent/5 rounded px-1 -mx-1 transition-colors cursor-text"
+      className="num hover:bg-accent-bg hover:underline decoration-dotted underline-offset-4 rounded px-1 -mx-1 transition-colors cursor-text"
     >
       {fmt(value)}
     </button>

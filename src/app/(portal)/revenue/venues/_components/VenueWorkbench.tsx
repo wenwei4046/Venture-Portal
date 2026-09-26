@@ -3,6 +3,8 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { formatMoney } from '@/lib/utils'
 import { withFairs, type Organiser } from '@/lib/organisers'
 import {
   groupByVenue,
@@ -12,7 +14,7 @@ import {
   registerSummary,
   type VenueRegisterRow,
 } from '@/lib/venue-register'
-import type { Fair, FairGap } from '@/lib/fair-calendar'
+import { fairCalendarSummary, type Fair, type FairGap } from '@/lib/fair-calendar'
 import FairCalendarSection from './FairCalendarSection'
 import OrganiserSection from './OrganiserSection'
 import VenueTable from './VenueTable'
@@ -89,12 +91,55 @@ export default function VenueWorkbench({
     () => (month ? gaps.filter(g => g.periodMonth === month) : gaps),
     [gaps, month],
   )
+  // The summary cards: the same rows and fairs the sections below are reading,
+  // for the same month, so a card can never disagree with its table.
+  const calendar = useMemo(() => fairCalendarSummary(shownFairs, shownGaps), [shownFairs, shownGaps])
+  const sales = useMemo(
+    () => shown.reduce((acc, r) => ({ bills: acc.bills + r.bills, total: acc.total + r.total }), { bills: 0, total: 0 }),
+    [shown],
+  )
 
   return (
     <div>
       {months.length > 1 ? (
         <SlidingTabs items={tabs} active={month ?? 'all'} onTabChange={goTo} variant="text" />
       ) : null}
+
+      <StatCards label={month ? `Venues in ${monthLabel(month)}` : 'Venues in every month on record'}>
+        <StatCard
+          label="Venues"
+          value={String(summary.venues)}
+          icon="pin"
+          note={month ? monthLabel(month) : 'Every month on record'}
+        />
+        <StatCard
+          label="Fairs"
+          value={String(summary.fairs)}
+          icon="calendar"
+          tone="primary"
+          note={`${summary.named} with an organiser named`}
+        />
+        <StatCard
+          label="Sales value"
+          value={formatMoney(sales.total)}
+          icon="sales"
+          note={`${sales.bills} bill${sales.bills === 1 ? '' : 's'}`}
+        />
+        <StatCard
+          label="Bills to move"
+          value={String(calendar.billsToMove)}
+          icon="swap"
+          tone={calendar.billsToMove > 0 ? 'alert' : undefined}
+          note={calendar.billsToMove > 0 ? formatMoney(calendar.valueToMove) : undefined}
+        />
+        <StatCard
+          label="Still to place"
+          value={String(calendar.unplacedBills)}
+          icon="inbox"
+          tone={calendar.unplacedBills > 0 ? 'alert' : undefined}
+          note={calendar.unplacedBills > 0 ? formatMoney(calendar.unplacedValue) : undefined}
+        />
+      </StatCards>
 
       <OrganiserSection organisers={withRuns} month={month} />
 

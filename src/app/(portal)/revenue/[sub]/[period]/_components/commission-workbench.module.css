@@ -1,5 +1,7 @@
 /* Keep the Product List palette inside this report. The shared header,
-   sidebar and mobile navigation inherit the portal's original colour tone. */
+   sidebar and mobile navigation inherit the portal's original colour tone.
+   Since 2026-09-27 the white sheet itself is PortalFrame's (`.sheet`, the
+   "Sheet theme" in globals.css) and these are the same tokens it declares. */
 .page {
   color-scheme: light;
   --paper: 243 243 241;
@@ -26,10 +28,6 @@
 
 .page {
   min-width: 0;
-  padding: 24px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 16px;
-  background: rgb(var(--surface));
   color: #000;
   font-size: 13px;
   font-family: var(--font-sans, 'Inter'), var(--font-cjk, sans-serif), sans-serif;
@@ -317,14 +315,12 @@
 }
 
 @media (max-width: 1000px) {
-  .page { padding: 20px; }
   .metrics { gap: 9px; }
   .metric { padding: 13px; }
   .metricValue { font-size: 22px; }
 }
 
 @media (max-width: 767px) {
-  .page { padding: 18px 12px; border-radius: 12px; }
   .page :global(.page-title) { font-size: 30px; }
   .page :global(.page-head) { gap: 12px; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
@@ -373,7 +369,6 @@
 }
 
 @media print {
-  .page { padding: 0; border: 0; }
   .tableFrame,
   .tableScroll { max-height: none; overflow: visible; }
   .table :is(th, td).stickyFirst,

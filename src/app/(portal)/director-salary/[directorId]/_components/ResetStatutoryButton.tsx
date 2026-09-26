@@ -22,8 +22,9 @@ export default function ResetStatutoryButton({ payoutId, overridden, overriddenL
   if (!overridden) return null
 
   return (
-    <div className="flex items-baseline justify-between text-xs">
-      <span className="font-serif italic text-alert">
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+      <span className="chip alert">
+        <span className="dot" />
         Manually overridden{overriddenLabel ? ` · ${overriddenLabel}` : ''}
       </span>
       <button
@@ -39,7 +40,7 @@ export default function ResetStatutoryButton({ payoutId, overridden, overriddenL
             }
           })
         }
-        className="text-accent hover:text-accent-hover font-serif italic disabled:opacity-50"
+        className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
       >
         {isPending ? 'Resetting…' : 'Reset to JADUAL'}
       </button>

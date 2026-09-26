@@ -50,11 +50,12 @@ const BANK_ISSUE_LABEL = {
   numeric_bank: 'bank name is a number',
 } as const
 
+/** A PV's state as a word on its wash: green paid / approved, amber with Principal. */
 function chip(status: string | undefined, date: string | null | undefined) {
-  if (!status) return <span className="pay-state whitespace-nowrap">Not generated</span>
-  if (status === 'paid') return <span className="pay-state text-ledger whitespace-nowrap">Paid · {shortDate(date)}</span>
-  if (status === 'approved') return <span className="pay-state text-ledger whitespace-nowrap">Approved</span>
-  return <span className="pay-state text-alert whitespace-nowrap">Awaiting Principal</span>
+  if (!status) return <span className="pay-state chip whitespace-nowrap"><span className="dot" />Not generated</span>
+  if (status === 'paid') return <span className="pay-state chip ledger whitespace-nowrap"><span className="dot" />Paid · {shortDate(date)}</span>
+  if (status === 'approved') return <span className="pay-state chip ledger whitespace-nowrap"><span className="dot" />Approved</span>
+  return <span className="pay-state chip alert whitespace-nowrap"><span className="dot" />Awaiting Principal</span>
 }
 
 function validPaymentDate(value: string) {
@@ -115,7 +116,7 @@ export default function DeptWindow({
       onClose={onClose}
       footer={
         <>
-          <span className="font-serif italic text-muted text-xs">
+          <span className="text-xs">
             {g.stage === 'paid'
               ? `Paid · ${g.vouchers.length} PV${g.vouchers.length === 1 ? '' : 's'}`
                 : showGeneration
@@ -203,7 +204,7 @@ export default function DeptWindow({
       ) : null}
 
       {showGeneration && g.stage === 'partial' ? (
-        <p className="font-serif italic text-muted text-xs" style={{ margin: 0 }}>
+        <p className="text-xs" style={{ margin: 0 }}>
           {g.generated} of {g.headcount} already have a voucher. {gran === 'department' ? `The remaining ${remaining} people are included in this batch.` : `Select any of the remaining ${remaining} people for this batch.`}
         </p>
       ) : null}
@@ -346,14 +347,14 @@ export default function DeptWindow({
                       title="Only this PV's saved payment lines and recipient accounts"
                     >Bank file · this PV</Link> : null}
                   </td>
-                  <td className="state-cell">{payment.amount > 0 ? chip(v?.status, v?.payment_date) : <span className="pay-state text-muted text-xs whitespace-nowrap">No salary due</span>}</td>
+                  <td className="state-cell">{payment.amount > 0 ? chip(v?.status, v?.payment_date) : <span className="pay-state chip whitespace-nowrap"><span className="dot" />No salary due</span>}</td>
                 </tr>
               )
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-hairline">
-              <td className="font-serif italic text-accent" colSpan={showSelection ? 3 : 2}>
+            <tr>
+              <td className="font-semibold" colSpan={showSelection ? 3 : 2}>
                 Total · {g.headcount} {who}
               </td>
               <td className="num font-semibold">{formatMoneyBare(g.net)}</td>
