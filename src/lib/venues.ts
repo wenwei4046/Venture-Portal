@@ -1,12 +1,11 @@
 /**
  * Fair venues — the place an event was held.
  *
- * The ERP names the venue on every sales order and says nothing about who
- * ORGANISED the event, so the two facts live apart: the venue travels on the
- * order (`sales_orders.venue`), the organiser is the portal's own — and since
- * 2026-09-17 it hangs off the FAIR, not the place, because the same hall has a
- * different organiser from month to month (`comm_venue_events`, shaped by
- * `lib/venue-register.ts`). `comm_venues` is the register of places and of
+ * The venue travels on the order (`sales_orders.venue`); the organiser hangs
+ * off the FAIR, not the place, because the same hall has a different
+ * organiser from month to month (`comm_venue_events`). Since 2026-09-27 the
+ * ERP names the fair on every order — the salesperson picks the event — and
+ * `erp_sync_fair` keeps it. `comm_venues` is the register of places and of
  * which spellings are one place (`canonical_key`).
  *
  * The matching key must agree with SQL's `venue_key()`: upper case, single
