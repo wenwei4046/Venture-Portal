@@ -19,7 +19,13 @@ export async function loadCommissionWorkbench(
     loadFairCalendar(db),
   ])
   const ids = [...new Set([...input.hierarchy.map(n => n.staffId), ...currentHierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId)])]
-  const [people, pay] = await Promise.all([
+  // Carry-forward bills need the same resolved venue/organiser as the source month's board.
+  const earlierPeriods = [...new Set(input.orders.filter(o => !o.upsale && o.periodMonth !== period).map(o => o.periodMonth))]
+  // Three independent reads, side by side (2026-09-26): the names, the salary
+  // preview (the slow one — a statutory lookup per wage band when no run
+  // exists yet), and the carried-forward bills with every bill's fair. One
+  // after another they were the whole of a month's wait.
+  const [people, pay, { allOrders, fairByOrder }] = await Promise.all([
     fetchByKeys<{ id: string; employee_name: string; employee_code: string | null }, string>(ids, keys =>
       db.from('hr_staff_costs').select('id, employee_name, employee_code').in('id', keys)),
     withPay
@@ -27,16 +33,19 @@ export async function loadCommissionWorkbench(
         .then(value => ({ ...value, unavailable: false }))
         .catch(() => ({ rows: [], unavailable: true }))
       : Promise.resolve({ rows: [], unavailable: true }),
+    (async () => {
+      const earlier = await Promise.all(earlierPeriods.map(p => loadMonthOrders(db, subDepartmentId, p)))
+      const everyOrder = [...monthOrders, ...earlier.flat()]
+      const assignments = await fetchByKeys<{ id: string; fair_event_id: string | null }, string>(
+        [...new Set(everyOrder.map(order => order.orderId))], keys =>
+          db.from('sales_orders').select('id, fair_event_id').in('id', keys),
+      )
+      return {
+        allOrders: everyOrder,
+        fairByOrder: new Map(assignments.map(assignment => [assignment.id, assignment.fair_event_id])),
+      }
+    })(),
   ])
-  // Carry-forward bills need the same resolved venue/organiser as the source month's board.
-  const earlierPeriods = [...new Set(input.orders.filter(o => !o.upsale && o.periodMonth !== period).map(o => o.periodMonth))]
-  const earlier = await Promise.all(earlierPeriods.map(p => loadMonthOrders(db, subDepartmentId, p)))
-  const allOrders = [...monthOrders, ...earlier.flat()]
-  const assignments = await fetchByKeys<{ id: string; fair_event_id: string | null }, string>(
-    [...new Set(allOrders.map(order => order.orderId))], ids =>
-      db.from('sales_orders').select('id, fair_event_id').in('id', ids),
-  )
-  const fairByOrder = new Map(assignments.map(assignment => [assignment.id, assignment.fair_event_id]))
   const fairById = new Map(calendar.map(fair => [fair.fairId, fair]))
   const orders = allOrders.map(o => {
     // ERP document dates can be weeks after a fair. The persisted assignment

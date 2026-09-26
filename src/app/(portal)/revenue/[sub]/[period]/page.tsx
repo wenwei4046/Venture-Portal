@@ -22,7 +22,7 @@ import { requireSubDepartment } from '../../_lib/sub-departments'
 import { loadMonthOrders, loadOrderShares, loadShareTeam } from '../../_lib/month-orders'
 import { loadFairChoices, loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadOpenBillPaid } from '../../_lib/open-bill'
-import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
+import { readRevenuePayrollAdjustments, type RevenuePayrollAdjustmentRead } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
 import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
@@ -83,6 +83,24 @@ interface RunRow {
   }> | null
 }
 
+interface BatchRow {
+  id: string
+  file_name: string
+  source: string
+  order_count: number
+  out_of_period_count: number
+  cancelled_count: number
+  unmatched_agent_count: number
+}
+
+interface SchemeRow {
+  deposit_threshold_pct: number | string | null
+  enable_open_bill: boolean
+  enable_kpi: boolean
+  enable_margin_penalty: boolean
+  enable_margin_incentive: boolean
+}
+
 interface StatementRow {
   id: string
   staff_id: string
@@ -122,36 +140,186 @@ interface StatementRow {
  * asked, so they are tabs rather than three sections stacked down the page.
  */
 export default async function CommissionPeriodPage({ params }: PageProps) {
-  await requirePermission('revenue')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
-  const subDept = await requireSubDepartment(sub)
+  // In flight while the permission is checked; only awaited once it passes,
+  // so a reader without it is redirected, never shown a 404.
+  const subDeptLookup = requireSubDepartment(sub)
+  subDeptLookup.catch(() => {})
+  await requirePermission('revenue')
+  const subDept = await subDeptLookup
   const supabase = (await createClient()) as unknown as SupabaseClient
 
-  const { data: batch } = await supabase
-    .from('sales_import_batches')
-    .select('id, file_name, source, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
-    .eq('period_month', period)
-    .eq('sub_department_id', subDept.id)
-    .eq('status', 'committed')
-    .maybeSingle()
+  // ── Every read the month needs, started at once (2026-09-26) ───────────
+  // One after another they were twenty-odd round trips before the first byte
+  // of the page; opening a month took 3–10 s. Only what truly depends on an
+  // earlier answer waits for it: the statements on the run, the names on the
+  // statements, the workbench on the month's orders and the run.
+  //
+  // `once` pins a query to a single request: a PostgREST builder sends its
+  // request again every time something awaits it, and several reads below
+  // hang off the same one.
+  const once = <T,>(query: PromiseLike<T>): Promise<T> => Promise.resolve(query)
 
-  const batchRow = batch as {
-    id: string
-    file_name: string
-    source: string
-    order_count: number
-    out_of_period_count: number
-    cancelled_count: number
-    unmatched_agent_count: number
-  } | null
+  const batchRowRead = once(
+    supabase
+      .from('sales_import_batches')
+      .select('id, file_name, source, order_count, out_of_period_count, cancelled_count, unmatched_agent_count, created_at')
+      .eq('period_month', period)
+      .eq('sub_department_id', subDept.id)
+      .eq('status', 'committed')
+      .maybeSingle(),
+  ).then(({ data }) => data as BatchRow | null)
 
   // One RPC for the whole month rather than a select per fact. The LINES in
   // particular cannot be read from the page: a Fair month has ~1,700 of them
   // and PostgREST hands back the first thousand without saying so, which is
-  // how "lines without a cost" used to under-report by a third.
-  const monthOrders = batchRow ? await loadMonthOrders(supabase, subDept.id, period) : []
+  // how "lines without a cost" used to under-report by a third. Asked beside
+  // the batch rather than after it: a month with no import answers nothing.
+  const monthOrdersRead = Promise.all([batchRowRead, loadMonthOrders(supabase, subDept.id, period)])
+    .then(([batchRow, rows]) => (batchRow ? rows : []))
+
+  // The deposit gate is a scheme setting, so it is THIS sub-department's.
+  const schemeRead = subDept.schemeId
+    ? once(
+        supabase
+          .from('comm_schemes')
+          .select('deposit_threshold_pct, enable_open_bill, enable_kpi, enable_margin_penalty, enable_margin_incentive')
+          .eq('id', subDept.schemeId)
+          .maybeSingle(),
+      ).then(({ data }) => data as SchemeRow | null)
+    : Promise.resolve(null)
+
+  // One run per sub-department per month (uq_comm_run_per_sub_dept_period):
+  // the batch above is the whole department's, this is only ours.
+  const runRead = once(
+    supabase
+      .from('comm_runs')
+      .select('id, status, staff_count, total_commission, warnings, computed_at, applied_at, deferred_orders, penalised_orders')
+      .eq('period_month', period)
+      .eq('sub_department_id', subDept.id)
+      .maybeSingle(),
+  ).then(({ data }) => data as RunRow | null)
+
+  const statementsRead = runRead.then(async run => {
+    if (!run) return [] as StatementRow[]
+    const { data } = await supabase
+      .from('comm_statements')
+      .select('id, staff_id, rank_key, qualifies_for_rank_key, promotes_to_title_id, promotes_to:titles!comm_statements_promotes_to_title_id_fkey (name), product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, group_incentive, group_subsidy_cap, margin_pct, margin_penalty_withheld, total_commission')
+      .eq('run_id', run.id)
+    return ((data ?? []) as unknown as StatementRow[]).sort(
+      (a, b) => Number(b.total_commission) - Number(a.total_commission),
+    )
+  })
+
+  // Names for anyone the run mentions but this month's batch does not — an
+  // upline who sold nothing themselves still earns an override.
+  const namesAndAdjustmentsRead = statementsRead.then(async statements => {
+    const staffIds = [...new Set(statements.map(s => s.staff_id))]
+    if (staffIds.length === 0) {
+      return { staffRows: [], payrollAdjustments: { rows: [], unavailable: false } as RevenuePayrollAdjustmentRead }
+    }
+    const [{ data }, payrollAdjustments] = await Promise.all([
+      once(supabase.from('hr_staff_costs').select('id, employee_name').in('id', staffIds)),
+      readRevenuePayrollAdjustments(supabase, subDept.id, period),
+    ])
+    return { staffRows: (data ?? []) as Array<{ id: string; employee_name: string }>, payrollAdjustments }
+  })
+
+  // A shared bill is credited in parts (2026-09-24): the owner keeps what
+  // nobody else holds, each holder their share — the same parts the run pays.
+  const sharesRead = monthOrdersRead.then(rows =>
+    loadOrderShares(supabase, rows.filter(o => !o.cancelled).map(o => o.orderId)),
+  )
+
+  // The picks come from the month's orders; what they PAID comes from the
+  // run's own lines, because a run also pays Open Bill on the bills it carried
+  // in from earlier months.
+  const openBillRead = Promise.all([schemeRead, runRead]).then(([scheme, run]) => {
+    const on = Boolean(scheme?.enable_open_bill)
+    return Promise.all([
+      on && subDept.schemeId
+        ? once(
+            supabase
+              .from('comm_open_bill_rules')
+              .select('bill_rank, pct')
+              .eq('scheme_id', subDept.schemeId)
+              .is('effective_to', null),
+          )
+        : Promise.resolve({ data: null }),
+      on && run ? loadOpenBillPaid(supabase, run.id) : Promise.resolve(new Map<string, number>()),
+    ])
+  })
+
+  // The month's workbench starts the moment its own inputs are in, not after
+  // everything else on the page.
+  const workbenchRead = Promise.all([batchRowRead, monthOrdersRead, runRead]).then(([batchRow, rows, run]) =>
+    batchRow && subDept.schemeId ? loadCommissionWorkbench(supabase, subDept.id, period, rows, run?.id) : null,
+  )
+
+  const [
+    batchRow,
+    monthOrders,
+    scheme,
+    { data: rankRows },
+    run,
+    statements,
+    { staffRows, payrollAdjustments },
+    shares,
+    [organisers, fairs],
+    [openBillRuleRes, openBillPaid],
+    [upsales, upsaleFairs, team, upsaleLock],
+    workbench,
+    [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments],
+  ] = await Promise.all([
+    batchRowRead,
+    monthOrdersRead,
+    schemeRead,
+    // A statement snapshots the rank KEY; the ladder says what letter that key
+    // wears today — the rung's label, a trigger-kept copy of its rank's
+    // (comm_rank_defs, 2026-09-05; SS, A, B … from the top). A key the ladder
+    // no longer carries is shown as itself.
+    subDept.schemeId
+      ? once(supabase.from('comm_ranks').select('rank_key, label').eq('scheme_id', subDept.schemeId))
+      : Promise.resolve({ data: null }),
+    runRead,
+    statementsRead,
+    namesAndAdjustmentsRead,
+    sharesRead,
+    // Who ran each of this month's fairs, and the register to pick from. The
+    // RPC above already carries the organiser's NAME on every order; these are
+    // the ids behind it, which is what a dropdown needs to show its own value.
+    Promise.all([loadOrganisers(supabase), loadFairsForMonth(supabase, period)]),
+    openBillRead,
+    // What HR recorded beside the bills: amounts customers added to earlier
+    // orders, paid in this month's run (`lib/commission/upsales.ts`).
+    Promise.all([
+      loadMonthUpsales(supabase, subDept.id, period),
+      loadFairChoices(supabase, period),
+      loadShareTeam(supabase, subDept.schemeId),
+      once(supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDept.id, p_period: period })),
+    ]),
+    workbenchRead,
+    // ── The feed, and bills claimed twice (2026-09-26) ───────────────────
+    // Whether the ERP may still change this month, and whether any bill here
+    // is on another bill's paper or rides in from a month no run of ours paid.
+    batchRowRead.then(hasBatch =>
+      Promise.all([
+        hasBatch ? loadErpFeedMonth(supabase, subDept.id, period) : Promise.resolve(null),
+        hasBatch ? loadDoubleClaims(supabase, subDept.id) : Promise.resolve(null),
+        once(
+          supabase.from('comm_runs').select('period_month')
+            .eq('sub_department_id', subDept.id).in('status', ['applied', 'locked']),
+        ),
+        // Drops and upsells the ERP found on settled bills, from any month —
+        // they are paid into the month somebody confirms them in (2026-09-26).
+        loadPendingAdjustments(supabase, subDept.id),
+      ]),
+    ),
+  ])
+  if (upsaleLock.error) throw new Error(`Could not check the commission run: ${upsaleLock.error.message}`)
+
   // A live month carries its excluded orders (cancelled, held, draft) so the
   // feed can bring them back; the money below is the live ones'.
   const orders = monthOrders.filter(o => !o.cancelled)
@@ -159,68 +327,19 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const linesWithoutCost = orders.reduce((a, o) => a + o.linesWithoutCost, 0)
   const linesWithoutBrand = orders.reduce((a, o) => a + o.linesWithoutBrand, 0)
 
-  // The deposit gate is a scheme setting, so it is THIS sub-department's.
-  const { data: scheme } = subDept.schemeId
-    ? await supabase
-        .from('comm_schemes')
-        .select('deposit_threshold_pct, enable_open_bill, enable_kpi, enable_margin_penalty, enable_margin_incentive')
-        .eq('id', subDept.schemeId)
-        .maybeSingle()
-    : { data: null }
-  const depositPct = scheme ? (scheme as { deposit_threshold_pct: number | string | null }).deposit_threshold_pct : null
+  const depositPct = scheme ? scheme.deposit_threshold_pct : null
   const threshold = depositPct === null || depositPct === undefined ? null : Number(depositPct)
 
-  // A statement snapshots the rank KEY; the ladder says what letter that key
-  // wears today — the rung's label, a trigger-kept copy of its rank's
-  // (comm_rank_defs, 2026-09-05; SS, A, B … from the top). A key the ladder
-  // no longer carries is shown as itself.
-  const { data: rankRows } = subDept.schemeId
-    ? await supabase.from('comm_ranks').select('rank_key, label').eq('scheme_id', subDept.schemeId)
-    : { data: null }
   const ladder = (rankRows ?? []) as Array<{ rank_key: string; label: string }>
   const rankNameOf = (key: string | null) => {
     if (!key) return null
     return ladder.find(x => x.rank_key === key)?.label ?? key
   }
 
-  // ── The run ────────────────────────────────────────────────────────────
-  // One run per sub-department per month (uq_comm_run_per_sub_dept_period):
-  // the batch above is the whole department's, this is only ours.
-  const { data: runData } = await supabase
-    .from('comm_runs')
-    .select('id, status, staff_count, total_commission, warnings, computed_at, applied_at, deferred_orders, penalised_orders')
-    .eq('period_month', period)
-    .eq('sub_department_id', subDept.id)
-    .maybeSingle()
-  const run = runData as RunRow | null
-
-  const { data: statementData } = run
-    ? await supabase
-        .from('comm_statements')
-        .select('id, staff_id, rank_key, qualifies_for_rank_key, promotes_to_title_id, promotes_to:titles!comm_statements_promotes_to_title_id_fkey (name), product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, group_incentive, group_subsidy_cap, margin_pct, margin_penalty_withheld, total_commission')
-        .eq('run_id', run.id)
-    : { data: null }
-  const statements = ((statementData ?? []) as unknown as StatementRow[]).sort(
-    (a, b) => Number(b.total_commission) - Number(a.total_commission),
-  )
-
   const warnings = run?.warnings ?? []
   const runTotal = run ? Number(run.total_commission) : 0
 
-  // Names for anyone the run mentions but this month's batch does not — an
-  // upline who sold nothing themselves still earns an override.
-  const staffIds = [...new Set(statements.map(s => s.staff_id))]
-  const [{ data: staffRows }, payrollAdjustments] = await Promise.all([
-    staffIds.length
-      ? supabase.from('hr_staff_costs').select('id, employee_name').in('id', staffIds)
-      : Promise.resolve({ data: null }),
-    staffIds.length
-      ? readRevenuePayrollAdjustments(supabase, subDept.id, period)
-      : Promise.resolve({ rows: [], unavailable: false }),
-  ])
-  const nameOf = new Map(
-    ((staffRows ?? []) as Array<{ id: string; employee_name: string }>).map(s => [s.id, s.employee_name]),
-  )
+  const nameOf = new Map(staffRows.map(s => [s.id, s.employee_name]))
 
   // Before a run exists the deposit gate is shown from live orders; once it
   // does, from the run's own snapshot of what it held back.
@@ -239,9 +358,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     string,
     { key: string; staffId: string | null; name: string; orders: number; total: number; held: number }
   >()
-  // A shared bill is credited in parts (2026-09-24): the owner keeps what
-  // nobody else holds, each holder their share — the same parts the run pays.
-  const shares = await loadOrderShares(supabase, orders.map(o => o.orderId))
   const sharesByOrder = new Map<string, typeof shares>()
   for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
   const credit = (key: string, staffId: string | null, name: string, value: number, held: boolean) => {
@@ -262,14 +378,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     }
   }
   const people = [...bySalesperson.values()].sort((a, b) => b.total - a.total)
-
-  // Who ran each of this month's fairs, and the register to pick from. The
-  // RPC above already carries the organiser's NAME on every order; these are
-  // the ids behind it, which is what a dropdown needs to show its own value.
-  const [organisers, fairs] = await Promise.all([
-    loadOrganisers(supabase),
-    loadFairsForMonth(supabase, period),
-  ])
 
   // Grouped by the PLACE the database resolved, not by the ERP's spelling —
   // one fair is one row however many ways the counter typed its name.
@@ -292,20 +400,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   )
 
   // ── Open Bill ──────────────────────────────────────────────────────────
-  // The picks come from the same orders as everything above; what they PAID
-  // comes from the run's own lines, because a run also pays Open Bill on the
-  // bills it carried in from earlier months.
-  const openBillOn = Boolean((scheme as { enable_open_bill?: boolean } | null)?.enable_open_bill)
-  const [openBillRuleRes, openBillPaid] = await Promise.all([
-    openBillOn && subDept.schemeId
-      ? supabase
-          .from('comm_open_bill_rules')
-          .select('bill_rank, pct')
-          .eq('scheme_id', subDept.schemeId)
-          .is('effective_to', null)
-      : Promise.resolve({ data: null }),
-    openBillOn && run ? loadOpenBillPaid(supabase, run.id) : Promise.resolve(new Map<string, number>()),
-  ])
+  const openBillOn = Boolean(scheme?.enable_open_bill)
   const openBill = openBillOn
     ? summariseOpenBill(orders, {
         paidByOrder: openBillPaid,
@@ -317,34 +412,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       })
     : null
 
-  // ── Upsales ────────────────────────────────────────────────────────────
-  // What HR recorded beside the bills: amounts customers added to earlier
-  // orders, paid in this month's run (`lib/commission/upsales.ts`).
-  const [upsales, upsaleFairs, team, upsaleLock] = await Promise.all([
-    loadMonthUpsales(supabase, subDept.id, period),
-    loadFairChoices(supabase, period),
-    loadShareTeam(supabase, subDept.schemeId),
-    supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDept.id, p_period: period }),
-  ])
-  if (upsaleLock.error) throw new Error(`Could not check the commission run: ${upsaleLock.error.message}`)
-
   const ordersPath = revenuePath(subDept.slug, period, 'orders')
-  const workbench = batchRow && subDept.schemeId
-    ? await loadCommissionWorkbench(supabase, subDept.id, period, monthOrders, run?.id)
-    : null
 
-  // ── The feed, and bills claimed twice (2026-09-26) ─────────────────────
-  // Whether the ERP may still change this month, and whether any bill here is
-  // on another bill's paper or rides in from a month no run of ours paid.
-  const [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments] = await Promise.all([
-    batchRow ? loadErpFeedMonth(supabase, subDept.id, period) : Promise.resolve(null),
-    batchRow ? loadDoubleClaims(supabase, subDept.id) : Promise.resolve(null),
-    supabase.from('comm_runs').select('period_month')
-      .eq('sub_department_id', subDept.id).in('status', ['applied', 'locked']),
-    // Drops and upsells the ERP found on settled bills, from any month —
-    // they are paid into the month somebody confirms them in (2026-09-26).
-    loadPendingAdjustments(supabase, subDept.id),
-  ])
   const paidMonths = new Set(((paidRunRows ?? []) as Array<{ period_month: string }>).map(r => r.period_month))
   const carriedUnpaid = workbench ? carriedFromUnpaidMonths(workbench.input.orders, period, paidMonths) : []
   const doubleClaimPanel = doubleClaims ? (

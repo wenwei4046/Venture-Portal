@@ -1,35 +1,8 @@
-export default function PortalLoading() {
-  return (
-    <div className="page-enter">
-      {/* Page header skeleton */}
-      <div className="mb-10">
-        <div className="skeleton h-10 w-64 mb-3" />
-        <div className="skeleton h-5 w-96" />
-      </div>
+import RouteSkeleton from '@/components/layout/RouteSkeleton'
 
-      {/* Hero section skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7">
-          <div className="skeleton h-4 w-32 mb-3" />
-          <div className="skeleton h-16 w-72 mb-3" />
-          <div className="skeleton h-3 w-48" />
-        </div>
-        <div className="lg:col-span-5 space-y-4">
-          <div className="skeleton h-4 w-full" />
-          <div className="skeleton h-4 w-full" />
-          <div className="skeleton h-4 w-full" />
-          <div className="skeleton h-4 w-3/4" />
-        </div>
-      </div>
-
-      {/* Content skeleton */}
-      <div className="space-y-4">
-        <div className="skeleton h-6 w-48 mb-6" />
-        <div className="skeleton h-10 w-full" />
-        <div className="skeleton h-10 w-full" />
-        <div className="skeleton h-10 w-full" />
-        <div className="skeleton h-10 w-full" />
-      </div>
-    </div>
-  )
+// The boundary around every top-level section. Each section folder with pages
+// of its own has another one (route-boundaries.test.ts), so a navigation
+// inside a section commits at once too instead of freezing the page it left.
+export default function Loading() {
+  return <RouteSkeleton />
 }

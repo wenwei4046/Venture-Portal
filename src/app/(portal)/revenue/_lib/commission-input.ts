@@ -118,17 +118,22 @@ export async function loadCommissionInput(
       : 'There is more than one sub-department — say which one to run.')
   }
 
-  if (options.replayRunId) {
-    const { data, error } = await supabase.from('comm_runs').select('id')
-      .eq('id', options.replayRunId).eq('period_month', period)
-      .eq('sub_department_id', scheme.sub_department_id).maybeSingle()
-    if (error) throw new Error(`Could not read the commission run: ${error.message}`)
-    if (!data) throw new Error('The commission run does not belong to this month and sub-department.')
+  // The replayed run's check and the month's batch do not depend on each
+  // other: asked together, one round trip instead of two (2026-09-26).
+  const [replay, { data: batchRow, error: batchError }] = await Promise.all([
+    options.replayRunId
+      ? supabase.from('comm_runs').select('id')
+        .eq('id', options.replayRunId).eq('period_month', period)
+        .eq('sub_department_id', scheme.sub_department_id).maybeSingle()
+      : Promise.resolve(null),
+    supabase.from('sales_import_batches')
+      .select('id').eq('sub_department_id', scheme.sub_department_id)
+      .eq('period_month', period).eq('status', 'committed').maybeSingle(),
+  ])
+  if (replay) {
+    if (replay.error) throw new Error(`Could not read the commission run: ${replay.error.message}`)
+    if (!replay.data) throw new Error('The commission run does not belong to this month and sub-department.')
   }
-
-  const { data: batchRow, error: batchError } = await supabase.from('sales_import_batches')
-    .select('id').eq('sub_department_id', scheme.sub_department_id)
-    .eq('period_month', period).eq('status', 'committed').maybeSingle()
   if (batchError) throw new Error(`Could not read the month's import: ${batchError.message}`)
   const batchId = (batchRow as { id: string } | null)?.id
   if (!batchId) throw new Error(`Nothing has been imported for ${period.slice(0, 7)} yet.`)

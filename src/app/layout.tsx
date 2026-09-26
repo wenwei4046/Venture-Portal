@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
-import NextTopLoader from 'nextjs-toploader'
+import NavProgress from '@/components/layout/NavProgress'
 import PwaRegister from '@/components/pwa/PwaRegister'
 import './globals.css'
 
@@ -96,14 +96,16 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        <NextTopLoader
-          color="rgb(204, 90, 46)"
-          height={2}
-          showSpinner={false}
-          shadow="0 0 8px rgb(204 90 46 / 0.35)"
-        />
         <PwaRegister />
         {children}
+        {/* The progress line along the top edge, for every surface. It
+            replaced nextjs-toploader (2026-09-26), which watched link clicks
+            and the address bar: it finished the moment a loading skeleton
+            committed the new URL, so it stopped while the page was still
+            coming, never saw a router.push, and still wore the rust accent
+            the palette dropped in August. After {children} so a skeleton's
+            count is in before the line decides a navigation is over. */}
+        <NavProgress />
       </body>
     </html>
   )
