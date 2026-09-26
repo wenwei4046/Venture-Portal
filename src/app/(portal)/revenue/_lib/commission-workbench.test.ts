@@ -20,7 +20,7 @@ describe('commission workbench server metadata', () => {
       currentHierarchy: [{ staffId: 'person-a' }], currentRules: {}, unmatchedOrderNos: [],
     })
     mocks.calendar.mockResolvedValue([{
-      fairId: 'fair-aug', venueKey: 'VENUE', startDate: '2026-08-28', endDate: '2026-08-31',
+      fairId: 'fair-aug', venueKey: 'VENUE', displayName: 'Venue Hall', startDate: '2026-08-28', endDate: '2026-08-31',
       organiserName: 'Assigned organiser', erpOrganiserText: null,
     }])
     mocks.pay.mockRejectedValue(new Error('Individual pay is visible to HR and the Principal only'))
@@ -38,6 +38,8 @@ describe('commission workbench server metadata', () => {
     expect(mocks.input).toHaveBeenCalledWith('2026-08-01', 'sub-1', db, { replayRunId: undefined, includeCurrentRules: true })
     expect(result.orders).toEqual([{
       orderId: 'order-a', venue: 'Venue', location: 'Warehouse', organizer: 'Assigned organiser', eventName: '28–31 Aug',
+      // The fair itself rides along, so Sales by venue can group on it (2026-09-26).
+      fair: { id: 'fair-aug', venueKey: 'VENUE', venueName: 'Venue Hall' },
     }])
     expect(result.payRows).toEqual([])
     expect(result.payUnavailable).toBe(true)

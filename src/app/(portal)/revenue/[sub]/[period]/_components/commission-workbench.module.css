@@ -183,6 +183,8 @@
 .eyebrow { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; }
 .sectionHeading { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; letter-spacing: -0.015em; }
 .subtitle { margin-top: 5px; max-width: 850px; font-size: 12px; line-height: 1.65; }
+.subtitle a { text-decoration: underline; text-underline-offset: 3px; }
+.tabNote { margin: -6px 0 14px; }
 .button,
 .primaryButton,
 .ghostButton {

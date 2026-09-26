@@ -583,11 +583,34 @@ src/
 │   │   │                              else — so a brand we no longer carry
 │   │   │                              (MYLATEX) is only out while its
 │   │   │                              salesperson is.
-│   │   │                              **THE MONTH ENDS IN A RAIL (2026-09-17):**
-│   │   │                              `[period]` itself closes on three cuts of
-│   │   │                              the same bills, one `SlidingTabs` rail
-│   │   │                              (`?tab=`, `MonthBreakdownTabs`): Sales by
-│   │   │                              venue / Sales by person / **Open Bill**.
+│   │   │                              **ONE RAIL AT THE TOP (2026-09-26):** the
+│   │   │                              workbench's tabs (`CommissionWorkbench`)
+│   │   │                              are Total Sales Orders / KPI Items / Open
+│   │   │                              Bill / **Below deposit** / **Sales by
+│   │   │                              venue**, one table design. Below deposit =
+│   │   │                              every bill the gate holds (live engine
+│   │   │                              verdict, `status = 'deposit_pending'`) with
+│   │   │                              Paid, Deposit needed and **Still to
+│   │   │                              collect**; a salesperson's page has the
+│   │   │                              same tab beside Personal / Overriding.
+│   │   │                              Sales by venue is one row per FAIR (venue ·
+│   │   │                              days · organiser, `salesByFair` in
+│   │   │                              `lib/venues.ts`, from each bill's
+│   │   │                              `fair_event_id`), READ-ONLY — organiser and
+│   │   │                              *same place as…* are picked on Revenue ›
+│   │   │                              Venues only. The Total Sales Orders table
+│   │   │                              gained **Group sales**; the saved run's
+│   │   │                              per-person table, the old *Waiting on a
+│   │   │                              deposit* section and *Sales by person* are
+│   │   │                              gone (user 2026-09-26). The bottom rail
+│   │   │                              below keeps only Open Bill (cost) and
+│   │   │                              Upsales & drops.
+│   │   │                              **THE MONTH ENDS IN A RAIL (2026-09-17,
+│   │   │                              trimmed 2026-09-26):** `[period]` closed on
+│   │   │                              three cuts of the same bills, one
+│   │   │                              `SlidingTabs` rail (`?tab=`,
+│   │   │                              `MonthBreakdownTabs`): Sales by venue /
+│   │   │                              Sales by person / **Open Bill**.
 │   │   │                              Only one is ever being read, and stacked
 │   │   │                              they meant scrolling past every venue to
 │   │   │                              reach a person. THE RAIL IS THE HEADING —

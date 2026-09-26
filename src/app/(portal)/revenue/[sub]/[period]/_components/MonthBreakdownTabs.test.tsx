@@ -14,21 +14,13 @@ vi.mock('next/navigation', () => ({
 }))
 
 const PANELS = {
-  venue: <div>Venue panel</div>,
-  person: <div>Person panel</div>,
   openBill: <div>Open Bill panel</div>,
+  upsales: <div>Upsales panel</div>,
 }
-const COUNTS = { venue: 30, person: 26, openBill: 211 }
+const COUNTS = { openBill: 211, upsales: 11 }
 
-function renderRail(openBill: React.ReactNode = PANELS.openBill) {
-  return render(
-    <MonthBreakdownTabs
-      venue={PANELS.venue}
-      person={PANELS.person}
-      openBill={openBill}
-      counts={COUNTS}
-    />,
-  )
+function renderRail(openBill: React.ReactNode = PANELS.openBill, upsales: React.ReactNode | undefined = PANELS.upsales) {
+  return render(<MonthBreakdownTabs openBill={openBill} upsales={upsales} counts={COUNTS} />)
 }
 
 beforeEach(() => {
@@ -37,86 +29,71 @@ beforeEach(() => {
 })
 
 describe('MonthBreakdownTabs', () => {
-  it('opens on Sales by venue, and renders only the panel being read', () => {
+  it('opens on the first tab, and renders only the panel being read', () => {
     renderRail()
-    expect(screen.getByText('Venue panel')).toBeVisible()
-    expect(screen.queryByText('Person panel')).toBeNull()
-    expect(screen.queryByText('Open Bill panel')).toBeNull()
+    expect(screen.getByText('Open Bill panel')).toBeVisible()
+    expect(screen.queryByText('Upsales panel')).toBeNull()
   })
 
-  it('carries each panel’s count on its tab', () => {
+  // 2026-09-26: Sales by venue moved up into the workbench's tabs, and Sales
+  // by person went — the workbench's own table is that.
+  it('no longer carries Sales by venue or Sales by person', () => {
     renderRail()
-    expect(screen.getByRole('button', { name: /Sales by venue/ })).toHaveTextContent('30')
-    expect(screen.getByRole('button', { name: /Sales by person/ })).toHaveTextContent('26')
+    expect(screen.queryByRole('button', { name: /Sales by venue/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Sales by person/ })).toBeNull()
+  })
+
+  it('carries each panel’s count on its tab, upsales last', () => {
+    renderRail()
     expect(screen.getByRole('button', { name: /Open Bill/ })).toHaveTextContent('211')
+    expect(screen.getByRole('button', { name: /Upsales/ })).toHaveTextContent('11')
+    expect(screen.getAllByRole('button').at(-1)?.textContent).toMatch(/Upsales/)
   })
 
   it('opens on the tab a link asked for', () => {
-    url.search = 'tab=open-bill'
+    url.search = 'tab=upsales'
     renderRail()
-    expect(screen.getByText('Open Bill panel')).toBeVisible()
-    expect(screen.queryByText('Venue panel')).toBeNull()
+    expect(screen.getByText('Upsales panel')).toBeVisible()
+    expect(screen.queryByText('Open Bill panel')).toBeNull()
   })
 
   it('pushes the tab into the URL instead of navigating', () => {
     const push = vi.spyOn(window.history, 'pushState')
     const { rerender } = renderRail()
 
-    fireEvent.click(screen.getByRole('button', { name: /Sales by person/ }))
-    expect(push).toHaveBeenCalledWith(null, '', '?tab=person')
+    fireEvent.click(screen.getByRole('button', { name: /Upsales/ }))
+    expect(push).toHaveBeenCalledWith(null, '', '?tab=upsales')
 
-    url.search = 'tab=person'
-    rerender(
-      <MonthBreakdownTabs
-        venue={PANELS.venue}
-        person={PANELS.person}
-        openBill={PANELS.openBill}
-        counts={COUNTS}
-      />,
-    )
-    expect(screen.getByText('Person panel')).toBeVisible()
-    expect(screen.queryByText('Venue panel')).toBeNull()
+    url.search = 'tab=upsales'
+    rerender(<MonthBreakdownTabs openBill={PANELS.openBill} upsales={PANELS.upsales} counts={COUNTS} />)
+    expect(screen.getByText('Upsales panel')).toBeVisible()
+    expect(screen.queryByText('Open Bill panel')).toBeNull()
   })
 
-  it('drops the key again on the way back to the default tab', () => {
-    url.search = 'tab=person'
+  it('drops the key again on the way back to the first tab', () => {
+    url.search = 'tab=upsales'
     const push = vi.spyOn(window.history, 'pushState')
     renderRail()
 
-    fireEvent.click(screen.getByRole('button', { name: /Sales by venue/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Open Bill/ }))
     expect(push).toHaveBeenCalledWith(null, '', window.location.pathname)
   })
 
-  it('has no Open Bill tab when the scheme pays none, whatever the URL says', () => {
+  it('has no Open Bill tab when the month pays none, whatever the URL says', () => {
     url.search = 'tab=open-bill'
     renderRail(null)
     expect(screen.queryByRole('button', { name: /Open Bill/ })).toBeNull()
-    expect(screen.getByText('Venue panel')).toBeVisible()
-  })
-
-  // Upsales (2026-09-24): what HR recorded beside the bills, last on the rail.
-  it('ends in Upsales with its count, and a link can open it', () => {
-    url.search = 'tab=upsales'
-    render(
-      <MonthBreakdownTabs
-        venue={PANELS.venue}
-        person={PANELS.person}
-        openBill={PANELS.openBill}
-        upsales={<div>Upsales panel</div>}
-        counts={{ ...COUNTS, upsales: 11 }}
-      />,
-    )
-    const tabs = screen.getAllByRole('button').map(b => b.textContent ?? '')
-    expect(tabs.at(-1)).toMatch(/Upsales/)
-    expect(screen.getByRole('button', { name: /Upsales/ })).toHaveTextContent('11')
     expect(screen.getByText('Upsales panel')).toBeVisible()
-    expect(screen.queryByText('Venue panel')).toBeNull()
   })
 
-  it('has no Upsales tab on a page that offers none, whatever the URL says', () => {
-    url.search = 'tab=upsales'
+  it('falls back to the first tab for a link to a tab that is gone', () => {
+    url.search = 'tab=person'
     renderRail()
-    expect(screen.queryByRole('button', { name: /Upsales/ })).toBeNull()
-    expect(screen.getByText('Venue panel')).toBeVisible()
+    expect(screen.getByText('Open Bill panel')).toBeVisible()
+  })
+
+  it('renders nothing when there is nothing to show', () => {
+    const { container } = render(<MonthBreakdownTabs openBill={null} counts={COUNTS} />)
+    expect(container).toBeEmptyDOMElement()
   })
 })

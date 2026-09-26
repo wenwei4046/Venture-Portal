@@ -13,21 +13,24 @@
  * spaces, empty becomes nothing.
  */
 
-export interface VenueSales {
-  /** The PLACE's key — the canonical one when the spelling has been merged. */
+/** One row of the month's *Sales by venue*: a fair, or a place's bills no fair claims. */
+export interface FairSales {
+  /** `fair:<id>` for the bills a fair claims, `place:<key>` for a place's unclaimed ones. */
+  key: string
+  /** The PLACE's key — what the All bills page filters on. '' for bills that name no venue. */
   venueKey: string
-  /** The spelling the orders carry; the register's name when the month has none. */
   displayName: string
+  fairId: string | null
+  /** The days the fair was open ("4–6 Sep"). Null when no fair claims these bills. */
+  event: string | null
   organizer: string | null
-  /**
-   * Every ERP spelling that rolled into this place, tidy and alphabetical.
-   * One entry is the ordinary case; more than one means somebody merged them.
-   */
-  spellings: string[]
   orders: number
-  /** People with at least one order at this venue. */
+  /** People with at least one order here. */
   people: number
+  /** Everything on the bills, transport and every other charge included. */
   total: number
+  /** The part of those bills that earns commission. */
+  commissionable: number
 }
 
 /** `  spice   arena ` → `SPICE ARENA`. Empty or blank is null. */
@@ -44,7 +47,7 @@ export function venueName(venue: string | null | undefined): string | null {
   return squeezed === '' ? null : squeezed
 }
 
-export interface VenueOrderInput {
+export interface FairOrderInput {
   /** The spelling on the document. */
   venue: string | null
   /**
@@ -55,61 +58,66 @@ export interface VenueOrderInput {
   groupKey?: string | null
   /** The place's tidy name, when the register knows it. */
   groupName?: string | null
+  /** The fair the calendar placed this bill at (`sales_orders.fair_event_id`), with its place. */
+  fair?: { id: string; venueKey: string; venueName: string } | null
+  /** That fair's days, as the rest of the month page prints them. */
+  event?: string | null
+  organizer?: string | null
   staffKey: string | null
   amount: number
+  commissionable?: number
 }
 
 /**
- * A month's orders grouped by PLACE, biggest first, with the organiser
- * attached.
+ * A month's bills by the FAIR they were written at, biggest first (2026-09-26).
  *
- * The ERP's venue is free text typed at the fair, so one place arrives under
- * several spellings; `canonical_key` in the register is where somebody records
- * that they are the same place, and `venue_group_key` on each order is that
- * answer applied. Grouping on it here — rather than on the raw spelling —
- * is what makes an event one row and one organiser rather than three.
+ * Nobody picks a venue or an organiser here any more: the fair calendar on
+ * Revenue › Venues stamps every bill with its fair by trigger
+ * (`sales_orders.fair_event_id`), and the fair carries the place, the days and
+ * the organiser. So the row is the fair, not the place — one hall holds two
+ * fairs in a month with a different organiser each, and a row per place would
+ * have to pick one of them.
  *
- * Orders with no venue are collected under one unnamed row rather than
+ * Bills no fair claims fall back to their PLACE — the canonical one, so the
+ * several spellings a venue arrives under still read as one row — and bills
+ * with no venue at all are collected under one unnamed row rather than
  * dropped: a venue the ERP forgot is a gap HR should see.
  */
-export function salesByVenue(
-  orders: VenueOrderInput[],
-  register: Map<string, { displayName: string; organizer: string | null }>,
-): VenueSales[] {
-  const byKey = new Map<string, VenueSales & { staff: Set<string>; seen: Set<string> }>()
+export function salesByFair(orders: FairOrderInput[]): FairSales[] {
+  const byKey = new Map<string, FairSales & { staff: Set<string> }>()
   for (const o of orders) {
-    const key = (o.groupKey ?? undefined) || venueKey(o.venue) || ''
+    const place = (o.groupKey ?? undefined) || venueKey(o.venue) || ''
+    const key = o.fair ? `fair:${o.fair.id}` : `place:${place}`
     const row =
       byKey.get(key) ??
       {
-        venueKey: key,
-        displayName:
-          o.groupName ??
-          register.get(key)?.displayName ??
-          venueName(o.venue) ??
-          '(no venue)',
-        organizer: register.get(key)?.organizer ?? null,
-        spellings: [],
+        key,
+        venueKey: o.fair?.venueKey ?? place,
+        displayName: o.fair?.venueName ?? o.groupName ?? venueName(o.venue) ?? '(no venue)',
+        fairId: o.fair?.id ?? null,
+        event: o.fair ? (o.event ?? null) : null,
+        organizer: null,
         orders: 0,
         people: 0,
         total: 0,
+        commissionable: 0,
         staff: new Set<string>(),
-        seen: new Set<string>(),
       }
     row.orders += 1
     row.total = round2(row.total + o.amount)
+    row.commissionable = round2(row.commissionable + (o.commissionable ?? 0))
+    row.organizer ??= o.organizer ?? null
     if (o.staffKey) row.staff.add(o.staffKey)
-    const spelling = venueName(o.venue)
-    if (spelling) row.seen.add(spelling)
     byKey.set(key, row)
   }
   return [...byKey.values()]
-    .map(({ staff, seen, ...rest }) => ({
-      ...rest,
-      people: staff.size,
-      spellings: [...seen].sort((a, b) => a.localeCompare(b)),
-    }))
-    .sort((a, b) => b.total - a.total || a.displayName.localeCompare(b.displayName))
+    .map(({ staff, ...rest }) => ({ ...rest, people: staff.size }))
+    .sort(
+      (a, b) =>
+        b.total - a.total ||
+        a.displayName.localeCompare(b.displayName) ||
+        (a.event ?? '').localeCompare(b.event ?? ''),
+    )
 }
 
 function round2(v: number): number {

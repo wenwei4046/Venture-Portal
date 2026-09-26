@@ -12,12 +12,13 @@ const SELECT =
 /**
  * Who ran the fair at this venue, in this month — saved the moment it is picked.
  *
- * One control, two homes: the venue register (all venues, every month) and the
- * month page's *Sales by venue* (this month's venues, as HR reads the month).
- * Shared rather than written twice, because the rule it encodes is not
- * obvious: the organiser belongs to the (venue, month) pair, so the same hall
- * shows a different name in August and September, and picking one here never
- * touches the other.
+ * Its one home is the venue register (all venues, every month). The month
+ * page's *Sales by venue* offered it too until 2026-09-26; since then that tab
+ * only READS the organiser each bill's fair carries (user: the fair calendar
+ * locates it — nothing to pick there). The rule it encodes is not obvious: the
+ * organiser belongs to the (venue, month) pair, so the same hall shows a
+ * different name in August and September, and picking one never touches the
+ * other.
  *
  * NO FORM, deliberately. A bare `<select>` inside a `RowForm` is never
  * submitted — the form is portalled out of the table and only its own controls

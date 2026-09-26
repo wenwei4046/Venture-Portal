@@ -5,21 +5,17 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
-import { ratePct } from '@/lib/commission/ranks'
-import { salesByVenue, venueKey } from '@/lib/venues'
+import { salesByFair } from '@/lib/venues'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import { summariseOpenBill } from '@/lib/commission/open-bill-summary'
 import RunControls from './_components/RunControls'
 import SchemeSwitches from './_components/SchemeSwitches'
-import { loadFairsForMonth, loadOrganisers } from '../../_lib/venue-register'
-import VenueSection from './_components/VenueSection'
-import PersonSection from './_components/PersonSection'
 import OpenBillSection from './_components/OpenBillSection'
 import MonthBreakdownTabs from './_components/MonthBreakdownTabs'
 import UpsaleSection from './_components/UpsaleSection'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
-import { loadMonthOrders, loadOrderShares, loadShareTeam } from '../../_lib/month-orders'
+import { loadMonthOrders, loadShareTeam } from '../../_lib/month-orders'
 import { loadFairChoices, loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadOpenBillPaid } from '../../_lib/open-bill'
 import { readRevenuePayrollAdjustments, type RevenuePayrollAdjustmentRead } from '../../_lib/payroll-adjustments'
@@ -49,12 +45,6 @@ function label(period: string): string {
 
 function pct(v: number | null): string {
   return v === null ? '—' : `${(v * 100).toFixed(1)}%`
-}
-
-/** PostgREST embeds a to-one relation as an object or a one-element array. */
-function one<T>(v: T | T[] | null | undefined): T | null {
-  if (!v) return null
-  return Array.isArray(v) ? (v[0] ?? null) : v
 }
 
 interface RunRow {
@@ -95,34 +85,21 @@ interface BatchRow {
 }
 
 interface SchemeRow {
-  deposit_threshold_pct: number | string | null
   enable_open_bill: boolean
   enable_kpi: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
 }
 
+/**
+ * What the page still reads off the saved run's statements: whose they are and
+ * what each came to. The statements themselves were a table here until
+ * 2026-09-26 — the live table above it carries every column now, Group sales
+ * included — and each one is still a page of its own (`statement/[staffId]`).
+ */
 interface StatementRow {
   id: string
   staff_id: string
-  rank_key: string | null
-  qualifies_for_rank_key: string | null
-  /** The engine's preview of the ratchet — embedded `titles (name)`. */
-  promotes_to_title_id: string | null
-  promotes_to: { name: string } | { name: string }[] | null
-  product_rate: number | string
-  product_revenue: number | string
-  group_revenue: number | string
-  deferred_revenue: number | string
-  product_commission: number | string
-  kpi_commission: number | string
-  open_bill_bonus: number | string
-  override_commission: number | string
-  margin_incentive: number | string
-  group_incentive: number | string
-  group_subsidy_cap: number | string
-  margin_pct: number | string | null
-  margin_penalty_withheld: number | string
   total_commission: number | string
 }
 
@@ -136,9 +113,11 @@ interface StatementRow {
  * replaces every order row, and a page that recomputed its own history would
  * quietly disagree with the money already in payroll.
  *
- * It ENDS IN A RAIL (2026-09-17): Sales by venue, Sales by person and Open
- * Bill are three questions about the same bills and only one is ever being
- * asked, so they are tabs rather than three sections stacked down the page.
+ * ONE RAIL AT THE TOP (2026-09-26): the workbench's tabs — Total Sales
+ * Orders, KPI Items, Open Bill, Below deposit and Sales by venue — are every
+ * cut of the month's bills, in one table design. The saved run's table, the
+ * deposit list and Sales by person that used to follow further down are gone:
+ * the first two moved up into that rail, the last was the top table already.
  */
 export default async function CommissionPeriodPage({ params }: PageProps) {
   const { sub, period } = await params
@@ -181,12 +160,12 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const monthOrdersRead = Promise.all([batchRowRead, loadMonthOrders(supabase, subDept.id, period)])
     .then(([batchRow, rows]) => (batchRow ? rows : []))
 
-  // The deposit gate is a scheme setting, so it is THIS sub-department's.
+  // The switches this run pays under are a scheme setting, so THIS sub-department's.
   const schemeRead = subDept.schemeId
     ? once(
         supabase
           .from('comm_schemes')
-          .select('deposit_threshold_pct, enable_open_bill, enable_kpi, enable_margin_penalty, enable_margin_incentive')
+          .select('enable_open_bill, enable_kpi, enable_margin_penalty, enable_margin_incentive')
           .eq('id', subDept.schemeId)
           .maybeSingle(),
       ).then(({ data }) => data as SchemeRow | null)
@@ -207,11 +186,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     if (!run) return [] as StatementRow[]
     const { data } = await supabase
       .from('comm_statements')
-      .select('id, staff_id, rank_key, qualifies_for_rank_key, promotes_to_title_id, promotes_to:titles!comm_statements_promotes_to_title_id_fkey (name), product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, group_incentive, group_subsidy_cap, margin_pct, margin_penalty_withheld, total_commission')
+      .select('id, staff_id, total_commission')
       .eq('run_id', run.id)
-    return ((data ?? []) as unknown as StatementRow[]).sort(
-      (a, b) => Number(b.total_commission) - Number(a.total_commission),
-    )
+    return (data ?? []) as unknown as StatementRow[]
   })
 
   // Names for anyone the run mentions but this month's batch does not — an
@@ -227,12 +204,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     ])
     return { staffRows: (data ?? []) as Array<{ id: string; employee_name: string }>, payrollAdjustments }
   })
-
-  // A shared bill is credited in parts (2026-09-24): the owner keeps what
-  // nobody else holds, each holder their share — the same parts the run pays.
-  const sharesRead = monthOrdersRead.then(rows =>
-    loadOrderShares(supabase, rows.filter(o => !o.cancelled).map(o => o.orderId)),
-  )
 
   // Whether THIS month pays Open Bill: its own setting over Rules (2026-09-26 —
   // on for August, which the claim form paid; September follows Rules).
@@ -270,12 +241,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     batchRow,
     monthOrders,
     scheme,
-    { data: rankRows },
     run,
     statements,
     { staffRows, payrollAdjustments },
-    shares,
-    [organisers, fairs],
     [openBillRuleRes, openBillPaid],
     [upsales, upsaleFairs, team, upsaleLock],
     workbench,
@@ -285,21 +253,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     batchRowRead,
     monthOrdersRead,
     schemeRead,
-    // A statement snapshots the rank KEY; the ladder says what letter that key
-    // wears today — the rung's label, a trigger-kept copy of its rank's
-    // (comm_rank_defs, 2026-09-05; SS, A, B … from the top). A key the ladder
-    // no longer carries is shown as itself.
-    subDept.schemeId
-      ? once(supabase.from('comm_ranks').select('rank_key, label').eq('scheme_id', subDept.schemeId))
-      : Promise.resolve({ data: null }),
     runRead,
     statementsRead,
     namesAndAdjustmentsRead,
-    sharesRead,
-    // Who ran each of this month's fairs, and the register to pick from. The
-    // RPC above already carries the organiser's NAME on every order; these are
-    // the ids behind it, which is what a dropdown needs to show its own value.
-    Promise.all([loadOrganisers(supabase), loadFairsForMonth(supabase, period)]),
     openBillRead,
     // What HR recorded beside the bills: amounts customers added to earlier
     // orders, paid in this month's run (`lib/commission/upsales.ts`).
@@ -337,23 +293,10 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const linesWithoutCost = orders.reduce((a, o) => a + o.linesWithoutCost, 0)
   const linesWithoutBrand = orders.reduce((a, o) => a + o.linesWithoutBrand, 0)
 
-  const depositPct = scheme ? scheme.deposit_threshold_pct : null
-  const threshold = depositPct === null || depositPct === undefined ? null : Number(depositPct)
-
-  const ladder = (rankRows ?? []) as Array<{ rank_key: string; label: string }>
-  const rankNameOf = (key: string | null) => {
-    if (!key) return null
-    return ladder.find(x => x.rank_key === key)?.label ?? key
-  }
-
   const warnings = run?.warnings ?? []
   const runTotal = run ? Number(run.total_commission) : 0
 
   const nameOf = new Map(staffRows.map(s => [s.id, s.employee_name]))
-
-  // Before a run exists the deposit gate is shown from live orders; once it
-  // does, from the run's own snapshot of what it held back.
-  const belowDeposit = threshold === null ? [] : orders.filter(o => !o.depositMet)
 
   const unmatched = orders.filter(o => !o.staffId)
   const total = orders.reduce((a, o) => a + o.orderTotal, 0)
@@ -362,51 +305,27 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // and other service lines are the difference (user 2026-09-26).
   const commissionableTotal = Math.round(orders.reduce((a, o) => a + o.marginRevenue, 0) * 100) / 100
 
-  // Sales by person and by venue, from the same rows, so the two sections can
-  // never disagree about what the month contains.
-  const bySalesperson = new Map<
-    string,
-    { key: string; staffId: string | null; name: string; orders: number; total: number; held: number }
-  >()
-  const sharesByOrder = new Map<string, typeof shares>()
-  for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
-  const credit = (key: string, staffId: string | null, name: string, value: number, held: boolean) => {
-    const e = bySalesperson.get(key) ?? { key, staffId, name, orders: 0, total: 0, held: 0 }
-    e.orders++
-    e.total += value
-    if (held) e.held += value
-    bySalesperson.set(key, e)
-  }
-  for (const o of orders) {
-    const key = o.staffId ?? `agent:${o.agentName}`
-    const name = o.employeeName ?? `${o.agentName} (unmatched)`
-    const mine = o.staffId ? (sharesByOrder.get(o.orderId) ?? []) : []
-    const given = mine.reduce((a, sh) => a + Math.round(o.orderTotal * sh.pct * 100) / 100, 0)
-    credit(key, o.staffId, name, o.orderTotal - given, !o.depositMet)
-    for (const sh of mine) {
-      credit(sh.staffId, sh.staffId, sh.name, Math.round(o.orderTotal * sh.pct * 100) / 100, !o.depositMet)
-    }
-  }
-  const people = [...bySalesperson.values()].sort((a, b) => b.total - a.total)
-
-  // Grouped by the PLACE the database resolved, not by the ERP's spelling —
-  // one fair is one row however many ways the counter typed its name.
-  const venueRows = salesByVenue(
-    orders.map(o => ({
-      venue: o.venue,
-      groupKey: o.venueGroupKey,
-      groupName: o.venueGroupName,
-      staffKey: o.staffId ?? o.agentName,
-      amount: o.orderTotal,
-    })),
-    new Map(
-      orders
-        .filter(o => o.venueGroupKey ?? venueKey(o.venue))
-        .map(o => [
-          (o.venueGroupKey ?? venueKey(o.venue))!,
-          { displayName: o.venueGroupName ?? o.venue ?? '', organizer: o.organizer },
-        ]),
-    ),
+  // Sales by venue (2026-09-26, the workbench's tab): every live bill —
+  // matched or not, so it adds up to Total sales value — at the fair the
+  // calendar placed it at. The fair is the workbench's own read of
+  // `sales_orders.fair_event_id`, so the tab and the bill rows beside it name
+  // the same venue, days and organiser.
+  const fairOf = new Map((workbench?.orders ?? []).map(meta => [meta.orderId, meta]))
+  const venueRows = salesByFair(
+    orders.map(o => {
+      const meta = fairOf.get(o.orderId)
+      return {
+        venue: o.venue,
+        groupKey: o.venueGroupKey,
+        groupName: o.venueGroupName,
+        fair: meta?.fair ?? null,
+        event: meta?.eventName ?? null,
+        organizer: meta?.organizer ?? o.organizer,
+        staffKey: o.staffId ?? o.agentName,
+        amount: o.orderTotal,
+        commissionable: o.marginRevenue,
+      }
+    }),
   )
 
   // ── Open Bill ──────────────────────────────────────────────────────────
@@ -512,7 +431,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   )
   const monthTools = (
           <details className={workbenchStyles.legacy}>
-            <summary>Payroll & source tools · saved run, costs, venues and upsales</summary>
+            <summary>Payroll & source tools · saved run, costs and upsales</summary>
             <p className={workbenchStyles.notice}>Payroll uses saved Revenue Rules and source orders. Temporary exclusions and preview settings above are for review only. Save Open Bill picks before computing the payroll run.</p>
 
           {(unmatched.length > 0 || linesWithoutCost > 0 || linesWithoutBrand > 0) && (
@@ -633,80 +552,16 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               </div>
             </div>
 
-            {statements.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>Salesperson</th>
-                      <th className="m-hide">Rank</th>
-                      <th className="right m-hide">Own revenue</th>
-                      <th className="right m-hide">Group</th>
-                      <th className="right m-hide">Product</th>
-                      <th className="right m-hide">KPI</th>
-                      <th className="right m-hide">Open Bill</th>
-                      <th className="right m-hide">Override</th>
-                      <th className="right m-hide">Incentive</th>
-                      {statements.some(s => Number(s.group_incentive) > 0) ? <th className="right m-hide">Group incentive</th> : null}
-                      {statements.some(s => Number(s.group_subsidy_cap) > 0) ? <th className="right m-hide">Subsidy cap</th> : null}
-                      <th className="right">Source total</th>
-                      <th className="lt-toggle" aria-hidden />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statements.map(s => (
-                      <LedgerRow key={s.id}>
-                        <td>
-                          <Link
-                            href={revenuePath(subDept.slug, period, 'statement', s.staff_id)}
-                            className="font-serif text-[15px] text-ink hover:text-accent"
-                          >
-                            {nameOf.get(s.staff_id) ?? s.staff_id}
-                          </Link>
-                          {s.qualifies_for_rank_key && s.qualifies_for_rank_key !== s.rank_key ? (
-                            <div className="font-mono text-[10.5px] text-accent mt-0.5">
-                              QUALIFIES FOR {(rankNameOf(s.qualifies_for_rank_key) ?? '').toUpperCase()}
-                            </div>
-                          ) : null}
-                          {s.promotes_to_title_id ? (
-                            <div className="font-mono text-[10.5px] text-accent mt-0.5">
-                              {run?.status === 'applied' ? 'TITLE RAISED TO' : 'TITLE → '}{' '}
-                              {(one(s.promotes_to)?.name ?? 'a higher title').toUpperCase()}
-                              {run?.status === 'applied' ? '' : ' ON SYNC'}
-                            </div>
-                          ) : null}
-                        </td>
-                        <td className="m-hide" data-label="Rank">
-                          <span className="font-mono text-[11px] text-graphite" title={s.rank_key ?? undefined}>
-                            {rankNameOf(s.rank_key) ?? '—'} · {Number(s.group_incentive) > 0 ? 'Group package' : ratePct(Number(s.product_rate))}
-                          </span>
-                        </td>
-                        <td className="num m-hide" data-label="Own revenue">{formatMoney(Number(s.product_revenue))}</td>
-                        <td className="num m-hide" data-label="Group">{formatMoney(Number(s.group_revenue))}</td>
-                        <td className="num m-hide" data-label="Product">{formatMoney(Number(s.product_commission))}</td>
-                        <td className="num m-hide" data-label="KPI">{formatMoney(Number(s.kpi_commission))}</td>
-                        <td className="num m-hide" data-label="Open Bill">{formatMoney(Number(s.open_bill_bonus))}</td>
-                        <td className="num m-hide" data-label="Override">{formatMoney(Number(s.override_commission))}</td>
-                        <td className="num m-hide" data-label="Incentive">{formatMoney(Number(s.margin_incentive))}</td>
-                        {statements.some(row => Number(row.group_incentive) > 0) ? <td className="num m-hide" data-label="Group incentive">{formatMoney(Number(s.group_incentive))}</td> : null}
-                        {statements.some(row => Number(row.group_subsidy_cap) > 0) ? <td className="num m-hide" data-label="Subsidy cap (outside payroll)">{formatMoney(Number(s.group_subsidy_cap))}</td> : null}
-                        <td className="num font-semibold">{formatMoney(Number(s.total_commission))}</td>
-                      </LedgerRow>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : run ? (
+            {/* The saved run's per-person table lived here until 2026-09-26.
+                The live table at the top of the page carries all of it now —
+                Group sales included — and each statement is still its own
+                page (`statement/[staffId]`, linked from HR payroll). */}
+            {run && statements.length === 0 ? (
               <p className="font-serif italic text-muted text-sm">
                 The run produced no statements — every order was either unmatched or held by the
                 deposit gate.
               </p>
             ) : null}
-
-            <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
-              Group revenue is a SALES figure: it is own plus the whole downline, and the
-              below-margin penalty does not reduce it. Commission is what the penalty cuts.
-            </p>
           </section>
 
           <PayrollAdjustmentPanel read={payrollAdjustments} periodLabel={label(period)} staffNames={nameOf}
@@ -758,73 +613,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
             </section>
           ) : null}
 
-          {/* ── Deposit gate ────────────────────────────────────────────── */}
-          {threshold !== null && (run ? (run.deferred_orders ?? []).length > 0 : belowDeposit.length > 0) ? (
-            <section className="mb-10">
-              <div className="sect-head">
-                <h2>Waiting on a deposit</h2>
-                <span className="rule" aria-hidden />
-                <span className="count">
-                  {(run ? (run.deferred_orders ?? []).length : belowDeposit.length)} ORDERS
-                </span>
-              </div>
-              <p className="font-serif italic text-muted text-sm mb-4 max-w-3xl">
-                Below {Math.round(threshold * 100)}% of the order total, so none of their commission
-                is released yet. Nothing is lost — each one pays in the month its deposit clears.
-              </p>
-              <div className="overflow-x-auto">
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>Order</th>
-                      <th className="m-hide">Salesperson</th>
-                      <th className="right m-hide">Order total</th>
-                      <th className="right m-hide">Paid</th>
-                      <th className="right">Needed</th>
-                      {run ? <th className="right m-hide">Commission held</th> : null}
-                      <th className="lt-toggle" aria-hidden />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {run
-                      ? (run.deferred_orders ?? []).slice(0, 60).map(d => (
-                          <LedgerRow key={d.orderNo}>
-                            <td className="font-mono text-xs">{d.orderNo}</td>
-                            <td className="m-hide" data-label="Salesperson">{nameOf.get(d.staffId) ?? d.staffId}</td>
-                            <td className="num m-hide" data-label="Order total">{formatMoney(d.orderTotal)}</td>
-                            <td className="num m-hide" data-label="Paid">{formatMoney(d.paidAmount)}</td>
-                            <td className="num">{formatMoney(d.requiredAmount)}</td>
-                            <td className="num m-hide" data-label="Commission held">{formatMoney(d.productRevenue)}</td>
-                          </LedgerRow>
-                        ))
-                      : belowDeposit.slice(0, 40).map(o => (
-                          <LedgerRow key={o.orderId}>
-                            <td className="font-mono text-xs">
-                              <Link
-                                href={revenuePath(subDept.slug, period, 'orders', o.orderId)}
-                                className="text-ink hover:text-accent"
-                              >
-                                {o.orderNo}
-                              </Link>
-                            </td>
-                            <td className="m-hide" data-label="Salesperson">{o.employeeName ?? o.agentName}</td>
-                            <td className="num m-hide" data-label="Order total">{formatMoney(o.orderTotal)}</td>
-                            <td className="num m-hide" data-label="Paid">{formatMoney(o.paidAmount)}</td>
-                            <td className="num">{formatMoney(o.depositRequired ?? o.orderTotal * threshold)}</td>
-                          </LedgerRow>
-                        ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          ) : null}
-
-          {/* Three cuts of the same bills, one at a time — the rail is their
-              heading, so each panel opens on its own explanation. */}
+          {/* Waiting on a deposit, Sales by venue and Sales by person were here
+              until 2026-09-26: the first two are tabs of the table at the top
+              of the page now (Below deposit · Sales by venue), and the third
+              was that table already. What is left is what HR records beside
+              the bills, and what the Open Bill picks cost. */}
           <MonthBreakdownTabs
             counts={{
-              venue: venueRows.length,
-              person: people.length,
               openBill: openBill?.totals.bills ?? 0,
               upsales: upsales.length + pendingAdjustments.length,
             }}
@@ -838,16 +633,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                 locked={Boolean(upsaleLock.data)}
               />
             }
-            venue={
-              <VenueSection
-                rows={venueRows}
-                ordersPath={ordersPath}
-                period={period}
-                organisers={organisers}
-                fairs={fairs}
-              />
-            }
-            person={<PersonSection rows={people} ordersPath={ordersPath} />}
             openBill={
               openBill ? (
                 <OpenBillSection
@@ -870,6 +655,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         monthOverview={<>{monthHeader}{erpChangesPanel}{doubleClaimPanel}</>}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
+        venues={venueRows}
         monthTools={monthTools}
         savedTotals={statements.map(row => ({ staffId: row.staff_id, total: Number(row.total_commission) }))} />
         : <>{monthHeader}{!batchRow ? (
