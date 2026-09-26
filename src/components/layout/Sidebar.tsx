@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import Link, { useLinkStatus } from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { cancelWarmIntent, railEntered, warmOnIntent } from '@/lib/nav-warm'
 import type { NavViewer } from './nav-config'
 import {
   buildNavEntries,
@@ -26,6 +27,7 @@ interface SidebarProps {
 // is no `mobileOpen` / `onClose` any more.
 export default function Sidebar({ viewer, navData }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const basisParam = searchParams.get('basis')
@@ -78,6 +80,14 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
   // load, and any button pressed during that window queued behind them. The
   // `<Link>`s below keep Next's default prefetch, which for these dynamic
   // routes fetches only the loading boundary, on hover and in-viewport.
+  //
+  // What replaced it (2026-09-26) is one link at a time: the link the pointer
+  // SETTLES on is rendered in full, so the click that follows is instant
+  // (lib/nav-warm.ts — intent delay, rail settle, never an audited page).
+  const warmHandlers = (href: string) => ({
+    onMouseEnter: () => warmOnIntent(router, href),
+    onMouseLeave: cancelWarmIntent,
+  })
 
   // Auto-open every group on the way to the page being read — both Revenue and
   // the sub-department inside it, so arriving at /revenue/fair/rules from a
@@ -150,6 +160,7 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
             <Marker active={lit} depth={depth} />
             <Link
               href={group.href}
+              {...warmHandlers(group.href)}
               className={
                 'flex-1 min-w-0 truncate ' +
                 (lit
@@ -157,6 +168,7 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
                   : `${labelPad(depth, false)} font-sans font-normal tracking-[0.005em] ${labelSize(depth, false)}`)
               }
             >
+              <PendingSweep />
               {group.label}
             </Link>
             <button
@@ -207,15 +219,13 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
       <Link
         key={item.href}
         href={item.href}
-        className={
-          'nav-link relative block truncate mb-0.5 rounded-md ' +
-          (active
-            ? `bg-accent-bg text-accent font-sans font-medium ${labelPad(depth, true)} ${labelSize(depth, true)}`
-            : `text-graphite hover:bg-surface-2 hover:text-ink font-sans font-normal tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`)
-        }
+        aria-current={active ? 'page' : undefined}
+        {...warmHandlers(item.href)}
+        className="nav-link group/nav block mb-0.5 rounded-md"
       >
-        <Marker active={active} depth={depth} />
-        {item.label}
+        <NavRow active={active} depth={depth}>
+          {item.label}
+        </NavRow>
       </Link>
     )
   }
@@ -230,6 +240,9 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
   // rail is not rendered at all — BottomTabBar owns mobile navigation.
   return (
     <aside
+      // A collapsed rail slides open under the pointer; a pinned one is
+      // already open, so the link under the pointer is a choice at once.
+      onMouseEnter={pinned ? undefined : () => railEntered()}
       className={
         `group/side sidebar-contrast w-[240px] shrink-0 border-r border-hairline h-full bg-surface ` +
         `hidden md:block md:relative md:z-auto md:overflow-hidden md:transition-[width] md:duration-200 ` +
@@ -350,9 +363,42 @@ function labelPad(depth: number, active: boolean): string {
   return active ? 'pl-[18px] pr-3 py-[7px]' : 'pl-[18px] pr-3 py-1.5'
 }
 
+/** A nav row's face. It lives INSIDE the <Link> so it can read that link's
+ *  pending state (2026-09-26): the row lights up — bar, tint, accent — the
+ *  instant it is clicked, with a sweep running across it until the page it
+ *  opens has committed and the pathname takes the highlight over. Without it a
+ *  click that has to wait on the server leaves the old row lit and the new one
+ *  looking as if nothing happened. */
+function NavRow({ active, depth, children }: { active: boolean; depth: number; children: React.ReactNode }) {
+  const { pending } = useLinkStatus()
+  const lit = active || pending
+  return (
+    <span
+      className={
+        'relative block truncate rounded-md transition-colors duration-150 ' +
+        (lit
+          ? `bg-accent-bg text-accent font-sans font-medium ${labelPad(depth, true)} ${labelSize(depth, true)}`
+          : `text-graphite group-hover/nav:bg-surface-2 group-hover/nav:text-ink font-sans font-normal tracking-[0.005em] ${labelPad(depth, false)} ${labelSize(depth, false)}`) +
+        (pending ? ' nav-row-pending' : '')
+      }
+    >
+      <Marker active={lit} depth={depth} pending={pending} />
+      {children}
+    </span>
+  )
+}
+
+/** The same sweep for a group's own link (Fair), whose row is drawn by the
+ *  group rather than by the link. */
+function PendingSweep() {
+  const { pending } = useLinkStatus()
+  return pending ? <span aria-hidden className="absolute inset-0 rounded-md nav-row-pending pointer-events-none" /> : null
+}
+
 /** The left gutter mark: a bar when the row is the page being read, a dot
- *  otherwise. Both tuck in with depth so the third level does not shout. */
-function Marker({ active, depth }: { active: boolean; depth: number }) {
+ *  otherwise. Both tuck in with depth so the third level does not shout. A row
+ *  just clicked grows its bar out of the dot. */
+function Marker({ active, depth, pending = false }: { active: boolean; depth: number; pending?: boolean }) {
   const barHeight = depth === 0 ? 'h-4' : depth === 1 ? 'h-3' : 'h-2.5'
   const barLeft = depth >= 2 ? 'left-[5px]' : 'left-[6px]'
   const dotLeft = depth >= 2 ? 'left-[7px]' : 'left-[8px]'
@@ -361,7 +407,7 @@ function Marker({ active, depth }: { active: boolean; depth: number }) {
       aria-hidden
       className={
         active
-          ? `absolute ${barLeft} top-1/2 -translate-y-1/2 w-[3px] ${barHeight} rounded-sm bg-accent`
+          ? `absolute ${barLeft} top-1/2 -translate-y-1/2 w-[3px] ${barHeight} rounded-sm bg-accent${pending ? ' nav-marker-grow' : ''}`
           : `absolute ${dotLeft} top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full bg-muted opacity-40`
       }
     />

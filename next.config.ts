@@ -11,6 +11,19 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '4mb',
     },
+    // The client router's memory (2026-09-26). `dynamic`: a page visited in
+    // the last 30 s opens again from memory — no server round trip — the way
+    // the Houzs ERP's 30 s query cache makes a revisit instant. `static`: a
+    // page warmed on hover (lib/nav-warm.ts), or by the phone tab bar, is
+    // reused for 30 s rather than Next's default 5 minutes, so nothing shown
+    // from memory is older than half a minute. A Server Action that
+    // revalidates a path or sets a cookie throws the whole memory away, and
+    // every write in the portal does one or the other before it redirects
+    // (checked 2026-09-26) — so your own edits always show at once.
+    staleTimes: {
+      dynamic: 30,
+      static: 30,
+    },
   },
 
   // The service worker must never be served from a cache, or a fix to it

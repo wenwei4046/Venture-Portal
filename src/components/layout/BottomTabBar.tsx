@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import Link, { useLinkStatus } from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import type { UserRole } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { canApprove } from '@/lib/roles'
+import { warmRoute } from '@/lib/nav-warm'
 import { tabsForRole, type NavViewer, type TabDef } from './nav-config'
 
 // Mobile navigation (2026-08-31). Replaces the hamburger + off-canvas drawer:
@@ -122,6 +123,31 @@ function TabIcon({ name }: { name: TabDef['icon'] | 'more' }) {
   )
 }
 
+/** A tab's face, inside its <Link> so it can read that link's pending state:
+ *  a tapped tab takes the accent and its marker at once, before the page it
+ *  opens has committed (2026-09-26). */
+function TabFace({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const { pending } = useLinkStatus()
+  const lit = active || pending
+  return (
+    <span
+      className={`relative flex flex-col items-center justify-center gap-1 h-[54px] px-1 ${
+        lit ? 'text-accent' : 'text-graphite'
+      }`}
+    >
+      {/* Active marker — a short accent bar on the top edge, the same
+          vocabulary the sidebar uses for its current item. */}
+      <span
+        aria-hidden
+        className={`absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-7 rounded-b-sm transition-opacity ${
+          lit ? 'bg-accent opacity-100' : 'opacity-0'
+        }${pending ? ' nav-tab-grow' : ''}`}
+      />
+      {children}
+    </span>
+  )
+}
+
 function tabActive(tab: TabDef, pathname: string): boolean {
   const path = tab.href.split('?')[0]
   const match = tab.exact ? pathname === path : pathname === path || pathname.startsWith(path + '/')
@@ -164,11 +190,15 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Pr
     // Re-count on navigation — approving on /approvals should drain the badge.
   }, [pathname, role]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Prefetch the four tab targets so thumb taps land instantly.
+  // Warm the four tab targets so thumb taps land instantly — only where this
+  // bar IS the navigation. It is mounted on desktop too (hidden by `md:hidden`),
+  // and there these were four full server renders on every hard load for a bar
+  // nobody could see (2026-09-26). warmRoute also skips a page that writes the
+  // audit log as it renders: HR's third tab is the staff directory, and every
+  // HR hard load was recording a view of it (lib/nav-warm.ts).
   useEffect(() => {
-    tabs.forEach((t) => {
-      if (t.href !== pathname) router.prefetch(t.href)
-    })
+    if (!window.matchMedia('(max-width: 767.98px)').matches) return
+    tabs.forEach((t) => warmRoute(router, t.href))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -182,35 +212,23 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Pr
           const showBadge = tab.badge && pending !== null && pending > 0
           return (
             <li key={tab.href} className="flex-1 min-w-0">
-              <Link
-                href={tab.href}
-                aria-current={active ? 'page' : undefined}
-                className={`relative flex flex-col items-center justify-center gap-1 h-[54px] px-1 ${
-                  active ? 'text-accent' : 'text-graphite'
-                }`}
-              >
-                {/* Active marker — a short accent bar on the top edge, the same
-                    vocabulary the sidebar uses for its current item. */}
-                <span
-                  aria-hidden
-                  className={`absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-7 rounded-b-sm transition-opacity ${
-                    active ? 'bg-accent opacity-100' : 'opacity-0'
-                  }`}
-                />
-                <span className="relative">
-                  <TabIcon name={tab.icon} />
-                  {showBadge ? (
-                    <span
-                      className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-danger text-paper font-mono text-[9.5px] leading-[15px] text-center"
-                      aria-label={`${pending} pending`}
-                    >
-                      {pending > 99 ? '99+' : pending}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="text-[10px] leading-none tracking-wide truncate max-w-full">
-                  {tab.label}
-                </span>
+              <Link href={tab.href} aria-current={active ? 'page' : undefined} className="block">
+                <TabFace active={active}>
+                  <span className="relative">
+                    <TabIcon name={tab.icon} />
+                    {showBadge ? (
+                      <span
+                        className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-danger text-paper font-mono text-[9.5px] leading-[15px] text-center"
+                        aria-label={`${pending} pending`}
+                      >
+                        {pending > 99 ? '99+' : pending}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="text-[10px] leading-none tracking-wide truncate max-w-full">
+                    {tab.label}
+                  </span>
+                </TabFace>
               </Link>
             </li>
           )

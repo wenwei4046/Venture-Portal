@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
-import { logPageView } from '@/app/(portal)/activity-actions'
+import { logPageView } from '@/lib/page-view'
 import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
@@ -53,7 +53,8 @@ export default function PortalFrame({
   // One access_log row per navigation, so a person's Activity tab can answer
   // "what were they in today". Fired after paint and never awaited: the trail
   // must not sit in front of the page. The ref keeps a re-render (or React's
-  // development double-effect) from logging the same path twice.
+  // development double-effect) from logging the same path twice. From the
+  // browser, not a Server Action — see lib/page-view.ts for why.
   const loggedPath = useRef<string | null>(null)
   useEffect(() => {
     if (!pathname || loggedPath.current === pathname) return
@@ -73,11 +74,14 @@ export default function PortalFrame({
         </div>
         <main className="flex-1 overflow-y-auto print:overflow-visible">
           {/* pb on mobile clears the 54px tab bar + the home-indicator inset,
-              so the last row of a ledger is never parked under the chrome. */}
+              so the last row of a ledger is never parked under the chrome.
+              `route-surface`: every page (or the skeleton standing in for it)
+              inserted here settles in — see "Navigation feedback" in
+              docs/DESIGN.md. */}
           <div
             className={productList
-              ? 'product-content print:p-0'
-              : `${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto ${commissionWorkbench ? 'p-2.5' : 'px-4 md:px-8 py-6 md:py-10'} pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
+              ? 'route-surface product-content print:p-0'
+              : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto ${commissionWorkbench ? 'p-2.5' : 'px-4 md:px-8 py-6 md:py-10'} pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
           >
             {children}
           </div>
