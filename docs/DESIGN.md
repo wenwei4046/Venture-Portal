@@ -779,6 +779,25 @@ is always available before saving; errors stay in the panel for retry. Use
 the existing menu placement and keyboard behavior, with danger text only on
 the final removal/termination control. There is no centered dialog or scrim.
 
+**Bill context menu (2026-09-27).** Revenue › Sales orders (`[period]/orders`)
+gives every bill the same paper menu (`BillContextMenu`, built on the
+hierarchy's `MenuPanel` and `membership-controls.module.css` — not a second
+menu style). Right-click anywhere on the row opens it at the pointer; the ⋯
+beside the order number opens it at the button, because a right-click alone
+is invisible on a phone and to a keyboard (it shows on row hover, always on a
+coarse pointer). The browser keeps its own menu for Shift + right-click, when
+text is selected (Copy), inside a form control, and on a control with its own
+right-click (*Share…*); a right-click on a link adds *Open link in new tab* for
+that link. Rows: the heading `ORDER · SALESPERSON`, *Open bill*, *Open bill in
+new tab*, then the one write — *Don't count this bill…*, which opens an
+adjacent confirmation (what it takes out, an optional *Why*, Cancel, and the
+danger-text confirm), or *Count this bill again* (one click, with who took it
+out, when and why beneath it). A bill the ERP or the not-ours list keeps out,
+or a month whose run has paid, shows the row disabled with its reason. After a
+write the table says what happened above itself, with *Undo* for a bill just
+taken out. An excluded row reads `Not counted` (tooltip: who, when, why) behind
+*Show excluded*.
+
 Two rules the canvas keeps that the rest of the page does not: a card dropped
 on empty ground **stays there** (remembered per browser and scheme in
 `localStorage`; Tidy or any move clears it, because a moved tree has a new

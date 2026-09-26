@@ -367,6 +367,53 @@ export async function unshareOrder(orderId: string, staffId: string): Promise<vo
   revalidatePath('/revenue', 'layout')
 }
 
+/** What taking a bill out, or counting it again, did. */
+export interface BillCountResult {
+  orderNo: string
+  /** False when it was already that way and nothing was written. */
+  changed: boolean
+  /** Count again: whether the bill counts now. */
+  counts?: boolean
+  /** Count again: what still keeps it out — the ERP's verdict, or a salesperson who is not ours. */
+  stillOut?: string | null
+  /** The Open Bill rank it gave up (taken out) or got back (counted again). */
+  openBillRank?: number | null
+}
+
+/**
+ * Take one bill out of its month by hand (2026-09-27, right-click on Sales
+ * orders): it stops counting everywhere a cancelled bill does — the month's
+ * sales, own and group sales, override, KPI, Open Bill — and stays out through
+ * every ERP re-send until somebody counts it again. The rule is the
+ * database's (`revenue_exclude_order`, mig 20260927020000): it refuses a month
+ * whose run has paid (23RUN) and a bill already out for another reason (23EXC).
+ */
+export async function excludeOrder(orderId: string, note?: string | null): Promise<BillCountResult> {
+  await requirePermission('revenue')
+  if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
+  const why = typeof note === 'string' ? note.trim().slice(0, 500) : ''
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('revenue_exclude_order', { p_order_id: orderId, p_note: why || null })
+  if (error) throw new Error(error.message)
+  revalidatePath('/revenue', 'layout')
+  return data as BillCountResult
+}
+
+/**
+ * Count a bill taken out by hand again: it goes back to whatever its document
+ * says (in, unless the ERP itself cancelled it meanwhile), with its Open Bill
+ * pick back while nobody has claimed that rank by hand.
+ */
+export async function includeOrder(orderId: string): Promise<BillCountResult> {
+  await requirePermission('revenue')
+  if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
+  const supabase = await client()
+  const { data, error } = await supabase.rpc('revenue_include_order', { p_order_id: orderId })
+  if (error) throw new Error(error.message)
+  revalidatePath('/revenue', 'layout')
+  return data as BillCountResult
+}
+
 /**
  * Key a bill's margin by hand. The stop-gap while the Product List fills up:
  * it OVERRIDES anything derived from line costs, so a human correction always

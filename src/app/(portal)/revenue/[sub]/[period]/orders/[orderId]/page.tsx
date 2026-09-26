@@ -10,7 +10,9 @@ import { classifyLine, normaliseCode, type LineClass } from '@/lib/commission/en
 import { costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { describeExclusion } from '@/lib/commission/bill-exclusion'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
+import { loadOrderExclusions } from '../../../../_lib/month-orders'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string; orderId: string }>
@@ -98,7 +100,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
       // The FK is named: since sales_order_shares (20260924010000) joins
       // sales_orders to hr_staff_costs as well, a bare `hr_staff_costs (…)`
       // is ambiguous to PostgREST (PGRST201) and the page read no order.
-      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
+      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, excluded_reason, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -119,6 +121,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
     balance: number | string | null
     manual_margin_pct: number | string | null
     cancelled: boolean
+    excluded_reason: string | null
     erp_status: string | null
     erp_on_hold: boolean
     sequence_in_day: number | null
@@ -131,7 +134,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   if (!order || order.period_month !== period) notFound()
 
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -164,7 +167,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
             .eq('id', subDept.schemeId)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      // Who took it out of the month by hand, when and why (2026-09-27).
+      order.excluded_reason === 'manual' ? loadOrderExclusions(supabase, [orderId]) : Promise.resolve(null),
     ])
+  const byHand = exclusions?.get(orderId) ?? null
 
   const lines = (lineData ?? []) as unknown as LineRow[]
   const groupIndex = new Map(
@@ -271,11 +277,30 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
       {order.cancelled ? (
         <div className="sheet-warning">
-          This bill earns nothing:{' '}
-          <strong>
-            {order.erp_on_hold ? 'it is on hold in the ERP' : `its ERP status is ${order.erp_status}`}
-          </strong>
-          . It stays here and comes back the moment the ERP releases it.
+          {order.excluded_reason === 'manual' ? (
+            <>
+              This bill does not count:{' '}
+              <strong>{byHand ? describeExclusion(byHand).replace(/^Taken/, 'taken') : 'taken out of the month by hand'}</strong>
+              . It stays out whatever the ERP sends next — right-click it on{' '}
+              <Link href={`${revenuePath(subDept.slug, period, 'orders')}?show=all`} className="text-accent hover:underline">
+                All bills
+              </Link>{' '}
+              and choose <em>Count this bill again</em> to bring it back.
+            </>
+          ) : order.excluded_reason === 'ignored_agent' ? (
+            <>
+              This bill earns nothing: <strong>its salesperson ({order.agent_name}) is not ours to pay</strong>. It
+              comes back if the name is put back under <em>Not our salespeople</em> on Comm Cal.
+            </>
+          ) : (
+            <>
+              This bill earns nothing:{' '}
+              <strong>
+                {order.erp_on_hold ? 'it is on hold in the ERP' : `its ERP status is ${order.erp_status}`}
+              </strong>
+              . It stays here and comes back the moment the ERP releases it.
+            </>
+          )}
         </div>
       ) : null}
 

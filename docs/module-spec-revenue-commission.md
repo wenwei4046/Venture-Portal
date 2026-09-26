@@ -886,6 +886,27 @@ the next change is measured from it; **Undo** puts back only the latest answer
 on a bill. Runs read confirmed rows only. Transport and every other
 non-commissionable line never count. Mig `20260926020000`.
 
+### 4.10 A bill that does not count — taken out by hand (2026-09-27)
+
+Until now a bill could leave the commission only the ERP's way (cancelled, a
+draft, on hold, deleted) or for a whole person (`comm_ignored_agents`, "not our
+salesperson"). **Right-click a bill on Sales orders → *Don't count this bill*
+takes that one bill out** (user 2026-09-27: 按右键 no count this sales order,
+so it will not calculate in this month's commission).
+
+| | |
+|---|---|
+| What it does | a `sales_order_exclusions` row makes the bill `cancelled` with `excluded_reason = 'manual'` — out of the month's sales, own and group sales, override, KPI, Open Bill, margin incentive, carry-forward, the member app and the double-claim check, exactly like an ERP cancellation |
+| Survives | every ERP re-send, a replay and a fair-calendar move — applied by trigger (`sales_orders_manual_exclusion`), because the ingest rewrites `cancelled` from the ERP's status on every save; a held re-send of a settled bill sees 0 in it (`erp_sync_note_adjustment`), so no false upsell |
+| Precedence | `ignored_agent` > `manual` > the ERP's own status |
+| Open Bill | in a month that pays it, the pick leaves with the bill and is remembered; the day is renumbered so the next bill moves up; *Count this bill again* puts the pick back unless somebody claimed the rank by hand. In a month that does not pay Open Bill the (inert) pick stays |
+| Undo | *Count this bill again* — back to the ERP's verdict, or in for a file import |
+| Refused | a month whose run has paid (23RUN); a bill already out for another reason (23EXC) |
+
+`revenue_exclude_order` / `revenue_include_order` own the write, one
+transaction each. The saved run, if any, still holds the bill until the month
+is computed again. Mig `20260927020000`.
+
 ---
 
 ## 5. Tax — Withholding instead of PCB

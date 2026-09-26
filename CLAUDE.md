@@ -599,6 +599,24 @@ src/
 │   │   │                              else — so a brand we no longer carry
 │   │   │                              (MYLATEX) is only out while its
 │   │   │                              salesperson is.
+│   │   │                              **NOT COUNTED (2026-09-27):** one BILL,
+│   │   │                              not a person: right-click a row on
+│   │   │                              `[period]/orders` (or its ⋯) → *Don't
+│   │   │                              count this bill*. A
+│   │   │                              `sales_order_exclusions` row makes it
+│   │   │                              `cancelled` + `excluded_reason =
+│   │   │                              'manual'` — out of everything a cancelled
+│   │   │                              bill is out of — kept through every ERP
+│   │   │                              re-send by trigger
+│   │   │                              (`sales_orders_manual_exclusion`);
+│   │   │                              ignored_agent > manual > ERP status. In a
+│   │   │                              month that pays Open Bill its pick is
+│   │   │                              remembered, the day renumbered, and
+│   │   │                              *Count this bill again* restores both.
+│   │   │                              23RUN / 23EXC. `revenue_exclude_order` /
+│   │   │                              `revenue_include_order`,
+│   │   │                              `lib/commission/bill-exclusion.ts`,
+│   │   │                              `BillContextMenu`, mig `20260927020000`.
 │   │   │                              **ONE RAIL AT THE TOP (2026-09-26):** the
 │   │   │                              workbench's tabs (`CommissionWorkbench`)
 │   │   │                              are Total Sales Orders / KPI Items / Open
