@@ -8,9 +8,17 @@ export interface ErpFeedChipProps {
   period: string
   subDepartmentId: string
   monthLabel: string
-  closed: { closedAt: string; closedByName: string | null; note: string | null } | null
+  closed: {
+    closedAt: string
+    closedByName: string | null
+    note: string | null
+    /** 'before_cutover' = settled by hand, before the first month the portal pays. */
+    reason?: 'closed' | 'before_cutover'
+  } | null
   /** Deliveries the feed has held for this month and nobody has replayed. */
   held: number
+  /** "September 2026" — the first month the portal pays, when one is set. */
+  firstPaidLabel?: string | null
 }
 
 function when(iso: string): string {
@@ -29,7 +37,7 @@ function when(iso: string): string {
  * nothing. Click or right-click the chip — the same menu either way, because
  * a right-click alone is invisible on a phone.
  */
-export default function ErpFeedChip({ period, subDepartmentId, monthLabel, closed, held }: ErpFeedChipProps) {
+export default function ErpFeedChip({ period, subDepartmentId, monthLabel, closed, held, firstPaidLabel = null }: ErpFeedChipProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -75,7 +83,10 @@ export default function ErpFeedChip({ period, subDepartmentId, monthLabel, close
     })
   }
 
-  const label = closed ? `ERP closed${held > 0 ? ` · ${held} held` : ''}` : 'Live from ERP'
+  const settled = closed?.reason === 'before_cutover'
+  const label = settled
+    ? `Settled by hand${held > 0 ? ` · ${held} held` : ''}`
+    : closed ? `ERP closed${held > 0 ? ` · ${held} held` : ''}` : 'Live from ERP'
 
   return (
     <div ref={box} className="relative inline-block">
@@ -88,13 +99,13 @@ export default function ErpFeedChip({ period, subDepartmentId, monthLabel, close
           e.preventDefault()
           show()
         }}
-        title={closed ? 'Closed to the ERP feed — click to reopen' : 'Fed live by the ERP — click or right-click to close this month to it'}
+        title={settled ? 'Settled by hand — the ERP cannot change it' : closed ? 'Closed to the ERP feed — click to reopen' : 'Fed live by the ERP — click or right-click to close this month to it'}
         className={[
           'font-mono text-[11px] uppercase tracking-[0.02em] border px-3 py-2 rounded-control bg-surface hover:bg-surface-2 transition-colors',
-          closed ? 'text-alert border-alert' : 'text-ledger border-hairline',
+          settled ? 'text-graphite border-hairline' : closed ? 'text-alert border-alert' : 'text-ledger border-hairline',
         ].join(' ')}
       >
-        <span aria-hidden className="mr-1.5">{closed ? '■' : '●'}</span>
+        <span aria-hidden className="mr-1.5">{settled ? '✓' : closed ? '■' : '●'}</span>
         {label}
       </button>
 
@@ -104,7 +115,20 @@ export default function ErpFeedChip({ period, subDepartmentId, monthLabel, close
           aria-label={`${monthLabel} and the ERP feed`}
           className="absolute right-0 top-full mt-2 z-30 w-[min(22rem,calc(100vw-2rem))] bg-surface border border-hairline rounded-card shadow-lg p-4 text-left"
         >
-          {closed ? (
+          {settled ? (
+            <>
+              <div className="font-serif text-[15px] text-ink mb-1">Settled by hand</div>
+              <p className="font-serif italic text-sm text-graphite mb-2">
+                {monthLabel} was paid outside the portal{firstPaidLabel ? ` — the portal pays from ${firstPaidLabel}` : ''}.
+                The ERP cannot change its bills: what it changes on one comes up as a drop or an
+                upsell to confirm at the top of the month you are paying.
+              </p>
+              {closed?.note ? <p className="font-serif text-sm text-ink mb-2">“{closed.note}”</p> : null}
+              <p className="font-mono text-[11px] uppercase tracking-[0.02em] text-graphite">
+                {held} {held === 1 ? 'delivery' : 'deliveries'} held · change the first paid month on Comm Cal to hand it back
+              </p>
+            </>
+          ) : closed ? (
             <>
               <div className="font-serif text-[15px] text-ink mb-1">Closed to the ERP feed</div>
               <p className="font-serif italic text-sm text-graphite mb-2">

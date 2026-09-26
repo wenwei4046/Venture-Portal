@@ -541,6 +541,9 @@ export interface OverrideCredit {
  * their target this month overrides at the higher rate. `baseByStaff` supplies
  * the PENALTY-WEIGHTED revenue, so a bill cut for bad margin cuts the upline's
  * override in the same proportion (user decision 2026-08-31).
+ *
+ * A base can be negative: a drop (2026-09-26) that outweighs the month's sales
+ * takes the override back from the line above, as it takes the seller's own.
  */
 export function computeOverrides(
   nodes: Map<string, HierarchyNode>,
@@ -553,7 +556,7 @@ export function computeOverrides(
   const credits: OverrideCredit[] = []
 
   for (const [downlineStaffId, base] of baseByStaff) {
-    if (base <= 0) continue
+    if (base === 0) continue
     const self = nodes.get(downlineStaffId)
     if (!self) continue
 
@@ -1150,6 +1153,18 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     const rank = resolved.get(d.staffId)
     const margin = marginSummary.get(d.staffId)
+
+    // Only a drop can take a month below zero, and payroll cannot pay a
+    // negative commission (hr_monthly_payroll.amounts_non_negative): say so
+    // here, where the apply refuses it in words, not as a constraint.
+    if (totalCommission < 0) {
+      const drops = d.eligibleOrders.filter(o => o.upsale && o.orderTotal < 0).map(o => o.orderNo)
+      warnings.push(
+        `Staff ${d.staffId}'s commission comes to ${totalCommission.toFixed(2)} this month — drops take back more ` +
+          `than the month pays${drops.length > 0 ? ` (${drops.join(', ')})` : ''}. Payroll cannot pay a negative ` +
+          'commission: pay the drop in a month their sales cover it.',
+      )
+    }
 
     // Someone with no orders, no downline volume, nothing deferred and no
     // rank contributes nothing — don't clutter the run with empty statements.

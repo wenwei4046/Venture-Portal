@@ -188,6 +188,7 @@ describe('parseUpsaleInput', () => {
   it('returns what HR typed, cleaned', () => {
     expect(parseUpsaleInput(ok)).toEqual({
       staffId: ok.staffId,
+      kind: 'upsale',
       amount: 1300.5,
       soldOn: '2026-08-29',
       fairEventId: null,
@@ -207,5 +208,59 @@ describe('parseUpsaleInput', () => {
     [{ originalRef: '   ' }, 'Give the bill number it was added to, e.g. HC5315.'],
   ])('refuses %o', (bad, message) => {
     expect(() => parseUpsaleInput({ ...ok, ...bad })).toThrow(message)
+  })
+
+  it('stores a drop negative, typed either way', () => {
+    const drop = { ...ok, kind: 'drop', amount: '2,088', originalRef: 'HC13911' }
+    expect(parseUpsaleInput(drop)).toMatchObject({ kind: 'drop', amount: -2088, originalRef: 'HC13911' })
+    expect(parseUpsaleInput({ ...drop, amount: '-2088' })).toMatchObject({ kind: 'drop', amount: -2088 })
+  })
+
+  it.each([
+    [{ kind: 'drop', amount: '0' }, 'The amount dropped must be more than RM 0.'],
+    [{ kind: 'drop', originalRef: '' }, 'Give the bill number it was dropped from, e.g. HC13911.'],
+    [{ kind: 'refund' }, 'An entry is an upsale or a drop.'],
+  ])('refuses %o', (bad, message) => {
+    expect(() => parseUpsaleInput({ ...ok, ...bad })).toThrow(message)
+  })
+})
+
+/**
+ * HC13911 (LOUIS in the claim form; YUNY here, on the same ladder as the
+ * upsale above): 16,888 was paid in August, the customer dropped an item on
+ * 18 August and the ERP now says 14,800 — a drop of 2,088 paid in September.
+ */
+const DROP = { id: 'd1', staff_id: 'yuny', amount: '-2088.00', sold_on: '2026-09-18', original_ref: 'HC13911', kind: 'drop' as const }
+
+describe('a drop', () => {
+  it('becomes a one-line order that takes its amount back', () => {
+    const [o] = upsalesToOrders([DROP], '2026-09-01')
+    expect(o).toMatchObject({ id: 'd1', orderNo: 'DROP HC13911', orderTotal: -2088, paidAmount: -2088, upsale: true })
+    expect(o.lines).toEqual([
+      { id: 'd1', itemGroup: 'UPSALE', productCode: 'DROP', productName: 'Drop sales', qty: 1, lineAmount: -2088, upsale: true },
+    ])
+    expect(upsaleOrderNo('HC13911', 'drop')).toBe('DROP HC13911')
+  })
+
+  it('comes off the seller’s sales and the upline’s override in the month it is paid', () => {
+    const inp = input([bill({ periodMonth: '2026-09-01' }), ...upsalesToOrders([DROP], '2026-09-01')], { periodMonth: '2026-09-01' })
+    const run = computeCommissionRun(inp)
+    const s = new Map(run.statements.map(x => [x.staffId, x]))
+    expect(s.get('yuny')!.productRevenue).toBe(7_912) // 10,000 − 2,088
+    expect(s.get('yuny')!.productCommission).toBe(553.84) // 7% × 7,912
+    expect(s.get('anthony')!.overrideCommission).toBe(158.24) // 2% × 7,912
+    expect(s.get('yuny')!.lines.map(l => l.note)).toContain('DROP HC13911 · 2026-09-18')
+    expect(run.warnings).toEqual([])
+  })
+
+  it('takes the override back even when it is all the seller has that month — and says payroll cannot pay it', () => {
+    const run = computeCommissionRun(input(upsalesToOrders([DROP], '2026-09-01'), { periodMonth: '2026-09-01' }))
+    const s = new Map(run.statements.map(x => [x.staffId, x]))
+    expect(s.get('yuny')!.totalCommission).toBe(-146.16) // 7% × −2,088
+    expect(s.get('anthony')!.overrideCommission).toBe(-41.76) // 2% × −2,088
+    expect(run.warnings).toEqual([
+      "Staff yuny's commission comes to -146.16 this month — drops take back more than the month pays (DROP HC13911). Payroll cannot pay a negative commission: pay the drop in a month their sales cover it.",
+      "Staff anthony's commission comes to -41.76 this month — drops take back more than the month pays. Payroll cannot pay a negative commission: pay the drop in a month their sales cover it.",
+    ])
   })
 })

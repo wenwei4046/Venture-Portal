@@ -855,6 +855,37 @@ flagged `upsale` (`lib/commission/upsales.ts`). Its statement line reads
 is a foreign key to sales orders. The table refuses changes in a month whose
 run has paid (23RUN), like every other input of a run. Mig `20260924060000`.
 
+### 4.9 Drops, and the drops and upsells the ERP finds (2026-09-26)
+
+A **drop** is an upsale the other way: the customer takes something off a bill
+whose commission was already paid (HC13911, 16,888 → 14,800 on 18 August). HR
+types it positive on the same tab (*Upsales & drops*); it is stored negative
+and takes back the seller's own commission **and** the upline's override —
+`computeOverrides` rolls a negative base up like a positive one. Payroll cannot
+pay a negative commission (`hr_monthly_payroll.amounts_non_negative`), so a
+month whose drops outweigh somebody's pay is a run warning: pay the drop in a
+month their sales cover it.
+
+**The portal pays from a month.** `comm_cutovers` names the first month a
+sub-department's runs pay (Fair: September 2026 — June to August were paid from
+the claim forms, user 2026-09-26: VP 从九月开始付). Earlier months are settled
+by hand: never carried into a run, closed to the ERP feed for good, and counted
+in their own month by the member app.
+
+**The ERP finds them itself.** It has no drop or upsell of its own — every
+save re-sends the whole document. When a delivery is held for a settled bill
+(a closed month, a month before the cutover, or a bill a run paid),
+`erp_sync_note_adjustment` takes the delivery's commissionable amount minus
+what was settled — the run's release, else the hand-worked row under the same
+paper number, else the bill as its closed month froze it, plus every answered
+drop or upsell on it — and keeps **one pending row per document**, updated as
+the ERP keeps saving and removed if the ERP returns to the settled figure. The
+month page lists them (*Drops and upsells the ERP found*): **Pay in {month}**
+confirms it into that month; **Not a change** lets the ERP's figure stand so
+the next change is measured from it; **Undo** puts back only the latest answer
+on a bill. Runs read confirmed rows only. Transport and every other
+non-commissionable line never count. Mig `20260926020000`.
+
 ---
 
 ## 5. Tax — Withholding instead of PCB

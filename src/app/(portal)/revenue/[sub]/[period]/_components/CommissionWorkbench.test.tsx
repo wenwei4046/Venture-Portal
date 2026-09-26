@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { EngineInput, Rank, SalesOrder } from '@/lib/commission/types'
 import { buildPayRow } from '@/lib/revenue-pay'
+import { upsalesToOrders } from '@/lib/commission/upsales'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench from './CommissionWorkbench'
 
@@ -190,6 +191,30 @@ describe('CommissionWorkbench', () => {
     expect(salesRow(table, 'SO-three')).toHaveTextContent('RM 1,147.00')
     expect(salesRow(table, 'SO-three')).toHaveTextContent('RM 1,000.00RM 147.00 no commission')
     expect(salesRow(table, 'SO-one')).not.toHaveTextContent('no commission')
+  })
+
+  it('sets upsells and drops beside the bills, never counted among them (user 2026-09-26)', () => {
+    const data = fixture()
+    data.input.orders = [
+      ...data.input.orders,
+      ...upsalesToOrders([
+        { id: 'up', staff_id: 'agent', amount: 300, sold_on: '2026-08-20', original_ref: 'HC5315' },
+        { id: 'drop', staff_id: 'agent', amount: -2_088, sold_on: '2026-08-21', original_ref: 'HC13911', kind: 'drop' },
+      ], '2026-08-01'),
+    ]
+    renderBoard(data)
+
+    const summary = screen.getByRole('table', { name: 'Salesperson commission summary' })
+    expect(within(summary).getByRole('columnheader', { name: 'Upsell' })).toBeVisible()
+    expect(within(summary).getByRole('columnheader', { name: 'Drop sales' })).toBeVisible()
+    const cells = within(within(summary).getByRole('row', { name: /Anthony/ })).getAllByRole('cell')
+    expect(cells[2]).toHaveTextContent(/^2$/) // the two bills, not four
+    expect(cells[3]).toHaveTextContent('RM 3,000.00')
+    expect(cells[5]).toHaveTextContent('RM 300.00')
+    expect(cells[6]).toHaveTextContent('RM (2,088.00)')
+    const alex = within(within(summary).getByRole('row', { name: /Alex/ })).getAllByRole('cell')
+    expect(alex[5]).toHaveTextContent('—')
+    expect(alex[6]).toHaveTextContent('—')
   })
 
   it('opens on salesperson selection, then shows one personal row per order with a reconcilable total', () => {

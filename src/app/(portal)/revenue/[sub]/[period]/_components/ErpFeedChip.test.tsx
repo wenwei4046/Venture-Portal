@@ -65,6 +65,18 @@ describe('ErpFeedChip', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('August 2026 is live again. 9 replayed: 8 applied, 1 still held.')
   })
 
+  it('a month settled by hand says when the portal starts paying, and has nothing to reopen', () => {
+    render(<ErpFeedChip {...props} held={3} firstPaidLabel="September 2026"
+      closed={{ closedAt: '2026-09-26T06:00:00Z', closedByName: 'Principal', note: 'June–August paid from the claim forms', reason: 'before_cutover' }} />)
+    fireEvent.contextMenu(screen.getByRole('button', { name: /Settled by hand · 3 held/ }))
+    const dialog = screen.getByRole('dialog', { name: 'August 2026 and the ERP feed' })
+    expect(dialog).toHaveTextContent('August 2026 was paid outside the portal — the portal pays from September 2026.')
+    expect(dialog).toHaveTextContent('“June–August paid from the claim forms”')
+    expect(dialog).toHaveTextContent('3 deliveries held')
+    expect(screen.queryByRole('button', { name: /Reopen/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Close this month/ })).toBeNull()
+  })
+
   it('says why when the portal refuses', async () => {
     closeMonth.mockRejectedValue(new Error('Could not close the month: Only HR or the Principal may close a month to the ERP feed'))
     render(<ErpFeedChip {...props} closed={null} held={0} />)

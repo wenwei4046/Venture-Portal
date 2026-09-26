@@ -56,7 +56,7 @@ export default function MonthBreakdownTabs({
     { key: 'venue', label: 'Sales by venue', count: counts.venue },
     { key: 'person', label: 'Sales by person', count: counts.person },
     ...(openBill ? [{ key: 'open-bill', label: 'Open Bill', count: counts.openBill }] : []),
-    ...(upsales ? [{ key: 'upsales', label: 'Upsales', count: counts.upsales ?? 0 }] : []),
+    ...(upsales ? [{ key: 'upsales', label: 'Upsales & drops', count: counts.upsales ?? 0 }] : []),
   ]
 
   function goTo(key: string) {

@@ -127,6 +127,36 @@ describe('authoritative commission input', () => {
     }
   })
 
+  it('never carries a bill of a month the portal does not pay (VP 从九月开始付)', async () => {
+    const data = fixture()
+    data.comm_order_releases = []
+    data.comm_cutovers = [{ sub_department_id: 'sub-1', first_paid_month: '2026-09-01' }]
+    const settled = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)
+    expect(settled.input.orders.map(row => row.id)).toEqual(['current'])
+
+    // Earlier, August is the portal's own month again: its unpaid bills ride.
+    data.comm_cutovers = [{ sub_department_id: 'sub-1', first_paid_month: '2026-08-01' }]
+    const carried = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)
+    expect(carried.input.orders.map(row => row.id)).toEqual(['current', 'carry', 'older-paid'])
+  })
+
+  it('pays the upsales and drops somebody answered, never one still waiting', async () => {
+    const data = fixture()
+    const row = (id: string, amount: number, status: string, kind = amount < 0 ? 'drop' : 'upsale') => ({
+      id, sub_department_id: 'sub-1', period_month: '2026-09-01', status, kind,
+      staff_id: 'person-a', amount, sold_on: '2026-09-18', original_ref: id.toUpperCase(),
+    })
+    data.comm_upsales = [
+      row('hc5315', 300, 'confirmed'),
+      row('hc13911', -2088, 'confirmed'),
+      row('hc1', -500, 'pending'),
+      row('hc2', 700, 'dismissed'),
+    ]
+    const loaded = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)
+    const upsales = loaded.input.orders.filter(o => o.upsale)
+    expect(upsales.map(o => [o.orderNo, o.orderTotal])).toEqual([['UPSALE HC5315', 300], ['DROP HC13911', -2088]])
+  })
+
   it('refuses incomplete configuration instead of silently returning zero commission', async () => {
     const db = database(fixture(), 'comm_kpi_items')
     await expect(loadCommissionInput('2026-09-01', 'sub-1', db.client)).rejects.toThrow('Could not read KPI items')
