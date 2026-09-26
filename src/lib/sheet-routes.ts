@@ -10,7 +10,7 @@
 // too, and the sheet stays put while one of these pages replaces another.
 //
 // The Product List keeps its own workspace (`.product-theme`), which re-tones
-// the shell as well and scrolls inside its own window.
+// the shell as well and decides its own scrolling per tab (`productTabScroll`).
 
 /** Route prefixes that render on the sheet — a prefix covers its whole subtree. */
 export const SHEET_ROUTE_PREFIXES = [
