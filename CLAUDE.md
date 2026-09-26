@@ -220,7 +220,11 @@ src/
 │   │   │                              still refuses. **POSSIBLE DOUBLE CLAIMS:**
 │   │   │                              `revenue_possible_double_claims` = a paper
 │   │   │                              number (`sales_order_bill_ref`: first number
-│   │   │                              in `customer_so_no`, else the order's own) on
+│   │   │                              in `customer_so_no`, else the order's own —
+│   │   │                              STORED on the row as the generated column
+│   │   │                              `sales_orders.bill_ref` since mig
+│   │   │                              `20260926110000`, so the check never opens
+│   │   │                              the raw document) on
 │   │   │                              more than one payable or paid bill; a
 │   │   │                              "checked — separate sales" answer
 │   │   │                              (`comm_double_claim_dismissals`) covers

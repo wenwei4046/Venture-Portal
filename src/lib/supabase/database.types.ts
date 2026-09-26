@@ -6317,6 +6317,7 @@ export type Database = {
           agent_name: string
           balance: number | null
           batch_id: string
+          bill_ref: string | null
           brand_code: string | null
           cancelled: boolean
           created_at: string
@@ -6342,6 +6343,7 @@ export type Database = {
           agent_name: string
           balance?: number | null
           batch_id: string
+          bill_ref?: string | null
           brand_code?: string | null
           cancelled?: boolean
           created_at?: string
@@ -6367,6 +6369,7 @@ export type Database = {
           agent_name?: string
           balance?: number | null
           batch_id?: string
+          bill_ref?: string | null
           brand_code?: string | null
           cancelled?: boolean
           created_at?: string
