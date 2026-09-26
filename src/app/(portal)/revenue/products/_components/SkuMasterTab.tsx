@@ -9,6 +9,7 @@ import { saveSkuPrices } from '../../catalogue-actions'
 import type { CatalogueSku } from '../load'
 import { categoryLabel, orderedCategories } from './ui'
 import { useProductDraftGuard } from './ProductWorkspace'
+import ColumnTable, { type TableColumn } from './ColumnTable'
 
 const LIMIT_STEP = 300
 // The categories whose models gather several SKUs — a model filter there, as
@@ -33,7 +34,13 @@ function modelKey(sku: CatalogueSku): string {
 }
 
 /** The ERP's SKU rows and matrix shape, with prices owned by the portal. */
-export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { skus: CatalogueSku[]; sofaSizes: string[]; initialQuery?: string }) {
+export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '', columnLayouts = {} }: {
+  skus: CatalogueSku[]
+  sofaSizes: string[]
+  initialQuery?: string
+  /** The reader's column layouts from the request (`layoutsFromCookies`). */
+  columnLayouts?: Record<string, string>
+}) {
   const router = useRouter()
   const [category, setCategory] = useState<string | null>(null)
   const [query, setQuery] = useState(initialQuery)
@@ -141,6 +148,64 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { s
   const visible = shown.slice(0, limit)
   const modelLabel = models.find(([key]) => key === model)?.[1]
 
+  function sizePrice(s: CatalogueSku, h: string) {
+    const current = cellPrice(s.grid, h, tier)
+    return editing ? (
+      <input
+        key={`${s.erpId}|${h}|${tier}`}
+        defaultValue={drafts.current.get(s.erpId)?.cells?.[cellKey(h, tier)]?.price ?? (current === null ? '' : String(current))}
+        onChange={e => touch(s.erpId, d => {
+          d.cells = { ...(d.cells ?? {}), [cellKey(h, tier)]: { height: h, tier, price: e.target.value } }
+        })}
+        disabled={saving} inputMode="decimal" aria-label={`${s.code} at ${h} ${tier}`} className="sku-price-input"
+      />
+    ) : current === null ? '—' : formatMoney(current)
+  }
+
+  function flatPrice(s: CatalogueSku) {
+    return editing && !(s.grid && s.grid.length > 0) ? (
+      <input
+        key={`${s.erpId}|flat`}
+        defaultValue={drafts.current.get(s.erpId)?.price ?? (s.price === null ? '' : String(s.price))}
+        onChange={e => touch(s.erpId, d => { d.price = e.target.value })}
+        disabled={saving} inputMode="decimal" aria-label={`${s.code} price`} className="sku-price-input"
+      />
+    ) : s.grid && s.grid.length > 0 && (s.category ?? '').toUpperCase() === 'SOFA' ? (
+      <button type="button" className="sku-grid-link" disabled={saving} onClick={() => { changeCategory('SOFA'); setModel(modelKey(s)) }}>View prices</button>
+    ) : s.price !== null ? formatMoney(s.price) : s.grid && s.grid.length > 0 ? (
+      <span title="A saved price matrix belongs to this SKU">Matrix price</span>
+    ) : '—'
+  }
+
+  // The table's own order. The reader may move and resize the columns
+  // (ColumnTable); a sofa's seat sizes stay behind the rest, in the ERP's order.
+  const columns: TableColumn<CatalogueSku>[] = [
+    { key: 'code', label: 'Product code', className: 'sku-nowrap sku-col-code', defaultWidth: 190, cell: s => s.code },
+    { key: 'description', label: 'Description', className: 'sku-description', defaultWidth: 340, cell: s => s.description ?? '—' },
+    {
+      key: 'model', label: 'Model', defaultWidth: 150,
+      cell: s => <>
+        {s.modelCode ?? '—'}
+        {s.modelName && s.modelName !== s.modelCode ? <div className="sku-model-name">{s.modelName}</div> : null}
+      </>,
+    },
+  ]
+  if (sofaView) {
+    columns.push(
+      { key: 'category', label: 'Category', defaultWidth: 120, cell: s => categoryLabel(s.category) },
+      { key: 'tier', label: 'PRICE_TIER', defaultWidth: 120, cell: () => tier },
+      ...heights.map((h): TableColumn<CatalogueSku> => ({
+        key: `size:${heightKey(h) ?? h}`, label: h, movable: false, className: 'num', defaultWidth: 128, cell: s => sizePrice(s, h),
+      })),
+    )
+  } else {
+    columns.push(
+      { key: 'size', label: 'Size', defaultWidth: 130, cell: s => (s.optionLabel !== s.code ? s.optionLabel : categoryLabel(s.category)) },
+      { key: 'brand', label: 'Brand', defaultWidth: 130, cell: s => s.brand ?? <span title="Rides any cart; the mattress or sofa decides the ladder">rider</span> },
+      { key: 'price', label: 'Price', className: 'num', defaultWidth: 140, cell: flatPrice },
+    )
+  }
+
   return (
     <section className="sku-master" aria-label="SKU Master">
       <div className="sku-filters">
@@ -183,117 +248,58 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { s
         </div>
       </div>
 
-      <div className="sku-actions">
-        <p className="sku-count" aria-live="polite">
-          <strong>{shown.length.toLocaleString()}</strong> SKU{shown.length === 1 ? '' : 's'}
-          {modelLabel ? ` · Model ${modelLabel}` : ''}
-          {sofaView ? ` · P${TIERS.indexOf(tier as typeof TIERS[number]) + 1}` : ''}
-        </p>
-        <div className="sku-action-buttons">
-          {editing ? (
-            <>
-              <button type="button" onClick={cancel} disabled={saving} className="sku-secondary-button">Cancel</button>
-              <button type="button" onClick={save} disabled={saving || dirty === 0} className="sku-primary-button">
-                {saving ? 'Saving…' : dirty === 0 ? 'Save changes' : `Save ${dirty} SKU${dirty === 1 ? '' : 's'}`}
+      <div className="sku-stage">
+        <div className="sku-actions">
+          <p className="sku-count" aria-live="polite">
+            <strong>{shown.length.toLocaleString()}</strong> SKU{shown.length === 1 ? '' : 's'}
+            {modelLabel ? ` · Model ${modelLabel}` : ''}
+            {sofaView ? ` · P${TIERS.indexOf(tier as typeof TIERS[number]) + 1}` : ''}
+          </p>
+          <div className="sku-action-buttons">
+            {editing ? (
+              <>
+                <button type="button" onClick={cancel} disabled={saving} className="sku-secondary-button">Cancel</button>
+                <button type="button" onClick={save} disabled={saving || dirty === 0} className="sku-primary-button">
+                  {saving ? 'Saving…' : dirty === 0 ? 'Save changes' : `Save ${dirty} SKU${dirty === 1 ? '' : 's'}`}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => { setEditing(true); setNotice(null) }} className="sku-primary-button">
+                <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+                  <path d="m12.5 3.5 4 4M3 17l1-5L13.5 2.5a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2L8 16l-5 1Z" />
+                </svg>
+                Edit Prices
               </button>
-            </>
-          ) : (
-            <button type="button" onClick={() => { setEditing(true); setNotice(null) }} className="sku-primary-button">
-              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-                <path d="m12.5 3.5 4 4M3 17l1-5L13.5 2.5a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2L8 16l-5 1Z" />
-              </svg>
-              Edit Prices
-            </button>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-      {editing ? <p className="sku-edit-note">Blank clears a price; 0 is a zero price. Changes across models and tiers are saved together.</p> : null}
-      {error ? <p className="sku-notice" data-tone="error" role="alert">{error}</p> : null}
-      {notice ? <p className="sku-notice" data-tone="ok" role="status">{notice}</p> : null}
-
-      <div className="sku-table-panel">
-        <div className="sku-table-window table-scroll" tabIndex={0} role="region" aria-label="SKU prices table">
-          <table className="ledger-table sku-table">
-            <thead>
-              <tr>
-                <th scope="col" className="sku-code-column">Product code</th>
-                <th scope="col">Description</th>
-                <th scope="col">Model</th>
-                {sofaView ? <><th scope="col">Category</th><th scope="col">PRICE_TIER</th></> : <><th scope="col">Size</th><th scope="col">Brand</th></>}
-                {sofaView ? heights.map(h => <th scope="col" key={h} className="num">{h}</th>) : null}
-                {!sofaView ? <th scope="col" className="num">Price</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {visible.length === 0 ? (
-                <tr><td colSpan={sofaView ? 5 + heights.length : 6} className="sku-empty">No SKUs match these filters.</td></tr>
-              ) : visible.map(s => (
-                <tr key={s.erpId}>
-                  <td className="sku-code-column">{s.code}</td>
-                  <td className="sku-description">{s.description ?? '—'}</td>
-                  <td>
-                    {s.modelCode ?? '—'}
-                    {s.modelName && s.modelName !== s.modelCode ? <div className="sku-model-name">{s.modelName}</div> : null}
-                  </td>
-                  {sofaView ? (
-                    <><td>{categoryLabel(s.category)}</td><td>{tier}</td></>
-                  ) : (
-                    <>
-                      <td>{s.optionLabel !== s.code ? s.optionLabel : categoryLabel(s.category)}</td>
-                      <td>{s.brand ?? <span title="Rides any cart; the mattress or sofa decides the ladder">rider</span>}</td>
-                    </>
-                  )}
-                  {sofaView ? heights.map(h => {
-                    const current = cellPrice(s.grid, h, tier)
-                    return (
-                      <td key={h} className="num">
-                        {editing ? (
-                          <input
-                            key={`${s.erpId}|${h}|${tier}`}
-                            defaultValue={drafts.current.get(s.erpId)?.cells?.[cellKey(h, tier)]?.price ?? (current === null ? '' : String(current))}
-                            onChange={e => touch(s.erpId, d => {
-                              d.cells = { ...(d.cells ?? {}), [cellKey(h, tier)]: { height: h, tier, price: e.target.value } }
-                            })}
-                            disabled={saving} inputMode="decimal" aria-label={`${s.code} at ${h} ${tier}`} className="sku-price-input"
-                          />
-                        ) : current === null ? '—' : formatMoney(current)}
-                      </td>
-                    )
-                  }) : null}
-                  {!sofaView ? <td className="num">
-                    {editing && !(s.grid && s.grid.length > 0) ? (
-                      <input
-                        key={`${s.erpId}|flat`}
-                        defaultValue={drafts.current.get(s.erpId)?.price ?? (s.price === null ? '' : String(s.price))}
-                        onChange={e => touch(s.erpId, d => { d.price = e.target.value })}
-                        disabled={saving} inputMode="decimal" aria-label={`${s.code} price`} className="sku-price-input"
-                      />
-                    ) : s.grid && s.grid.length > 0 && (s.category ?? '').toUpperCase() === 'SOFA' ? (
-                      <button type="button" className="sku-grid-link" disabled={saving} onClick={() => { changeCategory('SOFA'); setModel(modelKey(s)) }}>View prices</button>
-                    ) : s.price !== null ? formatMoney(s.price) : s.grid && s.grid.length > 0 ? (
-                      <span title="A saved price matrix belongs to this SKU">Matrix price</span>
-                    ) : '—'}
-                  </td> : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="sku-table-footer">
-          <span>{visible.length.toLocaleString()} of {shown.length.toLocaleString()} SKUs shown</span>
-          {shown.length > visible.length ? (
-            <button type="button" onClick={() => setLimit(l => l + LIMIT_STEP)} className="sku-load-more">Show {Math.min(LIMIT_STEP, shown.length - visible.length)} more</button>
-          ) : null}
-          {skus.some(s => s.removed) ? (
-            <label className="sku-catalogue-filter">
-              <span>Catalogue</span>
-              <select value={showGone ? 'all' : 'current'} disabled={saving} onChange={e => { setShowGone(e.target.value === 'all'); setModel(''); setLimit(LIMIT_STEP) }}>
-                <option value="current">Current SKUs</option>
-                <option value="all">Include removed SKUs</option>
-              </select>
-            </label>
-          ) : null}
-        </div>
+        {editing ? <p className="sku-edit-note">Blank clears a price; 0 is a zero price. Changes across models and tiers are saved together.</p> : null}
+        {error ? <p className="sku-notice" data-tone="error" role="alert">{error}</p> : null}
+        {notice ? <p className="sku-notice" data-tone="ok" role="status">{notice}</p> : null}
+        <ColumnTable
+          id={sofaView ? 'sku-master-sofa' : 'sku-master'}
+          initialLayout={columnLayouts[sofaView ? 'sku-master-sofa' : 'sku-master']}
+          label="SKU prices table"
+          columns={columns}
+          rows={visible}
+          rowKey={s => s.erpId}
+          empty="No SKUs match these filters."
+          footer={<>
+            <span>{visible.length.toLocaleString()} of {shown.length.toLocaleString()} SKUs shown</span>
+            {shown.length > visible.length ? (
+              <button type="button" onClick={() => setLimit(l => l + LIMIT_STEP)} className="sku-load-more">Show {Math.min(LIMIT_STEP, shown.length - visible.length)} more</button>
+            ) : null}
+            {skus.some(s => s.removed) ? (
+              <label className="sku-catalogue-filter">
+                <span>Catalogue</span>
+                <select value={showGone ? 'all' : 'current'} disabled={saving} onChange={e => { setShowGone(e.target.value === 'all'); setModel(''); setLimit(LIMIT_STEP) }}>
+                  <option value="current">Current SKUs</option>
+                  <option value="all">Include removed SKUs</option>
+                </select>
+              </label>
+            ) : null}
+          </>}
+        />
       </div>
     </section>
   )

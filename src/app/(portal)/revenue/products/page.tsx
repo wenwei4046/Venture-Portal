@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { requirePermission } from '@/lib/auth'
 import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '../_lib/sub-departments'
@@ -17,6 +18,7 @@ import MaintenanceTab from './_components/MaintenanceTab'
 import ComboPricingTab from './_components/ComboPricingTab'
 import CostingGapsSection from './_components/CostingGapsSection'
 import ProductWorkspace from './_components/ProductWorkspace'
+import { layoutsFromCookies } from './_components/column-layout'
 
 /**
  * Revenue → Product List — the Houzs ERP's catalogue, mirrored item by item,
@@ -67,6 +69,8 @@ export default async function ProductListPage({
   const gapToIso = gapTo.toISOString().slice(0, 10)
 
   const [status, subDepts] = await Promise.all([loadMirrorStatus(), listSubDepartments()])
+  // The columns as this reader arranged them, so the first paint is already theirs.
+  const columnLayouts = layoutsFromCookies((await cookies()).getAll())
 
   let body: React.ReactNode
   if (tab === 'sku') {
@@ -75,7 +79,7 @@ export default async function ProductListPage({
       .filter(o => o.pool === 'sofa_sizes' && !o.removed)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(o => o.value)
-    body = <SkuMasterTab skus={skus} sofaSizes={sofaSizes} initialQuery={q ?? ''} />
+    body = <SkuMasterTab skus={skus} sofaSizes={sofaSizes} initialQuery={q ?? ''} columnLayouts={columnLayouts} />
   } else if (tab === 'modular') {
     const [{ models, brands }, maintenance] = await Promise.all([loadModels(), loadMaintenance()])
     body = <ModularTab models={models} brands={brands} options={maintenance.options} />
@@ -90,6 +94,7 @@ export default async function ProductListPage({
         gaps={await loadCostingGaps(GAP_WINDOW_FROM, gapToIso)}
         from={GAP_WINDOW_FROM}
         to={gapToIso}
+        columnLayouts={columnLayouts}
       />
     )
   }

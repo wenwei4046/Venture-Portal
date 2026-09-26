@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { CostingGap } from '../load'
 import CostingGapsSection from './CostingGapsSection'
 
@@ -16,7 +16,17 @@ const fixtures = [
 const period = { from: '2026-08-01', to: '2027-01-01' }
 function summary() { return screen.getByRole('region', { name: 'Costing gaps' }).querySelector('.sku-count')! }
 function codeRows() { return within(screen.getByRole('table')).getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell')[0].textContent) }
+function headers() { return screen.getAllByRole('columnheader').map(h => h.textContent) }
 
+/** The Product List's layout cookies are scoped to its path. */
+function onProductList() {
+  window.history.replaceState(null, '', '/revenue/products')
+  for (const name of document.cookie.split(/;\s*/).map(part => part.split('=')[0])) {
+    if (name.startsWith('vp-cols.')) document.cookie = `${name}=; Path=/revenue/products; Max-Age=0`
+  }
+}
+
+beforeEach(onProductList)
 afterEach(cleanup)
 
 describe('Costing gaps work list', () => {
@@ -84,6 +94,22 @@ describe('Costing gaps work list', () => {
     expect(summary()).toHaveTextContent('1 codes · 1 sales lines · RM 1.00 revenue')
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search costing gaps' }), { target: { value: '' } })
     expect(screen.getByText('200 of 205 codes shown')).toBeInTheDocument()
+  })
+
+  it('keeps the count row and the table in one stage, and remembers the columns the reader moved', () => {
+    const { unmount } = render(<CostingGapsSection gaps={fixtures} {...period} />)
+    expect(screen.getByRole('region', { name: 'Costing gaps table' }).closest('.sku-stage')).toContainElement(summary() as HTMLElement)
+    expect(headers()).toEqual(['Item code', 'Product', 'Group', 'Lines', 'Bills', 'Revenue', 'Reason', 'Next step'])
+    fireEvent.dragStart(screen.getByRole('columnheader', { name: 'Revenue' }))
+    fireEvent.dragOver(screen.getByRole('columnheader', { name: 'Product' }))
+    fireEvent.drop(screen.getByRole('columnheader', { name: 'Product' }))
+    expect(headers()).toEqual(['Item code', 'Revenue', 'Product', 'Group', 'Lines', 'Bills', 'Reason', 'Next step'])
+    expect(codeRows()).toEqual(['2376-1A(P)/LHF & R', 'MISSING', 'READY', 'UNKNOWN', 'SIZE'])
+    unmount()
+    render(<CostingGapsSection gaps={fixtures} {...period} />)
+    expect(headers()[1]).toBe('Revenue')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset columns' }))
+    expect(headers()[1]).toBe('Product')
   })
 
   it('distinguishes an empty reporting period from a filtered-out result', () => {

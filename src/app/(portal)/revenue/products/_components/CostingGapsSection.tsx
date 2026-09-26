@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
 import type { CostingGap } from '../load'
+import ColumnTable, { type TableColumn } from './ColumnTable'
 
 const REASONS: Record<string, string> = {
   not_in_sku_master: 'Missing from SKU Master',
@@ -12,8 +13,32 @@ const REASONS: Record<string, string> = {
   error: 'Pricing error',
 }
 
+function nextStep(g: CostingGap) {
+  if (g.reason === 'unpriced' && g.has_price) return <span>Price now available. Recost the affected orders in Comm Cal.</span>
+  if (!g.in_sku_master) return <span>Check this code in the ERP catalogue.</span>
+  return <Link className="sku-grid-link" href={`/revenue/products?q=${encodeURIComponent(g.item_code)}`}>Review SKU price</Link>
+}
+
+// The table's own order; the reader may move and resize the columns (ColumnTable).
+const COLUMNS: TableColumn<CostingGap>[] = [
+  { key: 'code', label: 'Item code', className: 'sku-nowrap sku-col-code', defaultWidth: 190, cell: g => g.item_code },
+  { key: 'product', label: 'Product', className: 'sku-description', defaultWidth: 280, cell: g => g.product_name ?? '—' },
+  { key: 'group', label: 'Group', defaultWidth: 120, cell: g => g.item_group ?? '—' },
+  { key: 'lines', label: 'Lines', className: 'num', defaultWidth: 96, cell: g => g.lines.toLocaleString() },
+  { key: 'bills', label: 'Bills', className: 'num', defaultWidth: 96, cell: g => g.bills.toLocaleString() },
+  { key: 'revenue', label: 'Revenue', className: 'num', defaultWidth: 140, cell: g => formatMoney(g.revenue) },
+  { key: 'reason', label: 'Reason', defaultWidth: 180, cell: g => REASONS[g.reason] ?? g.reason },
+  { key: 'next', label: 'Next step', className: 'product-gap-next', defaultWidth: 300, cell: nextStep },
+]
+
 /** The RPC's end date is exclusive and its bill counts overlap across codes. */
-export default function CostingGapsSection({ gaps, from, to }: { gaps: CostingGap[]; from: string; to: string }) {
+export default function CostingGapsSection({ gaps, from, to, columnLayouts = {} }: {
+  gaps: CostingGap[]
+  from: string
+  to: string
+  /** The reader's column layouts from the request (`layoutsFromCookies`). */
+  columnLayouts?: Record<string, string>
+}) {
   const [query, setQuery] = useState('')
   const [reason, setReason] = useState('')
   const [limit, setLimit] = useState(200)
@@ -49,45 +74,25 @@ export default function CostingGapsSection({ gaps, from, to }: { gaps: CostingGa
           </label>
         </div>
       </div>
-      <div className="sku-actions">
-        <p className="sku-count" aria-live="polite"><strong>{shown.length.toLocaleString()}</strong> codes · {lines.toLocaleString()} sales lines · <strong>{formatMoney(revenue)}</strong> revenue</p>
-        <Link href="/revenue/products" className="sku-secondary-button">Open SKU Master</Link>
-      </div>
-      <div className="sku-table-panel">
-        <div className="sku-table-window table-scroll" tabIndex={0} role="region" aria-label="Costing gaps table">
-          <table className="ledger-table sku-table">
-            <thead><tr>
-              <th scope="col" className="sku-code-column">Item code</th>
-              <th scope="col">Product</th><th scope="col">Group</th>
-              <th scope="col" className="num">Lines</th><th scope="col" className="num">Bills</th>
-              <th scope="col" className="num">Revenue</th><th scope="col">Reason</th><th scope="col">Next step</th>
-            </tr></thead>
-            <tbody>
-              {visible.length === 0 ? <tr><td colSpan={8} className="sku-empty">{gaps.length === 0 ? 'No costing gaps were found in this sales period.' : 'No costing gaps match these filters.'}</td></tr> : visible.map(g => (
-                <tr key={g.item_code}>
-                  <td className="sku-code-column">{g.item_code}</td>
-                  <td className="sku-description">{g.product_name ?? '—'}</td><td>{g.item_group ?? '—'}</td>
-                  <td className="num">{g.lines.toLocaleString()}</td><td className="num">{g.bills.toLocaleString()}</td>
-                  <td className="num">{formatMoney(g.revenue)}</td><td>{REASONS[g.reason] ?? g.reason}</td>
-                  <td className="product-gap-next">
-                    {g.reason === 'unpriced' && g.has_price ? (
-                      <span>Price now available. Recost the affected orders in Comm Cal.</span>
-                    ) : !g.in_sku_master ? (
-                      <span>Check this code in the ERP catalogue.</span>
-                    ) : (
-                      <Link className="sku-grid-link" href={`/revenue/products?q=${encodeURIComponent(g.item_code)}`}>Review SKU price</Link>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="sku-stage">
+        <div className="sku-actions">
+          <p className="sku-count" aria-live="polite"><strong>{shown.length.toLocaleString()}</strong> codes · {lines.toLocaleString()} sales lines · <strong>{formatMoney(revenue)}</strong> revenue</p>
+          <Link href="/revenue/products" className="sku-secondary-button">Open SKU Master</Link>
         </div>
-        <div className="sku-table-footer">
-          <span>{visible.length.toLocaleString()} of {shown.length.toLocaleString()} codes shown</span>
-          {visible.length < shown.length ? <button type="button" className="sku-load-more" onClick={() => setLimit(n => n + 200)}>Show {Math.min(200, shown.length - visible.length)} more</button> : null}
-          <span>Bills are counted per code; the same bill may appear in several rows.</span>
-        </div>
+        <ColumnTable
+          id="costing-gaps"
+          initialLayout={columnLayouts['costing-gaps']}
+          label="Costing gaps table"
+          columns={COLUMNS}
+          rows={visible}
+          rowKey={g => g.item_code}
+          empty={gaps.length === 0 ? 'No costing gaps were found in this sales period.' : 'No costing gaps match these filters.'}
+          footer={<>
+            <span>{visible.length.toLocaleString()} of {shown.length.toLocaleString()} codes shown</span>
+            {visible.length < shown.length ? <button type="button" className="sku-load-more" onClick={() => setLimit(n => n + 200)}>Show {Math.min(200, shown.length - visible.length)} more</button> : null}
+            <span>Bills are counted per code; the same bill may appear in several rows.</span>
+          </>}
+        />
       </div>
     </section>
   )
