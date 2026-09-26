@@ -3424,9 +3424,68 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .maintenance-readonly, .maintenance-draft-count { display: inline-flex; padding: 3px 7px; border: 1px solid rgb(var(--product-divider)); border-radius: 5px; background: rgb(var(--surface-2)); font-size: 11px; }
 .maintenance-draft-count { background: rgb(var(--accent-bg)); border-color: rgb(var(--accent-border)); }
 .combo-filter-controls { padding-top: 0; }
-.combo-modules { min-width: 300px; max-width: 460px; }
-.combo-slots { display: flex; flex-wrap: wrap; gap: 4px 8px; }
-.combo-slot, .combo-tier { white-space: nowrap; }
+/* Combo Pricing is a board of cards, one group per base model — the ERP's own layout. */
+.combo-window { padding: 16px; background: rgb(var(--product-filter)); }
+.combo-empty { padding: 60px 0; text-align: center; font-size: 12px; }
+.combo-group + .combo-group { margin-top: 22px; }
+.combo-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; font-size: 14px; font-weight: 400; }
+.combo-group-head strong { font-weight: 600; }
+.combo-group-name { font-size: 12px; }
+.combo-group-count { font-size: 11px; text-transform: uppercase; letter-spacing: 0.045em; }
+.combo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.combo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgb(var(--product-table-border));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+}
+.combo-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.combo-model-chip, .combo-tier-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border: 1px solid rgb(var(--product-divider));
+  border-radius: 999px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.combo-model-chip { font-weight: 600; background: rgb(var(--surface-2)); }
+.combo-card-title { font-size: 13px; font-weight: 600; }
+.combo-tier-badge { margin-left: auto; }
+.combo-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgb(var(--surface-2));
+  font-size: 12px;
+}
+.combo-slot { white-space: nowrap; }
+.combo-heights { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.combo-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+  padding: 6px 4px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 7px;
+  background: rgb(var(--surface));
+  text-align: center;
+}
+.combo-cell[data-priced] { border-color: rgb(var(--product-table-rule)); background: rgb(var(--product-row-hover)); }
+.combo-cell[data-historical] { border-style: dashed; }
+.combo-cell[data-edited] { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
+.combo-cell-height { font-size: 11px; }
+.combo-cell-price { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.combo-cell:not([data-priced]) .combo-cell-price { font-weight: 400; }
+.product-page .combo-price-input { width: 100%; padding: 4px 5px; font-size: 12px; }
+.combo-card-foot { margin-top: auto; font-size: 11px; }
 .product-section-heading { margin-bottom: 12px; font-size: 12px; }
 .product-section-heading h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
 .product-gap-next { min-width: 240px; max-width: 330px; }
@@ -3447,6 +3506,8 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   .sku-table-panel { flex: none; height: 460px; }
   .product-page table.sku-table .sku-code-column { min-width: 145px; }
   .sku-description { min-width: 210px; }
+  .combo-window { padding: 10px; }
+  .combo-grid { grid-template-columns: minmax(0, 1fr); }
   .modular-workspace.is-editing { grid-template-columns: minmax(0, 1fr); }
   .modular-workspace.is-editing .sku-table-panel { height: 260px; }
   .modular-editor { height: 520px; }
