@@ -104,14 +104,32 @@ src/
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
-│   │   │                              [sub]/[period]/ runs, products/ (Principal) and
-│   │   │                              **venues/** — the VENUE REGISTER (2026-09-17):
-│   │   │                              every venue on one screen, one row per
-│   │   │                              (venue, month) with an organiser dropdown, the
-│   │   │                              organiser register above it, and *same place
-│   │   │                              as…*. Department-level because neither table
-│   │   │                              carries a scheme; `?month=` narrows both
-│   │   │                              tables client-side.
+│   │   │                              [sub]/[period]/ runs and products/ (Principal).
+│   │   │                              **THE ERP NAMES THE FAIR (2026-09-27):** the
+│   │   │                              venues/ register (organiser per venue×month,
+│   │   │                              fair calendar, *same place as…*) is GONE. The
+│   │   │                              ERP makes the salesperson pick the event to
+│   │   │                              open an order, and the delivery carries it as
+│   │   │                              `fair` (the brand booth's project: venue,
+│   │   │                              organiser, days, status — contract §3.4).
+│   │   │                              `erp_sync_fair` keeps it as the portal's fair
+│   │   │                              (one per EVENT: booths of one event, same
+│   │   │                              place + overlapping days, fold into one row
+│   │   │                              via `comm_venue_events.erp_project_ids`; the
+│   │   │                              ERP's organiser and days win; a cancelled
+│   │   │                              booth is no fair; unknown organisers are
+│   │   │                              added) and the ingest pins it
+│   │   │                              (`fair_source = 'erp'`, as confirmed as a
+│   │   │                              'manual' pin: never re-guessed). The month
+│   │   │                              still moves only by a click — *Bills of
+│   │   │                              another month's fair* on the month page
+│   │   │                              (`FairMovesPanel`, `moveConfirmedFairBills`).
+│   │   │                              The calendar's restamp skips a paid month's
+│   │   │                              bills. A wrong fair is fixed IN THE ERP. ERP
+│   │   │                              side: Houzs-ERP #4309 (`vp_build_payloads`
+│   │   │                              `fair`, `trg_vp_outbox_so` + project_id…,
+│   │   │                              `trg_vp_outbox_project`). Mig
+│   │   │                              `20260927010000`.
 │   │   │                              **THE FAIR SETS THE MONTH (2026-09-20):**
 │   │   │                              `period_month` followed `header.so_date` —
 │   │   │                              the day the ERP document was OPENED IN THE
@@ -166,11 +184,9 @@ src/
 │   │   │                              DAY", and collapsing a four-day fair onto one
 │   │   │                              date would turn three bonuses into one — a
 │   │   │                              separate decision with its own money attached.
-│   │   │                              UI: *Fair calendar* + *Still to place* on
-│   │   │                              Revenue > Venues, the second being the work
-│   │   │                              list (`revenue_fair_calendar_gaps()`), which
-│   │   │                              flags a place whose bills spread over more
-│   │   │                              than 8 days as more than one fair.
+│   │   │                              UI was *Fair calendar* + *Still to place* on
+│   │   │                              Revenue > Venues until 2026-09-27 (the ERP
+│   │   │                              names the fair now — see above).
 │   │   │                              `lib/fair-calendar.ts`, `fair-actions.ts`,
 │   │   │                              mig `20260920050000`.
 │   │   │                              **CONFIRMED MOVES (2026-09-23):** while next
@@ -596,9 +612,9 @@ src/
 │   │   │                              Sales by venue is one row per FAIR (venue ·
 │   │   │                              days · organiser, `salesByFair` in
 │   │   │                              `lib/venues.ts`, from each bill's
-│   │   │                              `fair_event_id`), READ-ONLY — organiser and
-│   │   │                              *same place as…* are picked on Revenue ›
-│   │   │                              Venues only. The Total Sales Orders table
+│   │   │                              `fair_event_id`), READ-ONLY — the fair and
+│   │   │                              its organiser come from the ERP (2026-09-27,
+│   │   │                              above). The Total Sales Orders table
 │   │   │                              gained **Group sales**; the saved run's
 │   │   │                              per-person table, the old *Waiting on a
 │   │   │                              deposit* section and *Sales by person* are

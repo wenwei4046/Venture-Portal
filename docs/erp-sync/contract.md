@@ -93,7 +93,11 @@ with three small additions marked **(add)**:
   "items":    [ /* scm.mfg_sales_order_items rows for the doc, verbatim */ ],
   "payments": [ /* scm.mfg_sales_order_payments rows for the doc, verbatim */ ],
   "salesperson": { "id": "<scm.staff.id>", "name": "Lucas Tan",     // (add) the person behind
-                   "staff_code": "EMP-0012", "user_id": 12 }         //       header.salesperson_id
+                   "staff_code": "EMP-0012", "user_id": 12 },        //       header.salesperson_id
+  "fair": { "projectId": 2212, "venue": "PENANG WATERFRONT CONVENTION CENTRE",   // (add 2026-09-27)
+            "organizer": "MLE", "startDate": "2026-09-25", "endDate": "2026-09-27", //  the event the
+            "status": "confirmed", "brand": "ZANOTTI", "match": "PICKED",         //  salesperson picked;
+            "fairDate": "2026-09-25", "code": "…", "name": "…", "eventType": "exhibition" } // null when none
 }
 ```
 
@@ -136,38 +140,63 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | lines | `items[]` where `cancelled = false`, by `line_no` | `item_group`, `item_code`, `description`, `description2`, `qty`, `unit_price_sen`, `total_sen`, `branding` |
 | **line build** | `items[].variants` (since 2026-09-24) | ALLOWLISTED to `fabricCode`, `seatHeight`, `legHeight`, `divanHeight`, `gap`, `totalHeight`, `size`, `specials` (strings) and stored on the line's `raw.variants` — what the cost rule reads a sofa's seat height and a bed frame's options from before it ever parses `description2` (§9.4). The ERP's `variants` also carries money (`extraAddonAmountRM`) and free text; neither is kept, and the ERP's own builder now sends only the allowlist |
 | line cost | `items[].line_cost_sen` / 100 | stored on `raw.cost` only. **Since 2026-09-24 it decides no margin** — every line is priced from the Product List (§9) |
+| **fair** | `fair` (since 2026-09-27) | the event the salesperson picked — see §3.4. Pinned to the bill; its venue, organiser and days are the fair's everywhere on the portal |
 
 
-### What it does NOT send — the organiser
+### 3.4 The fair — what the salesperson picked (2026-09-27)
 
-Nothing in the delivery says who ORGANISED an event. `venue` names the place;
-`sales_location` names the warehouse; there is no promoter, host or organiser
-field anywhere in the header, the items or the payments (checked against every
-delivery the portal holds, 2026-09-16).
+Since 2026-09-13 the ERP's sales-order form makes the salesperson PICK the event
+a bill was written at — a place plus an organiser plus its days, offered from
+the ERP's own project list (`backend/src/scm/lib/fair-options.ts` there) — and
+stamps the order with the matching brand booth (`scm.mfg_sales_orders.project_id`
+→ `public.projects`) and, from 2026-09-24, the day of the fair the sale was
+(`fair_date`). From 2026-09-27 the pick is required to open an order.
 
-The portal keeps that fact itself, per **(venue, month)** — the same hall has a
-different organiser from one month to the next — in `comm_venue_events`, with
-the names in a register, `comm_organisers`. Both are maintained on **Revenue →
-Venues** (every venue, every month, one screen) and on the month page's *Sales
-by venue* (2026-09-17). `comm_venues.organizer` is superseded and no longer
-read.
+`scm.vp_build_payloads` sends it as a top-level `fair` (ERP migration
+`20260927T…_scm_vp_order_fair`), built from the project row, not the header —
+the header comes from `mfg_sales_orders_with_payment_totals`, a view whose
+column list was frozen before `project_id` existed:
 
-#### If the ERP starts sending it
+| Key | From | Note |
+|---|---|---|
+| `projectId` | `projects.id` | one BRAND's booth. One event at one hall is several projects (MID VALLEY 11–13 Sep REX = 340, 341, 2250) |
+| `venue` | `projects.venue` | a name from the ERP's venue master; the portal tidies spaces and folds it through `canonical_key` like any venue |
+| `organizer` | `projects.organizer` | from the ERP's organiser register — a name the portal has not seen is ADDED to `comm_organisers` ("Named by the Houzs ERP"), never refused |
+| `startDate`, `endDate` | `projects.start_date` / `end_date` | `YYYY-MM-DD`, inclusive; an open-ended project closes on its first day |
+| `status` | `projects.status` | `cancelled` = the office withdrew from the booth: **no fair** |
+| `match`, `fairDate` | `mfg_sales_orders.fair_match` / `fair_date` | stored on `raw.fair`; not yet read |
+| `code`, `name`, `brand`, `eventType` | `projects` | descriptive; `name` becomes a new fair's note |
 
-**The receiver is already ready, and nothing needs to change on the portal
-side.** The delivery is stored verbatim in `sales_orders.raw`, and a trigger
-(`sales_orders_register_organiser`) reads the organiser out of `raw.header`
-under any of these names, in this order:
+`fair` is `null` (or absent) when the order has no project. A `fair` the portal
+cannot read — no project id, no venue, a date it cannot parse, an end before
+its start — is treated as no pick: **never** a reason to refuse the order.
 
-```
-organiser · organizer · event_organiser · event_organizer
-venue_organiser · venue_organizer · organiser_name · organizer_name
-```
+What the portal does with it (`erp_sync_fair`, mig `20260927010000`):
 
-Put a plain string there — the organiser's name, spelled the same way every
-time. `header.venue_id` is the other half of the same problem and is still
-never populated; if the ERP ever fills it, say so and the portal will match on
-the id instead of the name.
+1. **Finds the fair**: the one already holding this project, else the event it is
+   a booth of (same place, overlapping days — the exact window first), else a
+   new `comm_venue_events` row (`source = 'erp'`, month = the start's month).
+2. **The ERP wins**: an existing fair takes the ERP's organiser and days, and its
+   `source` becomes `erp`. Nobody types a fair on the portal any more — Revenue ›
+   Venues was removed the same day.
+3. **Pins it** to the bill (`fair_source = 'erp'`). The calendar never re-guesses
+   an ERP pin, and a move into its fair's month is a CONFIRMED move. A later
+   delivery without a fair un-pins it (the bill falls back to
+   `venue_event_for_order`).
+4. **The month does not move by itself.** A new document still lands in its
+   `so_date` month; a re-sent one with a fair keeps its month. A bill whose fair
+   counts in another month shows on the month page (*Bills of another month's
+   fair*), where one click moves every confirmed one (`revenue_apply_fair_calendar`,
+   refused for a month whose run has paid).
+
+A project edited in the ERP (its days, organiser or status) re-queues the orders
+that point at it (the same ERP migration), so the portal hears of it without
+waiting for somebody to save a bill.
+
+The old header-organiser path (`sales_orders_register_organiser`, which read
+`raw.header.organiser` and seven spellings of it) is gone: the ERP never sent
+the field, and the trigger's `ON CONFLICT` target had been dropped on
+2026-09-20, so the first header to carry one would have failed its delivery.
 
 **A venue-only edit is never forwarded (2026-09-20).** `trg_vp_outbox_so`
 fires on `status, on_hold, so_date, branding, salesperson_id, agent,
@@ -176,18 +205,6 @@ debtor_name, debtor_code, sales_location, company_id` and the money columns.
 queues nothing and the portal keeps the old spelling forever. The value does
 ride along on any other re-push, which is why this looks like it works. Add
 `venue` (and `venue_id`) to the trigger's `UPDATE OF` list.
-
-What the portal does with it:
-
-| The name the delivery carries | What happens |
-|---|---|
-| matches an organiser in the register (case- and space-insensitive) | the month's fair is named, `source = 'erp'` |
-| matches nothing | kept verbatim in `erp_organiser_text` and shown on the register page as *ERP: … — not registered*, so a human can add the name once and the next delivery matches |
-| anything, where a HUMAN has already picked an organiser for that month | **the human's pick stands.** The raw text is still recorded, so the disagreement is visible |
-
-The portal never invents an organiser from a delivery: a typo would otherwise
-become a real organiser with real sales against it. That is the one thing the
-feed may not do on its own.
 
 ### The feed window — orders the portal will not keep
 
@@ -595,6 +612,12 @@ feed (switch + company scope + `vp.url` + `vp.secret`); same response taxonomy.
 See the ERP's `docs/modules/venture-portal-feed.md`.
 
 ## 10. The one date the feed does not carry (2026-09-20)
+
+> **Answered 2026-09-27.** The ERP now makes the salesperson pick the event on
+> every order, and the delivery carries it as `fair` (§3.4) — the fair's own
+> venue, organiser and days, plus `fairDate`, the day of the sale. The fair
+> calendar is the ERP's from then on; what follows is the history of why it
+> was needed.
 
 **Ask.** Put the day of the SALE on the delivery, or an id for the fair it was
 written at. Anything stable would do: `header.event_date`, a `fair_id` with a

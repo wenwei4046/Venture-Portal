@@ -7,7 +7,6 @@ import { buildCommissionWorkbench, type CommissionOrderRow, type OverrideOrderRo
 import { depositRequired } from '@/lib/commission/engine'
 import { formatMoney } from '@/lib/utils'
 import { computeRevenuePay } from '@/lib/revenue-pay'
-import { VENUE_REGISTER_PATH } from '@/lib/revenue'
 import type { FairSales } from '@/lib/venues'
 import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
@@ -498,7 +497,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </>}
 
     {tab === 'venue' && <>
-      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Sales by venue</h2><p className={s.subtitle}>Every bill of the month at the fair it was written at. The venue, the days and the organiser come with the bill from the fair calendar on <Link href={VENUE_REGISTER_PATH}>Revenue › Venues</Link> — nothing is picked here. A venue that held two fairs this month has a row for each; bills no fair claims are grouped by venue.</p></div>
+      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Sales by venue</h2><p className={s.subtitle}>Every bill of the month at the fair it was written at. The venue, the days and the organiser come with the bill from the ERP, where the salesperson picks the event — nothing is picked here. A venue that held two fairs this month has a row for each; bills no fair claims are grouped by venue, and are placed by fixing the event on the order in the ERP.</p></div>
         <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(venueTotals.total)}</strong></div></div>
       <div className={s.toolbar}><input className={s.search} aria-label="Search venues" placeholder="Search venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} /></div>
       <div className={s.tableFrame}><div className={s.tableScroll} role="region" aria-label="Sales by venue, scroll horizontally" tabIndex={0}><table className={s.table} aria-label="Sales by venue">

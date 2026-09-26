@@ -44,7 +44,7 @@ function database() {
   // The month page reads its orders through revenue_month_orders; only the
   // adjustments RPC is what these assertions are about.
   const rpc = vi.fn((name: string) =>
-    name === 'revenue_month_orders'
+    name === 'revenue_month_orders' || name === 'revenue_fair_calendar_moves'
       ? Promise.resolve({ data:[], error:null })
       : Promise.resolve({ data:[{ staff_id:'staff',commission_synced_amount:13000,commission_adjustment_amount:-500,
           commission_adjustment_reason:'DN from cancelled sale',commission_amount:12500,status:'draft',source_run_count:2 }], error:null }))
