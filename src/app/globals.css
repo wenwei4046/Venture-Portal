@@ -3517,6 +3517,94 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .sku-catalogue-filter { display: flex; align-items: center; gap: 8px; }
 .sku-catalogue-filter select { padding-top: 4px; padding-bottom: 4px; font-size: 11px; }
 .sku-load-more { text-decoration: underline; text-underline-offset: 3px; }
+/* The screen stage (user 2026-09-27: "这个框架本身太小了"). SKU Master and
+   Costing gaps hold their count row, notes and table in one stage exactly a
+   screen tall: <main> is 100vh less the 70px greeting bar, and 45px is the
+   page's padding under the stage plus 10px of air above it. The page scrolls
+   again, so one turn of the wheel slides the filters away and the table fills
+   the screen — the ERP's tables freeze the same way. A downward wheel over the
+   table moves the page first (`usePageFirstWheel`). */
+.product-content:has(.sku-stage) { display: flex; flex-direction: column; height: auto; min-height: 100%; }
+.product-page.product-page-workspace:has(.sku-stage) { flex: 1 0 auto; height: auto; }
+.sku-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: max(440px, calc(100vh - 115px));
+}
+/* Columns the reader lays out (ColumnTable, user 2026-09-27). The first paint
+   is the auto layout; once its widths are read the table is fixed, a blank
+   last column takes the slack and a cell clips instead of pushing. */
+.product-page table.sku-table[data-layout="fixed"] { table-layout: fixed; }
+.product-page table.sku-table[data-layout="fixed"] :is(th, td) {
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+.product-page table.sku-table[data-layout="fixed"] .sku-price-input { width: 100%; max-width: 112px; }
+.product-page table.sku-table[data-layout="fixed"] .sku-model-name { overflow: hidden; text-overflow: ellipsis; }
+.product-page table.sku-table[data-fitting] :is(th, td) { white-space: nowrap; text-overflow: clip; }
+.product-page table.sku-table[data-fitting] .sku-price-input { width: 112px; }
+.product-page table.sku-table .sku-nowrap { white-space: nowrap; }
+.product-page table.sku-table .sku-col-code { min-width: 174px; }
+.product-page table.sku-table .sku-frozen-column {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid rgb(var(--product-table-border));
+  background: inherit;
+}
+.product-page table.sku-table thead .sku-frozen-column { z-index: 3; background: rgb(var(--product-table-head)); }
+.product-page table.sku-table .sku-col-filler { padding: 0; }
+.product-page table.sku-table thead th[draggable="true"] { cursor: grab; }
+.product-page table.sku-table thead th[data-dragging] { opacity: 0.45; }
+.sku-col-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sku-col-resize::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 3px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgb(var(--product-table-rule));
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.product-page table.sku-table thead th:hover .sku-col-resize::after { opacity: 1; }
+.sku-col-resize:is(:hover, :focus-visible, [data-active])::after { opacity: 1; background: rgb(var(--accent)); }
+.sku-col-resize:focus-visible { outline: 2px solid rgb(var(--product-text)); outline-offset: -2px; }
+.sku-col-drop {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 3px;
+  border-radius: 2px;
+  background: rgb(var(--accent));
+  pointer-events: none;
+}
+.sku-col-drop[data-side="before"] { left: 0; }
+.sku-col-drop[data-side="after"] { right: 0; }
+@media (max-width: 767px) {
+  .sku-stage { height: auto; }
+}
+@media print {
+  .sku-stage { height: auto; }
+  .product-page table.sku-table .sku-frozen-column { position: static; }
+  .sku-col-resize { display: none; }
+}
 .product-unsaved-notice, .modular-switch-notice {
   display: flex;
   flex-shrink: 0;

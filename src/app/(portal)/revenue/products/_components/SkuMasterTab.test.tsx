@@ -45,9 +45,28 @@ function changePrice(label: string, value: string) {
   fireEvent.change(screen.getByRole('textbox', { name: label }), { target: { value } })
 }
 
+function headers() {
+  return screen.getAllByRole('columnheader').map(h => h.textContent)
+}
+
+function dragColumn(from: string, to: string) {
+  fireEvent.dragStart(screen.getByRole('columnheader', { name: from }))
+  fireEvent.dragOver(screen.getByRole('columnheader', { name: to }))
+  fireEvent.drop(screen.getByRole('columnheader', { name: to }))
+}
+
+/** The Product List's layout cookies are scoped to its path. */
+function onProductList() {
+  window.history.replaceState(null, '', '/revenue/products')
+  for (const name of document.cookie.split(/;\s*/).map(part => part.split('=')[0])) {
+    if (name.startsWith('vp-cols.')) document.cookie = `${name}=; Path=/revenue/products; Max-Age=0`
+  }
+}
+
 beforeEach(() => {
   saveSkuPrices.mockReset().mockResolvedValue({ saved: 1 })
   refresh.mockReset()
+  onProductList()
 })
 afterEach(cleanup)
 
@@ -183,6 +202,35 @@ describe('SKU Master price workspace', () => {
     expect(screen.queryByRole('combobox', { name: 'Model' })).not.toBeInTheDocument()
     expect(screen.getByText('PILLOW')).toBeInTheDocument()
     expect(screen.getByText('BOLSTER')).toBeInTheDocument()
+  })
+
+  it('lets the reader rearrange the columns, apart for the sofa sheet, without losing a typed price', async () => {
+    render(<SkuMasterTab skus={fixtures} sofaSizes={['24']} />)
+    expect(screen.getByRole('region', { name: 'SKU prices table' }).closest('.sku-stage')).toContainElement(
+      screen.getByRole('button', { name: 'Edit Prices' }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Prices' }))
+    changePrice('BED-K price', '120')
+    dragColumn('Price', 'Product code')
+    expect(headers()).toEqual(['Price', 'Product code', 'Description', 'Model', 'Size', 'Brand'])
+    expect(screen.getByRole('columnheader', { name: 'Price' })).toHaveClass('sku-frozen-column')
+    expect(screen.getByRole('textbox', { name: 'BED-K price' })).toHaveValue('120')
+
+    openSofa()
+    expect(headers().slice(0, 5)).toEqual(['Product code', 'Description', 'Model', 'Category', 'PRICE_TIER'])
+    dragColumn('Model', 'Product code')
+    expect(headers().slice(0, 5)).toEqual(['Model', 'Product code', 'Description', 'Category', 'PRICE_TIER'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(headers()).toEqual(['Price', 'Product code', 'Description', 'Model', 'Size', 'Brand'])
+    expect(screen.getByRole('textbox', { name: 'BED-K price' })).toHaveValue('120')
+    fireEvent.click(screen.getByRole('button', { name: 'Save 1 SKU' }))
+    await waitFor(() => expect(saveSkuPrices).toHaveBeenCalledWith([{ erpId: 'bed', price: '120', grid: null }]))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset columns' }))
+    expect(headers()).toEqual(['Product code', 'Description', 'Model', 'Size', 'Brand', 'Price'])
+    openSofa()
+    expect(headers().slice(0, 5)).toEqual(['Model', 'Product code', 'Description', 'Category', 'PRICE_TIER'])
   })
 
   it('loads more rows inside the table and searches the entire catalogue', () => {

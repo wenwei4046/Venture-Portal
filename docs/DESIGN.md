@@ -113,9 +113,10 @@ is not rewritten.
   filter panel (`#F6F6F4`), with a divider between the two rows. Keep the main
   Product List tabs outside this panel.
 - Use a stronger table header (`#EBE7E0`), subtle white / `#F7F7F5` alternating
-  rows, and a footer. The wide sheets — SKU Master and Combo Pricing — fill the
-  remaining window and scroll internally in both directions, with a sticky
-  header and product code; on mobile a fixed-height window.
+  rows, and a footer. The wide sheets scroll internally in both directions,
+  with a sticky header and a frozen first column: Combo Pricing fills the
+  remaining window, SKU Master (and Costing gaps) take a whole screen — see
+  *One screen* below; on mobile a fixed-height window.
 - **Lists scroll with the page (2026-09-27).** Modular and Maintenance only grow
   downward, so they grow with their rows and the page's own scrollbar moves them,
   as the ERP's Products page does — no box inside the page. A table there keeps
@@ -152,6 +153,24 @@ is not rewritten.
   retain edits, and partially successful maintenance batches retry only failures.
 - Costing gaps is a searchable work list with reason filters and a direct SKU
   lookup. Sum lines and revenue; do not sum per-code bill counts, which overlap.
+- **One screen, not the remainder (2026-09-27).** SKU Master and Costing gaps
+  hold the count row, its notes and the table in a stage exactly one screen tall
+  (`.sku-stage`) instead of the space the filters leave: the page scrolls again,
+  one turn of the wheel slides the filters away and the table fills the screen.
+  A downward wheel over the table moves the page first, so rows never scroll
+  inside a frame whose bottom is below the screen; upward is the browser's own.
+  Phones keep the fixed-height window.
+- **The columns are the reader's (2026-09-27).** On those two tables a header
+  dragged onto another swaps their places (an orange bar shows where it lands)
+  and a header's right edge drags wider or narrower; double-clicking the edge
+  fits the column to its widest cell; from the keyboard ←/→ on the focused edge
+  resizes and Alt+←/→ moves. Whichever column stands first is the frozen one; a
+  sofa's seat-size prices stay behind the rest, in the ERP's order. The table
+  opens at its natural widths and then holds them, so widening one column never
+  squeezes another — a blank last column takes the slack. Each table (and the
+  sofa sheet apart) keeps its layout in this browser only, in a cookie scoped to
+  the Product List so the server renders it; *Reset columns* in the footer puts
+  it back. `ColumnTable` / `useColumnLayout`.
 
 The light workspace remains light when opened from a dark-mode route so black
 text retains contrast. The preference still applies when leaving Product List.
@@ -2189,6 +2208,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List workspace".
 - **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List workspace".
 - **2026-09-27 v3.9 (latest)** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".
 - **2026-09-27** — Revenue › Venues removed: the ERP names every bill's fair (venue, organiser, days), so there is nothing left to type. The one person's step it held — moving bills into their fair's month — is a panel on the month page, *Bills of another month's fair* (`FairMovesPanel`), in the same bordered-surface vocabulary as *Drops and upsells the ERP found*: a serif heading with a mono alert count, an italic explanation, one `.ledger-table` (Bill · Salesperson · Fair · Move · Sales value, the move's status as a small mono label), and one accent button *Move the N confirmed*.
