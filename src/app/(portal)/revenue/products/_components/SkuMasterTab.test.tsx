@@ -153,6 +153,38 @@ describe('SKU Master price workspace', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 
+  it('filters mattresses and bed frames by model too, but not a category where every SKU is its own model', () => {
+    const flat = (erpId: string, category: string, code: string, modelCode: string) =>
+      sku({ erpId, code, description: `${category} ${code}`, category, modelId: `id-${modelCode}`, modelCode, modelName: modelCode, grid: null, price: 1000 })
+    render(<SkuMasterTab sofaSizes={['24']} skus={[
+      ...fixtures,
+      flat('m1', 'MATTRESS', 'AKKA-K', 'AKKA'), flat('m2', 'MATTRESS', 'AKKA-Q', 'AKKA'), flat('m3', 'MATTRESS', 'ZEN-K', 'ZEN'),
+      flat('b2', 'BEDFRAME', 'B200-K', 'B200'),
+      flat('a1', 'ACCESSORY', 'PILLOW', 'ACC-PILLOW'), flat('a2', 'ACCESSORY', 'BOLSTER', 'ACC-BOLSTER'),
+    ]} />)
+    expect(screen.queryByRole('combobox', { name: 'Model' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mattress' }))
+    expect(within(screen.getByRole('combobox', { name: 'Model' })).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['All models', 'AKKA', 'ZEN'])
+    expect(screen.queryByRole('group', { name: 'Fabric tier' })).not.toBeInTheDocument()
+    chooseModel('id-AKKA')
+    expect(screen.getByText('AKKA-Q')).toBeInTheDocument()
+    expect(screen.queryByText('ZEN-K')).not.toBeInTheDocument()
+    expect(screen.getByText(/· Model AKKA/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bedframe' }))
+    expect(screen.getByRole('combobox', { name: 'Model' })).toHaveValue('')
+    chooseModel('id-B200')
+    expect(screen.getByText('B200-K')).toBeInTheDocument()
+    expect(screen.queryByText('BED-K')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accessory' }))
+    expect(screen.queryByRole('combobox', { name: 'Model' })).not.toBeInTheDocument()
+    expect(screen.getByText('PILLOW')).toBeInTheDocument()
+    expect(screen.getByText('BOLSTER')).toBeInTheDocument()
+  })
+
   it('loads more rows inside the table and searches the entire catalogue', () => {
     const many = Array.from({ length: 305 }, (_, i) => sku({ erpId: `sku-${i}`, code: `SKU-${i}`, description: `Product ${i}`, grid: null }))
     render(<SkuMasterTab skus={many} sofaSizes={['24']} />)

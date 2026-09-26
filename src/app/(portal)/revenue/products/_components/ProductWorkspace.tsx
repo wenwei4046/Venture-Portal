@@ -1,6 +1,17 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import type { ProductTab } from './ProductListTabs'
+
+/**
+ * How a tab scrolls. SKU Master and Combo Pricing are wide sheets: a window
+ * fixed to the screen that you drag both ways. Modular and Maintenance only
+ * ever grow downward, so they grow with the page and its own scrollbar moves
+ * them, the way the ERP's Products page does (user 2026-09-27).
+ */
+export function productTabScroll(tab: ProductTab): 'page' | 'window' {
+  return tab === 'modular' || tab === 'maintenance' ? 'page' : 'window'
+}
 
 type DraftState = { dirty: boolean; saving: boolean }
 const CLEAN: DraftState = { dirty: false, saving: false }
@@ -22,7 +33,7 @@ export function useProductDraftState() {
   return useContext(DraftContext)
 }
 
-export default function ProductWorkspace({ children }: { children: ReactNode }) {
+export default function ProductWorkspace({ tab = 'sku', children }: { tab?: ProductTab; children: ReactNode }) {
   const [draftState, setDraftState] = useState<DraftState>(CLEAN)
 
   useEffect(() => {
@@ -51,7 +62,7 @@ export default function ProductWorkspace({ children }: { children: ReactNode }) 
 
   return (
     <DraftContext.Provider value={{ ...draftState, setDraftState }}>
-      <div className="product-page product-page-workspace">{children}</div>
+      <div className="product-page product-page-workspace" data-scroll={productTabScroll(tab)}>{children}</div>
     </DraftContext.Provider>
   )
 }

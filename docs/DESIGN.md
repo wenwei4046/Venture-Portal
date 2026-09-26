@@ -113,25 +113,37 @@ is not rewritten.
   filter panel (`#F6F6F4`), with a divider between the two rows. Keep the main
   Product List tabs outside this panel.
 - Use a stronger table header (`#EBE7E0`), subtle white / `#F7F7F5` alternating
-  rows, and a footer. Each desktop table fills the remaining window and
-  scrolls internally in both directions, with a sticky header and product code.
-  Mobile uses a fixed-height scroll window for the editable matrix.
+  rows, and a footer. The wide sheets — SKU Master and Combo Pricing — fill the
+  remaining window and scroll internally in both directions, with a sticky
+  header and product code; on mobile a fixed-height window.
+- **Lists scroll with the page (2026-09-27).** Modular and Maintenance only grow
+  downward, so they grow with their rows and the page's own scrollbar moves them,
+  as the ERP's Products page does — no box inside the page. A table there keeps
+  its header stuck to the top of the page and scrolls sideways inside its card
+  only while it is wider than the card. `productTabScroll` names each tab's mode;
+  a new tab that only grows downward belongs on the page.
 - SKU Master is for finding SKUs and maintaining prices: omit pricing summary
   cards, calculator labels/filters, category ratios and the long introduction.
-  Sofa prices remain the ERP-ordered size columns and P1/P2/P3 tiers, with a
-  model filter. Preserve raw size labels, but omit the `DEFAULT` size and flat
+  Sofa prices remain the ERP-ordered size columns and P1/P2/P3 tiers. Sofa,
+  Mattress and Bedframe — whose models gather several SKUs — each carry a model
+  filter, as on the ERP; the other categories are one SKU per model and do not.
+  Preserve raw size labels, but omit the `DEFAULT` size and flat
   fallback price columns. Omit Status throughout SKU Master. Hidden saved
   defaults and fallback prices survive edits to visible prices; other product
   categories retain their ordinary Price column.
 - Retain portal-owned price writes, permission checks and existing pricing
   semantics. No ERP source price becomes a portal cost through this restyle.
-- Modular uses a scrollable model list beside an independently scrollable
-  editor, with fixed save/cancel controls. Empty ERP allowlists are unrestricted;
-  empty portal selections mean none. Keep inactive saved selections visible so
-  they can be removed. On phones the list and editor stack in bounded windows.
+- Modular is a board of model cards grouped by category, in the ERP's order. A
+  card opens the model in a floating one-sheet window with fixed save/cancel
+  controls; on phones the window fills the screen. Empty ERP allowlists are
+  unrestricted; empty portal selections mean none. Keep inactive saved
+  selections visible so they can be removed.
 - Maintenance keeps the ERP's Bedframe/Sofa pool order and values, with a separate
-  fabric view. Fabrics expose both category tiers, using the shared tier and then
-  P2 when a category mapping is absent. All rows remain reachable with Load more.
+  fabric view. An option pool has no search box — the largest holds about twenty
+  values and the ERP's Maintenance lists have none; the fabric view keeps its
+  search and tier filters. Fabrics expose both category tiers, using the shared
+  tier and then P2 when a category mapping is absent. All rows remain reachable
+  with Load more.
 - Combo Pricing retains module slots, alternatives, repeated modules, tiers and
   effective dates. Match equivalent size keys without losing their raw labels or
   historical price columns. A blank clears a price; zero remains a stored zero.
@@ -978,8 +990,9 @@ model, category, the ERP's allowed options as chips); what the portal DECIDES
 is an input — a price (`.num` right-aligned, `MONEY_INPUT`), a tick, a chip that
 toggles. Row status uses explicit black text: **New**, **Inactive** (off in
 the ERP), or **Removed from ERP** (retired, retained for historical references).
-Filters sit in the shared gray `.sku-filters` panel above a bounded
-`.ledger-table.sku-table` window. Modular opens a model in
+Filters sit in the shared gray `.sku-filters` panel above the
+`.ledger-table.sku-table` — a bounded window on the wide sheets, the page's own
+scroll on the lists (Modular, Maintenance). Modular opens a model in
 `ModelEditor` — its SKUs (compartments / sizes) and each option list as tick
 chips, what the ERP allows first and anything ticked here that it no longer
 allows after. Saving reports the result; a price moves margins only

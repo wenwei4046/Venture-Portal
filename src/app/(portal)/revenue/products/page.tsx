@@ -95,7 +95,7 @@ export default async function ProductListPage({
   }
 
   return (
-    <ProductWorkspace>
+    <ProductWorkspace tab={tab}>
       <div className="page-head tabbed">
         <div>
           <div className="page-eyebrow">
