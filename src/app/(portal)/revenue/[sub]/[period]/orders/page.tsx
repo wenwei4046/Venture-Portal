@@ -8,10 +8,11 @@ import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
 import { buildCommissionWorkbench } from '@/lib/commission/workbench'
 import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
+import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
 import {
-  exclusionReason,
   loadMonthOrders,
+  loadOrderExclusions,
   loadOrderShares,
   loadShareTeam,
   loadUncostedProducts,
@@ -84,10 +85,12 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
   const runLocked = Boolean(locked)
 
-  // Who else holds a part of each bill, and who a bill may be shared with.
-  const [shares, team] = await Promise.all([
+  // Who else holds a part of each bill, who a bill may be shared with, and
+  // who took a bill out of the month by hand — only an excluded bill can be.
+  const [shares, team, exclusions] = await Promise.all([
     loadOrderShares(supabase, all.map(o => o.orderId)),
     loadShareTeam(supabase, subDept.schemeId),
+    loadOrderExclusions(supabase, all.filter(o => o.cancelled).map(o => o.orderId)),
   ])
   const sharesByOrder = new Map<string, typeof shares>()
   for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
@@ -117,6 +120,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   // team history as the month page's salesperson ledger, without its drafts.
   let workbench: Awaited<ReturnType<typeof loadCommissionWorkbench>> | null = null
   let commissionNote: string | null = subDept.schemeId ? null : 'This sub-department has no commission scheme, so no bill pays commission.'
+  let hasRun = false
   if (subDept.schemeId && all.length > 0) {
     try {
       const { data: run } = await supabase
@@ -125,6 +129,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         .eq('period_month', period)
         .eq('sub_department_id', subDept.id)
         .maybeSingle()
+      hasRun = Boolean(run)
       workbench = await loadCommissionWorkbench(supabase, subDept.id, period, all, (run as { id: string } | null)?.id, { pay: false })
     } catch (e) {
       commissionNote = `The live commission could not be calculated: ${e instanceof Error ? e.message : 'unknown error'}. The bills themselves are complete.`
@@ -170,10 +175,12 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     return s ? `${base}?${s}` : base
   }
 
+  const monthLabel = label(period)
   const billRows: BillRow[] = base0.map(o => {
     const paid = byBill.get(o.orderId)
     const who = o.staffId ? personOf.get(o.staffId) : undefined
     const reason = exclusionReason(o)
+    const byHand = exclusions.get(o.orderId)
     return {
       orderId: o.orderId,
       orderNo: o.orderNo,
@@ -202,6 +209,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       marginKeyed: o.marginSource === 'manual',
       status: reason ?? (!o.staffId ? 'Pays nobody' : !o.depositMet ? 'Deposit pending' : 'Included'),
       cancelled: o.cancelled,
+      exclusionDetail: byHand ? describeExclusion(byHand) : null,
+      countAction: billCountAction({ ...o, excludedByHand: Boolean(byHand) }, { runLocked, monthLabel }),
       staff: o.staffId
         ? {
             id: o.staffId,
@@ -342,6 +351,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
             openBillPaid={openBillPaid}
             commissionNote={commissionNote}
             initialShowExcluded={includeExcluded}
+            monthLabel={monthLabel}
+            hasRun={hasRun}
           />
         )}
 
@@ -349,7 +360,10 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           &quot;Total commission&quot; is the live calculation&apos;s personal commission on the bill —
           every shared part added together, overriding left to the upline — from the same rules as
           the month&apos;s salesperson ledger, without its review drafts. A held bill pays in the
-          month its deposit clears. Open the bill to see it line by line.
+          month its deposit clears. Open the bill to see it line by line. Right-click a bill — or its ⋯ —
+          for <em>Don&apos;t count this bill</em>: it leaves the month&apos;s commission the way a bill
+          cancelled in the ERP does, and stays out whatever the ERP sends next until somebody counts it
+          again (<em>Show excluded</em> lists it).
           {openBillPaid ? (
             <>
               {' '}

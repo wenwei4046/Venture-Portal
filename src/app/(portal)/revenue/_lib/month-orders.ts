@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
+import type { HandExclusion } from '@/lib/commission/bill-exclusion'
 
 /**
  * A month's sales orders, as `revenue_month_orders` returns them.
@@ -41,7 +42,9 @@ export interface MonthOrder {
   /**
    * Why it is excluded when the ERP is not the reason. `ignored_agent` is a
    * bill the ERP is perfectly happy with, sold by somebody we have said is not
-   * ours to pay. Null for an ERP-side exclusion — erpStatus says that itself.
+   * ours to pay; `manual` is one bill somebody took out of the month by hand
+   * (2026-09-27, `sales_order_exclusions`). Null for an ERP-side exclusion —
+   * erpStatus says that itself.
    */
   excludedReason: string | null
   erpStatus: string | null
@@ -224,17 +227,24 @@ export async function loadUncostedProducts(
   }))
 }
 
-/** Why an order earns nothing, in the ERP's own words. Null when it earns. */
-export function exclusionReason(o: MonthOrder): string | null {
-  if (!o.cancelled) return null
-  // Asked before the ERP's own status, because this is the one exclusion the
-  // ERP knows nothing about: the document is live over there, the salesperson
-  // on it is simply not ours to pay.
-  if (o.excludedReason === 'ignored_agent') return 'Not our salesperson'
-  if (o.erpOnHold) return 'On hold in the ERP'
-  if (o.erpStatus === 'DELETED') return 'Deleted in the ERP'
-  if (o.erpStatus) return `${o.erpStatus.replace(/_/g, ' ').toLowerCase()} in the ERP`
-  return 'Excluded'
+// ─── Bills taken out by hand (2026-09-27) ───────────────────────────────────
+
+/**
+ * Who took a bill out of its month, when and why (`sales_order_exclusions`).
+ * Only excluded bills can have one, so callers pass just those ids.
+ */
+export async function loadOrderExclusions(
+  supabase: SupabaseClient,
+  orderIds: readonly string[],
+): Promise<Map<string, HandExclusion>> {
+  type Row = { order_id: string; note: string | null; excluded_by_name: string | null; excluded_at: string }
+  const rows = await fetchByKeys<Row, string>(orderIds, chunk =>
+    supabase
+      .from('sales_order_exclusions')
+      .select('order_id, note, excluded_by_name, excluded_at')
+      .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  )
+  return new Map(rows.map(r => [r.order_id, { note: r.note, byName: r.excluded_by_name, at: r.excluded_at }]))
 }
 
 // ─── Shared bills (2026-09-24) ──────────────────────────────────────────────

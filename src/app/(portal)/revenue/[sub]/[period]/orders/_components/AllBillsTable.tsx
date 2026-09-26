@@ -1,10 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useMemo, useState, useTransition, type MouseEvent } from 'react'
 import { formatMoney } from '@/lib/utils'
+import type { BillCountAction } from '@/lib/commission/bill-exclusion'
+import { includeOrder } from '../../../../run-actions'
+import type { MenuAnchor } from '../../../hierarchy/_components/ContextMenuPanel'
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
+import BillContextMenu, { type BillMenuOutcome } from './BillContextMenu'
 import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
 
@@ -40,6 +45,10 @@ export interface BillRow {
   /** The bill's standing, in words: Included / Deposit pending / why it is excluded. */
   status: string
   cancelled: boolean
+  /** "Taken out by Principal on 27 Sep 2026 — duplicate", while somebody has it out by hand. */
+  exclusionDetail: string | null
+  /** What the row's right-click menu may do about whether the bill counts. */
+  countAction: BillCountAction
   staff: { id: string; name: string; code: string | null; href: string } | null
   /** Set when no salesperson is matched: the ERP's agent string. */
   agent: { name: string; ignored: boolean } | null
@@ -83,7 +92,20 @@ interface Props {
   /** Null when the live calculation could not be produced; the columns then say why. */
   commissionNote: string | null
   initialShowExcluded: boolean
+  /** "September 2026". */
+  monthLabel: string
+  /** The month has a saved run, which taking a bill out leaves behind until it is computed again. */
+  hasRun: boolean
 }
+
+interface OpenMenu {
+  row: BillRow
+  anchor: MenuAnchor
+  link: { href: string; label: string } | null
+  byRightClick: boolean
+}
+
+const ORDINAL = ['', '1st', '2nd', '3rd'] as const
 
 /**
  * Every bill of the month in the salesperson ledger's format (2026-09-25) —
@@ -91,13 +113,24 @@ interface Props {
  * person's Personal table on the month page, plus the one thing a person's
  * table never needs: WHOSE bill it is. The Open Bill pick and *Share…* stay
  * on the row, because the evidence for both is the rest of the row.
+ *
+ * RIGHT-CLICK A BILL (2026-09-27) for its menu — open it, or *Don't count
+ * this bill*, which takes it out of the month the way an ERP cancellation does
+ * (`BillContextMenu`). The ⋯ beside the order number opens the same menu,
+ * because a right-click alone is invisible on a phone and to a keyboard.
  */
-export default function AllBillsTable({ rows, team, openBillPaid, commissionNote, initialShowExcluded }: Props) {
+export default function AllBillsTable({ rows, team, openBillPaid, commissionNote, initialShowExcluded, monthLabel, hasRun }: Props) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('')
   const [sort, setSort] = useState('date_asc')
   const [showExcluded, setShowExcluded] = useState(initialShowExcluded)
   const [hidden, setHidden] = useState<Column[]>(['location'])
+  const [menu, setMenu] = useState<OpenMenu | null>(null)
+  const [done, setDone] = useState<BillMenuOutcome | null>(null)
+  const [undoError, setUndoError] = useState<string | null>(null)
+  const [undoing, startUndo] = useTransition()
+  const closeMenu = useCallback(() => setMenu(null), [])
 
   const excludedCount = rows.filter(r => r.cancelled).length
   const brands = useMemo(() => [...new Set(rows.flatMap(r => r.brands))].sort(), [rows])
@@ -129,6 +162,65 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   const subtotalSales = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.orderTotal, 0))
   const subtotalCommissionable = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.commissionable, 0))
   const subtotalCommission = round2(visible.reduce((a, r) => a + (r.commission?.total ?? 0), 0))
+
+  function openRowMenu(event: MouseEvent<HTMLTableRowElement>, row: BillRow) {
+    // A control with a right-click of its own (Share…), or the browser's menu on purpose.
+    if (event.isDefaultPrevented() || event.shiftKey) return
+    const target = event.target as HTMLElement
+    if (target.closest('input, select, textarea')) return
+    // Selected text: Copy is what the right-click is for.
+    if (window.getSelection()?.toString().trim()) return
+    event.preventDefault()
+    // Right-clicking a link keeps the browser's one useful answer for it.
+    const linkEl = target.closest('a')
+    const href = linkEl?.getAttribute('href')
+    const link = linkEl && href && href !== row.href ? { href, label: linkEl.textContent?.trim() || href } : null
+    // The keyboard's menu key fires at 0, 0: hang the menu from the row instead.
+    const rect = event.currentTarget.getBoundingClientRect()
+    const anchor = event.clientX === 0 && event.clientY === 0
+      ? { left: rect.left + 16, top: rect.top, bottom: rect.bottom }
+      : { left: event.clientX, top: event.clientY, bottom: event.clientY }
+    setMenu({ row, anchor, link, byRightClick: true })
+  }
+
+  function openButtonMenu(button: HTMLButtonElement, row: BillRow) {
+    if (menu?.row.orderId === row.orderId) return setMenu(null)
+    const rect = button.getBoundingClientRect()
+    setMenu({ row, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom }, link: null, byRightClick: false })
+  }
+
+  function menuDone(outcome: BillMenuOutcome) {
+    setMenu(null)
+    setUndoError(null)
+    setDone(outcome.result.changed ? outcome : null)
+  }
+
+  function undo(outcome: BillMenuOutcome) {
+    setUndoError(null)
+    startUndo(async () => {
+      try {
+        const result = await includeOrder(outcome.orderId)
+        router.refresh()
+        setDone({ orderId: outcome.orderId, orderNo: outcome.orderNo, excluded: false, result })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'That did not save'
+        if (!message.includes('NEXT_REDIRECT')) setUndoError(message)
+      }
+    })
+  }
+
+  function doneMessage(outcome: BillMenuOutcome): string {
+    const rank = outcome.result.openBillRank
+    if (outcome.excluded) {
+      return `${outcome.orderNo} no longer counts in ${monthLabel}${rank ? ` and gave up its ${ORDINAL[rank]} Open Bill` : ''}.`
+        + (hasRun ? ' Compute the month again to take it out of the saved run.' : '')
+    }
+    if (outcome.result.counts === false) {
+      return `${outcome.orderNo} is no longer out by hand, but it still does not count: ${outcome.result.stillOut ?? 'it is excluded'}.`
+    }
+    return `${outcome.orderNo} counts again${rank ? `, back as the ${ORDINAL[rank]} Open Bill` : ''}.`
+      + (hasRun ? ' Compute the month again to put it back in the saved run.' : '')
+  }
 
   function salesperson(r: BillRow) {
     if (!r.staff) {
@@ -214,6 +306,13 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
       </details>
     </div>
     {commissionNote && <p className={s.notice} role="status">{commissionNote}</p>}
+    {done && <p className={s.notice} role="status">
+      {doneMessage(done)}
+      {done.excluded && <>{' '}<button type="button" className={s.ghostButton} disabled={undoing} onClick={() => undo(done)}>
+        {undoing ? 'Undoing…' : 'Undo'}
+      </button></>}
+      {undoError && <span className="text-danger"> {undoError}</span>}
+    </p>}
 
     <div className={s.tableFrame}>
       <div className={s.tableScroll} role="region" aria-label="All bills, scroll horizontally" tabIndex={0}>
@@ -224,10 +323,21 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
               title={key === 'sales' ? SALES_VALUE_HINT : key === 'commissionable' ? COMMISSIONABLE_HINT : undefined}>{label}</th>)}
             <th className={s.stickyTotal}>Total commission</th>
           </tr></thead>
-          <tbody>{visible.map(r => <tr key={r.orderId} className={r.cancelled ? s.excluded : undefined}>
+          <tbody>{visible.map(r => <tr key={r.orderId} className={r.cancelled ? s.excluded : undefined}
+            onContextMenu={event => openRowMenu(event, r)}>
             <td className={s.stickyFirst}>
-              <Link href={r.href}>{r.orderNo}</Link>
-              <small className={r.status === 'Deposit pending' ? 'text-alert' : undefined}>{r.status}</small>
+              <div className={s.billCell}>
+                <div>
+                  <Link href={r.href}>{r.orderNo}</Link>
+                  <small className={r.status === 'Deposit pending' ? 'text-alert' : undefined}
+                    title={r.exclusionDetail ?? undefined}>{r.status}</small>
+                </div>
+                <button type="button" className={s.rowMenuButton} aria-haspopup="menu" data-bill-menu-trigger
+                  aria-expanded={menu?.row.orderId === r.orderId} aria-label={`Actions for ${r.orderNo}`}
+                  title="Actions — or right-click the bill" onClick={event => openButtonMenu(event.currentTarget, r)}>
+                  ⋯
+                </button>
+              </div>
             </td>
             {columns.map(([key]) => <td key={key} className={NUMERIC.includes(key) ? s.numeric : undefined}>{cell(r, key)}</td>)}
             <td className={s.stickyTotal}>
@@ -244,9 +354,20 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
         {!visible.length && <div className={s.empty}>No bills match this view.</div>}
       </div>
       <div className={s.tableFooter}>
-        <span>{visible.length} of {rows.length} bills · Scroll left / right to inspect the full sales line</span>
+        <span>{visible.length} of {rows.length} bills · Scroll left / right to inspect the full sales line · Right-click a bill for its menu</span>
         <span>Total commission stays visible →</span>
       </div>
     </div>
+    {menu && <BillContextMenu
+      bill={{
+        orderId: menu.row.orderId,
+        orderNo: menu.row.orderNo,
+        href: menu.row.href,
+        who: menu.row.staff?.name ?? menu.row.agent?.name ?? null,
+        action: menu.row.countAction,
+        exclusionDetail: menu.row.exclusionDetail,
+      }}
+      anchor={menu.anchor} link={menu.link} byRightClick={menu.byRightClick} monthLabel={monthLabel}
+      onClose={closeMenu} onDone={menuDone} />}
   </div>
 }
