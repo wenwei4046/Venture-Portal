@@ -141,7 +141,7 @@ export async function loadCommissionInput(
   const orderSelect = 'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct'
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, marginBands, hierarchy, upsales, currentHierarchyRows,
-    currentKpiItems, currentKpiThresholds, currentOpenBillRules, cutover] = await Promise.all([
+    currentKpiItems, currentKpiThresholds, currentOpenBillRules, cutover, openBillThisMonth] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -210,6 +210,14 @@ export async function loadCommissionInput(
         if (error) throw new Error(`Could not read when the portal starts paying: ${error.message}`)
         return (data as { first_paid_month: string } | null)?.first_paid_month ?? null
       }),
+    // Open Bill may be set for this month alone, over Rules (2026-09-26:
+    // on for August, which the claim form paid; September follows Rules).
+    supabase.from('comm_open_bill_months').select('enabled')
+      .eq('sub_department_id', scheme.sub_department_id).eq('period_month', period).maybeSingle()
+      .then(({ data, error }: { data: unknown; error: { message: string } | null }) => {
+        if (error) throw new Error(`Could not read this month's Open Bill setting: ${error.message}`)
+        return (data as { enabled: boolean } | null)?.enabled ?? null
+      }),
   ])
 
   const releasedOrderNos = releases.filter(row => row.run_id !== options.replayRunId).map(row => row.order_no)
@@ -265,8 +273,9 @@ export async function loadCommissionInput(
     comm_statements: statementsByRun.get(run.id) ?? [],
   }))
 
+  const schemeForMonth = openBillThisMonth === null ? scheme : { ...scheme, enable_open_bill: openBillThisMonth }
   const sourceRows = {
-    periodMonth: period, scheme, ranks, itemGroups, kpiItems, kpiThresholds,
+    periodMonth: period, scheme: schemeForMonth, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, openBillTags, marginBands, hierarchy, orders: orderRows,
     releasedOrderNos, priorMonths, shares, upsales,
   }

@@ -18,6 +18,7 @@ import {
   type MonthOrder,
 } from '../../../_lib/month-orders'
 import { loadCommissionWorkbench } from '../../../_lib/commission-workbench'
+import { openBillOnFor } from '../../../_lib/open-bill-month'
 import workbenchStyles from '../_components/commission-workbench.module.css'
 import CostGapPanel from './_components/CostGapPanel'
 import AllBillsTable, { type BillRow } from './_components/AllBillsTable'
@@ -71,17 +72,15 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
 
   // The Open Bill pick belongs on the row, but only where the scheme pays one
   // and only while the run it would change is still open.
-  const [{ data: scheme }, { data: locked, error: lockError }] = await Promise.all([
-    subDept.schemeId
-      ? supabase.from('comm_schemes').select('enable_open_bill').eq('id', subDept.schemeId).single()
-      : Promise.resolve({ data: null }),
+  // Whether THIS month pays Open Bill: its own setting, else Rules (2026-09-26).
+  const [openBillPaid, { data: locked, error: lockError }] = await Promise.all([
+    subDept.schemeId ? openBillOnFor(supabase, subDept.id, period) : Promise.resolve(false),
     supabase.rpc('commission_order_period_locked', {
       p_sub_department_id: subDept.id,
       p_period: period,
     }),
   ])
   if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
-  const openBillPaid = Boolean((scheme as { enable_open_bill: boolean } | null)?.enable_open_bill)
   const runLocked = Boolean(locked)
 
   // Who else holds a part of each bill, and who a bill may be shared with.

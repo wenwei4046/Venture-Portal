@@ -7,6 +7,7 @@ import { requirePermission } from '@/lib/auth'
 import { computeCommissionRun as runEngine } from '@/lib/commission/engine'
 import { toRunPayload } from '@/lib/commission/run-payload'
 import { loadCommissionInput } from './_lib/commission-input'
+import { openBillOnFor } from './_lib/open-bill-month'
 import { fetchByKeys } from '@/lib/paginate'
 
 /**
@@ -138,12 +139,13 @@ async function readOpenBillOrders(supabase: SupabaseClient, ids: readonly string
     .in('id', chunk) as unknown as PromiseLike<{ data: OpenBillOrder[] | null; error: { message: string } | null }>)
 }
 
-async function assertOpenBillEnabled(supabase: SupabaseClient, subDepartmentId: string): Promise<void> {
-  const { data, error } = await supabase.from('comm_schemes').select('enable_open_bill')
-    .eq('sub_department_id', subDepartmentId).eq('is_active', true).is('effective_to', null).maybeSingle()
-  if (error) throw new Error(`Could not read the Open Bill switch: ${error.message}`)
-  if (!(data as { enable_open_bill: boolean } | null)?.enable_open_bill) {
-    throw new Error('Open Bill is switched off in Rules. Preview settings do not enable saving picks. No picks were changed by this check.')
+/**
+ * Picks are taken only in a month Open Bill pays in: the month's own setting,
+ * else Rules (2026-09-26, `comm_open_bill_on` — the rule the database asks).
+ */
+async function assertOpenBillEnabled(supabase: SupabaseClient, subDepartmentId: string, period: string): Promise<void> {
+  if (!(await openBillOnFor(supabase, subDepartmentId, period))) {
+    throw new Error(`Open Bill is switched off for ${period.slice(0, 7)}. Preview settings do not enable saving picks. No picks were changed by this check.`)
   }
 }
 
@@ -190,7 +192,7 @@ export async function saveOpenBillPicks(changes: OpenBillPickChange[]): Promise<
     }
   }
   await Promise.all([
-    ...[...new Set(orders.map(openBillSub))].map(sub => assertOpenBillEnabled(supabase, sub)),
+    ...[...periods.values()].map(({ sub, period }) => assertOpenBillEnabled(supabase, sub, period)),
     ...[...periods.values()].map(({ sub, period }) => assertRunOpen(supabase, period, sub)),
   ])
   const tagGroups = await Promise.all([...groups.values()].map(async group => {
@@ -253,7 +255,7 @@ async function writeOpenBillRank(orderId: string, rank: BillRank | null, allowMo
   const subDepartmentId = openBillSub(order)
   await Promise.all([
     assertRunOpen(supabase, order.period_month, subDepartmentId),
-    assertOpenBillEnabled(supabase, subDepartmentId),
+    assertOpenBillEnabled(supabase, subDepartmentId, order.period_month),
   ])
 
   if (expectedRank !== undefined) {

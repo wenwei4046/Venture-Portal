@@ -140,6 +140,22 @@ describe('authoritative commission input', () => {
     expect(carried.input.orders.map(row => row.id)).toEqual(['current', 'carry', 'older-paid'])
   })
 
+  it('pays Open Bill in a month set on for itself, whatever Rules say (open for August, not September)', async () => {
+    const data = fixture()
+    data.comm_schemes[0].enable_open_bill = false
+    data.comm_open_bill_months = [{ sub_department_id: 'sub-1', period_month: '2026-09-01', enabled: true }]
+    expect((await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)).input.scheme.enableOpenBill).toBe(true)
+
+    // Another month's setting is not this one's; without its own, Rules decide.
+    data.comm_open_bill_months = [{ sub_department_id: 'sub-1', period_month: '2026-08-01', enabled: true }]
+    expect((await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)).input.scheme.enableOpenBill).toBe(false)
+
+    // And a month can be switched off under Rules that are on.
+    data.comm_schemes[0].enable_open_bill = true
+    data.comm_open_bill_months = [{ sub_department_id: 'sub-1', period_month: '2026-09-01', enabled: false }]
+    expect((await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)).input.scheme.enableOpenBill).toBe(false)
+  })
+
   it('pays the upsales and drops somebody answered, never one still waiting', async () => {
     const data = fixture()
     const row = (id: string, amount: number, status: string, kind = amount < 0 ? 'drop' : 'upsale') => ({

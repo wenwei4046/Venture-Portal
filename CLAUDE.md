@@ -271,6 +271,25 @@ src/
 │   │   │                              cannot pay a negative commission). The
 │   │   │                              ledger shows *Upsell* / *Drop sales* beside
 │   │   │                              the bills. Mig `20260926020000`.
+│   │   │                              **OPEN BILL PER MONTH (2026-09-26):** the
+│   │   │                              claim form paid August's Open Bill (80
+│   │   │                              bills, RM 12,969.78 — the portal's own
+│   │   │                              50/40/30 % rule) while September keeps
+│   │   │                              Rules' switch off (user: "open for august,
+│   │   │                              not september"). `comm_open_bill_months`
+│   │   │                              sets ONE month over Rules;
+│   │   │                              `comm_open_bill_on(sub, month)` is the rule
+│   │   │                              the engine input, the pick guard, the
+│   │   │                              feed's suggestions and a file commit all
+│   │   │                              ask. The month page's *This run pays* Open
+│   │   │                              Bill switch sets the month (Follow Rules
+│   │   │                              hands it back); margin and KPI there are
+│   │   │                              still Rules. A month before the cutover
+│   │   │                              takes NO run (`comm_runs_before_cutover`,
+│   │   │                              23CUT): a clean compute syncs to payroll,
+│   │   │                              and it was paid by hand — its page shows
+│   │   │                              the rules applied to its bills, nothing
+│   │   │                              more. Mig `20260926030000`.
 │   │   │                              **UPSALES (2026-09-24):** a customer adds to
 │   │   │                              an earlier order and ONLY THE ADDED AMOUNT
 │   │   │                              earns. The ERP has no upsale concept (a new

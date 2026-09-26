@@ -106,7 +106,7 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
 
   const { data: scheme, error: schemeError } = await supabase
     .from('comm_schemes')
-    .select('id, enable_open_bill')
+    .select('id')
     .eq('sub_department_id', input.subDepartmentId)
     .eq('is_active', true)
     .is('effective_to', null)
@@ -321,7 +321,9 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
 
   const { data: suggested, error: commitError } = await supabase.rpc('commit_sales_import_batch', {
     p_batch_id: batchId,
-    p_suggest_open_bills: input.suggestOpenBills && scheme.enable_open_bill,
+    // The commit asks the MONTH whether Open Bill pays (comm_open_bill_on,
+    // 2026-09-26) — Rules alone would say no for a month set on for itself.
+    p_suggest_open_bills: input.suggestOpenBills,
   })
   if (commitError) throw new Error(`Import written but could not be committed: ${commitError.message}`)
 
