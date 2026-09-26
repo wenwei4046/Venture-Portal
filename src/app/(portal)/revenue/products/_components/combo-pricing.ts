@@ -52,3 +52,67 @@ export function buildComboPriceEdits(combos: readonly ComboRow[], drafts: ComboD
     return { baseModel: combo.baseModel, slotsKey: combo.slotsKey, tier: combo.tier, prices }
   })
 }
+
+/** One set of modules: the same (base model, slots) across its fabric tiers. */
+export interface ComboSet {
+  key: string
+  baseModel: string
+  modelName: string | null
+  label: string | null
+  slots: string[][]
+  isNew: boolean
+  /** One ERP row per tier; `null` = any tier. */
+  byTier: Map<string | null, ComboRow>
+}
+
+/** P2 and P3 of one set have the same modules, so the sheet shows them on one row. */
+export function comboSets(combos: readonly ComboRow[]): ComboSet[] {
+  const sets = new Map<string, ComboSet>()
+  for (const c of combos) {
+    const key = `${c.baseModel}\u0000${c.slotsKey}`
+    let set = sets.get(key)
+    if (!set) {
+      set = { key, baseModel: c.baseModel, modelName: c.modelName, label: c.label, slots: c.slots, isNew: false, byTier: new Map() }
+      sets.set(key, set)
+    }
+    set.byTier.set(c.tier, c)
+    set.isNew ||= c.isNew
+    set.label ??= c.label
+  }
+  return [...sets.values()]
+}
+
+export interface SlotGroup {
+  /** The module, or its shared base when the choice is only the side it faces. */
+  code: string
+  /** "either side" for LHF/RHF, else the other alternatives. */
+  alternatives: string | null
+  count: number
+}
+
+/** Collapse identical slots (×4) and read "X(LHF) or X(RHF)" as one module, either side. */
+export function slotGroups(slots: readonly string[][]): SlotGroup[] {
+  const groups: (SlotGroup & { id: string })[] = []
+  for (const slot of slots) {
+    const id = slot.join('\u0000')
+    const existing = groups.find(g => g.id === id)
+    if (existing) { existing.count++; continue }
+    const sides = slot.map(code => /^(.*)\((LHF|RHF)\)$/.exec(code))
+    const sameBase = slot.length > 1 && sides.every(Boolean) && new Set(sides.map(m => m![1])).size === 1
+    groups.push({
+      id,
+      code: sameBase ? sides[0]![1] : slot[0] ?? '',
+      alternatives: sameBase ? 'LHF / RHF' : slot.length > 1 ? `or ${slot.slice(1).join(' / ')}` : null,
+      count: 1,
+    })
+  }
+  return groups.map(({ code, alternatives, count }) => ({ code, alternatives, count }))
+}
+
+/** A spreadsheet clipboard: rows of tab-separated cells, money formatting stripped. */
+export function parsePastedGrid(text: string): string[][] | null {
+  const lines = text.replace(/\r/g, '').split('\n')
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop()
+  if (lines.length < 2 && !lines[0]?.includes('\t')) return null
+  return lines.map(line => line.split('\t').map(v => v.replace(/[^0-9.\-]/g, '')))
+}

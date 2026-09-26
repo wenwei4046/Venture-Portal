@@ -43,14 +43,13 @@ describe('Combo Pricing workspace', () => {
     render(<ComboPricingTab combos={fixtures} />)
     chooseModel('2376')
     fireEvent.click(screen.getByRole('button', { name: 'P2' }))
-    const card = screen.getByRole('article', { name: '2376 L set P2' })
-    expect([...card.querySelectorAll('.combo-cell-height')].map(h => h.textContent)).toEqual(['DEFAULT', '24', '30', '75CM'])
-    expect(within(card).getByText('RM 1,500.00')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /2376.*1 combo/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('columnheader').map(h => h.textContent)).toEqual([
+      'Set', 'What is in it', 'Fabric P2', '24', '30', '75CM', 'DEFAULT',
+    ])
+    expect(screen.getByRole('rowheader', { name: /L set/ }).closest('tr')).toHaveTextContent('RM 1,500.00')
     expect(screen.queryByText('Compact')).not.toBeInTheDocument()
     expect(screen.queryByText('L set P1')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('3 modules in one set')).toHaveTextContent('1A(LHF) or 1A(RHF) + 1S + 1S')
-    expect(screen.getByText('2026-09-24')).toBeInTheDocument()
+    expect(screen.getByLabelText('3 modules in one set')).toHaveTextContent('1ALHF / RHF+1S×2')
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '1A(RHF)' } })
     expect(screen.getByText('L set')).toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'no match' } })
@@ -59,12 +58,12 @@ describe('Combo Pricing workspace', () => {
     chooseModel('')
     fireEvent.click(screen.getByRole('button', { name: 'All' }))
     fireEvent.click(screen.getByRole('button', { name: 'Edit Prices' }))
-    const compactRow = screen.getByRole('article', { name: '9999 Compact any tier' })
+    const compactRow = screen.getByRole('rowheader', { name: /Compact/ }).closest('tr')!
     expect(within(compactRow).getAllByRole('textbox')).toHaveLength(1)
     expect(within(compactRow).getByRole('textbox')).toHaveAccessibleName('9999 Compact any tier at 27"')
     fireEvent.click(screen.getByRole('button', { name: 'Any' }))
     expect(screen.queryByText('L set')).not.toBeInTheDocument()
-    expect(screen.getByText('Any tier')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Any fabric' })).toBeInTheDocument()
   })
 
   it('saves changes across models and tiers together while preserving untouched cells and raw saved labels', async () => {
@@ -131,5 +130,22 @@ describe('Combo Pricing workspace', () => {
     expect(saveComboPrices).toHaveBeenCalledOnce()
     await act(async () => { resolveSave({ saved: 1 }) })
     expect(screen.getByRole('button', { name: 'Edit Prices' })).toBeEnabled()
+  })
+
+  it('shows the tiers of one set on one row and pastes an Excel block across them', () => {
+    const p3 = combo({ erpId: 'combo-d', tier: 'PRICE_3', heights: ['24', '30'], prices: {} })
+    render(<ComboPricingTab combos={[fixtures[0], p3, fixtures[2]]} />)
+    const row = screen.getByRole('rowheader', { name: /^L set/ }).closest('tr')!
+    expect(screen.getAllByRole('row')).toHaveLength(4) // two header rows, model row, one set row
+    expect(within(row).getByText('RM 1,800.00')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Prices' }))
+    const first = screen.getByRole('textbox', { name: '2376 L set PRICE_2 at 30' })
+    fireEvent.paste(first, { clipboardData: { getData: () => '1,850.00\t75\t2100\t2200\r\n' } })
+    expect(first).toHaveValue('1850.00')
+    expect(screen.getByRole('textbox', { name: '2376 L set PRICE_2 at 75CM' })).toHaveValue('75')
+    expect(screen.getByRole('textbox', { name: '2376 L set PRICE_2 at DEFAULT' })).toHaveValue('2100')
+    // The row runs on into the next fabric band: P3 24 comes after P2 DEFAULT.
+    expect(screen.getByRole('textbox', { name: '2376 L set PRICE_3 at 24' })).toHaveValue('2200')
+    expect(screen.getByRole('button', { name: 'Save 2 combos' })).toBeEnabled()
   })
 })
