@@ -3710,7 +3710,29 @@ dialog.modular-win:focus-visible { outline: none; }
 .product-section-heading h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
 .product-gap-next { min-width: 240px; max-width: 330px; }
 .product-gap-next a { text-decoration: underline; text-underline-offset: 3px; }
+/* Page scroll (user 2026-09-27). Modular and Maintenance only ever grow
+   downward, so they grow with the page and the portal's own scrollbar moves
+   them, as the ERP's Products page does; the wide sheets (SKU Master, Combo
+   Pricing) keep the fixed window above. `productTabScroll` picks the mode.
+   Nothing between a table and <main> may be a scroll box — the panel CLIPS its
+   corners rather than hides them — so a header sticks to the top of the page.
+   A table wider than its card scrolls sideways inside it (PageScrolledTable).
+   The bottom padding lifts the footer's "Show more" clear of BackToTop. */
+.product-content:has(.product-page[data-scroll="page"]) {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 100%;
+}
+.product-page.product-page-workspace[data-scroll="page"] { flex: 1 0 auto; height: auto; padding-bottom: 80px; }
+.product-page[data-scroll="page"] .sku-table-panel { flex: none; height: auto; min-height: 0; overflow: clip; }
+.product-page[data-scroll="page"] .sku-table-window { flex: none; overflow: visible; scrollbar-gutter: auto; }
+.product-page[data-scroll="page"] .sku-table-window[data-sideways] { overflow-x: auto; }
 @media (max-width: 767px) {
+  .product-page.product-page-workspace[data-scroll="page"] { padding-bottom: 18px; }
+  /* Every table is wider than a phone's card: scroll sideways from the first
+     paint, not only once PageScrolledTable has measured after hydration. */
+  .product-page[data-scroll="page"] .sku-table-window { overflow-x: auto; }
   .product-content { height: auto; padding: 10px 10px calc(76px + env(safe-area-inset-bottom)); }
   .product-page { padding: 18px 14px; }
   .product-page.product-page-workspace { height: auto; min-height: 0; }
@@ -3748,6 +3770,7 @@ dialog.modular-win:focus-visible { outline: none; }
   .product-content, .product-page.product-page-workspace { height: auto; }
   .sku-table-panel { height: auto; overflow: visible; }
   .sku-table-window { overflow: visible; }
+  .product-page[data-scroll="page"] :is(.sku-table-panel, .sku-table-window[data-sideways]) { overflow: visible; }
   .product-page table.sku-table :is(th, .sku-code-column) { position: static; }
 }
 

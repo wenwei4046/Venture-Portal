@@ -28,6 +28,9 @@ function click(name: string | RegExp) { fireEvent.click(screen.getByRole('button
 function changePrice(name: string, value: string) { fireEvent.change(screen.getByRole('textbox', { name }), { target: { value } }) }
 function select(name: string, value: string) { fireEvent.change(screen.getByRole('combobox', { name }), { target: { value } }) }
 function sofaLegs() { click('Sofa'); click('Leg Heights') }
+/** A save's alert or status can render before its transition settles, and the
+ *  pool buttons stay disabled until it does: a click in between is dropped. */
+async function saveSettled() { await waitFor(() => expect(screen.getByRole('button', { name: 'Fabrics' })).toBeEnabled()) }
 
 beforeEach(() => {
   saveOptionPrices.mockReset().mockImplementation(async (_pool, edits) => ({ saved: edits.length }))
@@ -68,16 +71,14 @@ describe('Maintenance workspace', () => {
     changePrice('24 inch sofa leg surcharge', '-40')
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch surcharge' })).toHaveValue('0')
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'standard' } })
-    expect(screen.queryByRole('textbox', { name: '24 inch surcharge' })).not.toBeInTheDocument()
     click('Save 3 surcharges')
     await waitFor(() => expect(saveOptionPrices).toHaveBeenCalledTimes(2))
     expect(saveOptionPrices).toHaveBeenNthCalledWith(1, 'bedframe_divan_heights', [{ value: '24"', price: '0' }, { value: 'DEFAULT', price: '' }])
     expect(saveOptionPrices).toHaveBeenNthCalledWith(2, 'sofa_leg_heights', [{ value: '24"', price: '-40' }])
     expect(await screen.findByRole('status')).toHaveTextContent('3 surcharges saved.')
     expect(refresh).toHaveBeenCalledOnce()
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
     expect(screen.getByText('RM 0.00')).toBeInTheDocument()
+    await saveSettled()
     sofaLegs()
     expect(screen.getByText('(RM 40.00)')).toBeInTheDocument()
   })
@@ -107,6 +108,7 @@ describe('Maintenance workspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost')
     expect(screen.getByRole('status')).toHaveTextContent('1 surcharge saved. Remaining changes are kept for retry.')
     expect(screen.getByRole('textbox', { name: '24 inch sofa leg surcharge' })).toHaveValue('55')
+    await saveSettled()
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch surcharge' })).toHaveValue('120')
     click('Save 1 surcharge')
@@ -125,7 +127,6 @@ describe('Maintenance workspace', () => {
     expect(screen.getByRole('button', { name: 'Fabrics' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Cancel changes' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: '24 inch surcharge' })).toBeDisabled()
-    expect(screen.getByRole('searchbox')).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Catalogue' })).toBeDisabled()
     await act(async () => resolveSave({ saved: 1 }))
     click('Edit surcharges')
@@ -147,11 +148,20 @@ describe('Maintenance workspace', () => {
     select('Catalogue', 'all')
     expect(screen.getByText('3 of 3 options shown')).toBeInTheDocument()
     expect(screen.getByText('Removed')).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'old' } })
-    expect(screen.getByText('1 of 1 options shown')).toBeInTheDocument()
     expect(screen.getByText('OLD')).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '24"' } })
-    expect(screen.getByText('24 inch')).toBeInTheDocument()
+  })
+
+  it('has no search box on an option pool, while Fabrics keeps its own', () => {
+    render(<MaintenanceTab options={options} fabrics={[fabric()]} />)
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    click('Sofa')
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    click('Fabrics')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search fabrics' }), { target: { value: 'linen' } })
+    expect(screen.getByText('FAB-A')).toBeInTheDocument()
+    click('Bedframe')
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(3)
   })
 
   it('uses newly refreshed authoritative prices instead of keeping a stale confirmed-save overlay', async () => {

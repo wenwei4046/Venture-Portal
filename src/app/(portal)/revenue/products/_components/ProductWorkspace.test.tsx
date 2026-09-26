@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import ProductWorkspace, { useProductDraftGuard, useProductDraftState } from './ProductWorkspace'
+import ProductWorkspace, { productTabScroll, useProductDraftGuard, useProductDraftState } from './ProductWorkspace'
 import ProductListTabs, { type ProductTab } from './ProductListTabs'
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
@@ -20,6 +20,25 @@ function Workspace({ dirty = false, saving = false, active = 'sku', editor = tru
 
 beforeEach(() => { push.mockReset(); vi.stubGlobal('confirm', vi.fn()); window.history.replaceState({}, '', '/revenue/products') })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+describe('Product List scrolling', () => {
+  it('lets the page scroll the lists and keeps the wide sheets in a fixed window', () => {
+    expect(productTabScroll('modular')).toBe('page')
+    expect(productTabScroll('maintenance')).toBe('page')
+    expect(productTabScroll('sku')).toBe('window')
+    expect(productTabScroll('combos')).toBe('window')
+    expect(productTabScroll('gaps')).toBe('window')
+  })
+
+  it("marks the workspace with its tab's mode, the fixed window when no tab is named", () => {
+    const view = render(<ProductWorkspace tab="maintenance"><p>Rows</p></ProductWorkspace>)
+    expect(view.container.firstElementChild).toHaveAttribute('data-scroll', 'page')
+    view.rerender(<ProductWorkspace tab="combos"><p>Rows</p></ProductWorkspace>)
+    expect(view.container.firstElementChild).toHaveAttribute('data-scroll', 'window')
+    view.rerender(<ProductWorkspace><p>Rows</p></ProductWorkspace>)
+    expect(view.container.firstElementChild).toHaveAttribute('data-scroll', 'window')
+  })
+})
 
 describe('Product List draft navigation', () => {
   it('navigates clean tabs with the correct URL without resetting page scroll', () => {

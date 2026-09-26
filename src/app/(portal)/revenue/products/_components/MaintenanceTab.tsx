@@ -7,6 +7,7 @@ import { validateOptionPrices } from '@/lib/catalogue/edits'
 import { MAINTENANCE_SECTIONS } from '@/lib/catalogue/options'
 import { saveOptionPrices } from '../../catalogue-actions'
 import type { FabricRow, MaintenanceOption } from '../load'
+import PageScrolledTable from './PageScrolledTable'
 import { useProductDraftGuard } from './ProductWorkspace'
 
 const FABRICS = 'fabrics'
@@ -52,12 +53,11 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
   const rows = byPool.get(pool) ?? []
   const liveFabrics = useMemo(() => fabrics.filter(f => showRemoved || !f.removed), [fabrics, showRemoved])
   const search = query.trim().toLowerCase()
-  const shownOptions = rows.filter(o => [o.value, o.label].some(v => v.toLowerCase().includes(search)))
   const shownFabrics = useMemo(() => liveFabrics.filter(f =>
     [f.code, f.description, f.series, f.category].some(v => (v ?? '').toLowerCase().includes(search)) &&
     matchesTier(f.sofaTier, f.priceTier, sofaTier) && matchesTier(f.bedframeTier, f.priceTier, bedframeTier),
   ), [liveFabrics, search, sofaTier, bedframeTier])
-  const count = fabricView ? shownFabrics.length : shownOptions.length
+  const count = fabricView ? shownFabrics.length : rows.length
   const total = fabricView ? liveFabrics.length : rows.length
   const visibleCount = Math.min(limit, count)
 
@@ -160,20 +160,23 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
             ))}
           </div>
         ) : null}
-        <div className="sku-filter-controls">
-          <label className="sku-search">
-            <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-              <circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" />
-            </svg>
-            <input type="search" value={query} disabled={saving} onChange={e => { setQuery(e.target.value); setLimit(PAGE_SIZE) }}
-              placeholder={fabricView ? 'Search fabric code, series or description…' : 'Search option value or description…'}
-              aria-label={fabricView ? 'Search fabrics' : 'Search maintenance options'} />
-          </label>
-          {fabricView ? <>
+        {/* No search on an option pool: the largest holds about twenty values,
+            and the ERP's own Maintenance lists have none (user 2026-09-27).
+            The fabrics run to the hundreds and keep theirs, as the ERP's
+            Fabrics panel does. */}
+        {fabricView ? (
+          <div className="sku-filter-controls">
+            <label className="sku-search">
+              <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+                <circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" />
+              </svg>
+              <input type="search" value={query} disabled={saving} onChange={e => { setQuery(e.target.value); setLimit(PAGE_SIZE) }}
+                placeholder="Search fabric code, series or description…" aria-label="Search fabrics" />
+            </label>
             <TierFilter label="Sofa tier" value={sofaTier} disabled={saving} onChange={value => { setSofaTier(value); setLimit(PAGE_SIZE) }} />
             <TierFilter label="Bedframe tier" value={bedframeTier} disabled={saving} onChange={value => { setBedframeTier(value); setLimit(PAGE_SIZE) }} />
-          </> : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="sku-actions">
@@ -204,7 +207,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
       {notice ? <p className="sku-notice" data-tone="ok" role="status">{notice}</p> : null}
 
       <div className="sku-table-panel">
-        <div className="sku-table-window table-scroll" role="region" tabIndex={0} aria-label={fabricView ? 'Fabric mappings table' : 'Maintenance options table'}>
+        <PageScrolledTable label={fabricView ? 'Fabric mappings table' : 'Maintenance options table'}>
           {fabricView ? (
             <table className="ledger-table sku-table">
               <thead><tr>
@@ -227,7 +230,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
                 {meta?.priced ? <th scope="col" className="num">Surcharge (RM)</th> : null}<th scope="col">Status</th>
               </tr></thead>
               <tbody>
-                {shownOptions.slice(0, limit).map(o => {
+                {rows.slice(0, limit).map(o => {
                   const price = optionPrice(o)
                   return <tr key={o.value}>
                     <td className="sku-code-column">{o.value}</td><td className="sku-description">{o.label}</td>
@@ -245,7 +248,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
               </tbody>
             </table>
           )}
-        </div>
+        </PageScrolledTable>
         <div className="sku-table-footer">
           <span>{visibleCount.toLocaleString()} of {count.toLocaleString()} {fabricView ? 'fabrics' : 'options'} shown</span>
           {visibleCount < count ? <button type="button" className="sku-load-more" disabled={saving} onClick={() => setLimit(value => value + PAGE_SIZE)}>

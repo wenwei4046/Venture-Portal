@@ -10,7 +10,8 @@ type Show = 'all' | 'offered' | 'not-offered' | 'new'
 
 /**
  * ERP models, one card each, grouped by category the way the ERP's own
- * Modular page is. A card opens the model in a floating window.
+ * Modular page is. The board grows with its cards and the page scrolls it
+ * (`productTabScroll`). A card opens the model in a floating window.
  * Prices stay on SKU Master, Maintenance and Combo Pricing.
  */
 export default function ModularTab({ models, brands, options }: {
@@ -91,7 +92,7 @@ export default function ModularTab({ models, brands, options }: {
       </div>
       {notice ? <p className="sku-notice" role="status">{notice}</p> : null}
       <div className="sku-table-panel">
-        <div className="sku-table-window modular-board" role="region" aria-label="Models" tabIndex={0}>
+        <div className="sku-table-window modular-board" role="region" aria-label="Models">
           {visible.length === 0 ? <p className="modular-board-empty">No models match these filters.</p> : groups.map(([cat, list]) => (
             <section key={cat || 'none'} className="modular-group" aria-label={`${categoryLabel(cat || null)} models`}>
               <h3 className="modular-group-head">

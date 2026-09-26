@@ -11,6 +11,11 @@ import { categoryLabel, orderedCategories } from './ui'
 import { useProductDraftGuard } from './ProductWorkspace'
 
 const LIMIT_STEP = 300
+// The categories whose models gather several SKUs — a model filter there, as
+// on the ERP's own SKU Master (user 2026-09-27: not sofas alone). Every
+// accessory, bedline, service… is a model of its own, so a filter would only
+// repeat the search; it stays off there, as it does under All.
+const MODEL_FILTER_CATEGORIES = new Set(['SOFA', 'MATTRESS', 'BEDFRAME'])
 type CellDraft = { height: string; tier: string; price: string }
 type Draft = { price?: string; cells?: Record<string, CellDraft> }
 
@@ -48,23 +53,24 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { s
   const live = useMemo(() => skus.filter(s => showGone || !s.removed), [skus, showGone])
   const categories = useMemo(() => orderedCategories(live.map(s => s.category)), [live])
   const models = useMemo(() => {
+    if (category === null || !MODEL_FILTER_CATEGORIES.has(category)) return []
     const options = new Map<string, string>()
     for (const s of live) {
       const key = modelKey(s)
-      if ((s.category ?? '').toUpperCase() === 'SOFA' && key) options.set(key, s.modelCode ?? s.modelName ?? key)
+      if ((s.category ?? '').toUpperCase() === category && key) options.set(key, s.modelCode ?? s.modelName ?? key)
     }
-    return [...options].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }))
-  }, [live])
+    return options.size < 2 ? [] : [...options].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }))
+  }, [live, category])
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
     return live.filter(s => {
       if (category !== null && (s.category ?? '').toUpperCase() !== category) return false
-      if (sofaView && model && modelKey(s) !== model) return false
+      if (model && modelKey(s) !== model) return false
       return !q || [s.code, s.description, s.modelCode, s.modelName, s.brand, s.optionLabel]
         .some(v => (v ?? '').toLowerCase().includes(q))
     })
-  }, [live, category, query, sofaView, model])
+  }, [live, category, query, model])
 
   // Keep visible sizes in ERP order, followed by historical priced sizes.
   // DEFAULT stays in saved grids but is not an editable size column here.
@@ -155,24 +161,24 @@ export default function SkuMasterTab({ skus, sofaSizes, initialQuery = '' }: { s
               placeholder="Search product code or description…" aria-label="Search the SKU master"
             />
           </label>
+          {models.length > 0 ? (
+            <label className="sku-model-filter">
+              <span>Model</span>
+              <select value={model} disabled={saving} onChange={e => { setModel(e.target.value); setLimit(LIMIT_STEP) }}>
+                <option value="">All models</option>
+                {models.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select>
+            </label>
+          ) : null}
           {sofaView ? (
-            <>
-              <label className="sku-model-filter">
-                <span>Model</span>
-                <select value={model} disabled={saving} onChange={e => { setModel(e.target.value); setLimit(LIMIT_STEP) }}>
-                  <option value="">All models</option>
-                  {models.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                </select>
-              </label>
-              <div className="sku-tier-filter" role="group" aria-label="Fabric tier">
-                <span>Tier</span>
-                <div className="sku-tier-options">
-                  {TIERS.map((t, i) => (
-                    <button key={t} type="button" aria-pressed={tier === t} disabled={saving} onClick={() => setTier(t)}>P{i + 1}</button>
-                  ))}
-                </div>
+            <div className="sku-tier-filter" role="group" aria-label="Fabric tier">
+              <span>Tier</span>
+              <div className="sku-tier-options">
+                {TIERS.map((t, i) => (
+                  <button key={t} type="button" aria-pressed={tier === t} disabled={saving} onClick={() => setTier(t)}>P{i + 1}</button>
+                ))}
               </div>
-            </>
+            </div>
           ) : null}
         </div>
       </div>

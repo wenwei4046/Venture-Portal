@@ -113,25 +113,37 @@ is not rewritten.
   filter panel (`#F6F6F4`), with a divider between the two rows. Keep the main
   Product List tabs outside this panel.
 - Use a stronger table header (`#EBE7E0`), subtle white / `#F7F7F5` alternating
-  rows, and a footer. Each desktop table fills the remaining window and
-  scrolls internally in both directions, with a sticky header and product code.
-  Mobile uses a fixed-height scroll window for the editable matrix.
+  rows, and a footer. The wide sheets — SKU Master and Combo Pricing — fill the
+  remaining window and scroll internally in both directions, with a sticky
+  header and product code; on mobile a fixed-height window.
+- **Lists scroll with the page (2026-09-27).** Modular and Maintenance only grow
+  downward, so they grow with their rows and the page's own scrollbar moves them,
+  as the ERP's Products page does — no box inside the page. A table there keeps
+  its header stuck to the top of the page and scrolls sideways inside its card
+  only while it is wider than the card. `productTabScroll` names each tab's mode;
+  a new tab that only grows downward belongs on the page.
 - SKU Master is for finding SKUs and maintaining prices: omit pricing summary
   cards, calculator labels/filters, category ratios and the long introduction.
-  Sofa prices remain the ERP-ordered size columns and P1/P2/P3 tiers, with a
-  model filter. Preserve raw size labels, but omit the `DEFAULT` size and flat
+  Sofa prices remain the ERP-ordered size columns and P1/P2/P3 tiers. Sofa,
+  Mattress and Bedframe — whose models gather several SKUs — each carry a model
+  filter, as on the ERP; the other categories are one SKU per model and do not.
+  Preserve raw size labels, but omit the `DEFAULT` size and flat
   fallback price columns. Omit Status throughout SKU Master. Hidden saved
   defaults and fallback prices survive edits to visible prices; other product
   categories retain their ordinary Price column.
 - Retain portal-owned price writes, permission checks and existing pricing
   semantics. No ERP source price becomes a portal cost through this restyle.
-- Modular uses a scrollable model list beside an independently scrollable
-  editor, with fixed save/cancel controls. Empty ERP allowlists are unrestricted;
-  empty portal selections mean none. Keep inactive saved selections visible so
-  they can be removed. On phones the list and editor stack in bounded windows.
+- Modular is a board of model cards grouped by category, in the ERP's order. A
+  card opens the model in a floating one-sheet window with fixed save/cancel
+  controls; on phones the window fills the screen. Empty ERP allowlists are
+  unrestricted; empty portal selections mean none. Keep inactive saved
+  selections visible so they can be removed.
 - Maintenance keeps the ERP's Bedframe/Sofa pool order and values, with a separate
-  fabric view. Fabrics expose both category tiers, using the shared tier and then
-  P2 when a category mapping is absent. All rows remain reachable with Load more.
+  fabric view. An option pool has no search box — the largest holds about twenty
+  values and the ERP's Maintenance lists have none; the fabric view keeps its
+  search and tier filters. Fabrics expose both category tiers, using the shared
+  tier and then P2 when a category mapping is absent. All rows remain reachable
+  with Load more.
 - Combo Pricing retains module slots, alternatives, repeated modules, tiers and
   effective dates. Match equivalent size keys without losing their raw labels or
   historical price columns. A blank clears a price; zero remains a stored zero.
@@ -978,8 +990,9 @@ model, category, the ERP's allowed options as chips); what the portal DECIDES
 is an input — a price (`.num` right-aligned, `MONEY_INPUT`), a tick, a chip that
 toggles. Row status uses explicit black text: **New**, **Inactive** (off in
 the ERP), or **Removed from ERP** (retired, retained for historical references).
-Filters sit in the shared gray `.sku-filters` panel above a bounded
-`.ledger-table.sku-table` window. Modular opens a model in
+Filters sit in the shared gray `.sku-filters` panel above the
+`.ledger-table.sku-table` — a bounded window on the wide sheets, the page's own
+scroll on the lists (Modular, Maintenance). Modular opens a model in
 `ModelEditor` — its SKUs (compartments / sizes) and each option list as tick
 chips, what the ERP allows first and anything ticked here that it no longer
 allows after. Saving reports the result; a price moves margins only
@@ -2157,6 +2170,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List workspace".
 - **2026-09-27 v3.9 (latest)** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".
 - **2026-09-27** — Revenue › Venues removed: the ERP names every bill's fair (venue, organiser, days), so there is nothing left to type. The one person's step it held — moving bills into their fair's month — is a panel on the month page, *Bills of another month's fair* (`FairMovesPanel`), in the same bordered-surface vocabulary as *Drops and upsells the ERP found*: a serif heading with a mono alert count, an italic explanation, one `.ledger-table` (Bill · Salesperson · Fair · Move · Sales value, the move's status as a small mono label), and one accent button *Move the N confirmed*.
 - **2026-09-26 (later)** — Comm Cal's month in one table design. *Below deposit* and *Sales by venue* join the workbench's rail (Total Sales Orders · KPI Items · Open Bill · Below deposit · Sales by venue), both in the workbench table (`.tableFrame` / `.table`, sticky first and answer columns, `tfoot`, `.tableFooter`); a salesperson's page gains *Below deposit* beside Personal / Overriding; the Total Sales Orders table gains *Group sales* between Commissionable value and Upsell, with the run's promotion preview as `.badge` tags under the rank. The saved run's `.ledger-table`, the *Waiting on a deposit* section and *Sales by person* are gone, and Sales by venue lost its organiser dropdown and *same place as…*. See "Tabbed pages".
