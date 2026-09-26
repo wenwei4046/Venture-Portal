@@ -29,15 +29,25 @@ import type { SalesOrder } from './types'
 export interface UpsaleRow {
   id: string
   staff_id: string
+  /** Signed: a drop (2026-09-26) is negative and takes its commission back. */
   amount: number | string
   sold_on: string
   original_ref: string | null
+  kind?: UpsaleKind | null
 }
 
-/** What an upsale is called on a statement line: `UPSALE HC5315`. */
-export function upsaleOrderNo(originalRef: string | null | undefined): string {
+/**
+ * An upsale adds to a settled bill; a drop takes away from it (2026-09-26).
+ * Both are paid in the month they are recorded under, at the salesperson's own
+ * rate, and both move the upline's override — a drop the other way.
+ */
+export type UpsaleKind = 'upsale' | 'drop'
+
+/** What it is called on a statement line: `UPSALE HC5315`, `DROP HC13911`. */
+export function upsaleOrderNo(originalRef: string | null | undefined, kind: UpsaleKind = 'upsale'): string {
   const ref = (originalRef ?? '').trim()
-  return ref ? `UPSALE ${ref}` : 'UPSALE'
+  const word = kind === 'drop' ? 'DROP' : 'UPSALE'
+  return ref ? `${word} ${ref}` : word
 }
 
 export function upsalesToOrders(rows: readonly UpsaleRow[], periodMonth: string): SalesOrder[] {
@@ -45,7 +55,7 @@ export function upsalesToOrders(rows: readonly UpsaleRow[], periodMonth: string)
     const amount = Math.round(Number(u.amount) * 100) / 100
     return {
       id: u.id,
-      orderNo: upsaleOrderNo(u.original_ref),
+      orderNo: upsaleOrderNo(u.original_ref, u.kind === 'drop' || amount < 0 ? 'drop' : 'upsale'),
       staffId: u.staff_id,
       orderDate: u.sold_on,
       periodMonth,
@@ -57,8 +67,8 @@ export function upsalesToOrders(rows: readonly UpsaleRow[], periodMonth: string)
         {
           id: u.id,
           itemGroup: 'UPSALE',
-          productCode: 'UPSALE',
-          productName: 'Upsale',
+          productCode: amount < 0 ? 'DROP' : 'UPSALE',
+          productName: amount < 0 ? 'Drop sales' : 'Upsale',
           qty: 1,
           lineAmount: amount,
           upsale: true,
@@ -72,7 +82,8 @@ export function upsalesToOrders(rows: readonly UpsaleRow[], periodMonth: string)
 
 export interface UpsaleInput {
   staffId: string
-  /** RM, two decimals, more than 0. */
+  kind: UpsaleKind
+  /** RM, two decimals — positive for an upsale, negative for a drop. */
   amount: number
   /** YYYY-MM-DD — the day it was sold. */
   soldOn: string
@@ -98,6 +109,7 @@ function isRealDate(s: string): boolean {
  */
 export function parseUpsaleInput(raw: {
   staffId?: string | null
+  kind?: string | null
   amount?: string | number | null
   soldOn?: string | null
   fairEventId?: string | null
@@ -107,12 +119,19 @@ export function parseUpsaleInput(raw: {
   const staffId = (raw.staffId ?? '').trim()
   if (!UUID.test(staffId)) throw new Error('Pick who sold it.')
 
-  const amountText = String(raw.amount ?? '').replace(/,/g, '').trim()
+  const kind: UpsaleKind = (raw.kind ?? 'upsale') === 'drop' ? 'drop' : 'upsale'
+  if (raw.kind && !['upsale', 'drop'].includes(raw.kind)) throw new Error('An entry is an upsale or a drop.')
+
+  // Typed as a positive amount; the kind gives it its sign. A minus typed on a
+  // drop says the same thing twice, so it is let through — on an upsale it is
+  // a mistake, and refused.
+  const typed = String(raw.amount ?? '').replace(/,/g, '').trim()
+  const amountText = kind === 'drop' ? typed.replace(/^-\s*/, '') : typed
   const amount = Number(amountText)
   if (amountText === '' || !Number.isFinite(amount) || amount <= 0) {
-    throw new Error('The upsale amount must be more than RM 0.')
+    throw new Error(kind === 'drop' ? 'The amount dropped must be more than RM 0.' : 'The upsale amount must be more than RM 0.')
   }
-  if (amount > 1_000_000) throw new Error('That amount is too large for one upsale.')
+  if (amount > 1_000_000) throw new Error('That amount is too large for one entry.')
   if (Math.round(amount * 100) !== Math.round(amount * 1000) / 10) {
     throw new Error('The amount can have at most two decimals.')
   }
@@ -124,15 +143,19 @@ export function parseUpsaleInput(raw: {
   if (fair !== '' && !UUID.test(fair)) throw new Error('That fair is not on the calendar.')
 
   const originalRef = (raw.originalRef ?? '').trim().replace(/\s+/g, ' ')
-  if (originalRef === '') throw new Error('Give the bill number it was added to, e.g. HC5315.')
+  if (originalRef === '') {
+    throw new Error(kind === 'drop' ? 'Give the bill number it was dropped from, e.g. HC13911.' : 'Give the bill number it was added to, e.g. HC5315.')
+  }
   if (originalRef.length > 60) throw new Error('The bill number is too long.')
 
   const note = (raw.note ?? '').trim()
   if (note.length > 500) throw new Error('The note is too long.')
 
+  const rounded = Math.round(amount * 100) / 100
   return {
     staffId,
-    amount: Math.round(amount * 100) / 100,
+    kind,
+    amount: kind === 'drop' ? -rounded : rounded,
     soldOn,
     fairEventId: fair === '' ? null : fair,
     originalRef,

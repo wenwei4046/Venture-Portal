@@ -8,6 +8,9 @@ import s from './commission-workbench.module.css'
  */
 export const SALES_VALUE_HINT = 'Everything on the bills — transport, disposal and every other charge included'
 export const COMMISSIONABLE_HINT = 'The part of the bills that earns commission. Transport, disposal and other service lines are left out.'
+/** Not bills: what was added to, or taken off, bills already settled (2026-09-26). */
+export const UPSELL_HINT = 'Added to bills already settled — paid this month at the salesperson’s own rate'
+export const DROP_HINT = 'Taken off bills already settled — this month’s commission gives it back'
 
 /** The small line under a Commissionable value: what the bill carries that earns nothing. */
 export default function NoCommission({ amount }: { amount: number }) {

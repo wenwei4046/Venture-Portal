@@ -10,7 +10,7 @@ import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import { saveOpenBillPicks } from '../../../run-actions'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
-import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from './NoCommission'
+import NoCommission, { COMMISSIONABLE_HINT, DROP_HINT, SALES_VALUE_HINT, UPSELL_HINT } from './NoCommission'
 import s from './commission-workbench.module.css'
 
 type Tab = 'sales' | 'kpi' | 'open'
@@ -288,19 +288,27 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Salesperson commission summary">
         <thead><tr><th className={s.stickyFirst}>Sales person</th><th>Title / rank</th><th>Orders</th>
           <th title={SALES_VALUE_HINT}>Sales value</th><th title={COMMISSIONABLE_HINT}>Commissionable value</th>
+          <th title={UPSELL_HINT}>Upsell</th><th title={DROP_HINT}>Drop sales</th>
           <th>Margin</th><th>Personal</th><th>Overriding</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
         <tbody>{people.map(p => {
           const counted = p.personalRows.filter(r => r.status !== 'excluded')
-          const salesValue = sum(counted, r => r.orderTotal)
-          const commissionable = sum(counted, r => r.commissionableValue)
+          // Bills, and beside them what was added to or dropped from settled
+          // ones (2026-09-26) — neither is a bill, so neither is an order.
+          const bills = counted.filter(r => !r.upsale)
+          const salesValue = sum(bills, r => r.orderTotal)
+          const commissionable = sum(bills, r => r.commissionableValue)
+          const upsell = sum(counted.filter(r => r.upsale && r.orderTotal > 0), r => r.orderTotal)
+          const dropped = sum(counted.filter(r => r.upsale && r.orderTotal < 0), r => r.orderTotal)
           return <tr key={p.staffId}><td className={s.stickyFirst}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} <span aria-hidden>↗</span></button></td>
-          <td>{p.titleLabel}<small>{p.rankLabel} · {pct(p.productRate)}</small></td><td>{counted.length}</td>
+          <td>{p.titleLabel}<small>{p.rankLabel} · {pct(p.productRate)}</small></td><td>{bills.length}</td>
           <td className={s.numeric}>{money(salesValue)}</td>
           <td className={s.numeric}>{money(commissionable)}<NoCommission amount={salesValue - commissionable} /></td>
+          <td className={s.numeric}>{upsell ? money(upsell) : <span className={s.muted}>—</span>}</td>
+          <td className={s.numeric}>{dropped ? <span className="neg">{money(dropped)}</span> : <span className={s.muted}>—</span>}</td>
           <td className={s.numeric}>{pct(p.statement?.marginPct)}<small>{p.statement?.marginPct == null ? 'Cost incomplete' : money(p.statement?.marginRevenue - p.statement?.marginCost)}</small></td>
           <td className={s.numeric}>{money(p.personalTotal)}</td><td className={s.numeric}>{money(p.overrideTotal)}</td><td className={s.stickyTotal}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{money(p.totalCommission)}</button>{p.monthlyGroupIncentive > 0 && <small>Includes {money(p.monthlyGroupIncentive)} group reward</small>}</td></tr>
         })}</tbody>
-        <tfoot><tr><td colSpan={8}>All salespeople · total commission</td><td className={s.stickyTotal}>{money(board.totalCommission)}</td></tr></tfoot>
+        <tfoot><tr><td colSpan={10}>All salespeople · total commission</td><td className={s.stickyTotal}>{money(board.totalCommission)}</td></tr></tfoot>
       </table></div></div>
       {!people.length && <p className={s.empty}>No salespeople found.</p>}
     </>}

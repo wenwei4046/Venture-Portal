@@ -20,7 +20,7 @@ import UpsaleSection from './_components/UpsaleSection'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../_lib/sub-departments'
 import { loadMonthOrders, loadOrderShares, loadShareTeam } from '../../_lib/month-orders'
-import { loadFairChoices, loadMonthUpsales } from '../../_lib/upsales'
+import { loadFairChoices, loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadOpenBillPaid } from '../../_lib/open-bill'
 import { readRevenuePayrollAdjustments } from '../../_lib/payroll-adjustments'
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
@@ -31,6 +31,7 @@ import { carriedFromUnpaidMonths, claimsInMonth } from '@/lib/commission/double-
 import CommissionWorkbench from './_components/CommissionWorkbench'
 import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
+import ErpChangesPanel from './_components/ErpChangesPanel'
 import workbenchStyles from './_components/commission-workbench.module.css'
 
 interface PageProps {
@@ -335,11 +336,14 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // ── The feed, and bills claimed twice (2026-09-26) ─────────────────────
   // Whether the ERP may still change this month, and whether any bill here is
   // on another bill's paper or rides in from a month no run of ours paid.
-  const [feedMonth, doubleClaims, { data: paidRunRows }] = await Promise.all([
+  const [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments] = await Promise.all([
     batchRow ? loadErpFeedMonth(supabase, subDept.id, period) : Promise.resolve(null),
     batchRow ? loadDoubleClaims(supabase, subDept.id) : Promise.resolve(null),
     supabase.from('comm_runs').select('period_month')
       .eq('sub_department_id', subDept.id).in('status', ['applied', 'locked']),
+    // Drops and upsells the ERP found on settled bills, from any month —
+    // they are paid into the month somebody confirms them in (2026-09-26).
+    loadPendingAdjustments(supabase, subDept.id),
   ])
   const paidMonths = new Set(((paidRunRows ?? []) as Array<{ period_month: string }>).map(r => r.period_month))
   const carriedUnpaid = workbench ? carriedFromUnpaidMonths(workbench.input.orders, period, paidMonths) : []
@@ -353,6 +357,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       unavailable={doubleClaims.unavailable}
     />
   ) : null
+  const erpChangesPanel = (
+    <ErpChangesPanel period={period} pending={pendingAdjustments} locked={Boolean(upsaleLock.data)} />
+  )
 
   const monthHeader = (
       <div className="page-head">
@@ -392,6 +399,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               monthLabel={label(period)}
               closed={feedMonth.closed}
               held={feedMonth.held}
+              firstPaidLabel={feedMonth.firstPaidMonth ? label(feedMonth.firstPaidMonth) : null}
             />
           ) : null}
           {batchRow?.source !== 'erp_sync' ? (
@@ -731,7 +739,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
               venue: venueRows.length,
               person: people.length,
               openBill: openBill?.totals.bills ?? 0,
-              upsales: upsales.length,
+              upsales: upsales.length + pendingAdjustments.length,
             }}
             upsales={
               <UpsaleSection
@@ -772,7 +780,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     <div className={workbenchStyles.page}>
       {workbench ? <CommissionWorkbench key={`${subDept.id}:${period}`} data={workbench}
         sub={subDept.slug} period={period} runStatus={run?.status ?? null}
-        monthOverview={<>{monthHeader}{doubleClaimPanel}</>}
+        monthOverview={<>{monthHeader}{erpChangesPanel}{doubleClaimPanel}</>}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
         monthTools={monthTools}
@@ -782,7 +790,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
             <p className="font-serif text-2xl text-ink mb-3">Nothing imported for this month.</p>
             <p className="font-serif italic text-muted text-sm max-w-lg mx-auto">Import the ERP sales-order export to begin.</p>
           </div>
-        ) : <>{doubleClaimPanel}{monthMetrics}{monthTools}</>}</>}
+        ) : <>{erpChangesPanel}{doubleClaimPanel}{monthMetrics}{monthTools}</>}</>}
     </div>
   )
 }

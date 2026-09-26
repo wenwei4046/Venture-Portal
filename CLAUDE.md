@@ -232,12 +232,48 @@ src/
 │   │   │                              (transport included) and the lines that earn
 │   │   │                              (`orderCommissionableValue`). Mig
 │   │   │                              `20260926010000`.
+│   │   │                              **THE PORTAL PAYS FROM A MONTH (2026-09-26):**
+│   │   │                              June–August were paid from the claim forms
+│   │   │                              and no run released any of it, so a run
+│   │   │                              would have carried all of it into September
+│   │   │                              (user: VP 从九月开始付). `comm_cutovers` =
+│   │   │                              the first month a sub-department's runs pay
+│   │   │                              (Comm Cal › *The portal pays from*). A month
+│   │   │                              before it is SETTLED BY HAND: never carried
+│   │   │                              (`loadCommissionInput`), closed to the feed
+│   │   │                              for good (`erp_feed_month_closed`), counted
+│   │   │                              in its own month by the member app. A re-send
+│   │   │                              never carries a bill of a paying month back
+│   │   │                              into one — an under-deposit August bill moved
+│   │   │                              to September keeps hearing of its payments.
+│   │   │                              **DROPS AND UPSELLS THE ERP FINDS:** the ERP
+│   │   │                              re-sends whole documents, so when a delivery
+│   │   │                              is held for a settled bill (closed, before
+│   │   │                              the cutover, or paid by a run)
+│   │   │                              `erp_sync_note_adjustment` takes new
+│   │   │                              commissionable − settled (the run's release,
+│   │   │                              else the hand-worked row under the same
+│   │   │                              paper, else the frozen bill; answered rows
+│   │   │                              count as settled) = ONE pending
+│   │   │                              `comm_upsales` row per document. The month
+│   │   │                              page's *Drops and upsells the ERP found*
+│   │   │                              pays it into that month or lets the ERP's
+│   │   │                              figure stand; Undo takes back only the
+│   │   │                              latest answer. Runs read CONFIRMED rows
+│   │   │                              only. A drop is negative: it takes back the
+│   │   │                              seller's commission AND the upline's
+│   │   │                              override, and a month whose drops outweigh
+│   │   │                              someone's pay is a run warning (payroll
+│   │   │                              cannot pay a negative commission). The
+│   │   │                              ledger shows *Upsell* / *Drop sales* beside
+│   │   │                              the bills. Mig `20260926020000`.
 │   │   │                              **UPSALES (2026-09-24):** a customer adds to
 │   │   │                              an earlier order and ONLY THE ADDED AMOUNT
 │   │   │                              earns. The ERP has no upsale concept (a new
 │   │   │                              line, a folded-in price or nothing at all),
 │   │   │                              so HR records it on the month page's
-│   │   │                              **Upsales** tab (`comm_upsales`). Own rate,
+│   │   │                              **Upsales & drops** tab (`comm_upsales`;
+│   │   │                              a drop is the same, negative). Own rate,
 │   │   │                              counts toward the upline's override (the
 │   │   │                              claim form's override bases include them),
 │   │   │                              paid in the month recorded, no deposit gate,

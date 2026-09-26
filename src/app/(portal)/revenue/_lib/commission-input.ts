@@ -136,7 +136,7 @@ export async function loadCommissionInput(
   const orderSelect = 'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct'
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, marginBands, hierarchy, upsales, currentHierarchyRows,
-    currentKpiItems, currentKpiThresholds, currentOpenBillRules] = await Promise.all([
+    currentKpiItems, currentKpiThresholds, currentOpenBillRules, cutover] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -176,9 +176,12 @@ export async function loadCommissionInput(
       supabase.from('comm_hierarchy').select('staff_id, upline_staff_id, rate_mode, title_id, comm_ranks (rank_key)')
         .eq('scheme_id', scheme.id).lte('effective_from', asAt)
         .or(`effective_to.is.null,effective_to.gte.${asAt}`).order('id').range(from, to)),
-    readRows<UpsaleRow>("the month's upsales", (from, to) =>
-      supabase.from('comm_upsales').select('id, staff_id, amount, sold_on, original_ref')
+    // Upsales and drops the run pays: CONFIRMED ones. A drop or upsell the ERP
+    // revealed waits as pending until somebody answers it (2026-09-26).
+    readRows<UpsaleRow>("the month's upsales and drops", (from, to) =>
+      supabase.from('comm_upsales').select('id, staff_id, amount, sold_on, original_ref, kind')
         .eq('sub_department_id', scheme.sub_department_id).eq('period_month', period)
+        .eq('status', 'confirmed')
         .order('id').range(from, to)),
     options.includeCurrentRules ? readRows<HierarchyRow>('the current Revenue Team hierarchy', (from, to) =>
       supabase.from('comm_hierarchy').select('staff_id, upline_staff_id, rate_mode, title_id, comm_ranks (rank_key)')
@@ -196,11 +199,21 @@ export async function loadCommissionInput(
       supabase.from('comm_open_bill_rules').select('bill_rank, pct')
         .eq('scheme_id', scheme.id).lte('effective_from', currentDate)
         .or(`effective_to.is.null,effective_to.gte.${currentDate}`).order('id').range(from, to)) : Promise.resolve<OpenBillRuleRow[]>([]),
+    supabase.from('comm_cutovers').select('first_paid_month')
+      .eq('sub_department_id', scheme.sub_department_id).maybeSingle()
+      .then(({ data, error }: { data: unknown; error: { message: string } | null }) => {
+        if (error) throw new Error(`Could not read when the portal starts paying: ${error.message}`)
+        return (data as { first_paid_month: string } | null)?.first_paid_month ?? null
+      }),
   ])
 
   const releasedOrderNos = releases.filter(row => row.run_id !== options.replayRunId).map(row => row.order_no)
   const releasedSet = new Set(releasedOrderNos)
-  const orderRows = [...thisMonth, ...earlier.filter(order => !releasedSet.has(order.order_no))]
+  // A month before the portal pays was settled by hand (comm_cutovers,
+  // 2026-09-26): its bills never ride into a run — June to August 2026 would
+  // otherwise all be paid again in September.
+  const settledElsewhere = (order: SalesOrderRow) => cutover !== null && order.period_month < cutover
+  const orderRows = [...thisMonth, ...earlier.filter(order => !releasedSet.has(order.order_no) && !settledElsewhere(order))]
   const orderIds = orderRows.map(order => order.id)
   const lookBack = Math.max(0, ...ranks.map(rank => (rank.consecutive_months ?? 1) - 1))
   const priorPeriods = Array.from({ length: lookBack }, (_, index) => monthsBefore(period, index + 1))

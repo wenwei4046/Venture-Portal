@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs",
+    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs && node validate-pays-from.mjs",
     "test:director-reporting": "node validate-director-reporting.mjs",
     "test:ir-specialist-downlines": "node validate-ir-specialist-downlines.mjs",
     "test:employee-chart-lifecycle": "node validate-employee-chart-lifecycle.mjs",
     "test:fair-calendar": "node validate-fair-calendar.mjs",
     "test:catalogue": "node validate-catalogue.mjs",
     "test:upsales": "node validate-upsales.mjs",
-    "test:closed-month": "node validate-closed-month.mjs"
+    "test:closed-month": "node validate-closed-month.mjs",
+    "test:pays-from": "node validate-pays-from.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"
