@@ -82,7 +82,7 @@ function salaryFixture() {
   return data
 }
 
-const monthStats = { salesValue: 3_000, totalOrders: 2, unmatchedAgents: 0, linesWithoutCost: 0 }
+const monthStats = { salesValue: 3_000, commissionableValue: 2_800, totalOrders: 2, unmatchedAgents: 0, linesWithoutCost: 0 }
 
 function renderBoard(data = fixture(), runStatus: string | null = null, savedTotals: { staffId: string; total: number }[] = []) {
   return render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={runStatus} savedTotals={savedTotals} monthStats={monthStats} />)
@@ -126,15 +126,18 @@ describe('CommissionWorkbench', () => {
     expect(screen.queryByText('Claims & travel')).toBeNull()
   })
 
-  it('keeps five month cards above the ledger and recalculates commission independently of search and source sales totals', () => {
+  it('keeps six month cards above the ledger and recalculates commission independently of search and source sales totals', () => {
     renderBoard()
     const summary = () => screen.getByRole('region', { name: 'Monthly commission summary' })
     const card = (name: string) => within(summary()).getByRole('group', { name, exact: true })
 
     expect(within(summary()).getAllByRole('group').map(group => group.getAttribute('aria-label'))).toEqual([
-      'Total sales value', 'Total orders', 'Salespeople', 'Total commission', 'Lines without a cost',
+      'Total sales value', 'Commissionable value', 'Total orders', 'Salespeople', 'Total commission', 'Lines without a cost',
     ])
     expect(card('Total sales value')).toHaveTextContent('RM 3,000.00')
+    // Two figures on purpose (user 2026-09-26): the whole bill, and the part that earns.
+    expect(card('Commissionable value')).toHaveTextContent('RM 2,800.00')
+    expect(card('Commissionable value')).toHaveTextContent('RM 200.00 no commission')
     expect(within(card('Total orders')).getByText('2')).toBeVisible()
     expect(within(card('Salespeople')).getByText('2')).toBeVisible()
     expect(card('Total commission')).toHaveTextContent('RM 1,313.00')
@@ -158,6 +161,35 @@ describe('CommissionWorkbench', () => {
     expect(within(card('Salespeople')).getByText('2')).toBeVisible()
     expect(within(card('Lines without a cost')).getByText('0')).toBeVisible()
     expect(saveOpenPicks).not.toHaveBeenCalled()
+  })
+
+  it("shows each salesperson's sales value beside what of it earns, and names what does not (user 2026-09-26)", () => {
+    // A Kuching bill: the goods, and the transport the ERP folds into the total.
+    const data = fixture()
+    data.input.scheme.itemGroups = [...data.input.scheme.itemGroups, { group: 'SERVICE', commissionable: false }]
+    data.input.orders = [...data.input.orders, sale('three', 1_000, {
+      orderTotal: 1_147, paidAmount: 1_147,
+      lines: [
+        { id: 'three-goods', itemGroup: 'SOFA', productCode: 'SOFA', brandCode: 'AKEMI', qty: 1, lineAmount: 1_000, costAmount: 600 },
+        { id: 'three-transport', itemGroup: 'SERVICE', productCode: 'TRANSPORTATION CHARGES', qty: 1, lineAmount: 147, costAmount: 0 },
+      ],
+    })]
+    renderBoard(data)
+
+    const summary = screen.getByRole('table', { name: 'Salesperson commission summary' })
+    expect(within(summary).getByRole('columnheader', { name: 'Commissionable value' })).toBeVisible()
+    const anthony = within(summary).getByRole('row', { name: /Anthony/ })
+    expect(anthony).toHaveTextContent('RM 4,147.00')
+    expect(anthony).toHaveTextContent('RM 4,000.00RM 147.00 no commission')
+    const alex = within(summary).getByRole('row', { name: /Alex/ })
+    expect(alex).not.toHaveTextContent('no commission')
+
+    choose('Anthony')
+    const table = personalTable()
+    expect(within(table).getByRole('columnheader', { name: 'Commissionable value' })).toBeVisible()
+    expect(salesRow(table, 'SO-three')).toHaveTextContent('RM 1,147.00')
+    expect(salesRow(table, 'SO-three')).toHaveTextContent('RM 1,000.00RM 147.00 no commission')
+    expect(salesRow(table, 'SO-one')).not.toHaveTextContent('no commission')
   })
 
   it('opens on salesperson selection, then shows one personal row per order with a reconcilable total', () => {

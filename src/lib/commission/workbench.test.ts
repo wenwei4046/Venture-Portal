@@ -244,6 +244,55 @@ describe('commission workbench ledger', () => {
   })
 })
 
+describe('what on a bill earns commission (2026-09-26)', () => {
+  // A Kuching bill: the goods, a KPI pillow, and the transport the ERP folds
+  // into the total. The two figures the ledger shows are the whole bill and
+  // the part that earns — the difference is what earns nothing.
+  const kuching = () => sale('kuching', 1_000, {
+    orderTotal: 1_247, paidAmount: 1_247,
+    lines: [
+      { id: 'k-goods', itemGroup: 'SOFA', productCode: 'SOFA', brandCode: 'AKEMI', qty: 1, lineAmount: 1_000, costAmount: 600 },
+      { id: 'k-pillow', itemGroup: 'ACC', productCode: 'PILLOW', brandCode: 'AKEMI', qty: 1, lineAmount: 100, costAmount: 40 },
+      { id: 'k-transport', itemGroup: 'SERVICE', productCode: 'TRANSPORTATION CHARGES', qty: 1, lineAmount: 147, costAmount: 0 },
+    ],
+  })
+  const scheme = { ...input().scheme, itemGroups: [...input().scheme.itemGroups, { group: 'SERVICE', commissionable: false }] }
+
+  it('leaves out transport and any group the scheme does not pay on, and keeps KPI items — they earn too', () => {
+    const odd = sale('odd', 500, {
+      orderTotal: 560,
+      lines: [
+        { id: 'o-goods', itemGroup: 'SOFA', productCode: 'SOFA', brandCode: 'AKEMI', qty: 1, lineAmount: 500, costAmount: 300 },
+        { id: 'o-unknown', itemGroup: 'UNGROUPED', productCode: 'MISC', qty: 1, lineAmount: 60 },
+      ],
+    })
+    const board = buildCommissionWorkbench(input({ scheme, orders: [kuching(), odd], openBillTags: [] }))
+    expect(board.personalRows.find(row => row.orderId === 'kuching')).toMatchObject({
+      orderTotal: 1_247, commissionableValue: 1_100, productRevenue: 1_000,
+    })
+    expect(board.personalRows.find(row => row.orderId === 'odd')).toMatchObject({ orderTotal: 560, commissionableValue: 500 })
+  })
+
+  it('with KPI switched off a KPI item is judged by its group, like the engine judges it', () => {
+    const board = buildCommissionWorkbench(input({ scheme: { ...scheme, enableKpi: false }, orders: [kuching()], openBillTags: [] }))
+    expect(board.personalRows[0]).toMatchObject({ commissionableValue: 1_100, productRevenue: 1_100 })
+  })
+
+  it("an upsale earns whole, and a shared bill's parts add back to the bill", () => {
+    const up = sale('up', 700, {
+      upsale: true,
+      lines: [{ id: 'up-line', itemGroup: 'UPSALE', productCode: 'UPSALE', qty: 1, lineAmount: 700, upsale: true }],
+    })
+    const shared = splitOrdersByShares([kuching()], [{ orderId: 'kuching', staffId: 'leader', pct: 0.5 }])
+    const board = buildCommissionWorkbench(input({ scheme, orders: [...shared, up], openBillTags: [] }))
+    expect(board.personalRows.find(row => row.orderId === 'up')?.commissionableValue).toBe(700)
+    const parts = board.personalRows.filter(row => row.orderId === 'kuching')
+    expect(parts).toHaveLength(2)
+    expect(round2(parts.reduce((a, row) => a + row.commissionableValue, 0))).toBe(1_100)
+    expect(round2(parts.reduce((a, row) => a + row.orderTotal, 0))).toBe(1_247)
+  })
+})
+
 describe('commission display allocation', () => {
   it('assigns residual cents deterministically and supports refunds', () => {
     expect(allocateCommissionAmount(0.07, [1, 1, 1])).toEqual([0.03, 0.02, 0.02])

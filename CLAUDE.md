@@ -203,6 +203,35 @@ src/
 │   │   │                              calendar moves it. No fair → `so_date`, as
 │   │   │                              before. New documents still land in their
 │   │   │                              `so_date` month. Mig `20260924050000`.
+│   │   │                              **A MONTH CLOSED TO THE FEED (2026-09-26):**
+│   │   │                              the month page's *Live from ERP* chip (click
+│   │   │                              or right-click) closes a month to the ERP
+│   │   │                              (`erp_feed_closed_months`): every delivery
+│   │   │                              that would write INTO or OUT OF it is held —
+│   │   │                              200, payload kept, logged under that month —
+│   │   │                              and every other month keeps syncing. Reopen
+│   │   │                              replays the latest held delivery per document
+│   │   │                              (`reopenErpMonth` → `replayHeldErpEvents`).
+│   │   │                              The fair calendar skips a closed month on
+│   │   │                              both sides and reads committed batches only;
+│   │   │                              `commit_sales_import_batch` may replace a
+│   │   │                              CLOSED month's live batch (the way a month
+│   │   │                              worked out by hand gets in), an open one
+│   │   │                              still refuses. **POSSIBLE DOUBLE CLAIMS:**
+│   │   │                              `revenue_possible_double_claims` = a paper
+│   │   │                              number (`sales_order_bill_ref`: first number
+│   │   │                              in `customer_so_no`, else the order's own) on
+│   │   │                              more than one payable or paid bill; a
+│   │   │                              "checked — separate sales" answer
+│   │   │                              (`comm_double_claim_dismissals`) covers
+│   │   │                              exactly those bills. The month page also
+│   │   │                              names bills carried in from months no run
+│   │   │                              paid (`lib/commission/double-claims.ts`).
+│   │   │                              **SALES VALUE vs COMMISSIONABLE VALUE:**
+│   │   │                              the ledger shows both — the whole bill
+│   │   │                              (transport included) and the lines that earn
+│   │   │                              (`orderCommissionableValue`). Mig
+│   │   │                              `20260926010000`.
 │   │   │                              **UPSALES (2026-09-24):** a customer adds to
 │   │   │                              an earlier order and ONLY THE ADDED AMOUNT
 │   │   │                              earns. The ERP has no upsale concept (a new

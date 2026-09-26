@@ -215,7 +215,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 | `applied` | a new order, an update, or an order becoming excluded | yes — header upserted, lines replaced, day re-sequenced, Open Bill suggestions re-derived, batch counters refreshed |
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
-| `held` | the month's commission run is **applied/locked**, or the month was **file-imported** | no — payload kept; HR replays after reopening the run |
+| `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported** | no — payload kept; HR replays after reopening the run or the month |
 | `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window | no |
 
 **Commission rule, mirrored from the ERP** (`scm/shared/hr-commission.ts`,

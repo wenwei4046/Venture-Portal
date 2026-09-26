@@ -182,7 +182,29 @@ describe('toCanonicalOrder', () => {
       item({ line_no: null, item_code: 'D' }),
     ])
     expect(lines.map(l => l.itemCode)).toEqual(['A', 'C', 'D'])
-    expect(lines.map(l => l.lineNo)).toEqual([1, 3, 3])
+    // The blank line is numbered after the highest, never onto a taken number.
+    expect(lines.map(l => l.lineNo)).toEqual([1, 3, 4])
+  })
+
+  it('never gives two lines one number — HC-SO-013504 failed every delivery for days', () => {
+    // The ERP numbered 1–5 and 7, and left the line added later blank. Its
+    // position was 7, which collided with line 7 on (order, line_no).
+    const shawn = toCanonicalLines([
+      ...[1, 2, 3, 4, 5, 7].map(n => item({ line_no: n, item_code: `L${n}` })),
+      item({ line_no: null, item_code: 'DL-SERENITY LTX PIL' }),
+    ])
+    expect(shawn.map(l => l.lineNo)).toEqual([1, 2, 3, 4, 5, 7, 8])
+    expect(shawn.at(-1)?.itemCode).toBe('DL-SERENITY LTX PIL')
+
+    const repeated = toCanonicalLines([
+      item({ line_no: 2, item_code: 'A' }),
+      item({ line_no: 2, item_code: 'B' }),
+      item({ line_no: null, item_code: 'C' }),
+    ])
+    expect(repeated.map(l => l.lineNo)).toEqual([2, 3, 4])
+
+    const unnumbered = toCanonicalLines([item({ line_no: null, item_code: 'A' }), item({ line_no: null, item_code: 'B' })])
+    expect(unnumbered.map(l => l.lineNo)).toEqual([1, 2])
   })
 
   it('strips the customer PII and the images from what is kept', () => {
