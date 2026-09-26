@@ -12,6 +12,12 @@ interface Props {
   status: 'none' | 'draft' | 'computed' | 'applied' | 'locked'
   warningCount: number
   hasImport: boolean
+  /**
+   * "September 2026" when this month was settled by hand — before the first
+   * month the portal pays (2026-09-26). Such a month takes no run: a clean
+   * compute syncs to payroll, and its pay was made outside the portal.
+   */
+  settledBefore?: string | null
 }
 
 /**
@@ -25,6 +31,7 @@ export default function RunControls({
   status,
   warningCount,
   hasImport,
+  settledBefore = null,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -66,6 +73,15 @@ export default function RunControls({
       await reopenRun(runId as string)
       return 'Reopened. This sub-department’s commission has been removed from payroll. Other sub-departments and titles already raised are preserved.'
     })
+
+  if (settledBefore && status === 'none') {
+    return (
+      <p className="font-serif italic text-graphite text-xs max-w-md text-right m-0">
+        Settled by hand — the portal pays from {settledBefore}, so this month takes no run and
+        nothing here reaches payroll. The commission shown is the rules applied to its bills.
+      </p>
+    )
+  }
 
   if (confirming === 'reopen') {
     return (

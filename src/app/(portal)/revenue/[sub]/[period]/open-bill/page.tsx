@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import OpenBillBoard, { type BoardOrder } from './_components/OpenBillBoard'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
+import { openBillOnFor } from '../../../_lib/open-bill-month'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
@@ -36,10 +37,8 @@ export default async function OpenBillPage({ params }: PageProps) {
 
   const subDept = await requireSubDepartment(sub)
   const supabase = (await createClient()) as unknown as SupabaseClient
-  const { data: scheme } = subDept.schemeId
-    ? await supabase.from('comm_schemes').select('enable_open_bill').eq('id', subDept.schemeId).single()
-    : { data: null }
-  if (!scheme?.enable_open_bill) notFound()
+  // This month's Open Bill: its own setting, else Rules (2026-09-26).
+  if (!subDept.schemeId || !(await openBillOnFor(supabase, subDept.id, period))) notFound()
 
   const { data: batch } = await supabase
     .from('sales_import_batches')

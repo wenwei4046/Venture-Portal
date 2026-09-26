@@ -483,7 +483,7 @@ describe('CommissionWorkbench', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
     const save = screen.getByRole('button', { name: 'Save Open Bill picks' })
     expect(save).toBeDisabled()
-    expect(screen.getByText('Open Bill is preview-only while switched off in Revenue Rules. Enable it in Rules before saving picks.')).toBeVisible()
+    expect(screen.getByText('Open Bill is preview-only while switched off for this month. Switch it on under This run pays before saving picks.')).toBeVisible()
     expect(salesRow(screen.getByRole('table', { name: 'Open Bill orders' }), 'SO-one')).toHaveTextContent('RM 20.00')
     fireEvent.click(save)
     expect(saveOpenPicks).not.toHaveBeenCalled()

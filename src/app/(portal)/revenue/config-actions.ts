@@ -760,6 +760,51 @@ export async function deleteMarginBand(id: string) {
  */
 export type SchemeSwitch = 'open_bill' | 'margin' | 'kpi'
 
+/**
+ * Open Bill for ONE month (2026-09-26 — user: "open for august, not
+ * september"). Rules › Scheme rules sets every month; a month may carry its
+ * own setting over it (`comm_open_bill_months`), which is what the run, the
+ * picks and the feed's suggestions for that month read (`comm_open_bill_on`).
+ * `null`, or the same value as Rules, clears it: the month follows Rules again.
+ * A month whose run has paid keeps what it paid.
+ */
+export async function setMonthOpenBill(subDepartmentId: string, period: string, on: boolean | null): Promise<void> {
+  const user = await requirePermission('revenue')
+  if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('A month is its first day, e.g. 2026-08-01')
+  const supabase = await client()
+
+  const [{ data: locked, error: lockError }, { data: scheme, error: schemeError }] = await Promise.all([
+    supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDepartmentId, p_period: period }),
+    supabase.from('comm_schemes').select('enable_open_bill')
+      .eq('sub_department_id', subDepartmentId).eq('is_active', true).is('effective_to', null).maybeSingle(),
+  ])
+  if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
+  if (locked) throw new Error(`The ${period.slice(0, 7)} run has paid. Reopen it before changing what it pays.`)
+  if (schemeError) throw new Error(`Could not read Rules: ${schemeError.message}`)
+  const rules = Boolean((scheme as { enable_open_bill: boolean } | null)?.enable_open_bill)
+
+  if (on === null || on === rules) {
+    check(
+      (await supabase.from('comm_open_bill_months').delete()
+        .eq('sub_department_id', subDepartmentId).eq('period_month', period)).error,
+      'Could not change the month',
+    )
+  } else {
+    check(
+      (await supabase.from('comm_open_bill_months').upsert({
+        sub_department_id: subDepartmentId,
+        period_month: period,
+        enabled: on,
+        set_by: user.id,
+        set_by_name: user.name,
+        set_at: new Date().toISOString(),
+      })).error,
+      'Could not change the month',
+    )
+  }
+  refresh()
+}
+
 export async function setSchemeSwitch(schemeId: string, which: SchemeSwitch, on: boolean): Promise<void> {
   await requirePermission('revenue')
   const supabase = await client()

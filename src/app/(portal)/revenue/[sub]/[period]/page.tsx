@@ -26,6 +26,7 @@ import { readRevenuePayrollAdjustments, type RevenuePayrollAdjustmentRead } from
 import PayrollAdjustmentPanel from '../../_components/PayrollAdjustmentPanel'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
 import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
+import { loadOpenBillMonthSetting, resolveOpenBill } from '../../_lib/open-bill-month'
 import { loadDoubleClaims } from '../../_lib/double-claims'
 import { carriedFromUnpaidMonths, claimsInMonth } from '@/lib/commission/double-claims'
 import CommissionWorkbench from './_components/CommissionWorkbench'
@@ -233,11 +234,18 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     loadOrderShares(supabase, rows.filter(o => !o.cancelled).map(o => o.orderId)),
   )
 
+  // Whether THIS month pays Open Bill: its own setting over Rules (2026-09-26 —
+  // on for August, which the claim form paid; September follows Rules).
+  const openBillMonthRead = Promise.all([
+    schemeRead,
+    subDept.schemeId ? loadOpenBillMonthSetting(supabase, subDept.id, period) : Promise.resolve(null),
+  ]).then(([scheme, month]) => resolveOpenBill(Boolean(scheme?.enable_open_bill), month))
+
   // The picks come from the month's orders; what they PAID comes from the
   // run's own lines, because a run also pays Open Bill on the bills it carried
   // in from earlier months.
-  const openBillRead = Promise.all([schemeRead, runRead]).then(([scheme, run]) => {
-    const on = Boolean(scheme?.enable_open_bill)
+  const openBillRead = Promise.all([openBillMonthRead, runRead]).then(([openBillMonth, run]) => {
+    const on = openBillMonth.on
     return Promise.all([
       on && subDept.schemeId
         ? once(
@@ -272,6 +280,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     [upsales, upsaleFairs, team, upsaleLock],
     workbench,
     [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments],
+    openBillMonth,
   ] = await Promise.all([
     batchRowRead,
     monthOrdersRead,
@@ -317,6 +326,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         loadPendingAdjustments(supabase, subDept.id),
       ]),
     ),
+    openBillMonthRead,
   ])
   if (upsaleLock.error) throw new Error(`Could not check the commission run: ${upsaleLock.error.message}`)
 
@@ -400,7 +410,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   )
 
   // ── Open Bill ──────────────────────────────────────────────────────────
-  const openBillOn = Boolean(scheme?.enable_open_bill)
+  const openBillOn = openBillMonth.on
   const openBill = openBillOn
     ? summariseOpenBill(orders, {
         paidByOrder: openBillPaid,
@@ -586,12 +596,20 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
                   status={run?.status ?? 'none'}
                   warningCount={warnings.length}
                   hasImport={Boolean(batchRow)}
+                  settledBefore={
+                    feedMonth?.closed?.reason === 'before_cutover' && feedMonth.firstPaidMonth
+                      ? label(feedMonth.firstPaidMonth)
+                      : null
+                  }
                 />
 
                 {subDept.schemeId && scheme ? (
                   <SchemeSwitches
                     schemeId={subDept.schemeId}
-                    openBill={Boolean((scheme as { enable_open_bill: boolean }).enable_open_bill)}
+                    subDepartmentId={subDept.id}
+                    period={period}
+                    monthLabel={label(period)}
+                    openBill={openBillMonth}
                     margin={Boolean(
                       (scheme as { enable_margin_penalty: boolean }).enable_margin_penalty ||
                         (scheme as { enable_margin_incentive: boolean }).enable_margin_incentive,

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 const mocks = vi.hoisted(() => ({ client: vi.fn(), revalidate: vi.fn() }))
+vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidate }))
 vi.mock('@/lib/auth', () => ({ requirePermission: vi.fn(async () => ({ id: 'user-1' })) }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.client }))
@@ -12,7 +13,7 @@ import { saveOpenBillPicks, setOpenBillRank } from './run-actions'
 type Row = Record<string, unknown>
 type Filter = { key: string; values: unknown[] }
 
-function database(options: { enabled?: boolean; locked?: string[]; failWrite?: boolean; raceOccupant?: boolean; raceSameOrder?: boolean } = {}) {
+function database(options: { enabled?: boolean; openMonths?: string[]; locked?: string[]; failWrite?: boolean; raceOccupant?: boolean; raceSameOrder?: boolean } = {}) {
   const order = (id: string, period = '2026-09-01') => ({
     id, staff_id: 'person-a', event_date: '2026-08-31', period_month: period, cancelled: false,
     sales_import_batches: { sub_department_id: 'sub-1' },
@@ -77,7 +78,12 @@ function database(options: { enabled?: boolean; locked?: string[]; failWrite?: b
   }
   const client = {
     from,
-    rpc: (_name: string, args: { p_period: string }) => {
+    rpc: (name: string, args: { p_period: string }) => {
+      // Open Bill is asked per month (2026-09-26); the rest is the run lock.
+      if (name === 'comm_open_bill_on') {
+        const on = options.openMonths ? options.openMonths.includes(args.p_period) : (options.enabled ?? true)
+        return Promise.resolve({ data: on, error: null })
+      }
       locks.push(args.p_period)
       return Promise.resolve({ data: options.locked?.includes(args.p_period) ?? false, error: null })
     },
@@ -94,6 +100,14 @@ describe('Open Bill saving safeguards', () => {
     await expect(saveOpenBillPicks([{ orderId: 'a', before: 1, after: 2 }, { orderId: 'b', before: 2, after: 1 }])).rejects.toThrow('switched off')
     expect(db.writes).toEqual([])
     expect(db.tables.sales_order_open_bill_tags).toHaveLength(2)
+  })
+
+  it('asks the order’s own month: August set on for itself takes a pick, September off refuses (2026-09-26)', async () => {
+    const db = database({ openMonths: ['2026-08-01'] })
+    await setOpenBillRank('older', 3)
+    expect(db.tables.sales_order_open_bill_tags.find(row => row.order_id === 'older')).toMatchObject({ bill_rank: 3 })
+    await expect(setOpenBillRank('a', 3)).rejects.toThrow('Open Bill is switched off for 2026-09')
+    expect(db.tables.sales_order_open_bill_tags.find(row => row.order_id === 'a')).toMatchObject({ bill_rank: 1 })
   })
 
   it('rejects stale baseline ranks and duplicate desired slots before writes', async () => {
