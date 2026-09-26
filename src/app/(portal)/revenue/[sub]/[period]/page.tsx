@@ -29,6 +29,8 @@ import CommissionWorkbench from './_components/CommissionWorkbench'
 import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
 import ErpChangesPanel from './_components/ErpChangesPanel'
+import FairMovesPanel from './_components/FairMovesPanel'
+import { loadFairMoves } from '../../_lib/fair-calendar'
 import workbenchStyles from './_components/commission-workbench.module.css'
 
 interface PageProps {
@@ -247,7 +249,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     [openBillRuleRes, openBillPaid],
     [upsales, upsaleFairs, team, upsaleLock],
     workbench,
-    [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments],
+    [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments, fairMoves],
     openBillMonth,
   ] = await Promise.all([
     batchRowRead,
@@ -280,6 +282,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         // Drops and upsells the ERP found on settled bills, from any month —
         // they are paid into the month somebody confirms them in (2026-09-26).
         loadPendingAdjustments(supabase, subDept.id),
+        // Bills in another month than the fair the ERP names (2026-09-27).
+        hasBatch ? loadFairMoves(supabase, subDept.id) : Promise.resolve([]),
       ]),
     ),
     openBillMonthRead,
@@ -356,7 +360,10 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     />
   ) : null
   const erpChangesPanel = (
-    <ErpChangesPanel period={period} pending={pendingAdjustments} locked={Boolean(upsaleLock.data)} />
+    <>
+      <ErpChangesPanel period={period} pending={pendingAdjustments} locked={Boolean(upsaleLock.data)} />
+      <FairMovesPanel period={period} subDepartmentId={subDept.id} moves={fairMoves} />
+    </>
   )
 
   const monthHeader = (

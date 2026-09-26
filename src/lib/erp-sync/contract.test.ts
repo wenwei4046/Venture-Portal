@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ERP_SYNC_MAX_ORDERS,
   agentKeyOf,
+  fairOf,
   isoDate,
   normaliseStatus,
   parseErpSyncBody,
@@ -299,5 +300,62 @@ describe('the line variants the portal keeps', () => {
     ])
     for (const line of lines) expect(line).not.toHaveProperty('variants', expect.anything())
     expect(JSON.parse(JSON.stringify(lines)).some((l: Record<string, unknown>) => 'variants' in l)).toBe(false)
+  })
+})
+
+// 2026-09-27: the ERP makes the salesperson pick the event, and the delivery
+// carries it. HC-SO-2609-221 as the ERP holds it.
+describe('the fair the ERP names', () => {
+  const PWCC = {
+    projectId: 2212,
+    code: '2026-09-MLE-PULAU-PINANG-PENANG-WATERFRONT-CONVENTION-CENTRE-ZANOTTI',
+    name: 'PULAU PINANG [ZANOTTI] MLE @ PENANG WATERFRONT CONVENTION CENTRE',
+    venue: 'PENANG WATERFRONT  CONVENTION CENTRE ',
+    organizer: 'MLE',
+    eventType: 'exhibition',
+    brand: 'ZANOTTI',
+    startDate: '2026-09-25',
+    endDate: '2026-09-27',
+    status: 'confirmed',
+    match: 'PICKED',
+    fairDate: '2026-09-25',
+  }
+
+  it('reads the pick onto the order, venue tidied like the header’s, and keeps it as received', () => {
+    const r = toCanonicalOrder(delivery({ fair: PWCC }))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.order.fair).toEqual({ ...PWCC, venue: 'PENANG WATERFRONT CONVENTION CENTRE' })
+    expect(r.order.raw.fair).toEqual(PWCC)
+  })
+
+  it('has no fair when the ERP sent none, and on a delete', () => {
+    const none = toCanonicalOrder(delivery())
+    expect(none.ok && none.order.fair).toBeNull()
+    expect(none.ok && none.order.raw.fair).toBeNull()
+    const gone = toCanonicalOrder({ docNo: 'HC-SO-000001', deleted: true, fair: PWCC })
+    expect(gone.ok && gone.order.fair).toBeNull()
+  })
+
+  it('never refuses an order for a pick it cannot read', () => {
+    for (const fair of [
+      { ...PWCC, projectId: null },
+      { ...PWCC, projectId: 'abc' },
+      { ...PWCC, projectId: 12.5 },
+      { ...PWCC, venue: '  ' },
+      { ...PWCC, startDate: '25/09/2026' },
+      { ...PWCC, endDate: '2026-09-20' },
+      'PWCC',
+    ]) {
+      const r = toCanonicalOrder(delivery({ fair }))
+      expect(r.ok).toBe(true)
+      expect(r.ok && r.order.fair).toBeNull()
+    }
+  })
+
+  it('closes an open-ended booth on its first day, and passes a cancelled one on for SQL to refuse', () => {
+    expect(fairOf({ ...PWCC, endDate: null })).toMatchObject({ startDate: '2026-09-25', endDate: '2026-09-25' })
+    expect(fairOf({ ...PWCC, status: 'cancelled' })).toMatchObject({ projectId: 2212, status: 'cancelled' })
+    expect(fairOf({ ...PWCC, organizer: ' ', fairDate: 'x' })).toMatchObject({ organizer: null, fairDate: null })
   })
 })

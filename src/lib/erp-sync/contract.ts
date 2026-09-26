@@ -30,12 +30,13 @@
  *     Cancelled lines (`cancelled = true`) are not lines.
  *   - Where it was sold: `sales_location` is the WAREHOUSE (KL / PG / SRW) and
  *     becomes the portal's `location`; `venue` is the fair itself — "SUNWAY
- *     PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB" — free text the ERP
- *     types (its `venue_id` is never populated) and its own column here. The
- *     ERP sends nothing about who ORGANISED the event; the portal carries
- *     that itself, per (venue × month), in `comm_venue_events`. If a
- *     delivery ever does name one, `erp_header_organiser()` in SQL reads it
- *     straight out of the stored `raw.header` — see erp-sync/contract.md.
+ *     PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB" — and its own column
+ *     here.
+ *   - Which fair (2026-09-27): the ERP makes the salesperson pick the event
+ *     and sends the pick as `fair` — the brand booth (`projectId`) with its
+ *     venue, organiser and days. `ingest_erp_sales_order` keeps it as the
+ *     portal's fair (`erp_sync_fair`) and pins it to the bill; the organiser
+ *     is no longer typed on the portal at all. See erp-sync/contract.md §3.4.
  *
  * PII is dropped before anything is stored: the header carries the customer's
  * addresses, phone, email and emergency contacts, and `customer_po_image_b64`
@@ -80,6 +81,64 @@ export interface ErpDelivery {
   items?: Row[] | null
   payments?: Row[] | null
   salesperson?: { id?: unknown; name?: unknown; staff_code?: unknown; user_id?: unknown } | null
+  /** The event the salesperson picked in the ERP (2026-09-27) — null when none. */
+  fair?: Row | null
+}
+
+/**
+ * The fair a bill was written at, as the ERP names it: one BRAND's booth
+ * (`projectId`, a `public.projects` row) at one organiser's event. The
+ * portal's fair is the event — `erp_sync_fair` folds the booths of one event
+ * (same place, overlapping days) into one `comm_venue_events` row.
+ */
+export interface CanonicalFair {
+  projectId: number
+  code: string | null
+  name: string | null
+  /** The ERP's venue-master name, spaces tidied like the header's venue. */
+  venue: string
+  organizer: string | null
+  /** `exhibition` / `solo` — a solo roadshow's "organizer" is the mall. */
+  eventType: string | null
+  brand: string | null
+  startDate: string
+  /** Inclusive. The start day when the ERP left the project open-ended. */
+  endDate: string
+  /** `confirmed` / `cancelled` … — a cancelled booth is no fair (decided in SQL). */
+  status: string | null
+  /** How the ERP matched it: PICKED / PENDING / AMBIGUOUS / UNMATCHED. */
+  match: string | null
+  /** Which day of the fair the sale was, when the salesperson said. */
+  fairDate: string | null
+}
+
+/**
+ * Read the delivery's `fair`, or null. A pick the portal cannot read is no
+ * pick — never a reason to refuse the order, which is a sale either way.
+ */
+export function fairOf(raw: unknown): CanonicalFair | null {
+  if (!isRow(raw)) return null
+  const projectId = num(raw.projectId)
+  const venue = normaliseVenue(raw.venue)
+  const startDate = isoDate(raw.startDate)
+  const endDate = isoDate(raw.endDate) ?? startDate
+  if (projectId === null || !Number.isInteger(projectId) || !venue || !startDate || !endDate || endDate < startDate) {
+    return null
+  }
+  return {
+    projectId,
+    code: text(raw.code),
+    name: text(raw.name),
+    venue,
+    organizer: text(raw.organizer),
+    eventType: text(raw.eventType),
+    brand: text(raw.brand),
+    startDate,
+    endDate,
+    status: text(raw.status),
+    match: text(raw.match),
+    fairDate: isoDate(raw.fairDate),
+  }
 }
 
 export interface CanonicalLine {
@@ -158,8 +217,10 @@ export interface CanonicalOrder {
   balance: number | null
   createdAt: string | null
   lines: CanonicalLine[]
+  /** The event the salesperson picked in the ERP; null when none came, or it could not be read. */
+  fair: CanonicalFair | null
   /** The delivery as received, minus PII — for re-deriving without asking again. */
-  raw: { header: Row | null; items: Row[]; payments: Row[]; salesperson: Row | null }
+  raw: { header: Row | null; items: Row[]; payments: Row[]; salesperson: Row | null; fair: Row | null }
 }
 
 export type ParseFailure = { ok: false; error: string; docNo: string | null }
@@ -328,7 +389,8 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
         balance: null,
         createdAt: null,
         lines: [],
-        raw: { header: null, items: [], payments: [], salesperson: null },
+        fair: null,
+        raw: { header: null, items: [], payments: [], salesperson: null, fair: null },
       },
     }
   }
@@ -374,11 +436,13 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
       balance,
       createdAt: isoTimestamp(header.created_at),
       lines: toCanonicalLines(items),
+      fair: fairOf(delivery.fair),
       raw: {
         header: stripHeaderPii(header),
         items,
         payments,
         salesperson,
+        fair: isRow(delivery.fair) ? delivery.fair : null,
       },
     },
   }
