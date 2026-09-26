@@ -6,6 +6,7 @@ const actions = vi.hoisted(() => ({
   recordUpsale: vi.fn(),
   updateUpsale: vi.fn(),
   deleteUpsale: vi.fn(),
+  reopenErpAdjustment: vi.fn(),
 }))
 vi.mock('../../../upsale-actions', () => actions)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
@@ -21,12 +22,39 @@ const UPSALE: UpsaleView = {
   id: 'u1',
   staffId: TEAM[0].staffId,
   staffName: 'YUNY',
+  kind: 'upsale',
+  source: 'manual',
+  status: 'confirmed',
+  erpDocNo: null,
+  settledAmount: null,
+  erpAmount: null,
+  originalPeriod: null,
+  periodMonth: '2026-09-01',
   amount: 300,
   soldOn: '2026-08-29',
   fairEventId: 'fair-bcck',
   fairLabel: FAIRS[0].label,
   originalRef: 'HC5315',
   note: 'protector',
+}
+/** HC13911 went from 16,888 to 14,800 after August was settled. */
+const ERP_DROP: UpsaleView = {
+  ...UPSALE,
+  id: 'd1',
+  staffId: TEAM[1].staffId,
+  staffName: 'LOUIS',
+  kind: 'drop',
+  source: 'erp',
+  erpDocNo: 'HC-SO-013911',
+  settledAmount: 16_888,
+  erpAmount: 14_800,
+  originalPeriod: '2026-08-01',
+  amount: -2_088,
+  soldOn: '2026-09-18',
+  fairEventId: null,
+  fairLabel: null,
+  originalRef: 'HC13911',
+  note: null,
 }
 
 function show(props: Partial<Parameters<typeof UpsaleSection>[0]> = {}) {
@@ -48,12 +76,13 @@ beforeEach(() => {
   actions.recordUpsale.mockResolvedValue(undefined)
   actions.updateUpsale.mockResolvedValue(undefined)
   actions.deleteUpsale.mockResolvedValue(undefined)
+  actions.reopenErpAdjustment.mockResolvedValue(undefined)
 })
 
 describe('UpsaleSection', () => {
   it('lists the month’s upsales with their total', () => {
     show()
-    expect(screen.getByText('1 upsale · RM 300.00')).toBeVisible()
+    expect(screen.getByText('1 upsale · net RM 300.00')).toBeVisible()
     expect(screen.getByRole('cell', { name: 'HC5315' })).toBeVisible()
     expect(screen.getByRole('cell', { name: FAIRS[0].label })).toBeVisible()
   })
@@ -70,6 +99,7 @@ describe('UpsaleSection', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Record upsale' })))
     expect(actions.recordUpsale).toHaveBeenCalledWith('fair', '2026-09-01', {
       staffId: TEAM[1].staffId,
+      kind: 'upsale',
       amount: '1300',
       soldOn: '2026-08-28',
       fairEventId: 'fair-bcck',
@@ -78,10 +108,26 @@ describe('UpsaleSection', () => {
     })
   })
 
+  it('records a drop the same way, typed as a positive amount', async () => {
+    show({ upsales: [] })
+    fireEvent.change(screen.getByLabelText('Salesperson'), { target: { value: TEAM[1].staffId } })
+    fireEvent.change(screen.getByLabelText('Upsale or drop'), { target: { value: 'drop' } })
+    fireEvent.change(screen.getByLabelText('Amount dropped'), { target: { value: '2088' } })
+    fireEvent.change(screen.getByLabelText('Sold on'), { target: { value: '2026-09-18' } })
+    fireEvent.change(screen.getByLabelText('Dropped from bill'), { target: { value: 'HC13911' } })
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Record drop' })))
+    expect(actions.recordUpsale).toHaveBeenCalledWith('fair', '2026-09-01', expect.objectContaining({
+      kind: 'drop',
+      amount: '2088',
+      originalRef: 'HC13911',
+    }))
+  })
+
   it('edits an upsale in the same form', async () => {
     show()
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    expect(screen.getByText('Change this upsale')).toBeVisible()
+    expect(screen.getByText('Change this entry')).toBeVisible()
     expect(screen.getByLabelText('Amount added')).toHaveValue('300.00')
     fireEvent.change(screen.getByLabelText('Amount added'), { target: { value: '350' } })
 
@@ -98,6 +144,25 @@ describe('UpsaleSection', () => {
     expect(actions.deleteUpsale).toHaveBeenCalledWith('u1')
   })
 
+  it('nets a drop against the upsales and shows it negative', () => {
+    show({ upsales: [UPSALE, ERP_DROP] })
+    expect(screen.getByText('1 upsale · 1 drop · net RM (1,788.00)')).toBeVisible()
+    expect(screen.getByText('Drop sales')).toBeVisible()
+    expect(screen.getByText('found by the ERP')).toBeVisible()
+    expect(screen.getByText('RM (2,088.00)')).toBeVisible()
+  })
+
+  it('never edits or deletes what the ERP found — Undo puts it back to wait', async () => {
+    show({ upsales: [ERP_DROP] })
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(actions.reopenErpAdjustment).not.toHaveBeenCalled()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Confirm — back to waiting' })))
+    expect(actions.reopenErpAdjustment).toHaveBeenCalledWith('d1')
+  })
+
   it('shows what the action refused, in its words', async () => {
     actions.recordUpsale.mockRejectedValue(new Error('The upsale amount must be more than RM 0.'))
     show({ upsales: [] })
@@ -106,11 +171,12 @@ describe('UpsaleSection', () => {
   })
 
   it('is read-only once the month’s run has paid', () => {
-    show({ locked: true })
+    show({ locked: true, upsales: [UPSALE, ERP_DROP] })
     expect(screen.getByText(/This month’s run has paid|This month's run has paid/)).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Record upsale' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
-    expect(screen.getByText('1 upsale · RM 300.00')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+    expect(screen.getByText('1 upsale · 1 drop · net RM (1,788.00)')).toBeVisible()
   })
 })

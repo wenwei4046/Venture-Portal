@@ -10,16 +10,19 @@ import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import { saveOpenBillPicks } from '../../../run-actions'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
+import NoCommission, { COMMISSIONABLE_HINT, DROP_HINT, SALES_VALUE_HINT, UPSELL_HINT } from './NoCommission'
 import s from './commission-workbench.module.css'
 
 type Tab = 'sales' | 'kpi' | 'open'
-type Column = 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+type Column = 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 const COLUMNS: [Column, string][] = [
   ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
   ['location', 'Sales location'], ['brand', 'Brand'], ['category', 'Category'], ['sales', 'Sales value'],
+  ['commissionable', 'Commissionable value'],
   ['margin', 'Margin'], ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
   ['incentive', 'Margin incentive'], ['open', 'Open Bill'],
 ]
+const NUMERIC_COLUMNS: Column[] = ['sales', 'commissionable', 'margin', 'product', 'kpi', 'incentive']
 const money = formatMoney
 const quantity = (value: number) => new Intl.NumberFormat('en-MY', { maximumFractionDigits: 8 }).format(value)
 const pct = (n: number | null | undefined) => n == null ? '—' : `${(n * 100).toFixed(1).replace('.0', '')}%`
@@ -201,6 +204,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       case 'brand': return row.brands.join(', ') || 'Unclassified'
       case 'category': return row.categories.join(', ') || '—'
       case 'sales': return money(row.orderTotal)
+      case 'commissionable': return <>{money(row.commissionableValue)}<NoCommission amount={row.orderTotal - row.commissionableValue} /></>
       case 'margin': return row.upsale ? 'Not applicable' : <>{pct(row.marginPct)}<small className={s.muted}>{row.marginCost == null ? 'Cost incomplete' : money(row.marginRevenue - row.marginCost)}</small></>
       case 'rank': return overriding ? <>{(row as OverrideOrderRow).downlineTitle}<small>{(row as OverrideOrderRow).downlineRank}</small></>
         : <>{selected?.titleLabel}<small>{selected?.rankLabel} · {pct(own.productRate)}</small></>
@@ -218,14 +222,14 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.tableScroll} role="region" aria-label={`${overriding ? 'Overriding' : 'Personal'} commission table, scroll horizontally`} tabIndex={0}>
         <table className={s.table} aria-label={overriding ? 'Overriding commission by downline order' : 'Personal commission by sales order'}>
           <thead><tr><th className={s.stickyFirst}>Sales order</th>{overriding && <th>Downline</th>}
-            {visibleColumns.map(([key, label]) => <th key={key}>{overriding && key === 'product' ? 'Override basis' : label}</th>)}
+            {visibleColumns.map(([key, label]) => <th key={key} title={key === 'sales' ? SALES_VALUE_HINT : key === 'commissionable' ? COMMISSIONABLE_HINT : undefined}>{overriding && key === 'product' ? 'Override basis' : label}</th>)}
             <th>Review</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
           <tbody>{filtered.map((row, i) => <tr key={`${row.orderId}:${overriding ? (row as OverrideOrderRow).downlineStaffId : row.staffId}:${i}`} className={excluded.includes(row.orderId) ? s.excluded : undefined}>
             <td className={s.stickyFirst}>{row.upsale ? <span>{row.orderNo}</span> : <Link href={`/revenue/${sub}/${row.periodMonth}/orders/${row.orderId}`}>{row.orderNo}</Link>}
               {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}
               {!overriding && <small>{statusLabel[(row as CommissionOrderRow).status]}</small>}</td>
             {overriding && <td>{(row as OverrideOrderRow).downlineName}</td>}
-            {visibleColumns.map(([key]) => <td key={key} className={['sales', 'margin', 'product', 'kpi', 'incentive'].includes(key) ? s.numeric : undefined}>{cell(row, key, overriding)}</td>)}
+            {visibleColumns.map(([key]) => <td key={key} className={NUMERIC_COLUMNS.includes(key) ? s.numeric : undefined}>{cell(row, key, overriding)}</td>)}
             <td><button type="button" className={s.ghostButton} onClick={() => exclude(row.orderId)}>{excluded.includes(row.orderId) ? 'Restore' : 'Exclude'}</button></td>
             <td className={s.stickyTotal}>{money(row.totalCommission)}{overriding && <small>{pct((row as OverrideOrderRow).overrideRate)} overriding</small>}</td>
           </tr>)}</tbody>
@@ -282,12 +286,29 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     <div role={isPersonView ? undefined : "tabpanel"} id={`commission-panel-${tab}`} aria-labelledby={isPersonView ? undefined : `commission-tab-${tab}`}>
     {tab === 'sales' && !selected && <>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Salesperson commission summary">
-        <thead><tr><th className={s.stickyFirst}>Sales person</th><th>Title / rank</th><th>Orders</th><th>Sales value</th><th>Margin</th><th>Personal</th><th>Overriding</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
-        <tbody>{people.map(p => <tr key={p.staffId}><td className={s.stickyFirst}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} <span aria-hidden>↗</span></button></td>
-          <td>{p.titleLabel}<small>{p.rankLabel} · {pct(p.productRate)}</small></td><td>{p.personalRows.filter(r => r.status !== 'excluded').length}</td>
-          <td className={s.numeric}>{money(sum(p.personalRows.filter(r => r.status !== 'excluded'), r => r.orderTotal))}</td><td className={s.numeric}>{pct(p.statement?.marginPct)}<small>{p.statement?.marginPct == null ? 'Cost incomplete' : money(p.statement?.marginRevenue - p.statement?.marginCost)}</small></td>
-          <td className={s.numeric}>{money(p.personalTotal)}</td><td className={s.numeric}>{money(p.overrideTotal)}</td><td className={s.stickyTotal}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{money(p.totalCommission)}</button>{p.monthlyGroupIncentive > 0 && <small>Includes {money(p.monthlyGroupIncentive)} group reward</small>}</td></tr>)}</tbody>
-        <tfoot><tr><td colSpan={7}>All salespeople · total commission</td><td className={s.stickyTotal}>{money(board.totalCommission)}</td></tr></tfoot>
+        <thead><tr><th className={s.stickyFirst}>Sales person</th><th>Title / rank</th><th>Orders</th>
+          <th title={SALES_VALUE_HINT}>Sales value</th><th title={COMMISSIONABLE_HINT}>Commissionable value</th>
+          <th title={UPSELL_HINT}>Upsell</th><th title={DROP_HINT}>Drop sales</th>
+          <th>Margin</th><th>Personal</th><th>Overriding</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
+        <tbody>{people.map(p => {
+          const counted = p.personalRows.filter(r => r.status !== 'excluded')
+          // Bills, and beside them what was added to or dropped from settled
+          // ones (2026-09-26) — neither is a bill, so neither is an order.
+          const bills = counted.filter(r => !r.upsale)
+          const salesValue = sum(bills, r => r.orderTotal)
+          const commissionable = sum(bills, r => r.commissionableValue)
+          const upsell = sum(counted.filter(r => r.upsale && r.orderTotal > 0), r => r.orderTotal)
+          const dropped = sum(counted.filter(r => r.upsale && r.orderTotal < 0), r => r.orderTotal)
+          return <tr key={p.staffId}><td className={s.stickyFirst}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} <span aria-hidden>↗</span></button></td>
+          <td>{p.titleLabel}<small>{p.rankLabel} · {pct(p.productRate)}</small></td><td>{bills.length}</td>
+          <td className={s.numeric}>{money(salesValue)}</td>
+          <td className={s.numeric}>{money(commissionable)}<NoCommission amount={salesValue - commissionable} /></td>
+          <td className={s.numeric}>{upsell ? money(upsell) : <span className={s.muted}>—</span>}</td>
+          <td className={s.numeric}>{dropped ? <span className="neg">{money(dropped)}</span> : <span className={s.muted}>—</span>}</td>
+          <td className={s.numeric}>{pct(p.statement?.marginPct)}<small>{p.statement?.marginPct == null ? 'Cost incomplete' : money(p.statement?.marginRevenue - p.statement?.marginCost)}</small></td>
+          <td className={s.numeric}>{money(p.personalTotal)}</td><td className={s.numeric}>{money(p.overrideTotal)}</td><td className={s.stickyTotal}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{money(p.totalCommission)}</button>{p.monthlyGroupIncentive > 0 && <small>Includes {money(p.monthlyGroupIncentive)} group reward</small>}</td></tr>
+        })}</tbody>
+        <tfoot><tr><td colSpan={10}>All salespeople · total commission</td><td className={s.stickyTotal}>{money(board.totalCommission)}</td></tr></tfoot>
       </table></div></div>
       {!people.length && <p className={s.empty}>No salespeople found.</p>}
     </>}

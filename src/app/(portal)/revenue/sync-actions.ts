@@ -179,6 +179,74 @@ export async function replayHeldErpEvents(period: string, subDepartmentId: strin
   return { replayed: latest.size, applied, stillHeld }
 }
 
+export interface ClosedMonth {
+  periodMonth: string
+  closedAt: string
+  closedByName: string | null
+  note: string | null
+}
+
+/**
+ * Close a month to the ERP feed (2026-09-26): from now on every delivery that
+ * would write into or out of that month is HELD — answered 200, payload kept,
+ * nothing written — the way a month whose run has paid already is. The
+ * month's bills stay exactly as they are, so it can hold what was worked out
+ * by hand while every other month keeps syncing.
+ */
+export async function closeErpMonth(period: string, subDepartmentId: string, note?: string): Promise<ClosedMonth> {
+  await requirePermission('revenue')
+  if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Period must be the first of a month')
+
+  const supabase = await client()
+  await assertErpSubDepartment(supabase, subDepartmentId)
+  const { data, error } = await supabase.rpc('erp_feed_close_month', {
+    p_sub_department_id: subDepartmentId,
+    p_period: period,
+    p_note: note?.trim() || null,
+  })
+  if (error) throw new Error(`Could not close the month: ${error.message}`)
+
+  revalidatePath('/revenue', 'layout')
+  const r = (data ?? {}) as { periodMonth?: string; closedAt?: string; closedByName?: string | null; note?: string | null }
+  return {
+    periodMonth: r.periodMonth ?? period,
+    closedAt: r.closedAt ?? new Date().toISOString(),
+    closedByName: r.closedByName ?? null,
+    note: r.note ?? null,
+  }
+}
+
+export interface ReopenResult {
+  /** Held deliveries that were waiting when the month reopened. */
+  held: number
+  replay: ReplayResult
+}
+
+/**
+ * Hand a closed month back to the feed, then replay what it held — latest
+ * delivery per document, through the receiver's own function, so the month
+ * ends up exactly as if it had never been closed.
+ */
+export async function reopenErpMonth(period: string, subDepartmentId: string): Promise<ReopenResult> {
+  await requirePermission('revenue')
+  if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('Period must be the first of a month')
+
+  const supabase = await client()
+  await assertErpSubDepartment(supabase, subDepartmentId)
+  const { data, error } = await supabase.rpc('erp_feed_reopen_month', {
+    p_sub_department_id: subDepartmentId,
+    p_period: period,
+  })
+  if (error) throw new Error(`Could not reopen the month: ${error.message}`)
+
+  const held = Number((data as { held?: number } | null)?.held ?? 0)
+  const replay = held > 0
+    ? await replayHeldErpEvents(period, subDepartmentId)
+    : { replayed: 0, applied: 0, stillHeld: 0 }
+  revalidatePath('/revenue', 'layout')
+  return { held, replay }
+}
+
 async function assertErpSubDepartment(supabase: SupabaseClient, subDepartmentId: string): Promise<void> {
   const { data, error } = await supabase.rpc('erp_sync_sub_department')
   if (error) throw new Error(`Could not identify the ERP programme: ${error.message}`)

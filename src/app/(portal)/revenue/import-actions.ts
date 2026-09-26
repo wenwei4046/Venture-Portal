@@ -142,9 +142,18 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     .maybeSingle()
   if (liveError) throw new Error(`Could not check existing sales: ${liveError.message}`)
   if (liveBatch) {
-    throw new Error(
-      `${input.periodMonth.slice(0, 7)} is fed live from the ERP. A file import would replace what the feed delivered — it is not needed for a live month.`,
-    )
+    // A month closed to the feed may take a file — that is how a month worked
+    // out by hand replaces what the feed delivered (2026-09-26).
+    const { data: closed, error: closedError } = await supabase.rpc('erp_feed_month_closed', {
+      p_sub_department_id: input.subDepartmentId,
+      p_period: input.periodMonth,
+    })
+    if (closedError) throw new Error(`Could not check whether the month is closed to the feed: ${closedError.message}`)
+    if (!closed) {
+      throw new Error(
+        `${input.periodMonth.slice(0, 7)} is fed live from the ERP. A file import would replace what the feed delivered — close the month to the ERP feed first.`,
+      )
+    }
   }
 
   // ── Resolve agents ─────────────────────────────────────────────────────

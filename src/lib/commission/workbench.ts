@@ -2,7 +2,7 @@ import {
   billMargin, classifyLine, computeCommissionRun, indexItemGroups, indexKpiItems,
   isDepositMet, marginBase, normaliseCode, orderProductRevenue, penaltyBandFor, round2,
 } from './engine'
-import type { EngineInput, EngineResult, MarginSource, OpenBillTag, Statement } from './types'
+import type { EngineInput, EngineResult, MarginSource, OpenBillTag, SalesOrder, Statement } from './types'
 
 /** Display metadata only; financial facts always come from EngineInput. */
 export interface WorkbenchPersonMeta {
@@ -47,7 +47,14 @@ export interface CommissionOrderRow {
   brands: string[]
   categories: string[]
   upsale: boolean
+  /** Everything on the bill — transport, disposal and every other charge included. */
   orderTotal: number
+  /**
+   * The part of the bill that earns commission — product commission or KPI —
+   * under the scheme's switches as they stand. `orderTotal − commissionableValue`
+   * is what the bill carries that earns nothing: transport, disposal, service.
+   */
+  commissionableValue: number
   paidAmount: number
   /** Original assigned share of revenue, retained when a row is excluded. */
   productRevenue: number
@@ -150,6 +157,27 @@ function sum(values: readonly number[]): number {
 }
 
 /**
+ * What on a bill earns commission (2026-09-26): every line the engine pays a
+ * rate on or a KPI amount for. A transport charge, a disposal request, any
+ * group the scheme marks as not commissionable and any group it has never
+ * heard of earn nothing, so they are the difference between this and the
+ * bill's total. Pass the KPI index the engine is using — with KPI switched
+ * off a KPI item is judged by its group like any other line.
+ */
+export function orderCommissionableValue(
+  order: Pick<SalesOrder, 'lines'>,
+  kpiIndex: Map<string, number>,
+  groupIndex: Map<string, boolean>,
+): number {
+  return sum(order.lines
+    .filter(line => {
+      const kind = classifyLine(line, kpiIndex, groupIndex)
+      return kind === 'commissionable' || kind === 'kpi'
+    })
+    .map(line => line.lineAmount))
+}
+
+/**
  * Apportion an existing engine amount to the sen. Largest remainders absorb
  * rounding; signed weights retain refunds rather than silently dropping them.
  * This never decides an entitlement, it only explains a monthly engine line.
@@ -231,7 +259,9 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       organizer: meta?.organizer ?? null, location: meta?.location ?? null,
       brands: [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
       categories: [...new Set(order.lines.map(line => line.itemGroup))],
-      upsale: !!order.upsale, orderTotal: order.orderTotal, paidAmount: order.paidAmount,
+      upsale: !!order.upsale, orderTotal: order.orderTotal,
+      commissionableValue: orderCommissionableValue(order, kpiIndex, groupIndex),
+      paidAmount: order.paidAmount,
       productRevenue, marginRevenue: base.revenue,
       marginCost: margin.source === 'none' ? null : margin.cost,
       marginPct: margin.pct, marginSource: margin.source, status,

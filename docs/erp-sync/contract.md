@@ -215,7 +215,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 | `applied` | a new order, an update, or an order becoming excluded | yes — header upserted, lines replaced, day re-sequenced, Open Bill suggestions re-derived, batch counters refreshed |
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
-| `held` | the month's commission run is **applied/locked**, or the month was **file-imported** | no — payload kept; HR replays after reopening the run |
+| `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported** | no — payload kept; HR replays after reopening the run or the month |
 | `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window | no |
 
 **Commission rule, mirrored from the ERP** (`scm/shared/hr-commission.ts`,
@@ -331,8 +331,15 @@ A window of 401s between the two only delays deliveries — the outbox retries.
   job is not running; pending with `last_error = 'http 401'` means the secret.
 - **A month's run is applied and the ERP keeps changing orders in it.** They
   arrive as `held` (visible on Comm Cal with a count per month). Reopen the run,
-  press **Replay**, recompute. Clawback across periods is still not a rule
-  (spec §13).
+  press **Replay**, recompute — or, since 2026-09-26, leave the month paid:
+  each held change to a paid or settled bill becomes a pending **drop** or
+  **upsell** (`erp_sync_note_adjustment`, the commissionable difference from
+  what was settled, one per document) that HR pays into the month they are
+  working on from the month page's *Drops and upsells the ERP found*.
+- **Months paid outside the portal.** `comm_cutovers` (Comm Cal › *The portal
+  pays from*) makes every earlier month closed to the feed for good — its
+  deliveries are `held` and its changes become drops/upsells as above. A re-send
+  never moves a bill that lives in a paying month back into one of them.
 - **A month was file-imported before the feed existed.** Its deliveries are
   `held` too. Retire that import (supersede it) and replay, or leave the month
   as imported — the feed never overwrites a file month.

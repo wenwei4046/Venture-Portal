@@ -9,6 +9,10 @@ import { requireSubDepartment } from '../_lib/sub-departments'
 import { headers } from 'next/headers'
 import { loadErpSyncPanelData } from '../_lib/erp-sync-panel'
 import { loadErpLinkView, receiverUrlFor } from '../_lib/erp-link'
+import { loadClosedMonthsOrNone, loadCutoverOrNone, settledByHand } from '../_lib/erp-feed-month'
+import PaysFromControl from '../_components/PaysFromControl'
+import { loadDoubleClaims } from '../_lib/double-claims'
+import { openClaimsByMonth } from '@/lib/commission/double-claims'
 import ErpSyncPanel from '../_components/ErpSyncPanel'
 import ErpLinkPanel from '../_components/ErpLinkPanel'
 import { formatAgo } from '@/lib/erp-sync/format'
@@ -62,6 +66,16 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
     link = await loadErpLinkView(supabase, subDept.id, receiverUrlFor(h.get('x-forwarded-host') ?? h.get('host')))
   }
 
+  // Months closed to the feed, what it has held for each, and the bills that
+  // may be claimed twice (2026-09-26) — each month says so in its own row.
+  const [closedMonths, doubleClaims, cutover] = await Promise.all([
+    sync ? loadClosedMonthsOrNone(supabase, subDept.id) : Promise.resolve(new Map<string, never>()),
+    loadDoubleClaims(supabase, subDept.id),
+    loadCutoverOrNone(supabase, subDept.id),
+  ])
+  const heldByMonth = new Map((sync?.held ?? []).map(h => [h.period, h.count]))
+  const claimsByMonth = openClaimsByMonth(doubleClaims.groups)
+
   const runByPeriod = new Map(
     ((runs ?? []) as Array<{ period_month: string; status: string; total_commission: number | string; staff_count: number }>)
       .map(r => [r.period_month, r]),
@@ -106,6 +120,8 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
         </div>
       ) : null}
 
+      {subDept.schemeId ? <PaysFromControl subDepartmentId={subDept.id} cutover={cutover} /> : null}
+
       {rows.length > 0 ? (
         <section className="mb-12">
           <div className="sect-head">
@@ -140,6 +156,11 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
                         >
                           {label(b.period_month)}
                         </Link>
+                        {claimsByMonth.get(b.period_month) ? (
+                          <div className="font-mono text-[10.5px] text-danger mt-0.5">
+                            {claimsByMonth.get(b.period_month)} POSSIBLE DOUBLE CLAIM{claimsByMonth.get(b.period_month) === 1 ? '' : 'S'}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="num m-hide" data-label="Orders">{b.order_count}</td>
                       <td className="num m-hide" data-label="Unmatched agents">
@@ -156,7 +177,17 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
                         {run ? formatMoney(Number(run.total_commission)) : '—'}
                       </td>
                       <td className="font-mono text-xs text-muted m-hide" data-label="Source">
-                        {b.source === 'erp_sync' ? (
+                        {settledByHand(b.period_month, cutover) ? (
+                          <span className="text-graphite">
+                            Settled by hand{heldByMonth.get(b.period_month) ? ` · ${heldByMonth.get(b.period_month)} held` : ''}
+                            {b.source === 'erp_sync' ? '' : ` · ${b.file_name}`}
+                          </span>
+                        ) : closedMonths.has(b.period_month) ? (
+                          <span className="text-alert">
+                            ERP closed{heldByMonth.get(b.period_month) ? ` · ${heldByMonth.get(b.period_month)} held` : ''}
+                            {b.source === 'erp_sync' ? '' : ` · ${b.file_name}`}
+                          </span>
+                        ) : b.source === 'erp_sync' ? (
                           <span className="text-ledger">ERP live · {formatAgo(b.last_synced_at)}</span>
                         ) : (
                           b.file_name

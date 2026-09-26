@@ -245,14 +245,37 @@ function lineSortKey(row: Row, index: number): [number, string] {
   return [n === null ? Number.MAX_SAFE_INTEGER : n, `${text(row.created_at) ?? ''}|${String(index).padStart(6, '0')}`]
 }
 
+/**
+ * One number per line, never two lines on one number (2026-09-26).
+ *
+ * The portal keys a bill's lines on (order, line_no). The ERP numbers its own
+ * lines but leaves `line_no` blank on a line added later — HC-SO-013504 came
+ * as 1 2 3 4 5 7 and a blank — and the blank used to take its POSITION (7),
+ * which collided, so every delivery of that bill failed from 22 September on
+ * and the outbox retried it forever. The ERP's own numbers are kept; a blank
+ * or a repeat is numbered after the highest one, in reading order.
+ */
+function uniqueLineNumbers(rows: Row[]): number[] {
+  const taken = new Set<number>()
+  const own = rows.map(row => {
+    const n = num(row.line_no)
+    if (n === null || !Number.isInteger(n) || taken.has(n)) return null
+    taken.add(n)
+    return n
+  })
+  let next = taken.size ? Math.max(...taken) : 0
+  return own.map(n => n ?? ++next)
+}
+
 export function toCanonicalLines(items: Row[]): CanonicalLine[] {
   const live = items
     .map((row, index) => ({ row, key: lineSortKey(row, index) }))
     .filter(({ row }) => row.cancelled !== true)
     .sort((a, b) => (a.key[0] - b.key[0]) || a.key[1].localeCompare(b.key[1]))
+  const lineNos = uniqueLineNumbers(live.map(({ row }) => row))
 
   return live.map(({ row }, i) => ({
-    lineNo: num(row.line_no) ?? i + 1,
+    lineNo: lineNos[i],
     itemGroup: text(row.item_group) ?? 'UNGROUPED',
     itemCode: text(row.item_code) ?? '(none)',
     description: text(row.description),

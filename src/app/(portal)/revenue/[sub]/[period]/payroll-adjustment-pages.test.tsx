@@ -26,7 +26,9 @@ function database() {
     rank_key:'a', group_breakdown:[], full_spec:false })
   const rows: Record<string, unknown> = {
     sales_import_batches: { id:'batch', source:'erp_sync', order_count:0 },
-    comm_runs: { id:'run', status:'applied', staff_count:1, total_commission:10000, warnings:[], deferred_orders:[], penalised_orders:[] },
+    // A list, as PostgREST returns one: maybeSingle() takes the first row, and
+    // the month page also reads which months a run has paid (2026-09-26).
+    comm_runs: [{ id:'run', period_month:'2026-09-01', status:'applied', staff_count:1, total_commission:10000, warnings:[], deferred_orders:[], penalised_orders:[] }],
     comm_statements: [statement], hr_staff_costs: [{ id:'staff', employee_name:'Employee One', employee_code:'EMP1' }],
   }
   const from = vi.fn((table: string) => {

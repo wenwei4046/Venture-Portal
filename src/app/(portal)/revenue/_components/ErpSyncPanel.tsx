@@ -257,8 +257,9 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
         <div className="mb-8">
           <h3 className="font-serif italic text-sm text-graphite mb-2">Held deliveries</h3>
           <Hint>
-            The ERP changed these orders after the month&apos;s run was applied, or the month was
-            imported from a file. Nothing was written. Reopen the run, then replay.
+            The ERP changed these orders after the month&apos;s run was applied, while the month was
+            closed to the feed, or after the month was imported from a file. Nothing was written.
+            Reopen the run or the month, then replay.
           </Hint>
           <div className="border border-hairline rounded-md bg-surface overflow-x-auto">
             <table className="ledger-table tight">
