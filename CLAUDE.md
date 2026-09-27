@@ -617,6 +617,28 @@ src/
 │   │   │                              `revenue_include_order`,
 │   │   │                              `lib/commission/bill-exclusion.ts`,
 │   │   │                              `BillContextMenu`, mig `20260927020000`.
+│   │   │                              The same menu (`useBillMenu`,
+│   │   │                              `BillCountNotice`) is on a salesperson's
+│   │   │                              ledger on the month — Personal /
+│   │   │                              Overriding / Below deposit — and the
+│   │   │                              month's Below deposit tab (user
+│   │   │                              2026-09-27); a carried-in bill answers
+│   │   │                              to ITS month's lock
+│   │   │                              (`lockedPeriods`).
+│   │   │                              **THE WORKBENCH IS A URL (2026-09-27):**
+│   │   │                              `?view=` (the cut) / `?person=` /
+│   │   │                              `?orders=` (their table), pushed with
+│   │   │                              `history.pushState`; `q` / `brand` /
+│   │   │                              `sort` replaced as typed
+│   │   │                              (`lib/commission/workbench-nav.ts`).
+│   │   │                              It was React state, so Back from a bill
+│   │   │                              opened on ANTHONY's ledger landed on the
+│   │   │                              list of people. NOT `?tab=` — that is
+│   │   │                              `MonthBreakdownTabs`'. Bill links carry
+│   │   │                              `?from=`; the bill page leads with
+│   │   │                              "← ANTHONY" (`ReturnLink`: steps Back
+│   │   │                              when the previous entry IS that page —
+│   │   │                              Navigation API — else a plain link).
 │   │   │                              **ONE RAIL AT THE TOP (2026-09-26):** the
 │   │   │                              workbench's tabs (`CommissionWorkbench`)
 │   │   │                              are Total Sales Orders / KPI Items / Open
