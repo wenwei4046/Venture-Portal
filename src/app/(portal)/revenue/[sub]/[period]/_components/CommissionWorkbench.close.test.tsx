@@ -209,6 +209,18 @@ describe('closing salespeople from the list', () => {
     expect(bar()).toHaveTextContent('settled by hand')
   })
 
+  // The screenshot of 2026-09-28: Close all 30 disabled by a draft of the old
+  // KPI / Open Bill / Margin preview checkboxes still in the tab's session —
+  // set to the month's own values, so nothing on screen looked different.
+  it('is not held shut by the incentive preview an older draft kept', () => {
+    sessionStorage.setItem('commission-draft:fair:2026-09-01', JSON.stringify({
+      picks: null, picksSource: null, currentTeam: false, previewFeatures: { kpi: false, openBill: false, margin: false },
+    }))
+    renderBoard()
+    expect(within(bar()).getByRole('button', { name: 'Close all 3' })).toBeEnabled()
+    expect(bar()).not.toHaveTextContent('A close locks the month as saved')
+  })
+
   it('surfaces the refusal the server gives, in words', async () => {
     closeSalespeople.mockRejectedValueOnce(new Error('Nobody was closed — ANTHONY is RM 200.00 now, not the RM 150.00 on your screen. Refresh the page and check again.'))
     renderBoard()
@@ -224,11 +236,15 @@ describe('bills paid on but priced RM 0 in the ERP', () => {
   const unpricedSale = (): SalesOrder => ({ ...sale('rm0', 0, 'agent'), orderNo: 'HC-SO-2609-114', paidAmount: 2_839 })
   const month = () => fixture([sale('one', 1_000, 'agent'), sale('two', 2_000, 'agent'), sale('three', 4_000, 'ch'), unpricedSale()])
 
-  it('names them above the list and tags the salesperson’s row', () => {
+  it('names them above the list, folded to one line, and tags the salesperson’s row', () => {
     renderBoard({ data: month() })
     const notice = screen.getByRole('region', { name: 'Bills priced RM 0 in the ERP' })
     expect(notice).toHaveTextContent('1 bill is paid but priced RM 0 in the ERP')
-    expect(within(notice).getByRole('link', { name: 'HC-SO-2609-114' })).toBeVisible()
+    // One line until asked (user 2026-09-28: 太显眼了); the bills open on a click.
+    const bill = within(notice).getByRole('link', { name: 'HC-SO-2609-114' })
+    expect(bill).not.toBeVisible()
+    fireEvent.click(notice.querySelector('summary')!)
+    expect(bill).toBeVisible()
     expect(notice).toHaveTextContent('paid RM 2,839.00')
     expect(within(row('ANTHONY')).getByText('1 bill RM 0')).toBeVisible()
     expect(within(row('CHEA HUAN')).queryByText(/RM 0$/)).toBeNull()

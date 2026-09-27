@@ -77,8 +77,6 @@ export interface PayrollBarFacts {
   settledBefore: string | null
   /** Why the month's payroll can take no more commission (`commission_payroll_closed`), or null. */
   payrollClosed: string | null
-  /** What the month pays — the scheme switches. */
-  switches?: ReactNode
 }
 
 /** A bill of the month taken out by hand (`excluded_reason = 'manual'`). */
@@ -105,6 +103,13 @@ interface Props {
   venues?: FairSales[]
   monthOverview?: ReactNode
   payroll?: PayrollBarFacts
+  /**
+   * What the month pays — the scheme's real switches (`SchemeSwitches`), in
+   * Review settings. The one set since 2026-09-28: the payroll bar's foot held
+   * them and Review settings held preview-only copies that saved nothing
+   * (user: 保留一个就好).
+   */
+  switches?: ReactNode
   /**
    * The month's bills somebody took out by hand (Don't count this bill) —
    * gone from the calculation, listed on their seller's page to count again.
@@ -148,7 +153,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -174,7 +179,6 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const [picks, setPicks] = useState<OpenBillTag[] | null>(null)
   const [picksSource, setPicksSource] = useState<string | null>(null)
   const [currentTeam, setCurrentTeam] = useState(false)
-  const [previewFeatures, setPreviewFeatures] = useState<{ kpi?: boolean; openBill?: boolean; margin?: boolean }>({})
   const [showExcluded, setShowExcluded] = useState(false)
   const [showAllOpen, setShowAllOpen] = useState(false)
   const [hidden, setHidden] = useState<Column[]>(['location'])
@@ -213,7 +217,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           } else setNotice('Saved Open Bill picks changed since this draft. Its Open Bill edits were discarded; other draft settings were restored.')
         }
         if (typeof draft.currentTeam === 'boolean') setCurrentTeam(draft.currentTeam)
-        if (draft.previewFeatures && typeof draft.previewFeatures === 'object') setPreviewFeatures(Object.fromEntries(Object.entries(draft.previewFeatures).filter(([key, value]) => ['kpi', 'openBill', 'margin'].includes(key) && typeof value === 'boolean')))
+        // A draft saved before 2026-09-28 may still carry `previewFeatures` —
+        // the incentive toggles that saved nothing. They are gone; so is it.
       }
       const layout = JSON.parse(sessionStorage.getItem(layoutKey) ?? 'null')
       if (Array.isArray(layout?.hidden)) setHidden(layout.hidden.filter((key: unknown) => COLUMNS.some(([column]) => column === key)))
@@ -224,9 +229,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
 
   useEffect(() => {
     if (hydrated) {
-      try { sessionStorage.setItem(storageKey, JSON.stringify({ picks, picksSource, currentTeam, previewFeatures })) } catch { /* private mode */ }
+      try { sessionStorage.setItem(storageKey, JSON.stringify({ picks, picksSource, currentTeam })) } catch { /* private mode */ }
     }
-  }, [storageKey, picks, picksSource, currentTeam, previewFeatures, hydrated])
+  }, [storageKey, picks, picksSource, currentTeam, hydrated])
 
   useEffect(() => {
     if (hydrated) {
@@ -241,22 +246,19 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     return () => window.removeEventListener('beforeunload', guard)
   }, [picks])
 
+  // What the month pays is the scheme's own switches, as saved (Review settings
+  // › This month pays): a switch there is saved, and the page follows it with
+  // the refresh. Only the current-team preview reads anything else.
   const effectiveInput = useMemo(() => ({ ...data.input,
     ...(currentTeam ? data.currentRules : {}),
     hierarchy: currentTeam ? data.currentHierarchy : data.input.hierarchy,
-    scheme: { ...data.input.scheme,
-      enableKpi: previewFeatures.kpi ?? data.input.scheme.enableKpi,
-      enableOpenBill: previewFeatures.openBill ?? data.input.scheme.enableOpenBill,
-      enableMarginIncentive: previewFeatures.margin ?? data.input.scheme.enableMarginIncentive,
-      enableMarginPenalty: previewFeatures.margin ?? data.input.scheme.enableMarginPenalty,
-    },
-  }), [data, currentTeam, previewFeatures])
+  }), [data, currentTeam])
   const board = useMemo(() => buildCommissionWorkbench(effectiveInput, {
     people: data.people, orders: data.orders, openBillTags: tags,
   }), [data, effectiveInput, tags])
   // What sending would put in payroll: the month as saved — no unsaved picks
   // or previews. The server works out the same.
-  const drafting = picks !== null || currentTeam || Object.keys(previewFeatures).length > 0
+  const drafting = picks !== null || currentTeam
   const sendBoard = useMemo(() => drafting
     ? buildCommissionWorkbench(data.input, { people: data.people, orders: data.orders })
     : board, [drafting, data, board])
@@ -545,7 +547,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       }
     })
   }
-  function reset() { setPicks(null); setPicksSource(null); setCurrentTeam(false); setPreviewFeatures({}); setNotice('Draft reset to the current source orders.'); setError('') }
+  function reset() { setPicks(null); setPicksSource(null); setCurrentTeam(false); setNotice('Draft reset to the current source orders.'); setError('') }
   function matches(row: CommissionOrderRow | OverrideOrderRow) {
     const q = query.trim().toLowerCase()
     return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories].some(v => v?.toLowerCase().includes(q)))
@@ -656,15 +658,15 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {brandDone && <p className={s.notice} role="status">{brandDone}</p>}
     {error && <p className={s.warning} role="alert">{error}</p>}
     {stalePicks && <p className={s.warning} role="alert">Saved Open Bill picks changed while this draft was open. Reset draft to use the latest picks before saving.</p>}
-    {picks && <div className={s.toolbar}><button className={s.primaryButton} disabled={saving || locked || stalePicks || !data.input.scheme.enableOpenBill} onClick={savePicks}>{saving ? 'Saving…' : 'Save Open Bill picks'}</button><span className={s.muted}>{data.input.scheme.enableOpenBill ? 'Unsaved until you save them — payroll is unchanged.' : 'Open Bill is preview-only while switched off for this month. Switch it on under This month pays, in the payroll bar, before saving picks.'}</span></div>}
+    {picks && <div className={s.toolbar}><button className={s.primaryButton} disabled={saving || locked || stalePicks || !data.input.scheme.enableOpenBill} onClick={savePicks}>{saving ? 'Saving…' : 'Save Open Bill picks'}</button><span className={s.muted}>{data.input.scheme.enableOpenBill ? 'Unsaved until you save them — payroll is unchanged.' : 'Open Bill is switched off for this month, so these picks pay nothing and cannot be saved. Switch it on under Review settings › This month pays first.'}</span></div>}
   </>
 
   return <section ref={workspaceRef} className={s.workspace} aria-label="Commission workbench">
     {!isPersonView && <>
     {monthOverview}
     <CommissionMonthSummary stats={monthStats} peopleCount={board.people.length} totalCommission={board.totalCommission}
-      status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Live calculation'} />
-    {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} period={period} state={payrollView} draft={drafting} switches={payroll.switches} />}
+      status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks ? 'Draft calculation' : 'Live calculation'} />
+    {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} period={period} state={payrollView} draft={drafting} />}
     <div className={s.tabs} role="tablist" aria-label="Commission views">
       {TABS.map(([key, text]) =>
         <button type="button" role="tab" aria-selected={tab === key} aria-controls={`commission-panel-${key}`} id={`commission-tab-${key}`} key={key}
@@ -672,21 +674,19 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </div>
     <div className={tab === 'sales' ? s.reviewToolbar : undefined}>
     {tab === 'sales' && <input className={s.search} placeholder="Search salesperson…" aria-label="Search salesperson" value={query} onChange={e => setQuery(e.target.value)} />}
-    <details className={tab === 'sales' ? s.reviewControls : s.monthSettings}><summary>Review settings</summary>
+    {/* Review settings (2026-09-28): what the month pays — the scheme's real
+        switches, the only set on the page — then how the figure is worked out
+        and the one preview left, the current team. The KPI / Open Bill /
+        Margin checkboxes that sat here were copies of the switches that saved
+        nothing, and a draft of them silently turned Close off. */}
+    <details className={tab === 'sales' ? s.reviewControls : s.monthSettings}><summary>Review settings{drafting && <span className={s.draftTag}>Draft</span>}</summary>
     <div>
-    <div className={s.topLine}><span className={s.badge}>Live calculation · {period.slice(0, 7)}</span><span className={s.muted}>Same Revenue Team rules as Arena</span><Link href={`/revenue/${sub}/rules`}>View rules ↗</Link></div>
+    {switches && <div className={s.monthPays}>{switches}</div>}
+    <div className={s.settingsLine}><span className={s.badge}>Live calculation · {period.slice(0, 7)}</span><span className={s.muted}>Same Revenue Team rules as Arena</span><Link href={`/revenue/${sub}/rules`}>View rules ↗</Link></div>
+    {(carriedCount > 0 || upsaleCount > 0) && <p className={s.settingsNote}>The month’s sales figures above stay unchanged. This commission calculation also includes {carriedCount} carried orders and {upsaleCount} recorded upsales.</p>}
     {data.input.hierarchy.length === 0 && !currentTeam && <p className={s.warning}>No team ranks are effective in {period.slice(0, 7)}. Product commission and overriding need an effective rank. Other configured incentives may still apply. You can try the current team below without changing history.</p>}
-    <details className={s.rules}><summary>Calculation setup · KPI {effectiveInput.scheme.enableKpi ? 'on' : 'off'} · Open Bill {openEnabled ? 'on' : 'off'} · Margin {effectiveInput.scheme.enableMarginIncentive ? 'on' : 'off'}</summary>
-      {(carriedCount > 0 || upsaleCount > 0) && <p>The month’s sales figures above stay unchanged. This commission calculation also includes {carriedCount} carried orders and {upsaleCount} recorded upsales.</p>}
-      <p>Try the configured incentives in this preview — nothing is saved. What the month really pays is set under This month pays, in the payroll bar above, and in <Link href={`/revenue/${sub}/rules`}>Revenue Rules</Link>.</p>
-      <div className={s.chips}>
-        {data.currentHierarchy.length > 0 && <label className={s.chip}><input type="checkbox" checked={currentTeam} onChange={e => setCurrentTeam(e.target.checked)} />Use current team & dated rules for preview</label>}
-        <label className={s.chip}><input type="checkbox" checked={effectiveInput.scheme.enableKpi} onChange={e => setPreviewFeatures(p => ({ ...p, kpi: e.target.checked }))} />KPI incentive</label>
-        <label className={s.chip}><input type="checkbox" checked={openEnabled} onChange={e => setPreviewFeatures(p => ({ ...p, openBill: e.target.checked }))} />Open Bill incentive</label>
-        <label className={s.chip}><input type="checkbox" checked={effectiveInput.scheme.enableMarginIncentive} onChange={e => setPreviewFeatures(p => ({ ...p, margin: e.target.checked }))} />Margin incentive & penalty</label>
-      </div>
-    </details>
-    {drafting && <div className={s.notice} role="status"><span>{[currentTeam && 'Current team preview', Object.keys(previewFeatures).length > 0 && 'Draft incentive settings', picks && 'Open Bill picks changed'].filter(Boolean).join(' · ')}. Payroll is unchanged.</span><button className={s.ghostButton} onClick={reset}>Reset draft</button></div>}
+    {data.currentHierarchy.length > 0 && <div className={s.settingsLine}><label className={s.chip}><input type="checkbox" checked={currentTeam} onChange={e => setCurrentTeam(e.target.checked)} />Use current team & dated rules for preview</label><span className={s.muted}>A preview — nothing is saved.</span></div>}
+    {drafting && <div className={s.notice} role="status"><span>{[currentTeam && 'Current team preview', picks && 'Open Bill picks changed'].filter(Boolean).join(' · ')}. Payroll is unchanged.</span><button className={s.ghostButton} onClick={reset}>Reset draft</button></div>}
     </div>
     </details>
     </div>
@@ -754,7 +754,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {tab === 'sales' && selected && <>
       <nav className={s.breadcrumb} aria-label="Commission navigation"><button onClick={backToPeople}>← Sales people</button><span>/</span><span>{selected.name}</span></nav>
       <div className={s.personHeader}>
-        <div className={s.personHeroTop}><span className={s.eyebrow}>COMMISSION · {new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</span><span className={s.heroStatus}>{selectedClose ? 'Closed' : currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Monthly calculation'}</span></div>
+        <div className={s.personHeroTop}><span className={s.eyebrow}>COMMISSION · {new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</span><span className={s.heroStatus}>{selectedClose ? 'Closed' : currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks ? 'Draft calculation' : 'Monthly calculation'}</span></div>
         <div className={s.personHeroBody}><div className={s.avatar}>{selected.name.slice(0, 2)}</div><div className={s.personIdentity}><h2>{selected.name}</h2><p>{heads.has(selected.staffId)
           ? selected.rankLabel
             ? <>{selected.titleLabel ?? HEAD_TITLE}<span>{selected.rankLabel} · {pct(selected.productRate)} · {DIRECTOR_NOTE}</span></>
@@ -842,7 +842,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
 
     {tab === 'kpi' && <>
       <div className={s.topLine}><div><h2 className={s.sectionHeading}>KPI across the team</h2><p className={s.subtitle}>Qualifying item quantities and commission expense for every salesperson.</p></div></div>
-      {!effectiveInput.scheme.enableKpi && <p className={s.notice}>KPI payout is switched off in this scheme. Configured KPI sales are listed; payable expense is zero.</p>}
+      {!effectiveInput.scheme.enableKpi && <p className={s.notice}>KPI payout is switched off in this scheme. Configured KPI sales are listed; payable expense is zero. It is switched on under Review settings › This month pays.</p>}
       {effectiveInput.kpiItems.length === 0 && <p className={s.warning}>No KPI items are configured for this date. <Link href={`/revenue/products?tab=kpi&sub=${sub}`}>Choose the SKUs and specials and their amounts on Product List › Add-on / KPI Items</Link> to calculate quantities and expenses.</p>}
       <div className={s.summaryGrid}><Summary label="KPI items" value={quantity(totals.kpiQty)} /><Summary label="Base expense" value={money(totals.kpiBase)} /><Summary label="Threshold bonus" value={money(totals.kpiTotal - totals.kpiBase)} /><Summary label="Total KPI expense" value={money(totals.kpiTotal)} /></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="KPI expense by salesperson"><thead><tr><th>Sales person</th><th>Title / rank</th><th>KPI items</th><th>Base amount</th><th>Threshold bonus</th><th className={s.stickyTotal}>Total KPI expense</th></tr></thead><tbody>{board.people.map(p => <tr key={p.staffId}><td><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} ↗</button></td><td>{p.titleLabel}<small>{p.rankLabel}</small></td><td>{quantity(board.kpi.find(k => k.staffId === p.staffId)?.soldQty ?? 0)}<small>{quantity(p.statement?.kpiQty ?? 0)} payable · {quantity(board.kpi.find(k => k.staffId === p.staffId)?.heldQty ?? 0)} held</small></td><td className={s.numeric}>{money((p.statement?.kpiBase ?? 0))}</td><td className={s.numeric}>+ {money((p.statement?.kpiCommission ?? 0) - (p.statement?.kpiBase ?? 0))}<small>{pct(p.statement?.kpiThresholdPct)}</small></td><td className={s.stickyTotal}>{money((p.statement?.kpiCommission ?? 0))}</td></tr>)}</tbody><tfoot><tr><td colSpan={5}>Total KPI expense</td><td className={s.stickyTotal}>{money(totals.kpiTotal)}</td></tr></tfoot></table></div></div>
@@ -850,7 +850,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
 
     {tab === 'open' && <>
       <div className={s.topLine}><div><h2 className={s.sectionHeading}>Open Bill allocation</h2><p className={s.subtitle}>Review every selected bill across the team. One rank per salesperson, per event day.</p></div><div className={s.overviewTotal}><span>Total Open Bill bonus</span><strong>{money(totals.open)}</strong></div></div>
-      {!openEnabled && <p className={s.notice}>Open Bill payout is switched off for this month. Saved picks remain visible and pay zero.</p>}
+      {!openEnabled && <p className={s.notice}>Open Bill payout is switched off for this month. Saved picks remain visible and pay zero; picks open once it is switched on under Review settings › This month pays.</p>}
       {locked && <p className={s.notice}>This month is in payroll, so its Open Bill picks cannot change.</p>}
       <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}><td className={s.stickyFirst}>{r.orderNo}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>

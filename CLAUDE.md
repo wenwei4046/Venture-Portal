@@ -854,9 +854,19 @@ src/
 │   │   │                              `commission_payroll_closed(period)` asks the
 │   │   │                              writes' guard (HR cannot read payroll_runs /
 │   │   │                              period_locks). The bar reads the month AS
-│   │   │                              SAVED, never the screen's draft. The month's
-│   │   │                              switches (*This month pays*) sit in its
-│   │   │                              foot. The whole foot section is gone —
+│   │   │                              SAVED, never the screen's draft, and FOLDS
+│   │   │                              to one line (2026-09-28, user 太显眼了): the
+│   │   │                              state and a tag (*N to settle* / *Moved
+│   │   │                              since* / *Payroll closed*); the why opens
+│   │   │                              on a click, and the RM 0 box folds the same
+│   │   │                              way. The month's switches (*This month
+│   │   │                              pays*) are in **Review settings** — the ONE
+│   │   │                              set (user: 保留一个就好): its KPI / Open
+│   │   │                              Bill / Margin preview checkboxes saved
+│   │   │                              nothing, repeated the bar's foot, and a
+│   │   │                              draft of them left in the tab's session
+│   │   │                              quietly disabled Close. The whole foot
+│   │   │                              section is gone —
 │   │   │                              saved-run hero, warnings list, Open Bill
 │   │   │                              cost, payroll-adjustment table (still on a
 │   │   │                              person's statement), below-margin list,

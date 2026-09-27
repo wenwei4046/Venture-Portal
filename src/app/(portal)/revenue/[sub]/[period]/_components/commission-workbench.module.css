@@ -123,7 +123,6 @@
 .reviewControls > summary:focus-visible { outline: 2px solid #000; outline-offset: 3px; }
 .reviewControls > div { grid-column: 1 / -1; min-width: 0; }
 .reviewControls:not([open]) > div { display: none; }
-.chips { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .chip {
   display: inline-flex;
   align-items: center;
@@ -305,8 +304,6 @@
 .monthSettings { margin: -7px 0 16px; font-size: 11px; }
 .monthSettings > summary { width: fit-content; margin-left: auto; cursor: pointer; padding: 6px 0; text-underline-offset: 3px; }
 .monthSettings[open] { padding: 0 14px 14px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; }
-.rules { margin-top: 16px; padding: 16px; border: 1px solid rgb(var(--hairline)); border-radius: 10px; background: rgb(var(--work-filter)); }
-.rules summary { cursor: pointer; font-size: 12px; font-weight: 600; }
 .salaryDetails { margin-bottom: 16px; padding: 13px 16px; border: 1px solid rgb(var(--hairline)); border-radius: 10px; background: rgb(var(--work-filter)); }
 .salaryDetails > summary { cursor: pointer; font-size: 12px; font-weight: 600; }
 .salaryDetails > p { margin: 11px 0; }
@@ -323,33 +320,64 @@
 /* A salesperson's bills taken out by hand, under their ledger (2026-09-27). */
 .notCounted { margin-top: 14px; }
 
+/* A fold (2026-09-28): the month's notices close to one line — the payroll
+   bar, the bills priced RM 0 — and open on a click, the way Review settings
+   does. The chevron points right while shut and down while open. */
+.fold > summary { list-style: none; cursor: pointer; }
+.fold > summary::-webkit-details-marker { display: none; }
+.foldMark {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 4px 0 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 150ms ease;
+}
+.fold[open] > summary .foldMark { transform: rotate(45deg); }
+
 /* Payroll, for this month (2026-09-27): what payroll holds of the live figure
-   above, the one button that sends it, and what the month pays. The dot says
-   which it is at a glance: sent and matching, moved since, held up, not sent. */
+   above. The dot says which it is at a glance: sent and matching, moved
+   since, held up, not sent. One line until it is opened (2026-09-28). */
 .payroll {
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   border: 1px solid #e8e1d8;
   border-left: 4px solid rgb(var(--accent));
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
-  box-shadow: 0 3px 12px rgb(90 62 43 / 5.5%);
 }
 .payroll[data-tone='ok'] { border-left-color: rgb(var(--ledger)); }
 .payroll[data-tone='stale'] { border-left-color: rgb(var(--alert)); }
 .payroll[data-tone='blocked'] { border-left-color: rgb(var(--danger)); }
 .payroll[data-tone='quiet'] { border-left-color: #cdb8a2; }
-.payrollMain { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px 24px; padding: 15px 18px 16px; }
-.payrollText { flex: 1 1 440px; min-width: 0; }
-.payrollState { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.payrollSummary { display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 12px; border-radius: 0 9px 9px 0; }
+/* Wraps beside the chevron, not under it, on a phone. */
+.payrollLine { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
+.payrollSummary:hover { background: rgb(var(--surface-2)); }
+.payrollSummary:focus-visible { outline: 2px solid #000; outline-offset: 2px; }
+.fold[open] > .payrollSummary { border-radius: 0 9px 0 0; }
+.payrollState { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .payrollDot { flex: none; width: 8px; height: 8px; border-radius: 99px; background: rgb(var(--accent)); }
 .payroll[data-tone='ok'] .payrollDot { background: rgb(var(--ledger)); }
 .payroll[data-tone='stale'] .payrollDot { background: rgb(var(--alert)); }
 .payroll[data-tone='blocked'] .payrollDot { background: rgb(var(--danger)); }
 .payroll[data-tone='quiet'] .payrollDot { background: #cdb8a2; }
-.payrollNote { margin-top: 6px; max-width: 820px; font-size: 12px; line-height: 1.65; }
+.payrollTag { padding: 2px 7px; border: 1px solid rgb(var(--hairline)); border-radius: 4px; background: rgb(var(--surface-2)); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; white-space: nowrap; }
+.payroll[data-tone='stale'] .payrollTag { border-color: rgb(var(--alert) / 0.4); background: rgb(var(--alert-bg)); }
+.payroll[data-tone='blocked'] .payrollTag { border-color: rgb(var(--danger) / 0.35); background: rgb(var(--danger-bg)); }
+.payrollBody { padding: 2px 18px 14px 35px; border-top: 1px solid rgb(var(--hairline)); }
+.payrollNote { margin-top: 8px; max-width: 820px; font-size: 12px; line-height: 1.65; }
 .payrollBlockers { margin: 8px 0 0; padding-left: 18px; list-style: disc; font-size: 12px; line-height: 1.6; }
 .payrollBlockers li + li { margin-top: 3px; }
-.payrollSwitches { padding: 11px 18px; border-top: 1px solid rgb(var(--hairline)); border-radius: 0 0 12px 12px; background: rgb(var(--work-filter)); }
+
+/* What this month pays (2026-09-28): the scheme's real switches, inside
+   Review settings — the one set since the preview-only copies went. */
+.monthPays { margin-top: 12px; padding: 12px 14px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: #fff; }
+.settingsLine { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; }
+.settingsLine a { text-decoration: underline; text-underline-offset: 3px; }
+.settingsNote { margin-top: 10px; font-size: 11px; line-height: 1.55; }
+.draftTag { display: inline-block; margin-left: 7px; padding: 1px 6px; border: 1px solid rgb(var(--accent)); border-radius: 4px; background: rgb(var(--accent-bg)); font-size: 10px; font-weight: 600; text-decoration: none; }
 
 @media (pointer: coarse) {
   .rowMenuButton { opacity: 1; min-width: 36px; min-height: 36px; }

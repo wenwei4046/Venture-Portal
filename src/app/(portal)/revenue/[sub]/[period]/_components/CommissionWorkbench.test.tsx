@@ -200,9 +200,11 @@ describe('CommissionWorkbench', () => {
     expect(within(card('Salespeople')).getByText('2')).toBeVisible()
     expect(card('Total commission')).toHaveTextContent('RM 1,309.30')
 
-    fireEvent.click(screen.getByText(/^Calculation setup/))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'KPI incentive' }))
-    expect(card('Total commission')).toHaveTextContent('RM 1,265.00')
+    // A draft — an Open Bill pick not yet saved — moves the commission and
+    // nothing the ERP sent: SO-one's bonus drops from 50% to 40% of its 49.00.
+    openTab()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
+    expect(card('Total commission')).toHaveTextContent('RM 1,304.40')
     expect(card('Total commission')).toHaveTextContent('Draft calculation')
     expect(card('Total sales value')).toHaveTextContent('RM 3,000.00')
     expect(within(card('Total orders')).getByText('2')).toBeVisible()
@@ -549,7 +551,6 @@ describe('CommissionWorkbench', () => {
     expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ })).toHaveTextContent('RM 1,048.00')
     expect(salesRow(summary, 'Anthony')).toHaveTextContent('0%')
 
-    fireEvent.click(screen.getByText(/^Calculation setup/))
     const preview = screen.getByRole('checkbox', { name: 'Use current team & dated rules for preview' })
     expect(preview).not.toBeChecked()
     fireEvent.click(preview)
@@ -564,30 +565,39 @@ describe('CommissionWorkbench', () => {
     expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ })).toHaveTextContent('RM 1,048.00')
   })
 
-  it('labels incentive switches as a draft, recalculates each feature, and restores source settings on reset', () => {
-    const data = fixture()
-    const original = JSON.stringify(data.input.scheme)
-    renderBoard(data)
-    fireEvent.click(screen.getByText(/^Calculation setup/))
-    const summary = screen.getByRole('table', { name: 'Salesperson commission summary' })
-    const total = () => within(summary).getByRole('row', { name: /All salespeople · total commission/ })
+  // User 2026-09-28 (保留一个就好): the payroll bar's *This month pays* and
+  // Review settings' *Calculation setup* were the same three switches — one
+  // saved, the other a preview that saved nothing. One set is left, the real
+  // one, and it lives in Review settings.
+  it('holds what the month pays in Review settings — the one set of switches on the page', () => {
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
+      payroll={PAYROLL} switches={<div>This month pays switches</div>} />)
+    expect(within(screen.getByRole('region', { name: 'Payroll · August 2026' })).queryByText('This month pays switches')).toBeNull()
+    const switches = screen.getByText('This month pays switches')
+    expect(switches).not.toBeVisible()
+    fireEvent.click(screen.getByText('Review settings', { exact: true }))
+    expect(switches).toBeVisible()
+    for (const name of ['KPI incentive', 'Open Bill incentive', 'Margin incentive & penalty']) {
+      expect(screen.queryByRole('checkbox', { name })).toBeNull()
+    }
+    expect(screen.queryByText(/Calculation setup/)).toBeNull()
+    // The current team stays a preview: nothing to save, so nothing to switch twice.
+    expect(screen.getByRole('checkbox', { name: 'Use current team & dated rules for preview' })).not.toBeChecked()
+  })
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'KPI incentive' }))
-    expect(total()).toHaveTextContent('RM 1,265.00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Open Bill incentive' }))
-    expect(total()).toHaveTextContent('RM 1,240.00')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Margin incentive & penalty' }))
-    expect(total()).toHaveTextContent('RM 240.00')
-    expect(screen.getByRole('status')).toHaveTextContent('Draft incentive settings')
-    expect(screen.getByRole('status')).toHaveTextContent('Payroll is unchanged')
-    expect(JSON.stringify(data.input.scheme)).toBe(original)
-    expect(saveOpenPicks).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset draft' }))
-    expect(total()).toHaveTextContent('RM 1,309.30')
-    expect(screen.getByRole('checkbox', { name: 'KPI incentive' })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Open Bill incentive' })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Margin incentive & penalty' })).toBeChecked()
+  // What the user met on 2026-09-28: toggling those preview checkboxes left a
+  // draft in the tab's session — even one equal to the month's own switches —
+  // so the month read "Draft calculation" and Close all 30 stayed disabled.
+  it('ignores the incentive preview an older draft kept, so the month is live again', () => {
+    sessionStorage.setItem('commission-draft:fair:2026-08-01', JSON.stringify({
+      picks: null, picksSource: null, currentTeam: false, previewFeatures: { kpi: false, openBill: false, margin: false },
+    }))
+    renderBoard()
+    const card = within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' })
+    expect(card).toHaveTextContent('RM 1,309.30')
+    expect(card).toHaveTextContent('Live calculation')
+    expect(screen.queryByText('Draft', { exact: true })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Reset draft' })).toBeNull()
   })
 
   it('shows the current salary calculation before a saved run', () => {
@@ -657,19 +667,17 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByText('Salary preview is unavailable for this session. Commission can still be reviewed above.')).toBeVisible()
   })
 
-  it('allows Open Bill calculation preview while source rules are off but never saves those picks', () => {
+  it('keeps the Open Bill picks shut while the month pays no Open Bill, and says where it is switched on', () => {
     const data = fixture()
     data.input.scheme.enableOpenBill = false
     renderBoard(data)
-    fireEvent.click(screen.getByText(/^Calculation setup/))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Open Bill incentive' }))
     openTab()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
-    const save = screen.getByRole('button', { name: 'Save Open Bill picks' })
-    expect(save).toBeDisabled()
-    expect(screen.getByText('Open Bill is preview-only while switched off for this month. Switch it on under This month pays, in the payroll bar, before saving picks.')).toBeVisible()
-    expect(salesRow(screen.getByRole('table', { name: 'Open Bill orders' }), 'SO-one')).toHaveTextContent('RM 19.60')
-    fireEvent.click(save)
+    expect(screen.getByText(/^Open Bill payout is switched off for this month/))
+      .toHaveTextContent('picks open once it is switched on under Review settings › This month pays')
+    expect(screen.getByRole('checkbox', { name: 'Open Bill SO-one' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' })).toBeDisabled()
+    expect(salesRow(screen.getByRole('table', { name: 'Open Bill orders' }), 'SO-one')).toHaveTextContent('RM 0.00')
+    expect(screen.queryByRole('button', { name: 'Save Open Bill picks' })).toBeNull()
     expect(saveOpenPicks).not.toHaveBeenCalled()
   })
 
@@ -689,17 +697,21 @@ describe('CommissionWorkbench', () => {
   describe('the payroll bar (2026-09-27)', () => {
     const board = (data = fixture(), runStatus: string | null = null, savedTotals: { staffId: string; total: number }[] = [], payroll = PAYROLL) =>
       render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={runStatus} savedTotals={savedTotals}
-        monthStats={monthStats} payroll={{ ...payroll, switches: <div>This month pays switches</div> }} />)
+        monthStats={monthStats} payroll={payroll} switches={<div>This month pays switches</div>} />)
     const bar = () => screen.getByRole('region', { name: 'Payroll · August 2026' })
 
     // User 2026-09-27: Send = Complete, per salesperson. The bar only says
     // what payroll holds; the whole-month button went the day it came.
-    it('says the live figure is not in payroll yet, and has nothing to press', () => {
+    // User 2026-09-28 (太显眼了): it says so in one line until it is opened.
+    it('says the live figure is not in payroll yet in one line, and has nothing to press', () => {
       board()
       expect(bar()).toHaveTextContent('Not in payroll yet')
-      expect(bar()).toHaveTextContent('worked out live from the ERP bills every time this page opens')
+      const why = within(bar()).getByText(/worked out live from the ERP bills every time this page opens/)
+      expect(why).not.toBeVisible()
+      fireEvent.click(bar().querySelector('summary')!)
+      expect(why).toBeVisible()
       expect(bar()).toHaveTextContent('it goes salesperson by salesperson, as each one is sent.')
-      expect(within(bar()).getByText('This month pays switches')).toBeVisible()
+      expect(within(bar()).queryByText('This month pays switches')).toBeNull()
       expect(within(bar()).queryByRole('button')).toBeNull()
       // Unified Payroll (2026-09-27): where a sent salesperson lands.
       expect(within(bar()).getByRole('link', { name: 'HR › Payroll →' })).toHaveAttribute('href', '/hr-costing/payroll/2026-08-01')
@@ -758,11 +770,17 @@ describe('CommissionWorkbench', () => {
     })
 
     it('reads the month as saved, never what is only drafted on this screen', () => {
-      board(fixture(), 'applied', [{ staffId: 'agent', total: 1_220.5 }, { staffId: 'leader', total: 88.8 }])
-      fireEvent.click(screen.getByText(/^Calculation setup/))
-      fireEvent.click(screen.getByRole('checkbox', { name: 'KPI incentive' }))
-      expect(within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' }))
-        .toHaveTextContent('RM 1,265.00')
+      const data = fixture()
+      // Today's team has Anthony a rank up; the month as saved does not.
+      data.currentHierarchy = data.input.hierarchy.map(n => n.staffId === 'agent' ? { ...n, baseRankKey: 'leader' } : n)
+      board(data, 'applied', [{ staffId: 'agent', total: 1_220.5 }, { staffId: 'leader', total: 88.8 }])
+      fireEvent.click(screen.getByText('Review settings', { exact: true }))
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Use current team & dated rules for preview' }))
+      const card = within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' })
+      expect(card).toHaveTextContent('Current team preview')
+      expect(card).not.toHaveTextContent('RM 1,309.30')
+      // Review settings says a draft is open, where its Reset is.
+      expect(screen.getByText('Draft', { exact: true })).toBeVisible()
       // Payroll's RM 1,309.30 still matches the month as saved.
       expect(bar()).toHaveTextContent('The commission above matches it')
       expect(bar()).toHaveTextContent('This screen holds a draft')
