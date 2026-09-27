@@ -23,6 +23,7 @@ const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, url } = vi.hoi
   }
 })
 vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder }))
+vi.mock('../../../close-actions', () => ({ closeSalespeople: vi.fn(), reopenSalespeople: vi.fn() }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
   return {

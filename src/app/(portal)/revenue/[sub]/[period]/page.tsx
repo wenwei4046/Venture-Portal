@@ -23,6 +23,7 @@ import DoubleClaimPanel from './_components/DoubleClaimPanel'
 import ErpChangesPanel from './_components/ErpChangesPanel'
 import FairMovesPanel from './_components/FairMovesPanel'
 import { loadFairMoves } from '../../_lib/fair-calendar'
+import { loadSalespersonCloses } from '../../_lib/salesperson-closes'
 import workbenchStyles from './_components/commission-workbench.module.css'
 
 interface PageProps {
@@ -192,6 +193,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     return earlier.filter((_, i) => answers[i].data === true)
   })
 
+  // Who has been closed this month (2026-09-27): their row shows what was
+  // locked, and the list says how far the month has been closed. A failed
+  // read turns closing off for the visit rather than taking the month down.
+  const closesRead = loadSalespersonCloses(supabase, subDept.id, period)
+    .then(rows => ({ rows, error: null as string | null }))
+    .catch((err: unknown) => ({ rows: [], error: err instanceof Error ? err.message : 'Could not read who is closed.' }))
+
   const [
     batchRow,
     monthOrders,
@@ -204,6 +212,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     openBillMonth,
     payrollClosed,
     earlierLocks,
+    closes,
   ] = await Promise.all([
     batchRowRead,
     monthOrdersRead,
@@ -238,6 +247,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     openBillMonthRead,
     payrollClosedRead,
     earlierLocksRead,
+    closesRead,
   ])
   if (monthLock.error) throw new Error(`Could not check the commission run: ${monthLock.error.message}`)
 
@@ -412,6 +422,14 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         // A bill's menu answers to its OWN month's run (#170): this month's lock,
         // and every earlier month a ledger carries bills in from.
         lockedPeriods={monthLock.data ? [period, ...earlierLocks] : earlierLocks}
+        closes={{
+          subDepartmentId: subDept.id,
+          closes: closes.rows,
+          // A month settled before the portal pays has nothing to lock.
+          unavailable: feedMonth?.closed?.reason === 'before_cutover'
+            ? `${label(period)} was settled by hand${feedMonth.firstPaidMonth ? ` — the portal pays from ${label(feedMonth.firstPaidMonth)}` : ''}, so there is nothing to close.`
+            : closes.error ? `${closes.error} Closing is off until the page reads it again.` : null,
+        }}
         savedTotals={statements.map(row => ({ staffId: row.staff_id, total: Number(row.total_commission) }))} />
         : <>{monthHeader}{!batchRow ? (
           <div className="py-16 text-center border border-hairline rounded-card bg-surface">

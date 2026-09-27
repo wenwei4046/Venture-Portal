@@ -1094,6 +1094,43 @@ Rules:
 
 ## Component Vocabulary
 
+### Closing — a lock you can see (2026-09-27 — Revenue › Comm Cal's month)
+
+A salesperson's month is **closed** when somebody has checked it: their
+commission is locked at that figure. Three pieces, in `close-controls.module.css`:
+
+- **The close bar** above Total Sales Orders' list: a lock tile (orange-bg),
+  "N of M closed" + "RM … locked" and a thin walnut meter; the actions on the
+  right — *Close N ticked* (accent), *Reopen N* (white), *Clear ticks* (quiet
+  underline), or with nothing ticked *Close the N still open* / *Close all N*.
+  Several at once never happen on one click: the actions give way to an
+  **inline confirm strip** (accent-bg, accent border) that names the people and
+  the RM, with *Close N* / *Cancel*. Done: the bar turns ledger-green, the
+  tile a check, "September 2026 is closed — all N salespeople". A reason it
+  cannot close (a draft on screen, a month settled by hand) sits under it and
+  disables the buttons; *moved since* gets an alert-bg line naming who.
+- **The list**: the tick lives in the first (sticky) cell beside the name, the
+  header tick takes every row shown (indeterminate when some are). A closed
+  row carries a small green **CLOSED** tag with a lock under the name, a faint
+  green wash, and the close's own figures; *Closed · moved since* (alert tag)
+  adds `Live now RM …` under the total. The ticks are the multi-select below —
+  `useStickySelection`, scoped to the month's path.
+- **The ledger's walnut header**, in the empty middle: *Close NAME* (cream
+  `#ffe1bd` on walnut, lock icon) and *Close & next →* (ghost), with "Locks RM …
+  for September 2026" under them — one person closes without asking. Closed:
+  a green stamp (CLOSED · when · who) and a ghost *Reopen*; the top-right pill
+  reads *Closed*, the total *Total commission · locked*, the take-home card
+  "Based on the closed commission"; a moved close adds `Live now RM … (+RM …)`
+  and an alert box above the cards listing the bills and overrides that moved.
+  Phone: the controls stack full width under the name.
+- **Bills priced RM 0** (paid, but the ERP prices their goods at RM 0 — they
+  earn nothing): an alert-bg box above the close bar (*N bills are paid but
+  priced RM 0 in the ERP*, each bill as a mono link, its salesperson as a
+  quiet link to the ledger, *paid RM …*), an alert tag *N bills RM 0* under
+  the name, the same box in the ledger and *Priced RM 0 in the ERP* under the
+  bill's number. The bulk confirm strip adds an alert line naming whose; one
+  person's *Close* turns into *Close anyway* / *Cancel* with the bills named.
+
 ### ERP link card (2026-09-13 — Revenue › Comm Cal, Fair only)
 
 A `.sect-head` section ("Houzs ERP link", counter `LINKED` / `NOT LINKED`)
@@ -2304,6 +2341,7 @@ If adding a new component to vocabulary, update this doc first.
 - **2026-09-27 (unified Payroll)** — HR › Payroll holds everybody's pay and moves it person by person. The grid gains a frozen **Status** column (`td.pg-status`, offsets `.l0`–`.l5`), a ⋯ and right-click menu per row (*Resubmit…*), a *Director* band, and a selection bar of *Complete / Unlock / Delete*; the header's *Submit to Finance · N* stays pressable after every batch, *Total Close* sits beside it, and a new **Submitted to Finance** section lists each batch with its funding. Director Salary's *Submit to Finance* is *Complete*; Comm Cal's payroll bar (no button since the entry below) gains one line — a salesperson sent from here shows on *HR › Payroll →* as Completed — and names a Total Closed month as such. See "Payroll batches".
 - **2026-09-27 (night)** — The payroll bar sends nothing. Its whole-month *Send RM X to payroll* / *Update payroll* / *Take back* lived a few hours: the user's Send is per salesperson (tick five and send them, or send everybody not yet sent — somebody already sent is never sent again), which is the per-person close's, not a card about the month. The bar keeps its state, its reasons by name, the draft note and *This month pays*; `.payrollActions` / `.payrollConfirm` / `.payrollDone` / `.payrollError` went with the button.
 - **2026-09-27 v3.11** — Product List gains **Costing Setting** and **Add-on / KPI Items**, per sub-department: a chip row for the sub-department, a card for its own figure (the cost ratio at work on RM 1,000, or the KPI switch with a link to Rules), and a peach picker panel above the table while editing. Both scroll with the page. See "Product List workspace".
+- **2026-09-27 (close)** — Comm Cal's month can be **closed** salesperson by salesperson: ticks in the list's first column, a close bar above it (progress, *Close N ticked* / *Close the N still open* / *Reopen N* behind an inline confirm strip, green once everybody is closed), a **CLOSED** tag and the locked figures on a closed row, and *Close NAME* / *Close & next →* in the empty middle of the ledger's walnut header, which turns into a green CLOSED stamp with *Reopen*. See "Closing — a lock you can see".
 - **2026-09-27 (later)** — Comm Cal's workbench stands in the URL (`?view=` · `?person=` · `?orders=`, search / brand / sort as `?q=` `?brand=` `?sort=`), so Back from a bill returns to the salesperson's ledger it was opened from; bill links carry `?from=` and the bill page's header leads with **← NAME** (`ReturnLink`, which steps Back when that is where the reader came from), then *All bills*. The bill context menu joins a salesperson's Personal / Overriding / Below deposit tables and the month's Below deposit tab. See "Tabbed pages" and "Bill context menu".
 - **2026-09-27 v3.10** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
 - **2026-09-27 (night)** — A pencil on a folded box. Comm Cal's *Salary calculation · current preview* keeps its `<details>` fold and gains a 30px outlined icon button pinned to the box's top-right corner (a sibling of the details, never inside the summary). It opens an editor inside the box, above the table: an orange-bordered white panel of one-row lines — type select · description · `RM` amount (mono, right-aligned) · ✕ — then *+ Add line* on the left and *Cancel* / *Save lines* (the accent button) on the right. The table below recomputes as the lines are typed, and a pay line in it is marked by a 3px orange rule on its first cell. Where the month can no longer change the pencil stays, dimmed (`aria-disabled`), and pressing it says why. On a phone a line takes two rows: the type beside its ✕, then description and amount.
