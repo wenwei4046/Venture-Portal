@@ -140,7 +140,8 @@ describe('Modular model workspace', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(saveModelSettings).toHaveBeenCalledTimes(2))
-    expect(screen.getByRole('status')).toHaveTextContent('2376 saved')
+    // Called is not finished: the save's transition still reads "Saving…" until it ends.
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('2376 saved'))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 

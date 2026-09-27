@@ -115,7 +115,7 @@ export default function CostGapPanel({ subDepartmentId, period, rows, runLocked 
         </Link>
         {runLocked ? (
           <span className="text-xs">
-            This month is in payroll — take it back on the month before the costs behind it can move.
+            This month is in payroll, so the costs behind it cannot move.
           </span>
         ) : null}
       </div>

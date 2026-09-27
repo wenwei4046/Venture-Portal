@@ -4,104 +4,22 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { computeCommissionRun as runEngine } from '@/lib/commission/engine'
-import { toRunPayload } from '@/lib/commission/run-payload'
-import { unmatchedWarnings } from '@/lib/commission/payroll-send'
-import { loadCommissionInput } from './_lib/commission-input'
 import { openBillOnFor } from './_lib/open-bill-month'
 import { fetchByKeys } from '@/lib/paginate'
 
 /**
- * Sending a month's commission to payroll, and taking it back.
+ * What a commission month's people change by hand: Open Bill picks, shares,
+ * bills that do not count, keyed margins, a month's costs. Every write is one
+ * SQL function or a guarded row write; none of them does commission maths.
  *
- * The shape here follows the hybrid pattern the user chose for the salary
- * engine: the arithmetic is TypeScript (`src/lib/commission/engine.ts`, tested
- * against hand-worked examples), the WRITE is a single SQL function so a
- * half-written run is impossible. This file is the courier between them and
- * does no maths of its own beyond picking which rows to load.
- *
- * The month page works the commission out live every time it opens; payroll
- * holds only what was SENT (2026-09-27 — the page had read as if the two were
- * the same, and September had never been sent).
+ * Sending to payroll is not here any more (2026-09-27): the whole-month send
+ * went the day it came — the user's Send is per salesperson (Send = Complete),
+ * which is the per-person close's job.
  *
  * comm_* / sales_* postdate database.types.ts — untyped-client convention.
  */
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
-}
-
-export interface SendSummary {
-  runId: string
-  periodMonth: string
-  staffCount: number
-  totalCommission: number
-  deferredCount: number
-  releasedCount: number
-}
-
-/**
- * Work the month out from its bills and put it in payroll — replacing what
- * this sub-department sent before, in one transaction
- * (`send_commission_to_payroll`). Refused while the result has anything to
- * settle: the page lists the same things, and payroll keeps what it had.
- */
-export async function sendToPayroll(period: string, subDepartmentId: string): Promise<SendSummary> {
-  await requirePermission('revenue')
-  const supabase = await client()
-  const { input, batchId, schemeId, subDepartmentId: resolvedSubDepartmentId, unmatchedOrderNos } =
-    await loadCommissionInput(period, subDepartmentId, supabase)
-
-  const result = runEngine(input)
-  const payload = toRunPayload(input, result)
-  const warnings = [...unmatchedWarnings(unmatchedOrderNos), ...payload.p_warnings]
-  if (warnings.length > 0) {
-    throw new Error(
-      `${warnings.length} thing(s) to settle before this month can go to payroll — they are listed on the page. Payroll is unchanged.`,
-    )
-  }
-
-  const { data: runId, error: sendError } = await supabase.rpc('send_commission_to_payroll', {
-    p_period_month: period,
-    p_sub_department_id: resolvedSubDepartmentId,
-    p_scheme_id: schemeId,
-    p_batch_id: batchId,
-    p_total_commission: payload.p_total_commission,
-    p_warnings: warnings,
-    p_statements: payload.p_statements,
-    p_released_orders: payload.p_released_orders,
-    p_deferred_orders: payload.p_deferred_orders,
-    p_penalised_orders: payload.p_penalised_orders,
-  })
-  if (sendError) throw new Error(sendError.message)
-
-  revalidatePath('/revenue', 'layout')
-  revalidatePath('/hr-costing/payroll', 'layout')
-  revalidatePath('/team', 'layout')
-
-  return {
-    runId: runId as string,
-    periodMonth: period,
-    staffCount: payload.p_statements.length,
-    totalCommission: payload.p_total_commission,
-    deferredCount: payload.p_deferred_orders.length,
-    releasedCount: payload.p_released_orders.length,
-  }
-}
-
-/**
- * Take this sub-department's commission back out of the month's payroll, so
- * its bills and picks can change again. Other sub-departments' shares and the
- * titles already raised stay.
- */
-export async function takeBackFromPayroll(runId: string): Promise<void> {
-  await requirePermission('revenue')
-  const supabase = await client()
-
-  const { error } = await supabase.rpc('reopen_commission_run', { p_run_id: runId })
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/revenue', 'layout')
-  revalidatePath('/hr-costing/payroll', 'layout')
 }
 
 // ─── Review-board edits ─────────────────────────────────────────────────────
@@ -464,7 +382,7 @@ async function assertRunOpen(supabase: SupabaseClient, periodMonth: string, subD
   if (error) throw new Error(`Could not check the commission run: ${error.message}`)
   if (locked) {
     throw new Error(
-      `These ${periodMonth.slice(0, 7)} sales are in payroll. Take the month back from payroll (its payroll bar) before making changes.`,
+      `These ${periodMonth.slice(0, 7)} sales are in payroll, so they cannot change until the month comes out of payroll.`,
     )
   }
 }

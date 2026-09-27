@@ -178,10 +178,11 @@ describe('Costing Setting', () => {
     click('Add 1 SKU')
     click('Save 1 change')
     expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
+    // The notice lands inside the save; the button says Saved only once its transition has ended.
+    expect(await screen.findByRole('button', { name: 'Saved' })).toBeDisabled()
     expect(refresh).toHaveBeenCalled()
     expect(bodyRows()[0]).toHaveTextContent('AK-ULTIMATE MATT (Q)')
     expect(screen.getByRole('textbox', { name: 'AK-ULTIMATE MATT (Q) ratio' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled()
 
     view.rerender(<CostSettingTab sub={subs[0]} subs={subs} schemeId={SCHEME} divisor={0.7}
       ratios={[{ erpId: 'ult-q', code: 'AK-ULTIMATE MATT (Q)', ratio: 0.6, updatedAt: null }, ultK]} skus={skus} />)
