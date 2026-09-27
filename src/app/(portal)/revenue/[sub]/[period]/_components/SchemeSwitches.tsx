@@ -26,15 +26,15 @@ const ITEMS: { key: SchemeSwitch; label: string; hint: string }[] = [
 ]
 
 /**
- * What the month pays, under the button that sends it to payroll (2026-09-24;
- * one row of the payroll bar since 2026-09-27).
+ * What the month pays (2026-09-24; one row of the payroll bar since
+ * 2026-09-27).
  *
  * Open Bill is THIS month's (2026-09-26 — user: "open for august, not
  * september"): switching it here sets the month alone, over Rules, and Follow
  * Rules hands it back. Margin and KPI are still Rules › Scheme rules, reached
  * from the month so trying a month with and without one is two clicks. Off =
  * that component pays nothing: the commission above follows at once, payroll
- * when the month is sent again.
+ * as each salesperson is sent.
  */
 export default function SchemeSwitches({ schemeId, subDepartmentId, period, monthLabel, openBill, margin, kpi }: Props) {
   const router = useRouter()
@@ -118,7 +118,7 @@ export default function SchemeSwitches({ schemeId, subDepartmentId, period, mont
       </ul>
       <p className="text-[11px] leading-relaxed mt-1.5 mb-0">
         Open Bill is set for {monthLabel} alone; margin and KPI are Rules › Scheme rules for every month.
-        The commission above follows a switch at once — payroll when the month is sent again.
+        The commission above follows a switch at once — payroll as each salesperson is sent.
       </p>
       {error ? <p className="text-danger text-xs mt-1 mb-0" role="alert">{error}</p> : null}
     </div>

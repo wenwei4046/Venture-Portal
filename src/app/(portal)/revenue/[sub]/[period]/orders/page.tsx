@@ -382,7 +382,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                 What the picks add up to
               </Link>{' '}
               — every pick, whose, and the bonus it pays — is the month&apos;s Open Bill tab.
-              {runLocked ? ' This month is in payroll — take it back on the month to change a pick.' : ''}
+              {runLocked ? ' This month is in payroll, so its picks cannot change.' : ''}
             </>
           ) : null}
         </p>

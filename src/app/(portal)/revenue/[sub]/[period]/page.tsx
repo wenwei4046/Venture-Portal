@@ -403,9 +403,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           orderId: o.orderId, orderNo: o.orderNo, orderDate: o.orderDate, staffId: o.staffId, orderTotal: o.orderTotal,
         }))}
         payroll={{
-          subDepartmentId: subDept.id,
           monthLabel: label(period),
-          runId: run?.id ?? null,
           sentAt: run?.applied_at ?? null,
           settledBefore,
           payrollClosed,

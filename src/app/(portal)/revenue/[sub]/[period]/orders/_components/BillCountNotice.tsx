@@ -12,13 +12,13 @@ export function billOutcomeMessage(outcome: BillMenuOutcome, monthLabel: string,
   const rank = outcome.result.openBillRank
   if (outcome.excluded) {
     return `${outcome.orderNo} no longer counts in ${monthLabel}${rank ? ` and gave up its ${ORDINAL[rank]} Open Bill` : ''}.`
-      + (hasRun ? ' Payroll follows when the month is sent.' : '')
+      + (hasRun ? ' Payroll follows when the salesperson is sent.' : '')
   }
   if (outcome.result.counts === false) {
     return `${outcome.orderNo} is no longer out by hand, but it still does not count: ${outcome.result.stillOut ?? 'it is excluded'}.`
   }
   return `${outcome.orderNo} counts again${rank ? `, back as the ${ORDINAL[rank]} Open Bill` : ''}.`
-    + (hasRun ? ' Payroll follows when the month is sent.' : '')
+    + (hasRun ? ' Payroll follows when the salesperson is sent.' : '')
 }
 
 interface Props {
