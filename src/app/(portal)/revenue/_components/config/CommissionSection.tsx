@@ -14,6 +14,7 @@ import {
   updateOpenBillRule,
   updateScheme,
   upsertBrand,
+  upsertDirectorPay,
   upsertItemGroup,
   upsertKpiThreshold,
   upsertMarginBand,
@@ -93,6 +94,7 @@ export default function CommissionSection({
     ? visibleRulesTabs(scheme, {
         itemGroups: data.itemGroups.length,
         promotionRules: data.promotionRules.length,
+        directors: data.directors.length,
       })
     : []
   const tab: RulesTab = resolveRulesTab(searchParams.get('tab'), tabs)
@@ -163,6 +165,8 @@ export default function CommissionSection({
         <OpenBillRates data={data} />
       ) : tab === 'brands' ? (
         <BrandsAndBands data={data} scheme={scheme} />
+      ) : tab === 'directors' ? (
+        <DirectorPay data={data} scheme={scheme} subName={subDept.name} onLadder={() => goTo('ladder')} />
       ) : (
         <PromotionCriteria ranks={data.ranks} rules={data.promotionRules} bands={data.marginBands} />
       )}
@@ -435,6 +439,10 @@ function TitleLadder({
   const defById = new Map(data.rankDefs.map(d => [d.id, d]))
   const titleById = new Map(data.titles.map(t => [t.id, t.name]))
   const holderByDef = new Map(data.ranks.map(r => [r.rank_def_id, r]))
+  // The Revenue Director's rung (2026-09-27) sets the rate of their own bills:
+  // nobody climbs into it, so it takes no gate, and a director always recruits.
+  const headTitles = new Set(data.titles.filter(t => t.isDepartmentHead).map(t => t.id))
+  const onLadder = new Set(data.ranks.map(r => r.title_id))
 
   // The rank picker for one rung (or, with `self` null, for the row that adds one).
   const rankOptions = (self: { id: string } | null) =>
@@ -475,6 +483,9 @@ function TitleLadder({
         — passing it raises the title for good and later months climb from there. Leave both
         blank for a percentage rung nobody can reach on volume alone. A group package uses the monthly
         group-sales target for each eligible direct line, including the leader&apos;s own sales.
+        The <strong>Revenue Director</strong> may hold a rung too (2026-09-27): its rank is the rate
+        of their own bills and nothing more — no override, no gate, nobody promoted into it — and
+        what else the month pays them is set on the Directors tab.
       </Hint>
       <div className="overflow-x-auto table-scroll">
         <table className="ledger-table">
@@ -492,6 +503,7 @@ function TitleLadder({
           <tbody>
             {data.ranks.map(r => {
               const rank = defById.get(r.rank_def_id)
+              const head = headTitles.has(r.title_id)
               return (
                 <RowForm key={r.id} action={upsertRank}>
                   {({ pending }) => (
@@ -513,16 +525,31 @@ function TitleLadder({
                           {rankPayLabelOf(rank ?? r)}
                         </span>
                       </td>
-                      <td><Tick name="can_recruit" defaultChecked={r.can_recruit} ariaLabel={`${r.rank_key} can recruit`} /></td>
-                      <td className="num">
-                        <Field name="group_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.group_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} group sales target`} />
-                      </td>
-                      <td className="num whitespace-nowrap">
-                        <Field name="personal_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.personal_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} personal sales target`} />
-                        <span className="mx-1 text-xs">×</span>
-                        <Field name="consecutive_months" type="number" step="1" width="w-14" defaultValue={r.consecutive_months ?? ''} placeholder="—" ariaLabel={`${r.rank_key} months running`} />
-                        <span className="ml-1 text-xs">mths</span>
-                      </td>
+                      {head ? (
+                        // A director always recruits and is never promoted into:
+                        // nothing to tick, no gate to type.
+                        <>
+                          <td><span className="text-xs whitespace-nowrap" title="A director may always have people under them">Always</span></td>
+                          <td colSpan={2}>
+                            <span className="text-xs whitespace-nowrap" title="Their rung sets the rate of their own bills — nobody climbs into it">
+                              Own bills only · no override · no gate
+                            </span>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td><Tick name="can_recruit" defaultChecked={r.can_recruit} ariaLabel={`${r.rank_key} can recruit`} /></td>
+                          <td className="num">
+                            <Field name="group_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.group_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} group sales target`} />
+                          </td>
+                          <td className="num whitespace-nowrap">
+                            <Field name="personal_sales_threshold" type="number" step="1" width="w-28" defaultValue={r.personal_sales_threshold ?? ''} placeholder="—" ariaLabel={`${r.rank_key} personal sales target`} />
+                            <span className="mx-1 text-xs">×</span>
+                            <Field name="consecutive_months" type="number" step="1" width="w-14" defaultValue={r.consecutive_months ?? ''} placeholder="—" ariaLabel={`${r.rank_key} months running`} />
+                            <span className="ml-1 text-xs">mths</span>
+                          </td>
+                        </>
+                      )}
                       <td><SaveButton pending={pending} /></td>
                     </tr>
                   )}
@@ -534,7 +561,8 @@ function TitleLadder({
                 <tr className="bg-surface-2/40">
                   <td>
                     <Hidden name="scheme_id" value={scheme.id} />
-                    <TitleChoice titles={data.titles} current={null} ariaLabel="new rung title" required />
+                    {/* Only a title without a rung yet: one rung per title. */}
+                    <TitleChoice titles={data.titles.filter(t => !onLadder.has(t.id))} current={null} ariaLabel="new rung title" required />
                   </td>
                   <td>
                     <Choice name="rank_def_id" defaultValue="" required ariaLabel="new rung rank" width="w-48">
@@ -703,9 +731,109 @@ function TitleChoice({
       {current === null ? <option value="">— pick a title —</option> : null}
       {current !== null && !known ? <option value={current}>(inactive title)</option> : null}
       {titles.map(t => (
-        <option key={t.id} value={t.id}>{t.name}</option>
+        <option key={t.id} value={t.id}>{t.isDepartmentHead ? `${t.name} · heads the department` : t.name}</option>
       ))}
     </Choice>
+  )
+}
+
+// ─── X. Directors ────────────────────────────────────────────────────────────
+
+/**
+ * What this sub-department pays the directors it reports to (user
+ * 2026-09-27: "they have fix pay amount that pay from revenue department …
+ * One is a fixed amount. The other is a threshold"). One row per director,
+ * each their own: the fixed amount is their base commission — the Revenue
+ * payroll carves their basic out of it like anybody's — and the incentive is
+ * paid in a month whose Commissionable value, Comm Cal's card, reaches the
+ * threshold. Their own bills pay the Revenue Director rung's rate on the Title
+ * ladder, and no override ever reaches them.
+ */
+function DirectorPay({
+  data,
+  scheme,
+  subName,
+  onLadder,
+}: {
+  data: CommissionSettingsData
+  scheme: SchemeRow
+  subName: string
+  onLadder: () => void
+}) {
+  const headRung = data.ranks.find(r => data.titles.some(t => t.id === r.title_id && t.isDepartmentHead))
+  const rung = headRung ? data.rankDefs.find(d => d.id === headRung.rank_def_id) : undefined
+  const LadderTab = (
+    <button type="button" onClick={onLadder} className="text-accent underline underline-offset-[3px]">
+      Title ladder
+    </button>
+  )
+  return (
+    <section>
+      <SectionHead title="X. Directors" count={`${data.directors.length} DIRECTOR${data.directors.length === 1 ? '' : 'S'}`} />
+      <Hint>
+        What {subName} pays the directors it reports to (Staff Hierarchy › Team › Reports to), each on
+        their own row. A director holds no position on the team and earns <strong>no override</strong>:
+        their own bills pay the rate of the Revenue Director&apos;s rung on the {LadderTab} and nothing
+        more. On top of that, every month: the <strong>fixed amount</strong> — their base commission;
+        the Revenue payroll carves their basic out of it, as it does anybody&apos;s commission — and the{' '}
+        <strong>incentive</strong>, paid in a month whose <strong>Commissionable value</strong> (Comm
+        Cal&apos;s card: every live bill of the month) reaches the threshold. Both show in their commission
+        on Comm Cal and go to payroll when they are closed there. A month already closed keeps what it
+        locked; every other month follows what is saved here.
+      </Hint>
+      <div className="overflow-x-auto table-scroll">
+        <table className="ledger-table">
+          <thead>
+            <tr>
+              <th>Director</th>
+              <th className="right">Fixed amount · RM</th>
+              <th className="right">Incentive when Commissionable value reaches · RM</th>
+              <th className="right">Incentive · RM</th>
+              <th className="w-24"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.directors.map(d => (
+              <RowForm key={d.staffId} action={upsertDirectorPay}>
+                {({ pending }) => (
+                  <tr>
+                    <td>
+                      <Hidden name="scheme_id" value={scheme.id} />
+                      <Hidden name="staff_id" value={d.staffId} />
+                      <span className="font-medium whitespace-nowrap">{d.name}</span>
+                      <span className="block text-[11px]">
+                        {[d.titleName, d.employeeCode].filter(Boolean).join(' · ')}
+                        {d.fixedAmount === null ? ' · nothing saved yet' : ''}
+                      </span>
+                    </td>
+                    <td className="num">
+                      <Field name="fixed_amount" type="number" step="0.01" width="w-32" defaultValue={d.fixedAmount ?? 0} ariaLabel={`${d.name} fixed amount`} />
+                    </td>
+                    <td className="num">
+                      <Field name="sales_threshold" type="number" step="0.01" width="w-36" defaultValue={d.salesThreshold ?? ''} placeholder="—" ariaLabel={`${d.name} incentive threshold`} />
+                    </td>
+                    <td className="num">
+                      <Field name="incentive_amount" type="number" step="0.01" width="w-32" defaultValue={d.incentiveAmount ?? 0} ariaLabel={`${d.name} incentive`} />
+                    </td>
+                    <td><SaveButton pending={pending} /></td>
+                  </tr>
+                )}
+              </RowForm>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {headRung ? (
+        <p className="text-xs mt-3">
+          Own bills: {rung ? rankPayLabelOf(rung) : rankPayLabelOf(headRung)} — the Revenue Director&apos;s rung on the {LadderTab}.
+        </p>
+      ) : (
+        <p className="sheet-warning">
+          The Revenue Director has no rung on the {LadderTab} yet, so a director&apos;s own bills earn
+          nothing. Add one there to pay them a rank&apos;s rate.
+        </p>
+      )}
+    </section>
   )
 }
 

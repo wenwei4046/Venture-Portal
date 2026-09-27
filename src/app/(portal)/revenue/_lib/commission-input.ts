@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchByKeys } from '@/lib/paginate'
 import { monthsBefore } from '@/lib/commission/engine'
 import { toEngineInput } from '@/lib/commission/run-payload'
+import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/director-pay'
+import { loadMonthOrders } from './month-orders'
 import type {
   CostRatioRow,
   HierarchyRow,
@@ -21,7 +23,7 @@ import type {
   SalesOrderRow,
   SchemeRow,
 } from '@/lib/commission/run-payload'
-import type { EngineInput } from '@/lib/commission/types'
+import type { DirectorTerms, EngineInput } from '@/lib/commission/types'
 import type { UpsaleRow } from '@/lib/commission/upsales'
 
 interface QueryResult {
@@ -88,6 +90,13 @@ export interface CommissionInputOptions {
    * The saving action never uses this option.
    */
   replayRunId?: string
+  /**
+   * The month's bills as the page already read them (`revenue_month_orders`),
+   * for the directors' incentive threshold — Comm Cal's Commissionable value
+   * card. Absent, they are read here when a director's incentive needs them,
+   * so the close the server recomputes judges the same figure.
+   */
+  monthOrders?: readonly { cancelled: boolean; marginRevenue: number }[]
 }
 
 /**
@@ -148,7 +157,7 @@ export async function loadCommissionInput(
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, marginBands, hierarchy, upsales, currentHierarchyRows,
     currentKpiItems, currentKpiThresholds, currentOpenBillRules, cutover, openBillThisMonth,
-    costRatios, heads] = await Promise.all([
+    costRatios, heads, directorRows, directorPayRows] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -231,9 +240,18 @@ export async function loadCommissionInput(
         .eq('scheme_id', scheme.id).order('erp_product_id').range(from, to)),
     // A Revenue Director's own bills earn nothing by rule (2026-09-27): the
     // engine must know them from somebody merely left off the team.
-    readRows<{ id: string }>('who heads the department', (from, to) =>
-      supabase.from('hr_staff_costs').select('id, titles!inner (is_department_head)')
+    readRows<{ id: string; title_id: string | null }>('who heads the department', (from, to) =>
+      supabase.from('hr_staff_costs').select('id, title_id, titles!inner (is_department_head)')
         .eq('titles.is_department_head', true).order('id').range(from, to)),
+    // Who directs this sub-department, and what Rules › Directors pays them
+    // (2026-09-27).
+    readRows<{ staff_id: string }>('the directors', (from, to) =>
+      supabase.from('comm_sub_department_directors').select('staff_id')
+        .eq('sub_department_id', scheme.sub_department_id).order('staff_id').range(from, to)),
+    readRows<{ staff_id: string; fixed_amount: number | string; sales_threshold: number | string | null; incentive_amount: number | string }>(
+      "the directors' pay", (from, to) =>
+        supabase.from('comm_director_pay').select('staff_id, fixed_amount, sales_threshold, incentive_amount')
+          .eq('scheme_id', scheme.id).order('staff_id').range(from, to)),
   ])
 
   const releasedOrderNos = releases.filter(row => row.run_id !== options.replayRunId).map(row => row.order_no)
@@ -289,12 +307,37 @@ export async function loadCommissionInput(
     comm_statements: statementsByRun.get(run.id) ?? [],
   }))
 
+  // Revenue Directors (2026-09-27): the rank of their title's rung on this
+  // ladder pays their own bills; the ones who direct this sub-department add
+  // Rules › Directors' fixed amount and incentive. A head with neither is
+  // left out — their bills earn nothing, as before.
+  const rungByTitle = new Map(ranks.flatMap(rank => rank.title_id ? [[rank.title_id, rank.rank_key] as const] : []))
+  const directing = new Set(directorRows.map(row => row.staff_id))
+  const payByStaff = new Map(directorPayRows.map(row => [row.staff_id, row]))
+  const directors: DirectorTerms[] = heads.flatMap(head => {
+    const pay = directing.has(head.id) ? payByStaff.get(head.id) : undefined
+    const terms: DirectorTerms = {
+      staffId: head.id,
+      rankKey: head.title_id ? rungByTitle.get(head.title_id) ?? null : null,
+      fixedAmount: Number(pay?.fixed_amount ?? 0),
+      salesThreshold: pay?.sales_threshold == null ? null : Number(pay.sales_threshold),
+      incentiveAmount: Number(pay?.incentive_amount ?? 0),
+    }
+    return terms.rankKey !== null || terms.fixedAmount > 0 || terms.incentiveAmount > 0 ? [terms] : []
+  })
+  // The incentive's measure is Comm Cal's card, read the card's way.
+  const monthValue = needsMonthValue(directors)
+    ? monthCommissionableValue(options.monthOrders ?? await loadMonthOrders(supabase, scheme.sub_department_id, period))
+    : undefined
+
   const schemeForMonth = openBillThisMonth === null ? scheme : { ...scheme, enable_open_bill: openBillThisMonth }
   const sourceRows = {
     periodMonth: period, scheme: schemeForMonth, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, openBillTags, marginBands, hierarchy, orders: orderRows,
     releasedOrderNos, priorMonths, shares, upsales, costRatios,
     departmentHeadIds: heads.map(head => head.id),
+    directors,
+    monthCommissionableValue: monthValue,
   }
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,

@@ -13,9 +13,11 @@
  *   Monthly margin incentive             holds the penalty rungs AND the incentive
  *                                        rungs, so either switch needs the tab
  *   (no switch — recorded policy)      → Promotion criteria, while anything is recorded
+ *   (no switch — who it reports to)    → Directors, while the sub-department has
+ *                                        a director to pay (2026-09-27)
  *
  * So IR — a percentage ladder plus group packages, nothing per item — shows
- * three tabs, and Fair shows all nine.
+ * three tabs and its director's, and Fair shows all ten.
  *
  * One exception, on purpose. Item groups is read by Product revenue
  * commission, not by the KPI switch it is listed under: the engine treats a
@@ -37,13 +39,14 @@ export type RulesTab =
   | 'brands'
   | 'promotion'
   | 'ranks'
+  | 'directors'
 
 export interface RulesTabItem {
   key: RulesTab
   label: string
 }
 
-/** Every tab, in section order — Ranks is section IX, so it comes last. */
+/** Every tab, in section order — Ranks is section IX, Directors X. */
 export const RULES_TABS: readonly RulesTabItem[] = [
   { key: 'scheme', label: 'Scheme rules' },
   { key: 'ladder', label: 'Title ladder' },
@@ -54,6 +57,7 @@ export const RULES_TABS: readonly RulesTabItem[] = [
   { key: 'brands', label: 'Brands & margin bands' },
   { key: 'promotion', label: 'Promotion criteria' },
   { key: 'ranks', label: 'Ranks' },
+  { key: 'directors', label: 'Directors' },
 ]
 
 /** The switches of `comm_schemes` that decide a tab. */
@@ -68,6 +72,8 @@ export interface RulesSwitches {
 export interface RulesRecorded {
   itemGroups: number
   promotionRules: number
+  /** Directors the sub-department reports to (Staff Hierarchy › Team › Reports to). */
+  directors?: number
 }
 
 export function isRulesTab(s: string | null | undefined): s is RulesTab {
@@ -91,6 +97,8 @@ function tabIsShown(key: RulesTab, scheme: RulesSwitches, recorded: RulesRecorde
       return scheme.enable_margin_penalty || scheme.enable_margin_incentive
     case 'promotion':
       return recorded.promotionRules > 0
+    case 'directors':
+      return (recorded.directors ?? 0) > 0
   }
 }
 

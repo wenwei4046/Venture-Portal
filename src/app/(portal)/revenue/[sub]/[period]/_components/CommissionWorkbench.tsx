@@ -30,6 +30,7 @@ import SalaryCalculation from './SalaryCalculation'
 import NoCommission, { COMMISSIONABLE_HINT, DEPOSIT_HINT, DROP_HINT, GROUP_SALES_HINT, SALES_VALUE_HINT, UPSELL_HINT } from './NoCommission'
 import CloseBar from './CloseBar'
 import PayrollBar from './PayrollBar'
+import DirectorPayNote from './DirectorPayNote'
 import PersonCloseControl from './PersonCloseControl'
 import UnpricedBillsNotice from './UnpricedBillsNotice'
 import { useSalespersonCloses } from './useSalespersonCloses'
@@ -60,6 +61,9 @@ const tagFingerprint = (tags: readonly OpenBillTag[]) => JSON.stringify(tags.map
 const monthName = (month: string) => new Date(`${month}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 const HEAD_TITLE = 'Department head'
 const HEAD_NOTE = 'Own bills earn no commission'
+// A Revenue Director with a rung (2026-09-27): paid that rate on their own
+// bills and nothing more — never an override.
+const DIRECTOR_NOTE = 'own bills only · no override'
 
 /**
  * What the payroll bar needs from the server beside the run itself
@@ -304,6 +308,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   }, [board, closer.closedById])
   const listTotal = sum(listRows, r => r.figures.total)
   const selectedClose = selected ? closer.closedById.get(selected.staffId) : undefined
+  // A director's terms here (Rules › Directors, 2026-09-27): the note above
+  // their ledger says what the month pays them beside their own bills.
+  const selectedDirector = selected
+    ? (data.input.directors ?? []).find(d => d.staffId === selected.staffId && (d.fixedAmount > 0 || d.incentiveAmount > 0))
+    : undefined
   const selectedDrift = selected && selectedClose ? closeDrift(selectedClose, selected) : null
   const openOrder = listRows.map(r => r.staffId)
   const nextId = selected ? nextOpenPerson(openOrder, selected.staffId, new Set(closer.closedById.keys())) : null
@@ -721,7 +730,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
               <SheetIcon name="lock" />{row.drift ? 'Closed · moved since' : 'Closed'}</span></small>}
             {(unpricedOf.get(row.staffId)?.length ?? 0) > 0 && <small><span className={`${c.closedTag} ${c.unpricedTag}`} title="Paid, but priced RM 0 in the ERP — earns nothing until the ERP has prices">
               <SheetIcon name="alert" />{unpricedOf.get(row.staffId)!.length} {unpricedOf.get(row.staffId)!.length === 1 ? 'bill' : 'bills'} RM 0</span></small>}</td>
-          <td>{heads.has(row.staffId) ? <>{HEAD_TITLE}<small>{HEAD_NOTE}</small></> : <>{f.titleLabel}<small>{f.rankLabel} · {pct(f.productRate)}</small></>}
+          <td>{heads.has(row.staffId)
+            ? f.rankLabel ? <>{f.titleLabel ?? HEAD_TITLE}<small>{f.rankLabel} · {pct(f.productRate)} · {DIRECTOR_NOTE}</small></> : <>{HEAD_TITLE}<small>{HEAD_NOTE}</small></>
+            : <>{f.titleLabel}<small>{f.rankLabel} · {pct(f.productRate)}</small></>}
             {qualifies && <small><span className={s.badge}>Qualifies for {rankName(qualifies)}</span></small>}
             {promotes && <small><span className={s.badge}>{locked ? `Title raised to ${titleName(promotes)}` : `Title → ${titleName(promotes)} when sent`}</span></small>}</td>
           <td>{f.orders}</td>
@@ -732,6 +743,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           <td className={s.numeric}>{f.dropped ? <span className="neg">{money(f.dropped)}</span> : <span className={s.muted}>—</span>}</td>
           <td className={s.numeric}>{pct(f.marginPct)}<small>{f.marginPct == null || f.marginRevenue === null || f.marginCost === null ? 'Cost incomplete' : money(f.marginRevenue - f.marginCost)}</small></td>
           <td className={s.numeric}>{money(f.personal)}</td><td className={s.numeric}>{money(f.overriding)}</td><td className={s.stickyTotal}><button className={s.ghostButton} onClick={open} disabled={!p}>{money(f.total)}</button>{f.groupIncentive > 0 && <small>Includes {money(f.groupIncentive)} group reward</small>}
+            {f.directorPay > 0 && <small>Includes {money(f.directorPay)} director pay</small>}
             {row.drift && <small className={c.live}>Live now {money(row.drift.liveTotal)}</small>}</td></tr>
         })}</tbody>
         <tfoot><tr><td colSpan={11}>All salespeople · total commission{closer.closedById.size > 0 ? ' · closed at their locked figure' : ''}</td><td className={s.stickyTotal}>{money(listTotal)}</td></tr></tfoot>
@@ -744,7 +756,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.personHeader}>
         <div className={s.personHeroTop}><span className={s.eyebrow}>COMMISSION · {new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</span><span className={s.heroStatus}>{selectedClose ? 'Closed' : currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Monthly calculation'}</span></div>
         <div className={s.personHeroBody}><div className={s.avatar}>{selected.name.slice(0, 2)}</div><div className={s.personIdentity}><h2>{selected.name}</h2><p>{heads.has(selected.staffId)
-          ? <>{HEAD_TITLE}<span>{HEAD_NOTE}</span></>
+          ? selected.rankLabel
+            ? <>{selected.titleLabel ?? HEAD_TITLE}<span>{selected.rankLabel} · {pct(selected.productRate)} · {DIRECTOR_NOTE}</span></>
+            : <>{HEAD_TITLE}<span>{HEAD_NOTE}</span></>
           : <>{selected.titleLabel ?? 'Title unassigned'}<span>{selected.rankLabel ?? 'Rank unassigned'} · {pct(selected.productRate)}</span></>}</p></div>
           {closeFacts && <PersonCloseControl key={selected.staffId} name={selected.name}
             unpriced={(unpricedOf.get(selected.staffId) ?? []).map(bill => bill.orderNo)} total={selected.totalCommission} monthLabel={monthLabel}
@@ -753,7 +767,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             onClose={() => closer.close([{ staffId: selected.staffId, name: selected.name, total: selected.totalCommission }])}
             onCloseAndNext={() => closer.close([{ staffId: selected.staffId, name: selected.name, total: selected.totalCommission }], () => { if (nextId) choosePerson(nextId) })}
             onReopen={() => closer.reopen([{ staffId: selected.staffId, name: selected.name }])} />}
-          <div className={s.overviewTotal}><span>{selectedClose ? 'Total commission · locked' : 'Total commission'}</span><strong>{money(selectedClose?.total ?? selected.totalCommission)}</strong><small>Personal + overriding{(selectedClose?.summary.groupIncentive ?? selected.monthlyGroupIncentive) ? ` + ${money(selectedClose?.summary.groupIncentive ?? selected.monthlyGroupIncentive)} group reward` : ''}</small></div>
+          <div className={s.overviewTotal}><span>{selectedClose ? 'Total commission · locked' : 'Total commission'}</span><strong>{money(selectedClose?.total ?? selected.totalCommission)}</strong><small>Personal + overriding{(selectedClose?.summary.groupIncentive ?? selected.monthlyGroupIncentive) ? ` + ${money(selectedClose?.summary.groupIncentive ?? selected.monthlyGroupIncentive)} group reward` : ''}{(selectedClose?.summary.directorPay ?? selected.monthlyDirectorPay) ? ` + ${money(selectedClose?.summary.directorPay ?? selected.monthlyDirectorPay)} director pay` : ''}</small></div>
         </div>
       </div>
       {(closer.notice || closer.error) && <p className={closer.error ? s.warning : s.notice} role={closer.error ? 'alert' : 'status'}>{closer.error || closer.notice}</p>}
@@ -780,6 +794,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         ? <>In payroll: {money(saved?.total ?? 0)}{Math.abs((saved?.total ?? 0) - selected.totalCommission) >= .01 ? ` · Difference ${money(selected.totalCommission - (saved?.total ?? 0))}` : ''}</>
         : 'Not in payroll yet'}</span>
         {locked && saved && <Link href={`/revenue/${sub}/${period}/pay/${selected.staffId}`}>Payroll breakdown ↗</Link>}</div>
+      {selectedDirector && <DirectorPayNote terms={selectedDirector} statement={selected.statement}
+        monthValue={data.input.monthCommissionableValue ?? null} monthLabel={monthLabel} />}
       <div className={s.tabs} role="tablist" aria-label="Salesperson commission type">
         <button role="tab" aria-selected={view === 'personal'} className={view === 'personal' ? s.activeTab : undefined} onClick={() => showLedger('personal')}>Personal <span className={s.badge}>{selected.personalRows.length}</span></button>
         <button role="tab" aria-selected={view === 'overriding'} className={view === 'overriding' ? s.activeTab : undefined} onClick={() => showLedger('overriding')}>Overriding <span className={s.badge}>{selected.overridingRows.length}</span></button>

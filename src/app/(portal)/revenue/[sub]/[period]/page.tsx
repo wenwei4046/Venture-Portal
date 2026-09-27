@@ -11,6 +11,7 @@ import { agentKeyOf } from '@/lib/erp-sync/contract'
 import SchemeSwitches from './_components/SchemeSwitches'
 import { requireSubDepartment } from '../../_lib/sub-departments'
 import { loadBrandOptions, loadMonthOrders, loadOrderBrandPicks } from '../../_lib/month-orders'
+import { monthCommissionableValue } from '@/lib/commission/director-pay'
 import { loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
 import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
@@ -274,8 +275,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   const total = orders.reduce((a, o) => a + o.orderTotal, 0)
   // The part of the same bills that earns: every line in a group the scheme
   // pays on (the RPC's margin base is exactly that sum). Transport, disposal
-  // and other service lines are the difference (user 2026-09-26).
-  const commissionableTotal = Math.round(orders.reduce((a, o) => a + o.marginRevenue, 0) * 100) / 100
+  // and other service lines are the difference (user 2026-09-26). The
+  // directors' incentive threshold reads this same figure (2026-09-27).
+  const commissionableTotal = monthCommissionableValue(monthOrders)
 
   // Sales by venue (2026-09-26, the workbench's tab): every live bill —
   // matched or not, so it adds up to Total sales value — at the fair the

@@ -22,6 +22,7 @@ import {
 } from './engine'
 import type {
   CommissionScheme,
+  DirectorTerms,
   EngineInput,
   HierarchyNode,
   ItemGroupRule,
@@ -1586,5 +1587,123 @@ describe('unranked salesperson', () => {
       ])],
     })
     expect(find(r.statements, 'stranger').kpiCommission).toBe(600)
+  })
+})
+
+// ─── Revenue Director pay (user 2026-09-27) ──────────────────────────────────
+// A director holds no membership and earns no override. Their title's rung
+// sets the rate of their OWN bills — that rate and nothing else — and Rules ›
+// Directors adds a fixed amount and an incentive once the month's
+// Commissionable value reaches the threshold.
+describe('Revenue Director pay', () => {
+  const T_RD = 'title-rd'
+  const DIRECTOR_RUNG: Rank = {
+    rankKey: 'rd_12', titleId: T_RD, titleLabel: 'Revenue Director', label: 'Rank SS', productRate: 0.12,
+    canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null, sortOrder: 70,
+  }
+  const LADDER = [...RANKS, DIRECTOR_RUNG]
+  const terms = (over: Partial<DirectorTerms> = {}): DirectorTerms => ({
+    staffId: 'director', rankKey: 'rd_12', fixedAmount: 0, salesThreshold: null, incentiveAmount: 0, ...over,
+  })
+
+  it('pays their own bills at the rung rate, and nothing else', () => {
+    const r = run({
+      ranks: LADDER,
+      scheme: { ...SCHEME, openBillBasis: 'pct_of_revenue' },
+      orders: [order('1', 'director', [
+        ['MATTRESS', 'M1', 1, 10_000, 9_000, 'AKEMI'],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0, 0, 'AKEMI'],
+      ])],
+      openBillTags: [{ orderId: '1', rank: 1 }],
+      departmentHeadIds: ['director'],
+      directors: [terms()],
+    })
+    const s = find(r.statements, 'director')
+    // The main sales (the pillows' KPI value comes off every bill) at 12%:
+    // no KPI allowance, no Open Bill, no margin penalty for a 10% margin.
+    expect(s.productRevenue).toBe(9_500)
+    expect(s.lines.map(l => [l.component, l.amount])).toEqual([['product_revenue', 1_140]])
+    expect(s.productRate).toBe(0.12)
+    expect(s.effectiveRankKey).toBe('rd_12')
+    expect(s.promotesToTitleId).toBeNull()
+    expect(s.kpiCommission).toBe(0)
+    expect(s.openBillBonus).toBe(0)
+    expect(s.marginIncentive).toBe(0)
+    expect(s.totalCommission).toBe(1_140)
+    expect(r.warnings).toEqual([])
+  })
+
+  it('pays the fixed amount in a month they sold nothing', () => {
+    const r = run({ ranks: LADDER, departmentHeadIds: ['director'], directors: [terms({ fixedAmount: 38_000 })] })
+    const s = find(r.statements, 'director')
+    expect(s.directorFixed).toBe(38_000)
+    expect(s.directorIncentive).toBe(0)
+    expect(s.lines).toEqual([expect.objectContaining({ component: 'director_fixed', amount: 38_000 })])
+    expect(s.totalCommission).toBe(38_000)
+  })
+
+  it('pays the incentive once the month reaches the threshold, and not a sen before', () => {
+    const month = (value: number) => find(run({
+      ranks: LADDER,
+      departmentHeadIds: ['director'],
+      directors: [terms({ fixedAmount: 10_000, salesThreshold: 2_000_000, incentiveAmount: 5_000 })],
+      monthCommissionableValue: value,
+    }).statements, 'director')
+    expect(month(1_999_999.99).directorIncentive).toBe(0)
+    expect(month(1_999_999.99).totalCommission).toBe(10_000)
+    const reached = month(2_000_000)
+    expect(reached.directorIncentive).toBe(5_000)
+    expect(reached.totalCommission).toBe(15_000)
+    expect(reached.lines.find(l => l.component === 'director_incentive')?.note).toBe('Commissionable value 2000000.00 reached 2000000.00')
+  })
+
+  it('says so when the month figure was not read, rather than silently skipping', () => {
+    const r = run({
+      ranks: LADDER,
+      departmentHeadIds: ['director'],
+      directors: [terms({ salesThreshold: 2_000_000, incentiveAmount: 5_000 })],
+    })
+    expect(r.warnings).toEqual([expect.stringMatching(/^Staff director's director incentive could not be judged/)])
+  })
+
+  it('earns no rate without a rung, but keeps the Directors tab amounts', () => {
+    const r = run({
+      orders: [order('1', 'director', [['MATTRESS', 'M1', 1, 9_500]])],
+      departmentHeadIds: ['director'],
+      directors: [terms({ rankKey: null, fixedAmount: 1_000 })],
+    })
+    const s = find(r.statements, 'director')
+    expect(s.productCommission).toBe(0)
+    expect(s.totalCommission).toBe(1_000)
+    expect(r.warnings).toEqual([])
+  })
+
+  it('never lets a salesperson climb into the director rung, however much they sell', () => {
+    const r = run({
+      ranks: LADDER,
+      hierarchy: [node('stl', null, 'stl_10', 'variable', T_STL)],
+      orders: [order('1', 'stl', [['MATTRESS', 'M1', 1, 5_000_000]])],
+      departmentHeadIds: ['director'],
+      directors: [terms()],
+    })
+    const s = find(r.statements, 'stl')
+    expect(s.effectiveRankKey).toBe('stl_10')
+    expect(s.qualifiesForRankKey).toBeNull()
+    expect(s.promotesToTitleId).toBeNull()
+  })
+
+  it('pays a director no override, and changes nobody else’s', () => {
+    const without = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])] })
+    const withDirector = run({
+      ranks: LADDER,
+      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])],
+      departmentHeadIds: ['director'],
+      directors: [terms({ fixedAmount: 1 })],
+    })
+    for (const staffId of ['stl', 'tl', 'ta', 'rs']) {
+      expect(find(withDirector.statements, staffId).totalCommission).toBe(find(without.statements, staffId).totalCommission)
+    }
+    expect(find(withDirector.statements, 'director').overrideCommission).toBe(0)
+    expect(find(withDirector.statements, 'director').totalCommission).toBe(1)
   })
 })

@@ -51,6 +51,11 @@ export interface SalespersonFigures {
   overriding: number
   /** A fixed group reward, paid as a month line of its own. */
   groupIncentive: number
+  /**
+   * A director's fixed amount and threshold incentive (2026-09-27), a month
+   * line of its own. Absent from a close written before it: reads as 0.
+   */
+  directorPay: number
   total: number
 }
 
@@ -80,6 +85,7 @@ export function salespersonFigures(person: WorkbenchPerson): SalespersonFigures 
     personal: person.personalTotal,
     overriding: person.overrideTotal,
     groupIncentive: person.monthlyGroupIncentive,
+    directorPay: person.monthlyDirectorPay,
     total: person.totalCommission,
   }
 }
@@ -213,6 +219,7 @@ export function parseCloseSummary(raw: unknown, fallbackName: string): CloseSumm
     personal: num(o.personal),
     overriding: num(o.overriding),
     groupIncentive: num(o.groupIncentive),
+    directorPay: num(o.directorPay),
     total: num(o.total),
     bills: bills.flatMap(b => {
       const r = b && typeof b === 'object' ? b as Record<string, unknown> : null

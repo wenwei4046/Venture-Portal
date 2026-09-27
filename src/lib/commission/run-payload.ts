@@ -37,6 +37,7 @@ import {
 } from './engine'
 import { isKpiOptionPool, lineSpecialsOf } from './kpi'
 import type {
+  DirectorTerms,
   EngineInput,
   EngineResult,
   ItemGroupRule,
@@ -228,6 +229,13 @@ export interface RunSourceRows {
    * (`titles.is_department_head`). Absent = nobody.
    */
   departmentHeadIds?: string[]
+  /**
+   * What each department head is paid here (2026-09-27), already resolved by
+   * the loader: their title's rung and the Directors tab. Absent = nothing.
+   */
+  directors?: DirectorTerms[]
+  /** The month's Commissionable value (Comm Cal's card), when an incentive needs it. */
+  monthCommissionableValue?: number
 }
 
 /** A `sales_order_shares` row. */
@@ -444,6 +452,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     hierarchy,
     priorMonths,
     departmentHeadIds: [...new Set(rows.departmentHeadIds ?? [])],
+    ...(rows.directors?.length ? { directors: rows.directors } : {}),
+    ...(rows.monthCommissionableValue !== undefined ? { monthCommissionableValue: rows.monthCommissionableValue } : {}),
   }
 }
 
@@ -501,6 +511,9 @@ export interface StatementDto {
   group_breakdown: NonNullable<Statement['groupBreakdown']>
   full_spec: boolean
   margin_penalty_withheld: number
+  /** A director's fixed amount and threshold incentive (2026-09-27); 0 for anybody else. */
+  director_fixed: number
+  director_incentive: number
   total_commission: number
   lines: StatementLineDto[]
   brand_margins: Array<{
@@ -598,6 +611,8 @@ function toStatementDto(s: Statement, upsaleIds: ReadonlySet<string>): Statement
     group_incentive: s.groupIncentive ?? 0,
     group_subsidy_cap: s.groupSubsidyCap ?? 0,
     group_breakdown: s.groupBreakdown ?? [],
+    director_fixed: s.directorFixed ?? 0,
+    director_incentive: s.directorIncentive ?? 0,
     full_spec: s.fullSpec ?? false,
     margin_penalty_withheld: s.marginPenaltyWithheld,
     total_commission: s.totalCommission,
