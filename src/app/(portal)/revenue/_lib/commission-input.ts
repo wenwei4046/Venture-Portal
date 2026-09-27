@@ -142,11 +142,13 @@ export async function loadCommissionInput(
   const batchId = (batchRow as { id: string } | null)?.id
   if (!batchId) throw new Error(`Nothing has been imported for ${period.slice(0, 7)} yet.`)
 
-  const orderSelect = 'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct'
+  // brand_code: the brand the bill was written under — it alone picks the
+  // margin ladder; the brands of what rides on it do not (2026-09-27).
+  const orderSelect = 'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct, brand_code'
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, marginBands, hierarchy, upsales, currentHierarchyRows,
     currentKpiItems, currentKpiThresholds, currentOpenBillRules, cutover, openBillThisMonth,
-    costRatios] = await Promise.all([
+    costRatios, heads] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -227,6 +229,11 @@ export async function loadCommissionInput(
     readRows<CostRatioRow>('the cost ratios', (from, to) =>
       supabase.from('comm_cost_ratios').select('product_code, ratio')
         .eq('scheme_id', scheme.id).order('erp_product_id').range(from, to)),
+    // A Revenue Director's own bills earn nothing by rule (2026-09-27): the
+    // engine must know them from somebody merely left off the team.
+    readRows<{ id: string }>('who heads the department', (from, to) =>
+      supabase.from('hr_staff_costs').select('id, titles!inner (is_department_head)')
+        .eq('titles.is_department_head', true).order('id').range(from, to)),
   ])
 
   const releasedOrderNos = releases.filter(row => row.run_id !== options.replayRunId).map(row => row.order_no)
@@ -287,6 +294,7 @@ export async function loadCommissionInput(
     periodMonth: period, scheme: schemeForMonth, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, openBillTags, marginBands, hierarchy, orders: orderRows,
     releasedOrderNos, priorMonths, shares, upsales, costRatios,
+    departmentHeadIds: heads.map(head => head.id),
   }
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,

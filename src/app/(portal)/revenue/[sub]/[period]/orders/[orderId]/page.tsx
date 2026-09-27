@@ -281,7 +281,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The margin is unknowable the moment one of them has no cost — a
   // part-costed bill is not a high-margin bill.
   const goodsLines = classed.filter(c => c.cls === 'commissionable')
-  const base = marginBaseOf(salesLines, kpiIndex, groupIndex, costBasis)
+  const base = marginBaseOf(salesLines, kpiIndex, groupIndex, costBasis, order.brand_code ?? null)
   const baseMissing = goodsLines.filter(c => c.line.cost_amount === null).length
   const cost = base.cost
   const manualMargin = order.manual_margin_pct === null ? null : Number(order.manual_margin_pct)

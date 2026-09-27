@@ -15,6 +15,58 @@ cross-apply the two programmes.
 
 ---
 
+## Send to payroll — 2026-09-27 amendment
+
+Supersedes the button of the 2026-09-11 amendment below (*Compute & sync
+payroll*). The month page works a month's commission out LIVE, from the ERP's
+bills, every time it opens. **Payroll holds only what was sent.** The user read
+the live figure as already synced (本来它就一直都在 sync 的，不是吗？) — and
+September 2026, the first month the portal pays, had never reached payroll: its
+one computed run carried six warnings, and any warning stops the sync.
+
+| | |
+|---|---|
+| Where | the **payroll bar** under the month's cards: *Not in payroll yet* · *In payroll · RM X* (matching, or moved since — by how much and for how many people) · the month's payroll closed · *Settled by hand* |
+| Send | **Send RM X to payroll** — `send_commission_to_payroll`: refuses any warning before anything moves; a month already in payroll is taken back and replaced in the same transaction (*Update payroll to RM X*) |
+| Take back | takes this sub-department's share back out of the month's payroll (`reopen_commission_run`) so its bills and picks can change again |
+| What stops it | listed in the bar, live and by NAME — the engine's warnings plus unmatched agents, the same list the send checks |
+| Closed | `commission_payroll_closed(period)` asks the guard the writes use; HR cannot read `payroll_runs` or `period_locks` itself |
+| What the month pays | the scheme switches sit in the bar (*This month pays*) |
+
+The section at the foot of the page that held the saved run's hero, its
+warnings, *Recompute & sync payroll*, the Open Bill cost tab, the payroll
+adjustments table, the below-margin list and the hand-typed upsales (§4.8) is
+gone (user: 下面这整个东西就不需要存在了). A person's payroll adjustment stays on
+their statement page.
+
+**Two of September's warnings were rules, not gaps**, and no longer stop a month:
+
+- a **department head's** own bills (KRIS, PETER — Revenue Director, never
+  ranked, 23DIR) are theirs and earn nothing, by the 2026-09-19 ruling. The
+  engine is told who heads the department (`EngineInput.departmentHeadIds`)
+  and pays them no component at all — not KPI, Open Bill or margin either; the
+  table says *Department head · Own bills earn no commission*;
+- **the margin ladder is the BILL's brand** — the brand it was written under,
+  the ERP's Branding on the document (`sales_orders.brand_code`), exactly as
+  the member app already grouped it (user 2026-09-27: 主体是 Akemi 就跟 Akemi 的
+  margin ladder，主体是 Zanotti 就跟 Zanotti 的). An accessory or a bed frame
+  is a **rider**: a Dunlopillo pillow given away on an Akemi bill counts its
+  cost in that bill's margin, measured on Akemi's ladder; the same pillow on a
+  Dunlopillo bill, on Dunlopillo's. Only a bill with no brand of its own (a bed
+  frame or an accessory sold alone — 10 September bills) reads its lines, and
+  only there can two priced brands be ambiguous; the question is asked only in
+  a month that pays margin, because a ladder is all the brand chooses. The
+  bill's Brand column shows that one brand.
+
+**Don't count, from a salesperson's page too.** The ledger's per-bill button
+was a review draft on the screen (*Exclude*); it is now the real *Don't count
+this bill* of §4.10 — the bill leaves the month for good, through every ERP
+re-send, with Undo on the notice. *Show not counted* lists that person's bills
+taken out by hand, each with *Count again*. Disabled while the month is in
+payroll.
+
+Mig `20260927030000`.
+
 ## Month-end payroll commission adjustments — 2026-09-11
 
 After Revenue commission is confirmed and before payroll is submitted or paid,
@@ -872,7 +924,13 @@ sum of its rounded lines, so `Σ lines === total` holds exactly.
 `comm_statements` carries a CHECK that makes a component/total drift impossible
 to store.
 
-### 4.8 Upsales — recorded by HR (2026-09-24)
+### 4.8 Upsales — recorded by HR (2026-09-24; the form went 2026-09-27)
+
+> **2026-09-27:** the hand-typed form below is gone (user: 所有的 order 都只会从
+> ERP 那边抽过来，这边不需要自己调动 — the one thing adjusted in the portal is
+> whether a bill counts at all, §4.10). Every drop and upsell now comes from the
+> ERP feed (§4.9). The rows typed in — August's claim form among them — stay,
+> and still count in their month; the rules in this section still apply to them.
 
 A customer adds to an order they placed earlier: a protector at the next fair,
 a second mattress, a bedframe upgrade. The first sale's commission was paid
@@ -906,8 +964,8 @@ run has paid (23RUN), like every other input of a run. Mig `20260924060000`.
 
 A **drop** is an upsale the other way: the customer takes something off a bill
 whose commission was already paid (HC13911, 16,888 → 14,800 on 18 August). HR
-types it positive on the same tab (*Upsales & drops*); it is stored negative
-and takes back the seller's own commission **and** the upline's override —
+typed it positive on the same tab (*Upsales & drops*, gone 2026-09-27); it is
+stored negative and takes back the seller's own commission **and** the upline's override —
 `computeOverrides` rolls a negative base up like a positive one. Payroll cannot
 pay a negative commission (`hr_monthly_payroll.amounts_non_negative`), so a
 month whose drops outweigh somebody's pay is a run warning: pay the drop in a
@@ -930,7 +988,8 @@ the ERP keeps saving and removed if the ERP returns to the settled figure. The
 month page lists them (*Drops and upsells the ERP found*): **Pay in {month}**
 confirms it into that month; **Not a change** lets the ERP's figure stand so
 the next change is measured from it; **Undo** puts back only the latest answer
-on a bill. Runs read confirmed rows only. Transport and every other
+on a bill — listed under the panel's *Paid in {month}* since 2026-09-27, when
+the Upsales tab that used to hold it went. Runs read confirmed rows only. Transport and every other
 non-commissionable line never count. Mig `20260926020000`.
 
 ### 4.10 A bill that does not count — taken out by hand (2026-09-27)
@@ -951,15 +1010,17 @@ so it will not calculate in this month's commission).
 | Refused | a month whose run has paid (23RUN); a bill already out for another reason (23EXC) |
 
 `revenue_exclude_order` / `revenue_include_order` own the write, one
-transaction each. The saved run, if any, still holds the bill until the month
-is computed again. Mig `20260927020000`.
+transaction each. Payroll follows when the month is sent (the payroll bar);
+a month already in payroll refuses the write until it is taken back. Mig `20260927020000`.
 
 The same right-click is on a salesperson's ledger on Comm Cal's month —
 Personal, Overriding and Below deposit — and on the month's Below deposit tab
 (user 2026-09-27: "right click 这个 order，然后选择它不算 commission"). A bill
 carried in from an earlier month is refused by THAT month's lock, and the menu
-says so before anybody tries. It is not the ledger's *Exclude*, which is a
-review draft that changes nothing.
+says so before anybody tries. The ledger's own per-bill button does the same
+since the same day (it was *Exclude*, a review draft that changed nothing —
+user: 真正 don't count): *Don't count*, answered on the same notice with the
+same Undo; *Show not counted* lists that person's bills taken out by hand.
 
 ---
 

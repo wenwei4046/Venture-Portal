@@ -749,7 +749,7 @@ export async function setMonthOpenBill(subDepartmentId: string, period: string, 
       .eq('sub_department_id', subDepartmentId).eq('is_active', true).is('effective_to', null).maybeSingle(),
   ])
   if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
-  if (locked) throw new Error(`The ${period.slice(0, 7)} run has paid. Reopen it before changing what it pays.`)
+  if (locked) throw new Error(`The ${period.slice(0, 7)} month is in payroll. Take it back from payroll before changing what it pays.`)
   if (schemeError) throw new Error(`Could not read Rules: ${schemeError.message}`)
   const rules = Boolean((scheme as { enable_open_bill: boolean } | null)?.enable_open_bill)
 

@@ -193,9 +193,17 @@ export interface MarginBase {
   cost: number
   /** false when at least one line in scope had no cost — margin is unknowable. */
   complete: boolean
-  /** The order's brand. A sales order never crosses brands (user 2026-08-31). */
+  /**
+   * The brand whose margin ladder the bill answers to: the brand it was
+   * written under (`SalesOrder.brandCode`), else what its lines say.
+   */
   brandCode: string | null
-  /** true when the lines disagree about the brand — a data-integrity problem. */
+  /**
+   * true when a bill with no brand of its own SELLS more than one brand, so
+   * which ladder it answers to is a guess. A bill written under a brand never
+   * is — whatever else rides on it (2026-09-27). Nor is a gift of another
+   * brand at RM 0 on a bill that has none.
+   */
   mixedBrand: boolean
 }
 
@@ -212,6 +220,12 @@ export interface MarginBase {
  * bill with HB Straight at RM 200 is judged on 9,800 — the items' cost stays.
  * Every line's cost is divided by its own SKU's ratio, else the sub-
  * department's (`cost-basis.ts`).
+ *
+ * Every line counts toward the margin, whatever brand it carries: the ladder
+ * is the BILL's (user 2026-09-27 — an Akemi bill that gives away a
+ * Dunlopillo pillow is measured on Akemi's ladder, the pillow's cost in it; a
+ * Dunlopillo bill with the same pillow, on Dunlopillo's). A bed frame or an
+ * accessory is a rider: it follows the brand of the bill it is sold on.
  */
 export function marginBase(
   lines: SalesLine[],
@@ -219,12 +233,16 @@ export function marginBase(
   groupIndex: Map<string, boolean>,
   /** Revenue Team basis: a line's cost ÷ its ratio. A number is the one default. */
   costBasis: CostBasis | number = 1,
+  /** The brand the bill was written under, when it has one. */
+  orderBrand: string | null = null,
 ): MarginBase {
   let revenue = 0
   let cost = 0
   let complete = true
   const byBrand = new Map<string, number>()
   const basis = typeof costBasis === 'number' ? costBasisOf(costBasis) : costBasis
+  // The brands the customer paid for — a free gift carries its brand at RM 0.
+  const sold = new Set<string>()
 
   for (const line of lines) {
     if (!inGoodsScope(line, groupIndex)) continue
@@ -233,9 +251,13 @@ export function marginBase(
     else cost = round2(cost + line.costAmount / costDivisorFor(line.productCode, basis))
     if (line.brandCode) {
       byBrand.set(line.brandCode, round2((byBrand.get(line.brandCode) ?? 0) + line.lineAmount))
+      if (line.lineAmount > 0) sold.add(line.brandCode)
     }
   }
   if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
+
+  // The bill's own brand decides; the lines only speak for a bill without one.
+  if (orderBrand) return { revenue, cost, complete, brandCode: orderBrand, mixedBrand: false }
 
   let brandCode: string | null = null
   let best = -Infinity
@@ -246,7 +268,10 @@ export function marginBase(
     }
   }
 
-  return { revenue, cost, complete, brandCode, mixedBrand: byBrand.size > 1 }
+  // Nothing priced at all (a rider carries the bill, every branded line is a
+  // gift): two brands on it are still two ladders to choose between.
+  const mixedBrand = sold.size > 1 || (sold.size === 0 && byBrand.size > 1)
+  return { revenue, cost, complete, brandCode, mixedBrand }
 }
 
 /** (revenue − cost) / revenue, or null when it cannot be known. */
@@ -744,13 +769,15 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   const drafts = new Map<string, Draft>()
   const deferred: DeferredOrder[] = []
   const penalised: PenalisedOrder[] = []
+  // A Revenue Director is never ranked: their 0% is the rule, not a gap.
+  const heads = new Set(input.departmentHeadIds ?? [])
 
   // ── Pass A: deposit gate + own revenue ─────────────────────────────────
   for (const staffId of staffIds) {
     const node = nodes.get(staffId)
     const orders = ordersByStaff.get(staffId) ?? []
 
-    if (!node && orders.length > 0) {
+    if (!node && orders.length > 0 && !heads.has(staffId)) {
       warnings.push(
         `Staff ${staffId} has sales this period but no rank / hierarchy row — commission computed at 0%.`,
       )
@@ -909,6 +936,10 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   let ordersWithoutCost = 0
 
   for (const draft of drafts.values()) {
+    // Not a flat KPI allowance, an Open Bill bonus or a margin incentive
+    // either: the scheme pays a head nothing on their own bills. Their sales
+    // still stand on the statement and the bills still close with the run.
+    if (heads.has(draft.staffId)) continue
     const rate = rateOf.get(draft.staffId) ?? 0
 
     for (const order of draft.eligibleOrders) {
@@ -918,9 +949,11 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       const carriedNote = carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''
 
       // A sales order never crosses brands (user 2026-08-31); if one does, the
-      // import has a problem and the margin ladder becomes ambiguous.
-      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis)
-      if (base.mixedBrand) {
+      // import has a problem and the margin ladder becomes ambiguous. The
+      // brand only chooses a margin ladder, so a month that pays no margin
+      // has nothing to ask about it (2026-09-27).
+      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
+      if (base.mixedBrand && (scheme.enableMarginPenalty || scheme.enableMarginIncentive)) {
         warnings.push(
           `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
         )

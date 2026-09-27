@@ -196,6 +196,8 @@ export interface SalesOrderRow {
   order_total: Num
   paid_amount: Num
   manual_margin_pct: Num
+  /** The brand the bill was written under (the ERP's Branding). Absent in older fixtures. */
+  brand_code?: string | null
   sales_order_lines: SalesLineRow[] | null
 }
 
@@ -221,6 +223,11 @@ export interface RunSourceRows {
   upsales?: UpsaleRow[]
   /** `comm_cost_ratios` of this scheme. Absent = every SKU at the default. */
   costRatios?: CostRatioRow[]
+  /**
+   * Who among the sellers holds a title that heads the department
+   * (`titles.is_department_head`). Absent = nobody.
+   */
+  departmentHeadIds?: string[]
 }
 
 /** A `sales_order_shares` row. */
@@ -379,6 +386,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       paidAmount: num(o.paid_amount),
       alreadyReleased: released.has(o.order_no),
       manualMarginPct: numOrNull(o.manual_margin_pct),
+      brandCode: o.brand_code?.trim() || null,
       lines: (o.sales_order_lines ?? []).map(l => ({
         id: l.id,
         itemGroup: l.item_group,
@@ -435,6 +443,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     marginBands,
     hierarchy,
     priorMonths,
+    departmentHeadIds: [...new Set(rows.departmentHeadIds ?? [])],
   }
 }
 
