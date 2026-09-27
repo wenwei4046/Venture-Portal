@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { submitDirectorSalaryToFinance } from '../actions'
+import { completeDirectorSalary } from '../actions'
 
 interface Props {
   period: string
@@ -11,7 +11,13 @@ interface Props {
   disabledHint?: string
 }
 
-export default function SubmitDirectorSalaryButton({
+/**
+ * Complete (unified Payroll, 2026-09-27 — was "Submit to Finance"): the
+ * directors' pay is checked and locked, and they appear on HR › Payroll as
+ * Completed, with the date. The money goes to Finance with that page's Submit
+ * to Finance, in a batch like everybody else's.
+ */
+export default function CompleteDirectorSalaryButton({
   period,
   totalGross,
   disabled,
@@ -26,11 +32,11 @@ export default function SubmitDirectorSalaryButton({
     setError(null)
     startTransition(async () => {
       try {
-        await submitDirectorSalaryToFinance(period)
+        await completeDirectorSalary(period)
         setConfirming(false)
         router.refresh()
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Submit failed'
+        const msg = err instanceof Error ? err.message : 'Complete failed'
         if (msg.includes('NEXT_REDIRECT')) return
         setError(msg)
         setConfirming(false)
@@ -38,21 +44,15 @@ export default function SubmitDirectorSalaryButton({
     })
   }
 
-  // Transparency rule: a submit whose total comes from another source must
+  // Transparency rule: a Complete whose total comes from another source must
   // explain itself when that source is missing — disabled + hint, no silent 0.
   if (disabled) {
     return (
       <div className="flex flex-col items-end gap-2">
-        <button
-          disabled
-          title={disabledHint}
-          className="bg-accent/40 text-sm px-4 py-2 rounded-control cursor-not-allowed"
-        >
-          Submit to Finance
+        <button disabled title={disabledHint} className="bg-accent/40 text-sm px-4 py-2 rounded-control cursor-not-allowed">
+          Complete
         </button>
-        {disabledHint && (
-          <span className="text-xs text-right">{disabledHint}</span>
-        )}
+        {disabledHint && <span className="text-xs text-right">{disabledHint}</span>}
       </div>
     )
   }
@@ -62,9 +62,10 @@ export default function SubmitDirectorSalaryButton({
       <div className="flex flex-col items-end gap-2">
         <div className="flex items-center gap-3 bg-surface border border-accent-border rounded-card px-4 py-2.5">
           <span className="text-sm max-w-md">
-            Submit director salary (RM {totalGross.toLocaleString('en-MY', { minimumFractionDigits: 2 })}) to Finance?
+            Complete director salary (gross RM {totalGross.toLocaleString('en-MY', { minimumFractionDigits: 2 })})?
             <span className="block mt-1 text-xs">
-              Totals + per-subsidiary contributions become visible to Finance immediately, and a funding request (gross + employer statutory) is filed in Finance&apos;s payroll queue.
+              The directors lock and appear on HR › Payroll as Completed; the per-subsidiary split becomes
+              visible to Finance for billing. The money goes to Finance when HR › Payroll submits the next batch.
             </span>
           </span>
           <button
@@ -72,7 +73,7 @@ export default function SubmitDirectorSalaryButton({
             disabled={isPending}
             className="shrink-0 bg-accent hover:bg-accent-hover text-sm px-3 py-1.5 rounded-control transition-colors disabled:opacity-50"
           >
-            {isPending ? 'Submitting...' : 'Confirm'}
+            {isPending ? 'Completing…' : 'Confirm'}
           </button>
           <button
             onClick={() => setConfirming(false)}
@@ -93,7 +94,7 @@ export default function SubmitDirectorSalaryButton({
         onClick={() => setConfirming(true)}
         className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors"
       >
-        Submit to Finance
+        Complete
       </button>
       {error && <span className="text-sm text-danger">{error}</span>}
     </div>

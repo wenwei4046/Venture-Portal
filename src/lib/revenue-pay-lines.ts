@@ -241,6 +241,26 @@ export function checkSavePayLines(input: SavePayLinesInput): SavePayLinesInput {
   return { staffId: input.staffId, period: input.period, lines, seen: input.seen }
 }
 
+/**
+ * Why ONE person's pay lines cannot change right now, or null while they can
+ * (the unified Payroll, 2026-09-27). The month may be open while this person
+ * has moved on: a salesperson is Completed when closed on Comm Cal, and then
+ * sent to Finance in a batch. `revenue_save_pay_lines` refuses anything but a
+ * draft row; this says so before HR types the lines, and says what to do.
+ */
+export function personPayLinesLock(payrollStatus: string | null | undefined, name: string): string | null {
+  switch (payrollStatus) {
+    case 'completed':
+      return `${name} is closed for the month. Reopen their close first — closing them again sends the new figure to payroll.`
+    case 'submitted':
+      return `${name}'s pay is with Finance. Right-click them on HR › Payroll — Resubmit or Second payroll — first.`
+    case 'paid':
+      return `${name} has been paid for the month. Right-click them on HR › Payroll — Resubmit or Second payroll — to pay a difference.`
+    default:
+      return null
+  }
+}
+
 /** Whether saving the drafts would change anything stored. */
 export function draftsDiffer(drafts: readonly PayLineDraft[], lines: readonly PayLine[]): boolean {
   if (drafts.length !== lines.length) return true

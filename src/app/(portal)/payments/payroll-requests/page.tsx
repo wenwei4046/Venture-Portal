@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { round2 } from '@/lib/payroll-funding'
+import { topupSummary } from '@/lib/payroll-lifecycle'
 import GeneratePvForm, { type PoolBreakdownRow } from './_components/GeneratePvForm'
 import StatutorySection, { type StatutoryPeriod } from './_components/StatutorySection'
 import SendBackButton from './_components/SendBackButton'
@@ -18,6 +19,9 @@ interface RequestRow {
   requested_by_name: string
   // Run-less requests are director salary fundings (mig 20260727100000).
   isDirector: boolean
+  /** Unified Payroll (2026-09-27): the batch this request funds. */
+  batchId: string | null
+  batchLabel: string | null
 }
 
 interface BreakdownRpcRow {
@@ -33,6 +37,18 @@ interface FundingInfo {
   pvs: { id: string; voucher_no: string | null; amount: number; status: string }[]
 }
 
+/** "Batch #2 · HR 5" — which people a request funds (department totals only). */
+function batchLabel(raw: unknown): string | null {
+  const b = (Array.isArray(raw) ? raw[0] : raw) as
+    | { batch_no: number; people: number; topups: number; second_payrolls?: number | null; legacy: boolean; departments: Array<{ name: string; people: number }> | null }
+    | null
+    | undefined
+  if (!b) return null
+  if (b.legacy) return 'Whole month'
+  const who = (b.departments ?? []).map(d => `${d.name} ${d.people}`).join(' · ')
+  return `Batch #${b.batch_no}${who ? ` · ${who}` : ''}${b.topups ? ` · ${topupSummary(b.topups, b.second_payrolls ?? 0)}` : ''}`
+}
+
 export default async function PayrollRequestsPage() {
   await requirePermission('treasury')
   const supabase = await createClient()
@@ -41,8 +57,9 @@ export default async function PayrollRequestsPage() {
     supabase
       .from('payroll_payment_requests')
       .select(`
-        id, amount, status, requested_at, payroll_run_id, period_month,
+        id, amount, status, requested_at, payroll_run_id, period_month, batch_id,
         payroll_runs (period_month),
+        payroll_batches (batch_no, people, topups, second_payrolls, legacy, departments),
         users:requested_by (name)
       `)
       .in('status', ['submitted', 'pv_generated'])
@@ -68,6 +85,8 @@ export default async function PayrollRequestsPage() {
       period_month: run.period_month ?? r.period_month ?? '',
       requested_by_name: submitter.name ?? 'HR',
       isDirector: r.payroll_run_id == null,
+      batchId: r.batch_id ?? null,
+      batchLabel: batchLabel((r as { payroll_batches?: unknown }).payroll_batches),
     }
   })
 
@@ -141,11 +160,12 @@ export default async function PayrollRequestsPage() {
     .eq('status', 'completed')
     .order('requested_at', { ascending: false })
     .limit(3)
-  const statutoryRuns = (completedReqs ?? []).map(r => ({
+  // A month funded in several batches has several completed requests on one run.
+  const statutoryRuns = [...new Map((completedReqs ?? []).map(r => [r.payroll_run_id as string, {
     runId: r.payroll_run_id as string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     period: ((r.payroll_runs as any)?.period_month ?? '') as string,
-  })).filter(r => r.period)
+  }])).values()].filter(r => r.period)
   const { data: statutoryPvsRaw } = statutoryRuns.length
     ? await supabase
         .from('payment_vouchers')
@@ -233,6 +253,11 @@ export default async function PayrollRequestsPage() {
                             Director salary
                           </span>
                         ) : null}
+                        {r.batchLabel ? (
+                          <span className="ml-2 font-mono text-[10px] text-graphite uppercase tracking-wider">
+                            {r.batchLabel}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="font-serif italic text-graphite text-sm mt-0.5">
                         Requested by {r.requested_by_name} ·{' '}
@@ -254,7 +279,8 @@ export default async function PayrollRequestsPage() {
                         <div className="mt-2">
                           <SendBackButton
                             period={r.period_month}
-                            periodLabel={dayjs(r.period_month).format('MMM YYYY')}
+                            batchId={r.batchId}
+                            periodLabel={`${dayjs(r.period_month).format('MMM YYYY')}${r.batchLabel ? ` ${r.batchLabel}` : ''}`}
                           />
                         </div>
                       ) : null}
@@ -297,6 +323,11 @@ export default async function PayrollRequestsPage() {
                         {r.isDirector ? (
                           <span className="ml-2 font-mono text-[10px] text-graphite uppercase tracking-wider">
                             Director salary
+                          </span>
+                        ) : null}
+                        {r.batchLabel ? (
+                          <span className="ml-2 font-mono text-[10px] text-graphite uppercase tracking-wider">
+                            {r.batchLabel}
                           </span>
                         ) : null}
                       </div>

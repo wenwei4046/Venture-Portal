@@ -12,6 +12,7 @@ import {
   payLineLabel,
   payLineTotals,
   payLinesToSave,
+  personPayLinesLock,
   seenOf,
   type PayLine,
 } from './revenue-pay-lines'
@@ -137,5 +138,21 @@ describe('the drafts as they stand', () => {
     expect(draftsDiffer([draftOf(advance), draftOf(claim)], lines)).toBe(true)
     expect(draftsDiffer([draftOf(claim)], lines)).toBe(true)
     expect(draftsDiffer([...lines.map(draftOf), newDraft('n1')], lines)).toBe(true)
+  })
+})
+
+// The unified Payroll (2026-09-27): the month can be open while one person has
+// moved on. The pencil says so before any typing, and names the way back.
+describe('one person moved on from draft', () => {
+  it('lets a draft or a person with no payroll row yet change their lines', () => {
+    expect(personPayLinesLock('draft', 'ANTHONY')).toBeNull()
+    expect(personPayLinesLock(null, 'ANTHONY')).toBeNull()
+    expect(personPayLinesLock(undefined, 'ANTHONY')).toBeNull()
+  })
+
+  it('sends a closed salesperson back to their close, and a sent one to Resubmit', () => {
+    expect(personPayLinesLock('completed', 'ANTHONY')).toBe('ANTHONY is closed for the month. Reopen their close first — closing them again sends the new figure to payroll.')
+    expect(personPayLinesLock('submitted', 'ANTHONY')).toBe('ANTHONY\'s pay is with Finance. Right-click them on HR › Payroll — Resubmit or Second payroll — first.')
+    expect(personPayLinesLock('paid', 'ANTHONY')).toContain('Resubmit or Second payroll')
   })
 })

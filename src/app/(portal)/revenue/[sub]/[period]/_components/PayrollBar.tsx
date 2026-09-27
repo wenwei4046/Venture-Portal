@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { formatMoney } from '@/lib/utils'
 import type { PayrollState } from '@/lib/commission/payroll-send'
 import s from './commission-workbench.module.css'
@@ -6,6 +7,8 @@ import s from './commission-workbench.module.css'
 interface Props {
   /** "September 2026". */
   monthLabel: string
+  /** YYYY-MM-01 — where HR › Payroll holds each salesperson once sent. */
+  period?: string
   state: PayrollState
   /**
    * The screen holds a draft — Open Bill picks not yet saved, a preview. The
@@ -43,8 +46,12 @@ function difference(now: number, before: number): string {
  * the day it shipped; the user's Send is per SALESPERSON (Send = Complete: tick
  * five people and send them, or send everybody not yet sent), so the send
  * belongs to the per-person close, not to one button for the month.
+ *
+ * Where a sent salesperson goes (the unified Payroll, 2026-09-27): their row
+ * on HR › Payroll takes the figure and shows Completed, and HR's Submit to
+ * Finance sends them on in a batch. A month HR has Total Closed takes nothing.
  */
-export default function PayrollBar({ monthLabel, state, draft = false, switches }: Props) {
+export default function PayrollBar({ monthLabel, period, state, draft = false, switches }: Props) {
   let tone: Tone
   let title: string
   let body: ReactNode
@@ -61,7 +68,9 @@ export default function PayrollBar({ monthLabel, state, draft = false, switches 
       title = state.sentTotal === null ? 'Not in payroll' : `In payroll · ${formatMoney(state.sentTotal)}`
       body = state.closedAs === 'locked'
         ? <>This month&apos;s commission is locked in payroll. Nothing here can change it now.</>
-        : <>{state.closedAs.replace(/\.?$/, '.')} Until then nothing here can change the {monthLabel} payroll.</>
+        : /closed for good/.test(state.closedAs)
+          ? <>HR has closed the {monthLabel} payroll for good (Total Close), so nothing here can change it. Only the Principal can reopen the month.</>
+          : <>{state.closedAs.replace(/\.?$/, '.')} Until then nothing here can change the {monthLabel} payroll.</>
       break
     case 'not_sent':
       blockers = state.blockers
@@ -93,6 +102,13 @@ export default function PayrollBar({ monthLabel, state, draft = false, switches 
             <ul className={s.payrollBlockers} aria-label="To settle before payroll">
               {blockers.map((b, i) => <li key={i}>{b}</li>)}
             </ul>
+          )}
+          {period && (state.kind === 'not_sent' || state.kind === 'sent') && (
+            <p className={s.payrollNote}>
+              A salesperson sent from here shows on{' '}
+              <Link href={`/hr-costing/payroll/${period}`} className="underline underline-offset-[3px]">HR › Payroll →</Link>
+              {' '}as Completed; HR&apos;s Submit to Finance sends them on.
+            </p>
           )}
           {draft && (state.kind === 'not_sent' || state.kind === 'sent') && (
             <p className={s.payrollNote}>

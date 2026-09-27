@@ -46,4 +46,19 @@ describe('PayrollBar', () => {
     expect(bar()).toHaveTextContent('In payroll · RM 91,971.90')
     expect(bar()).toHaveTextContent('Payroll for Sep 2026 has already been submitted. Reopen payroll before changing commission. Until then nothing here can change the September 2026 payroll.')
   })
+
+  // The unified Payroll (2026-09-27): where a sent salesperson lands, and a month HR has closed for good.
+  it('points at HR › Payroll while the month can still take people', () => {
+    render(<PayrollBar monthLabel="September 2026" period="2026-09-01" state={{ kind: 'not_sent', total: 10, blockers: [] }} />)
+    expect(screen.getByRole('link', { name: 'HR › Payroll →' })).toHaveAttribute('href', '/hr-costing/payroll/2026-09-01')
+    expect(bar()).toHaveTextContent("shows on HR › Payroll → as Completed; HR's Submit to Finance sends them on.")
+  })
+
+  it('names a Total Closed month as such, and offers no way in', () => {
+    render(<PayrollBar monthLabel="September 2026" period="2026-09-01" state={{
+      kind: 'closed', sentTotal: null, closedAs: 'Payroll for September 2026 is closed for good',
+    }} />)
+    expect(bar()).toHaveTextContent('HR has closed the September 2026 payroll for good (Total Close), so nothing here can change it. Only the Principal can reopen the month.')
+    expect(screen.queryByRole('link')).toBeNull()
+  })
 })

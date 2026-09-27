@@ -10,8 +10,11 @@ import {
   groupByDepartment,
   neighbourId,
 } from '@/lib/payroll-grid'
-import { deletePayrollRows } from '../actions'
+import { round2 } from '@/lib/payroll-funding'
+import { isTopupKind, rowActions, rowStatusView, type LifecycleRow, type RowStatus } from '@/lib/payroll-lifecycle'
+import { completePayrollRows, deletePayrollRows, unlockPayrollRows } from '../actions'
 import PayrollRow from './PayrollRow'
+import PayrollRowMenu, { type RowMenuAnchor } from './PayrollRowMenu'
 
 export interface PayrollRowData {
   id: string
@@ -20,6 +23,22 @@ export interface PayrollRowData {
   dept_name: string
   status: string
   source: string
+  /** staff = hr_monthly_payroll; directors = director_monthly_payroll (read-only here). */
+  scope: 'staff' | 'directors'
+  /** Where the pay is worked out, and so where it is Completed. */
+  origin: 'staff' | 'revenue' | 'director'
+  completed_at: string | null
+  topup_opened_at: string | null
+  /** While unlocked: a correction (resubmit) or a planned second payment (second_payroll). */
+  topup_kind?: string | null
+  /** Standing batches that carried this person, oldest first. */
+  batch_nos: number[]
+  /** CTC those batches already sent — a resubmit sends the rest. */
+  submitted_ctc: number
+  /** Revenue: their ledger on Comm Cal, where they are closed / reopened. */
+  comm_cal_href?: string | null
+  /** Directors: Director Salary, where they are keyed and Completed. */
+  director_href?: string | null
   basic_salary: number
   statutory_allowance: number
   non_statutory_allowance: number
@@ -52,8 +71,8 @@ export interface PayrollRowData {
   net: number
   /**
    * True for a salesperson in a `payroll_source = 'commission'` department.
-   * The source commission belongs to the commission run. Gross changes use
-   * the separate adjustment action; ordinary payroll saves cannot replace it.
+   * The source commission belongs to Comm Cal. Gross changes use the
+   * separate adjustment action; ordinary payroll saves cannot replace it.
    */
   commission_is_derived: boolean
   /** Link to this month's statement, when a run has computed one. */
@@ -70,12 +89,15 @@ export interface PayrollRowData {
 interface Props {
   rows: PayrollRowData[]
   period: string
+  /** Total Close: nothing on the grid can change. */
+  monthClosed?: boolean
 }
 
 /** Column order, left to right — the <colgroup> that fixes the widths. */
 const COLUMNS = [
   'chk',
   'name',
+  'status',
   'gross',
   'net',
   'act',
@@ -91,6 +113,8 @@ const COLUMNS = [
   'socso',
   'eis',
 ] as const
+
+const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`
 
 const TOTAL_KEYS = [
   'gross',
@@ -108,24 +132,42 @@ const TOTAL_KEYS = [
   'eis_er',
 ] as const
 
+export function lifecycleOf(r: PayrollRowData): LifecycleRow {
+  return {
+    id: r.id,
+    scope: r.scope,
+    origin: r.origin,
+    status: r.status as RowStatus,
+    name: r.staff_name,
+    dept: r.dept_name,
+    ctc: round2(r.gross + r.epf_er + r.socso_er + r.eis_er),
+    submittedCtc: r.submitted_ctc,
+    batchNos: r.batch_nos,
+    completedAt: r.completed_at,
+    topupOpenedAt: r.topup_opened_at,
+    topupKind: isTopupKind(r.topup_kind) ? r.topup_kind : null,
+    sourceLinked: r.source === 'commission' && Boolean(r.commission_statements?.length || r.commission_statement_href),
+  }
+}
+
 /**
- * The payroll grid — redesigned 2026-09-05 ("C · Window", chosen out of
- * three mockups). One line per person inside a well; ✓ · Name · Gross · Net
- * frozen on the left with the eleven working columns scrolling under them;
- * rows grouped by department under a band that carries the subtotal; the
- * nine editable figures typed straight into the row, or into the person's
- * paycheck window (▾ or the name) which is a second view of the same
- * figures. The old table sat bare on the page with four-line names, ~130px
- * a row, and pushed Gross and Net off the right edge.
+ * The payroll grid — "C · Window" (2026-09-05): one line per person inside a
+ * well; ✓ · Name · Status · Gross · Net frozen on the left with the working
+ * columns scrolling under them; rows grouped by department under a band that
+ * carries the subtotal. Since the unified Payroll (2026-09-27) the Status
+ * column says where each person's pay stands; tick people to Complete,
+ * Unlock or Delete them, right-click somebody to Resubmit or add a Second payroll.
  */
-export default function PayrollGrid({ rows, period }: Props) {
+export default function PayrollGrid({ rows, period, monthClosed = false }: Props) {
   const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
   const [department, setDepartment] = useState('')
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [menu, setMenu] = useState<{ rowId: string; anchor: RowMenuAnchor; byRightClick: boolean } | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const groups = useMemo(() => groupByDepartment(rows), [rows])
@@ -140,11 +182,14 @@ export default function PayrollGrid({ rows, period }: Props) {
   const grossCommissionTotal = columnTotals(revenueRows, ['commission_amount']).commission_amount
   const displayedCommissionTotal = splitTotals.commissionBalance
     + columnTotals(visibleRows.filter(r => !(r.revenue_payroll ?? r.source === 'commission')), ['commission_amount']).commission_amount
-  // Display order — what ‹ › in the paycheck window step through.
-  const order = useMemo(() => visibleRows.map(r => r.id), [visibleRows])
+  const order = useMemo(() => visibleRows.filter(r => r.scope === 'staff').map(r => r.id), [visibleRows])
   const totals = useMemo(() => columnTotals(visibleRows, TOTAL_KEYS), [visibleRows])
 
-  // The frozen edge casts a shadow only once something has scrolled under it.
+  const views = useMemo(() => new Map(rows.map(r => {
+    const life = lifecycleOf(r)
+    return [r.id, { life, status: rowStatusView(life), actions: rowActions(life, monthClosed) }]
+  })), [rows, monthClosed])
+
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -153,20 +198,33 @@ export default function PayrollGrid({ rows, period }: Props) {
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Finalized rows and Revenue rows with applied source statements must stay.
-  // An unlinked Revenue draft can be removed after its source is reopened.
+  // Drop ticks on rows whose state moved under them (a refresh after an action).
+  useEffect(() => {
+    setSelected(prev => {
+      const next = new Set([...prev].filter(id => {
+        const a = views.get(id)?.actions
+        return a && (a.complete || a.unlock || a.remove)
+      }))
+      return next.size === prev.size ? prev : next
+    })
+  }, [views])
+
   const selectableIds = useMemo(
-    () => visibleRows.filter(r => r.status === 'draft' && !(
-      r.source === 'commission' && (r.commission_statements?.length || r.commission_statement_href)
-    )).map(r => r.id),
-    [visibleRows],
+    () => visibleRows.filter(r => {
+      const a = views.get(r.id)?.actions
+      return a && (a.complete || a.unlock || a.remove)
+    }).map(r => r.id),
+    [visibleRows, views],
   )
-  const allSelectableChecked =
-    selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
-  const someSelected = selected.size > 0
+  const allSelectableChecked = selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
+  const picked = [...selected].map(id => views.get(id)).filter((v): v is NonNullable<typeof v> => !!v)
+  const toComplete = picked.filter(v => v.actions.complete).map(v => v.life.id)
+  const toUnlock = picked.filter(v => v.actions.unlock).map(v => v.life.id)
+  const toRemove = picked.filter(v => v.actions.remove).map(v => v.life.id)
 
   function toggleRow(id: string) {
-    setDeleteError(null)
+    setActionError(null)
+    setNotice(null)
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -176,12 +234,9 @@ export default function PayrollGrid({ rows, period }: Props) {
   }
 
   function toggleAll() {
-    setDeleteError(null)
-    if (allSelectableChecked) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(selectableIds))
-    }
+    setActionError(null)
+    setNotice(null)
+    setSelected(allSelectableChecked ? new Set() : new Set(selectableIds))
   }
 
   function toggleFold(dept: string) {
@@ -193,34 +248,53 @@ export default function PayrollGrid({ rows, period }: Props) {
     })
   }
 
-  function handleDelete() {
-    if (selected.size === 0) return
-    const count = selected.size
-    const label = count === 1 ? 'row' : 'rows'
-    if (
-      !window.confirm(
-        `Delete ${count} payroll ${label}? These staff won't appear in this month's payroll. You can re-add them with Import InfoTech or a new period.`,
-      )
-    ) {
-      return
-    }
-
-    setDeleteError(null)
-    const ids = Array.from(selected)
+  function act(label: string, run: () => Promise<string>) {
+    setActionError(null)
+    setNotice(null)
     startTransition(async () => {
       try {
-        await deletePayrollRows(ids, period)
+        const done = await run()
         setSelected(new Set())
+        setNotice(done)
         router.refresh()
       } catch (err) {
-        setDeleteError(err instanceof Error ? err.message : 'Delete failed')
+        setActionError(err instanceof Error ? err.message : `${label} failed`)
+        router.refresh()
       }
     })
   }
 
+  function handleComplete() {
+    if (toComplete.length === 0) return
+    act('Complete', async () => {
+      const r = await completePayrollRows(period, toComplete)
+      return `${r.completed} completed${r.unchanged ? ` · ${r.unchanged} resubmit${r.unchanged === 1 ? '' : 's'} unchanged, back as sent` : ''} — Submit to Finance when ready`
+    })
+  }
+
+  function handleUnlock() {
+    if (toUnlock.length === 0) return
+    act('Unlock', async () => {
+      const r = await unlockPayrollRows(period, toUnlock)
+      return `${r.unlocked} unlocked — editable again`
+    })
+  }
+
+  function handleDelete() {
+    if (toRemove.length === 0) return
+    const label = toRemove.length === 1 ? 'row' : 'rows'
+    if (!window.confirm(`Delete ${toRemove.length} payroll ${label}? These staff won't appear in this month's payroll. You can re-add them with Import InfoTech or a new period.`)) return
+    act('Delete', async () => {
+      const r = await deletePayrollRows(toRemove, period)
+      return `${r.deleted} deleted`
+    })
+  }
+
+  const menuRow = menu ? rows.find(r => r.id === menu.rowId) ?? null : null
+  const menuView = menuRow ? views.get(menuRow.id) ?? null : null
+
   return (
     <div className="mb-12">
-      {/* The month's filter panel: which department, and how many are shown. */}
       <div className="sheet-toolbar">
         <label className="flex items-center gap-2 text-xs font-medium">
           Department
@@ -230,7 +304,7 @@ export default function PayrollGrid({ rows, period }: Props) {
               setDepartment(event.target.value)
               setOpenId(null)
               setSelected(new Set())
-              setDeleteError(null)
+              setActionError(null)
             }}
             className="text-ink"
           >
@@ -238,61 +312,68 @@ export default function PayrollGrid({ rows, period }: Props) {
             {groups.map(group => <option key={group.dept} value={group.dept}>{group.dept}</option>)}
           </select>
         </label>
-        <span className="sheet-count ml-auto">{visibleRows.length} staff</span>
+        <span className="sheet-count ml-auto">{people(visibleRows.length)}</span>
       </div>
       {showRevenueSplit && (
         <p className="sheet-notice">
           Revenue: Gross Commission is the total before allocations; Balance under Earnings is the remaining commission payment.
           {' '}Net basic + Balance = Net to bank.
-          {' '}Basic follows normal payroll deductions; both employee and employer statutory are funded from the commission total.
-          {' '}Open a paycheck for the allocation and editable PCB. Historical rows retain their saved split.
+          {' '}A salesperson completes here when they are closed on Comm Cal — right-click them to open their ledger.
+          {' '}Directors are keyed and Completed on Director Salary.
         </p>
       )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3 min-h-[1.75rem]">
-        {someSelected ? (
-          <span className="text-xs font-bold">
-            {selected.size} selected
-          </span>
+        {selected.size > 0 ? (
+          <span className="text-xs font-bold">{selected.size} selected</span>
+        ) : notice ? (
+          <span className="chip ledger" role="status"><span className="dot" />{notice}</span>
         ) : (
           <p className="text-xs">
-            All values in RM · edit in the row, or open a name for the paycheck ·
-            Name and the payout stay put, the working scrolls.
+            Tick people and Complete them when their figures are checked · right-click a row for more ·
+            Name, Status and the payout stay put, the working scrolls.
           </p>
         )}
-        {someSelected ? (
-          <div className="flex items-center gap-3">
-            {deleteError && (
-              <span className="text-danger text-xs">{deleteError}</span>
+        {selected.size > 0 ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            {actionError && <span className="text-danger text-xs max-w-md" role="alert">{actionError}</span>}
+            {toComplete.length > 0 && (
+              <button
+                onClick={handleComplete}
+                disabled={isPending}
+                className="text-xs font-medium bg-accent hover:bg-accent-hover px-2.5 py-1 rounded-control transition-colors disabled:opacity-50"
+              >
+                {isPending ? 'Working…' : `Complete ${toComplete.length}`}
+              </button>
             )}
-            <button
-              onClick={handleDelete}
-              disabled={isPending}
-              className="text-xs font-medium text-danger bg-danger-bg hover:bg-danger/15 border border-danger/40 px-2.5 py-1 rounded-control transition-colors disabled:opacity-50"
-            >
-              {isPending ? 'Deleting…' : `Delete ${selected.size}`}
-            </button>
-            <button
-              onClick={() => setSelected(new Set())}
-              disabled={isPending}
-              className="text-xs hover:underline underline-offset-2 disabled:opacity-50"
-            >
+            {toUnlock.length > 0 && (
+              <button
+                onClick={handleUnlock}
+                disabled={isPending}
+                className="text-xs font-medium border border-hairline bg-surface px-2.5 py-1 rounded-control disabled:opacity-50"
+              >
+                Unlock {toUnlock.length}
+              </button>
+            )}
+            {toRemove.length > 0 && (
+              <button
+                onClick={handleDelete}
+                disabled={isPending}
+                className="text-xs font-medium text-danger bg-danger-bg hover:bg-danger/15 border border-danger/40 px-2.5 py-1 rounded-control transition-colors disabled:opacity-50"
+              >
+                Delete {toRemove.length}
+              </button>
+            )}
+            <button onClick={() => setSelected(new Set())} disabled={isPending} className="text-xs hover:underline underline-offset-2 disabled:opacity-50">
               Clear
             </button>
           </div>
+        ) : actionError ? (
+          <span className="text-danger text-xs max-w-md" role="alert">{actionError}</span>
         ) : (
           <span className="pg-legend">
-            <span>
-              <i className="in" aria-hidden />
-              editable
-            </span>
-            <span>
-              <i className="ro" aria-hidden />
-              computed
-            </span>
-            <span>
-              <i className="dv" aria-hidden />
-              from commission run
-            </span>
+            <span><i className="in" aria-hidden />editable</span>
+            <span><i className="ro" aria-hidden />computed</span>
+            <span><i className="dv" aria-hidden />from Comm Cal / Director Salary</span>
           </span>
         )}
       </div>
@@ -318,26 +399,18 @@ export default function PayrollGrid({ rows, period }: Props) {
             </colgroup>
             <thead>
               <tr className="pg-grp">
-                <th className="pg-st l0" colSpan={2} />
-                <th className="pg-st l2" colSpan={3}>
-                  Payout
-                </th>
+                <th className="pg-st l0" colSpan={3} />
+                <th className="pg-st l3" colSpan={3}>Payout</th>
                 {showRevenueSplit && <th className="g1" colSpan={2}>Revenue payout</th>}
-                <th className="g1" colSpan={5}>
-                  Earnings
-                </th>
-                <th className="g1" colSpan={3}>
-                  Deductions
-                </th>
-                <th className="g1" colSpan={3}>
-                  Employer
-                </th>
+                <th className="g1" colSpan={5}>Earnings</th>
+                <th className="g1" colSpan={3}>Deductions</th>
+                <th className="g1" colSpan={3}>Employer</th>
               </tr>
               <tr className="pg-cols">
                 <th className="pg-st l0 col-chk">
                   <input
                     type="checkbox"
-                    aria-label="Select all draft rows"
+                    aria-label="Select everyone who can be completed, unlocked or deleted"
                     checked={allSelectableChecked}
                     disabled={selectableIds.length === 0 || isPending}
                     onChange={toggleAll}
@@ -345,9 +418,10 @@ export default function PayrollGrid({ rows, period }: Props) {
                   />
                 </th>
                 <th className="pg-st l1 col-name">Name</th>
-                <th className="num pg-st l2 col-gross">Gross</th>
-                <th className="num pg-st l3 col-net">Net</th>
-                <th className="pg-st l4 col-act" />
+                <th className="pg-st l2 col-status">Status</th>
+                <th className="num pg-st l3 col-gross">Gross</th>
+                <th className="num pg-st l4 col-net">Net</th>
+                <th className="pg-st l5 col-act" />
                 {showRevenueSplit && (
                   <>
                     <th className="num g1">{visibleRows.filter(row => row.source === 'commission').every(row => row.payout_split_version === 2) ? 'Net basic' : 'Basic pay'}</th>
@@ -359,16 +433,9 @@ export default function PayrollGrid({ rows, period }: Props) {
                 <th className="num col-ns">Non-stat.</th>
                 <th className="num col-ot">OT</th>
                 <th className="num col-comm" title={showRevenueSplit ? 'Remaining commission payment for Revenue; regular commission for other departments' : undefined}>{showRevenueSplit ? 'Balance' : 'Comm.'}</th>
-                <th className="num g1 col-unpaid">
-                  Unpaid <i>days</i>
-                </th>
+                <th className="num g1 col-unpaid">Unpaid <i>days</i></th>
                 <th className="num col-ded">Deduct</th>
-                <th
-                  className="num col-skbbk"
-                  title="Net-only employee deduction — gross and statutory are unaffected"
-                >
-                  SKBBK
-                </th>
+                <th className="num col-skbbk" title="Net-only employee deduction — gross and statutory are unaffected">SKBBK</th>
                 <th className="num g1 col-epf">EPF ER</th>
                 <th className="num col-socso">SOCSO ER</th>
                 <th className="num col-eis">EIS ER</th>
@@ -383,6 +450,8 @@ export default function PayrollGrid({ rows, period }: Props) {
                 const groupGrossCommission = columnTotals(groupRevenueRows, ['commission_amount']).commission_amount
                 const groupDisplayedCommission = groupSplit.commissionBalance
                   + columnTotals(g.rows.filter(r => !(r.revenue_payroll ?? r.source === 'commission')), ['commission_amount']).commission_amount
+                const waiting = g.rows.filter(r => r.status === 'completed').length
+                const sent = g.rows.filter(r => r.status === 'submitted' || r.status === 'paid').length
                 return (
                   <Fragment key={g.dept}>
                     <tr className="pg-band" hidden={filteredOut}>
@@ -391,20 +460,21 @@ export default function PayrollGrid({ rows, period }: Props) {
                           type="button"
                           className="group-btn"
                           aria-expanded={!isFolded}
-                          aria-label={`${g.dept}, ${g.rows.length} staff`}
+                          aria-label={`${g.dept}, ${people(g.rows.length)}`}
                           title={g.dept}
                           onClick={() => toggleFold(g.dept)}
                         >
-                          <span className="chev shrink-0" aria-hidden>
-                            ▾
-                          </span>
+                          <span className="chev shrink-0" aria-hidden>▾</span>
                           <span className="min-w-0 truncate">{g.dept}</span>
                           <span className="count shrink-0">{g.rows.length}</span>
                         </button>
                       </td>
-                      <td className="pg-st l2 sub">{formatMoneyBare(g.gross)}</td>
-                      <td className="pg-st l3 sub">{formatMoneyBare(g.net)}</td>
-                      <td className="pg-st l4" />
+                      <td className="pg-st l2 pg-band-state">
+                        {sent === g.rows.length ? 'all with Finance' : sent || waiting ? `${sent} sent · ${waiting} ready` : ''}
+                      </td>
+                      <td className="pg-st l3 sub">{formatMoneyBare(g.gross)}</td>
+                      <td className="pg-st l4 sub">{formatMoneyBare(g.net)}</td>
+                      <td className="pg-st l5" />
                       {showRevenueSplit && (
                         <>
                           <td className="num g1 sub">{groupRevenueRows.length ? formatMoneyBare(groupSplit.basicPay) : '—'}</td>
@@ -415,40 +485,47 @@ export default function PayrollGrid({ rows, period }: Props) {
                       <td className="num sub">{formatMoneyBare(groupDisplayedCommission)}</td>
                       <td colSpan={6} />
                     </tr>
-                    {g.rows.map((r, i) => (
-                      <PayrollRow
-                        key={r.id}
-                        row={r}
-                        period={period}
-                        index={order.indexOf(r.id)}
-                        count={order.length}
-                        alt={i % 2 === 1}
-                        hidden={isFolded || filteredOut}
-                        showRevenueSplit={showRevenueSplit}
-                        open={openId === r.id}
-                        onOpen={() => setOpenId(r.id)}
-                        onClose={() => setOpenId(null)}
-                        onStep={dir => {
-                          const next = neighbourId(order, r.id, dir)
-                          if (next) setOpenId(next)
-                        }}
-                        selected={selected.has(r.id)}
-                        onToggleSelect={() => toggleRow(r.id)}
-                        selectDisabled={isPending}
-                      />
-                    ))}
+                    {g.rows.map((r, i) => {
+                      const view = views.get(r.id)!
+                      const selectable = view.actions.complete || view.actions.unlock || view.actions.remove
+                      return (
+                        <PayrollRow
+                          key={r.id}
+                          row={r}
+                          period={period}
+                          index={order.indexOf(r.id)}
+                          count={order.length}
+                          alt={i % 2 === 1}
+                          hidden={isFolded || filteredOut}
+                          showRevenueSplit={showRevenueSplit}
+                          status={view.status}
+                          open={openId === r.id}
+                          onOpen={() => setOpenId(r.id)}
+                          onClose={() => setOpenId(null)}
+                          onStep={dir => {
+                            const next = neighbourId(order, r.id, dir)
+                            if (next) setOpenId(next)
+                          }}
+                          selected={selected.has(r.id)}
+                          onToggleSelect={() => toggleRow(r.id)}
+                          selectDisabled={isPending || !selectable}
+                          selectHint={selectable ? undefined : view.actions.hint ?? undefined}
+                          onMenu={(anchor, byRightClick) => setMenu({ rowId: r.id, anchor, byRightClick })}
+                        />
+                      )
+                    })}
                   </Fragment>
                 )
               })}
             </tbody>
             <tfoot>
               <tr>
-                <td className="pg-st l0" colSpan={2} style={{ paddingLeft: 12 }}>
-                  Total · {visibleRows.length} staff
+                <td className="pg-st l0" colSpan={3} style={{ paddingLeft: 12 }}>
+                  Total · {people(visibleRows.length)}
                 </td>
-                <td className="num pg-st l2">{formatMoneyBare(totals.gross)}</td>
-                <td className="num pg-st l3">{formatMoneyBare(totals.net)}</td>
-                <td className="pg-st l4" />
+                <td className="num pg-st l3">{formatMoneyBare(totals.gross)}</td>
+                <td className="num pg-st l4">{formatMoneyBare(totals.net)}</td>
+                <td className="pg-st l5" />
                 {showRevenueSplit && (
                   <>
                     <td className="num g1">{formatMoneyBare(splitTotals.basicPay)}</td>
@@ -473,10 +550,27 @@ export default function PayrollGrid({ rows, period }: Props) {
       </div>
 
       <p className="text-xs mt-4">
-        Edit values in the row and click Save, or open a name for the paycheck — same
-        figures either way. Statutory re-computes automatically. Tick draft rows and{' '}
-        <strong className="font-bold">Delete</strong> to drop staff who shouldn&apos;t be on this month&apos;s payroll.
+        Edit a draft in the row and click Save, or open a name for the paycheck — same figures either way.
+        Tick people and <strong className="font-bold">Complete</strong> them when checked; <strong className="font-bold">Submit to Finance</strong>
+        {' '}sends everybody Completed as one batch, and can be pressed again for the next group. Right-click somebody already sent to
+        {' '}<strong className="font-bold">Resubmit</strong> them (a correction) or give them a <strong className="font-bold">Second payroll</strong>
+        {' '}(a planned second payment) — either way the next batch sends only the difference.
       </p>
+
+      {menu && menuRow && menuView && (
+        <PayrollRowMenu
+          key={menu.rowId}
+          row={menuRow}
+          period={period}
+          anchor={menu.anchor}
+          byRightClick={menu.byRightClick}
+          actions={menuView.actions}
+          status={menuView.status}
+          onOpenPaycheck={menuRow.scope === 'staff' ? () => setOpenId(menuRow.id) : undefined}
+          onClose={() => setMenu(null)}
+          onDone={message => { setMenu(null); setNotice(message); setActionError(null) }}
+        />
+      )}
     </div>
   )
 }
