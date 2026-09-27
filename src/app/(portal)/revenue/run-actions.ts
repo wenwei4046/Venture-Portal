@@ -6,13 +6,14 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { computeCommissionRun as runEngine } from '@/lib/commission/engine'
 import { toRunPayload } from '@/lib/commission/run-payload'
+import { unmatchedWarnings } from '@/lib/commission/payroll-send'
 import { loadCommissionInput } from './_lib/commission-input'
 import { openBillOnFor } from './_lib/open-bill-month'
 import { assertBillsNotClosed } from './_lib/salesperson-closes'
 import { fetchByKeys } from '@/lib/paginate'
 
 /**
- * Computing a month's commission and syncing its clean result to payroll.
+ * Sending a month's commission to payroll, and taking it back.
  *
  * The shape here follows the hybrid pattern the user chose for the salary
  * engine: the arithmetic is TypeScript (`src/lib/commission/engine.ts`, tested
@@ -20,30 +21,32 @@ import { fetchByKeys } from '@/lib/paginate'
  * half-written run is impossible. This file is the courier between them and
  * does no maths of its own beyond picking which rows to load.
  *
+ * The month page works the commission out live every time it opens; payroll
+ * holds only what was SENT (2026-09-27 — the page had read as if the two were
+ * the same, and September had never been sent).
+ *
  * comm_* / sales_* postdate database.types.ts — untyped-client convention.
  */
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
 }
 
-export interface ComputeSummary {
+export interface SendSummary {
   runId: string
   periodMonth: string
   staffCount: number
   totalCommission: number
-  warnings: string[]
   deferredCount: number
-  penalisedCount: number
   releasedCount: number
-  payrollSynced: boolean
 }
 
 /**
- * Compute the month from sales orders. The save RPC also syncs a clean run to
- * payroll, releases its orders and raises earned titles in the same transaction.
- * A run with warnings remains computed until its inputs are corrected.
+ * Work the month out from its bills and put it in payroll — replacing what
+ * this sub-department sent before, in one transaction
+ * (`send_commission_to_payroll`). Refused while the result has anything to
+ * settle: the page lists the same things, and payroll keeps what it had.
  */
-export async function computeRun(period: string, subDepartmentId?: string): Promise<ComputeSummary> {
+export async function sendToPayroll(period: string, subDepartmentId: string): Promise<SendSummary> {
   await requirePermission('revenue')
   const supabase = await client()
   const { input, batchId, schemeId, subDepartmentId: resolvedSubDepartmentId, unmatchedOrderNos } =
@@ -51,29 +54,26 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
 
   const result = runEngine(input)
   const payload = toRunPayload(input, result)
-
-  // An unmatched agent never reaches the engine (the order pays nobody), so
-  // the run would look clean while quietly excluding real sales. Say so here.
-  if (unmatchedOrderNos.length > 0) {
-    payload.p_warnings = [
-      `${unmatchedOrderNos.length} order(s) carry an agent who is not a salesperson in the portal and were excluded. Match them in the import wizard.`,
-      ...payload.p_warnings,
-    ]
+  const warnings = [...unmatchedWarnings(unmatchedOrderNos), ...payload.p_warnings]
+  if (warnings.length > 0) {
+    throw new Error(
+      `${warnings.length} thing(s) to settle before this month can go to payroll — they are listed on the page. Payroll is unchanged.`,
+    )
   }
 
-  const { data: runId, error: saveError } = await supabase.rpc('save_commission_run', {
+  const { data: runId, error: sendError } = await supabase.rpc('send_commission_to_payroll', {
     p_period_month: period,
     p_sub_department_id: resolvedSubDepartmentId,
     p_scheme_id: schemeId,
     p_batch_id: batchId,
     p_total_commission: payload.p_total_commission,
-    p_warnings: payload.p_warnings,
+    p_warnings: warnings,
     p_statements: payload.p_statements,
     p_released_orders: payload.p_released_orders,
     p_deferred_orders: payload.p_deferred_orders,
     p_penalised_orders: payload.p_penalised_orders,
   })
-  if (saveError) throw new Error(saveError.message)
+  if (sendError) throw new Error(sendError.message)
 
   revalidatePath('/revenue', 'layout')
   revalidatePath('/hr-costing/payroll', 'layout')
@@ -84,16 +84,17 @@ export async function computeRun(period: string, subDepartmentId?: string): Prom
     periodMonth: period,
     staffCount: payload.p_statements.length,
     totalCommission: payload.p_total_commission,
-    warnings: payload.p_warnings,
     deferredCount: payload.p_deferred_orders.length,
-    penalisedCount: payload.p_penalised_orders.length,
     releasedCount: payload.p_released_orders.length,
-    payrollSynced: payload.p_warnings.length === 0,
   }
 }
 
-/** Pull an applied run back to draft, undoing the payroll figures it wrote. */
-export async function reopenRun(runId: string): Promise<void> {
+/**
+ * Take this sub-department's commission back out of the month's payroll, so
+ * its bills and picks can change again. Other sub-departments' shares and the
+ * titles already raised stay.
+ */
+export async function takeBackFromPayroll(runId: string): Promise<void> {
   await requirePermission('revenue')
   const supabase = await client()
 
@@ -478,7 +479,7 @@ async function assertRunOpen(supabase: SupabaseClient, periodMonth: string, subD
   if (error) throw new Error(`Could not check the commission run: ${error.message}`)
   if (locked) {
     throw new Error(
-      `These ${periodMonth.slice(0, 7)} sales have an applied or locked commission run. Reopen the run that paid them before making changes.`,
+      `These ${periodMonth.slice(0, 7)} sales are in payroll. Take the month back from payroll (its payroll bar) before making changes.`,
     )
   }
 }

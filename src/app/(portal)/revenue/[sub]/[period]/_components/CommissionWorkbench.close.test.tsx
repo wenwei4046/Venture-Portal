@@ -269,7 +269,8 @@ describe('closing one salesperson from their ledger', () => {
   it('turns Close off while the page holds a draft', () => {
     renderBoard()
     openLedger('ANTHONY')
-    fireEvent.click(within(screen.getByRole('table', { name: 'Personal commission by sales order' })).getAllByRole('button', { name: 'Exclude' })[0])
+    // An Open Bill pick not yet saved is a draft: the close would lock a figure payroll never sees.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Open Bill SO-one' }))
     expect(screen.getByRole('button', { name: /Close ANTHONY/ })).toBeDisabled()
     expect(screen.getByText(/A close locks the month as saved/)).toBeVisible()
   })

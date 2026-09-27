@@ -140,7 +140,7 @@ describe('Open Bill saving safeguards', () => {
   it('checks a displaced order period and prevents a no-op edit from bypassing conflict protection', async () => {
     const db = database({ locked: ['2026-08-01'] })
     db.tables.sales_order_open_bill_tags = [db.tag('older', 1)]
-    await expect(saveOpenBillPicks([{ orderId: 'a', before: null, after: 1 }])).rejects.toThrow('applied or locked')
+    await expect(saveOpenBillPicks([{ orderId: 'a', before: null, after: 1 }])).rejects.toThrow('are in payroll')
     expect(db.locks).toContain('2026-08-01')
     expect(db.writes).toEqual([])
 
@@ -182,7 +182,7 @@ describe('Open Bill saving safeguards', () => {
     const db = database({ locked: ['2026-08-01'] })
     await expect(setOpenBillRank('a', 4 as 1)).rejects.toThrow('rank must be')
     db.tables.sales_order_open_bill_tags = [db.tag('older', 1)]
-    await expect(setOpenBillRank('a', 1)).rejects.toThrow('applied or locked')
+    await expect(setOpenBillRank('a', 1)).rejects.toThrow('are in payroll')
     expect(db.writes).toEqual([])
   })
 })
