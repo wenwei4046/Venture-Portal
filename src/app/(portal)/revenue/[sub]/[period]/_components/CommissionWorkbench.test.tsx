@@ -7,6 +7,9 @@ import { upsalesToOrders } from '@/lib/commission/upsales'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench, { type PayrollBarFacts } from './CommissionWorkbench'
 
+// The salary preview's pay-line editor saves through a server action (its own tests are SalaryCalculation.test).
+vi.mock('../../../pay-line-actions', () => ({ savePayLines: vi.fn() }))
+
 const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, url } = vi.hoisted(() => {
   // Next re-renders `useSearchParams` from the browser's own pushState and
   // replaceState; the stand-in does the same through this subscription.

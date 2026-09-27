@@ -19,14 +19,23 @@
  *                  no basic and no statutory allowance, so it is 0 and every
  *                  contribution with it.
  *   gross          commission − EMPLOYER EPF/SOCSO/EIS + prorated statutory
- *                  allowance + prorated OT + non-statutory allowance − the
- *                  deduction. The employer's share is funded OUT of the
- *                  commission: that is what makes this payroll different from
- *                  a salaried one, where it sits beside the wage.
+ *                  allowance + prorated OT + non-statutory allowance + the
+ *                  earning pay lines − the deduction. The employer's share is
+ *                  funded OUT of the commission: that is what makes this
+ *                  payroll different from a salaried one, where it sits beside
+ *                  the wage.
  *   tax            exactly one of PCB and Withholding. PCB is looked up on the
  *                  BASIC alone (after employee EPF) — commission does not
  *                  raise it; withholding is a flat rate on gross.
- *   net            gross less every employee contribution, the tax and SKBBK.
+ *   net            gross less every employee contribution, the tax, SKBBK and
+ *                  the deduction pay lines.
+ *
+ * Pay lines (2026-09-27, `revenue_pay_lines`) are what HR adds to the month on
+ * Comm Cal — a special claim, an allowance, an incentive, a deduction. The
+ * earnings are paid in full and sit outside the statutory wage, like the
+ * non-statutory allowance; a deduction comes off take-home pay only, like
+ * SKBBK. The payroll row carries their two totals (`pay_line_earnings` /
+ * `pay_line_deductions`) and both triggers add them the way this does.
  *   the split      net basic is what the salary PV pays as "basic"; the rest
  *                  is the commission balance. Both come from the same net, so
  *                  they always add back to it.
@@ -36,6 +45,8 @@
  * reads them with the same `lookup_epf` / `lookup_socso` / `lookup_eis` /
  * `lookup_pcb` the trigger calls, and hands them in.
  */
+
+import type { PayLine } from './revenue-pay-lines'
 
 export type TaxMode = 'pcb' | 'withholding' | 'none'
 
@@ -60,6 +71,10 @@ export interface RevenuePayInput {
   pcb: number
   taxMode: TaxMode
   withholdingRate: number
+  /** Earning pay lines (special claim, allowance, incentive): into gross in full. Absent = none. */
+  payLineEarnings?: number
+  /** Deduction pay lines: off net only. Absent = none. */
+  payLineDeductions?: number
 }
 
 export interface RevenuePay {
@@ -68,6 +83,10 @@ export interface RevenuePay {
   proratedStatutoryAllowance: number
   proratedOt: number
   statutoryWages: number
+  /** The month's earning pay lines, in gross. */
+  payLineEarnings: number
+  /** The month's deduction pay lines, off net. */
+  payLineDeductions: number
   /** EPF + SOCSO + EIS the employer pays, funded from the commission. */
   employerContributions: number
   /** EPF + SOCSO + EIS the employee pays. */
@@ -106,6 +125,8 @@ export function computeRevenuePay(input: RevenuePayInput): RevenuePay {
 
   const employer = round2(input.epfEr + input.socsoEr + input.eisEr)
   const employee = round2(input.epfEe + input.socsoEe + input.eisEe)
+  const lineEarnings = input.payLineEarnings ?? 0
+  const lineDeductions = input.payLineDeductions ?? 0
 
   // The trigger rounds gross only when it stores it; withholding and net are
   // both taken off the unrounded figure, so they are taken off it here too.
@@ -116,7 +137,8 @@ export function computeRevenuePay(input: RevenuePayInput): RevenuePay {
     input.eisEr +
     proratedStat +
     proratedOt +
-    input.nonStatutoryAllowance -
+    input.nonStatutoryAllowance +
+    lineEarnings -
     input.deductionAmount
 
   const pcb = input.taxMode === 'pcb' ? round2(input.pcb) : 0
@@ -125,7 +147,8 @@ export function computeRevenuePay(input: RevenuePayInput): RevenuePay {
 
   const gross = round2(grossRaw)
   const net = round2(
-    grossRaw - input.epfEe - input.socsoEe - input.eisEe - pcb - withholdingTax - input.skbbkAmount,
+    grossRaw - input.epfEe - input.socsoEe - input.eisEe - pcb - withholdingTax - input.skbbkAmount
+      - lineDeductions,
   )
 
   const basicPayNet = round2(
@@ -139,11 +162,13 @@ export function computeRevenuePay(input: RevenuePayInput): RevenuePay {
     proratedStatutoryAllowance: round2(proratedStat),
     proratedOt: round2(proratedOt),
     statutoryWages: round2(statutoryWages),
+    payLineEarnings: round2(lineEarnings),
+    payLineDeductions: round2(lineDeductions),
     employerContributions: employer,
     employeeContributions: employee,
     pcb,
     withholdingTax,
-    totalDeductions: round2(employee + pcb + withholdingTax + input.skbbkAmount),
+    totalDeductions: round2(employee + pcb + withholdingTax + input.skbbkAmount + lineDeductions),
     gross,
     net,
     basicPayNet,
@@ -176,6 +201,8 @@ export interface PayRowSource {
   payrollGross: number | null
   payrollNet: number | null
   input: Omit<RevenuePayInput, 'commission'>
+  /** The month's pay lines, in their order; their totals are already in `input`. */
+  lines?: PayLine[]
 }
 
 export interface PayRow extends PayRowSource {

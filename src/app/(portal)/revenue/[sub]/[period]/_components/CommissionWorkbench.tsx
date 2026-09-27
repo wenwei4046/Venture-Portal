@@ -22,6 +22,7 @@ import BillContextMenu, { type BillMenuOutcome } from '../orders/_components/Bil
 import BillCountNotice from '../orders/_components/BillCountNotice'
 import { useBillMenu } from '../orders/_components/useBillMenu'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
+import SalaryCalculation from './SalaryCalculation'
 import NoCommission, { COMMISSIONABLE_HINT, DEPOSIT_HINT, DROP_HINT, GROUP_SALES_HINT, SALES_VALUE_HINT, UPSELL_HINT } from './NoCommission'
 import PayrollBar from './PayrollBar'
 import s from './commission-workbench.module.css'
@@ -671,32 +672,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.footerTotal}>{view === 'deposit'
         ? <><span>Still to collect · {personHeld.length} {personHeld.length === 1 ? 'bill' : 'bills'} below deposit</span><strong>{money(sum(personHeld, r => depositOf(r).short))}</strong></>
         : <><span>{view === 'personal' ? 'Personal commission' : 'Overriding commission'} · all included orders</span><strong>{money(view === 'personal' ? selected.personalTotal : selected.overrideTotal)}</strong></>}</div>
-      <details className={s.salaryDetails}>
-        <summary>Salary calculation · current preview</summary>
-        {salary && salarySource ? <>
-          <p className={s.muted}>Uses this commission draft and the available payroll inputs. Allowances and overtime use {salarySource.input.daysWorked} / {salarySource.input.daysInMonth} days.</p>
-          <div className={s.tableFrame}>
-            <table className={`${s.table} ${s.salaryTable}`} aria-label="Current salary calculation">
-              <thead><tr><th>Component</th><th className={s.numeric}>Amount</th></tr></thead>
-              <tbody>
-                <tr><td>Current commission<small>Personal + overriding + group reward</small></td><td className={s.numeric}>{money(selected.totalCommission)}</td></tr>
-                <tr><td>Other programmes<small>Already applied for this month</small></td><td className={s.numeric}>{money(salarySource.commissionElsewhere)}</td></tr>
-                <tr><td>Payroll adjustment</td><td className={s.numeric}>{money(salarySource.payrollAdjustment)}</td></tr>
-                <tr><td>Employer contributions deducted<small>EPF + SOCSO + EIS, funded from commission</small></td><td className={s.numeric}>{money(-salary.employerContributions)}</td></tr>
-                <tr><td>Statutory allowance<small>Prorated</small></td><td className={s.numeric}>{money(salary.proratedStatutoryAllowance)}</td></tr>
-                <tr><td>Other allowances</td><td className={s.numeric}>{money(salarySource.input.nonStatutoryAllowance)}</td></tr>
-                <tr><td>Overtime<small>Prorated</small></td><td className={s.numeric}>{money(salary.proratedOt)}</td></tr>
-                <tr><td>Payroll deductions</td><td className={s.numeric}>{money(-salarySource.input.deductionAmount)}</td></tr>
-                <tr className={s.salarySubtotal}><td>Gross pay</td><td className={s.numeric}>{money(salary.gross)}</td></tr>
-                <tr><td>Employee contributions<small>EPF + SOCSO + EIS</small></td><td className={s.numeric}>{money(-salary.employeeContributions)}</td></tr>
-                <tr><td>{salarySource.input.taxMode === 'withholding' ? 'Withholding tax' : salarySource.input.taxMode === 'pcb' ? 'PCB tax' : 'Tax · none'}</td><td className={s.numeric}>{money(-(salary.pcb + salary.withholdingTax))}</td></tr>
-                <tr><td>SKBBK</td><td className={s.numeric}>{money(-salarySource.input.skbbkAmount)}</td></tr>
-              </tbody>
-              <tfoot><tr><td>Estimated take-home pay</td><td className={s.numeric}>{money(salary.net)}</td></tr></tfoot>
-            </table>
-          </div>
-        </> : <p className={s.muted}>{data.payUnavailable ? 'Salary preview is unavailable for this session.' : 'Payroll inputs are not set for this person.'} Commission can still be reviewed above.</p>}
-      </details>
+      {/* The salary this month comes to — and, from its pencil, the pay lines
+          HR adds to it (2026-09-27). Keyed so one person's unsaved lines never
+          follow the page to the next person. */}
+      <SalaryCalculation key={selected.staffId} staffName={selected.name} period={period} commission={selected.totalCommission}
+        source={salarySource} payUnavailable={data.payUnavailable} closedReason={data.payLinesClosed ?? null} />
     </>}
 
     {tab === 'kpi' && <>
