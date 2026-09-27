@@ -60,6 +60,9 @@ export interface RevenuePayrollRow {
   ot_amount?: number
   deduction_amount?: number
   skbbk_amount?: number
+  /** Pay lines added on Comm Cal (2026-09-27): earnings in gross in full, deductions off net only. */
+  pay_line_earnings?: number
+  pay_line_deductions?: number
   withholding_tax?: number
   payout_split_version?: number | null
   basic_pay_net?: number | null
@@ -95,8 +98,8 @@ export function calculateRevenuePayrollSplit(row: RevenuePayrollRow): RevenuePay
     pcb: row.pcb,
     withholdingTax: row.withholding_tax,
     otherEarnings: round4((row.statutory_allowance ?? 0) * ratio)
-      + round4((row.ot_amount ?? 0) * ratio) + (row.non_statutory_allowance ?? 0),
-    otherDeductions: (row.deduction_amount ?? 0) + (row.skbbk_amount ?? 0),
+      + round4((row.ot_amount ?? 0) * ratio) + (row.non_statutory_allowance ?? 0) + (row.pay_line_earnings ?? 0),
+    otherDeductions: (row.deduction_amount ?? 0) + (row.skbbk_amount ?? 0) + (row.pay_line_deductions ?? 0),
   })
 }
 

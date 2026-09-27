@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildPayRow, type PayRow, type TaxMode } from '@/lib/revenue-pay'
+import { normalisePayLine, payLineTotals, type PayLine } from '@/lib/revenue-pay-lines'
 import { fetchAllRows } from '@/lib/paginate'
 import { loadPayBeforeRun } from './pay-preview-before-run'
 
@@ -104,6 +105,36 @@ function taxMode(v: string): TaxMode {
   return v === 'withholding' || v === 'none' ? v : 'pcb'
 }
 
+/**
+ * The month's pay lines, everybody's (2026-09-27, `revenue_pay_lines`) — what
+ * HR added on Comm Cal, a few dozen rows at most. Read only once
+ * `revenue_pay_preview` has let the caller see individual pay; the table's own
+ * policy is the same gate.
+ */
+export async function loadPayLines(supabase: SupabaseClient, period: string): Promise<Map<string, PayLine[]>> {
+  const rows = await fetchAllRows<unknown>((from, to) => supabase
+    .from('revenue_pay_lines')
+    .select('id, staff_id, kind, description, amount, version, sort_order, created_at')
+    .eq('period_month', period)
+    .order('staff_id')
+    .order('sort_order')
+    .order('created_at')
+    .order('id')
+    .range(from, to))
+  const byPerson = new Map<string, PayLine[]>()
+  for (const raw of rows) {
+    const { staffId, ...line } = normalisePayLine(raw)
+    byPerson.set(staffId, [...(byPerson.get(staffId) ?? []), line])
+  }
+  return byPerson
+}
+
+/** A person's pay-line totals, as the pay arithmetic takes them. */
+function payLineInput(lines: readonly PayLine[] = []) {
+  const { earnings, deductions } = payLineTotals(lines)
+  return { payLineEarnings: earnings, payLineDeductions: deductions }
+}
+
 export async function loadPayBoard(
   supabase: SupabaseClient,
   subDepartmentId: string,
@@ -131,9 +162,13 @@ export async function loadPayBoard(
       )
       .eq('run_id', run.id).order('id').range(from, to)) : Promise.resolve([]),
   ])
-  const previewData = !run && options.allowWithoutRun
-    ? await loadPayBeforeRun(supabase, subDepartmentId, period, options.previewStaffIds)
-    : savedPreviewData
+  // Past the individual-pay gate: the salary inputs and the month's pay lines.
+  const [previewData, linesByPerson] = await Promise.all([
+    !run && options.allowWithoutRun
+      ? loadPayBeforeRun(supabase, subDepartmentId, period, options.previewStaffIds)
+      : Promise.resolve(savedPreviewData),
+    loadPayLines(supabase, period),
+  ])
 
   const statements = new Map(
     ((statementData ?? []) as StatementRow[]).map(s => [
@@ -189,7 +224,9 @@ export async function loadPayBoard(
         pcb: Number(p.pcb),
         taxMode: taxMode(p.tax_mode),
         withholdingRate: Number(p.withholding_rate ?? 0),
+        ...payLineInput(linesByPerson.get(p.staff_id)),
       },
+      lines: linesByPerson.get(p.staff_id) ?? [],
     }),
     components: statements.get(p.staff_id) ?? null,
   }))

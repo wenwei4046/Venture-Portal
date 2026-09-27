@@ -7,6 +7,9 @@ import { upsalesToOrders } from '@/lib/commission/upsales'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench from './CommissionWorkbench'
 
+// The salary preview's pay-line editor saves through a server action (its own tests are SalaryCalculation.test).
+vi.mock('../../../pay-line-actions', () => ({ savePayLines: vi.fn() }))
+
 const { saveOpenPicks, refresh } = vi.hoisted(() => ({ saveOpenPicks: vi.fn(), refresh: vi.fn() }))
 vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
@@ -54,7 +57,7 @@ function fixture(): CommissionWorkbenchData {
   return {
     input, currentHierarchy: input.hierarchy,
     currentRules: { hierarchy: input.hierarchy, kpiItems: input.kpiItems, kpiThresholds: input.kpiThresholds, openBillRules: input.openBillRules },
-    unmatchedOrderNos: [], payRows: [], payUnavailable: true,
+    unmatchedOrderNos: [], payRows: [], payUnavailable: true, payLinesClosed: null,
     people: [
       { staffId: 'agent', name: 'Anthony', employeeCode: 'HV001' },
       { staffId: 'leader', name: 'Alex', employeeCode: 'HV002' },

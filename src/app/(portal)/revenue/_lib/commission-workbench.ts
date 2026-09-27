@@ -29,10 +29,20 @@ export async function loadCommissionWorkbench(
     fetchByKeys<{ id: string; employee_name: string; employee_code: string | null }, string>(ids, keys =>
       db.from('hr_staff_costs').select('id, employee_name, employee_code').in('id', keys)),
     withPay
-      ? loadPayBoard(db, subDepartmentId, period, { allowWithoutRun: true, previewStaffIds: ids })
-        .then(value => ({ ...value, unavailable: false }))
-        .catch(() => ({ rows: [], unavailable: true }))
-      : Promise.resolve({ rows: [], unavailable: true }),
+      ? Promise.all([
+        loadPayBoard(db, subDepartmentId, period, { allowWithoutRun: true, previewStaffIds: ids }),
+        // Whether the month's pay lines can still change (2026-09-27): null, or
+        // the sentence the save would be refused with — payroll submitted, a
+        // voucher raised, the period locked.
+        db.rpc('revenue_pay_lines_closed', { p_period: period }),
+      ])
+        .then(([value, closed]) => ({
+          ...value,
+          unavailable: false,
+          linesClosed: closed.error ? 'Pay lines cannot be changed right now.' : (closed.data as string | null),
+        }))
+        .catch(() => ({ rows: [], unavailable: true, linesClosed: null }))
+      : Promise.resolve({ rows: [], unavailable: true, linesClosed: null }),
     (async () => {
       const earlier = await Promise.all(earlierPeriods.map(p => loadMonthOrders(db, subDepartmentId, p)))
       const everyOrder = [...monthOrders, ...earlier.flat()]
@@ -63,6 +73,8 @@ export async function loadCommissionWorkbench(
     input, currentHierarchy, currentRules, orders, unmatchedOrderNos,
     people: people.map(p => ({ staffId: p.id, name: p.employee_name, employeeCode: p.employee_code })),
     payRows: pay.rows, payUnavailable: pay.unavailable,
+    /** Why the month's pay lines cannot change, or null while they can. */
+    payLinesClosed: pay.linesClosed,
   }
 }
 

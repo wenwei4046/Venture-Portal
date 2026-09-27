@@ -1,0 +1,103 @@
+/* The salary preview under a salesperson's ledger, and its pay-line editor
+   (2026-09-27). The box itself is the workbench's `.salaryDetails`; this adds
+   the pencil in its top-right corner and the editor that opens inside it. The
+   tokens are the ones `.page` declares in commission-workbench.module.css. */
+
+.salary { position: relative; }
+/* Room for the pencil at the end of the summary line. */
+.salary > details > summary { padding-right: 40px; }
+
+.editButton {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+}
+.editButton:hover { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
+.editButton[aria-disabled='true'] { opacity: 0.45; }
+.editButton[aria-disabled='true']:hover { border-color: rgb(var(--hairline)); background: #fff; }
+.editButton svg { width: 15px; height: 15px; }
+
+.editor {
+  margin: 12px 0 14px;
+  padding: 14px;
+  border: 1px solid rgb(var(--accent));
+  border-radius: 10px;
+  background: #fff;
+}
+.editorHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 12px; }
+.editorHead strong { font-size: 13px; font-weight: 600; }
+.editorHead span { font-size: 11px; line-height: 1.5; }
+.empty { margin: 0 0 10px; font-size: 12px; }
+
+.lines { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.line {
+  display: grid;
+  grid-template-columns: minmax(130px, 170px) minmax(0, 1fr) minmax(130px, 170px) 32px;
+  align-items: center;
+  gap: 8px;
+}
+.line :is(select, input) {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+}
+.line :is(select, input):focus { border-color: rgb(var(--accent)); outline: none; box-shadow: 0 0 0 2px rgb(var(--accent-bg)); }
+.line[data-problem='true'] :is(select, input) { border-color: #b02822; }
+
+.amount { position: relative; display: block; }
+.amount > span { position: absolute; top: 50%; left: 10px; transform: translateY(-50%); font-size: 11px; pointer-events: none; }
+.amount > input {
+  padding-left: 34px;
+  text-align: right;
+  font-family: var(--font-mono, 'Chivo Mono'), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.remove {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1;
+}
+.remove:hover { border-color: rgb(var(--hairline)); background: rgb(var(--surface-2)); }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.spacer { flex: 1; }
+
+/* A pay line in the table: the same row as the rest, marked by a warm rule. */
+.lineRow td:first-child { box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+
+@media (max-width: 599px) {
+  /* Two rows a line: the type across the top beside its ✕, then the
+     description and the amount — a phone's 16px type does not fit three
+     fields on one row without cutting "Special claim" or the figure short. */
+  .line { grid-template-columns: minmax(0, 1fr) 120px 32px; row-gap: 6px; }
+  .line > select { grid-column: 1 / 3; grid-row: 1; }
+  .line > .remove { grid-column: 3; grid-row: 1; }
+  .line > input { grid-column: 1; grid-row: 2; }
+  .line > .amount { grid-column: 2 / 4; grid-row: 2; }
+  .lines { gap: 14px; }
+  .actions .spacer { display: none; }
+}
+
+@media print {
+  .editButton { display: none; }
+}

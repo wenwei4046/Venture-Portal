@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { ratePct } from '@/lib/commission/ranks'
+import { payLineKind, payLineLabel } from '@/lib/revenue-pay-lines'
 import LedgerRow from '@/components/LedgerRow'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadPayBoard } from '../../../../_lib/pay-preview'
@@ -96,6 +97,8 @@ export default async function StaffPayPage({ params }: PageProps) {
 
   const c = row.components
   const pay = row.pay
+  const earningLines = (row.lines ?? []).filter(line => !payLineKind(line.kind).deduction)
+  const deductionLines = (row.lines ?? []).filter(line => payLineKind(line.kind).deduction)
   const earnings: Array<[string, number, string | null]> = c
     ? [
         ['Product commission', c.productCommission, `${ratePct(c.productRate)} of own commissionable sales`],
@@ -124,13 +127,10 @@ export default async function StaffPayPage({ params }: PageProps) {
           </div>
           <h1 className="page-title">Payslip</h1>
         </div>
+        {/* No "Their bills" here (2026-09-27): the salesperson's ledger on Comm
+            Cal already lists every bill of theirs, and it is where this page
+            is opened from — user: 感觉是之前留下来的，有点 duplicate。 */}
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href={`${revenuePath(subDept.slug, period, 'orders')}?staff=${row.staffId}`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-          >
-            Their bills
-          </Link>
           <Link
             href={revenuePath(subDept.slug, period, 'pay')}
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
@@ -359,6 +359,11 @@ export default async function StaffPayPage({ params }: PageProps) {
               {row.input.nonStatutoryAllowance > 0 ? (
                 <Step name="Non-statutory allowance" value={row.input.nonStatutoryAllowance} />
               ) : null}
+              {/* Pay lines HR added on Comm Cal (2026-09-27): earnings here,
+                  in full; deductions after the tax, off take-home only. */}
+              {earningLines.map(line => (
+                <Step key={line.id} name={payLineLabel(line)} value={line.amount} note="Pay line — paid in full, no EPF / SOCSO / EIS" />
+              ))}
               {row.input.deductionAmount > 0 ? (
                 <Step name="Less deduction" value={-row.input.deductionAmount} />
               ) : null}
@@ -381,6 +386,9 @@ export default async function StaffPayPage({ params }: PageProps) {
                 />
               ) : null}
               {row.input.skbbkAmount > 0 ? <Step name="Less SKBBK" value={-row.input.skbbkAmount} /> : null}
+              {deductionLines.map(line => (
+                <Step key={line.id} name={`Less ${payLineLabel(line)}`} value={-line.amount} note="Pay line — off take-home pay only" />
+              ))}
             </tbody>
             {/* Where the walk ends — the peach total band. */}
             <tfoot>
