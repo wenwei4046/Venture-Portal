@@ -5,10 +5,25 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 // Always re-fetch on request — dept pool balances change after every approve
 // & pay, so cached renders go stale within seconds.
 export const dynamic = 'force-dynamic'
+
+// The Overview sits on the white sheet (DESIGN.md › "Sheet theme",
+// lib/sheet-routes.ts) for every role at once — one route, four dashboards.
+// Each opens the way every sheet page does: the page head, then summary cards
+// with one walnut `primary` (the figure the dashboard is opened for), then
+// tables in the month's style with a closing total in <tfoot>. Statuses are
+// chips, never coloured words.
+
+/** The sheet's two button weights, as on HR Costing. */
+const PRIMARY_BUTTON =
+  'inline-block bg-accent hover:bg-accent-hover text-ink text-sm font-medium px-4 py-2 rounded-control transition-colors'
+
+/** An empty section: a quiet well that says what is missing. */
+const EMPTY_WELL = 'border border-hairline rounded-card bg-surface-2 p-6 text-center'
 
 type Subsidiary = {
   id: string
@@ -48,7 +63,8 @@ function approvalHref(req: {
 }
 
 type Alert = {
-  type: 'overdue' | 'buffer' | 'maturity'
+  /** Not sent by dashboard_summary() today — only severity and message. */
+  type?: 'overdue' | 'buffer' | 'maturity'
   severity: 'danger' | 'warning' | 'info'
   message: string
 }
@@ -127,9 +143,19 @@ export default async function DashboardPage() {
     : await supabase.rpc('dashboard_summary')
   if (error) {
     return (
-      <div className="py-16 text-center">
-        <p className="font-serif italic text-danger">Failed to load dashboard.</p>
-        <p className="font-mono text-xs text-muted mt-2">{error.message}</p>
+      <div>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow">
+              <em>I.</em> OVERVIEW
+            </div>
+            <h1 className="page-title">Overview</h1>
+          </div>
+        </div>
+        <div className="sheet-danger">
+          <p className="font-medium">Failed to load the dashboard.</p>
+          <p className="font-mono text-xs mt-1">{error.message}</p>
+        </div>
       </div>
     )
   }
@@ -211,211 +237,241 @@ export default async function DashboardPage() {
       const directorStatus = director?.status ?? 'not_calculated'
       const directorSubmitted = Boolean(director?.submission)
 
+      const monthLabel = dayjs().format('MMMM YYYY')
+      const monthName = dayjs().format('MMMM')
+      const deptCount = staffDepts.length
+      const directorMode =
+        director?.payout_mode === 'fully_paid'
+          ? 'Fully Paid'
+          : director?.payout_mode === 'split'
+            ? '75/25 split'
+            : null
+      // The Staff Master's closing line adds up its own rows.
+      const staffTotals = staffDepts.reduce(
+        (acc, d) => ({
+          staff: acc.staff + Number(d.staff_count ?? 0),
+          basic: acc.basic + Number(d.total_basic ?? 0),
+        }),
+        { staff: 0, basic: 0 },
+      )
+
       return (
         <div>
           <div className="page-head">
             <div>
               <div className="page-eyebrow">
-                <em>II.</em> HR · OVERVIEW
+                <em>II.</em> HR · OVERVIEW · {monthLabel.toUpperCase()}
               </div>
               <h1 className="page-title">HR Overview</h1>
-              <p className="font-serif italic text-graphite text-base mt-3">
-                {dayjs().format('MMMM YYYY')}
-              </p>
             </div>
-            <Link
-              href="/hr-costing/payment"
-              className="shrink-0 border border-hairline bg-surface hover:bg-surface-2 rounded-md px-5 py-3 transition-colors block text-right"
-            >
-              <div className="font-serif italic text-graphite text-xs uppercase tracking-wide">HR Pool balance</div>
-              <div className={`num text-xl mt-0.5 ${poolBalance < 0 ? 'neg' : ''}`}>
-                {formatMoney(poolBalance)}
-              </div>
-              <div className="font-sans text-[11px] text-muted mt-0.5">Open Payment →</div>
-            </Link>
           </div>
 
-          {/* Three entry points — the whole HR job under the direct-submit flow */}
-          <section className="mb-12">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <ActionCard
-                n="I"
-                title="Employment List"
-                status={staffCount > 0 ? `${staffCount} active staff · ${staffDepts.length} dept${staffDepts.length === 1 ? '' : 's'}` : 'No staff yet'}
-                statusTone={staffCount > 0 ? 'ok' : 'idle'}
-                ctaLabel={staffCount > 0 ? 'Manage / re-import →' : 'Import Employment List →'}
-                ctaHref="/team/people"
-              />
-              <ActionCard
-                n="II"
-                title="Import Payroll"
-                status={
-                  payrollRows === 0
-                    ? 'Not imported this month'
-                    : runSubmitted
-                      ? `Submitted to Finance · RM ${formatMoneyBare(Number(run?.total_amount ?? 0))}`
-                      : `${payrollRows} row${payrollRows === 1 ? '' : 's'} · ${draftCount} draft`
-                }
-                statusTone={payrollRows === 0 ? 'idle' : runSubmitted ? 'ok' : 'warn'}
-                ctaLabel={payrollRows === 0 ? 'Import Payroll →' : 'Open grid →'}
-                ctaHref={periodUrl}
-              />
-              <ActionCard
-                n="III"
-                title="Director Salary"
-                status={
-                  directorStatus === 'not_calculated'
-                    ? 'Not calculated'
-                    : `${directorStatus === 'confirmed' ? 'Confirmed' : 'Draft'}${director?.payout_mode === 'fully_paid' ? ' · Fully Paid' : director?.payout_mode === 'split' ? ' · 75/25 Split' : ''}${directorSubmitted ? ' · Submitted ✓' : ''}`
-                }
-                statusTone={directorStatus === 'not_calculated' ? 'idle' : directorStatus === 'confirmed' ? 'ok' : 'warn'}
-                ctaLabel={directorStatus === 'not_calculated' ? 'Calculate →' : 'Open Director Salary →'}
-                ctaHref="/director-salary"
-              />
-            </div>
-          </section>
+          {/* The whole HR job under the direct-submit flow is three actions —
+              Employment List, Import Payroll, Director Salary — so the month
+              opens on three cards that each lead to where the work is done,
+              and the HR Pool that pays for it. The month's payroll is the
+              figure the page is opened for: the one walnut card. */}
+          <StatCards label={`HR for ${monthLabel}`}>
+            <StatCard
+              label="Employment list"
+              value={staffCount > 0 ? String(staffCount) : 'No staff yet'}
+              icon="people"
+              href="/team/people"
+              note={
+                staffCount > 0
+                  ? `Active staff · ${deptCount} dept${deptCount === 1 ? '' : 's'} · manage / re-import`
+                  : 'Import Employment List'
+              }
+            />
+            <StatCard
+              label={`Payroll · ${monthName}`}
+              value={
+                payrollRows === 0
+                  ? 'Not imported'
+                  : runSubmitted
+                    ? formatMoney(Number(run?.total_amount ?? 0))
+                    : `${payrollRows} row${payrollRows === 1 ? '' : 's'}`
+              }
+              icon="receipt"
+              tone="primary"
+              href={periodUrl}
+              note={
+                payrollRows === 0
+                  ? 'Import Payroll'
+                  : runSubmitted
+                    ? 'Submitted to Finance'
+                    : `${draftCount} draft · open grid`
+              }
+            />
+            <StatCard
+              label={`Director salary · ${monthName}`}
+              value={
+                directorStatus === 'not_calculated'
+                  ? 'Not calculated'
+                  : directorStatus === 'confirmed'
+                    ? 'Confirmed'
+                    : 'Draft'
+              }
+              icon="briefcase"
+              tone={directorStatus === 'confirmed' ? 'ledger' : 'default'}
+              href="/director-salary"
+              note={
+                directorStatus === 'not_calculated'
+                  ? 'Calculate'
+                  : [directorMode, directorSubmitted ? 'submitted' : null].filter(Boolean).join(' · ') || undefined
+              }
+            />
+            <StatCard
+              label="HR Pool balance"
+              value={formatMoney(poolBalance)}
+              icon="wallet"
+              tone={poolBalance < 0 ? 'danger' : 'default'}
+              href="/hr-costing/payment"
+              note="Open Payment"
+            />
+          </StatCards>
 
           {/* This month's payroll, per department */}
-          <section className="mb-12">
+          <section className="mb-10">
             <div className="sect-head">
-              <h2>This Month · Payroll</h2>
+              <h2>This month · payroll</h2>
               <span className="rule" aria-hidden />
               <span className="count">
                 {payrollRows} ROW{payrollRows === 1 ? '' : 'S'} · {run?.status ? run.status.toUpperCase() : 'NO RUN'}
               </span>
             </div>
             {payrollDepts.length === 0 ? (
-              <div className="border border-hairline rounded-md bg-surface p-6">
-                <p className="font-serif italic text-graphite text-base">
-                  No payroll imported for {dayjs().format('MMMM YYYY')} yet.
-                </p>
-                <Link href={periodUrl} className="font-serif italic text-sm text-accent hover:text-accent-hover">
-                  Import Payroll →
+              <div className={EMPTY_WELL}>
+                <p className="text-sm">No payroll imported for {monthLabel} yet.</p>
+                <Link href={periodUrl} className={`${PRIMARY_BUTTON} mt-3`}>
+                  Import Payroll
                 </Link>
               </div>
             ) : (
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Department</th>
-                    <th className="num m-hide">Staff</th>
-                    <th className="num m-hide">Basic</th>
-                    <th className="num m-hide">Statutory</th>
-                    <th className="num m-hide">Gross</th>
-                    <th className="num">Net</th>
-                    <th className="lt-toggle" aria-hidden />
-                  </tr>
-                </thead>
-                <tbody>
-                  {payrollDepts.map((d) => (
-                    <LedgerRow key={d.department_name}>
-                      <td>{d.department_name}</td>
-                      <td className="num m-hide" data-label="Staff">{d.staff_count}</td>
-                      <td className="num m-hide" data-label="Basic">{formatMoneyBare(Number(d.basic))}</td>
-                      <td className="num m-hide" data-label="Statutory">{formatMoneyBare(Number(d.statutory_er) + Number(d.statutory_ee))}</td>
-                      <td className="num m-hide" data-label="Gross">{formatMoneyBare(Number(d.gross))}</td>
-                      <td className="num">{formatMoneyBare(Number(d.net))}</td>
-                    </LedgerRow>
-                  ))}
-                  <tr className="font-semibold">
-                    <td>Total</td>
-                    <td className="num m-hide">{payrollTotals.staff}</td>
-                    <td className="num m-hide">{formatMoneyBare(payrollTotals.basic)}</td>
-                    <td className="num m-hide">{formatMoneyBare(payrollTotals.statutory)}</td>
-                    <td className="num m-hide">{formatMoneyBare(payrollTotals.gross)}</td>
-                    <td className="num">{formatMoneyBare(payrollTotals.net)}</td>
-                    <td className="lt-toggle" />
-                  </tr>
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Department</th>
+                      <th className="right m-hide">Staff</th>
+                      <th className="right m-hide">Basic</th>
+                      <th className="right m-hide">Statutory</th>
+                      <th className="right m-hide">Gross</th>
+                      <th className="right">Net</th>
+                      <th className="lt-toggle" aria-hidden />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payrollDepts.map((d) => (
+                      <LedgerRow key={d.department_name}>
+                        <td className="font-medium">{d.department_name}</td>
+                        <td className="num m-hide" data-label="Staff">{d.staff_count}</td>
+                        <td className="num m-hide" data-label="Basic">{formatMoneyBare(Number(d.basic))}</td>
+                        <td className="num m-hide" data-label="Statutory">{formatMoneyBare(Number(d.statutory_er) + Number(d.statutory_ee))}</td>
+                        <td className="num m-hide" data-label="Gross">{formatMoneyBare(Number(d.gross))}</td>
+                        <td className="num">{formatMoneyBare(Number(d.net))}</td>
+                      </LedgerRow>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td>All departments</td>
+                      <td className="num m-hide">{payrollTotals.staff}</td>
+                      <td className="num m-hide">{formatMoneyBare(payrollTotals.basic)}</td>
+                      <td className="num m-hide">{formatMoneyBare(payrollTotals.statutory)}</td>
+                      <td className="num m-hide">{formatMoneyBare(payrollTotals.gross)}</td>
+                      <td className="num">{formatMoneyBare(payrollTotals.net)}</td>
+                      <td className="lt-toggle" aria-hidden />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             )}
           </section>
 
           {/* Staff master, per department */}
           {staffDepts.length > 0 ? (
-            <section className="mb-12">
+            <section className="mb-10">
               <div className="sect-head">
-                <h2>Staff Master</h2>
+                <h2>Staff master</h2>
                 <span className="rule" aria-hidden />
                 <span className="count">{staffCount} ACTIVE</span>
               </div>
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Department</th>
-                    <th className="num">Staff</th>
-                    <th className="num">Total Basic</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {staffDepts.map((d) => (
-                    <tr key={d.department_id}>
-                      <td>{d.department_name}</td>
-                      <td className="num">{d.staff_count}</td>
-                      <td className="num">{formatMoneyBare(Number(d.total_basic))}</td>
+              <div className="overflow-x-auto">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Department</th>
+                      <th className="right">Staff</th>
+                      <th className="right">Total basic</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {staffDepts.map((d) => (
+                      <tr key={d.department_id}>
+                        <td className="font-medium">{d.department_name}</td>
+                        <td className="num">{d.staff_count}</td>
+                        <td className="num">{formatMoneyBare(Number(d.total_basic))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td>All departments</td>
+                      <td className="num">{staffTotals.staff}</td>
+                      <td className="num">{formatMoneyBare(staffTotals.basic)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </section>
           ) : null}
 
-          {/* Director salary status strip */}
-          <section className="mb-12">
+          {/* The month's director salary in four figures */}
+          <section className="mb-10">
             <div className="sect-head">
-              <h2>Director Salary · {dayjs().format('MMMM')}</h2>
+              <h2>Director salary · {monthName}</h2>
               <span className="rule" aria-hidden />
               <span className="count">
                 {director?.payout_count ?? 0} DIRECTOR{(director?.payout_count ?? 0) === 1 ? '' : 'S'}
               </span>
             </div>
             {directorStatus === 'not_calculated' ? (
-              <div className="border border-hairline rounded-md bg-surface p-6">
-                <p className="font-serif italic text-graphite text-base">
-                  Not calculated for {dayjs().format('MMMM YYYY')} yet.
-                </p>
-                <Link href="/director-salary" className="font-serif italic text-sm text-accent hover:text-accent-hover">
-                  Calculate Director Salary →
+              <div className={EMPTY_WELL}>
+                <p className="text-sm">Not calculated for {monthLabel} yet.</p>
+                <Link href="/director-salary" className={`${PRIMARY_BUTTON} mt-3`}>
+                  Calculate Director Salary
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="border border-hairline rounded-md bg-surface p-5">
-                  <div className="font-serif italic text-accent text-sm mb-1">Status</div>
-                  <div className={`font-serif italic text-lg leading-none ${directorStatus === 'confirmed' ? 'text-ledger' : 'text-alert'}`}>
-                    {directorStatus === 'confirmed' ? 'Confirmed' : 'Draft'}
-                  </div>
-                  <div className="font-mono text-xs text-muted mt-2">
-                    {director?.payout_mode === 'fully_paid' ? 'Fully Paid mode' : '75/25 split mode'}
-                    {directorSubmitted ? ' · submitted to Finance' : ''}
-                  </div>
-                </div>
-                <div className="border border-hairline rounded-md bg-surface p-5">
-                  <div className="font-serif italic text-accent text-sm mb-1">Total gross</div>
-                  <div className="statement-amount text-num-ink">
-                    {formatMoney(Number(director?.total_gross ?? 0))}
-                  </div>
-                  <div className="font-mono text-xs text-muted mt-2">
-                    saving {formatMoneyBare(Number(director?.total_saving ?? 0))}
-                  </div>
-                </div>
-                <div className="border border-hairline rounded-md bg-surface p-5">
-                  <div className="font-serif italic text-accent text-sm mb-1">Payroll net</div>
-                  <div className="statement-amount text-num-ink">
-                    {formatMoney(Number(director?.total_payroll_net ?? 0))}
-                  </div>
-                  <div className="font-mono text-xs text-muted mt-2">paid via payroll</div>
-                </div>
-                <div className="border border-hairline rounded-md bg-surface p-5">
-                  <div className="font-serif italic text-accent text-sm mb-1">Invoice total</div>
-                  <div className="statement-amount text-num-ink">
-                    {formatMoney(Number(director?.total_invoice ?? 0))}
-                  </div>
-                  <div className="font-mono text-xs text-muted mt-2">
-                    {director?.payout_mode === 'fully_paid' ? 'n/a in Fully Paid mode' : '25% outsource accumulation'}
-                  </div>
-                </div>
-              </div>
+              <StatCards label={`Director salary for ${monthLabel}`}>
+                <StatCard
+                  label="Status"
+                  value={directorStatus === 'confirmed' ? 'Confirmed' : 'Draft'}
+                  icon={directorStatus === 'confirmed' ? 'check' : 'clock'}
+                  tone={directorStatus === 'confirmed' ? 'ledger' : 'alert'}
+                  note={`${director?.payout_mode === 'fully_paid' ? 'Fully Paid mode' : '75/25 split mode'}${directorSubmitted ? ' · submitted to Finance' : ''}`}
+                />
+                <StatCard
+                  label="Total gross"
+                  value={formatMoney(Number(director?.total_gross ?? 0))}
+                  icon="coin"
+                  tone="primary"
+                  note={`Saving ${formatMoneyBare(Number(director?.total_saving ?? 0))}`}
+                />
+                <StatCard
+                  label="Payroll net"
+                  value={formatMoney(Number(director?.total_payroll_net ?? 0))}
+                  icon="bank"
+                  note="Paid via payroll"
+                />
+                <StatCard
+                  label="Invoice total"
+                  value={formatMoney(Number(director?.total_invoice ?? 0))}
+                  icon="receipt"
+                  note={director?.payout_mode === 'fully_paid' ? 'n/a in Fully Paid mode' : '25% outsource accumulation'}
+                />
+              </StatCards>
             )}
           </section>
         </div>
@@ -426,14 +482,7 @@ export default async function DashboardPage() {
       // Dept Manager Dashboard — shows the manager's own department pool
       // state + their submitted expense requests awaiting Principal sign-off.
       if (!user.department_id) {
-        return (
-          <div className="py-16 text-center">
-            <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
-            <p className="font-serif italic text-graphite">
-              No department assigned. Contact Principal to set this up.
-            </p>
-          </div>
-        )
+        return <UnplacedDashboard message="No department assigned. Contact Principal to set this up." />
       }
 
       const period = dayjs().startOf('month').format('YYYY-MM-DD')
@@ -445,12 +494,7 @@ export default async function DashboardPage() {
         .single()
 
       if (!dept) {
-        return (
-          <div className="py-16 text-center">
-            <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
-            <p className="font-serif italic text-graphite">Department not found.</p>
-          </div>
-        )
+        return <UnplacedDashboard message="Department not found." />
       }
 
       const [
@@ -530,180 +574,166 @@ export default async function DashboardPage() {
           return s + Math.max(0, Number(i.total_amount) - (m?.receipts ?? 0) - (m?.credits ?? 0))
         }, 0)
 
+      const monthShort = dayjs(period).format('MMM')
+
       return (
         <div>
           <div className="page-head">
             <div>
               <div className="page-eyebrow">
-                <em>·</em> {dept.name.toUpperCase()} · OVERVIEW
+                <em>·</em> {dept.name.toUpperCase()} · OVERVIEW · {dayjs(period).format('MMMM YYYY').toUpperCase()}
               </div>
               <h1 className="page-title">{dept.name} Department</h1>
             </div>
           </div>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <div className="border border-hairline rounded-md bg-surface p-5">
-              <div className="font-serif italic text-sm text-accent mb-1">
-                Pool balance
-              </div>
-              <div className={`statement-amount ${balance < 0 ? 'text-danger' : 'text-num-ink'}`}>
-                {formatMoney(balance)}
-              </div>
-              <div className="font-mono text-xs text-muted mt-2">
-                running NP − approved expenses
-              </div>
-            </div>
-            <div className="border border-hairline rounded-md bg-surface p-5">
-              <div className="font-serif italic text-sm text-accent mb-1">
-                Revenue {dayjs(period).format('MMM')}
-              </div>
-              <div className="statement-amount text-num-ink">
-                {formatMoney(np.revenue)}
-              </div>
-              <div className="font-mono text-xs text-muted mt-2">
-                from approved project invoices
-              </div>
-            </div>
-            <div className="border border-hairline rounded-md bg-surface p-5">
-              <div className="font-serif italic text-sm text-accent mb-1">
-                This month NP
-              </div>
-              <div className={`statement-amount ${np.net_profit < 0 ? 'text-danger' : 'text-num-ink'}`}>
-                {formatMoney(np.net_profit)}
-              </div>
-              <div className="font-mono text-xs text-muted mt-2">
-                revenue − staff cost − expenses
-              </div>
-            </div>
-            <div className="border border-hairline rounded-md bg-surface p-5">
-              <div className="font-serif italic text-sm text-accent mb-1">
-                Awaiting Principal
-              </div>
-              <div className="statement-amount text-num-ink">
-                {pendingCount}
-              </div>
-              <div className="font-mono text-xs text-muted mt-2">
-                {pendingCount > 0
-                  ? `${formatMoney(pendingTotal)} total`
-                  : 'Nothing waiting'}
-              </div>
-            </div>
-            <div className="border border-hairline rounded-md bg-surface p-5">
-              <div className="font-serif italic text-sm text-accent mb-1">
-                本月开单 Billed {dayjs(period).format('MMM')}
-              </div>
-              <div className="statement-amount text-num-ink">
-                {formatMoney(billedThisMonth)}
-              </div>
-              <div className="font-mono text-xs text-muted mt-2">
-                <Link href="/my-billing" className="text-accent hover:underline">My Billing →</Link>
-              </div>
-            </div>
-            <div className="border border-hairline rounded-md bg-surface p-5">
-              <div className="font-serif italic text-sm text-accent mb-1">
-                未收 To collect
-              </div>
-              <div className={`statement-amount ${dmOutstanding > 0 ? 'text-alert' : 'text-num-ink'}`}>
-                {formatMoney(dmOutstanding)}
-              </div>
-              <div className="font-mono text-xs text-muted mt-2">
-                issued invoices net of receipts/CN
-              </div>
-            </div>
-          </div>
+          {/* The department's month in six figures. The pool balance is what
+              the page is opened for — walnut, or red while it is below zero. */}
+          <StatCards label={`${dept.name} department this month`}>
+            <StatCard
+              label="Pool balance"
+              value={formatMoney(balance)}
+              icon="wallet"
+              tone={balance < 0 ? 'danger' : 'primary'}
+              note="Running NP − approved expenses"
+            />
+            <StatCard
+              label={`Revenue ${monthShort}`}
+              value={formatMoney(np.revenue)}
+              icon="trend"
+              note="From approved project invoices"
+            />
+            <StatCard
+              label="This month NP"
+              value={formatMoney(np.net_profit)}
+              icon="chart"
+              tone={np.net_profit < 0 ? 'danger' : 'default'}
+              note="Revenue − staff cost − expenses"
+            />
+            <StatCard
+              label="Awaiting Principal"
+              value={String(pendingCount)}
+              icon="clock"
+              tone={pendingCount > 0 ? 'alert' : 'default'}
+              note={pendingCount > 0 ? `${formatMoney(pendingTotal)} total` : 'Nothing waiting'}
+            />
+            <StatCard
+              label={`本月开单 Billed ${monthShort}`}
+              value={formatMoney(billedThisMonth)}
+              icon="receipt"
+              href="/my-billing"
+              note="My Billing"
+            />
+            <StatCard
+              label="未收 To collect"
+              value={formatMoney(dmOutstanding)}
+              icon="inbox"
+              tone={dmOutstanding > 0 ? 'alert' : 'default'}
+              note="Issued invoices net of receipts / CN"
+            />
+          </StatCards>
 
           {/* Your submissions awaiting Principal sign-off */}
-          <section className="mb-12">
+          <section className="mb-10">
             <div className="sect-head">
               <h2>Awaiting Principal sign-off</h2>
               <span className="rule" aria-hidden />
               <span className="count">{pendingCount} REQUEST{pendingCount === 1 ? '' : 'S'} · POSTS TO POOL ONCE APPROVED</span>
             </div>
             {pendingCount === 0 ? (
-              <div className="border border-hairline rounded-md bg-surface p-6">
-                <p className="font-serif italic text-ledger text-base">All caught up.</p>
-                <p className="font-mono text-xs text-muted mt-1">
-                  Nothing waiting on Principal.
-                </p>
+              <div className={EMPTY_WELL}>
+                <p className="text-sm font-medium">All caught up.</p>
+                <p className="text-xs mt-1">Nothing waiting on Principal.</p>
               </div>
             ) : (
-              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-                {pendingList.slice(0, 5).map((r) => (
-                  <Link
-                    key={r.id}
-                    href={deptDetailHref}
-                    className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0 pr-4">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
-                        {r.request_type.replace(/_/g, ' ')}
-                      </div>
-                      <div className="font-serif italic text-graphite text-sm truncate">
-                        {r.description ?? '—'}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="num">{formatMoney(Number(r.amount))}</span>
-                      <div className="font-mono text-xs text-muted">
-                        {dayjs(r.created_at).format('D MMM')}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+              <div className="table-frame">
+                <div className="table-frame-scroll">
+                  <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th className="m-hide">Request</th>
+                        <th className="right">Amount</th>
+                        <th className="right m-hide">Submitted</th>
+                        <th className="lt-toggle" aria-hidden />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingList.slice(0, 5).map((r) => (
+                        <LedgerRow key={r.id}>
+                          <td>
+                            <Link href={deptDetailHref}>{r.description ?? '—'}</Link>
+                          </td>
+                          <td className="m-hide" data-label="Request">
+                            <RequestChip type={r.request_type} />
+                          </td>
+                          <td className="num">{formatMoney(Number(r.amount))}</td>
+                          <td className="right m-hide font-mono text-xs" data-label="Submitted">
+                            {dayjs(r.created_at).format('D MMM')}
+                          </td>
+                        </LedgerRow>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {pendingList.length > 5 ? (
-                  <Link
-                    href={deptDetailHref}
-                    className="block text-center px-5 py-3 font-serif italic text-sm text-accent hover:text-accent-hover"
-                  >
-                    See all {pendingList.length} →
-                  </Link>
+                  <div className="table-frame-foot">
+                    <span>Showing 5 of {pendingList.length}</span>
+                    <Link href={deptDetailHref} className="underline underline-offset-4">
+                      See all {pendingList.length} →
+                    </Link>
+                  </div>
                 ) : null}
               </div>
             )}
           </section>
 
           {/* Recent approved expenses */}
-          <section className="mb-12">
+          <section className="mb-10">
             <div className="sect-head">
               <h2>Recent approved</h2>
               <span className="rule" aria-hidden />
               <span className="count">LAST {Math.min(5, recentList.length || 5)} · POSTED TO POOL</span>
             </div>
-            <div className="flex items-baseline justify-end -mt-3 mb-4">
-              <Link
-                href={deptDetailHref}
-                className="font-serif italic text-sm text-accent hover:text-accent-hover"
-              >
-                See full pool →
-              </Link>
-            </div>
             {recentList.length === 0 ? (
-              <div className="border border-hairline rounded-md bg-surface p-6">
-                <p className="font-serif italic text-graphite text-base">
-                  No approved expenses yet.
-                </p>
+              <div className={EMPTY_WELL}>
+                <p className="text-sm">No approved expenses yet.</p>
+                <Link href={deptDetailHref} className="inline-block text-sm underline underline-offset-4 mt-2">
+                  See full pool →
+                </Link>
               </div>
             ) : (
-              <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-                {recentList.map((e) => (
-                  <div
-                    key={e.id}
-                    className="flex items-baseline justify-between px-5 py-4"
-                  >
-                    <div className="flex-1 min-w-0 pr-4">
-                      <div className="font-serif italic text-graphite text-sm truncate">
-                        {e.description ?? '—'}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="num neg">{formatMoney(-Number(e.amount))}</span>
-                      <div className="font-mono text-xs text-muted">
-                        {dayjs(e.created_at).format('D MMM YYYY')}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="table-frame">
+                <div className="table-frame-scroll">
+                  <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th className="right">Amount</th>
+                        <th className="right">Approved</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentList.map((e) => (
+                        <tr key={e.id}>
+                          <td>{e.description ?? '—'}</td>
+                          <td className="num">
+                            <span className="neg">{formatMoney(-Number(e.amount))}</span>
+                          </td>
+                          <td className="right font-mono text-xs whitespace-nowrap">
+                            {dayjs(e.created_at).format('D MMM YYYY')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="table-frame-foot">
+                  <span>Posted to the {dept.name} pool</span>
+                  <Link href={deptDetailHref} className="underline underline-offset-4">
+                    See full pool →
+                  </Link>
+                </div>
               </div>
             )}
           </section>
@@ -714,14 +744,19 @@ export default async function DashboardPage() {
     // Any other non-treasury role (future-proofing — currently only hr/dept_manager hit
     // the Access denied branch, so this is dead-ish code but keeps the type checker happy)
     return (
-      <div className="py-16 text-center">
-        <p className="font-serif italic text-2xl text-ink mb-2">Dashboard</p>
-        <p className="font-serif italic text-graphite">
-          Treasury data is available to Principal and Finance only.
-        </p>
-        <p className="font-mono text-xs text-muted mt-4">
-          Use the sidebar to navigate to your modules.
-        </p>
+      <div>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow">
+              <em>·</em> OVERVIEW
+            </div>
+            <h1 className="page-title">Dashboard</h1>
+          </div>
+        </div>
+        <div className={EMPTY_WELL}>
+          <p className="text-sm font-medium">Treasury data is available to Principal and Finance only.</p>
+          <p className="text-xs mt-1">Use the sidebar to navigate to your modules.</p>
+        </div>
       </div>
     )
   }
@@ -808,394 +843,395 @@ export default async function DashboardPage() {
     amount: financeRecentLive.get(r.id) ?? null,
   }))
 
+  // Where the margin panel stood before: beside the hero for anybody but the
+  // Principal, and below it for the Principal once there is money to measure.
+  const showMargin = !isPrincipal || hasAnyData
+  const subsidiaryTotals = subsidiaries.reduce(
+    (acc, s) => ({
+      savings: acc.savings + Number(s.savings_deposited ?? 0),
+      loans: acc.loans + Number(s.loans_outstanding ?? 0),
+      net: acc.net + Number(s.net_position ?? 0),
+    }),
+    { savings: 0, loans: 0, net: 0 },
+  )
+  const hvBalance = Number(summary.hv_fund_balance ?? 0)
+
   return (
     <div>
-      {/* ───────── Hero grid: 7+5 broadsheet ───────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-14 mb-16">
-        {/* LEFT 7 columns — Venture Pool hero */}
-        <div className="lg:col-span-7">
-          {/* The one dark object — see .hero-walnut in globals.css. Everything
-              else on the page is light, so the figure is the heaviest thing on
-              screen, which is what you came here to read. */}
-          <div className="hero-walnut px-6 py-6 md:px-8 md:py-7 mb-6">
-          <div className="font-serif italic text-accent text-base mb-1">
-            Venture Pool
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> TREASURY · OVERVIEW · {today.toUpperCase()}
           </div>
-          <div className="statement-amount text-num-ink mb-3">
-            {hasAnyData ? (
-              <span className={(summary.hv_fund_balance ?? 0) < 0 ? 'text-danger' : ''}>
-                {formatMoney(summary.hv_fund_balance ?? 0)}
-              </span>
-            ) : (
-              <>
-                RM <span className="text-muted">—</span>
-              </>
-            )}
-          </div>
-          <div className="font-mono text-xs text-muted">
-            As of {today}
-            {hasAnyData ? ' · live ledger' : ' · no fund sources yet'}
-          </div>
-
-          {/* Sparkline placeholder — 12-month trend belongs to /reports.
-              Strokes bind to rgb(var(--ink)) / rgb(var(--hairline)), which
-              .hero-walnut has already flipped to the light end. */}
-          <svg
-            className="w-full h-12 mt-6 -mb-1"
-            viewBox="0 0 600 48"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            {hasAnyData ? (
-              <>
-                <path
-                  d="M 0 30 L 40 28 L 80 32 L 120 25 L 160 22 L 200 20 L 240 24 L 280 18 L 320 15 L 360 17 L 400 12 L 440 14 L 480 10 L 520 13 L 560 8 L 600 6"
-                  fill="none"
-                  stroke="rgb(var(--ink))"
-                  strokeWidth="1.25"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <line
-                  x1="0"
-                  y1="40"
-                  x2="600"
-                  y2="40"
-                  stroke="rgb(var(--hairline))"
-                  strokeWidth="0.5"
-                  strokeDasharray="3,3"
-                />
-              </>
-            ) : (
-              <line
-                x1="0"
-                y1="40"
-                x2="600"
-                y2="40"
-                stroke="rgb(var(--hairline))"
-                strokeWidth="1"
-                strokeDasharray="3,3"
-              />
-            )}
-          </svg>
-          </div>
-          {/* ── back on the page: light again ── */}
-
-          {hasAnyData ? (
-            <>
-              <div className="text-sm text-graphite">
-                <em className="font-serif text-graphite">
-                  Pool{' '}
-                  <span className="font-mono tabular not-italic font-medium text-ink">
-                    {formatMoney(summary.total_pool)}
-                  </span>
-                </em>
-                {' · '}
-                <em className="font-serif text-graphite">
-                  lent{' '}
-                  <span className="font-mono tabular not-italic">
-                    {formatMoney(summary.loans_outstanding)}
-                  </span>
-                </em>
-              </div>
-
-              {/* ── Pool breakdown detail ── */}
-              {summary.pool_breakdown ? (
-                <details className="mt-4">
-                  <summary className="font-serif italic text-accent text-sm cursor-pointer hover:text-accent-hover">
-                    Pool breakdown
-                  </summary>
-                  <div className="mt-3 border border-hairline rounded-md bg-surface p-4 space-y-3">
-                    {/* Source categories */}
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">Fund Sources</div>
-                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.fund_sources)}</div>
-                      </div>
-                      <div>
-                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">Dept Pool</div>
-                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.dept_pool)}</div>
-                      </div>
-                      <div>
-                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-1">Venture Pool</div>
-                        <div className="font-mono tabular font-medium text-ink">{formatMoney(summary.pool_breakdown.venture_pool)}</div>
-                      </div>
-                    </div>
-
-                    {/* Fund source type breakdown */}
-                    {summary.fund_source_breakdown?.length > 0 ? (
-                      <div className="border-t border-hairline pt-3">
-                        <div className="font-mono text-xs text-muted uppercase tracking-wide mb-2">By fund source type</div>
-                        {summary.fund_source_breakdown.map((fs) => (
-                          <div key={fs.source_type} className="flex justify-between text-sm py-0.5">
-                            <span className="font-serif italic text-graphite">
-                              {fs.source_type.replace(/_/g, ' ')} ({fs.count})
-                            </span>
-                            <span className="font-mono tabular font-medium text-ink">
-                              {formatMoney(Number(fs.amount))}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {/* Dept pool by department (+ Venture from corporate+treasury GL) */}
-                    {(() => {
-                      const rows: Array<{ key: string; name: string; balance: number }> = [
-                        ...(summary.dept_pool_breakdown ?? []).map((dp) => ({
-                          key: dp.department_id,
-                          name: dp.department_name,
-                          balance: Number(dp.balance),
-                        })),
-                      ]
-                      const venture = Number(summary.hv_fund_balance ?? 0)
-                      if (Math.abs(venture) >= 0.005) {
-                        rows.push({ key: 'venture', name: 'Venture (Office)', balance: venture })
-                      }
-                      rows.sort((a, b) => b.balance - a.balance)
-                      if (rows.length === 0) return null
-                      return (
-                        <div className="border-t border-hairline pt-3">
-                          <div className="font-mono text-xs text-muted uppercase tracking-wide mb-2">Dept pool by department</div>
-                          {rows.map((r) => (
-                            <div key={r.key} className="flex justify-between text-sm py-0.5">
-                              <span className="font-serif italic text-graphite">{r.name}</span>
-                              <span className="font-mono tabular font-medium text-ink">
-                                {formatMoney(r.balance)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )
-                    })()}
-                  </div>
-                </details>
-              ) : null}
-            </>
-          ) : (
-            <div className="mt-4">
-              <p className="font-serif italic text-graphite text-base mb-4">
-                No fund sources yet. Start by recording the first one.
-              </p>
-              <Link
-                href="/fund-in"
-                className="inline-block bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-md font-serif italic text-sm transition-colors"
-              >
-                Record first fund source
-              </Link>
-            </div>
-          )}
+          <h1 className="page-title">Overview</h1>
         </div>
+      </div>
 
-        {/* RIGHT 5 columns — Pending your hand (Principal only) */}
-        <div className="lg:col-span-5">
+      {/* ───────── The treasury in four figures ─────────
+          The Venture Pool was the page's walnut hero; on the sheet it is the
+          one walnut card, with the pool and what is lent out beside it and the
+          queue that waits on somebody's hand. */}
+      <StatCards label={`Treasury as of ${today}`}>
+        <StatCard
+          label="Venture Pool"
+          value={hasAnyData ? formatMoney(hvBalance) : '—'}
+          icon="wallet"
+          tone={hasAnyData && hvBalance < 0 ? 'danger' : 'primary'}
+          note={hasAnyData ? `As of ${today} · live ledger` : 'No fund sources yet'}
+        />
+        <StatCard
+          label="Pool"
+          value={hasAnyData ? formatMoney(summary.total_pool) : '—'}
+          icon="layers"
+          note="Dept pools + Venture Pool"
+        />
+        <StatCard
+          label="Lent out"
+          value={hasAnyData ? formatMoney(summary.loans_outstanding) : '—'}
+          icon="send"
+          note="Loans outstanding"
+        />
+        {isPrincipal ? (
+          <StatCard
+            label="Pending your hand"
+            value={String(pendingCount)}
+            icon="inbox"
+            tone={pendingCount > 0 ? 'alert' : 'default'}
+            href="/approvals"
+            note={pendingCount === 0 ? 'All caught up' : `${pendingCount === 1 ? 'Approval' : 'Approvals'} waiting`}
+          />
+        ) : (
+          <StatCard
+            label="Awaiting Principal"
+            value={String(financePendingList.length)}
+            icon="clock"
+            tone={financePendingList.length > 0 ? 'alert' : 'default'}
+            note={financePendingList.length === 0 ? 'Nothing waiting on Principal' : 'Your requests, not yet decided'}
+          />
+        )}
+      </StatCards>
+
+      {hasAnyData ? (
+        summary.pool_breakdown ? (
+          <details className="mb-10">
+            <summary className="w-fit text-sm font-medium underline underline-offset-4 cursor-pointer select-none">
+              Pool breakdown
+            </summary>
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* The three sources, side by side. They are not added up
+                  here: the pool is the dept pools plus the Venture Pool, and
+                  the fund sources are what fed them. */}
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th className="right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Fund sources</td>
+                    <td className="num">{formatMoney(summary.pool_breakdown.fund_sources)}</td>
+                  </tr>
+                  <tr>
+                    <td>Dept pool</td>
+                    <td className="num">{formatMoney(summary.pool_breakdown.dept_pool)}</td>
+                  </tr>
+                  <tr>
+                    <td>Venture Pool</td>
+                    <td className="num">{formatMoney(summary.pool_breakdown.venture_pool)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Fund source type breakdown */}
+              {summary.fund_source_breakdown?.length > 0 ? (
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>By fund source type</th>
+                      <th className="right">Count</th>
+                      <th className="right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.fund_source_breakdown.map((fs) => (
+                      <tr key={fs.source_type}>
+                        <td className="capitalize">{fs.source_type.replace(/_/g, ' ')}</td>
+                        <td className="num">{fs.count}</td>
+                        <td className="num">{formatMoney(Number(fs.amount))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+
+              {/* Dept pool by department (+ Venture from corporate+treasury GL) */}
+              {(() => {
+                const rows: Array<{ key: string; name: string; balance: number }> = [
+                  ...(summary.dept_pool_breakdown ?? []).map((dp) => ({
+                    key: dp.department_id,
+                    name: dp.department_name,
+                    balance: Number(dp.balance),
+                  })),
+                ]
+                const venture = Number(summary.hv_fund_balance ?? 0)
+                if (Math.abs(venture) >= 0.005) {
+                  rows.push({ key: 'venture', name: 'Venture (Office)', balance: venture })
+                }
+                rows.sort((a, b) => b.balance - a.balance)
+                if (rows.length === 0) return null
+                return (
+                  <table className="ledger-table">
+                    <thead>
+                      <tr>
+                        <th>Dept pool by department</th>
+                        <th className="right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.key}>
+                          <td>{r.name}</td>
+                          <td className="num">
+                            {r.balance < 0 ? <span className="neg">{formatMoney(r.balance)}</span> : formatMoney(r.balance)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              })()}
+            </div>
+          </details>
+        ) : null
+      ) : (
+        <div className={`${EMPTY_WELL} mb-10`}>
+          <p className="text-sm">No fund sources yet. Start by recording the first one.</p>
+          <Link href="/fund-in" className={`${PRIMARY_BUTTON} mt-3`}>
+            Record first fund source
+          </Link>
+        </div>
+      )}
+
+      {/* ───────── The queue beside the margin ─────────
+          Principal: what waits on their hand. Finance: what they submitted
+          and what Principal decided. The margin panel on the right for both —
+          the Principal's only once there is money to measure. */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-2 mb-2">
+        <div className={showMargin ? 'lg:col-span-7 min-w-0' : 'lg:col-span-12 min-w-0'}>
           {isPrincipal ? (
-            <>
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="font-serif italic text-xl text-ink">
-                  Pending your hand
-                </h2>
-                <span className="font-mono text-xs text-muted">
-                  {pendingCount} {pendingCount === 1 ? 'item' : 'items'}
+            <section className="mb-10">
+              <div className="sect-head">
+                <h2>Pending your hand</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">
+                  {pendingCount} {pendingCount === 1 ? 'ITEM' : 'ITEMS'}
                 </span>
               </div>
-
               {pendingCount === 0 ? (
-                <div className="border border-hairline rounded-md bg-surface p-6 text-center">
-                  <p className="font-serif italic text-ledger text-base">
-                    All caught up.
-                  </p>
-                  <p className="text-xs text-muted mt-1">
-                    No approvals waiting.
-                  </p>
+                <div className={EMPTY_WELL}>
+                  <p className="text-sm font-medium">All caught up.</p>
+                  <p className="text-xs mt-1">No approvals waiting.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {pendingApprovals.slice(0, 5).map((req) => (
-                    <Link
-                      key={req.id}
-                      href={approvalHref({
-                        id: req.id,
-                        request_type: req.request_type,
-                        reference_id: pendingApprovalRefs.get(req.id) ?? null,
-                      })}
-                      className="block border-b border-hairline pb-3 hover:bg-surface-2/40 -mx-2 px-2 rounded transition-colors"
-                    >
-                      <div className="flex items-baseline justify-between mb-1">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
-                          {req.request_type.replace(/_/g, ' ')}
-                        </span>
-                        <span className="font-mono text-xs text-muted">
-                          {dayjs(req.created_at).format('D MMM')}
-                        </span>
-                      </div>
-                      <div className="font-serif text-sm text-ink leading-tight">
-                        {req.description ?? '—'}
-                      </div>
-                      <div className="font-mono text-xs text-muted mt-1">
-                        {(() => {
+                <div className="table-frame">
+                  <div className="table-frame-scroll">
+                    <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                      <thead>
+                        <tr>
+                          <th>Description</th>
+                          <th className="m-hide">Request</th>
+                          <th className="right">Amount</th>
+                          <th className="m-hide">By</th>
+                          <th className="right m-hide">Submitted</th>
+                          <th className="lt-toggle" aria-hidden />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingApprovals.slice(0, 5).map((req) => {
                           const amt = pendingApprovalAmounts.has(req.id)
                             ? pendingApprovalAmounts.get(req.id)
                             : req.amount == null
                               ? null
                               : Number(req.amount)
-                          return amt != null ? formatMoney(amt) : '—'
-                        })()}
-                        {req.submitted_by_name
-                          ? ` · by ${req.submitted_by_name}`
-                          : ''}
-                      </div>
-                    </Link>
-                  ))}
+                          return (
+                            <LedgerRow key={req.id}>
+                              <td>
+                                <Link
+                                  href={approvalHref({
+                                    id: req.id,
+                                    request_type: req.request_type,
+                                    reference_id: pendingApprovalRefs.get(req.id) ?? null,
+                                  })}
+                                >
+                                  {req.description ?? '—'}
+                                </Link>
+                              </td>
+                              <td className="m-hide" data-label="Request">
+                                <RequestChip type={req.request_type} />
+                              </td>
+                              <td className="num">{amt != null ? formatMoney(amt) : '—'}</td>
+                              <td className="m-hide" data-label="By">{req.submitted_by_name ?? '—'}</td>
+                              <td className="right m-hide font-mono text-xs" data-label="Submitted">
+                                {dayjs(req.created_at).format('D MMM')}
+                              </td>
+                            </LedgerRow>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                   {pendingCount > 5 ? (
-                    <Link
-                      href="/approvals"
-                      className="block text-center text-sm text-accent hover:text-accent-hover font-serif italic pt-2"
-                    >
-                      See all {pendingCount} →
-                    </Link>
-                  ) : null}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="font-serif italic text-xl text-ink">
-                  Margin panel
-                </h2>
-                <span className="font-mono text-xs text-muted">monthly</span>
-              </div>
-              <MarginPanel summary={summary} />
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ───────── Margin panel (Principal sees this below hero) ───────── */}
-      {isPrincipal && hasAnyData ? (
-        <section className="mb-16">
-          <h2 className="font-serif text-2xl text-ink mb-1">Margin panel</h2>
-          <MarginPanel summary={summary} />
-        </section>
-      ) : null}
-
-      {/* ───────── Awaiting + Recent Actions (Finance only) ───────── */}
-      {isFinance ? (
-        <section className="mb-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* LEFT — Awaiting Principal sign-off */}
-            <div>
-              <div className="flex items-baseline justify-between mb-1">
-                <h2 className="font-serif text-xl text-ink">Awaiting Principal sign-off</h2>
-                <span className="font-mono text-xs text-muted">
-                  {financePendingList.length}{' '}
-                  {financePendingList.length === 1 ? 'item' : 'items'}
-                </span>
-              </div>
-              {financePendingList.length === 0 ? (
-                <div className="border border-hairline rounded-md bg-surface p-6">
-                  <p className="font-serif italic text-ledger text-base">All caught up.</p>
-                  <p className="font-mono text-xs text-muted mt-1">
-                    Nothing waiting on Principal.
-                  </p>
-                </div>
-              ) : (
-                <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-                  {financePendingList.slice(0, 5).map((req) => (
-                    <Link
-                      key={req.id}
-                      href={approvalHref(req)}
-                      className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-1">
-                          {req.request_type.replace(/_/g, ' ')}
-                        </div>
-                        <div className="font-serif italic text-graphite text-sm truncate">
-                          {req.description ?? '—'}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono tabular font-medium text-ink text-sm">
-                          {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
-                        </div>
-                        <div className="font-mono text-xs text-muted">
-                          {dayjs(req.created_at).format('D MMM')}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                  {financePendingList.length > 5 ? (
-                    <div className="block text-center px-5 py-3 font-serif italic text-sm text-muted">
-                      + {financePendingList.length - 5} more pending
+                    <div className="table-frame-foot">
+                      <span>Showing 5 of {pendingCount}</span>
+                      <Link href="/approvals" className="underline underline-offset-4">
+                        See all {pendingCount} →
+                      </Link>
                     </div>
                   ) : null}
                 </div>
               )}
-            </div>
+            </section>
+          ) : null}
 
-            {/* RIGHT — Recent actions (approved / rejected) */}
-            <div>
-              <div className="flex items-baseline justify-between mb-1">
-                <h2 className="font-serif text-xl text-ink">Recent actions</h2>
-                <span className="font-mono text-xs text-muted">
-                  {financeRecentList.length}{' '}
-                  {financeRecentList.length === 1 ? 'item' : 'items'}
-                </span>
+          {isFinance ? (
+            <>
+              {/* Awaiting Principal sign-off — Finance's own submitted
+                  approval_requests (new_loan, new_contract, advance, etc)
+                  still pending the Principal's decision. */}
+              <section className="mb-10">
+                <div className="sect-head">
+                  <h2>Awaiting Principal sign-off</h2>
+                  <span className="rule" aria-hidden />
+                  <span className="count">
+                    {financePendingList.length} {financePendingList.length === 1 ? 'ITEM' : 'ITEMS'}
+                  </span>
+                </div>
+                {financePendingList.length === 0 ? (
+                  <div className={EMPTY_WELL}>
+                    <p className="text-sm font-medium">All caught up.</p>
+                    <p className="text-xs mt-1">Nothing waiting on Principal.</p>
+                  </div>
+                ) : (
+                  <div className="table-frame">
+                    <div className="table-frame-scroll">
+                      <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                        <thead>
+                          <tr>
+                            <th>Description</th>
+                            <th className="m-hide">Request</th>
+                            <th className="right">Amount</th>
+                            <th className="right m-hide">Submitted</th>
+                            <th className="lt-toggle" aria-hidden />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financePendingList.slice(0, 5).map((req) => (
+                            <LedgerRow key={req.id}>
+                              <td>
+                                <Link href={approvalHref(req)}>{req.description ?? '—'}</Link>
+                              </td>
+                              <td className="m-hide" data-label="Request">
+                                <RequestChip type={req.request_type} />
+                              </td>
+                              <td className="num">
+                                {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
+                              </td>
+                              <td className="right m-hide font-mono text-xs" data-label="Submitted">
+                                {dayjs(req.created_at).format('D MMM')}
+                              </td>
+                            </LedgerRow>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {financePendingList.length > 5 ? (
+                      <div className="table-frame-foot">
+                        <span>+ {financePendingList.length - 5} more pending</span>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </section>
+
+              {/* Recent actions — their submitted requests Principal has decided */}
+              <section className="mb-10">
+                <div className="sect-head">
+                  <h2>Recent actions</h2>
+                  <span className="rule" aria-hidden />
+                  <span className="count">
+                    {financeRecentList.length} {financeRecentList.length === 1 ? 'ITEM' : 'ITEMS'}
+                  </span>
+                </div>
+                {financeRecentList.length === 0 ? (
+                  <div className={EMPTY_WELL}>
+                    <p className="text-sm font-medium">No recent actions.</p>
+                    <p className="text-xs mt-1">Decisions will appear here once Principal acts.</p>
+                  </div>
+                ) : (
+                  <div className="table-frame">
+                    <div className="table-frame-scroll">
+                      <table className="ledger-table [&_td.num]:whitespace-nowrap">
+                        <thead>
+                          <tr>
+                            <th>Description</th>
+                            <th className="m-hide">Request</th>
+                            <th>Decision</th>
+                            <th className="right">Amount</th>
+                            <th className="right m-hide">Decided</th>
+                            <th className="lt-toggle" aria-hidden />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeRecentList.map((req) => (
+                            <LedgerRow key={req.id}>
+                              <td>
+                                <Link href={approvalHref(req)}>{req.description ?? '—'}</Link>
+                              </td>
+                              <td className="m-hide" data-label="Request">
+                                <RequestChip type={req.request_type} />
+                              </td>
+                              <td>
+                                <span className={`${req.status === 'approved' ? 'chip ledger' : 'chip danger'} whitespace-nowrap`}>
+                                  <span className="dot" />
+                                  {req.status}
+                                </span>
+                              </td>
+                              <td className="num">
+                                {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
+                              </td>
+                              <td className="right m-hide font-mono text-xs" data-label="Decided">
+                                {req.approved_at ? dayjs(req.approved_at).format('D MMM') : dayjs(req.created_at).format('D MMM')}
+                              </td>
+                            </LedgerRow>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </>
+          ) : null}
+        </div>
+
+        {showMargin ? (
+          <div className="lg:col-span-5 min-w-0">
+            <section className="mb-10">
+              <div className="sect-head">
+                <h2>Margin panel</h2>
+                <span className="rule" aria-hidden />
+                <span className="count">MONTHLY</span>
               </div>
-              {financeRecentList.length === 0 ? (
-                <div className="border border-hairline rounded-md bg-surface p-6">
-                  <p className="font-serif italic text-muted text-base">No recent actions.</p>
-                  <p className="font-mono text-xs text-muted mt-1">
-                    Decisions will appear here once Principal acts.
-                  </p>
-                </div>
-              ) : (
-                <div className="border border-hairline rounded-md bg-surface divide-y divide-hairline">
-                  {financeRecentList.map((req) => (
-                    <Link
-                      key={req.id}
-                      href={approvalHref(req)}
-                      className="flex items-baseline justify-between px-5 py-4 hover:bg-surface-2/40 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="font-mono text-[10px] uppercase tracking-wider text-accent">
-                            {req.request_type.replace(/_/g, ' ')}
-                          </div>
-                          <span
-                            className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                              req.status === 'approved'
-                                ? 'bg-ledger/10 text-ledger'
-                                : 'bg-danger/10 text-danger'
-                            }`}
-                          >
-                            {req.status}
-                          </span>
-                        </div>
-                        <div className="font-serif italic text-graphite text-sm truncate">
-                          {req.description ?? '—'}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono tabular font-medium text-ink text-sm">
-                          {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
-                        </div>
-                        <div className="font-mono text-xs text-muted">
-                          {req.approved_at ? dayjs(req.approved_at).format('D MMM') : dayjs(req.created_at).format('D MMM')}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+              <MarginPanel summary={summary} />
+            </section>
           </div>
-        </section>
-      ) : null}
+        ) : null}
+      </div>
 
       {/* ───────── Subsidiaries ───────── */}
-      <section className="mb-16">
+      <section className="mb-10">
         <div className="sect-head">
           <h2>Subsidiaries</h2>
           <span className="rule" aria-hidden />
@@ -1203,10 +1239,8 @@ export default async function DashboardPage() {
         </div>
 
         {subsidiaries.length === 0 ? (
-          <div className="py-10 text-center border border-hairline rounded-md bg-surface">
-            <p className="font-serif italic text-muted text-base">
-              No companies configured. Visit Settings to add subsidiaries.
-            </p>
+          <div className={EMPTY_WELL}>
+            <p className="text-sm">No companies configured. Visit Settings to add subsidiaries.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1225,36 +1259,25 @@ export default async function DashboardPage() {
                 {subsidiaries.map((sub) => (
                   <LedgerRow key={sub.id}>
                     <td>
-                      <div className="font-serif text-[15px] text-ink">{sub.name}</div>
-                      <div className="font-mono text-[11px] text-graphite mt-0.5">
-                        {sub.short_code}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{sub.name}</span>
                         {sub.has_overdue ? (
-                          <span className="text-danger"> · overdue</span>
+                          <span className="chip danger">
+                            <span className="dot" />
+                            overdue
+                          </span>
                         ) : null}
                       </div>
+                      <div className="font-mono text-[11px] mt-0.5">{sub.short_code}</div>
                     </td>
                     <td className="num m-hide" data-label="Savings">
-                      {sub.savings_deposited > 0
-                        ? formatMoney(sub.savings_deposited)
-                        : <span className="text-muted">—</span>}
+                      {sub.savings_deposited > 0 ? formatMoney(sub.savings_deposited) : '—'}
                     </td>
                     <td className="num m-hide" data-label="Loans">
-                      {sub.loans_outstanding > 0
-                        ? formatMoney(sub.loans_outstanding)
-                        : <span className="text-muted">—</span>}
+                      {sub.loans_outstanding > 0 ? formatMoney(sub.loans_outstanding) : '—'}
                     </td>
                     <td className="num">
-                      {sub.net_position === 0 ? (
-                        <span className="text-muted">—</span>
-                      ) : sub.net_position > 0 ? (
-                        <span className="text-ledger font-semibold">
-                          +{formatMoneyBare(sub.net_position)}
-                        </span>
-                      ) : (
-                        <span className="text-danger font-semibold neg">
-                          {formatMoneyBare(sub.net_position)}
-                        </span>
-                      )}
+                      <SignedFigure value={sub.net_position} />
                     </td>
                     <td className="m-hide" data-label="Position">
                       <PositionLabel position={sub.position} />
@@ -1262,6 +1285,18 @@ export default async function DashboardPage() {
                   </LedgerRow>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td>All subsidiaries</td>
+                  <td className="num m-hide">{formatMoney(subsidiaryTotals.savings)}</td>
+                  <td className="num m-hide">{formatMoney(subsidiaryTotals.loans)}</td>
+                  <td className="num">
+                    <SignedFigure value={subsidiaryTotals.net} />
+                  </td>
+                  <td className="m-hide" />
+                  <td className="lt-toggle" aria-hidden />
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
@@ -1269,203 +1304,180 @@ export default async function DashboardPage() {
 
       {/* ───────── Alerts ───────── */}
       {alerts.length > 0 ? (
-        <section className="mb-16">
-          <h2 className="font-serif text-2xl text-ink mb-1">Alerts</h2>
-          <div className="space-y-2">
-            {alerts.map((alert, i) => (
-              <div
-                key={i}
-                className="border-b border-hairline pb-2 flex items-baseline gap-3"
-              >
-                <span
-                  className={
-                    alert.severity === 'danger'
-                      ? 'font-mono text-[10px] uppercase tracking-wider text-danger'
-                      : alert.severity === 'warning'
-                        ? 'font-mono text-[10px] uppercase tracking-wider text-alert'
-                        : 'font-mono text-[10px] uppercase tracking-wider text-muted'
-                  }
-                >
-                  {alert.type}
-                </span>
-                <span className="font-serif italic text-sm text-graphite">
-                  {alert.message}
-                </span>
-              </div>
-            ))}
+        <section className="mb-10">
+          <div className="sect-head">
+            <h2>Alerts</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">{alerts.length} OPEN</span>
           </div>
+          <ul className="table-frame divide-y divide-hairline">
+            {alerts.map((alert, i) => (
+              <li key={i} className="flex items-baseline gap-3 px-[14px] py-[11px] text-[12px]">
+                {/* dashboard_summary() sends a severity and a message; the
+                    chip names the severity when no type comes with it. */}
+                <span className={`${ALERT_CHIP[alert.severity] ?? 'chip'} shrink-0`}>
+                  <span className="dot" />
+                  {alert.type ?? alert.severity}
+                </span>
+                <span>{alert.message}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 
       {/* ───────── Phase 4 — Bank Accounts ───────── */}
       {banks.length > 0 ? (
-        <section className="mb-16">
-          <h2 className="font-serif text-2xl text-ink mb-1">Bank Accounts</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {banks.map((b) => (
-              <div
-                key={b.id}
-                className="border border-hairline rounded-md bg-surface p-5"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="font-serif text-md text-ink">{b.bank_name}</div>
-                  {b.is_primary ? (
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-accent bg-accent-bg px-1.5 py-0.5 rounded">
-                      Primary
-                    </span>
-                  ) : null}
-                </div>
-                <div className="font-mono text-xs text-muted mb-3">{b.account_number}</div>
-                <div className="statement-amount text-ink">
-                  {formatMoney(Number(b.current_balance))}
-                </div>
-              </div>
-            ))}
-            <div className="border border-hairline rounded-md bg-surface p-5">
-              <div className="font-serif text-md text-graphite mb-2">Total balance</div>
-              <div className="font-mono text-xs text-muted mb-3">across all accounts</div>
-              <div className="statement-amount text-ink">
-                {formatMoney(totalBankBalance)}
-              </div>
-            </div>
+        <section className="mb-10">
+          <div className="sect-head">
+            <h2>Bank accounts</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {banks.length} ACTIVE
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="ledger-table">
+              <thead>
+                <tr>
+                  <th>Bank</th>
+                  <th>Account number</th>
+                  <th className="right">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {banks.map((b) => (
+                  <tr key={b.id}>
+                    <td>
+                      <span className="font-medium">{b.bank_name}</span>
+                      {b.is_primary ? <span className="chip accent ml-2">Primary</span> : null}
+                    </td>
+                    <td className="font-mono text-xs">{b.account_number}</td>
+                    <td className="num">{formatMoney(Number(b.current_balance))}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Total balance</td>
+                  <td>
+                    {/* The footer is set in 600; the caption is not a figure. */}
+                    <span className="text-xs font-normal">across all accounts</span>
+                  </td>
+                  <td className="num">{formatMoney(totalBankBalance)}</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </section>
       ) : null}
 
       {/* ───────── Phase 2 — Billing + Dept Pool snapshot ───────── */}
-      <section className="mb-16">
-        <h2 className="font-serif text-2xl text-ink mb-1">Billing &amp; Dept Pool</h2>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">
-              Billing float
-            </div>
-            <div className="statement-amount text-ink">
-              {formatMoney(Number(summary.billing_float ?? 0))}
-            </div>
-            <p className="font-mono text-xs text-muted mt-2">
-              Unpaid invoices (draft + issued)
-            </p>
-          </div>
-
-          <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">
-              Dept pool total
-            </div>
-            <div
-              className={
-                Number(summary.dept_pool_total ?? 0) < 0
-                  ? 'statement-amount text-danger'
-                  : 'statement-amount text-ink'
-              }
-            >
-              {formatMoney(Number(summary.dept_pool_total ?? 0))}
-            </div>
-            <p className="font-mono text-xs text-muted mt-2">
-              Sum of positive dept pool balances
-            </p>
-          </div>
-
-          <MarketingNpCard mkNp={summary.marketing_np_this_month} />
+      <section className="mb-10">
+        <div className="sect-head">
+          <h2>Billing &amp; dept pool</h2>
+          <span className="rule" aria-hidden />
+          <span className="count">THIS MONTH</span>
         </div>
+        <StatCards label="Billing and department pools">
+          <StatCard
+            label="Billing float"
+            value={formatMoney(Number(summary.billing_float ?? 0))}
+            icon="receipt"
+            tone="primary"
+            note="Unpaid invoices (draft + issued)"
+          />
+          <StatCard
+            label="Dept pool total"
+            value={formatMoney(Number(summary.dept_pool_total ?? 0))}
+            icon="building"
+            tone={Number(summary.dept_pool_total ?? 0) < 0 ? 'danger' : 'default'}
+            note="Sum of positive dept pool balances"
+          />
+          <MarketingNpCard mkNp={summary.marketing_np_this_month} />
+        </StatCards>
       </section>
 
       {/* ───────── Phase 3 — Director Salary + Director Pool ───────── */}
-      <section className="mb-12 pb-12 border-b border-hairline">
-        <div className="flex items-baseline justify-between mb-1">
-          <h2 className="font-serif text-2xl text-ink">Director Salary</h2>
-          <Link
-            href="/director-pool"
-            className="font-serif italic text-sm text-accent hover:text-accent-hover"
-          >
-            Director Pool →
+      <section className="mb-4">
+        <div className="sect-head">
+          <h2>Director salary</h2>
+          <span className="rule" aria-hidden />
+          <Link href="/director-pool" className="count underline underline-offset-4">
+            DIRECTOR POOL →
           </Link>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Director Pool</div>
-            <div className="statement-amount text-ink">
-              {formatMoney(Number(summary.salary_pool_total ?? 0))}
-            </div>
-            <p className="font-mono text-xs text-muted mt-2">
-              {(summary.payouts_pending ?? 0) === 0
+        <StatCards label="Director salary and pools">
+          <StatCard
+            label="Director Pool"
+            value={formatMoney(Number(summary.salary_pool_total ?? 0))}
+            icon="briefcase"
+            tone="primary"
+            note={
+              (summary.payouts_pending ?? 0) === 0
                 ? 'No draft payouts'
-                : `${summary.payouts_pending} draft payout${summary.payouts_pending === 1 ? '' : 's'} pending`}
-            </p>
-          </div>
-
-          <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Venture Pool</div>
-            <div
-              className={
-                Number(summary.hv_fund_balance ?? 0) < 0
-                  ? 'statement-amount text-danger'
-                  : 'statement-amount text-ink'
-              }
-            >
-              {formatMoney(Number(summary.hv_fund_balance ?? 0))}
-            </div>
-            <p className="font-mono text-xs text-muted mt-2">
-              HV group-level running balance
-            </p>
-          </div>
-
-          <div className="border border-hairline rounded-md bg-surface p-5">
-            <div className="font-serif italic text-accent text-sm mb-1">Director Invoice</div>
-            <div className="statement-amount text-ink">
-              {formatMoney(Number(summary.invoice_pool_balance ?? 0))}
-            </div>
-            <p className="font-mono text-xs text-muted mt-2">
-              25% director invoice accumulation
-            </p>
-          </div>
-        </div>
+                : `${summary.payouts_pending} draft payout${summary.payouts_pending === 1 ? '' : 's'} pending`
+            }
+          />
+          <StatCard
+            label="Venture Pool"
+            value={formatMoney(hvBalance)}
+            icon="wallet"
+            tone={hvBalance < 0 ? 'danger' : 'default'}
+            note="HV group-level running balance"
+          />
+          <StatCard
+            label="Director Invoice"
+            value={formatMoney(Number(summary.invoice_pool_balance ?? 0))}
+            icon="receipt"
+            note="25% director invoice accumulation"
+          />
+        </StatCards>
       </section>
-
     </div>
   )
 }
 
-// HR Overview entry card — one of the three actions that make up the HR job
-// under the direct-submit flow (Employment List / Import Payroll / Director
-// Salary). Roman numeral marker echoes the sidebar convention.
-function ActionCard({
-  n,
-  title,
-  status,
-  statusTone,
-  ctaLabel,
-  ctaHref,
-}: {
-  n: string
-  title: string
-  status: string
-  statusTone: 'ok' | 'warn' | 'idle'
-  ctaLabel: string
-  ctaHref: string
-}) {
-  const toneStyle =
-    statusTone === 'ok'
-      ? 'text-ledger'
-      : statusTone === 'warn'
-        ? 'text-alert'
-        : 'text-muted'
+/** Alert severity → the chip that carries it: red for overdue money, amber
+ *  for a buffer or a maturity coming up, grey for anything informational. */
+const ALERT_CHIP: Record<Alert['severity'], string> = {
+  danger: 'chip danger',
+  warning: 'chip alert',
+  info: 'chip info',
+}
 
+/** A department manager the portal cannot place yet: the page head, and why. */
+function UnplacedDashboard({ message }: { message: string }) {
   return (
-    <Link
-      href={ctaHref}
-      className="border border-hairline rounded-md bg-surface hover:bg-surface-2 p-5 transition-colors block"
-    >
-      <div className="font-mono text-[10px] uppercase tracking-wider text-accent mb-2">
-        <em className="font-serif normal-case">{n}.</em>
+    <div>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>·</em> OVERVIEW
+          </div>
+          <h1 className="page-title">Dashboard</h1>
+        </div>
       </div>
-      <div className="font-serif text-lg text-ink mb-1">{title}</div>
-      <div className={`font-serif italic text-sm ${toneStyle}`}>{status}</div>
-      <div className="font-serif italic text-sm text-accent mt-3">{ctaLabel}</div>
-    </Link>
+      <div className={EMPTY_WELL}>
+        <p className="text-sm">{message}</p>
+      </div>
+    </div>
   )
+}
+
+/** What kind of request a row is — a label, not a status, so no colour. */
+function RequestChip({ type }: { type: string }) {
+  return <span className="chip whitespace-nowrap">{type.replace(/_/g, ' ')}</span>
+}
+
+/** A net position: a dash at zero, green and signed when HV owes, red in
+ *  brackets when HV is owed. */
+function SignedFigure({ value }: { value: number }) {
+  if (value === 0) return <>—</>
+  if (value > 0) {
+    return <span className="text-ledger font-semibold">+{formatMoneyBare(value)}</span>
+  }
+  return <span className="text-danger font-semibold neg">{formatMoneyBare(value)}</span>
 }
 
 function MarketingNpCard({ mkNp }: { mkNp: MarketingNp | undefined }) {
@@ -1476,46 +1488,46 @@ function MarketingNpCard({ mkNp }: { mkNp: MarketingNp | undefined }) {
   const isLoss = netProfit < 0
 
   return (
-    <div className="border border-hairline rounded-md bg-surface p-5">
-      <div className="font-serif italic text-accent text-sm mb-1">
-        Marketing NP this month
-      </div>
-      <div
-        className={
-          isLoss
-            ? 'statement-amount text-danger'
-            : 'statement-amount text-ink'
-        }
-      >
-        {formatMoney(netProfit)}
-      </div>
-      <div className="font-mono text-xs text-muted mt-2 space-y-0.5">
-        <div>Revenue {formatMoney(revenue)}</div>
-        <div>− Staff {formatMoney(staffCost)}</div>
-        <div>− Expenses {formatMoney(expenses)}</div>
-      </div>
-    </div>
+    <StatCard
+      label="Marketing NP this month"
+      value={formatMoney(netProfit)}
+      icon="chart"
+      tone={isLoss ? 'danger' : 'default'}
+      note={`Revenue ${formatMoney(revenue)} − Staff ${formatMoney(staffCost)} − Expenses ${formatMoney(expenses)}`}
+    />
   )
 }
 
+// A position is a word on a wash: green when HV owes the subsidiary, amber
+// when the subsidiary owes HV, plain when they are even.
 function PositionLabel({ position }: { position: Subsidiary['position'] }) {
   if (position === 'creditor') {
     return (
-      <em className="font-serif text-ledger text-sm" title="HV owes this subsidiary">
+      <span className="chip ledger" title="HV owes this subsidiary">
+        <span className="dot" />
         creditor
-      </em>
+      </span>
     )
   }
   if (position === 'debtor') {
     return (
-      <em className="font-serif text-alert text-sm" title="Subsidiary owes HV">
+      <span className="chip alert" title="Subsidiary owes HV">
+        <span className="dot" />
         debtor
-      </em>
+      </span>
     )
   }
-  return <em className="font-serif text-muted text-sm">even</em>
+  return (
+    <span className="chip">
+      <span className="dot" />
+      even
+    </span>
+  )
 }
 
+// The month's margin as two small ledgers, each closing on its result line:
+// the spread (base rate over the weighted cost of capital) and the interest it
+// earned. Green while the result is positive, red once it is not.
 function MarginPanel({ summary }: { summary: DashboardSummary }) {
   const weightedCost = summary.weighted_cost_rate
   const baseRate = summary.current_base_rate
@@ -1524,70 +1536,64 @@ function MarginPanel({ summary }: { summary: DashboardSummary }) {
 
   const spreadNegative = netSpread != null && netSpread < 0
   const interestNegative = netInterest < 0
+  const pct = (rate: number | null) => (rate != null ? `${(rate * 100).toFixed(3)}%/mo` : '—')
 
   return (
-    <div className="border border-hairline rounded-md bg-surface p-5 space-y-3">
-      <div className="flex items-baseline justify-between">
-        <span className="font-serif italic text-base text-ink">
-          Weighted cost of capital
-        </span>
-        <span className="font-mono tabular text-base font-medium text-ink">
-          {weightedCost != null ? `${(weightedCost * 100).toFixed(3)}%/mo` : '—'}
-        </span>
-      </div>
-      <div className="flex items-baseline justify-between">
-        <span className="font-serif italic text-base text-ink">
-          Current base rate
-        </span>
-        <span className="font-mono tabular text-base font-medium text-ink">
-          {baseRate != null ? `${(baseRate * 100).toFixed(3)}%/mo` : '—'}
-        </span>
-      </div>
-      <div className="flex items-baseline justify-between pt-2 border-t border-hairline">
-        <span className="font-serif italic text-base font-medium text-accent">Net spread</span>
-        <span
-          className={
-            spreadNegative
-              ? 'font-mono tabular text-lg font-semibold text-danger'
-              : 'font-mono tabular text-lg font-semibold text-ledger'
-          }
-        >
-          {netSpread != null ? `${(netSpread * 100).toFixed(3)}%/mo` : '—'}
-        </span>
-      </div>
+    <div className="space-y-3">
+      <table className="ledger-table">
+        <thead>
+          <tr>
+            <th>Spread</th>
+            <th className="right">Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Weighted cost of capital</td>
+            <td className="num">{pct(weightedCost)}</td>
+          </tr>
+          <tr>
+            <td>Current base rate</td>
+            <td className="num">{pct(baseRate)}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Net spread</td>
+            {/* The colour rides on a span: a `.num` cell sets its own ink. */}
+            <td className="num">
+              <span className={spreadNegative ? 'text-danger' : 'text-ledger'}>{pct(netSpread)}</span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
 
-      <div className="pt-3 border-t border-hairline space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="font-serif italic text-sm text-ink">
-            Interest income
-          </span>
-          <span className="font-mono tabular text-sm font-medium text-ink">
-            {formatMoney(summary.monthly_interest_income)}
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="font-serif italic text-sm text-ink">
-            Interest expense
-          </span>
-          <span className="font-mono tabular text-sm font-medium text-graphite">
-            {formatMoney(-Math.abs(summary.monthly_interest_expense))}
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between pt-1 border-t border-hairline">
-          <span className="font-serif italic text-base font-medium text-accent">
-            Net interest
-          </span>
-          <span
-            className={
-              interestNegative
-                ? 'font-mono tabular text-base font-semibold text-danger'
-                : 'font-mono tabular text-base font-semibold text-ledger'
-            }
-          >
-            {formatMoney(netInterest)}
-          </span>
-        </div>
-      </div>
+      <table className="ledger-table">
+        <thead>
+          <tr>
+            <th>Interest this month</th>
+            <th className="right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Interest income</td>
+            <td className="num">{formatMoney(summary.monthly_interest_income)}</td>
+          </tr>
+          <tr>
+            <td>Interest expense</td>
+            <td className="num">{formatMoney(-Math.abs(summary.monthly_interest_expense))}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Net interest</td>
+            <td className="num">
+              <span className={interestNegative ? 'text-danger' : 'text-ledger'}>{formatMoney(netInterest)}</span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   )
 }

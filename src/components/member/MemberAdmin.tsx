@@ -22,6 +22,23 @@ const names: Record<string, string> = {
   expired: "Expired",
   paid: "Paid",
 };
+// On the portal's white sheet a status is a word on a wash (DESIGN.md ›
+// "Sheet theme"): amber waits on somebody, green is approved, red was refused,
+// grey is closed. The member app keeps its own pill.
+const statusChips: Record<string, string> = {
+  submitted: "chip alert",
+  needs_info: "chip alert",
+  waiting: "chip alert",
+  reserved: "chip alert",
+  accepted: "chip alert",
+  approved: "chip ledger",
+  rejected: "chip danger",
+  allocated: "chip info",
+  executed: "chip info",
+  paid: "chip info",
+  withdrawn: "chip",
+  expired: "chip",
+};
 const detailLabels: Record<string, string> = {
   category: "Claim category",
   amount: "Claim amount",
@@ -103,9 +120,18 @@ function displayDetail(key: string, value: unknown, data: AdminMemberData) {
 export default function MemberAdmin({
   initialData,
   demo = false,
+  portal = false,
 }: {
   initialData: AdminMemberData;
   demo?: boolean;
+  /**
+   * Rendered inside the portal (People › Member services, /member-admin),
+   * where PortalFrame puts it on the white sheet: the portal's page head
+   * above the workspace, status chips, and the sheet's tabs, fields and
+   * buttons (member.module.css › "on the portal's white sheet"). Without it —
+   * the member app's preview — it keeps the member app's own look.
+   */
+  portal?: boolean;
 }) {
   const [data, setData] = useState(initialData),
     [tab, setTab] = useState(
@@ -485,21 +511,26 @@ export default function MemberAdmin({
       )}
     </div>
   );
-  return (
+  // Inside the portal the page already sits in the portal's <main>, and a
+  // document has one; the member app's preview has none of its own.
+  const Body = portal ? "div" : "main";
+  const workspace = (
     <div className={s.workspace} lang="en-MY">
-      <main className={s.main}>
-        <div className={s.titleRow}>
-          <div>
-            <p className={s.eyebrow}>REVENUE · PEOPLE OPERATIONS</p>
-            <h1>Member services</h1>
-            <p className={`${s.sub} ${s.intro}`}>
-              Manage HR requests, waiting lists, memos and the member catalogue.
-            </p>
+      <Body className={s.main}>
+        {!portal && (
+          <div className={s.titleRow}>
+            <div>
+              <p className={s.eyebrow}>REVENUE · PEOPLE OPERATIONS</p>
+              <h1>Member services</h1>
+              <p className={`${s.sub} ${s.intro}`}>
+                Manage HR requests, waiting lists, memos and the member catalogue.
+              </p>
+            </div>
+            <Link className={s.link} href={demo ? "/member/preview" : "/member"}>
+              Member workspace →
+            </Link>
           </div>
-          <Link className={s.link} href={demo ? "/member/preview" : "/member"}>
-            Member workspace →
-          </Link>
-        </div>
+        )}
         {demo && (
           <div className={s.notice}>
             Admin preview · Live staff and financial records are unaffected
@@ -570,9 +601,18 @@ export default function MemberAdmin({
                         {r.kind} · {r.id.slice(0, 12)}
                       </p>
                     </div>
-                    <span className={`${s.pill} ${s.warning}`}>
-                      {names[r.status] ?? r.status}
-                    </span>
+                    {portal ? (
+                      <span
+                        className={`${statusChips[r.status] ?? "chip"} shrink-0 whitespace-nowrap`}
+                      >
+                        <span className="dot" />
+                        {names[r.status] ?? r.status}
+                      </span>
+                    ) : (
+                      <span className={`${s.pill} ${s.warning}`}>
+                        {names[r.status] ?? r.status}
+                      </span>
+                    )}
                   </button>
                 ))
               ) : (
@@ -1122,7 +1162,32 @@ export default function MemberAdmin({
             </p>
           </section>
         )}
-      </main>
+      </Body>
     </div>
+  );
+  if (!portal) return workspace;
+  // On the sheet the head is the portal's own, outside the workspace so none of
+  // the member app's heading rules reach it.
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <div className="page-eyebrow">
+            <em>I.</em> PEOPLE · MEMBER SERVICES
+          </div>
+          <h1 className="page-title">Member services</h1>
+          <p className="text-sm mt-3 max-w-2xl">
+            Manage HR requests, waiting lists, memos and the member catalogue.
+          </p>
+        </div>
+        <Link
+          href={demo ? "/member/preview" : "/member"}
+          className="inline-block shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+        >
+          Member workspace →
+        </Link>
+      </div>
+      {workspace}
+    </>
   );
 }

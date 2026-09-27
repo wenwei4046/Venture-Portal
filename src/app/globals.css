@@ -4436,3 +4436,69 @@ a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb
   --accent-border: 132 100 76;
   --accent-hover: 222 190 156;
 }
+
+/* ── Sheet: People hierarchy (phase 2) ── */
+/* The company chart's in-canvas actions — a card's "N roles" line, a team
+   leader's Expand/Collapse members, a collapsed department's Explore teams —
+   are lettered in the accent, which on the sheet is orange. They take the
+   canvas's own ink instead; the accent's frame and marker uses stay. */
+:where(.sheet-theme) .company-role-badge { color: rgb(var(--cv-graphite)); }
+:where(.sheet-theme) .company-team-toggle { color: rgb(var(--cv-ink)); }
+:where(.sheet-theme) .company-department-summary button { color: rgb(var(--cv-ink)); }
+/* The canvas stays at its light palette on the sheet (`.org-canvas` above),
+   but its department tones and the title tags on its cards carry dark-mode
+   variants of their own — pale tones meant for a dark card, which on the
+   sheet's white cards all but vanish. Pinned to their light values too, with
+   the weight to beat those variants (the Revenue hierarchy shares both). */
+.sheet-theme .space-canvas.space-canvas.space-canvas {
+  --space-blue: 76 125 157;
+  --space-violet: 134 109 164;
+  --space-warm: 158 123 79;
+}
+.sheet-theme .space-person.space-person.space-person {
+  --title-leader: 109 62 157;
+  --title-assistant: 159 54 63;
+  --title-senior-specialist: 157 75 25;
+  --title-specialist: 124 98 16;
+  --title-head: 112 90 129;
+}
+
+/* ── Sheet: Roles · Permissions (phase 2) ── */
+/* A band row: a label over the rows under it inside a sheet table, in the
+   header band's tone with a walnut marker — the roster's department band
+   (`.group-btn`) for a table that groups without folding. Roles groups its
+   titles by department with it:
+     <tr class="band-row"><td colSpan={n}>Finance <span class="count">4 titles</span></td></tr>
+   The cell paints the band, so the table's zebra and hover never show
+   through it. */
+:where(.sheet-theme) table.ledger-table tr.band-row > td {
+  height: 32px;
+  padding: 6px 14px 6px 13px;
+  background: rgb(var(--sheet-table-head));
+  box-shadow: inset 3px 0 0 rgb(var(--walnut));
+  color: rgb(var(--ink));
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+:where(.sheet-theme) table.ledger-table tr.band-row > td .count {
+  margin-left: 10px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgb(var(--ink) / 0.7);
+}
+
+/* ── Sheet: People roster (phase 2) ── */
+/* A login's monogram tile on the roster and the person window is lettered in
+   the accent, which on the sheet is orange: the initials go black on the
+   peach wash, the orange edge stays — `.chip.accent`'s treatment. */
+:where(.sheet-theme) .mono-tile.linked { color: rgb(var(--ink)); }
+/* The row pencil (and every `.icon-btn`) lit orange on hover; on the sheet the
+   glyph goes black inside its lifted box instead. `.icon-btn.danger` keeps
+   its red — it is one class heavier. */
+:where(.sheet-theme) .icon-btn:hover,
+:where(.sheet-theme) .icon-btn:focus-visible { color: rgb(var(--ink)); }

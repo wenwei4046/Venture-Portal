@@ -57,22 +57,18 @@ export default function Promotion({
   return (
     <div className="mt-6 pt-4 border-t border-hairline flex flex-wrap items-start gap-x-4 gap-y-2">
       <div className="min-w-0 flex-1">
-        <div className="font-sans text-[10px] uppercase tracking-[0.14em] text-accent">
-          Promotion
-        </div>
-        <div className="font-serif text-sm text-ink mt-1.5">
+        <div className="text-[10px] font-bold uppercase tracking-[0.1em]">Promotion</div>
+        <div className="text-sm mt-1.5">
           {ladder.level === null ? (
-            <span className="italic text-muted">
-              {title} is not on the ladder yet — place it under Hierarchy → Levels first.
-            </span>
+            <>{title} is not on the ladder yet — place it under Hierarchy → Levels first.</>
           ) : next === null ? (
-            <span className="italic text-muted">
+            <>
               Top of the {department ?? 'department'} ladder, as {title} ({ladder.level}).
-            </span>
+            </>
           ) : next.titles.length === 1 ? (
             <>
-              Next up: <span className="text-ink">{next.titles[0].name}</span>
-              <span className="font-mono text-[11px] text-muted ml-2">
+              Next up: <span className="font-bold">{next.titles[0].name}</span>
+              <span className="font-mono text-[11px] ml-2">
                 {ladder.level} → {next.level}
               </span>
             </>
@@ -84,7 +80,7 @@ export default function Promotion({
                 onChange={e => setChoice(e.target.value)}
                 disabled={pending}
                 aria-label="Title to promote to"
-                className="px-2 py-1 bg-paper border border-hairline rounded text-sm text-ink"
+                className="px-2 py-1 bg-surface border border-hairline rounded-control text-sm text-ink"
               >
                 {next.titles.map(t => (
                   <option key={t.id} value={t.id}>
@@ -95,17 +91,16 @@ export default function Promotion({
             </label>
           )}
         </div>
-        {ladder.blocker ? (
-          <div className="font-serif italic text-alert text-xs mt-1.5">{ladder.blocker}</div>
-        ) : null}
-        {error ? <div className="font-serif italic text-danger text-xs mt-1.5">{error}</div> : null}
+        {/* Why the button is off, in the amber of something still to settle. */}
+        {ladder.blocker ? <div className="sheet-warning mt-2 mb-0">{ladder.blocker}</div> : null}
+        {error ? <div className="sheet-danger mt-2 mb-0">{error}</div> : null}
       </div>
       {next ? (
         <button
           type="button"
           onClick={promote}
           disabled={pending || !target || ladder.blocker !== null}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {pending ? 'Promoting…' : 'Promote'}
         </button>

@@ -1,9 +1,9 @@
 # DESIGN.md — HOUZS Venture Portal
 
-**Version:** 3.9
+**Version:** 3.10
 **Last updated:** 2026-09-27
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.9 (Sheet theme on HR's view / Walnut shell / approved Product List workspace) — single source of truth for all UI work
+**Status:** v3.10 (Sheet theme on HR's whole view — Overview and People included / Walnut shell / approved Product List workspace) — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -11,7 +11,7 @@
 
 ## Implementation rules — read this first
 
-### Sheet theme — the portal's new tone, HR's view first (v3.9, 2026-09-27)
+### Sheet theme — the portal's new tone, HR's view first (v3.9–v3.10, 2026-09-27)
 
 Comm Cal's month (#151 → #162) is the reference for how the portal now looks,
 and the user asked for every page to follow it "so that the software is all
@@ -19,8 +19,13 @@ sync with the tone" — starting with the pages HR reads: **HR Costing** (Overvi
 Payroll, Payment, Allocation, payslips, import), **Director Salary**, **Director
 Pool**, **Revenue** (Comm Cal and every page under a month, Staff Hierarchy,
 Rules — not the Product List, which keeps its own workspace) and
-**Claims**. `lib/sheet-routes.ts` lists the prefixes; extending the tone to the
-rest of the portal is adding a prefix there and converting the page (below).
+**Claims** (v3.9), then the rest of HR's sidebar (v3.10): the **Overview**
+(`/dashboard` — one route, so the Principal's, Finance's and a department
+manager's dashboards moved with HR's) and **People** (People Management and
+every person / account page and form under it, Member Services, Hierarchy,
+Roles, Permissions). `lib/sheet-routes.ts` lists the prefixes; extending the
+tone to the rest of the portal is adding a prefix there and converting the
+page (below).
 
 **What it is.** PortalFrame draws, for those routes, the content column inset
 10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline
@@ -72,7 +77,11 @@ sheet `.sheet-theme` declares the Comm Cal month's tokens:
    geometry and takes only the lettering and the light department bands
    (`.group-btn` is the header band's tone with a walnut marker on the sheet).
    `.table-frame` › `.table-frame-scroll` + `.table-frame-foot` when a table
-   needs the month's footer strip.
+   needs the month's footer strip. Rows grouped under a label that does not
+   fold (Roles' departments) sit under a band row —
+   `<tr className="band-row"><td colSpan={n}>Finance <span className="count">4 titles</span></td></tr>`
+   — the header band's tone with a walnut marker, the roster's `.group-btn`
+   band without the button.
 5. Tabs: `SlidingTabs` renders the month's tabs on the sheet by itself (a
    tinted, underlined pick; counts in boxed badges). A hand-built rail uses
    `.sheet-tabs` with `aria-selected` / `aria-current` and `.sheet-count`.
@@ -2208,9 +2217,10 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-27 v3.10 (latest)** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
 - **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List workspace".
 - **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List workspace".
-- **2026-09-27 v3.9 (latest)** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".
+- **2026-09-27 v3.9** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".
 - **2026-09-27** — Revenue › Venues removed: the ERP names every bill's fair (venue, organiser, days), so there is nothing left to type. The one person's step it held — moving bills into their fair's month — is a panel on the month page, *Bills of another month's fair* (`FairMovesPanel`), in the same bordered-surface vocabulary as *Drops and upsells the ERP found*: a serif heading with a mono alert count, an italic explanation, one `.ledger-table` (Bill · Salesperson · Fair · Move · Sales value, the move's status as a small mono label), and one accent button *Move the N confirmed*.
 - **2026-09-26 (later)** — Comm Cal's month in one table design. *Below deposit* and *Sales by venue* join the workbench's rail (Total Sales Orders · KPI Items · Open Bill · Below deposit · Sales by venue), both in the workbench table (`.tableFrame` / `.table`, sticky first and answer columns, `tfoot`, `.tableFooter`); a salesperson's page gains *Below deposit* beside Personal / Overriding; the Total Sales Orders table gains *Group sales* between Commissionable value and Upsell, with the run's promotion preview as `.badge` tags under the rank. The saved run's `.ledger-table`, the *Waiting on a deposit* section and *Sales by person* are gone, and Sales by venue lost its organiser dropdown and *same place as…*. See "Tabbed pages".
 - **2026-09-26 v3.8** — Navigation feedback. A click inside a section used to leave the page frozen for 0.2–1.4 s (only a change of top-level section showed a skeleton). Now every route folder with child routes has a `loading.tsx`, and every navigation answers in four steps: the clicked row lights up with a sweep, the skeleton of the page that is coming (ledger / record / form / chart, real `.page-head` and `.sect-head`, one viewport-pinned shimmer), a 2 px accent progress line with a glowing head, and the page settling in (rise 6px, blocks 45ms apart). A kept page dims while it is being replaced. The line replaced `nextjs-toploader`, which stopped when a skeleton moved the URL and still wore the rust accent. See "Navigation feedback (v3.8)". Later the same day: `WarmLink` brings the sidebar's warm and sweep to the month links inside Comm Cal and HR › Payment.

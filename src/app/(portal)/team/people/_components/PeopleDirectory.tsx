@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import LedgerRow from '@/components/LedgerRow'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { ratePct } from '@/lib/commission/ranks'
 import { compareByLadder } from '@/lib/ladder'
 import PersonCard from './PersonCard'
@@ -144,22 +145,46 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
 
   return (
     <div className="mb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+      {/* The roster in five figures, over the whole roster whatever the
+          filter below shows — the counts somebody would otherwise scroll to
+          find, and the one that turns the roster into a worklist. Active staff
+          is what the page is opened for, so it is the sheet's walnut card;
+          Missing details turns amber only while somebody is missing one. */}
+      <StatCards label="The roster">
+        <StatCard
+          label="Active staff"
+          value={String(counts.active)}
+          icon="people"
+          tone="primary"
+          note={`${counts.total} on the roster`}
+        />
+        <StatCard label="Departments" value={String(counts.departments)} icon="building" />
+        <StatCard label="With a login" value={String(counts.withLogin)} icon="user" note="Can sign in to the portal" />
+        <StatCard
+          label="Missing details"
+          value={String(counts.incomplete)}
+          icon="file-alert"
+          tone={counts.incomplete > 0 ? 'alert' : 'default'}
+          note="NRIC · bank account · hire date"
+          title="Active people missing an NRIC, a bank account or a hire date — each blocks payroll or the InfoTech import"
+        />
+        <StatCard label="Inactive" value={String(counts.inactive)} icon="clock" note="Resigned or deactivated" />
+      </StatCards>
+
+      <div className="sheet-toolbar">
         <input
           type="search"
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Search name, code, title or email…"
-          className="flex-1 sm:max-w-md px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border font-sans"
+          className="flex-1 min-w-0 basis-60 sm:max-w-md focus:outline-none"
           aria-label="Search people"
         />
         {/* Employment filter. Deactivating somebody used to delete them from
-            the only page that lists people; now it moves them one tab over. */}
-        <div
-          className="inline-flex bg-surface-2 border border-hairline rounded-control p-0.5 gap-0.5 self-start"
-          role="group"
-          aria-label="Employment status"
-        >
+            the only page that lists people; now it moves them one tab over.
+            The sheet's filter pills: the pick is a peach wash with an orange
+            edge, its count in the boxed badge. */}
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Employment status">
           {(
             [
               ['active', 'Active', counts.active],
@@ -172,57 +197,22 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
               type="button"
               onClick={() => setStatus(key)}
               aria-pressed={status === key}
-              className={`font-serif italic text-sm px-3 py-1 rounded-[5px] transition-colors ${
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                 status === key
-                  ? 'bg-surface text-ink shadow-sm'
-                  : 'text-graphite hover:text-ink'
+                  ? 'border-accent bg-accent-bg font-bold'
+                  : 'border-hairline bg-surface hover:border-accent'
               }`}
             >
               {label}
-              <span
-                className={`font-mono not-italic text-[10.5px] ml-1.5 ${
-                  status === key ? 'text-accent' : 'text-muted'
-                }`}
-              >
-                {n}
-              </span>
+              <span className="sheet-count">{n}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Counts somebody would otherwise scroll to find — and the one that
-          turns the roster into a worklist. */}
-      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 mb-5 px-3 py-2 bg-surface border border-hairline rounded-control font-mono text-[11px] text-muted">
-        <span>
-          <b className="text-num-ink text-[12.5px] font-semibold">{counts.total}</b> people
-        </span>
-        <span>
-          <b className="text-num-ink text-[12.5px] font-semibold">{counts.departments}</b>{' '}
-          departments
-        </span>
-        <span>
-          <b className="text-num-ink text-[12.5px] font-semibold">{counts.withLogin}</b>{' '}
-          {counts.withLogin === 1 ? 'has a login' : 'have a login'}
-        </span>
-        {counts.incomplete > 0 ? (
-          <span>
-            <b className="text-alert text-[12.5px] font-semibold">{counts.incomplete}</b> with
-            missing details
-          </span>
-        ) : null}
-        {counts.inactive > 0 ? (
-          <span>
-            <b className="text-num-ink text-[12.5px] font-semibold">{counts.inactive}</b> inactive
-          </span>
-        ) : null}
-      </div>
-
       {filtered.length === 0 ? (
-        <div className="py-12 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif italic text-graphite text-base">
-            Nobody matches the current filter.
-          </p>
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">Nobody matches the current filter.</p>
         </div>
       ) : (
         <div className="table-scroll">
@@ -331,8 +321,10 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                                   // min-w-0 so the name can ellipsize: a flex
                                   // item defaults to min-width:auto, which
                                   // makes the longest name on the roster set
-                                  // the whole column's width.
-                                  className="clip min-w-0 font-sans text-ink hover:text-accent transition-colors"
+                                  // the whole column's width. The sheet
+                                  // underlines a link in a cell, so it reads
+                                  // as one without a colour of its own.
+                                  className="clip min-w-0"
                                 >
                                   {p.name}
                                 </Link>
@@ -340,16 +332,13 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                             </td>
                             <td className="m-hide" data-label="Title">
                               <span className="flex items-baseline gap-2 min-w-0">
-                                <span
-                                  className="clip min-w-0 text-ink"
-                                  title={p.title ?? undefined}
-                                >
+                                <span className="clip min-w-0" title={p.title ?? undefined}>
                                   {p.title ?? '—'}
                                 </span>
                                 {/* The rung — the rows are in its order. */}
                                 {p.levelRank !== null ? (
                                   <span
-                                    className="font-mono text-[10px] text-muted shrink-0"
+                                    className="font-mono text-[10px] shrink-0"
                                     title={`Level ${p.levelRank} · ${p.levelName}`}
                                   >
                                     L{p.levelRank}
@@ -362,19 +351,17 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                                 <span className="flex items-center gap-2 min-w-0">
                                   <span className="chip shrink-0">{p.rankLabel}</span>
                                   {p.rankRate != null ? (
-                                    <span className="font-mono text-[10px] text-muted shrink-0">
+                                    <span className="font-mono text-[10px] shrink-0">
                                       {ratePct(p.rankRate)}
                                     </span>
                                   ) : null}
                                 </span>
                               ) : (
-                                <span className="text-muted">—</span>
+                                '—'
                               )}
                             </td>
                             <td className="m-hide" data-label="Code">
-                              <span className="font-mono text-[11px] text-muted">
-                                {p.code ?? '—'}
-                              </span>
+                              <span className="font-mono text-[11px]">{p.code ?? '—'}</span>
                             </td>
                             <td className="m-hide" data-label="Employment">
                               <span className="whitespace-nowrap">
@@ -452,7 +439,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
               {unattachedAccounts.length === 1 ? 'ACCOUNT' : 'ACCOUNTS'}
             </span>
           </div>
-          <p className="font-serif italic text-muted text-sm mb-4 max-w-2xl">
+          <p className="text-sm mb-4 max-w-2xl">
             These can sign in but are not on the roster above. Attaching one to a person is what
             Invite User will do.
           </p>
@@ -464,34 +451,37 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                   <th className="m-hide">Email</th>
                   <th className="m-hide">Role</th>
                   <th className="m-hide">Status</th>
+                  <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
               <tbody>
                 {unattachedAccounts.map(a => (
                   <LedgerRow key={a.id}>
-                    <td>
+                    <td className="font-medium">
                       {canSeeActivity ? (
-                        <Link
-                          href={`/team/accounts/${a.id}`}
-                          className="font-serif text-md text-ink hover:text-accent hover:underline underline-offset-4 decoration-1 transition-colors"
-                        >
-                          {a.name}
-                        </Link>
+                        <Link href={`/team/accounts/${a.id}`}>{a.name}</Link>
                       ) : (
-                        <span className="font-serif text-md text-ink">{a.name}</span>
+                        a.name
                       )}
                     </td>
                     <td className="m-hide" data-label="Email">
-                      <span className="font-mono text-xs text-graphite">{a.email}</span>
+                      <span className="font-mono text-xs">{a.email}</span>
                     </td>
                     <td className="m-hide" data-label="Role">
-                      <span className="font-serif italic text-graphite">{a.role}</span>
+                      {/* The role is a value, not a state — no dot. */}
+                      <span className="chip">{a.role}</span>
                     </td>
                     <td className="m-hide" data-label="Status">
                       {a.isActive ? (
-                        <span className="font-serif italic text-ledger">active</span>
+                        <span className="chip ledger">
+                          <span className="dot" aria-hidden />
+                          active
+                        </span>
                       ) : (
-                        <span className="font-serif italic text-muted">disabled</span>
+                        <span className="chip">
+                          <span className="dot" aria-hidden />
+                          disabled
+                        </span>
                       )}
                     </td>
                   </LedgerRow>
@@ -516,30 +506,37 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
 /**
  * Four different facts, four different weights. A dash is "no account at all",
  * which is not the same as an account that has never been used — and an active
- * login nobody has touched in six weeks is the one worth acting on.
+ * login nobody has touched in six weeks is the one worth acting on, so that
+ * one is a state on an amber wash rather than one more date.
  */
 function LastSeen({ person }: { person: PersonRow }) {
   if (!person.accountEmail) {
     return (
-      <span className="font-mono text-[11px] text-muted" title="No login account">
+      <span className="font-mono text-[11px]" title="No login account">
         —
       </span>
     )
   }
   if (person.accountActive === false) {
-    return <span className="chip danger">Disabled</span>
+    return (
+      <span className="chip danger">
+        <span className="dot" aria-hidden />
+        Disabled
+      </span>
+    )
   }
   if (!person.lastSeenAt) {
-    return <span className="font-mono text-[11px] text-muted">never</span>
+    return <span className="font-mono text-[11px]">never</span>
   }
   const at = dayjs(person.lastSeenAt)
   const stale = dayjs().diff(at, 'day') >= STALE_DAYS
-  return (
-    <span
-      className={`font-mono text-[11px] ${stale ? 'text-alert' : 'text-graphite'}`}
-      title={at.format('D MMM YYYY, HH:mm')}
-    >
-      {stale ? '● ' : ''}
+  return stale ? (
+    <span className="chip alert" title={`${at.format('D MMM YYYY, HH:mm')} — no sign-in for ${STALE_DAYS}+ days`}>
+      <span className="dot" aria-hidden />
+      {at.fromNow()}
+    </span>
+  ) : (
+    <span className="font-mono text-[11px]" title={at.format('D MMM YYYY, HH:mm')}>
       {at.fromNow()}
     </span>
   )

@@ -93,12 +93,12 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={person ? person.staff.employee_name : 'Person'}
-        className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
+        className="bg-surface border border-hairline rounded-panel shadow-xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
       >
-        {/* Header — deliberately unchanged from the page it replaces (user
+        {/* Header — the page it replaced, in the sheet's lettering (user
             2026-09-01 picked treatment ①): light ground, the identity line in
-            one grey italic string. */}
-        <div className="bg-surface border-b border-hairline px-5 pt-4">
+            one string under the name. */}
+        <div className="bg-surface px-5 pt-4">
           <div className="flex items-start gap-3">
             <span
               className={`mono-tile mono-tile-lg ${person?.account ? 'linked' : ''}`}
@@ -107,10 +107,10 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
               {initials || '··'}
             </span>
             <div className="flex-1 min-w-0">
-              <h2 className="font-serif text-xl text-ink leading-tight">
+              <h2 className="text-lg font-bold leading-tight tracking-[-0.015em]">
                 {person ? person.staff.employee_name : 'Loading…'}
               </h2>
-              <p className="font-serif italic text-graphite text-[12.5px] mt-0.5 truncate">
+              <p className="text-[12px] mt-0.5 truncate">
                 {person
                   ? [person.code, person.title, person.department].filter(Boolean).join(' · ')
                   : ' '}
@@ -140,7 +140,7 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                           Login disabled
                         </span>
                       )}
-                      <span className="font-mono text-[11px] text-muted">
+                      <span className="font-mono text-[11px]">
                         {person.account.lastSeenAt
                           ? `seen ${dayjs(person.account.lastSeenAt).fromNow()}`
                           : 'never signed in'}
@@ -185,7 +185,10 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
             </div>
           </div>
 
-          <div className="flex gap-1 mt-3" role="tablist">
+          {/* The sheet's tab rail, run edge to edge so its rule is the
+              header's bottom edge; `!mb-0` because the rail's own gap is the
+              panel's `pt-5` here. */}
+          <div className="sheet-tabs -mx-5 mt-3 px-5 !mb-0" role="tablist" aria-label="Person">
             {(
               [
                 ['details', 'Details'],
@@ -202,15 +205,10 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                   setTab(key)
                   setEditing(false)
                 }}
-                className={`font-serif italic text-sm px-3 py-2 border-b-2 transition-colors ${
-                  tab === key
-                    ? 'border-accent text-accent'
-                    : 'border-transparent text-graphite hover:text-ink'
-                }`}
               >
                 {label}
                 {key === 'permissions' && person?.permissions ? (
-                  <span className="font-mono not-italic text-[10px] text-muted ml-1.5">
+                  <span className="sheet-count">
                     {person.permissions.rows.filter(r => (r.override ?? r.inherited)).length}
                   </span>
                 ) : null}
@@ -226,9 +224,9 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
             instead, and the edit form's bar takes the edge. */}
         <div className="overflow-y-auto px-5 pt-5">
           {error ? (
-            <p className="font-serif italic text-danger text-sm pb-5">{error}</p>
+            <p className="sheet-danger mt-0 mb-5">{error}</p>
           ) : !person ? (
-            <p className="font-serif italic text-muted text-sm pb-5">Reading their record…</p>
+            <p className="text-sm pb-5">Reading their record…</p>
           ) : tab === 'details' ? (
             editing ? (
               <EditStaffForm
@@ -291,31 +289,42 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                 Nothing recorded yet. Page visits are logged from the moment they next sign in.
               </EmptyPanel>
             ) : (
-              <ol className="border-t border-hairline pb-5">
-                {person.activity.map((line, i) => (
-                  <li
-                    key={`${line.at}-${i}`}
-                    className="py-2 border-b border-hairline last:border-0 flex items-baseline justify-between gap-4"
-                  >
-                    <div className="min-w-0">
-                      <span className="font-sans text-[11px] uppercase tracking-wide text-graphite mr-2">
-                        {line.verb}
-                      </span>
-                      <span className="font-serif text-sm text-ink">{line.target}</span>
-                      {line.detail ? (
-                        <span className="font-mono text-[11px] text-muted ml-2">{line.detail}</span>
-                      ) : null}
-                    </div>
-                    <time
-                      dateTime={line.at}
-                      title={dayjs(line.at).format('D MMM YYYY HH:mm:ss')}
-                      className="font-mono text-[11px] text-muted shrink-0"
-                    >
-                      {dayjs(line.at).format('D MMM HH:mm')}
-                    </time>
-                  </li>
-                ))}
-              </ol>
+              // The same table as the person page's Activity section.
+              <div className="pb-5">
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th className="w-[104px]">When</th>
+                      <th className="w-[96px]">Action</th>
+                      <th>Where</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {person.activity.map((line, i) => (
+                      <tr key={`${line.at}-${i}`}>
+                        <td className="whitespace-nowrap">
+                          <time
+                            dateTime={line.at}
+                            title={dayjs(line.at).format('D MMM YYYY HH:mm:ss')}
+                            className="font-mono text-[11px]"
+                          >
+                            {dayjs(line.at).format('D MMM HH:mm')}
+                          </time>
+                        </td>
+                        <td className="text-[10.5px] font-medium uppercase tracking-[0.06em]">
+                          {line.verb}
+                        </td>
+                        <td>
+                          {line.target}
+                          {line.detail ? (
+                            <span className="font-mono text-[11px] ml-2">{line.detail}</span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )
           ) : (
             <EmptyPanel>
@@ -326,8 +335,8 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
           )}
         </div>
 
-        <div className="border-t border-hairline bg-surface px-5 py-3 flex items-center gap-2">
-          <span className="font-serif italic text-muted text-xs mr-auto">
+        <div className="border-t border-hairline bg-surface-2 px-5 py-3 flex items-center gap-2">
+          <span className="text-[11px] mr-auto">
             {editing
               ? 'Saving updates the row behind this window — no page change.'
               : 'Esc closes.'}
@@ -336,14 +345,14 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
             <>
               <Link
                 href={`/team/people/${person.staff.id}`}
-                className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
               >
                 Full page
               </Link>
               {!person.account ? (
                 <Link
                   href={`/team/people/invite?staff=${person.staff.id}`}
-                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
                 >
                   Invite
                 </Link>
@@ -432,7 +441,7 @@ function Details({ person }: { person: PersonCardData }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="font-sans text-[10px] uppercase tracking-[0.14em] text-accent mb-2 pb-1.5 border-b border-hairline">
+      <h3 className="text-[10px] font-bold uppercase tracking-[0.1em] mb-2 pb-1.5 border-b border-hairline">
         {title}
       </h3>
       <dl className="space-y-1.5">{children}</dl>
@@ -440,15 +449,21 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+/** On the sheet every grey is black, so "not recorded" is told apart from a
+ *  value by fading it rather than by a lighter colour. */
 function Field({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
   const empty = value == null || value === ''
   return (
     <div className="grid grid-cols-[110px_1fr] gap-3 items-baseline">
-      <dt className="font-sans text-[11px] uppercase tracking-wide text-graphite">{label}</dt>
+      <dt className="text-[10.5px] font-medium uppercase tracking-[0.06em]">{label}</dt>
       <dd
-        className={`${mono && !empty ? 'font-mono tabular text-[13px]' : 'font-serif text-sm'} ${
-          empty ? 'text-muted italic' : 'text-ink'
-        }`}
+        className={
+          empty
+            ? 'text-[12px] text-ink/60'
+            : mono
+              ? 'font-mono tabular text-[12.5px]'
+              : 'text-sm'
+        }
       >
         {empty ? 'not recorded' : value}
       </dd>
@@ -458,9 +473,9 @@ function Field({ label, value, mono }: { label: string; value: string | null; mo
 
 function EmptyPanel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="font-serif italic text-muted text-sm py-8 pb-12 text-center max-w-md mx-auto">
-      {children}
-    </p>
+    <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center mb-5">
+      <p className="text-sm max-w-md mx-auto">{children}</p>
+    </div>
   )
 }
 

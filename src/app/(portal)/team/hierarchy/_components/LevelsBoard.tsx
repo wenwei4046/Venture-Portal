@@ -18,6 +18,11 @@ export interface BoardTitle {
   isActive: boolean
 }
 
+/** A link-button on the sheet: underlined at rest, never coloured. */
+const SHEET_LINK = 'underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink'
+/** A caption in the summary cards' small caps. */
+const CAPTION = 'text-[10px] font-medium uppercase tracking-[0.06em]'
+
 /** Column key for titles that belong to no department. */
 const NO_DEPT = ''
 /** Drop-target key for the tray under the board. */
@@ -227,7 +232,7 @@ export default function LevelsBoard({
             type="button"
             onClick={addOnTop}
             disabled={pending}
-            className="text-xs font-sans text-accent hover:underline disabled:opacity-50"
+            className={`text-xs ${SHEET_LINK} disabled:opacity-50`}
           >
             + Add level
           </button>
@@ -245,14 +250,16 @@ export default function LevelsBoard({
 
       <ErrorNote error={error} />
 
+      {/* Something that needs somebody: the sheet's amber warning, the words
+          black on it. */}
       {breaks > 0 ? (
-        <p className="mb-4 font-serif italic text-sm text-alert">
+        <p className="sheet-warning">
           {breaks} reporting {breaks === 1 ? 'line breaks' : 'lines break'} this ladder as it
           stands.{' '}
           <Link
             href="/team/hierarchy"
             scroll={false}
-            className="not-italic font-sans text-xs text-accent hover:underline"
+            className={`text-xs ${SHEET_LINK}`}
           >
             See them on the chart →
           </Link>
@@ -260,8 +267,8 @@ export default function LevelsBoard({
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="py-10 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif italic text-muted text-sm">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">
             No levels yet. Add one, then drag titles onto it.
           </p>
         </div>
@@ -280,9 +287,11 @@ export default function LevelsBoard({
             <tbody>
               {rows.map(rung => (
                 <tr key={rung.id} className="group/row">
-                  <td className="align-top">
+                  {/* A board reads from the top of each cell. `!` because the
+                      sheet's table centres every cell vertically. */}
+                  <td className="!align-top">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-mono text-[10.5px] text-muted shrink-0">
+                      <span className="font-mono text-[10.5px] shrink-0">
                         L{rung.rank}
                       </span>
                       {renaming === rung.id ? (
@@ -292,12 +301,14 @@ export default function LevelsBoard({
                           type="button"
                           onClick={() => setRenaming(rung.id)}
                           title="Rename this level"
-                          className="font-serif text-sm text-ink hover:text-accent text-left leading-tight"
+                          className="text-sm font-medium text-left leading-tight hover:underline underline-offset-[3px]"
                         >
                           {rung.name}
                         </button>
                       )}
                     </div>
+                    {/* A rung's own actions, shown on the row's hover. They
+                        underline under the pointer; only `remove` turns red. */}
                     <div className="flex flex-wrap gap-x-3 mt-1.5 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
                       <button
                         type="button"
@@ -305,7 +316,7 @@ export default function LevelsBoard({
                           run('Could not add a level', () => insertLevel(rung.rank + 1))
                         }
                         disabled={pending}
-                        className="font-sans text-[10.5px] text-graphite hover:text-accent disabled:opacity-50"
+                        className="text-[10.5px] hover:underline underline-offset-2 disabled:opacity-50"
                       >
                         + above
                       </button>
@@ -314,7 +325,7 @@ export default function LevelsBoard({
                           type="button"
                           onClick={() => run('Could not add a level', () => insertLevel(1))}
                           disabled={pending}
-                          className="font-sans text-[10.5px] text-graphite hover:text-accent disabled:opacity-50"
+                          className="text-[10.5px] hover:underline underline-offset-2 disabled:opacity-50"
                         >
                           + below
                         </button>
@@ -324,7 +335,7 @@ export default function LevelsBoard({
                           type="button"
                           onClick={() => remove(rung)}
                           disabled={pending}
-                          className="font-sans text-[10.5px] text-graphite hover:text-danger disabled:opacity-50"
+                          className="text-[10.5px] hover:text-danger hover:underline underline-offset-2 disabled:opacity-50"
                         >
                           remove
                         </button>
@@ -339,7 +350,7 @@ export default function LevelsBoard({
                     return (
                       <td
                         key={col.key}
-                        className={`align-top transition-colors ${
+                        className={`!align-top transition-colors ${
                           over === key ? 'bg-accent-bg' : ''
                         } ${foreign ? 'opacity-40' : ''}`}
                         onDragOver={e => allow(e, key, col.key)}
@@ -380,23 +391,23 @@ export default function LevelsBoard({
         </div>
       )}
 
-      {/* The tray: titles not on the ladder. A drop here takes one off it. */}
+      {/* The tray: titles not on the ladder. A drop here takes one off it.
+          A well on the sheet — the toolbar's shallow grey — with a dashed
+          edge, peach while a title is held over it. */}
       <div
         className={`mt-4 rounded-card border border-dashed p-3 transition-colors ${
-          over === TRAY ? 'border-accent bg-accent-bg' : 'border-hairline bg-surface'
+          over === TRAY ? 'border-accent bg-accent-bg' : 'border-hairline bg-surface-2'
         }`}
         onDragOver={e => allow(e, TRAY, null)}
         onDragLeave={e => leave(e, TRAY)}
         onDrop={e => drop(e, null, null)}
       >
         <div className="flex items-baseline gap-2 mb-2">
-          <span className="font-mono text-[0.6rem] uppercase tracking-wide text-muted">
-            Not on the ladder
-          </span>
-          <span className="font-mono text-[0.6rem] text-muted">· {unplaced.length}</span>
+          <span className={CAPTION}>Not on the ladder</span>
+          <span className={`${CAPTION} tabular-nums`}>· {unplaced.length}</span>
         </div>
         {unplaced.length === 0 ? (
-          <p className="font-serif italic text-muted text-xs">
+          <p className="text-xs">
             Every title is placed. Drop one here to take it off the ladder.
           </p>
         ) : (
@@ -408,15 +419,15 @@ export default function LevelsBoard({
                 onDragStart={e => onDragStart(e, t)}
                 onDragEnd={onDragEnd}
                 title={`${t.name} · ${t.departmentName ?? 'no department'}`}
-                className={`inline-flex items-center gap-2 max-w-full rounded-control border border-hairline bg-paper pl-2 pr-1 py-1 cursor-grab active:cursor-grabbing ${
+                className={`inline-flex items-center gap-2 max-w-full rounded-control border border-hairline bg-surface pl-2 pr-1 py-1 cursor-grab active:cursor-grabbing ${
                   t.isActive ? '' : 'opacity-60'
                 }`}
               >
                 <span className="min-w-0">
-                  <span className="block font-sans text-[11.5px] leading-tight text-ink">
+                  <span className="block text-[11.5px] leading-tight">
                     {t.name}
                   </span>
-                  <span className="block font-mono text-[9.5px] uppercase tracking-wide text-muted mt-0.5 truncate">
+                  <span className="block text-[9.5px] font-medium uppercase tracking-[0.06em] mt-0.5 truncate">
                     {t.departmentName ?? 'no department'}
                     {t.people > 0 ? ` · ${t.people}` : ''}
                   </span>
@@ -429,7 +440,7 @@ export default function LevelsBoard({
                     onChange={e => {
                       if (e.target.value) place(t, e.target.value)
                     }}
-                    className="px-1 py-0.5 bg-surface border border-hairline rounded text-[11px] text-graphite max-w-[120px]"
+                    className="px-1 py-0.5 bg-surface border border-hairline rounded text-[11px] max-w-[120px]"
                   >
                     <option value="">Place on…</option>
                     {rows.map(r => (
@@ -480,21 +491,23 @@ function Chip({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       title={`${title.name}${people}${title.isActive ? '' : ' · inactive'}`}
-      className={`group/chip inline-flex items-center gap-1.5 max-w-full rounded-control border border-hairline bg-paper pl-2 pr-0.5 py-0.5 cursor-grab active:cursor-grabbing ${
+      className={`group/chip inline-flex items-center gap-1.5 max-w-full rounded-control border border-hairline bg-surface pl-2 pr-0.5 py-0.5 cursor-grab active:cursor-grabbing ${
         title.isActive ? '' : 'opacity-60'
       }`}
     >
-      <span className="font-sans text-[11.5px] leading-tight text-ink">{title.name}</span>
+      <span className="text-[11.5px] leading-tight">{title.name}</span>
       {title.people > 0 ? (
-        <span className="font-mono text-[10px] text-muted">{title.people}</span>
+        <span className="font-mono text-[10px]">{title.people}</span>
       ) : null}
+      {/* The arrows are black; the one under the pointer sits on a peach
+          wash — orange is never lettering on the sheet. */}
       <span className="inline-flex flex-col leading-none">
         <button
           type="button"
           onClick={onUp}
           disabled={busy || !canUp}
           aria-label={`Move ${title.name} up a level`}
-          className="px-1 text-[8px] leading-[10px] text-graphite opacity-50 group-hover/chip:opacity-100 hover:!text-accent disabled:opacity-15 disabled:hover:!text-graphite"
+          className="px-1 rounded-sm text-[8px] leading-[10px] opacity-50 group-hover/chip:opacity-100 hover:bg-accent-bg disabled:opacity-15 disabled:hover:bg-transparent"
         >
           ▲
         </button>
@@ -503,7 +516,7 @@ function Chip({
           onClick={onDown}
           disabled={busy}
           aria-label={downLabel}
-          className="px-1 text-[8px] leading-[10px] text-graphite opacity-50 group-hover/chip:opacity-100 hover:!text-accent disabled:opacity-15"
+          className="px-1 rounded-sm text-[8px] leading-[10px] opacity-50 group-hover/chip:opacity-100 hover:bg-accent-bg disabled:opacity-15 disabled:hover:bg-transparent"
         >
           ▼
         </button>

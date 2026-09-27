@@ -86,7 +86,7 @@ export default async function NewStaffPage() {
     <div>
       <Link
         href="/team/people"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+        className="text-sm hover:text-accent transition-colors"
       >
         ← Back to Staff
       </Link>

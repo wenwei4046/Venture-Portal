@@ -80,7 +80,7 @@ export default function TitlesSection({
           <button
             type="button"
             onClick={() => setAdding(a => !a)}
-            className="text-xs font-sans text-accent hover:underline"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs px-3 py-1.5 rounded-control transition-colors whitespace-nowrap"
           >
             {adding ? 'Cancel' : '+ New title'}
           </button>
@@ -99,7 +99,7 @@ export default function TitlesSection({
             <button
               type="button"
               onClick={() => setShowInactive(s => !s)}
-              className="not-italic font-sans text-xs text-accent hover:underline"
+              className="font-sans text-xs underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink"
             >
               {showInactive ? 'Hide' : `Show ${inactiveCount}`} inactive
             </button>
@@ -111,12 +111,12 @@ export default function TitlesSection({
         <ActionForm
           action={createTitle}
           onDone={() => setAdding(false)}
-          className="mb-6 border border-hairline rounded-card bg-surface p-4 max-w-2xl"
+          className="mb-6 border border-hairline rounded-card bg-surface-2 p-4 max-w-2xl"
         >
           {({ pending }) => (
             <div className="flex flex-wrap items-end gap-3">
               <label className="flex-1 min-w-[220px]">
-                <span className="block font-sans text-xs uppercase tracking-wide text-graphite mb-1">
+                <span className="block font-sans text-[10px] font-semibold uppercase tracking-[0.06em] mb-1">
                   Title
                 </span>
                 <input
@@ -124,16 +124,16 @@ export default function TitlesSection({
                   required
                   maxLength={120}
                   placeholder="e.g. Marketing Executive"
-                  className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent-border"
+                  className="w-full px-2 py-1.5 bg-surface border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent-border"
                 />
               </label>
               <label className="min-w-[180px]">
-                <span className="block font-sans text-xs uppercase tracking-wide text-graphite mb-1">
+                <span className="block font-sans text-[10px] font-semibold uppercase tracking-[0.06em] mb-1">
                   Department
                 </span>
                 <select
                   name="department_id"
-                  className="w-full px-2 py-1.5 bg-paper border border-hairline rounded-control text-sm text-ink"
+                  className="w-full px-2 py-1.5 bg-surface border border-hairline rounded-control text-sm text-ink"
                 >
                   <option value="">— No department</option>
                   {departments.map(d => (
@@ -143,14 +143,15 @@ export default function TitlesSection({
                   ))}
                 </select>
               </label>
-              <label className="flex items-center gap-2 pb-2 font-sans text-xs text-graphite">
+              <label className="flex items-center gap-2 pb-2 font-sans text-xs">
                 <input type="checkbox" name="is_department_head" className="accent-[rgb(var(--accent))]" />
                 Heads the department
               </label>
+              {/* The form's one action: orange, black lettering. */}
               <button
                 type="submit"
                 disabled={pending}
-                className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
+                className="bg-accent hover:bg-accent-hover text-ink font-medium text-sm px-4 py-2 rounded-control transition-colors"
               >
                 {pending ? 'Saving…' : 'Add title'}
               </button>
@@ -160,8 +161,8 @@ export default function TitlesSection({
       ) : null}
 
       {visible.length === 0 ? (
-        <div className="py-10 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif italic text-muted text-sm">No titles yet.</p>
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">No titles yet.</p>
         </div>
       ) : (
         <div className="table-scroll">
@@ -179,11 +180,15 @@ export default function TitlesSection({
             <tbody>
               {groups.map(group => (
                 <Fragment key={group.dept}>
-                  <tr className="bg-surface">
+                  {/* The department band — the header band's tone with a
+                      walnut marker, like the roster's (globals.css ›
+                      `.band-row`). It labels the rows under it; unlike the
+                      roster's it does not fold. */}
+                  <tr className="band-row">
                     <td colSpan={6}>
-                      <span className="font-serif italic text-accent text-sm">{group.dept}</span>
-                      <span className="font-mono text-[11px] text-muted ml-2">
-                        · {group.rows.length}
+                      {group.dept}
+                      <span className="count">
+                        {group.rows.length} {group.rows.length === 1 ? 'title' : 'titles'}
                       </span>
                     </td>
                   </tr>

@@ -133,57 +133,52 @@ export default function PermissionMatrix({
         </span>
       </div>
 
-      {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
-          {error}
-        </div>
-      ) : null}
-      {note && !error ? (
-        <div className="bg-surface-2 border border-hairline text-ink rounded-md p-3 mb-4 text-sm font-sans">
-          {note}
-        </div>
-      ) : null}
+      {error ? <div className="sheet-danger">{error}</div> : null}
+      {note && !error ? <div className="sheet-notice">{note}</div> : null}
 
+      {/* Two framed wells in the sheet's table tone: the titles on the left,
+          the one being read on the right. */}
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
         {/* Titles */}
-        <div className="border border-hairline rounded-card bg-surface overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-hairline">
-            <span className="font-mono text-[0.6rem] uppercase tracking-wide text-muted">
-              Titles
-            </span>
+        <div className="border border-[rgb(var(--sheet-table-border))] rounded-lg bg-surface overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[rgb(var(--sheet-table-rule))] bg-[rgb(var(--sheet-table-head))]">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">Titles</span>
           </div>
           <ul className="max-h-[520px] overflow-y-auto">
             {titles.map(t => {
               const active = t.id === selectedId
               return (
                 <li key={t.id}>
+                  {/* The title being read: a peach wash with an orange marker,
+                      the sheet's way of saying "this one" — never orange
+                      lettering. */}
                   <button
                     type="button"
                     onClick={() => pick(t)}
+                    aria-current={active ? 'true' : undefined}
                     className={`w-full text-left px-4 py-2.5 border-b border-hairline last:border-0 transition-colors ${
-                      active ? 'bg-accent/[0.06]' : 'hover:bg-surface-2/50'
+                      active
+                        ? 'bg-accent-bg shadow-[inset_3px_0_0_rgb(var(--accent))]'
+                        : 'hover:bg-surface-2'
                     }`}
                   >
-                    <div
-                      className={`font-serif text-sm truncate ${active ? 'text-accent' : 'text-ink'}`}
-                    >
+                    <div className={`text-sm truncate ${active ? 'font-semibold' : ''}`}>
                       {t.name}
                     </div>
-                    <div className="flex items-baseline gap-2 mt-0.5">
-                      <span className="font-mono text-[0.6rem] text-muted truncate">
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="font-mono text-[10px] truncate">
                         {t.departmentName ?? 'no department'}
                       </span>
                       {t.granted === null ? (
-                        <span className="font-mono text-[0.55rem] uppercase tracking-wide text-muted">
-                          inherits
-                        </span>
+                        <span className="chip shrink-0">inherits</span>
                       ) : (
-                        <span className="font-mono text-[0.55rem] uppercase tracking-wide text-accent">
-                          {t.granted.length} set
-                        </span>
+                        <span className="chip accent shrink-0">{t.granted.length} set</span>
                       )}
                       {t.people > 0 ? (
-                        <span className="font-mono text-[0.55rem] text-muted ml-auto">
+                        <span
+                          className="font-mono text-[10px] ml-auto shrink-0"
+                          title={`${t.people} ${t.people === 1 ? 'person holds' : 'people hold'} this title`}
+                        >
                           {t.people}
                         </span>
                       ) : null}
@@ -196,17 +191,17 @@ export default function PermissionMatrix({
         </div>
 
         {/* The selected title's permissions */}
-        <div className="border border-hairline rounded-card bg-surface">
+        <div className="border border-[rgb(var(--sheet-table-border))] rounded-lg bg-surface">
           {!selected ? (
-            <div className="p-10 text-center font-serif italic text-muted text-sm">
+            <div className="p-10 text-center text-sm">
               No titles yet. Add one above.
             </div>
           ) : (
             <>
               <div className="px-5 py-4 border-b border-hairline flex flex-wrap items-baseline justify-between gap-3">
                 <div>
-                  <div className="font-serif text-lg text-ink">{selected.name}</div>
-                  <div className="font-serif italic text-muted text-xs mt-1 max-w-xl">
+                  <div className="sheet-heading">{selected.name}</div>
+                  <div className="sheet-subtitle max-w-xl">
                     {inheriting ? (
                       <>
                         Inherits from whatever role each holder&apos;s account was
@@ -229,16 +224,19 @@ export default function PermissionMatrix({
                         type="button"
                         onClick={reset}
                         disabled={pending}
-                        className="text-xs font-sans text-graphite hover:text-ink transition-colors disabled:opacity-50"
+                        className="text-xs underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink transition-colors"
                       >
                         Back to inherit
                       </button>
                     ) : null}
+                    {/* The panel's one action. While nothing has changed it
+                        reads "Saved" and is disabled — the sheet fades a
+                        disabled control. */}
                     <button
                       type="button"
                       onClick={save}
                       disabled={!dirty || pending}
-                      className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="bg-accent hover:bg-accent-hover text-ink font-medium text-sm px-4 py-2 rounded-control transition-colors"
                     >
                       {pending ? 'Saving…' : dirty ? 'Save' : 'Saved'}
                     </button>
@@ -249,10 +247,10 @@ export default function PermissionMatrix({
               <div className="p-5 space-y-6">
                 {sections.map(([section, items]) => (
                   <div key={section}>
-                    <div className="font-mono text-[0.6rem] uppercase tracking-wide text-muted mb-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] mb-2">
                       {section}
                     </div>
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-2">
                       {items.map(d => (
                         <li key={d.key}>
                           <label
@@ -263,14 +261,12 @@ export default function PermissionMatrix({
                               checked={shown.has(d.key)}
                               disabled={!canEdit}
                               onChange={() => toggle(d.key)}
-                              className="h-4 w-4 mt-0.5 accent-[var(--accent)]"
+                              className="h-4 w-4 mt-0.5"
                             />
                             <span className="min-w-0">
-                              <span className="font-serif text-sm text-ink">{d.label}</span>
+                              <span className="text-sm font-medium">{d.label}</span>
                               {d.description ? (
-                                <span className="block font-serif italic text-muted text-xs mt-0.5">
-                                  {d.description}
-                                </span>
+                                <span className="block text-xs mt-0.5">{d.description}</span>
                               ) : null}
                             </span>
                           </label>
@@ -287,7 +283,7 @@ export default function PermissionMatrix({
 
       {/* What the four roles grant, for reference while deciding. */}
       <details className="mt-6">
-        <summary className="font-serif italic text-graphite text-sm cursor-pointer">
+        <summary className="text-sm font-medium cursor-pointer">
           What each role grants today
         </summary>
         <div className="mt-3 table-scroll">
@@ -305,15 +301,13 @@ export default function PermissionMatrix({
             <tbody>
               {defs.map(d => (
                 <tr key={d.key}>
-                  <td>
-                    <span className="font-serif text-sm text-ink">{d.label}</span>
-                  </td>
+                  <td>{d.label}</td>
                   {roleDefaults.map(r => (
                     <td key={r.role} className="text-center">
                       {r.keys.includes(d.key) ? (
-                        <span className="text-ledger">✓</span>
+                        <span className="text-ledger font-semibold">✓</span>
                       ) : (
-                        <span className="text-muted">·</span>
+                        <span className="opacity-40">·</span>
                       )}
                     </td>
                   ))}
