@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   classifyLine,
   computeCommissionRun,
+  costBasisOf,
+  costDivisorFor,
   computeGroupRevenue,
   computeOverrides,
   depositRequired,
@@ -276,7 +278,8 @@ describe('deposit gate', () => {
     })
     const rs = find(r.statements, 'rs')
     expect(rs.productRevenue).toBe(0)
-    expect(rs.deferredRevenue).toBe(10_000)
+    // The four pillows' RM 200 is KPI, not sales — what waits is 9,800.
+    expect(rs.deferredRevenue).toBe(9_800)
     expect(rs.kpiCommission).toBe(0) // the free pillows wait too
     expect(rs.openBillBonus).toBe(0)
     expect(rs.totalCommission).toBe(0)
@@ -702,13 +705,15 @@ describe('KPI items', () => {
   const kpiIndex = indexKpiItems(KPI_ITEMS)
   const groupIndex = indexItemGroups(ITEM_GROUPS)
 
-  it('excludes a KPI item from product revenue even though ACC is commissionable', () => {
+  // 2026-09-27: the ITEM's amount comes off the bill, not its line's — the
+  // ERP prices packages, so a line rarely says what the item was worth.
+  it("takes the item's own amount off the bill's sales, not its line's", () => {
     const o = order('1', 'rs', [
       ['MATTRESS', 'AK-GUARDIAN MATT (Q)', 1, 2800],
       ['ACC', 'AK-CS AIRLOFT COMFY PIL', 1, 250],
     ])
-    expect(orderProductRevenue(o, kpiIndex, groupIndex)).toBe(2800)
-    expect(classifyLine(o.lines[1], kpiIndex, groupIndex)).toBe('kpi')
+    expect(orderProductRevenue(o, kpiIndex, groupIndex)).toBe(3_000) // 3,050 − 1 × 50
+    expect(classifyLine(o.lines[1], groupIndex)).toBe('commissionable')
   })
 
   it('pays free bundled KPI items — the usual case in the ERP export', () => {
@@ -719,7 +724,7 @@ describe('KPI items', () => {
       ])],
     })
     const rs = find(r.statements, 'rs')
-    expect(rs.productRevenue).toBe(6400)
+    expect(rs.productRevenue).toBe(6_200) // 6,400 less the four pillows' 200
     expect(rs.kpiQty).toBe(4)
     expect(rs.kpiCommission).toBe(200)
   })
@@ -756,7 +761,102 @@ describe('KPI items', () => {
 
   it('matches product codes case-insensitively and trimmed', () => {
     const o = order('1', 'rs', [['ACC', '  ak-cs airloft comfy pil ', 2, 500]])
-    expect(orderProductRevenue(o, kpiIndex, groupIndex)).toBe(0)
+    expect(orderProductRevenue(o, kpiIndex, groupIndex)).toBe(400) // 500 − 2 × 50
+  })
+})
+
+// ─── KPI items a bill carries (Product List › Add-on / KPI Items) ───────────
+
+describe('KPI items a bill carries — the flat allowance, 2026-09-27', () => {
+  const HB_STRAIGHT = { source: 'option' as const, optionPool: 'bedframe_specials' as const, optionValue: 'HB Straight', kpiAmount: 200 }
+  const bill = (lines: SalesOrder['lines'], opts: OrderOpts = {}) => {
+    const o = order('1', 'ta', [], opts)
+    const total = lines.reduce((a, l) => a + l.lineAmount, 0)
+    return { ...o, orderTotal: opts.orderTotal ?? total, paidAmount: opts.paidAmount ?? total, lines }
+  }
+  const mattress = (amount: number, cost: number) =>
+    ({ id: 'm', itemGroup: 'MATTRESS', productCode: 'AK-GUARDIAN MATT (K)', qty: 1, lineAmount: amount, costAmount: cost, brandCode: 'AKEMI' })
+  const bedframe = (specials: string[], qty = 1) =>
+    ({ id: `b${qty}`, itemGroup: 'BEDFRAME', productCode: 'TRION (A)-(K)', qty, lineAmount: 0, costAmount: 0, specials })
+
+  // The user's own figures: RM 10,000 with HB Straight at RM 200, rate 7%.
+  it('pays 9,800 × 7% and RM 200 flat, judging the margin on 9,800', () => {
+    const r = run({ orders: [bill([mattress(10_000, 6_500), bedframe(['HB Straight'])])], kpiItems: [HB_STRAIGHT] })
+    const ta = find(r.statements, 'ta')
+    expect(ta.productRevenue).toBe(9_800)
+    expect(ta.productCommission).toBe(686)
+    expect(ta.kpiQty).toBe(1)
+    expect(ta.kpiCommission).toBe(200)
+    expect(ta.marginPct).toBeCloseTo(3_300 / 9_800, 10) // 33.7%
+    expect(ta.lines.find(l => l.component === 'kpi_item')).toMatchObject({
+      sourceLineId: 'b1', basisAmount: 200, qty: 1, amount: 200, rate: null,
+    })
+  })
+
+  it('takes nothing off while the scheme has KPI switched off', () => {
+    const r = run({
+      orders: [bill([mattress(10_000, 6_500), bedframe(['HB Straight'])])],
+      kpiItems: [HB_STRAIGHT],
+      scheme: { ...SCHEME, enableKpi: false },
+    })
+    const ta = find(r.statements, 'ta')
+    expect(ta.productRevenue).toBe(10_000)
+    expect(ta.kpiCommission).toBe(0)
+  })
+
+  // Not a warning: every warning blocks Apply, and an exchange is no error.
+  it('pays a bill whose sales cannot cover its KPI items as sales, with no KPI', () => {
+    const r = run({ orders: [bill([mattress(100, 50), bedframe(['HB Straight'])])], kpiItems: [HB_STRAIGHT] })
+    const ta = find(r.statements, 'ta')
+    expect(ta.productRevenue).toBe(100)
+    expect(ta.kpiQty).toBe(0)
+    expect(ta.kpiCommission).toBe(0)
+    expect(r.warnings).toEqual([])
+  })
+
+  it('counts two bed frames as two add-ons toward the quantity ladder', () => {
+    const r = run({ orders: [bill([mattress(10_000, 6_500), bedframe(['HB Straight'], 2)])], kpiItems: [HB_STRAIGHT] })
+    expect(find(r.statements, 'ta').kpiQty).toBe(2)
+    expect(find(r.statements, 'ta').productRevenue).toBe(9_600)
+  })
+
+  it("adds the KPI part to the upline's override base only when the scheme says so", () => {
+    const orders = [bill([mattress(10_000, 6_500), bedframe(['HB Straight'])])]
+    const without = run({ orders, kpiItems: [HB_STRAIGHT] })
+    const withKpi = run({ orders, kpiItems: [HB_STRAIGHT], scheme: { ...SCHEME, overrideIncludesKpi: true } })
+    // TL 9% over TA 7%: 2% of 9,800 — or of 10,000 with the KPI part counted.
+    expect(find(without.statements, 'tl').overrideCommission).toBe(196)
+    expect(find(withKpi.statements, 'tl').overrideCommission).toBe(200)
+  })
+})
+
+// ─── Cost ratios per SKU (Product List › Costing Setting) ───────────────────
+
+describe('a SKU judged at its own cost ratio — 2026-09-27', () => {
+  const groupIndex = indexItemGroups(ITEM_GROUPS)
+
+  it("divides that SKU's cost by its own ratio and the rest by the default", () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'SPECIAL-SKU', 1, 10_000, 6_000],
+      ['MATTRESS', 'M1', 1, 10_000, 7_000],
+    ])
+    const basis = costBasisOf(0.7, [{ productCode: ' special-sku ', ratio: 0.6 }])
+    const base = marginBase(o.lines, indexKpiItems([]), groupIndex, basis)
+    expect(base.cost).toBe(20_000) // 6,000 ÷ 0.6 + 7,000 ÷ 0.7
+  })
+
+  it('falls back to the default for a ratio that is unusable', () => {
+    const basis = costBasisOf(0.7, [{ productCode: 'M1', ratio: 0 }])
+    expect(costDivisorFor('M1', basis)).toBe(0.7)
+    expect(costDivisorFor('M1', costBasisOf(0, []))).toBe(1)
+  })
+
+  it('carries the ratios into the run', () => {
+    const r = run({
+      orders: [order('1', 'rs', [['MATTRESS', 'SPECIAL-SKU', 1, 10_000, 6_000]])],
+      scheme: { ...SCHEME, costDivisor: 0.7, costRatios: [{ productCode: 'SPECIAL-SKU', ratio: 0.6 }] },
+    })
+    expect(find(r.statements, 'rs').marginPct).toBeCloseTo(0, 10) // 6,000 ÷ 0.6 = 10,000
   })
 })
 
@@ -799,7 +899,7 @@ describe('Open Bill bonus', () => {
     expect(find(three.statements, 'ta').openBillBonus).toBe(210) // 700 x 30%
   })
 
-  it('excludes transport and KPI revenue from the bonus base', () => {
+  it("bases the bonus on the main sales: transport out, KPI items' amounts off", () => {
     const r = run({
       orders: [order('1', 'ta', [
         ['MATTRESS', 'M1', 1, 10_000],
@@ -808,7 +908,8 @@ describe('Open Bill bonus', () => {
       ])],
       openBillTags: [{ orderId: '1', rank: 1 }],
     })
-    expect(find(r.statements, 'ta').openBillBonus).toBe(350)
+    // (10,300 − 2 × 50) × 7% × 50%
+    expect(find(r.statements, 'ta').openBillBonus).toBe(357)
   })
 
   it('warns when a tagged rank has no configured rate', () => {
@@ -932,8 +1033,9 @@ describe('run invariants', () => {
   // adjustment in play.
   const result = run({
     orders: [
+      // (20,000 − 11 × 50 of KPI items) × 67%: the bill is judged on its main sales.
       order('1', 'ta', [
-        ['MATTRESS', 'M1', 1, 20_000, 13_400],
+        ['MATTRESS', 'M1', 1, 20_000, 13_031.5],
         ['ACC', 'AK-CS AIRLOFT COMFY PIL', 11, 0, 0],
         ['TRANS', 'TRANSPORTATION CHARGES', 1, 800, 780],
       ]),
@@ -1003,15 +1105,17 @@ describe('margin base', () => {
     expect(marginPctOf(base)).toBeCloseTo(0.30, 10)
   })
 
-  it('includes a free bundled KPI item — giving pillows away hurts margin', () => {
+  // The KPI items' amount is not the main product's price (2026-09-27): it
+  // leaves the revenue — while their cost, being real, stays.
+  it('judges the main sales: KPI items off the revenue, their cost kept', () => {
     const o = order('1', 'rs', [
       ['MATTRESS', 'M1', 1, 10_000, 7_300],
       ['ACC', 'AK-CS AIRLOFT COMFY PIL', 4, 0, 100],
     ])
     const base = marginBase(o.lines, kpiIndex, groupIndex)
-    expect(base.revenue).toBe(10_000)
+    expect(base.revenue).toBe(9_800)
     expect(base.cost).toBe(7_400)
-    expect(marginPctOf(base)).toBeCloseTo(0.26, 10)
+    expect(marginPctOf(base)).toBeCloseTo(2_400 / 9_800, 10)
   })
 
   it('returns null when any line in scope has no cost', () => {
@@ -1042,9 +1146,9 @@ describe('margin base', () => {
       ['ACC', 'AK-CS AIRLOFT COMFY PIL', 2, 0, 70],
     ])
     const base = marginBase(o.lines, kpiIndex, groupIndex, 0.7)
-    expect(base.revenue).toBe(10_000)
+    expect(base.revenue).toBe(9_900) // the two pillows' 100 is KPI
     expect(base.cost).toBe(10_100)
-    expect(marginPctOf(base)).toBeCloseTo(-0.01, 10)
+    expect(marginPctOf(base)).toBeCloseTo(-200 / 9_900, 10)
     expect(marginBase(o.lines, kpiIndex, groupIndex, 1).cost).toBe(7_070)
     // A nonsense divisor never silently zeroes or inflates the cost.
     expect(marginBase(o.lines, kpiIndex, groupIndex, 0).cost).toBe(7_070)
@@ -1198,15 +1302,15 @@ describe('below-margin penalty, end to end', () => {
   it('does NOT scale the flat KPI allowance', () => {
     const r = run({
       orders: [order('1', 'rs', [
-        ['MATTRESS', 'M1', 1, 10_000, 7_300],
+        ['MATTRESS', 'M1', 1, 10_000, 7_152],
         ['ACC', 'AK-CS AIRLOFT COMFY PIL', 4, 0, 100],
       ])],
     })
     const rs = find(r.statements, 'rs')
-    expect(rs.marginPct).toBeCloseTo(0.26, 10)
-    expect(rs.productCommission).toBe(250) // halved
+    expect(rs.marginPct).toBeCloseTo(0.26, 10) // (9,800 − 7,252) ÷ 9,800
+    expect(rs.productCommission).toBe(245) // 9,800 × 5%, halved
     expect(rs.kpiCommission).toBe(200) // 4 x 50, untouched
-    expect(rs.totalCommission).toBe(450)
+    expect(rs.totalCommission).toBe(445)
   })
 
   it('kills the commission outright below Tier 3', () => {
@@ -1464,8 +1568,10 @@ describe('unranked salesperson', () => {
       departmentHeadIds: ['director'],
     })
     const s = find(r.statements, 'director')
-    // The sale is theirs and stays on the record…
-    expect(s.productRevenue).toBe(10_000)
+    // The sale is theirs and stays on the record — as every bill's main sales:
+    // the ten pillows' RM 500 of KPI value comes off the bill whoever sold it
+    // (2026-09-27), as the month page shows it, and a head is paid neither part…
+    expect(s.productRevenue).toBe(9_500)
     // …and earns no KPI allowance, Open Bill bonus or margin incentive.
     expect(s.lines).toEqual([])
     expect(s.totalCommission).toBe(0)

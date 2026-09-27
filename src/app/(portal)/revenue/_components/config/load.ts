@@ -5,6 +5,7 @@ import { listSubDepartments } from '../../_lib/sub-departments'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
+import { officeDate } from '@/lib/office-clock'
 import type {
   CommissionSettingsData,
   DirectorRow,
@@ -131,7 +132,9 @@ export async function loadCommissionSettings(
     supabase.from('comm_rank_defs').select('*').eq('scheme_id', schemeId).order('sort_order'),
     supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
     supabase.from('comm_item_groups').select('*').eq('scheme_id', schemeId).order('item_group'),
-    supabase.from('comm_kpi_items').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('product_code'),
+    // In force today or later, as Product List › Add-on / KPI Items lists them.
+    supabase.from('comm_kpi_items').select('*').eq('scheme_id', schemeId)
+      .or(`effective_to.is.null,effective_to.gte.${officeDate()}`).order('effective_from').order('id'),
     supabase.from('comm_kpi_thresholds').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('min_qty'),
     supabase.from('comm_open_bill_rules').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('bill_rank'),
     supabase.from('comm_brands').select('*').eq('scheme_id', schemeId).order('code'),

@@ -4095,6 +4095,8 @@ export type Database = {
           commission_adjusted_by: string | null
           commission_balance: number | null
           payout_split_version: number | null
+          pay_line_deductions: number
+          pay_line_earnings: number
           basic_pay_net: number | null
           pcb_override_amount: number | null
           created_at: string
@@ -4141,6 +4143,8 @@ export type Database = {
           commission_adjusted_by?: string | null
           commission_balance?: number | null
           payout_split_version?: number | null
+          pay_line_deductions?: number
+          pay_line_earnings?: number
           basic_pay_net?: number | null
           pcb_override_amount?: number | null
           created_at?: string
@@ -4187,6 +4191,8 @@ export type Database = {
           commission_adjusted_by?: string | null
           commission_balance?: number | null
           payout_split_version?: number | null
+          pay_line_deductions?: number
+          pay_line_earnings?: number
           basic_pay_net?: number | null
           pcb_override_amount?: number | null
           created_at?: string
@@ -5646,6 +5652,55 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      revenue_pay_lines: {
+        Row: {
+          id: string
+          staff_id: string
+          period_month: string
+          kind: string
+          description: string | null
+          amount: number
+          sort_order: number
+          version: number
+          created_by: string
+          created_at: string
+          updated_by: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          staff_id: string
+          period_month: string
+          kind: string
+          description?: string | null
+          amount: number
+          sort_order?: number
+          version?: number
+          created_by: string
+          created_at?: string
+          updated_by: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          staff_id?: string
+          period_month?: string
+          kind?: string
+          description?: string | null
+          amount?: number
+          sort_order?: number
+          version?: number
+          created_by?: string
+          created_at?: string
+          updated_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "revenue_pay_lines_staff_id_fkey"; columns: ["staff_id"]; isOneToOne: false; referencedRelation: "hr_staff_costs"; referencedColumns: ["id"] },
+          { foreignKeyName: "revenue_pay_lines_created_by_fkey"; columns: ["created_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+          { foreignKeyName: "revenue_pay_lines_updated_by_fkey"; columns: ["updated_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
         ]
       }
       revenue_payroll_commission_adjustments: {
@@ -7409,6 +7464,15 @@ export type Database = {
       adjust_revenue_payroll_commission: { Args: { p_payroll_id: string; p_gross: number; p_expected_synced: number; p_expected_adjustment: number; p_reason: string }; Returns: Json }
       save_revenue_payroll_row: {
         Args: { p_payroll_id: string; p_gross: number; p_expected_synced: number; p_expected_adjustment: number; p_reason: string; p_row_updates?: Json }
+        Returns: Json
+      }
+      revenue_pay_line_totals: {
+        Args: { p_staff_id: string; p_period: string }
+        Returns: { earnings: number; deductions: number }[]
+      }
+      revenue_pay_lines_closed: { Args: { p_period: string }; Returns: string | null }
+      revenue_save_pay_lines: {
+        Args: { p_staff_id: string; p_period: string; p_lines: Json; p_seen: Json }
         Returns: Json
       }
       revenue_payroll_adjustments: {

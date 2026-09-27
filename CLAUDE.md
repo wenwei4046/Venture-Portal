@@ -106,7 +106,7 @@ src/
 │   │   │                              Comm Cal, Directors Completed on Director
 │   │   │                              Salary — and a person moves draft → completed
 │   │   │                              → submitted → paid (enum value `completed`,
-│   │   │                              mig 20260927060000). Tick → *Complete* (staff
+│   │   │                              mig 20260927060500). Tick → *Complete* (staff
 │   │   │                              only; a salesperson completes when their
 │   │   │                              `comm_salesperson_closes` row stands — trigger
 │   │   │                              `comm_close_sync_payroll` sets the row's
@@ -481,6 +481,40 @@ src/
 │   │   │                              `lib/erp-sync/catalogue.ts`,
 │   │   │                              `revenue/catalogue-actions.ts`, migs
 │   │   │                              `20260924020000` / `025000` / `030000`.
+│   │   │                              **COSTING SETTING + ADD-ON / KPI ITEMS
+│   │   │                              (2026-09-27):** two more Product List tabs,
+│   │   │                              per sub-department (`?sub=`). Costing
+│   │   │                              Setting = the ratio a cost is divided by
+│   │   │                              for the Revenue Team (`comm_schemes.
+│   │   │                              revenue_cost_divisor`, Fair 0.7) and SKUs
+│   │   │                              with a ratio of their OWN
+│   │   │                              (`comm_cost_ratios`, e.g. ÷ 0.6), applied
+│   │   │                              per line in the engine (`lib/commission/
+│   │   │                              cost-basis.ts`), the month page, the member
+│   │   │                              facts and the calculator. Add-on / KPI
+│   │   │                              Items = a SKU or a bed frame / sofa SPECIAL
+│   │   │                              (`comm_kpi_items.source` 'sku' | 'option',
+│   │   │                              `option_pool` / `option_value`) with one
+│   │   │                              amount. A bill that carries one (found by
+│   │   │                              `orderKpiHits` and its SQL twin
+│   │   │                              `comm_kpi_hits`: a SKU per unit, a bed
+│   │   │                              frame special per frame, a sofa special
+│   │   │                              ONCE per bill) has the amount taken OFF its
+│   │   │                              commissionable sales — the margin is judged
+│   │   │                              on the rest — and paid flat as KPI (user
+│   │   │                              chose "Flat KPI allowance"). A bill whose
+│   │   │                              sales do not cover its items (a RM 0
+│   │   │                              exchange) pays none: never a run warning,
+│   │   │                              because every warning blocks Apply. Items
+│   │   │                              are effective-dated — a change closes the
+│   │   │                              old row yesterday and opens today's
+│   │   │                              (`catalogue_save_kpi_items`), so a month
+│   │   │                              already run keeps its amount. Rules › KPI
+│   │   │                              items is read-only now; the switch and the
+│   │   │                              threshold ladder stay on Rules.
+│   │   │                              `lib/commission/kpi.ts`,
+│   │   │                              `lib/catalogue/rule-edits.ts`, mig
+│   │   │                              `20260927050000`.
 │   │   │                              Inside a view, sections get their own nav
 │   │   │                              (2026-09-05): rules = 9 sections (`?tab=`)
 │   │   │                              in a VERTICAL sidebar since 2026-09-07 —
@@ -934,6 +968,32 @@ src/
 │   │   │                              PREVIEW until the run is synced, and
 │   │   │                              says so when payroll disagrees.
 │   │   │                              Migs `20260917020000` / `030000`.
+│   │   │                              **PAY LINES (2026-09-27):** the pencil on a
+│   │   │                              salesperson's *Salary calculation* (under
+│   │   │                              their ledger on Comm Cal) adds lines to the
+│   │   │                              month — Special claim / Allowance /
+│   │   │                              Incentive (EARNINGS: into gross in full,
+│   │   │                              never pro-rated, outside the statutory wage
+│   │   │                              — no EPF / SOCSO / EIS) or Deduction (off
+│   │   │                              take-home only, like SKBBK). The lines
+│   │   │                              (`revenue_pay_lines`) are the fact;
+│   │   │                              `hr_monthly_payroll.pay_line_earnings` /
+│   │   │                              `pay_line_deductions` are DERIVED by both
+│   │   │                              payroll triggers (re-read on every compute,
+│   │   │                              held at 0 on non-Revenue rows by CHECK), so
+│   │   │                              a row made later picks up lines typed
+│   │   │                              before it. One writer,
+│   │   │                              `revenue_save_pay_lines`: Principal / HR,
+│   │   │                              `assert_commission_payroll_open`, a stale
+│   │   │                              editor refused on id:version, before and
+│   │   │                              after in `access_log`. `lib/revenue-pay.ts`
+│   │   │                              adds them exactly as the triggers do; the
+│   │   │                              rules are `lib/revenue-pay-lines.ts`. HR's
+│   │   │                              paycheck window and payslip show them
+│   │   │                              read-only. The payslip (`pay/[staffId]`)
+│   │   │                              lost *Their bills*: the ledger it is opened
+│   │   │                              from already lists every bill. Mig
+│   │   │                              `20260927060000`.
 │   │   │                              IR rules: commission spec §15; two layers,
 │   │   │                              repeated own sales per group, monthly
 │   │   │                              packages and a 4% fallback. SDL retains
@@ -1100,7 +1160,13 @@ src/
 │   └── setup.ts                    ← Vitest + jest-dom matcher setup
 ├── types/
 │   └── index.ts                    ← All TypeScript interfaces
-├── middleware.ts                   ← Supabase Auth session refresh + redirect gating
+├── (no middleware.ts)              ← it sits at the REPO ROOT, which Next never
+│                                     loads while the app is in src/ (the build's
+│                                     middleware manifest is empty; a signed-in
+│                                     GET /login answers 200 — found 2026-09-27).
+│                                     Gating is the layouts' requireAuth. Moving
+│                                     it would switch on session refresh +
+│                                     redirects everywhere: its own decision.
 supabase/
 ├── migrations/                     ← 16 SQL migration files (core → Step 9 dashboard RPC)
 ├── seed/                           ← (empty — seed scripts in /scripts)
@@ -1183,6 +1249,14 @@ A title with NO permissions of its own falls back to the role its holder's
 account was created with — which is why the cutover changed nobody's access.
 `users.role` survives ONLY for that fallback and for the 16 dept_manager
 row-scoped policies no scope can express. Do not add new gates that read it.
+
+View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
+tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
+(`getMemberUser`); the portal's `getUser` ignores it. Before, switching one tab
+to Revenue View sent every other tab's portal page to /dashboard — a Product
+List tab "jumping to Overview". `vp-view` is a readable mirror of the choice,
+so a tab left open re-renders its shell when another tab switches
+(`useViewAsSync`, `lib/view-as.ts`).
 
 4 Roles (now: the fallback each account is created with)
 Role	DB Value	Access

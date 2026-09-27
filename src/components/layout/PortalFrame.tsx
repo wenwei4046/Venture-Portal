@@ -6,6 +6,8 @@ import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
 import { logPageView } from '@/lib/page-view'
 import { isSheetRoute } from '@/lib/sheet-routes'
+import { isPrincipalAccount } from '@/lib/view-as'
+import { useViewAsSync } from './useViewAsSync'
 import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
@@ -66,6 +68,9 @@ export default function PortalFrame({
     loggedPath.current = pathname
     void logPageView(pathname)
   }, [pathname])
+
+  // View-as switched in another tab → this shell is drawn in the old view.
+  useViewAsSync(user.role, isPrincipalAccount(user))
 
   return (
     <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible${productList ? ' product-theme' : ''}`}>

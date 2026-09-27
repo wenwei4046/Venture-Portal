@@ -9,6 +9,8 @@ const rank = (rankKey: string, productRate: number, sortOrder: number, extra: Pa
   canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null, ...extra,
 })
 
+// Every bill carries a KPI pillow at RM 20 (2026-09-27): its RM 20 comes off
+// the bill's sales and is paid flat as KPI, so a 1,000 bill earns its rate on 980.
 function sale(id: string, amount = 1_000, extra: Partial<SalesOrder> = {}): SalesOrder {
   return {
     id, orderNo: `SO-${id}`, staffId: 'agent', periodMonth: '2026-08-01',
@@ -75,16 +77,16 @@ describe('commission workbench ledger', () => {
     expect(anthony.personalRows).toHaveLength(2)
     expect(anthony.personalRows[0]).toMatchObject({
       staffName: 'Anthony', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL',
-      productCommission: 50, kpiQty: 1, kpiBase: 20, kpiBonus: 4,
-      marginIncentive: 333.33, marginAllocationBasis: 'eligible_goods_revenue',
-      openBillBonus: 25, totalCommission: 432.33,
+      productRevenue: 980, productCommission: 49, kpiQty: 1, kpiBase: 20, kpiBonus: 4,
+      marginIncentive: 331.08, marginAllocationBasis: 'eligible_goods_revenue',
+      openBillBonus: 24.5, totalCommission: 428.58,
     })
-    expect(anthony.personalRows[1].marginIncentive).toBe(666.67)
-    expect(anthony.totalCommission).toBe(1223)
+    expect(anthony.personalRows[1].marginIncentive).toBe(668.92)
+    expect(anthony.totalCommission).toBe(1220.5)
     expect(board.overridingRows.map(row => [row.downlineName, row.downlineTitle, row.downlineRank, row.overrideRate, row.overrideAmount]))
-      .toEqual([['Anthony', 'Revenue Specialist', '5%', 0.03, 30], ['Anthony', 'Revenue Specialist', '5%', 0.03, 60]])
+      .toEqual([['Anthony', 'Revenue Specialist', '5%', 0.03, 29.4], ['Anthony', 'Revenue Specialist', '5%', 0.03, 59.4]])
     expect(board.kpi.find(row => row.staffId === 'agent')).toMatchObject({ qty: 2, base: 40, bonus: 8, total: 48, thresholdPct: 0.2 })
-    expect(board.totalCommission).toBe(1313)
+    expect(board.totalCommission).toBe(1309.3)
     reconcile(board)
   })
 
@@ -93,13 +95,13 @@ describe('commission workbench ledger', () => {
     const before = JSON.stringify(source)
     const excluded = buildCommissionWorkbench(source, { excludedOrderIds: ['one'] })
     expect(excluded.personalRows.find(row => row.orderId === 'one')).toMatchObject({
-      status: 'excluded', productRevenue: 1000, orderTotal: 1000, totalCommission: 0, kpiBase: 0,
+      status: 'excluded', productRevenue: 980, orderTotal: 1000, totalCommission: 0, kpiBase: 0,
     })
     expect(excluded.kpi.find(row => row.staffId === 'agent')).toMatchObject({ qty: 1, base: 20, bonus: 0 })
     expect(excluded.overridingRows.map(row => row.orderId)).toEqual(['two'])
-    expect(excluded.people.find(person => person.staffId === 'agent')?.totalCommission).toBe(1120)
+    expect(excluded.people.find(person => person.staffId === 'agent')?.totalCommission).toBe(1119)
     const restored = buildCommissionWorkbench(source, { excludedOrderIds: [] })
-    expect(restored.totalCommission).toBe(1313)
+    expect(restored.totalCommission).toBe(1309.3)
     expect(JSON.stringify(source)).toBe(before)
     reconcile(excluded)
     reconcile(restored)
@@ -109,7 +111,7 @@ describe('commission workbench ledger', () => {
     const source = input({ orders: [sale('one'), sale('two', 2000), sale('pending', 1000, { paidAmount: 20 }), sale('released', 1000, { alreadyReleased: true })] })
     const board = buildCommissionWorkbench(source, { openBillTags: [{ orderId: 'two', rank: 2 }, { orderId: 'pending', rank: 1 }] })
     expect(board.personalRows.find(row => row.orderId === 'one')?.openBillBonus).toBe(0)
-    expect(board.personalRows.find(row => row.orderId === 'two')).toMatchObject({ openBillBonus: 40, openBillRate: 0.4, openBillRank: 2 })
+    expect(board.personalRows.find(row => row.orderId === 'two')).toMatchObject({ openBillBonus: 39.6, openBillRate: 0.4, openBillRank: 2 })
     expect(board.personalRows.find(row => row.orderId === 'pending')).toMatchObject({ status: 'deposit_pending', totalCommission: 0 })
     expect(board.personalRows.find(row => row.orderId === 'released')).toMatchObject({ status: 'already_released', totalCommission: 0 })
     expect(board.overridingRows.map(row => row.orderId)).toEqual(['one', 'two'])
@@ -120,8 +122,8 @@ describe('commission workbench ledger', () => {
   it('uses engine margin penalties for personal/open-bill/override, while KPI stays unpenalised', () => {
     const order = sale('one', 1000, { manualMarginPct: 0.2 })
     const board = buildCommissionWorkbench(input({ orders: [order] }))
-    expect(board.personalRows[0]).toMatchObject({ productCommission: 25, openBillBonus: 12.5, kpiBase: 20, penaltyWithheld: 37.5, marginPct: 0.2, marginCost: 800, marginSource: 'manual' })
-    expect(board.overridingRows[0]).toMatchObject({ overrideBasis: 500, overrideRate: 0.03, overrideAmount: 15 })
+    expect(board.personalRows[0]).toMatchObject({ productCommission: 24.5, openBillBonus: 12.25, kpiBase: 20, penaltyWithheld: 36.75, marginPct: 0.2, marginCost: 784, marginSource: 'manual' })
+    expect(board.overridingRows[0]).toMatchObject({ overrideBasis: 490, overrideRate: 0.03, overrideAmount: 14.7 })
     reconcile(board)
   })
 
@@ -133,7 +135,8 @@ describe('commission workbench ledger', () => {
     const source = input({ orders: [sale('one')] })
     source.scheme.costDivisor = 0.8
     const costed = buildCommissionWorkbench(source)
-    expect(costed.personalRows[0]).toMatchObject({ marginPct: 0.25, marginCost: 750, penaltyMultiplier: 0.5, marginIncentive: 0 })
+    // 600 ÷ 0.8 = 750 of team cost against the bill's 980 of main sales.
+    expect(costed.personalRows[0]).toMatchObject({ marginPct: expect.closeTo(230 / 980, 10), marginCost: 750, penaltyMultiplier: 0.5, marginIncentive: 0 })
     reconcile(unknown)
     reconcile(costed)
   })
@@ -158,7 +161,7 @@ describe('commission workbench ledger', () => {
     const without = buildCommissionWorkbench(source)
     source.scheme.overrideIncludesKpi = true
     const withKpi = buildCommissionWorkbench(source)
-    expect(without.overridingRows[0].overrideBasis).toBe(1000)
+    expect(without.overridingRows[0].overrideBasis).toBe(1180) // 1,200 less the pillow's 20
     expect(withKpi.overridingRows[0].overrideBasis).toBe(1200)
     expect(withKpi.overridingRows[0].overrideAmount).toBe(36)
     reconcile(withKpi)
@@ -171,7 +174,7 @@ describe('commission workbench ledger', () => {
     expect(board.personalRows.map(row => row.originalOrderId)).toEqual(['one', 'one'])
     expect(board.personalRows.map(row => row.orderTotal)).toEqual([500, 500])
     expect(new Set(board.personalRows.map(row => row.key)).size).toBe(2)
-    expect(board.personalRows.map(row => row.openBillBonus)).toEqual([12.5, 20])
+    expect(board.personalRows.map(row => row.openBillBonus)).toEqual([12.25, 19.6]) // 490 each
     const excluded = buildCommissionWorkbench(source, { excludedOrderIds: ['one'] })
     expect(excluded.totalCommission).toBe(0)
     expect(excluded.personalRows.every(row => row.status === 'excluded')).toBe(true)
@@ -222,8 +225,8 @@ describe('commission workbench ledger', () => {
     const source = input({ orders: [order], kpiItems: [{ productCode: 'PILLOW', kpiAmount: 0.03 }, { productCode: 'BOLSTER', kpiAmount: 0.02 }] })
     const board = buildCommissionWorkbench(source)
     expect(board.kpi.find(agent => agent.staffId === 'agent')?.perItem).toEqual([
-      { productCode: 'BOLSTER', productName: 'Bolster', qty: 1, heldQty: 0, excludedQty: 0, payableQty: 1, unitAmount: 0.02, base: 0.02, bonus: 0, total: 0.02 },
-      { productCode: 'PILLOW', productName: 'PILLOW', qty: 1, heldQty: 0, excludedQty: 0, payableQty: 1, unitAmount: 0.03, base: 0.03, bonus: 0.01, total: 0.04 },
+      { itemKey: 'sku:BOLSTER', source: 'sku', productCode: 'BOLSTER', productName: 'Bolster', qty: 1, heldQty: 0, excludedQty: 0, payableQty: 1, unitAmount: 0.02, base: 0.02, bonus: 0, total: 0.02 },
+      { itemKey: 'sku:PILLOW', source: 'sku', productCode: 'PILLOW', productName: 'PILLOW', qty: 1, heldQty: 0, excludedQty: 0, payableQty: 1, unitAmount: 0.03, base: 0.03, bonus: 0.01, total: 0.04 },
     ])
     source.orders = splitOrdersByShares([order], [{ orderId: 'one', staffId: 'leader', pct: 1 / 3 }])
     const shared = buildCommissionWorkbench(source)
@@ -239,7 +242,7 @@ describe('commission workbench ledger', () => {
     const board = buildCommissionWorkbench(source)
     expect(board.kpi.find(agent => agent.staffId === 'agent')).toMatchObject({ soldQty: 2, qty: 2, base: 40, bonus: 8, total: 48 })
     expect(board.personalRows.find(row => row.orderId === 'return')).toMatchObject({ kpiBase: -20, kpiBonus: -4 })
-    expect(board.overridingRows.find(row => row.orderId === 'return')?.overrideAmount).toBe(-3)
+    expect(board.overridingRows.find(row => row.orderId === 'return')?.overrideAmount).toBe(-2.4) // −80 of 2,860
     reconcile(board)
   })
 })
@@ -258,7 +261,7 @@ describe('what on a bill earns commission (2026-09-26)', () => {
   })
   const scheme = { ...input().scheme, itemGroups: [...input().scheme.itemGroups, { group: 'SERVICE', commissionable: false }] }
 
-  it('leaves out transport and any group the scheme does not pay on, and keeps KPI items — they earn too', () => {
+  it('leaves out transport and any group the scheme does not pay on, and keeps KPI items — they earn too, as KPI', () => {
     const odd = sale('odd', 500, {
       orderTotal: 560,
       lines: [
@@ -268,7 +271,7 @@ describe('what on a bill earns commission (2026-09-26)', () => {
     })
     const board = buildCommissionWorkbench(input({ scheme, orders: [kuching(), odd], openBillTags: [] }))
     expect(board.personalRows.find(row => row.orderId === 'kuching')).toMatchObject({
-      orderTotal: 1_247, commissionableValue: 1_100, productRevenue: 1_000,
+      orderTotal: 1_247, commissionableValue: 1_100, productRevenue: 1_080, // the pillow's 20 is KPI
     })
     expect(board.personalRows.find(row => row.orderId === 'odd')).toMatchObject({ orderTotal: 560, commissionableValue: 500 })
   })
@@ -290,6 +293,28 @@ describe('what on a bill earns commission (2026-09-26)', () => {
     expect(parts).toHaveLength(2)
     expect(round2(parts.reduce((a, row) => a + row.commissionableValue, 0))).toBe(1_100)
     expect(round2(parts.reduce((a, row) => a + row.orderTotal, 0))).toBe(1_247)
+  })
+})
+
+describe('a KPI special on a bed frame (2026-09-27)', () => {
+  it("summarises it by the special, and takes its amount off the bill's sales", () => {
+    const order = sale('bf', 10_000, {
+      lines: [
+        { id: 'bf-goods', itemGroup: 'SOFA', productCode: 'SOFA', brandCode: 'AKEMI', qty: 1, lineAmount: 10_000, costAmount: 6_500 },
+        { id: 'bf-frame', itemGroup: 'BEDFRAME', productCode: 'TRION (A)-(K)', qty: 1, lineAmount: 0, costAmount: 0, specials: ['HB Straight'] },
+      ],
+    })
+    const source = input({
+      orders: [order], openBillTags: [],
+      scheme: { ...input().scheme, itemGroups: [...input().scheme.itemGroups, { group: 'BEDFRAME', commissionable: true }] },
+      kpiItems: [{ source: 'option', optionPool: 'bedframe_specials', optionValue: 'HB Straight', kpiAmount: 200 }],
+    })
+    const board = buildCommissionWorkbench(source)
+    expect(board.personalRows[0]).toMatchObject({ productRevenue: 9_800, productCommission: 490, kpiBase: 200, commissionableValue: 10_000 })
+    expect(board.kpi.find(agent => agent.staffId === 'agent')?.perItem).toMatchObject([
+      { itemKey: 'option:bedframe_specials:hb straight', source: 'option', productCode: 'HB Straight', qty: 1, base: 200 },
+    ])
+    reconcile(board)
   })
 })
 

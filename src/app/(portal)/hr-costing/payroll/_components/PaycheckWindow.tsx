@@ -244,6 +244,15 @@ export default function PaycheckWindow({
                 ))}
               </div>
             )}
+            {/* Pay lines are typed on the salesperson's ledger on Comm Cal
+                (2026-09-27); payroll carries their total, read-only here. */}
+            {revenuePayroll && (
+              <Field label="Pay lines" sub="special claim · allowance · incentive — added on Comm Cal">
+                <span className={cn('ro num', !row.pay_line_earnings && 'zero')} title="In gross in full; no EPF, SOCSO or EIS">
+                  {formatMoneyBare(row.pay_line_earnings ?? 0)}
+                </span>
+              </Field>
+            )}
           </section>
 
           <section>
@@ -260,6 +269,13 @@ export default function PaycheckWindow({
             <Field label="SKBBK" sub="net only — gross and statutory unaffected">
               {amount('skbbk_amount')}
             </Field>
+            {revenuePayroll && (
+              <Field label="Pay line deductions" sub="net only — added on Comm Cal">
+                <span className={cn('ro num', !row.pay_line_deductions && 'zero')}>
+                  {formatMoneyBare(row.pay_line_deductions ?? 0)}
+                </span>
+              </Field>
+            )}
           </section>
 
           <section className="c3">

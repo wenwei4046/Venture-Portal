@@ -47,6 +47,23 @@ dropdowns (an empty ERP list is the ERP's "no restriction"), pricing and
 service-role-only access. Run only these checks with
 `npm run test:catalogue --prefix tests/member-sql`.
 
+The default command also runs `validate-kpi-add-ons.mjs` (Product List ›
+Costing Setting and › Add-on / KPI Items, 2026-09-27). It applies
+`20260927050000` verbatim over the foundation's `comm_kpi_items` and checks the
+new constraints (one live row per special however it is spelled, one ratio per
+code), `comm_kpi_hits` (a SKU by code, a bed frame special per bed frame from
+`raw.variants` or the ERP's description grammar, a sofa special once per bill,
+the category guard, the as-at date, and no KPI on a bill whose sales do not
+cover it), and that `revenue_month_orders` and `member_order_facts` take the
+same amounts off and divide each line's cost by its SKU's own ratio. It also
+drives the tabs' two writers: `catalogue_save_cost_setting` (a SKU's code read
+from the SKU master, a renamed SKU followed, an unchanged ratio not a write)
+and `catalogue_save_kpi_items` (a special stored as its pool spells it, adds
+from today, a new amount or a removal of an item begun before today closed
+yesterday, one begun today changed or deleted where it stands, another
+sub-department's row refused). Run only these checks with
+`npm run test:kpi-add-ons --prefix tests/member-sql`.
+
 Expected final output:
 
 ```text

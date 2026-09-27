@@ -22,6 +22,7 @@ const fair: SchemeSettings & { id: string; scheme_name: string } = {
   deposit_threshold_pct: '0.500000',
   open_bill_basis: 'uplift_on_commission',
   default_rate_mode: 'variable',
+  revenue_cost_divisor: '0.7000',
 }
 
 describe('newSchemeSettings', () => {
@@ -42,12 +43,18 @@ describe('newSchemeSettings', () => {
     expect(isBlankScheme(copied)).toBe(false)
   })
 
+  it("a follower judges cost as its source does; a blank scheme keeps the cost as keyed", () => {
+    expect(newSchemeSettings(fair).revenue_cost_divisor).toBe('0.7000')
+    expect(newSchemeSettings(null).revenue_cost_divisor).toBe(1)
+    expect(copiedSchemeSettings({ ...fair, revenue_cost_divisor: undefined }).revenue_cost_divisor).toBe(1)
+  })
+
   it('copies settings only, never the source row identity', () => {
     const copied = copiedSchemeSettings(fair) as unknown as Record<string, unknown>
     expect(copied).not.toHaveProperty('id')
     expect(copied).not.toHaveProperty('scheme_name')
     expect(Object.keys(copied).sort()).toEqual(
-      [...SCHEME_SWITCHES, 'override_includes_kpi', 'deposit_threshold_pct', 'open_bill_basis', 'default_rate_mode', 'enable_group_incentive', 'group_sales_depth', 'override_depth', 'direct_line_limit'].sort(),
+      [...SCHEME_SWITCHES, 'override_includes_kpi', 'deposit_threshold_pct', 'open_bill_basis', 'default_rate_mode', 'enable_group_incentive', 'group_sales_depth', 'override_depth', 'direct_line_limit', 'revenue_cost_divisor'].sort(),
     )
   })
 

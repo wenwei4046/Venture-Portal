@@ -3825,6 +3825,79 @@ dialog.modular-win:focus-visible { outline: none; }
 .product-section-heading h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
 .product-gap-next { min-width: 240px; max-width: 330px; }
 .product-gap-next a { text-decoration: underline; text-underline-offset: 3px; }
+/* Costing Setting · Add-on / KPI Items (2026-09-27). Per sub-department
+   settings on the page, like Maintenance: a filter panel of one chip row, a
+   card holding the sub-department's own figure, the picker while editing
+   (a peach panel — what it adds lands in the table below it), the table. */
+.sku-categories[data-only] { padding-bottom: 0; border-bottom: 0; }
+.sku-filters .product-unsaved-notice { margin: 12px 0 0; }
+.rule-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 28px;
+  margin-top: 14px;
+  padding: 14px 18px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+}
+.rule-card[data-tone="on"] { background: rgb(var(--ledger-bg)); border-color: transparent; }
+.rule-card[data-tone="off"] { background: rgb(var(--alert-bg)); border-color: rgb(var(--accent-border)); }
+.rule-card-figure { display: grid; gap: 4px; min-width: 160px; }
+.rule-card-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.rule-card-value { font-size: 22px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.rule-card-input { display: inline-flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 600; }
+.rule-card-input .sku-price-input { width: 96px; font-size: 14px; }
+.rule-card p { flex: 1 1 320px; font-size: 12.5px; line-height: 1.5; }
+.rule-card a { text-decoration: underline; text-underline-offset: 3px; }
+.rule-picker {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid rgb(var(--accent-border));
+  border-radius: 10px;
+  background: rgb(var(--accent-bg));
+}
+.rule-picker-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px; }
+.rule-picker-head h3 { font-size: 13px; font-weight: 600; }
+.rule-picker-head .sku-search { flex: 1 1 280px; }
+.rule-picker-sources { display: flex; flex-wrap: wrap; gap: 7px; }
+.rule-picker-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px; }
+.rule-picker-field { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap; }
+.rule-picker-field .sku-price-input { width: 96px; }
+.rule-picker-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; margin-top: 10px; }
+.rule-pick-list { overflow: hidden; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface)); }
+.rule-pick-list > li + li { border-top: 1px solid rgb(var(--hairline)); }
+.rule-pick-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.6fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+label.rule-pick-row { grid-template-columns: 18px minmax(120px, 0.8fr) minmax(0, 1.6fr) auto; cursor: pointer; }
+.rule-pick-row:hover { background: rgb(var(--product-row-hover)); }
+.rule-pick-row[data-disabled] { background: rgb(var(--surface-2)); cursor: default; }
+.rule-pick-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+.rule-pick-code { font-weight: 600; overflow-wrap: anywhere; }
+.rule-pick-desc { min-width: 0; overflow-wrap: anywhere; }
+.rule-pick-cost { justify-self: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rule-pick-row .sku-secondary-button { justify-self: end; padding: 5px 12px; }
+.rule-pick-empty, .rule-pick-more { padding: 6px 2px 0; font-size: 12px; }
+.rule-flags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; vertical-align: middle; }
+.rule-flags:empty { display: none; }
+.rule-row-button { font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.rule-row-button:disabled { cursor: not-allowed; opacity: 0.5; }
+.product-page table.sku-table tbody tr[data-state="new"] { background: rgb(var(--accent-bg)); }
+.product-page table.sku-table tbody tr[data-state="removing"] td:not(:last-child) { opacity: 0.5; }
+@media (max-width: 767px) {
+  .rule-pick-row { grid-template-columns: minmax(0, 1fr) auto; }
+  label.rule-pick-row { grid-template-columns: 18px minmax(0, 1fr) auto; }
+  .rule-pick-desc { order: 3; grid-column: 1 / -1; }
+  label.rule-pick-row .rule-pick-desc { grid-column: 2 / -1; }
+  .rule-picker-foot { justify-content: flex-start; }
+}
 /* Page scroll (user 2026-09-27). Modular and Maintenance only ever grow
    downward, so they grow with the page and the portal's own scrollbar moves
    them, as the ERP's Products page does; the wide sheets (SKU Master, Combo
