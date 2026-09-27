@@ -3075,6 +3075,7 @@ export type Database = {
           completed_at: string | null
           completed_by: string | null
           status: string
+          topup_kind: string | null
           topup_opened_at: string | null
           topup_opened_by: string | null
           created_at: string
@@ -3109,6 +3110,7 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           status?: string
+          topup_kind?: string | null
           topup_opened_at?: string | null
           topup_opened_by?: string | null
           created_at?: string
@@ -3143,6 +3145,7 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           status?: string
+          topup_kind?: string | null
           topup_opened_at?: string | null
           topup_opened_by?: string | null
           created_at?: string
@@ -4087,6 +4090,7 @@ export type Database = {
           commission_synced_amount: number | null
           completed_at: string | null
           completed_by: string | null
+          topup_kind: string | null
           topup_opened_at: string | null
           topup_opened_by: string | null
           commission_adjustment_amount: number
@@ -4135,6 +4139,7 @@ export type Database = {
           commission_synced_amount?: number | null
           completed_at?: string | null
           completed_by?: string | null
+          topup_kind?: string | null
           topup_opened_at?: string | null
           topup_opened_by?: string | null
           commission_adjustment_amount?: number
@@ -4183,6 +4188,7 @@ export type Database = {
           commission_synced_amount?: number | null
           completed_at?: string | null
           completed_by?: string | null
+          topup_kind?: string | null
           topup_opened_at?: string | null
           topup_opened_by?: string | null
           commission_adjustment_amount?: number
@@ -5781,6 +5787,7 @@ export type Database = {
           employee_name: string
           id: string
           is_topup: boolean
+          topup_kind: string | null
           period_month: string
           row_id: string
           scope: string
@@ -5814,6 +5821,7 @@ export type Database = {
           employee_name: string
           id?: string
           is_topup?: boolean
+          topup_kind?: string | null
           period_month: string
           row_id: string
           scope: string
@@ -5847,6 +5855,7 @@ export type Database = {
           employee_name?: string
           id?: string
           is_topup?: boolean
+          topup_kind?: string | null
           period_month?: string
           row_id?: string
           scope?: string
@@ -5889,6 +5898,7 @@ export type Database = {
           submitted_at: string
           submitted_by: string | null
           submitted_by_name: string | null
+          second_payrolls: number
           topups: number
           total_amount: number | null
         }
@@ -5915,6 +5925,7 @@ export type Database = {
           submitted_at?: string
           submitted_by?: string | null
           submitted_by_name?: string | null
+          second_payrolls?: number
           topups?: number
         }
         Update: {
@@ -5940,6 +5951,7 @@ export type Database = {
           submitted_at?: string
           submitted_by?: string | null
           submitted_by_name?: string | null
+          second_payrolls?: number
           topups?: number
         }
         Relationships: [
@@ -8177,7 +8189,7 @@ export type Database = {
         Returns: Json
       }
       payroll_open_topup: {
-        Args: { p_scope: string; p_row_id: string }
+        Args: { p_kind?: string; p_row_id: string; p_scope: string }
         Returns: undefined
       }
       payroll_reopen_month: {

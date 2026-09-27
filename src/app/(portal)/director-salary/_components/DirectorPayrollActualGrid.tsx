@@ -376,7 +376,7 @@ function DirectorPayrollRow({
       min="0"
       value={edit[name] ?? 0}
       disabled={isPending || locked}
-      title={locked ? `${row.employee_name} is ${row.status} — reopen (or Resubmit on HR › Payroll) to change` : undefined}
+      title={locked ? `${row.employee_name} is ${row.status} — reopen (or Resubmit / Second payroll on HR › Payroll) to change` : undefined}
       onChange={e => setEdit({ ...edit, [name]: parseFloat(e.target.value) || 0 })}
       className={`${w} text-right font-mono tabular text-[12px] bg-transparent border-b border-transparent focus:border-accent-border focus:outline-none px-1 py-1 disabled:opacity-50 disabled:cursor-not-allowed`}
     />

@@ -152,7 +152,7 @@ describe('one person moved on from draft', () => {
 
   it('sends a closed salesperson back to their close, and a sent one to Resubmit', () => {
     expect(personPayLinesLock('completed', 'ANTHONY')).toBe('ANTHONY is closed for the month. Reopen their close first — closing them again sends the new figure to payroll.')
-    expect(personPayLinesLock('submitted', 'ANTHONY')).toBe('ANTHONY\'s pay is with Finance. Resubmit them on HR › Payroll (right-click their row) first.')
-    expect(personPayLinesLock('paid', 'ANTHONY')).toContain('Resubmit them on HR › Payroll')
+    expect(personPayLinesLock('submitted', 'ANTHONY')).toBe('ANTHONY\'s pay is with Finance. Right-click them on HR › Payroll — Resubmit or Second payroll — first.')
+    expect(personPayLinesLock('paid', 'ANTHONY')).toContain('Resubmit or Second payroll')
   })
 })

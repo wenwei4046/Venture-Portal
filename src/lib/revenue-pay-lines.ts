@@ -253,9 +253,9 @@ export function personPayLinesLock(payrollStatus: string | null | undefined, nam
     case 'completed':
       return `${name} is closed for the month. Reopen their close first — closing them again sends the new figure to payroll.`
     case 'submitted':
-      return `${name}'s pay is with Finance. Resubmit them on HR › Payroll (right-click their row) first.`
+      return `${name}'s pay is with Finance. Right-click them on HR › Payroll — Resubmit or Second payroll — first.`
     case 'paid':
-      return `${name} has been paid for the month. Resubmit them on HR › Payroll (right-click their row) to pay a difference.`
+      return `${name} has been paid for the month. Right-click them on HR › Payroll — Resubmit or Second payroll — to pay a difference.`
     default:
       return null
   }
