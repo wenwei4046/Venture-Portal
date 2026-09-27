@@ -1,10 +1,10 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { useProductDraftState } from './ProductWorkspace'
 
-export type ProductTab = 'sku' | 'modular' | 'maintenance' | 'combos' | 'gaps'
+export type ProductTab = 'sku' | 'modular' | 'maintenance' | 'combos' | 'gaps' | 'costing' | 'kpi'
 
 /**
  * The Product List's rail, on the header's rule — the ERP Products page's own
@@ -13,7 +13,8 @@ export type ProductTab = 'sku' | 'modular' | 'maintenance' | 'combos' | 'gaps'
  * Unlike the Comm Cal month's rail, switching here IS a round trip: each tab
  * reads a different part of the catalogue (the SKU master alone is 2,350 rows),
  * so the server renders only the one being read. `?tab=` still opens the page
- * where a link meant it to.
+ * where a link meant it to. The two settings tabs are per sub-department and
+ * carry `?sub=` from one to the other.
  */
 export default function ProductListTabs({
   active,
@@ -22,13 +23,15 @@ export default function ProductListTabs({
 }) {
   const router = useRouter()
   const pathname = usePathname()
+  const sub = useSearchParams().get('sub')
   const [pending, startTransition] = useTransition()
   const [leaveFor, setLeaveFor] = useState<ProductTab | null>(null)
   const { dirty, saving } = useProductDraftState()
 
   function navigate(key: ProductTab) {
     setLeaveFor(null)
-    startTransition(() => router.push(key === 'sku' ? pathname : `${pathname}?tab=${key}`, { scroll: false }))
+    const perSub = (key === 'costing' || key === 'kpi') && sub ? `&sub=${encodeURIComponent(sub)}` : ''
+    startTransition(() => router.push(key === 'sku' ? pathname : `${pathname}?tab=${key}${perSub}`, { scroll: false }))
   }
 
   const items: { key: ProductTab; label: string }[] = [
@@ -37,6 +40,8 @@ export default function ProductListTabs({
     { key: 'maintenance', label: 'Maintenance' },
     { key: 'combos', label: 'Combo Pricing' },
     { key: 'gaps', label: 'Costing gaps' },
+    { key: 'costing', label: 'Costing Setting' },
+    { key: 'kpi', label: 'Add-on / KPI Items' },
   ]
 
   return (

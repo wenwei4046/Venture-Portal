@@ -48,6 +48,8 @@ const rank = (rankKey: string, productRate: number, sortOrder: number, titleLabe
   canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null,
 })
 
+// Every bill carries a KPI pillow at RM 20 (2026-09-27): its RM 20 comes off the
+// bill's sales and is paid flat as KPI, so a 1,000 bill earns its rate on 980.
 function sale(id: string, amount = 1_000, extra: Partial<SalesOrder> = {}): SalesOrder {
   return {
     id, orderNo: `SO-${id}`, staffId: 'agent', periodMonth: '2026-08-01',
@@ -185,7 +187,7 @@ describe('CommissionWorkbench', () => {
     expect(card('Commissionable value')).toHaveTextContent('RM 200.00 no commission')
     expect(within(card('Total orders')).getByText('2')).toBeVisible()
     expect(within(card('Salespeople')).getByText('2')).toBeVisible()
-    expect(card('Total commission')).toHaveTextContent('RM 1,313.00')
+    expect(card('Total commission')).toHaveTextContent('RM 1,309.30')
     expect(within(card('Lines without a cost')).getByText('0')).toBeVisible()
     expect(within(summary()).getByText('Unmatched agents')).toHaveTextContent('Unmatched agents 0')
     expect(screen.queryByRole('heading', { name: 'Salespeople' })).toBeNull()
@@ -194,7 +196,7 @@ describe('CommissionWorkbench', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search salesperson' }), { target: { value: 'Anthony' } })
     expect(screen.queryByRole('button', { name: 'Alex' })).toBeNull()
     expect(within(card('Salespeople')).getByText('2')).toBeVisible()
-    expect(card('Total commission')).toHaveTextContent('RM 1,313.00')
+    expect(card('Total commission')).toHaveTextContent('RM 1,309.30')
 
     fireEvent.click(screen.getByText(/^Calculation setup/))
     fireEvent.click(screen.getByRole('checkbox', { name: 'KPI incentive' }))
@@ -268,11 +270,11 @@ describe('CommissionWorkbench', () => {
     expect(headers.slice(headers.indexOf('Commissionable value'), headers.indexOf('Upsell') + 1))
       .toEqual(['Commissionable value', 'Group sales', 'Upsell'])
     const anthony = within(within(summary).getByRole('row', { name: /Anthony/ })).getAllByRole('cell')
-    expect(anthony[5]).toHaveTextContent('RM 3,000.00')
+    expect(anthony[5]).toHaveTextContent('RM 2,960.00')
     // Alex sold nothing himself; his group is his downline's sales.
     const alex = within(within(summary).getByRole('row', { name: /Alex/ })).getAllByRole('cell')
     expect(alex[3]).toHaveTextContent('RM 0.00')
-    expect(alex[5]).toHaveTextContent('RM 3,000.00')
+    expect(alex[5]).toHaveTextContent('RM 2,960.00')
     expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ }).firstElementChild).toHaveAttribute('colspan', '11')
   })
 
@@ -360,12 +362,12 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByRole('tab', { name: /^Total Sales Orders/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('table', { name: 'Salesperson commission summary' })).toBeVisible()
     expect(screen.queryByRole('table', { name: 'Personal commission by sales order' })).toBeNull()
-    expect(screen.getAllByText('RM 1,313.00').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('RM 1,309.30').length).toBeGreaterThan(0)
 
     choose('Anthony')
     const table = personalTable()
     expect(within(table).getAllByRole('row')).toHaveLength(4)
-    expect(within(salesRow(table, 'SO-one')).getByText('RM 432.33')).toBeVisible()
+    expect(within(salesRow(table, 'SO-one')).getByText('RM 428.58')).toBeVisible()
     expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 20.00+ RM 4.00 · 20% bonus')
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Arena')
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Home Fair')
@@ -373,7 +375,7 @@ describe('CommissionWorkbench', () => {
     expect(within(table).getByRole('columnheader', { name: 'Total commission' })).toBeVisible()
     expect(within(table).getByRole('link', { name: 'SO-one' })).toHaveAttribute('href',
       `/revenue/fair/2026-08-01/orders/one?from=${encodeURIComponent('/revenue/fair/2026-08-01?person=agent')}`)
-    expect(screen.getAllByText('RM 1,223.00').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('RM 1,220.50').length).toBeGreaterThan(0)
   })
 
   it('lets an upline with no personal orders inspect each downline order and overriding rate', () => {
@@ -386,9 +388,9 @@ describe('CommissionWorkbench', () => {
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Anthony')
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Revenue Specialist')
     expect(salesRow(table, 'SO-one')).toHaveTextContent('5%')
-    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 30.003% overriding')
-    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 60.003% overriding')
-    expect(within(table).getByText('RM 90.00')).toBeVisible()
+    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 29.403% overriding')
+    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 59.403% overriding')
+    expect(within(table).getByText('RM 88.80')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '← Sales people' }))
     expect(screen.getByRole('table', { name: 'Salesperson commission summary' })).toBeVisible()
   })
@@ -457,7 +459,7 @@ describe('CommissionWorkbench', () => {
     expect(within(salesRow(personalTable(), 'SO-one')).getByText('KL')).toBeVisible()
     expect(within(personalTable()).getByRole('columnheader', { name: 'Sales order' })).toBeVisible()
     expect(within(personalTable()).getByRole('columnheader', { name: 'Total commission' })).toBeVisible()
-    expect(screen.getAllByText('RM 1,223.00').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('RM 1,220.50').length).toBeGreaterThan(0)
   })
 
   it('shows cross-agent KPI expense and lets a KPI name return to their commission table', () => {
@@ -475,18 +477,18 @@ describe('CommissionWorkbench', () => {
     renderBoard()
     openTab()
     let table = screen.getByRole('table', { name: 'Open Bill orders' })
-    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 25.00')
+    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 24.50')
     expect(within(table).queryByText('SO-two')).toBeNull()
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show all orders to add picks' }))
     fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
-    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 20.00')
+    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 19.60')
     fireEvent.click(screen.getByRole('checkbox', { name: /^Open Bill SO-two$/ }))
     expect(screen.getByRole('checkbox', { name: /^Open Bill SO-two$/ })).toBeChecked()
-    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 50.00')
+    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 49.50')
     fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-two' }), { target: { value: '2' } })
     expect(screen.getByRole('checkbox', { name: /^Open Bill SO-one$/ })).not.toBeChecked()
     table = screen.getByRole('table', { name: 'Open Bill orders' })
-    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 40.00')
+    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 39.60')
     expect(saveOpenPicks).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Save Open Bill picks' }))
     await waitFor(() => expect(refresh).toHaveBeenCalledOnce())
@@ -521,7 +523,7 @@ describe('CommissionWorkbench', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Sort sales orders' }), { target: { value: 'commission_desc' } })
     const rows = within(personalTable()).getAllByRole('row')
     expect(rows[1]).toHaveTextContent('SO-two')
-    expect(personalTable()).toHaveTextContent('RM 1,223.00')
+    expect(personalTable()).toHaveTextContent('RM 1,220.50')
   })
 
   it('ignores an exclusion drafted on this screen before bills were taken out for real', () => {
@@ -529,7 +531,7 @@ describe('CommissionWorkbench', () => {
     renderBoard()
     choose('Anthony')
     expect(personalTable()).toHaveTextContent('SO-one')
-    expect(personalTable()).toHaveTextContent('RM 1,223.00')
+    expect(personalTable()).toHaveTextContent('RM 1,220.50')
     expect(saveOpenPicks).not.toHaveBeenCalled()
   })
 
@@ -551,7 +553,7 @@ describe('CommissionWorkbench', () => {
     fireEvent.click(preview)
     expect(screen.getByRole('status')).toHaveTextContent('Current team preview')
     expect(screen.getByRole('status')).toHaveTextContent('Payroll is unchanged')
-    expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ })).toHaveTextContent('RM 1,313.00')
+    expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ })).toHaveTextContent('RM 1,309.30')
     expect(JSON.stringify(data)).toBe(original)
     expect(saveOpenPicks).not.toHaveBeenCalled()
 
@@ -580,7 +582,7 @@ describe('CommissionWorkbench', () => {
     expect(saveOpenPicks).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset draft' }))
-    expect(total()).toHaveTextContent('RM 1,313.00')
+    expect(total()).toHaveTextContent('RM 1,309.30')
     expect(screen.getByRole('checkbox', { name: 'KPI incentive' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Open Bill incentive' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Margin incentive & penalty' })).toBeChecked()
@@ -592,7 +594,7 @@ describe('CommissionWorkbench', () => {
     expect(screen.queryByRole('link', { name: /salary breakdown/i })).toBeNull()
     fireEvent.click(screen.getByText('Salary calculation · current preview'))
     const salary = screen.getByRole('table', { name: 'Current salary calculation' })
-    expect(salesRow(salary, '^Current commission')).toHaveTextContent('RM 1,223.00')
+    expect(salesRow(salary, '^Current commission')).toHaveTextContent('RM 1,220.50')
     expect(salesRow(salary, '^Other programmes')).toHaveTextContent('RM 100.00')
     expect(salesRow(salary, '^Payroll adjustment')).toHaveTextContent('RM 20.00')
     expect(salesRow(salary, '^Employer contributions')).toHaveTextContent('72.00')
@@ -600,13 +602,13 @@ describe('CommissionWorkbench', () => {
     expect(salesRow(salary, '^Other allowances')).toHaveTextContent('RM 30.00')
     expect(salesRow(salary, '^Overtime')).toHaveTextContent('RM 40.00')
     expect(salesRow(salary, '^Payroll deductions')).toHaveTextContent('11.00')
-    expect(salesRow(salary, '^Gross pay')).toHaveTextContent('RM 1,430.00')
+    expect(salesRow(salary, '^Gross pay')).toHaveTextContent('RM 1,427.50')
     expect(salesRow(salary, '^Employee contributions')).toHaveTextContent('56.00')
     expect(salesRow(salary, '^PCB tax')).toHaveTextContent('15.00')
     expect(salesRow(salary, '^SKBBK')).toHaveTextContent('4.00')
-    expect(salesRow(salary, '^Estimated take-home pay')).toHaveTextContent('RM 1,355.00')
+    expect(salesRow(salary, '^Estimated take-home pay')).toHaveTextContent('RM 1,352.50')
 
-    expect(screen.getByText('Estimated take-home pay', { selector: 'span' }).parentElement).toHaveTextContent('RM 1,355.00')
+    expect(screen.getByText('Estimated take-home pay', { selector: 'span' }).parentElement).toHaveTextContent('RM 1,352.50')
     expect(saveOpenPicks).not.toHaveBeenCalled()
   })
 
@@ -622,11 +624,11 @@ describe('CommissionWorkbench', () => {
 
     renderBoard(salaryFixture(), 'applied', [{ staffId: 'agent', total: 1200 }])
     choose('Anthony')
-    expect(screen.getByText('In payroll: RM 1,200.00 · Difference RM 23.00')).toBeVisible()
+    expect(screen.getByText('In payroll: RM 1,200.00 · Difference RM 20.50')).toBeVisible()
     expect(screen.getByRole('link', { name: 'Payroll breakdown ↗' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/pay/agent')
     fireEvent.click(screen.getByRole('button', { name: '← Sales people' }))
     choose('Alex')
-    expect(screen.getByText('In payroll: RM 0.00 · Difference RM 90.00')).toBeVisible()
+    expect(screen.getByText('In payroll: RM 0.00 · Difference RM 88.80')).toBeVisible()
     expect(screen.queryByRole('link', { name: /breakdown/i })).toBeNull()
   })
 
@@ -649,7 +651,7 @@ describe('CommissionWorkbench', () => {
     const save = screen.getByRole('button', { name: 'Save Open Bill picks' })
     expect(save).toBeDisabled()
     expect(screen.getByText('Open Bill is preview-only while switched off for this month. Switch it on under This month pays, in the payroll bar, before saving picks.')).toBeVisible()
-    expect(salesRow(screen.getByRole('table', { name: 'Open Bill orders' }), 'SO-one')).toHaveTextContent('RM 20.00')
+    expect(salesRow(screen.getByRole('table', { name: 'Open Bill orders' }), 'SO-one')).toHaveTextContent('RM 19.60')
     fireEvent.click(save)
     expect(saveOpenPicks).not.toHaveBeenCalled()
   })
@@ -713,22 +715,22 @@ describe('CommissionWorkbench', () => {
     })
 
     it('reads the month as saved, never what is only drafted on this screen', () => {
-      board(fixture(), 'applied', [{ staffId: 'agent', total: 1_223 }, { staffId: 'leader', total: 90 }])
+      board(fixture(), 'applied', [{ staffId: 'agent', total: 1_220.5 }, { staffId: 'leader', total: 88.8 }])
       fireEvent.click(screen.getByText(/^Calculation setup/))
       fireEvent.click(screen.getByRole('checkbox', { name: 'KPI incentive' }))
       expect(within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' }))
         .toHaveTextContent('RM 1,265.00')
-      // Payroll's RM 1,313.00 still matches the month as saved.
+      // Payroll's RM 1,309.30 still matches the month as saved.
       expect(bar()).toHaveTextContent('The commission above matches it')
       expect(bar()).toHaveTextContent('This screen holds a draft')
     })
 
     it('says a month in payroll has moved since, by how much and for how many', () => {
-      board(fixture(), 'applied', [{ staffId: 'agent', total: 1_223 }, { staffId: 'leader', total: 80 }], { ...PAYROLL, sentAt: '2026-09-15T02:30:00Z' })
-      expect(bar()).toHaveTextContent('In payroll · RM 1,303.00')
+      board(fixture(), 'applied', [{ staffId: 'agent', total: 1_220.5 }, { staffId: 'leader', total: 80 }], { ...PAYROLL, sentAt: '2026-09-15T02:30:00Z' })
+      expect(bar()).toHaveTextContent('In payroll · RM 1,300.50')
       // Malaysia time, whatever the machine's zone.
       expect(bar()).toHaveTextContent(/Sent 15 Sept? 2026, 10:30/)
-      expect(bar()).toHaveTextContent('RM 1,313.00, RM 10.00 more · 1 person changed')
+      expect(bar()).toHaveTextContent('RM 1,309.30, RM 8.80 more · 1 person changed')
       expect(within(bar()).queryByRole('button')).toBeNull()
     })
   })

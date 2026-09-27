@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { VIEW_AS_COOKIE, isViewAsRole } from '@/lib/view-as'
+import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE, isViewAsRole } from '@/lib/view-as'
 
 // Switch the Principal's app-layer view to another role (or back to
 // principal, which clears the cookie). Reads the REAL role straight from the
@@ -40,6 +40,15 @@ export async function setViewAs(formData: FormData) {
   } else {
     store.delete(VIEW_AS_COOKIE)
   }
+  // The copy other tabs can read, so a portal tab still drawn in the old view
+  // redraws when it is next looked at (useViewAsSync). Never read by the
+  // server: the httpOnly cookie above is the only one that decides anything.
+  store.set(VIEW_AS_MIRROR_COOKIE, isViewAsRole(target) ? target : 'principal', {
+    httpOnly: false,
+    sameSite: 'lax',
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+  })
   if (target === 'revenue_member') redirect('/member')
   // Management links leave Revenue View without accepting arbitrary redirects.
   const destination = formData.get('destination')

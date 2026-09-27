@@ -5,11 +5,15 @@ import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '../_lib/sub-departments'
 import {
   loadCombos,
+  loadCostRatios,
   loadCostingGaps,
+  loadKpiItems,
   loadMaintenance,
   loadMirrorStatus,
   loadModels,
+  loadSchemeRules,
   loadSkus,
+  toPickSku,
 } from './load'
 import ProductListTabs, { type ProductTab } from './_components/ProductListTabs'
 import SkuMasterTab from './_components/SkuMasterTab'
@@ -17,6 +21,8 @@ import ModularTab from './_components/ModularTab'
 import MaintenanceTab from './_components/MaintenanceTab'
 import ComboPricingTab from './_components/ComboPricingTab'
 import CostingGapsSection from './_components/CostingGapsSection'
+import CostSettingTab from './_components/CostSettingTab'
+import KpiItemsTab from './_components/KpiItemsTab'
 import ProductWorkspace from './_components/ProductWorkspace'
 import { layoutsFromCookies } from './_components/column-layout'
 
@@ -32,19 +38,25 @@ import { layoutsFromCookies } from './_components/column-layout'
  * against: the Revenue calculator's, the monthly run's, the drill-downs'.
  * A delivery from the ERP never touches a price.
  *
- * Five tabs, the ERP's own four and the work list:
+ * Seven tabs — the ERP's own four, the work list, and two settings:
  *
- *   SKU Master     every SKU, and its price (a sofa module's per seat height
- *                  and fabric tier)
- *   Modular        the models, and what the Revenue calculator may offer of
- *                  each — its SKUs and its option dropdowns ("Modular 是独立的")
- *   Maintenance    the Bedframe and Sofa option pools and their surcharges;
- *                  the fabrics and the tier each costs at
- *   Combo Pricing  the sofa combos, and their price per seat height
- *   Costing gaps   what was sold and nothing could price, worth-first
+ *   SKU Master          every SKU, and its price (a sofa module's per seat
+ *                       height and fabric tier)
+ *   Modular             the models, and what the Revenue calculator may offer
+ *                       of each — its SKUs and its option dropdowns
+ *                       ("Modular 是独立的")
+ *   Maintenance         the Bedframe and Sofa option pools and their
+ *                       surcharges; the fabrics and the tier each costs at
+ *   Combo Pricing       the sofa combos, and their price per seat height
+ *   Costing gaps        what was sold and nothing could price, worth-first
+ *   Costing Setting     the ratio a cost is divided by for the Revenue Team,
+ *                       and the SKUs divided by a ratio of their own
+ *   Add-on / KPI Items  SKUs and Maintenance specials paid flat as KPI and
+ *                       taken off the bill's sales (2026-09-27)
  *
  * Each tab loads its own data (`?tab=`): the SKU master alone is 2,350 rows
- * and nobody reads all five at once.
+ * and nobody reads all seven at once. The two settings are per sub-department
+ * (`?sub=`, the first when absent).
  *
  * **Principal only** (`product_list`).
  */
@@ -53,15 +65,15 @@ import { layoutsFromCookies } from './_components/column-layout'
 // so a gap older than that is not one anybody can act on.
 const GAP_WINDOW_FROM = '2026-08-01'
 
-const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 'gaps']
+const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 'gaps', 'costing', 'kpi']
 
 export default async function ProductListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; q?: string }>
+  searchParams: Promise<{ tab?: string; q?: string; sub?: string }>
 }) {
   await requirePermission('product_list')
-  const { tab: asked, q } = await searchParams
+  const { tab: asked, q, sub: subAsked } = await searchParams
   const tab: ProductTab = (TABS as readonly string[]).includes(asked ?? '') ? (asked as ProductTab) : 'sku'
 
   const gapTo = new Date()
@@ -88,6 +100,49 @@ export default async function ProductListPage({
     body = <MaintenanceTab options={maintenance.options} fabrics={maintenance.fabrics} />
   } else if (tab === 'combos') {
     body = <ComboPricingTab combos={await loadCombos()} />
+  } else if (tab === 'costing' || tab === 'kpi') {
+    // Per sub-department: each keeps its own ratio and its own KPI items.
+    const current = subDepts.find(s => s.slug === subAsked) ?? subDepts[0]
+    const subs = subDepts.map(s => ({ slug: s.slug, name: s.name }))
+    const rules = current?.schemeId ? await loadSchemeRules(current.schemeId) : null
+    if (!current || !current.schemeId || !rules) {
+      body = (
+        <p className="product-sync-notice" role="status">
+          {current ? `${current.name} has no active scheme yet.` : 'No Revenue sub-department is set up yet.'}
+        </p>
+      )
+    } else if (tab === 'costing') {
+      const [skus, ratios] = await Promise.all([loadSkus(), loadCostRatios(current.schemeId)])
+      body = (
+        <CostSettingTab
+          key={current.slug}
+          sub={{ slug: current.slug, name: current.name }}
+          subs={subs}
+          schemeId={current.schemeId}
+          divisor={rules.divisor}
+          ratios={ratios}
+          skus={skus.map(toPickSku)}
+        />
+      )
+    } else {
+      const [skus, items, maintenance] = await Promise.all([
+        loadSkus(),
+        loadKpiItems(current.schemeId),
+        loadMaintenance(),
+      ])
+      body = (
+        <KpiItemsTab
+          key={current.slug}
+          sub={{ slug: current.slug, name: current.name }}
+          subs={subs}
+          schemeId={current.schemeId}
+          enableKpi={rules.enableKpi}
+          items={items}
+          skus={skus.map(toPickSku)}
+          specials={maintenance.options.filter(o => o.pool === 'bedframe_specials' || o.pool === 'sofa_specials')}
+        />
+      )
+    }
   } else {
     body = (
       <CostingGapsSection

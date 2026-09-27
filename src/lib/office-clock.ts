@@ -67,3 +67,18 @@ export function officeClock(at: Date = new Date()): Clock {
     quarter: `Q${Math.floor((Number(part(monthNo, 'month')) - 1) / 3) + 1} ${year}`,
   }
 }
+
+/**
+ * The office's calendar date, `YYYY-MM-DD` — the day the database calls
+ * `(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date`. Assembled from parts, not
+ * a locale's date format, which is not the same everywhere.
+ */
+export function officeDate(at: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: OFFICE_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at)
+  return `${part(parts, 'year')}-${part(parts, 'month')}-${part(parts, 'day')}`
+}

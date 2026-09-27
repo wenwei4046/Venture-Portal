@@ -2,11 +2,12 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getUser } from "@/lib/auth";
+import { getMemberUser } from "@/lib/auth";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { calculateQuote, cents, customerQuote } from "./calculator";
+import { quoteCostRatios, quoteKpiItems } from "./quote-rules";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
@@ -128,7 +129,7 @@ async function session(
   permission?: string,
   allowPrincipal = false,
 ): Promise<SupabaseClient> {
-  const user = await getUser();
+  const user = await getMemberUser();
   if (!user?.is_active) throw new Error("Sign in with an active work account.");
   if (
     permission &&
@@ -222,7 +223,7 @@ function requestLabels(request: MemberRequest): MemberRequest {
 
 /** No demo fallback and no privileged row query: the database resolves the caller. */
 export async function loadMemberData(): Promise<MemberData> {
-  const user = await getUser();
+  const user = await getMemberUser();
   const principalView = !!user && isPrincipalAccount(user);
   const empty: MemberData = {
     demo: false,
@@ -301,7 +302,7 @@ export async function loadMemberInsight(
   context?: MemberReadContext,
 ): Promise<MemberOutcome<MemberInsight>> {
   return outcome(async () => {
-    const user = await getUser();
+    const user = await getMemberUser();
     if (!user?.is_active) throw new Error("Sign in with an active work account.");
     const principal = principalReadContext(user, context);
     const client = await session("member_insight", principal);
@@ -340,7 +341,7 @@ export async function loadMemberInsight(
 /** The mapping map behind My team. Names, titles and reporting lines; no pay. */
 export async function loadMemberOrgMap(context?: Pick<MemberReadContext, "subDepartmentId">): Promise<MemberOutcome<MemberOrgMap>> {
   return outcome(async () => {
-    const user = await getUser();
+    const user = await getMemberUser();
     if (!user?.is_active) throw new Error("Sign in with an active work account.");
     const principal = principalReadContext(user, context, true);
     const client = await session("member_portal", principal);
@@ -395,11 +396,16 @@ export async function calculateMemberQuote(
       cents(input.delivery || "0") === null
     )
       throw new Error("Enter a valid amount with up to two decimal places.");
-    const user = await getUser();
+    const user = await getMemberUser();
     const principalView = !!user && isPrincipalAccount(user);
     const build = quoteBuild(input.build);
     const client = await session("member_quote", principalView);
-    const context = await rpc<{ bands: MemberBand[]; costDivisor?: number | string | null }>(
+    const context = await rpc<{
+      bands: MemberBand[];
+      costDivisor?: number | string | null;
+      costRatios?: unknown;
+      kpiItems?: unknown;
+    }>(
       client,
       principalView ? "member_principal_quote_context" : "member_quote_context",
       { p_scheme: input.schemeId },
@@ -453,7 +459,13 @@ export async function calculateMemberQuote(
         "A free gift size does not match a product in this cart. Please select a matching size.",
       );
     const checked: QuoteInput = { ...input, build };
-    const result = calculateQuote(checked, products, context.bands, { costDivisor }, pricing);
+    const result = calculateQuote(
+      checked,
+      products,
+      context.bands,
+      { costDivisor, costRatios: quoteCostRatios(context.costRatios), kpiItems: quoteKpiItems(context.kpiItems) },
+      pricing,
+    );
     if (!result.valid)
       throw new Error(result.error ?? "The quote could not be calculated.");
     return { ...result, customerText: customerQuote(checked, products, result) };

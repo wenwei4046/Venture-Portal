@@ -15,6 +15,12 @@ import {
   type OptionPriceEdit,
   type SkuPriceEdit,
 } from '@/lib/catalogue/edits'
+import {
+  validateCostSetting,
+  validateKpiItems,
+  type CostSettingEdit,
+  type KpiItemsEdit,
+} from '@/lib/catalogue/rule-edits'
 
 /**
  * Revenue → Product List: the portal's OWN decisions about the ERP's catalogue
@@ -28,6 +34,12 @@ import {
  * A PRICE MOVES MARGINS. New and re-pushed sales lines are costed at the new
  * price from the moment it is saved; a month already landed moves only when
  * somebody presses Recost on it, and a paid month refuses (23RUN).
+ *
+ * Two tabs set commission rules rather than prices (2026-09-27): Costing
+ * Setting — the ratio a cost is divided by for the Revenue Team, per
+ * sub-department and per SKU — and Add-on / KPI Items. Both are read by the run
+ * when it is computed, never stored on a bill, so a month moves when its run
+ * is computed again.
  *
  * The catalogue tables postdate database.types.ts — untyped-client convention.
  */
@@ -180,4 +192,63 @@ export async function saveComboPrices(edits: ComboPriceEdit[]): Promise<SaveSumm
   }
   refresh()
   return { saved: rows.length }
+}
+
+// ─── Costing Setting · Add-on / KPI Items ───────────────────────────────────
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The two writers' own refusals already read as sentences; the database's
+ * constraints get one here.
+ */
+function ruleFail(what: string, err: { message: string; code?: string } | null): never {
+  const code = err?.code
+  if (code === '23P01') throw new Error('That item is already a KPI item of this sub-department')
+  if (code === '23505') throw new Error('Two SKUs share that code — only one of them can carry its own ratio')
+  if (code === 'P0002' || code === '22023' || code === '23503' || code === '40001') throw new Error(err!.message)
+  throw new Error(`Could not save ${what}: ${err?.message ?? 'unknown error'}`)
+}
+
+function schemeOf(schemeId: string): string {
+  if (typeof schemeId !== 'string' || !UUID.test(schemeId)) throw new Error('No sub-department chosen')
+  return schemeId
+}
+
+/** One sub-department's cost ratio and its SKUs' own, in one transaction. */
+export async function saveCostSetting(schemeId: string, edit: CostSettingEdit): Promise<SaveSummary> {
+  await requirePermission('product_list')
+  const scheme = schemeOf(schemeId)
+  const plan = guard(() => validateCostSetting(edit))
+  const sb = await client()
+  const { data, error } = await sb.rpc('catalogue_save_cost_setting', {
+    p_scheme: scheme,
+    p_divisor: plan.divisor,
+    p_ratios: plan.ratios,
+    p_removes: plan.removes,
+  })
+  if (error) ruleFail('the costing setting', error)
+  refresh()
+  return { saved: Number(data ?? 0) }
+}
+
+/**
+ * One sub-department's KPI items. Added items start today; a new amount, or a
+ * removal, of an item begun before today closes it yesterday, so a month
+ * already run keeps what it was run at.
+ */
+export async function saveKpiItems(schemeId: string, edit: KpiItemsEdit): Promise<SaveSummary> {
+  await requirePermission('product_list')
+  const scheme = schemeOf(schemeId)
+  const plan = guard(() => validateKpiItems(edit))
+  const sb = await client()
+  const { data, error } = await sb.rpc('catalogue_save_kpi_items', {
+    p_scheme: scheme,
+    p_adds: plan.adds,
+    p_changes: plan.changes,
+    p_removes: plan.removes,
+  })
+  if (error) ruleFail('the KPI items', error)
+  refresh()
+  return { saved: Number(data ?? 0) }
 }

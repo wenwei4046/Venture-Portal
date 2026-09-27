@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getUser } from "@/lib/auth";
+import { getMemberUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readKpiSummary, type MemberKpiSummaryOutcome } from "./kpi-summary";
 import { principalReadContext } from "./read-access";
@@ -10,7 +10,7 @@ import type { MemberReadContext } from "./types";
 /** Employees stay self-scoped; Principal reads require an explicit, independently authorized context. */
 export async function loadMemberKpiSummary(schemeId: string, context?: MemberReadContext): Promise<MemberKpiSummaryOutcome> {
   try {
-    const user = await getUser();
+    const user = await getMemberUser();
     if (!user?.is_active || (!isPrincipalAccount(user) && !user.permissions.includes("member_portal"))) {
       return { ok: false, error: "Member portal access is required." };
     }

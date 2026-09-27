@@ -3,13 +3,15 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { User, UserRole } from '@/types'
-import { VIEW_AS_COOKIE, isViewAsRole } from '@/lib/view-as'
+import { VIEW_AS_COOKIE, honouredViewAs, type ViewSurface } from '@/lib/view-as'
 import { can, type Permission } from '@/lib/permissions'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
 // (JWT verification + users row + permissions) into one set per HTTP request.
-export const getUser = cache(async (): Promise<User | null> => {
+// Keyed by surface, so a request reads the caller once for the surface it is
+// answered on (the two never meet in one request).
+const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   const supabase = await createClient()
   // Who is calling, from the JWT's own claims. `getClaims()` verifies the
   // token's signature locally against the project's cached public keys (the
@@ -29,9 +31,9 @@ export const getUser = cache(async (): Promise<User | null> => {
   // rather than taken from current_permissions(), whose answer is about the
   // real account. The cookie is read first so that lookup shares the round
   // trip below instead of being a third one behind it (2026-09-11); it is
-  // honoured only once the row proves a Principal.
-  const viewAsCookie = (await cookies()).get(VIEW_AS_COOKIE)?.value ?? ''
-  const viewAs = isViewAsRole(viewAsCookie) ? viewAsCookie : null
+  // honoured only once the row proves a Principal — and the Revenue View only
+  // in the member app (lib/view-as.ts, 2026-09-27).
+  const viewAs = honouredViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value, surface)
 
   const [{ data }, { data: perms }, masked] = await Promise.all([
     supabase.from('users').select('*').eq('id', authUserId).single(),
@@ -61,6 +63,19 @@ export const getUser = cache(async (): Promise<User | null> => {
 
   return user
 })
+
+/** The caller, anywhere but the member app: the portal, `/`, print pages. */
+export function getUser(): Promise<User | null> {
+  return loadUser('portal')
+}
+
+/**
+ * The caller as the member app sees them — the one surface where a Principal's
+ * Revenue View applies. Everything under `(member)` and `lib/member` asks here.
+ */
+export function getMemberUser(): Promise<User | null> {
+  return loadUser('member')
+}
 
 export async function requireAuth(): Promise<User> {
   const user = await getUser()
