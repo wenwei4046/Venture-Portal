@@ -121,6 +121,14 @@ export function kpiItemLabel(item: KpiItem): string {
   return kpiSourceOf(item) === 'sku' ? kpiCodeKey(item.productCode) : (item.optionValue ?? '').trim()
 }
 
+/** What an item is, and how a bill counts it — the words the tabs print. */
+export function kpiItemKind(item: Pick<KpiItem, 'source' | 'optionPool'>): { kind: string; counted: string } {
+  if (kpiSourceOf(item) === 'sku') return { kind: 'SKU', counted: 'Per unit' }
+  return item.optionPool === 'sofa_specials'
+    ? { kind: 'Sofa special', counted: 'Once per sofa bill' }
+    : { kind: 'Bed frame special', counted: 'Per bed frame' }
+}
+
 export function indexKpiItems(items: readonly KpiItem[]): KpiIndex {
   const byCode = new Map<string, KpiItem>()
   const byOption = new Map<KpiOptionPool, Map<string, KpiItem>>()

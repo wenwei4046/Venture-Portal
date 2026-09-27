@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-09-27
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.10 (Sheet theme on HR's whole view — Overview and People included / Walnut shell / approved Product List workspace) — single source of truth for all UI work
+**Status:** v3.11 (Sheet theme on HR's whole view — Overview and People included / Walnut shell / approved Product List workspace, with its two settings tabs) — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -162,6 +162,24 @@ is not rewritten.
   retain edits, and partially successful maintenance batches retry only failures.
 - Costing gaps is a searchable work list with reason filters and a direct SKU
   lookup. Sum lines and revenue; do not sum per-code bill counts, which overlap.
+- **Two settings tabs close the rail (2026-09-27): Costing Setting and Add-on /
+  KPI Items.** Both are per sub-department — the filter panel holds one row of
+  sub-department chips (`?sub=`, carried from one of the two tabs to the other;
+  switching with unsaved changes asks keep/discard like a tab switch) — and
+  both scroll with the page. Under the panel a card holds the sub-department's
+  own figure: the ratio every SKU's cost is divided by, with a worked RM 1,000
+  example, or the KPI switch — On on the ledger green wash, Off on the amber
+  one — and a link to Rules, where it is set. Then the workspace's own rhythm:
+  heading and count, *Edit ratios* / *Edit items*, then *Cancel changes* and
+  *Save N changes*. While editing, a peach picker panel sits above the table:
+  a search that shows nothing until something is typed (twenty results at
+  most, *narrow the search* beyond), what is already listed marked *On the
+  list*; Costing Setting ticks SKUs and adds them at one ratio, Add-on / KPI
+  Items adds one at a time from SKU Master, Bed frame specials or Sofa
+  specials, at the amount typed beside the search. Added rows land at the top
+  on the peach wash with a NEW chip; a row being removed fades and says so,
+  with *Keep* to undo. Nothing is written until Save; a failed save keeps
+  every draft.
 - **One screen, not the remainder (2026-09-27).** SKU Master and Costing gaps
   hold the count row, its notes and the table in a stage exactly one screen tall
   (`.sku-stage`) instead of the space the filters leave: the page scrolls again,
@@ -2217,7 +2235,8 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
-- **2026-09-27 v3.10 (latest)** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
+- **2026-09-27 v3.11 (latest)** — Product List gains **Costing Setting** and **Add-on / KPI Items**, per sub-department: a chip row for the sub-department, a card for its own figure (the cost ratio at work on RM 1,000, or the KPI switch with a link to Rules), and a peach picker panel above the table while editing. Both scroll with the page. See "Product List workspace".
+- **2026-09-27 v3.10** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
 - **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List workspace".
 - **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List workspace".
 - **2026-09-27 v3.9** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".

@@ -173,7 +173,8 @@ async function cloneSchemeChildren(
 
   const simple: Array<[table: string, columns: string[]]> = [
     ['comm_item_groups', ['item_group', 'commissionable', 'note']],
-    ['comm_kpi_items', ['product_code', 'product_name', 'kpi_amount', 'effective_from', 'effective_to']],
+    ['comm_kpi_items', ['source', 'product_code', 'product_name', 'erp_product_id', 'option_pool', 'option_value', 'kpi_amount', 'effective_from', 'effective_to']],
+    ['comm_cost_ratios', ['erp_product_id', 'product_code', 'ratio', 'note']],
     ['comm_kpi_thresholds', ['tier_label', 'min_qty', 'bonus_pct', 'effective_from', 'effective_to']],
     ['comm_open_bill_rules', ['bill_rank', 'pct', 'effective_from', 'effective_to']],
     ['comm_promotion_rules', ['from_rank_key', 'to_rank_key', 'alternative_group', 'criterion', 'threshold_amount', 'threshold_qty', 'margin_band_key', 'consecutive_months', 'is_enforced', 'note']],
@@ -584,39 +585,8 @@ export async function upsertItemGroup(formData: FormData) {
 
 // ─── KPI items and thresholds ───────────────────────────────────────────────
 
-export async function upsertKpiItem(formData: FormData) {
-  const user = await requirePermission('revenue')
-  const supabase = await client()
-
-  const id = text(formData, 'id')
-  const amount = num(formData, 'kpi_amount')
-  if (amount === null || amount < 0) throw new Error('KPI amount must be zero or more')
-
-  const row = {
-    scheme_id: required(formData, 'scheme_id', 'Scheme'),
-    product_code: required(formData, 'product_code', 'Item code'),
-    product_name: text(formData, 'product_name') || null,
-    kpi_amount: amount,
-    effective_from: text(formData, 'effective_from') || new Date().toISOString().slice(0, 10),
-    created_by: user.id,
-  }
-
-  check(
-    id
-      ? (await supabase.from('comm_kpi_items').update(row).eq('id', id)).error
-      : (await supabase.from('comm_kpi_items').insert(row)).error,
-    'Could not save the KPI item',
-  )
-
-  refresh()
-}
-
-export async function deleteKpiItem(id: string) {
-  await requirePermission('revenue')
-  const supabase = await client()
-  check((await supabase.from('comm_kpi_items').delete().eq('id', id)).error, 'Could not remove the KPI item')
-  refresh()
-}
+// KPI items are set on Product List › Add-on / KPI Items since 2026-09-27
+// (`catalogue-actions.ts` saveKpiItems): a SKU or a special, effective-dated.
 
 export async function upsertKpiThreshold(formData: FormData) {
   await requirePermission('revenue')

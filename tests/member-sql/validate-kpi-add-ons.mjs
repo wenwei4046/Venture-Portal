@@ -87,9 +87,12 @@ try {
       id uuid PRIMARY KEY, sub_department_id uuid NOT NULL,
       enable_kpi boolean NOT NULL DEFAULT false, is_active boolean NOT NULL DEFAULT true,
       effective_from date NOT NULL DEFAULT '2026-01-01', effective_to date,
-      deposit_threshold_pct numeric, revenue_cost_divisor numeric(6,4) NOT NULL DEFAULT 1);
+      deposit_threshold_pct numeric, revenue_cost_divisor numeric(6,4) NOT NULL DEFAULT 1,
+      updated_at timestamptz);
     CREATE TABLE comm_item_groups(scheme_id uuid, item_group text, commissionable boolean);
-    CREATE TABLE erp_products(erp_id text PRIMARY KEY, item_code text NOT NULL, removed_at timestamptz);
+    CREATE TABLE erp_products(erp_id text PRIMARY KEY, item_code text NOT NULL, description text, removed_at timestamptz);
+    CREATE TABLE erp_maintenance_options(erp_company_id int NOT NULL DEFAULT 1, pool text NOT NULL,
+      value text NOT NULL, removed_at timestamptz);
     CREATE FUNCTION comm_first_paid_month(uuid) RETURNS date LANGUAGE sql STABLE AS $$ SELECT NULL::date $$;
 
     -- comm_kpi_items exactly as the foundation created it (20260831010000).
@@ -111,7 +114,11 @@ try {
     INSERT INTO comm_item_groups VALUES
       ('${SCHEME}', 'mattress', true), ('${SCHEME}', 'bedframe', true), ('${SCHEME}', 'sofa', true),
       ('${SCHEME}', 'accessory', true), ('${SCHEME}', 'service', false);
-    INSERT INTO erp_products VALUES ('mfg-special', 'SPECIAL-SKU', NULL), ('mfg-pillow', 'AK-CS PIL', NULL);
+    INSERT INTO erp_products VALUES ('mfg-special', 'SPECIAL-SKU', 'Special mattress', NULL),
+                                    ('mfg-pillow', 'AK-CS PIL', 'Akemi cushion pillow', NULL);
+    INSERT INTO erp_maintenance_options(pool, value) VALUES
+      ('bedframe_specials', 'HB Straight'), ('bedframe_specials', 'No Side Panel'),
+      ('sofa_specials', 'Nylon Fabric'), ('sofa_specials', 'Wooden Arm');
   `)
 
   await productionFunction('20260917020000_venue_feed_window_pay_preview', 'venue_key')
@@ -232,6 +239,90 @@ try {
        FROM member_order_facts($1, NULL, NULL)`, [SCHEME])).map(r => [r.order_no, r]))
   check([facts.B1.revenue, facts.B1.goods, facts.B1.kpi], [9_800, 9_800, 1], 'the member facts agree with the month')
   check([facts.B2.kpi, facts.B3.kpi, facts.B4.kpi, facts.B5.kpi], [2, 1, 0, 4], 'and count the KPI items the run counts')
+
+  // ─── the Product List's writers ──────────────────────────────────────────
+  // A scheme of their own, so nothing above moves. "Today" is the office's.
+
+  const TAB = id(6)
+  await q(`INSERT INTO comm_schemes(id, sub_department_id, revenue_cost_divisor) VALUES ($1, $2, 0.7)`, [TAB, FAIR_SUB])
+  const today = await one(`SELECT ((now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)::text`)
+  const yesterday = await one(`SELECT (((now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date) - 1)::text`)
+  const daysAgo = n => q(`SELECT (((now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date) - $1::int)::text AS d`, [n]).then(r => r[0].d)
+  const saveCost = (divisor, ratios, removes = []) =>
+    one(`SELECT catalogue_save_cost_setting($1, $2, $3::jsonb, $4::text[])`, [TAB, divisor, JSON.stringify(ratios), removes])
+  const ratioRows = () => q(`SELECT erp_product_id, product_code, ratio::float AS ratio FROM comm_cost_ratios WHERE scheme_id = $1 ORDER BY 1`, [TAB])
+
+  check(await saveCost(0.65, [{ erp_product_id: 'mfg-special', ratio: 0.6 }]), 2, 'the ratio and one SKU, in one call')
+  check(Number(await one(`SELECT revenue_cost_divisor FROM comm_schemes WHERE id = $1`, [TAB])), 0.65, "the sub-department's ratio")
+  check(await ratioRows(), [{ erp_product_id: 'mfg-special', product_code: 'SPECIAL-SKU', ratio: 0.6 }],
+    "a SKU's own ratio, its code read from the SKU master")
+  check(await saveCost(0.65, [{ erp_product_id: 'mfg-special', ratio: 0.6 }]), 1, 'an unchanged ratio is not a write')
+  await q(`UPDATE erp_products SET item_code = 'SPECIAL-SKU-2' WHERE erp_id = 'mfg-special'`)
+  await saveCost(null, [{ erp_product_id: 'mfg-special', ratio: 0.55 }])
+  check(await ratioRows(), [{ erp_product_id: 'mfg-special', product_code: 'SPECIAL-SKU-2', ratio: 0.55 }],
+    'saving a SKU the ERP renamed follows it to its new code')
+  await q(`UPDATE erp_products SET item_code = 'SPECIAL-SKU' WHERE erp_id = 'mfg-special'`)
+  await reject(`SELECT catalogue_save_cost_setting($1, NULL, '[{"erp_product_id":"nobody","ratio":0.6}]'::jsonb, '{}')`, [TAB],
+    /not in the SKU Master/, 'a SKU the master does not hold')
+  await reject(`SELECT catalogue_save_cost_setting($1, 0, '[]'::jsonb, '{}')`, [TAB], /above 0/, 'a ratio of nothing')
+  check(await saveCost(null, [], ['mfg-special']), 1, 'a SKU back to the ratio of its sub-department')
+  check([await ratioRows(), Number(await one(`SELECT revenue_cost_divisor FROM comm_schemes WHERE id = $1`, [TAB]))], [[], 0.65],
+    "and the sub-department's ratio left alone")
+
+  const saveKpi = (adds, changes = [], removes = []) =>
+    one(`SELECT catalogue_save_kpi_items($1, $2::jsonb, $3::jsonb, $4::uuid[])`,
+      [TAB, JSON.stringify(adds), JSON.stringify(changes), removes])
+  const kpiRows = () => q(
+    `SELECT source, coalesce(option_value, product_code) AS item, product_name AS name, kpi_amount::float AS amount,
+            effective_from::text AS "from", effective_to::text AS "to"
+       FROM comm_kpi_items WHERE scheme_id = $1 ORDER BY 2, 5`, [TAB])
+  const kpiId = async (item, from) => one(
+    `SELECT id FROM comm_kpi_items WHERE scheme_id = $1 AND coalesce(option_value, product_code) = $2 AND effective_from = $3`,
+    [TAB, item, from])
+
+  check(await saveKpi([{ source: 'sku', erp_product_id: 'mfg-pillow', kpi_amount: 50 },
+                       { source: 'option', option_pool: 'bedframe_specials', option_value: ' hb  STRAIGHT ', kpi_amount: 200 }]), 2,
+    'two items added in one call')
+  check(await kpiRows(), [
+    { source: 'sku', item: 'AK-CS PIL', name: 'Akemi cushion pillow', amount: 50, from: today, to: null },
+    { source: 'option', item: 'HB Straight', name: null, amount: 200, from: today, to: null },
+  ], "in force from today: a SKU under its master's code and name, a special under its pool's spelling")
+  await reject(`SELECT catalogue_save_kpi_items($1, '[{"source":"option","option_pool":"bedframe_specials","option_value":"Gold Trim","kpi_amount":1}]'::jsonb, '[]'::jsonb, '{}')`,
+    [TAB], /not in the bedframe_specials Maintenance pool/, 'only a special its pool holds')
+  await reject(`SELECT catalogue_save_kpi_items($1, '[{"source":"option","option_pool":"bedframe_specials","option_value":"HB Straight","kpi_amount":1}]'::jsonb, '[]'::jsonb, '{}')`,
+    [TAB], /no_overlapping_kpi_option/, 'never twice at once')
+  await reject(`SELECT catalogue_save_kpi_items($1, '[{"source":"model","kpi_amount":1}]'::jsonb, '[]'::jsonb, '{}')`,
+    [TAB], /a SKU or a special/, 'a SKU or a special, nothing else')
+
+  // Begun today: a change is the row itself.
+  check(await saveKpi([], [{ id: await kpiId('AK-CS PIL', today), kpi_amount: 60 }]), 1, 'a new amount on an item begun today')
+  check((await kpiRows()).filter(r => r.item === 'AK-CS PIL').map(r => [r.amount, r.from, r.to]), [[60, today, null]],
+    'changes it where it stands')
+
+  // Begun before today: the old amount keeps its days.
+  const tenDaysAgo = await daysAgo(10)
+  await q(`INSERT INTO comm_kpi_items(scheme_id, source, option_pool, option_value, kpi_amount, effective_from)
+           VALUES ($1, 'option', 'sofa_specials', 'Nylon Fabric', 150, $2)`, [TAB, tenDaysAgo])
+  const nylonBefore = await kpiId('Nylon Fabric', tenDaysAgo)
+  check(await saveKpi([], [{ id: nylonBefore, kpi_amount: 180 }]), 1, 'a new amount on an item begun before today')
+  check((await kpiRows()).filter(r => r.item === 'Nylon Fabric').map(r => [r.amount, r.from, r.to]),
+    [[150, tenDaysAgo, yesterday], [180, today, null]], 'closes it yesterday and opens the new amount today')
+  check(await saveKpi([], [{ id: await kpiId('Nylon Fabric', today), kpi_amount: 180 }]), 0, 'an unchanged amount is not a write')
+
+  // Removed: begun before today closes yesterday; begun today goes.
+  const fiveDaysAgo = await daysAgo(5)
+  await q(`INSERT INTO comm_kpi_items(scheme_id, source, option_pool, option_value, kpi_amount, effective_from)
+           VALUES ($1, 'option', 'sofa_specials', 'Wooden Arm', 99, $2)`, [TAB, fiveDaysAgo])
+  check(await saveKpi([], [], [await kpiId('Wooden Arm', fiveDaysAgo), await kpiId('Nylon Fabric', today)]), 2, 'two removed')
+  check((await kpiRows()).filter(r => r.source === 'option' && r.item !== 'HB Straight').map(r => [r.item, r.amount, r.from, r.to]), [
+    ['Nylon Fabric', 150, tenDaysAgo, yesterday],
+    ['Wooden Arm', 99, fiveDaysAgo, yesterday],
+  ], 'the month already run keeps them; the amount begun today never was')
+  await reject(`SELECT catalogue_save_kpi_items($1, '[]'::jsonb, '[]'::jsonb, $2::uuid[])`, [TAB, [nylonBefore]],
+    /changed since the page was opened/, 'an item no longer in force')
+  await reject(`SELECT catalogue_save_kpi_items($1, '[]'::jsonb, $2::jsonb, '{}')`,
+    [SCHEME, JSON.stringify([{ id: await kpiId('AK-CS PIL', today), kpi_amount: 1 }])],
+    /changed since the page was opened/, "never another sub-department's item")
 
   console.log(`PASS: ${checks} KPI add-on and cost ratio checks. Real migration 20260927050000; synthetic surroundings. No live database connection.`)
 } finally {

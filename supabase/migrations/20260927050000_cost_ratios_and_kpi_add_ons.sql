@@ -35,6 +35,12 @@
 --    member_kpi_for_staff (the Today KPI card), member_arena_history_for_staff
 --    (fair results) and the two quote contexts (the calculator).
 --
+-- 5. The two tabs save through catalogue_save_cost_setting and
+--    catalogue_save_kpi_items, each one transaction. A KPI item's new amount
+--    closes the old row yesterday and opens today's, so a month already run
+--    keeps the amount it was run at (the run reads the list as at the month's
+--    end); an item removed the same way stops from this month.
+--
 -- NOTHING MOVES TODAY: no ratio exists, no KPI item exists, and both schemes
 -- have KPI switched off. Each change is the old answer when nothing is set.
 
@@ -65,15 +71,18 @@ COMMENT ON TABLE comm_cost_ratios IS
 
 ALTER TABLE comm_cost_ratios ENABLE ROW LEVEL SECURITY;
 
--- Written by the Principal (Product List, product_list); read by whoever runs
--- the commission (HR), as the catalogue tables are (20260924020000).
+-- Set on the Product List, whose tab is the Principal's (product_list). At the
+-- table it is a commission rule like every comm_* table — Principal and HR —
+-- because HR already sets the scheme's own ratio on Rules, and a new
+-- sub-department that follows Fair (created by either) copies these rows.
 CREATE POLICY comm_cost_ratios_principal_all ON comm_cost_ratios
     FOR ALL TO authenticated
     USING ((SELECT has_scope(ARRAY['admin'])))
     WITH CHECK ((SELECT has_scope(ARRAY['admin'])));
-CREATE POLICY comm_cost_ratios_hr_select ON comm_cost_ratios
-    FOR SELECT TO authenticated
-    USING ((SELECT has_scope(ARRAY['hr'])));
+CREATE POLICY comm_cost_ratios_hr_all ON comm_cost_ratios
+    FOR ALL TO authenticated
+    USING ((SELECT has_scope(ARRAY['hr'])))
+    WITH CHECK ((SELECT has_scope(ARRAY['hr'])));
 
 -- ── 2. comm_kpi_items: a SKU or a special ──────────────────────────────────
 
@@ -696,5 +705,196 @@ BEGIN
  RETURN jsonb_build_object('schemeId',p_scheme,'subDepartmentId',v_sub,'bands',v_bands,'costDivisor',coalesce(v_divisor,1),
   'costRatios',v_ratios,'kpiItems',v_kpi);
 END $function$;
+
+-- ── 9. The Product List's two writers ───────────────────────────────────────
+-- Costing Setting and Add-on / KPI Items save through these
+-- (catalogue-actions.ts, behind product_list), each in ONE transaction.
+-- SECURITY INVOKER: RLS decides who may write, as it does for every comm_*
+-- rule table. What names a SKU or a special is read HERE, never taken from
+-- the caller: a SKU's code and name from erp_products, a special's spelling
+-- from its Maintenance pool.
+
+CREATE OR REPLACE FUNCTION catalogue_save_cost_setting(
+    p_scheme  UUID,
+    p_divisor NUMERIC,  -- the sub-department's ratio; NULL leaves it alone
+    p_ratios  JSONB,    -- [{erp_product_id, ratio}]: a SKU's own ratio, set or changed
+    p_removes TEXT[]    -- SKUs going back to the sub-department's ratio
+) RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path TO 'public'
+AS $fn$
+DECLARE
+    v_touched INTEGER := 0;
+    v_n       INTEGER;
+    v_missing TEXT;
+BEGIN
+    PERFORM 1 FROM comm_schemes WHERE id = p_scheme;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Unknown sub-department scheme' USING ERRCODE = 'P0002';
+    END IF;
+
+    IF p_divisor IS NOT NULL THEN
+        -- The range 20260915060000 gave revenue_cost_divisor.
+        IF NOT (p_divisor > 0 AND p_divisor <= 10) THEN
+            RAISE EXCEPTION 'A cost ratio must be above 0 and at most 10' USING ERRCODE = '22023';
+        END IF;
+        UPDATE comm_schemes
+           SET revenue_cost_divisor = p_divisor, updated_at = now()
+         WHERE id = p_scheme AND revenue_cost_divisor IS DISTINCT FROM p_divisor;
+        GET DIAGNOSTICS v_n = ROW_COUNT;
+        v_touched := v_touched + v_n;
+    END IF;
+
+    IF COALESCE(CARDINALITY(p_removes), 0) > 0 THEN
+        DELETE FROM comm_cost_ratios WHERE scheme_id = p_scheme AND erp_product_id = ANY (p_removes);
+        GET DIAGNOSTICS v_n = ROW_COUNT;
+        v_touched := v_touched + v_n;
+    END IF;
+
+    IF jsonb_typeof(p_ratios) = 'array' AND jsonb_array_length(p_ratios) > 0 THEN
+        SELECT r.erp_product_id INTO v_missing
+          FROM jsonb_to_recordset(p_ratios) AS r(erp_product_id TEXT, ratio NUMERIC)
+         WHERE NOT EXISTS (SELECT 1 FROM erp_products p WHERE p.erp_id = r.erp_product_id)
+         LIMIT 1;
+        IF FOUND THEN
+            RAISE EXCEPTION 'SKU % is not in the SKU Master', v_missing USING ERRCODE = '23503';
+        END IF;
+        -- The code is read again on every save, so saving a SKU the ERP
+        -- renamed follows it to the code its new bills carry.
+        INSERT INTO comm_cost_ratios (scheme_id, erp_product_id, product_code, ratio, updated_by, updated_at)
+        SELECT p_scheme, r.erp_product_id, p.item_code, r.ratio, auth.uid(), now()
+          FROM jsonb_to_recordset(p_ratios) AS r(erp_product_id TEXT, ratio NUMERIC)
+          JOIN erp_products p ON p.erp_id = r.erp_product_id
+        ON CONFLICT (scheme_id, erp_product_id) DO UPDATE
+           SET product_code = EXCLUDED.product_code,
+               ratio        = EXCLUDED.ratio,
+               updated_by   = EXCLUDED.updated_by,
+               updated_at   = EXCLUDED.updated_at;
+        GET DIAGNOSTICS v_n = ROW_COUNT;
+        v_touched := v_touched + v_n;
+    END IF;
+
+    RETURN v_touched;
+END;
+$fn$;
+
+COMMENT ON FUNCTION catalogue_save_cost_setting(UUID, NUMERIC, JSONB, TEXT[]) IS
+    'Product List › Costing Setting: a sub-department''s cost ratio and its SKUs'' own, in one transaction (2026-09-27).';
+
+REVOKE ALL ON FUNCTION catalogue_save_cost_setting(UUID, NUMERIC, JSONB, TEXT[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION catalogue_save_cost_setting(UUID, NUMERIC, JSONB, TEXT[]) TO authenticated;
+
+CREATE OR REPLACE FUNCTION catalogue_save_kpi_items(
+    p_scheme  UUID,
+    p_adds    JSONB,   -- [{source:'sku', erp_product_id, kpi_amount} | {source:'option', option_pool, option_value, kpi_amount}]
+    p_changes JSONB,   -- [{id, kpi_amount}]
+    p_removes UUID[]
+) RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path TO 'public'
+AS $fn$
+DECLARE
+    v_today   DATE := (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date;
+    v_touched INTEGER := 0;
+    v_item    comm_kpi_items%ROWTYPE;
+    v_code    TEXT;
+    v_name    TEXT;
+    v_value   TEXT;
+    r         RECORD;
+BEGIN
+    PERFORM 1 FROM comm_schemes WHERE id = p_scheme;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Unknown sub-department scheme' USING ERRCODE = 'P0002';
+    END IF;
+
+    -- Removed. Begun before today: closed yesterday, so a month already run
+    -- keeps it. Begun today or later: it never applied, and goes.
+    FOR r IN SELECT DISTINCT u.id FROM UNNEST(COALESCE(p_removes, '{}'::UUID[])) AS u(id) LOOP
+        SELECT * INTO v_item FROM comm_kpi_items
+         WHERE id = r.id AND scheme_id = p_scheme
+           AND (effective_to IS NULL OR effective_to >= v_today)
+           FOR UPDATE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'A KPI item changed since the page was opened. Reload and try again.'
+                USING ERRCODE = '40001';
+        END IF;
+        IF v_item.effective_from < v_today THEN
+            UPDATE comm_kpi_items SET effective_to = v_today - 1 WHERE id = v_item.id;
+        ELSE
+            DELETE FROM comm_kpi_items WHERE id = v_item.id;
+        END IF;
+        v_touched := v_touched + 1;
+    END LOOP;
+
+    -- A new amount, from today, the same way.
+    FOR r IN SELECT * FROM jsonb_to_recordset(COALESCE(p_changes, '[]'::JSONB)) AS c(id UUID, kpi_amount NUMERIC) LOOP
+        SELECT * INTO v_item FROM comm_kpi_items
+         WHERE id = r.id AND scheme_id = p_scheme
+           AND (effective_to IS NULL OR effective_to >= v_today)
+           FOR UPDATE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'A KPI item changed since the page was opened. Reload and try again.'
+                USING ERRCODE = '40001';
+        END IF;
+        CONTINUE WHEN v_item.kpi_amount = r.kpi_amount;
+        IF v_item.effective_from < v_today THEN
+            UPDATE comm_kpi_items SET effective_to = v_today - 1 WHERE id = v_item.id;
+            INSERT INTO comm_kpi_items (scheme_id, source, product_code, product_name, erp_product_id,
+                                        option_pool, option_value, kpi_amount,
+                                        effective_from, effective_to, created_by)
+            VALUES (p_scheme, v_item.source, v_item.product_code, v_item.product_name, v_item.erp_product_id,
+                    v_item.option_pool, v_item.option_value, r.kpi_amount,
+                    v_today, v_item.effective_to, auth.uid());
+        ELSE
+            UPDATE comm_kpi_items SET kpi_amount = r.kpi_amount WHERE id = v_item.id;
+        END IF;
+        v_touched := v_touched + 1;
+    END LOOP;
+
+    -- New items, in force from today.
+    FOR r IN SELECT * FROM jsonb_to_recordset(COALESCE(p_adds, '[]'::JSONB))
+               AS a(source TEXT, erp_product_id TEXT, option_pool TEXT, option_value TEXT, kpi_amount NUMERIC) LOOP
+        IF r.source = 'sku' THEN
+            SELECT p.item_code, p.description INTO v_code, v_name
+              FROM erp_products p WHERE p.erp_id = r.erp_product_id;
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'SKU % is not in the SKU Master', r.erp_product_id USING ERRCODE = '23503';
+            END IF;
+            INSERT INTO comm_kpi_items (scheme_id, source, product_code, product_name, erp_product_id,
+                                        kpi_amount, effective_from, created_by)
+            VALUES (p_scheme, 'sku', v_code, v_name, r.erp_product_id, r.kpi_amount, v_today, auth.uid());
+        ELSIF r.source = 'option' THEN
+            -- The pool's own spelling: what comm_kpi_hits compares a line against.
+            SELECT o.value INTO v_value
+              FROM erp_maintenance_options o
+             WHERE o.erp_company_id = 1 AND o.pool = r.option_pool
+               AND catalogue_value_key(o.value) = catalogue_value_key(r.option_value)
+             ORDER BY (o.removed_at IS NULL) DESC, o.value
+             LIMIT 1;
+            IF NOT FOUND THEN
+                RAISE EXCEPTION '"%" is not in the % Maintenance pool', r.option_value, r.option_pool
+                    USING ERRCODE = '23503';
+            END IF;
+            INSERT INTO comm_kpi_items (scheme_id, source, option_pool, option_value,
+                                        kpi_amount, effective_from, created_by)
+            VALUES (p_scheme, 'option', r.option_pool, v_value, r.kpi_amount, v_today, auth.uid());
+        ELSE
+            RAISE EXCEPTION 'A KPI item is a SKU or a special, not %', COALESCE(r.source, 'nothing')
+                USING ERRCODE = '22023';
+        END IF;
+        v_touched := v_touched + 1;
+    END LOOP;
+
+    RETURN v_touched;
+END;
+$fn$;
+
+COMMENT ON FUNCTION catalogue_save_kpi_items(UUID, JSONB, JSONB, UUID[]) IS
+    'Product List › Add-on / KPI Items, in one transaction (2026-09-27). Adds start today; a new amount or a removal of an item begun before today closes it yesterday, so a month already run keeps what it was run at.';
+
+REVOKE ALL ON FUNCTION catalogue_save_kpi_items(UUID, JSONB, JSONB, UUID[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION catalogue_save_kpi_items(UUID, JSONB, JSONB, UUID[]) TO authenticated;
 
 COMMIT;
