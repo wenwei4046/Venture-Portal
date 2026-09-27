@@ -4,29 +4,20 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { parseUpsaleInput } from '@/lib/commission/upsales'
 
 /**
- * Upsales HR records by hand (2026-09-24): an amount a customer added to an
- * earlier order, paid at the salesperson's own rate in the month it is recorded
- * under and counted toward the upline's override. The rules live in
- * `lib/commission/upsales.ts`; the table (`comm_upsales`) refuses a month whose
- * run has paid (23RUN) — the check here is so the person typing hears it in
+ * Drops and upsells the ERP finds on settled bills (2026-09-26): each waits in
+ * `comm_upsales` until somebody pays it into a month or lets the ERP's figure
+ * stand. It is paid at the salesperson's own rate and moves their upline's
+ * override the same way (`lib/commission/upsales.ts`).
+ *
+ * HR typed them in by hand from 2026-09-24 until 2026-09-27, when the form went
+ * (user: 所有的 order 都只会从 ERP 那边抽过来，这边不需要自己调动 — the only
+ * thing adjusted in the portal is whether a bill counts at all). The rows it
+ * wrote stay, and still count in their month. The table refuses a month whose
+ * run has paid (23RUN) — the check here is so the person answering hears it in
  * words first.
  */
-
-/** What the form sends, as typed. */
-export interface UpsaleForm {
-  staffId: string
-  /** 'upsale' or 'drop' (2026-09-26). */
-  kind: string
-  /** Typed positive; the kind gives it its sign. */
-  amount: string
-  soldOn: string
-  fairEventId: string
-  originalRef: string
-  note: string
-}
 
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
@@ -45,131 +36,8 @@ async function assertMonthOpen(supabase: SupabaseClient, subDepartmentId: string
   })
   if (error) throw new Error(`Could not check the commission run: ${error.message}`)
   if (locked) {
-    throw new Error(`The ${period.slice(0, 7)} run has paid. Reopen it before changing its upsales.`)
+    throw new Error(`The ${period.slice(0, 7)} month is in payroll. Take it back before changing its drops and upsells.`)
   }
-}
-
-/**
- * Only somebody on this sub-department's ladder is paid by its run — an upsale
- * recorded for anybody else would sit in the table paying nobody.
- */
-async function assertMember(supabase: SupabaseClient, subDepartmentId: string, staffId: string): Promise<void> {
-  const { data: scheme, error: schemeError } = await supabase
-    .from('comm_schemes')
-    .select('id')
-    .eq('sub_department_id', subDepartmentId)
-    .eq('is_active', true)
-    .is('effective_to', null)
-    .maybeSingle()
-  if (schemeError) throw new Error(`Could not read the scheme: ${schemeError.message}`)
-  if (!scheme) throw new Error('This sub-department has no active commission scheme.')
-
-  const { data: member, error } = await supabase
-    .from('comm_hierarchy')
-    .select('staff_id')
-    .eq('scheme_id', (scheme as { id: string }).id)
-    .eq('staff_id', staffId)
-    .is('effective_to', null)
-    .limit(1)
-  if (error) throw new Error(`Could not read the team: ${error.message}`)
-  if (!member || member.length === 0) {
-    throw new Error('That person is not on this sub-department’s team, so its run would pay them nothing.')
-  }
-}
-
-export async function recordUpsale(subDepartmentId: string, period: string, form: UpsaleForm): Promise<void> {
-  await requirePermission('revenue')
-  assertPeriod(period)
-  const input = parseUpsaleInput(form)
-  const supabase = await client()
-
-  await assertMonthOpen(supabase, subDepartmentId, period)
-  await assertMember(supabase, subDepartmentId, input.staffId)
-
-  const { error } = await supabase.from('comm_upsales').insert({
-    sub_department_id: subDepartmentId,
-    period_month: period,
-    staff_id: input.staffId,
-    kind: input.kind,
-    amount: input.amount,
-    sold_on: input.soldOn,
-    fair_event_id: input.fairEventId,
-    original_ref: input.originalRef,
-    note: input.note,
-  })
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/revenue', 'layout')
-}
-
-export async function updateUpsale(upsaleId: string, form: UpsaleForm): Promise<void> {
-  await requirePermission('revenue')
-  const input = parseUpsaleInput(form)
-  const supabase = await client()
-
-  const { data: row, error: readError } = await supabase
-    .from('comm_upsales')
-    .select('sub_department_id, period_month, source')
-    .eq('id', upsaleId)
-    .maybeSingle()
-  if (readError) throw new Error(readError.message)
-  if (!row) throw new Error('That entry is no longer there.')
-  const { sub_department_id: subDepartmentId, period_month: period, source } = row as {
-    sub_department_id: string
-    period_month: string
-    source: string
-  }
-  if (source === 'erp') {
-    throw new Error('A change the ERP found is confirmed or dismissed as it stands — record a correction by hand instead.')
-  }
-
-  await assertMonthOpen(supabase, subDepartmentId, period)
-  await assertMember(supabase, subDepartmentId, input.staffId)
-
-  const { error } = await supabase
-    .from('comm_upsales')
-    .update({
-      staff_id: input.staffId,
-      kind: input.kind,
-      amount: input.amount,
-      sold_on: input.soldOn,
-      fair_event_id: input.fairEventId,
-      original_ref: input.originalRef,
-      note: input.note,
-    })
-    .eq('id', upsaleId)
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/revenue', 'layout')
-}
-
-export async function deleteUpsale(upsaleId: string): Promise<void> {
-  await requirePermission('revenue')
-  const supabase = await client()
-
-  const { data: row, error: readError } = await supabase
-    .from('comm_upsales')
-    .select('sub_department_id, period_month, source')
-    .eq('id', upsaleId)
-    .maybeSingle()
-  if (readError) throw new Error(readError.message)
-  if (!row) return
-  const { sub_department_id: subDepartmentId, period_month: period, source } = row as {
-    sub_department_id: string
-    period_month: string
-    source: string
-  }
-  if (source === 'erp') {
-    // Deleted, it would stop counting as settled and come back on the bill's
-    // next save — or never, if the ERP never saves it again.
-    throw new Error('A change the ERP found is put back to waiting, not deleted.')
-  }
-  await assertMonthOpen(supabase, subDepartmentId, period)
-
-  const { error } = await supabase.from('comm_upsales').delete().eq('id', upsaleId)
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/revenue', 'layout')
 }
 
 /**
@@ -253,6 +121,19 @@ export async function confirmErpAdjustment(adjustmentId: string, period: string)
   if (!row) throw new Error('That change is no longer waiting — the ERP may have put it back.')
   const { sub_department_id: subDepartmentId, status } = row as { sub_department_id: string; status: string }
   if (status !== 'pending') throw new Error('That change has already been answered.')
+
+  // A month settled by hand, before the portal pays, takes no run: paid into
+  // it, the change would never be paid at all (2026-09-27).
+  const { data: cutover, error: cutoverError } = await supabase
+    .from('comm_cutovers')
+    .select('first_paid_month')
+    .eq('sub_department_id', subDepartmentId)
+    .maybeSingle()
+  if (cutoverError) throw new Error(`Could not read when the portal starts paying: ${cutoverError.message}`)
+  const firstPaid = (cutover as { first_paid_month: string } | null)?.first_paid_month ?? null
+  if (firstPaid && period < firstPaid) {
+    throw new Error(`${period.slice(0, 7)} was settled by hand and takes no run — pay this in ${firstPaid.slice(0, 7)} or later.`)
+  }
 
   await assertMonthOpen(supabase, subDepartmentId, period)
 

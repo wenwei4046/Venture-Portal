@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import type { UpsaleView } from '../../../_lib/upsales'
 import ErpChangesPanel from './ErpChangesPanel'
 
-const { confirm, dismiss, refresh } = vi.hoisted(() => ({ confirm: vi.fn(), dismiss: vi.fn(), refresh: vi.fn() }))
-vi.mock('../../../upsale-actions', () => ({ confirmErpAdjustment: confirm, dismissErpAdjustment: dismiss }))
+const { confirm, dismiss, reopen, refresh } = vi.hoisted(() => ({ confirm: vi.fn(), dismiss: vi.fn(), reopen: vi.fn(), refresh: vi.fn() }))
+vi.mock('../../../upsale-actions', () => ({ confirmErpAdjustment: confirm, dismissErpAdjustment: dismiss, reopenErpAdjustment: reopen }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 /** HC13911 was paid in August on 16,888; the ERP now says 14,800. */
@@ -23,6 +23,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   confirm.mockResolvedValue(undefined)
   dismiss.mockResolvedValue(undefined)
+  reopen.mockResolvedValue(undefined)
   Object.defineProperty(window, 'confirm', { value: vi.fn(() => true), configurable: true, writable: true })
 })
 afterEach(cleanup)
@@ -69,11 +70,52 @@ describe('ErpChangesPanel', () => {
     expect(window.confirm).toHaveBeenLastCalledWith("HC13911: let the ERP's figure stand and pay no drop?")
   })
 
-  it('pays nothing into a month whose run has paid', () => {
+  it('pays nothing into a month that is in payroll', () => {
     render(<ErpChangesPanel period="2026-09-01" pending={[DROP]} locked />)
-    expect(screen.getByText(/September 2026's run has paid — open a later month to pay these/)).toBeVisible()
+    expect(screen.getByText(/September 2026 is in payroll — open a later month to pay these, or take this one back first/)).toBeVisible()
     expect(screen.getByRole('button', { name: 'Pay in Sep 2026' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Not a change' })).toBeEnabled()
+  })
+
+  // August 2026 was paid from the claim form and takes no run: a change paid
+  // into it would never be paid at all.
+  it('pays nothing into a month settled by hand', () => {
+    render(<ErpChangesPanel period="2026-08-01" pending={[DROP]} locked={false} settledBefore="September 2026" />)
+    expect(screen.getByText(/August 2026 was settled by hand and takes no run — pay these in September 2026 or later/)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Pay in Aug 2026' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Not a change' })).toBeEnabled()
+  })
+
+  // The Upsales & drops tab, where these were listed with their Undo, went
+  // with the hand-typed form (2026-09-27): they are listed here now.
+  describe('what was paid into the month', () => {
+    const PAID: UpsaleView = { ...DROP, id: 'p1', status: 'confirmed', originalRef: 'HC13052', erpDocNo: 'HC-SO-2609-061', amount: -500, staffName: 'MELVIN CHONG' }
+
+    it('lists them under what still waits, and shows the panel for them alone', () => {
+      render(<ErpChangesPanel period="2026-09-01" pending={[]} paid={[PAID]} locked={false} />)
+      const panel = screen.getByRole('region', { name: 'Drops and upsells the ERP found' })
+      expect(panel).not.toHaveTextContent('to answer')
+      expect(panel).toHaveTextContent('Paid in September 2026 · 1 · net RM (500.00)')
+      const row = within(screen.getByRole('table', { name: 'Paid in September 2026' })).getByRole('row', { name: /HC13052/ })
+      expect(row).toHaveTextContent('HC-SO-2609-061')
+      expect(row).toHaveTextContent('MELVIN CHONG')
+      expect(row).toHaveTextContent('RM (500.00)Drop sales')
+      expect(screen.queryByRole('button', { name: /Pay in/ })).toBeNull()
+    })
+
+    it('sends one back to wait only after asking', async () => {
+      render(<ErpChangesPanel period="2026-09-01" pending={[]} paid={[PAID]} locked={false} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+      expect(reopen).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm — back to waiting' }))
+      await waitFor(() => expect(reopen).toHaveBeenCalledWith('p1'))
+      expect(refresh).toHaveBeenCalledTimes(1)
+    })
+
+    it('offers no Undo while the month is in payroll', () => {
+      render(<ErpChangesPanel period="2026-09-01" pending={[]} paid={[PAID]} locked />)
+      expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+    })
   })
 
   it('says why when the portal refuses', async () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeCommissionRun } from './engine'
 import { releasedOrders, toEngineInput, toRunPayload, type RunSourceRows } from './run-payload'
-import { parseUpsaleInput, upsaleOrderNo, upsalesToOrders } from './upsales'
+import { upsaleOrderNo, upsalesToOrders } from './upsales'
 import type { CommissionScheme, EngineInput, Rank, SalesOrder } from './types'
 
 /**
@@ -172,56 +172,6 @@ describe('an upsale on its way to the database', () => {
     const eng = toEngineInput(rows)
     expect(eng.orders).toHaveLength(1)
     expect(eng.orders[0]).toMatchObject({ id: 'u1', upsale: true, periodMonth: '2026-08-01', orderTotal: 300 })
-  })
-})
-
-describe('parseUpsaleInput', () => {
-  const ok = {
-    staffId: '6c1f5d0e-3b1a-4c2d-9e8f-1a2b3c4d5e6f',
-    amount: '1,300.50',
-    soldOn: '2026-08-29',
-    fairEventId: '',
-    originalRef: '  HC12878 ',
-    note: '',
-  }
-
-  it('returns what HR typed, cleaned', () => {
-    expect(parseUpsaleInput(ok)).toEqual({
-      staffId: ok.staffId,
-      kind: 'upsale',
-      amount: 1300.5,
-      soldOn: '2026-08-29',
-      fairEventId: null,
-      originalRef: 'HC12878',
-      note: null,
-    })
-  })
-
-  it.each([
-    [{ staffId: '' }, 'Pick who sold it.'],
-    [{ amount: '0' }, 'The upsale amount must be more than RM 0.'],
-    [{ amount: '-5' }, 'The upsale amount must be more than RM 0.'],
-    [{ amount: 'abc' }, 'The upsale amount must be more than RM 0.'],
-    [{ amount: '12.345' }, 'The amount can have at most two decimals.'],
-    [{ soldOn: '2026-02-30' }, 'Give the day it was sold.'],
-    [{ fairEventId: 'not-a-fair' }, 'That fair is not on the calendar.'],
-    [{ originalRef: '   ' }, 'Give the bill number it was added to, e.g. HC5315.'],
-  ])('refuses %o', (bad, message) => {
-    expect(() => parseUpsaleInput({ ...ok, ...bad })).toThrow(message)
-  })
-
-  it('stores a drop negative, typed either way', () => {
-    const drop = { ...ok, kind: 'drop', amount: '2,088', originalRef: 'HC13911' }
-    expect(parseUpsaleInput(drop)).toMatchObject({ kind: 'drop', amount: -2088, originalRef: 'HC13911' })
-    expect(parseUpsaleInput({ ...drop, amount: '-2088' })).toMatchObject({ kind: 'drop', amount: -2088 })
-  })
-
-  it.each([
-    [{ kind: 'drop', amount: '0' }, 'The amount dropped must be more than RM 0.'],
-    [{ kind: 'drop', originalRef: '' }, 'Give the bill number it was dropped from, e.g. HC13911.'],
-    [{ kind: 'refund' }, 'An entry is an upsale or a drop.'],
-  ])('refuses %o', (bad, message) => {
-    expect(() => parseUpsaleInput({ ...ok, ...bad })).toThrow(message)
   })
 })
 

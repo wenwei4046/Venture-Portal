@@ -83,6 +83,15 @@ export interface SalesOrder {
    */
   manualMarginPct?: number | null
   /**
+   * The brand the bill was written under — the ERP's Branding on the document
+   * (`sales_orders.brand_code`). It alone chooses the margin ladder (user
+   * 2026-09-27: 主体是 Akemi 就跟 Akemi 的 margin ladder). A pillow of another
+   * brand given away, a bed frame, any accessory: riders — their cost counts
+   * in this bill's margin, measured on this brand's ladder. Absent (a bed
+   * frame on its own, an old import) = the lines decide, as they always did.
+   */
+  brandCode?: string | null
+  /**
    * An upsale HR recorded by hand (`comm_upsales`, 2026-09-24), not an ERP
    * bill: a customer added to an order whose commission was already paid, and
    * only the added amount earns (user: 跟着 upsells 的 amount 来算). It is paid
@@ -330,6 +339,14 @@ export interface EngineInput {
    * before — the first month a sub-department runs, no streak can pass.
    */
   priorMonths: PriorMonth[]
+  /**
+   * Whoever holds a title that HEADS the department — a Revenue Director
+   * (`titles.is_department_head`). Above the ladder, the database refuses them
+   * a rank (23DIR), so a bill they sell is theirs and earns nothing (user
+   * 2026-09-19: PETER's bills 单归他名下但一分不算). The run does not flag them
+   * as missing a rank — that 0% is the rule, not a gap (2026-09-27).
+   */
+  departmentHeadIds?: string[]
 }
 
 // ─── Results ────────────────────────────────────────────────────────────────
