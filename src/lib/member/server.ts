@@ -7,6 +7,7 @@ import { isPrincipalAccount } from "@/lib/view-as";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { calculateQuote, cents, customerQuote } from "./calculator";
+import { quoteCostRatios, quoteKpiItems } from "./quote-rules";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
@@ -399,7 +400,12 @@ export async function calculateMemberQuote(
     const principalView = !!user && isPrincipalAccount(user);
     const build = quoteBuild(input.build);
     const client = await session("member_quote", principalView);
-    const context = await rpc<{ bands: MemberBand[]; costDivisor?: number | string | null }>(
+    const context = await rpc<{
+      bands: MemberBand[];
+      costDivisor?: number | string | null;
+      costRatios?: unknown;
+      kpiItems?: unknown;
+    }>(
       client,
       principalView ? "member_principal_quote_context" : "member_quote_context",
       { p_scheme: input.schemeId },
@@ -453,7 +459,13 @@ export async function calculateMemberQuote(
         "A free gift size does not match a product in this cart. Please select a matching size.",
       );
     const checked: QuoteInput = { ...input, build };
-    const result = calculateQuote(checked, products, context.bands, { costDivisor }, pricing);
+    const result = calculateQuote(
+      checked,
+      products,
+      context.bands,
+      { costDivisor, costRatios: quoteCostRatios(context.costRatios), kpiItems: quoteKpiItems(context.kpiItems) },
+      pricing,
+    );
     if (!result.valid)
       throw new Error(result.error ?? "The quote could not be calculated.");
     return { ...result, customerText: customerQuote(checked, products, result) };

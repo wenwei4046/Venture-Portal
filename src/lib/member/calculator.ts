@@ -22,6 +22,8 @@ import {
   type PriceCell,
 } from "@/lib/catalogue/pricing";
 import { pickCombo, spreadComboTotal, type PricedCombo } from "@/lib/catalogue/combos";
+import { costBasisOf, costDivisorFor } from "@/lib/commission/cost-basis";
+import { indexKpiItems, kpiItemLabel, orderKpiHits, type KpiLine } from "@/lib/commission/kpi";
 import { buildChoicesFor, buildError, buildKey, buildLines, kindOf } from "./build";
 
 /** Decimal money enters the engine as integer cents; tier comparisons use unrounded ratios. */
@@ -203,10 +205,31 @@ export function bandFor(margin: number | null, bands: MemberBand[]) {
 export const DEFAULT_RULES: QuoteRules = { costDivisor: 1 };
 
 /**
- * Margin = (price − cost) ÷ price, where cost is every line's cost ÷ the
- * department's divisor. The price that reaches a threshold t is
- * cost ÷ (1 − t) — never cost × (1 + t) (user 2026-09-12: 33% on 1,000 is
- * 1,000 ÷ 0.67 = 1,492.54, not 1,330).
+ * The cart as the run will read the bill it becomes, for its KPI items: each
+ * product line with the build's specials for its kind — the ERP prints a
+ * sofa build's specials on every module and a bed frame's on each frame.
+ */
+function cartKpiLines(
+  selected: { line: QuoteLine; product: MemberProduct }[],
+  build: QuoteBuild | undefined,
+): KpiLine[] {
+  return selected.map(({ line, product }, i) => {
+    const kind = kindOf(product);
+    const specials =
+      kind === "SOFA" ? build?.specials : kind === "BEDFRAME" ? build?.bedframe?.specials : undefined;
+    return { id: String(i), itemGroup: kind, productCode: product.code, qty: line.quantity, specials };
+  });
+}
+
+/**
+ * Margin = (price − cost) ÷ price, where cost is every line's cost ÷ its
+ * SKU's ratio, else the department's divisor. The price that reaches a
+ * threshold t is cost ÷ (1 − t) — never cost × (1 + t) (user 2026-09-12: 33%
+ * on 1,000 is 1,000 ÷ 0.67 = 1,492.54, not 1,330).
+ *
+ * A cart that carries KPI items (2026-09-27) is judged on its MAIN price: the
+ * items' amount K is paid flat as KPI, so margin = (price − K − cost) ÷
+ * (price − K), and the price that reaches t is K + cost ÷ (1 − t).
  *
  * A line's cost is the portal's own price for it (user 2026-09-24: every
  * margin is measured against the Product List's prices): the SKU's price at
@@ -240,6 +263,9 @@ export function calculateQuote(
   const divisor = rules.costDivisor;
   if (!Number.isFinite(divisor) || divisor <= 0)
     return invalid("The cost rule for this department is not configured.");
+  // A SKU may carry its own ratio (Product List › Costing Setting).
+  const basis = costBasisOf(divisor, rules.costRatios ?? []);
+  const divisorOf = (product: MemberProduct) => costDivisorFor(product.code, basis);
   const price = cents(input.price),
     delivery = cents(input.delivery || "0");
   if (price === null || price <= 0)
@@ -354,13 +380,26 @@ export function calculateQuote(
     (sum, l) =>
       sum +
       (l.comboCents !== null
-        ? Math.round(l.comboCents / divisor)
-        : teamCostCents(l.unit! + l.surcharge, divisor) * l.line.quantity),
+        ? Math.round(l.comboCents / divisorOf(l.product))
+        : teamCostCents(l.unit! + l.surcharge, divisorOf(l.product)) * l.line.quantity),
     0,
   );
   if (!Number.isSafeInteger(cost))
     return invalid("The cart amount is outside the supported range.");
-  const margin = ((price - cost) / price) * 100,
+  // The cart's KPI items: their amount is paid flat as KPI, so the margin is
+  // the main sales' — the run judges the bill on the same (2026-09-27).
+  const kpiIndex = indexKpiItems(rules.kpiItems ?? []);
+  const kpiHits = orderKpiHits(
+    { lines: cartKpiLines(selected.map(({ line, product }) => ({ line, product: product! })), input.build) },
+    kpiIndex,
+  );
+  const kpi = kpiHits.reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
+  const main = price - kpi;
+  if (main <= 0)
+    return invalid(
+      `The price must be more than the RM ${(kpi / 100).toFixed(2)} of KPI items in the cart, which is paid as KPI.`,
+    );
+  const margin = ((main - cost) / main) * 100,
     band = brand
       ? bandFor(margin, bands)
       : {
@@ -374,7 +413,7 @@ export function calculateQuote(
   // A displayed percentage may round up to a threshold while still being below it.
   const boundary =
     next && Number(margin.toFixed(2)) >= next.threshold
-      ? `Actual margin is just below ${next.threshold}%. Add RM ${((Math.ceil(cost / (1 - next.threshold / 100) - 1e-7) - price) / 100).toFixed(2)} to reach it.`
+      ? `Actual margin is just below ${next.threshold}%. Add RM ${((kpi + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7) - price) / 100).toFixed(2)} to reach it.`
       : null;
   const target = bands
     .filter((b) => b.kind === "incentive" && margin + 1e-10 >= b.threshold)
@@ -393,13 +432,16 @@ export function calculateQuote(
             categoryKey(p.category) === "pillow" &&
             isCompatibleGift(p, paidProducts),
         )
-        .map((p) => ({
-          productId: p.id,
-          name: p.name,
-          margin:
-            ((price - cost - teamCostCents(p.cost!, divisor)) / price) * 100,
-          label: target.key,
-        }))
+        .map((p) => {
+          const giftKpi = Math.round((kpiIndex.byCode.get(p.code.trim().toUpperCase())?.kpiAmount ?? 0) * 100);
+          const base = main - giftKpi;
+          return {
+            productId: p.id,
+            name: p.name,
+            margin: base > 0 ? ((base - cost - teamCostCents(p.cost!, divisorOf(p))) / base) * 100 : -Infinity,
+            label: target.key,
+          };
+        })
         .filter(
           (s) =>
             s.margin + 1e-10 >= target.threshold &&
@@ -416,10 +458,12 @@ export function calculateQuote(
     margin,
     ...band,
     nextPrice: next
-      ? Math.ceil(cost / (1 - next.threshold / 100) - 1e-7) / 100
+      ? (kpi + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7)) / 100
       : null,
     nextThreshold: next?.threshold ?? null,
     boundary,
+    kpiAmount: kpi / 100,
+    kpiItems: kpiHits.map((hit) => ({ label: kpiItemLabel(hit.item), qty: hit.qty, amount: hit.amount })),
     version: productVersions(selected.map(({ product }) => product!)),
     inputKey: quoteInputKey(input),
     suggestions,

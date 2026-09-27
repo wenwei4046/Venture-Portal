@@ -1690,6 +1690,16 @@ export default function MemberQuoteBuilder({
               </p>
             )}
             {result?.boundary && <p className={s.error}>{result.boundary}</p>}
+            {result?.valid && (result.kpiAmount ?? 0) > 0 && (
+              <p className={s.caption}>
+                KPI items{" "}
+                {(result.kpiItems ?? [])
+                  .map((item) => (item.qty === 1 ? item.label : `${item.label} × ${item.qty}`))
+                  .join(", ")}{" "}
+                · {money(result.kpiAmount ?? 0)} is paid as KPI, so this margin is
+                on {money(result.price - (result.kpiAmount ?? 0))}.
+              </p>
+            )}
             <div className={s.calculatorKeypad} aria-label="Calculator keypad">
               {[
                 "7",
