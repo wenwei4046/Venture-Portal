@@ -143,4 +143,29 @@ describe('Add-on / KPI Items', () => {
     renderTab(false, [])
     expect(screen.getByText(/No KPI items for Fair yet/)).toBeInTheDocument()
   })
+
+  // Regression (prod, 2026-09-27): cleared at once, the drafts gave way to the
+  // list from before the save until the refresh landed.
+  it('keeps what was saved on screen until the refreshed items arrive', async () => {
+    const view = renderTab(true)
+    click('Edit items')
+    type('KPI amount for the next item added', '120')
+    click('Add No Side Panel')
+    click('Save 1 change')
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
+    expect(refresh).toHaveBeenCalled()
+    expect(bodyRows()[0]).toHaveTextContent('No Side Panel')
+    expect(within(bodyRows()[0]).getByRole('textbox', { name: 'No Side Panel KPI amount' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled()
+
+    const saved: KpiItemSetting = { id: '33333333-3333-4333-8333-333333333333', source: 'option', erpId: null, code: null, name: null,
+      optionPool: 'bedframe_specials', optionValue: 'No Side Panel', amount: 120, from: '2026-09-27', to: null }
+    view.rerender(<KpiItemsTab sub={subs[0]} subs={subs} schemeId={SCHEME} enableKpi items={[...items, saved]} skus={skus} specials={specials} />)
+    expect(screen.getByRole('button', { name: 'Edit items' })).toBeEnabled()
+    expect(bodyRows().map(cells)).toEqual([
+      ['HB Straight', 'Bed frame special', 'Per bed frame', '200.00', '01 Sep 2026'],
+      ['No Side Panel', 'Bed frame special', 'Per bed frame', '120.00', '27 Sep 2026'],
+      ['AK-CS PILAkemi cushion pillow', 'SKU', 'Per unit', '50.00', '01 Aug 2026'],
+    ])
+  })
 })

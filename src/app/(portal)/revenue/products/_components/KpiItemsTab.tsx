@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate, formatMoneyBare } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -76,9 +76,39 @@ export default function KpiItemsTab({
   const [source, setSource] = useState<PickSource>('bedframe_specials')
   const [query, setQuery] = useState('')
   const [pickAmount, setPickAmount] = useState('')
-  const [saving, startSaving] = useTransition()
+  const [pending, startSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+
+  const reset = useCallback(() => {
+    setAmounts(new Map())
+    setRemoving(new Set())
+    setAdded([])
+    setQuery('')
+    setPickAmount('')
+  }, [])
+
+  // A save leaves its drafts on screen, read-only, until the refreshed items
+  // arrive (as Costing Setting does): clearing them at once showed the list
+  // from before the save for a moment. Settled when the server's items
+  // change — or, should the refresh never land, a little later.
+  const [settling, setSettling] = useState(false)
+  const settleFrom = useRef<KpiItemSetting[] | null>(null)
+  const settle = useCallback(() => {
+    settleFrom.current = null
+    setSettling(false)
+    setEditing(false)
+    reset()
+  }, [reset])
+  useEffect(() => {
+    if (settling && settleFrom.current && settleFrom.current !== items) settle()
+  }, [settling, items, settle])
+  useEffect(() => {
+    if (!settling) return
+    const timer = window.setTimeout(settle, 15_000)
+    return () => window.clearTimeout(timer)
+  }, [settling, settle])
+  const saving = pending || settling
 
   const skuById = useMemo(() => new Map(skus.map(s => [s.erpId, s])), [skus])
   const specialByKey = useMemo(() => new Map(specials.map(o => [optionKey(o.pool, o.value), o])), [specials])
@@ -145,14 +175,6 @@ export default function KpiItemsTab({
     [specials, source, q],
   )
 
-  function reset() {
-    setAmounts(new Map())
-    setRemoving(new Set())
-    setAdded([])
-    setQuery('')
-    setPickAmount('')
-  }
-
   function cancel() {
     if (saving) return
     reset()
@@ -210,11 +232,12 @@ export default function KpiItemsTab({
     }
     setError(null)
     setNotice(null)
+    const before = items
     startSaving(async () => {
       try {
         await saveKpiItems(schemeId, edit)
-        reset()
-        setEditing(false)
+        settleFrom.current = before
+        setSettling(true)
         setNotice(
           enableKpi
             ? "Saved. This month's run pays them when it is computed; a month already run keeps what it was run at."
@@ -261,7 +284,7 @@ export default function KpiItemsTab({
                 Cancel changes
               </button>
               <button type="button" className="sku-primary-button" disabled={saving || dirty === 0} onClick={save}>
-                {saving ? 'Saving…' : dirty === 0 ? 'Save changes' : `Save ${dirty} change${dirty === 1 ? '' : 's'}`}
+                {pending ? 'Saving…' : settling ? 'Saved' : dirty === 0 ? 'Save changes' : `Save ${dirty} change${dirty === 1 ? '' : 's'}`}
               </button>
             </>
           ) : (

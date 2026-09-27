@@ -165,4 +165,28 @@ describe('Costing Setting', () => {
   it('prints a ratio with two decimals at least, four at most', () => {
     expect([0.7, 0.65, 0.655, 0.6543, 1].map(formatRatio)).toEqual(['0.70', '0.65', '0.655', '0.6543', '1.00'])
   })
+
+  // Regression (prod, 2026-09-27): the drafts were cleared the moment the save
+  // returned, and until the refresh landed the table showed the rows from
+  // before it — an empty list right under "Saved.".
+  it('keeps what was saved on screen until the refreshed rows arrive', async () => {
+    const view = renderTab()
+    click('Edit ratios')
+    search('Find a SKU', 'queen')
+    fireEvent.click(screen.getByRole('checkbox'))
+    type('Ratio for the ticked SKUs', '0.6')
+    click('Add 1 SKU')
+    click('Save 1 change')
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
+    expect(refresh).toHaveBeenCalled()
+    expect(bodyRows()[0]).toHaveTextContent('AK-ULTIMATE MATT (Q)')
+    expect(screen.getByRole('textbox', { name: 'AK-ULTIMATE MATT (Q) ratio' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled()
+
+    view.rerender(<CostSettingTab sub={subs[0]} subs={subs} schemeId={SCHEME} divisor={0.7}
+      ratios={[{ erpId: 'ult-q', code: 'AK-ULTIMATE MATT (Q)', ratio: 0.6, updatedAt: null }, ultK]} skus={skus} />)
+    expect(screen.getByRole('button', { name: 'Edit ratios' })).toBeEnabled()
+    expect(cells(bodyRows()[0])).toEqual(['AK-ULTIMATE MATT (Q)', 'Akemi Ultimate Queen', 'Mattress', '1,500.00', '0.60', '2,500.00'])
+    expect(bodyRows()).toHaveLength(2)
+  })
 })
