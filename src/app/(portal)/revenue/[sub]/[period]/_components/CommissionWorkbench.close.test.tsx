@@ -6,12 +6,32 @@ import { parseCloseSummary, type SalespersonClose } from '@/lib/commission/close
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench, { type CloseFacts } from './CommissionWorkbench'
 
-const { closeSalespeople, reopenSalespeople, refresh } = vi.hoisted(() => ({
-  closeSalespeople: vi.fn(), reopenSalespeople: vi.fn(), refresh: vi.fn(),
-}))
+const { closeSalespeople, reopenSalespeople, refresh, url } = vi.hoisted(() => {
+  // The workbench stands on the URL (`useSearchParams`); the stand-in follows
+  // the browser's pushState / replaceState through this subscription.
+  const listeners = new Set<() => void>()
+  return {
+    closeSalespeople: vi.fn(), reopenSalespeople: vi.fn(), refresh: vi.fn(),
+    url: {
+      subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
+      changed() { for (const listener of listeners) listener() },
+    },
+  }
+})
 vi.mock('../../../close-actions', () => ({ closeSalespeople, reopenSalespeople }))
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
+vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn() }))
+vi.mock('next/navigation', async () => {
+  const { useMemo, useSyncExternalStore } = await import('react')
+  return {
+    useRouter: () => ({ refresh, push: vi.fn() }),
+    useSearchParams: () => {
+      const search = useSyncExternalStore(url.subscribe, () => window.location.search, () => '')
+      return useMemo(() => new URLSearchParams(search), [search])
+    },
+  }
+})
+const originalPush = window.history.pushState.bind(window.history)
+const originalReplace = window.history.replaceState.bind(window.history)
 vi.mock('next/link', () => ({ default: ({ children, href, ...props }: { children: ReactNode; href: string }) => <a href={href} {...props}>{children}</a> }))
 
 const rank = (rankKey: string, productRate: number, sortOrder: number, titleLabel: string): Rank => ({
@@ -92,10 +112,16 @@ const bar = () => screen.getByRole('region', { name: 'Close September 2026' })
 beforeEach(() => {
   vi.clearAllMocks()
   sessionStorage.clear()
+  originalReplace(null, '', '/revenue/fair/2026-09-01')
+  vi.spyOn(window.history, 'pushState').mockImplementation((data, unused, next) => { originalPush(data, unused, next); url.changed() })
+  vi.spyOn(window.history, 'replaceState').mockImplementation((data, unused, next) => { originalReplace(data, unused, next); url.changed() })
   closeSalespeople.mockImplementation(async ({ people }: { people: Array<{ staffId: string }> }) => ({ closed: people.length, names: people.map(p => p.staffId) }))
   reopenSalespeople.mockImplementation(async ({ staffIds }: { staffIds: string[] }) => ({ reopened: staffIds.length }))
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('closing salespeople from the list', () => {
   it('ticks a few and closes them at the figures on screen, after naming them', async () => {

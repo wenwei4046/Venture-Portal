@@ -240,6 +240,20 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     batchRow && subDept.schemeId ? loadCommissionWorkbench(supabase, subDept.id, period, rows, run?.id) : null,
   )
 
+  // Which EARLIER months' bills can no longer be taken out (2026-09-27): a
+  // salesperson's ledger carries bills in from them, and their menu answers
+  // to the bill's own month — `revenue_exclude_order` refuses a paid one
+  // (23RUN). This month's own answer is the upsale lock below. A month that
+  // cannot be read is left open: the database still refuses it.
+  const earlierLocksRead = workbenchRead.then(async workbench => {
+    const earlier = [...new Set((workbench?.input.orders ?? [])
+      .filter(o => !o.upsale && o.periodMonth !== period).map(o => o.periodMonth))]
+    const answers = await Promise.all(earlier.map(month => once(
+      supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDept.id, p_period: month }),
+    )))
+    return earlier.filter((_, i) => answers[i].data === true)
+  })
+
   // Who has been closed this month (2026-09-27): their row shows what was
   // locked, and the list says how far the month has been closed. A failed
   // read turns closing off for the visit rather than taking the month down.
@@ -259,6 +273,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     workbench,
     [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments, fairMoves],
     openBillMonth,
+    earlierLocks,
     closes,
   ] = await Promise.all([
     batchRowRead,
@@ -296,6 +311,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       ]),
     ),
     openBillMonthRead,
+    earlierLocksRead,
     closesRead,
   ])
   if (upsaleLock.error) throw new Error(`Could not check the commission run: ${upsaleLock.error.message}`)
@@ -674,6 +690,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
         venues={venueRows}
         monthTools={monthTools}
+        lockedPeriods={upsaleLock.data ? [period, ...earlierLocks] : earlierLocks}
         closes={{
           subDepartmentId: subDept.id,
           closes: closes.rows,
