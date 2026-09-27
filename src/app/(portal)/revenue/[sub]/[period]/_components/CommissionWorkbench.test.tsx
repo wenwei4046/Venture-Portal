@@ -9,6 +9,7 @@ import CommissionWorkbench from './CommissionWorkbench'
 
 const { saveOpenPicks, refresh } = vi.hoisted(() => ({ saveOpenPicks: vi.fn(), refresh: vi.fn() }))
 vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks }))
+vi.mock('../../../close-actions', () => ({ closeSalespeople: vi.fn(), reopenSalespeople: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 vi.mock('next/link', () => ({ default: ({ children, href, ...props }: { children: ReactNode; href: string }) => <a href={href} {...props}>{children}</a> }))
 

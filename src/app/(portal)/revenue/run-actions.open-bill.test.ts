@@ -13,7 +13,7 @@ import { saveOpenBillPicks, setOpenBillRank } from './run-actions'
 type Row = Record<string, unknown>
 type Filter = { key: string; values: unknown[] }
 
-function database(options: { enabled?: boolean; openMonths?: string[]; locked?: string[]; failWrite?: boolean; raceOccupant?: boolean; raceSameOrder?: boolean } = {}) {
+function database(options: { enabled?: boolean; openMonths?: string[]; locked?: string[]; failWrite?: boolean; raceOccupant?: boolean; raceSameOrder?: boolean; closed?: Row[] } = {}) {
   const order = (id: string, period = '2026-09-01') => ({
     id, staff_id: 'person-a', event_date: '2026-08-31', period_month: period, cancelled: false,
     sales_import_batches: { sub_department_id: 'sub-1' },
@@ -23,16 +23,20 @@ function database(options: { enabled?: boolean; openMonths?: string[]; locked?: 
     sales_orders: [order('a'), order('b'), order('older', '2026-08-01'), order('new-occupant')],
     comm_schemes: [{ sub_department_id: 'sub-1', is_active: true, effective_to: null, enable_open_bill: options.enabled ?? true }],
     sales_order_open_bill_tags: [tag('a', 1), tag('b', 2)],
+    // Salespeople whose month is closed on Comm Cal (2026-09-27).
+    comm_salesperson_closes: options.closed ?? [],
   }
   const writes: { operation: string; filters: Filter[] }[] = []
   const locks: string[] = []
   let raced = false
   function from(table: string) {
     const filters: Filter[] = []
+    const overlaps: Filter[] = []
     let operation = 'read'
     let payload: Row | null = null
     const execute = () => {
       const matching = (row: Row) => filters.every(filter => filter.values.includes(row[filter.key]))
+        && overlaps.every(filter => (row[filter.key] as unknown[]).some(value => filter.values.includes(value)))
       if (operation === 'delete') {
         writes.push({ operation, filters: [...filters] })
         const removed = tables[table].filter(matching)
@@ -68,6 +72,7 @@ function database(options: { enabled?: boolean; openMonths?: string[]; locked?: 
       eq: (key: string, value: unknown) => { filters.push({ key, values: [value] }); return query },
       is: (key: string, value: unknown) => { filters.push({ key, values: [value] }); return query },
       in: (key: string, values: unknown[]) => { filters.push({ key, values }); return query },
+      overlaps: (key: string, values: unknown[]) => { overlaps.push({ key, values }); return query },
       delete: () => { operation = 'delete'; return query },
       upsert: (row: Row) => { operation = 'upsert'; payload = row; return query },
       insert: (row: Row) => { operation = 'insert'; payload = row; return query },
@@ -95,6 +100,21 @@ function database(options: { enabled?: boolean; openMonths?: string[]; locked?: 
 beforeEach(() => vi.clearAllMocks())
 
 describe('Open Bill saving safeguards', () => {
+  it('refuses a pick on a closed salesperson’s bill before anything is written (2026-09-27)', async () => {
+    const db = database({ closed: [{
+      staff_id: 'person-a', period_month: '2026-09-01', reopened_at: null, order_ids: ['a', 'zzz'],
+      hr_staff_costs: { employee_name: 'ANTHONY' },
+    }] })
+    await expect(saveOpenBillPicks([{ orderId: 'a', before: 1, after: null }]))
+      .rejects.toThrow('ANTHONY’s September 2026 is closed. Reopen it on Comm Cal before changing this bill.')
+    // Taking rank 1 for another bill would take it off the closed bill: refused too.
+    await expect(setOpenBillRank('b', 1)).rejects.toThrow('ANTHONY’s September 2026 is closed')
+    expect(db.tables.sales_order_open_bill_tags.find(row => row.order_id === 'a')).toMatchObject({ bill_rank: 1 })
+    // A bill nobody closed, on a free rank, is still anybody's to pick.
+    await expect(setOpenBillRank('b', 3)).resolves.toBeUndefined()
+    expect(db.tables.sales_order_open_bill_tags.find(row => row.order_id === 'b')).toMatchObject({ bill_rank: 3 })
+  })
+
   it('rejects source-switch-off saves before clearing any existing pick', async () => {
     const db = database({ enabled: false })
     await expect(saveOpenBillPicks([{ orderId: 'a', before: 1, after: 2 }, { orderId: 'b', before: 2, after: 1 }])).rejects.toThrow('switched off')

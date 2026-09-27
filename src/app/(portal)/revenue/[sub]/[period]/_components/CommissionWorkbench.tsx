@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { buildCommissionWorkbench, type CommissionOrderRow, type OverrideOrderRow } from '@/lib/commission/workbench'
+import { buildCommissionWorkbench, type CommissionOrderRow, type OverrideOrderRow, type WorkbenchPerson } from '@/lib/commission/workbench'
+import { closeDrift, nextOpenPerson, salespersonFigures, type CloseDrift, type SalespersonClose, type SalespersonFigures } from '@/lib/commission/closes'
 import { depositRequired } from '@/lib/commission/engine'
 import { formatMoney } from '@/lib/utils'
 import { computeRevenuePay } from '@/lib/revenue-pay'
@@ -13,7 +14,12 @@ import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench
 import { saveOpenBillPicks } from '../../../run-actions'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
 import NoCommission, { COMMISSIONABLE_HINT, DEPOSIT_HINT, DROP_HINT, GROUP_SALES_HINT, SALES_VALUE_HINT, UPSELL_HINT } from './NoCommission'
+import CloseBar from './CloseBar'
+import PersonCloseControl from './PersonCloseControl'
+import { useSalespersonCloses } from './useSalespersonCloses'
+import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
+import c from './close-controls.module.css'
 
 type Tab = 'sales' | 'kpi' | 'open' | 'deposit' | 'venue'
 const TABS: [Tab, string][] = [
@@ -50,9 +56,34 @@ interface Props {
   venues?: FairSales[]
   monthOverview?: ReactNode
   monthTools?: ReactNode
+  /**
+   * Closing salespeople's month (2026-09-27): who is closed, and whether this
+   * month can be closed at all. Absent: no ticks, bar or Close button.
+   */
+  closes?: CloseFacts
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, monthTools }: Props) {
+/** What the month page hands over for closing salespeople. */
+export interface CloseFacts {
+  subDepartmentId: string
+  closes: SalespersonClose[]
+  /** Why nobody in this month can be closed (a month settled by hand), or null. */
+  unavailable: string | null
+}
+
+/** One line of the list of salespeople: live, or as it stood when closed. */
+interface ListRow {
+  staffId: string
+  /** The live calculation's person; null for somebody closed who has since left the month. */
+  person: WorkbenchPerson | null
+  /** What the row shows — the close's figures once closed. */
+  figures: SalespersonFigures
+  close: SalespersonClose | undefined
+  /** Closed, and the live month has moved since. */
+  drift: CloseDrift | null
+}
+
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, monthTools, closes: closeFacts }: Props) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('sales')
   const [personId, setPersonId] = useState<string | null>(null)
@@ -129,11 +160,40 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   }), [data, effectiveInput, excluded, tags])
   const selected = board.people.find(p => p.staffId === personId)
   const isPersonView = tab === 'sales' && !!selected
+
+  // ── Closing salespeople's month (2026-09-27) ───────────────────────────
+  // A closed person's row shows what was locked; the live figure only rides
+  // along when it has moved since. A close always locks the month AS SAVED,
+  // so nobody can be closed while a draft is on screen.
+  const closer = useSalespersonCloses({ subDepartmentId: closeFacts?.subDepartmentId ?? '', period, closes: closeFacts?.closes ?? [] })
+  const monthLabel = new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const drafting = excluded.length > 0 || picks !== null || currentTeam || Object.keys(previewFeatures).length > 0
+  const closeBlocked = closeFacts?.unavailable
+    ?? (data.input.hierarchy.length === 0 ? `No team ranks are effective in ${monthLabel} — set them before closing anybody.`
+      : drafting ? 'A close locks the month as saved — reset the draft (or save the Open Bill picks) first.' : null)
+  const listRows: ListRow[] = useMemo(() => {
+    const live = board.people.map(person => {
+      const close = closer.closedById.get(person.staffId)
+      return { staffId: person.staffId, person, close,
+        figures: close ? close.summary : salespersonFigures(person),
+        drift: close ? closeDrift(close, person) : null }
+    })
+    const here = new Set(live.map(r => r.staffId))
+    const gone = [...closer.closedById.values()].filter(close => !here.has(close.staffId))
+      .map(close => ({ staffId: close.staffId, person: null, close, figures: close.summary, drift: closeDrift(close, null) }))
+    return [...live, ...gone].sort((a, b) => a.figures.name.localeCompare(b.figures.name))
+  }, [board, closer.closedById])
+  const listTotal = sum(listRows, r => r.figures.total)
+  const selectedClose = selected ? closer.closedById.get(selected.staffId) : undefined
+  const selectedDrift = selected && selectedClose ? closeDrift(selectedClose, selected) : null
+  const openOrder = listRows.map(r => r.staffId)
+  const nextId = selected ? nextOpenPerson(openOrder, selected.staffId, new Set(closer.closedById.keys())) : null
+  const nextName = nextId ? listRows.find(r => r.staffId === nextId)?.figures.name ?? null : null
   const workspaceRef = useRef<HTMLElement>(null)
   const saved = savedTotals.find(p => p.staffId === personId)
   const salarySource = data.payRows.find(p => p.staffId === personId)
   const salary = selected && salarySource ? computeRevenuePay({ ...salarySource.input,
-    commission: selected.totalCommission + salarySource.commissionElsewhere + salarySource.payrollAdjustment,
+    commission: (selectedClose?.total ?? selected.totalCommission) + salarySource.commissionElsewhere + salarySource.payrollAdjustment,
   }) : null
   const openEnabled = effectiveInput.scheme.enableOpenBill
   const hasOpen = openEnabled || tags.length > 0
@@ -142,7 +202,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const brands = [...new Set(board.personalRows.flatMap(r => r.brands))].sort()
   const carriedCount = new Set(data.input.orders.filter(o => !o.upsale && o.periodMonth !== period).map(o => o.id)).size
   const upsaleCount = new Set(data.input.orders.filter(o => o.upsale).map(o => o.id)).size
-  const people = board.people.filter(p => p.name.toLowerCase().includes(query.trim().toLowerCase()))
+  const people = listRows.filter(r => r.figures.name.toLowerCase().includes(query.trim().toLowerCase()))
   const totals = {
     kpiQty: board.kpi.reduce((total, p) => total + p.soldQty, 0),
     kpiBase: sum(board.people, p => (p.statement?.kpiBase ?? 0)),
@@ -229,10 +289,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     const order = data.input.orders.find(o => o.id === row.orderId)
     return <div className="flex items-center gap-2">
       <input type="checkbox" aria-label={`Open Bill ${row.orderNo}`} checked={row.openBillRank != null}
-        disabled={!openEnabled || locked || saving || !!order?.upsale || row.status === 'excluded'}
+        disabled={!openEnabled || locked || saving || !!order?.upsale || row.status === 'excluded' || closer.closedById.has(row.staffId)}
+        title={closer.closedById.has(row.staffId) ? `${row.staffName} is closed — reopen to change this pick` : undefined}
         onChange={e => changePick(row.orderId, e.target.checked ? 1 : null)} />
       {row.openBillRank != null && <select aria-label={`Open Bill rank ${row.orderNo}`} value={row.openBillRank}
-        disabled={!openEnabled || locked || saving} onChange={e => changePick(row.orderId, Number(e.target.value) as 1 | 2 | 3)}>
+        disabled={!openEnabled || locked || saving || closer.closedById.has(row.staffId)} onChange={e => changePick(row.orderId, Number(e.target.value) as 1 | 2 | 3)}>
         <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option>
       </select>}
       <span>{money(row.openBillBonus)}</span>
@@ -363,38 +424,50 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
 
     <div role={isPersonView ? undefined : "tabpanel"} id={`commission-panel-${tab}`} aria-labelledby={isPersonView ? undefined : `commission-tab-${tab}`}>
     {tab === 'sales' && !selected && <>
+      {closeFacts && <CloseBar monthLabel={monthLabel} ticked={closer.ticked} busy={closer.busy} disabledReason={closeBlocked}
+        error={closer.error} notice={closer.notice} onClearTicks={closer.clearTicks}
+        rows={listRows.map(r => ({ staffId: r.staffId, name: r.figures.name, total: r.figures.total, closed: !!r.close, changed: !!r.drift }))}
+        onClose={targets => closer.close(targets)} onReopen={targets => closer.reopen(targets)} />}
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Salesperson commission summary">
-        <thead><tr><th className={s.stickyFirst}>Sales person</th><th>Title / rank</th><th>Orders</th>
+        <thead><tr><th className={s.stickyFirst}>{closeFacts ? <span className={c.nameCell}><input type="checkbox" aria-label="Tick every salesperson shown"
+            checked={people.length > 0 && people.every(r => closer.ticked.has(r.staffId))}
+            ref={box => { if (box) box.indeterminate = people.some(r => closer.ticked.has(r.staffId)) && !people.every(r => closer.ticked.has(r.staffId)) }}
+            onChange={e => closer.tickAll(people.map(r => r.staffId), e.target.checked)} />Sales person</span> : 'Sales person'}</th>
+          <th>Title / rank</th><th>Orders</th>
           <th title={SALES_VALUE_HINT}>Sales value</th><th title={COMMISSIONABLE_HINT}>Commissionable value</th>
           <th title={GROUP_SALES_HINT}>Group sales</th>
           <th title={UPSELL_HINT}>Upsell</th><th title={DROP_HINT}>Drop sales</th>
           <th>Margin</th><th>Personal</th><th>Overriding</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
-        <tbody>{people.map(p => {
-          const counted = p.personalRows.filter(r => r.status !== 'excluded')
-          // Bills, and beside them what was added to or dropped from settled
-          // ones (2026-09-26) — neither is a bill, so neither is an order.
-          const bills = counted.filter(r => !r.upsale)
-          const salesValue = sum(bills, r => r.orderTotal)
-          const commissionable = sum(bills, r => r.commissionableValue)
-          const upsell = sum(counted.filter(r => r.upsale && r.orderTotal > 0), r => r.orderTotal)
-          const dropped = sum(counted.filter(r => r.upsale && r.orderTotal < 0), r => r.orderTotal)
-          const qualifies = p.statement?.qualifiesForRankKey && p.statement.qualifiesForRankKey !== p.statement.effectiveRankKey
+        <tbody>{people.map(row => {
+          // A closed person's row is the close's: what was checked and locked,
+          // not whatever the live month says since (2026-09-27). Bills, and
+          // beside them what was added to or dropped from settled ones — neither
+          // of those is a bill, so neither is an order.
+          const f = row.figures
+          const p = row.person
+          const qualifies = p?.statement?.qualifiesForRankKey && p.statement.qualifiesForRankKey !== p.statement.effectiveRankKey
             ? p.statement.qualifiesForRankKey : null
-          const promotes = p.statement?.promotesToTitleId ?? null
-          return <tr key={p.staffId}><td className={s.stickyFirst}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} <span aria-hidden>↗</span></button></td>
-          <td>{p.titleLabel}<small>{p.rankLabel} · {pct(p.productRate)}</small>
+          const promotes = p?.statement?.promotesToTitleId ?? null
+          const open = () => { if (p) choosePerson(p.staffId) }
+          return <tr key={row.staffId} className={row.close ? c.rowClosed : undefined}><td className={s.stickyFirst}>
+            <span className={c.nameCell}>{closeFacts && <input type="checkbox" aria-label={`Tick ${f.name}`} checked={closer.ticked.has(row.staffId)} onChange={() => closer.toggle(row.staffId)} />}
+              <button className={s.ghostButton} onClick={open} disabled={!p}>{f.name} <span aria-hidden>↗</span></button></span>
+            {row.close && <small><span className={`${c.closedTag} ${row.drift ? c.movedTag : ''}`} title={`Closed ${new Date(row.close.closedAt).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })}${row.close.closedByName ? ` by ${row.close.closedByName}` : ''}`}>
+              <SheetIcon name="lock" />{row.drift ? 'Closed · moved since' : 'Closed'}</span></small>}</td>
+          <td>{f.titleLabel}<small>{f.rankLabel} · {pct(f.productRate)}</small>
             {qualifies && <small><span className={s.badge}>Qualifies for {rankName(qualifies)}</span></small>}
             {promotes && <small><span className={s.badge}>{locked ? `Title raised to ${titleName(promotes)}` : `Title → ${titleName(promotes)} on sync`}</span></small>}</td>
-          <td>{bills.length}</td>
-          <td className={s.numeric}>{money(salesValue)}</td>
-          <td className={s.numeric}>{money(commissionable)}<NoCommission amount={salesValue - commissionable} /></td>
-          <td className={s.numeric}>{p.statement ? money(p.statement.groupRevenue) : <span className={s.muted}>—</span>}</td>
-          <td className={s.numeric}>{upsell ? money(upsell) : <span className={s.muted}>—</span>}</td>
-          <td className={s.numeric}>{dropped ? <span className="neg">{money(dropped)}</span> : <span className={s.muted}>—</span>}</td>
-          <td className={s.numeric}>{pct(p.statement?.marginPct)}<small>{p.statement?.marginPct == null ? 'Cost incomplete' : money(p.statement?.marginRevenue - p.statement?.marginCost)}</small></td>
-          <td className={s.numeric}>{money(p.personalTotal)}</td><td className={s.numeric}>{money(p.overrideTotal)}</td><td className={s.stickyTotal}><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{money(p.totalCommission)}</button>{p.monthlyGroupIncentive > 0 && <small>Includes {money(p.monthlyGroupIncentive)} group reward</small>}</td></tr>
+          <td>{f.orders}</td>
+          <td className={s.numeric}>{money(f.salesValue)}</td>
+          <td className={s.numeric}>{money(f.commissionable)}<NoCommission amount={f.salesValue - f.commissionable} /></td>
+          <td className={s.numeric}>{f.groupRevenue !== null ? money(f.groupRevenue) : <span className={s.muted}>—</span>}</td>
+          <td className={s.numeric}>{f.upsell ? money(f.upsell) : <span className={s.muted}>—</span>}</td>
+          <td className={s.numeric}>{f.dropped ? <span className="neg">{money(f.dropped)}</span> : <span className={s.muted}>—</span>}</td>
+          <td className={s.numeric}>{pct(f.marginPct)}<small>{f.marginPct == null || f.marginRevenue === null || f.marginCost === null ? 'Cost incomplete' : money(f.marginRevenue - f.marginCost)}</small></td>
+          <td className={s.numeric}>{money(f.personal)}</td><td className={s.numeric}>{money(f.overriding)}</td><td className={s.stickyTotal}><button className={s.ghostButton} onClick={open} disabled={!p}>{money(f.total)}</button>{f.groupIncentive > 0 && <small>Includes {money(f.groupIncentive)} group reward</small>}
+            {row.drift && <small className={c.live}>Live now {money(row.drift.liveTotal)}</small>}</td></tr>
         })}</tbody>
-        <tfoot><tr><td colSpan={11}>All salespeople · total commission</td><td className={s.stickyTotal}>{money(board.totalCommission)}</td></tr></tfoot>
+        <tfoot><tr><td colSpan={11}>All salespeople · total commission{closer.closedById.size > 0 ? ' · closed at their locked figure' : ''}</td><td className={s.stickyTotal}>{money(listTotal)}</td></tr></tfoot>
       </table></div></div>
       {!people.length && <p className={s.empty}>No salespeople found.</p>}
     </>}
@@ -402,16 +475,33 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {tab === 'sales' && selected && <>
       <nav className={s.breadcrumb} aria-label="Commission navigation"><button onClick={() => { setPersonId(null); setQuery(''); setBrand('') }}>← Sales people</button><span>/</span><span>{selected.name}</span></nav>
       <div className={s.personHeader}>
-        <div className={s.personHeroTop}><span className={s.eyebrow}>COMMISSION · {new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</span><span className={s.heroStatus}>{currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : excluded.length || picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Monthly calculation'}</span></div>
+        <div className={s.personHeroTop}><span className={s.eyebrow}>COMMISSION · {new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</span><span className={s.heroStatus}>{selectedClose ? 'Closed' : currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : excluded.length || picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Monthly calculation'}</span></div>
         <div className={s.personHeroBody}><div className={s.avatar}>{selected.name.slice(0, 2)}</div><div className={s.personIdentity}><h2>{selected.name}</h2><p>{selected.titleLabel ?? 'Title unassigned'}<span>{selected.rankLabel ?? 'Rank unassigned'} · {pct(selected.productRate)}</span></p></div>
-          <div className={s.overviewTotal}><span>Total commission</span><strong>{money(selected.totalCommission)}</strong><small>Personal + overriding{selected.monthlyGroupIncentive ? ` + ${money(selected.monthlyGroupIncentive)} group reward` : ''}</small></div>
+          {closeFacts && <PersonCloseControl name={selected.name} total={selected.totalCommission} monthLabel={monthLabel}
+            close={selectedClose} liveTotal={selectedDrift ? selectedDrift.liveTotal : null} nextName={nextName}
+            busy={closer.busy} disabledReason={closeBlocked}
+            onClose={() => closer.close([{ staffId: selected.staffId, name: selected.name, total: selected.totalCommission }])}
+            onCloseAndNext={() => closer.close([{ staffId: selected.staffId, name: selected.name, total: selected.totalCommission }], () => { if (nextId) choosePerson(nextId) })}
+            onReopen={() => closer.reopen([{ staffId: selected.staffId, name: selected.name }])} />}
+          <div className={s.overviewTotal}><span>{selectedClose ? 'Total commission · locked' : 'Total commission'}</span><strong>{money(selectedClose?.total ?? selected.totalCommission)}</strong><small>Personal + overriding{(selectedClose?.summary.groupIncentive ?? selected.monthlyGroupIncentive) ? ` + ${money(selectedClose?.summary.groupIncentive ?? selected.monthlyGroupIncentive)} group reward` : ''}</small></div>
         </div>
       </div>
+      {(closer.notice || closer.error) && <p className={closer.error ? s.warning : s.notice} role={closer.error ? 'alert' : 'status'}>{closer.error || closer.notice}</p>}
+      {selectedClose && selectedDrift && <div className={c.moved} role="note">
+        <strong>Moved since {selected.name} was closed: {selectedDrift.delta >= 0 ? '+' : ''}{money(selectedDrift.delta)}</strong>
+        The closed {money(selectedClose.total)} still stands — the bills below are live and now come to {money(selectedDrift.liveTotal)}. Reopen to take the new figure, or leave it for the payroll step to carry.
+        {(selectedDrift.bills.length > 0 || selectedDrift.overrides.length > 0) && <ul>
+          {selectedDrift.bills.map(b => <li key={b.id}>{b.no}: {b.closed === null ? `new · ${money(b.live ?? 0)}` : b.live === null ? `gone · was ${money(b.closed)}` : `${money(b.closed)} → ${money(b.live)}`}</li>)}
+          {selectedDrift.overrides.map(o => <li key={o.staffId}>Override from {o.name}: {money(o.closed)} → {money(o.live)}</li>)}
+        </ul>}
+      </div>}
       <div className={s.summaryGrid}>
-        <Summary label="Personal commission" value={money(selected.personalTotal)} />
-        <Summary label="Overriding commission" value={money(selected.overrideTotal)} />
-        <Summary label="Monthly margin" value={pct(selected.statement?.marginPct)} note={selected.statement?.marginPct == null ? 'Cost incomplete' : `${money(selected.statement?.marginRevenue - selected.statement?.marginCost)} margin`} />
-        <Summary label="Estimated take-home pay" value={salary ? money(salary.net) : 'Not available'} note={salary ? 'Based on current commission' : data.payUnavailable ? 'Salary preview is unavailable for this session' : 'Payroll inputs are not set for this person'} />
+        <Summary label="Personal commission" value={money(selectedClose?.summary.personal ?? selected.personalTotal)} />
+        <Summary label="Overriding commission" value={money(selectedClose?.summary.overriding ?? selected.overrideTotal)} />
+        {selectedClose
+          ? <Summary label="Monthly margin" value={pct(selectedClose.summary.marginPct)} note={selectedClose.summary.marginPct == null || selectedClose.summary.marginRevenue === null || selectedClose.summary.marginCost === null ? 'Cost incomplete' : `${money(selectedClose.summary.marginRevenue - selectedClose.summary.marginCost)} margin`} />
+          : <Summary label="Monthly margin" value={pct(selected.statement?.marginPct)} note={selected.statement?.marginPct == null ? 'Cost incomplete' : `${money(selected.statement?.marginRevenue - selected.statement?.marginCost)} margin`} />}
+        <Summary label="Estimated take-home pay" value={salary ? money(salary.net) : 'Not available'} note={salary ? (selectedClose ? 'Based on the closed commission' : 'Based on current commission') : data.payUnavailable ? 'Salary preview is unavailable for this session' : 'Payroll inputs are not set for this person'} />
       </div>
 
       <div className={s.topLine}><span className={s.muted}>Saved commission: {saved ? money(saved.total) : 'No saved run'}{saved && Math.abs(saved.total - selected.totalCommission) >= .01 ? ` · Difference ${money(selected.totalCommission - saved.total)}` : ''}</span>

@@ -8,6 +8,7 @@ import { computeCommissionRun as runEngine } from '@/lib/commission/engine'
 import { toRunPayload } from '@/lib/commission/run-payload'
 import { loadCommissionInput } from './_lib/commission-input'
 import { openBillOnFor } from './_lib/open-bill-month'
+import { assertBillsNotClosed } from './_lib/salesperson-closes'
 import { fetchByKeys } from '@/lib/paginate'
 
 /**
@@ -194,6 +195,7 @@ export async function saveOpenBillPicks(changes: OpenBillPickChange[]): Promise<
   await Promise.all([
     ...[...periods.values()].map(({ sub, period }) => assertOpenBillEnabled(supabase, sub, period)),
     ...[...periods.values()].map(({ sub, period }) => assertRunOpen(supabase, period, sub)),
+    assertBillsNotClosed(supabase, [...changedIds]),
   ])
   const tagGroups = await Promise.all([...groups.values()].map(async group => {
     const { data, error } = await supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank')
@@ -256,6 +258,7 @@ async function writeOpenBillRank(orderId: string, rank: BillRank | null, allowMo
   await Promise.all([
     assertRunOpen(supabase, order.period_month, subDepartmentId),
     assertOpenBillEnabled(supabase, subDepartmentId, order.period_month),
+    assertBillsNotClosed(supabase, [orderId]),
   ])
 
   if (expectedRank !== undefined) {
@@ -284,7 +287,10 @@ async function writeOpenBillRank(orderId: string, rank: BillRank | null, allowMo
     if (!allowMove && occupiedIds.length > 0) throw new Error('Another order claimed this Open Bill rank while saving. Refresh before retrying.')
     const occupiedOrders = await readOpenBillOrders(supabase, occupiedIds)
     if (occupiedOrders.length !== occupiedIds.length) throw new Error('The occupied Open Bill rank could not be checked. Refresh before saving.')
-    await Promise.all(occupiedOrders.map(row => assertRunOpen(supabase, row.period_month, openBillSub(row))))
+    await Promise.all([
+      ...occupiedOrders.map(row => assertRunOpen(supabase, row.period_month, openBillSub(row))),
+      assertBillsNotClosed(supabase, occupiedIds),
+    ])
     // Only free the occupant we actually checked. A different order claiming
     // the slot meanwhile must cause a unique-conflict failure, not be deleted.
     if (occupiedIds.length > 0) {
@@ -348,7 +354,10 @@ export async function shareOrder(orderId: string, staffId: string, pct = 0.5): P
   if (!order.staff_id) throw new Error('Match this bill to a salesperson before sharing it.')
   if (order.staff_id === staffId) throw new Error('That is who the bill already belongs to.')
 
-  await assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id)
+  await Promise.all([
+    assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id),
+    assertBillsNotClosed(supabase, [orderId]),
+  ])
 
   const { error } = await supabase
     .from('sales_order_shares')
@@ -362,6 +371,7 @@ export async function shareOrder(orderId: string, staffId: string, pct = 0.5): P
 export async function unshareOrder(orderId: string, staffId: string): Promise<void> {
   await requirePermission('revenue')
   const supabase = await client()
+  await assertBillsNotClosed(supabase, [orderId])
   const { error } = await supabase.from('sales_order_shares').delete().eq('order_id', orderId).eq('staff_id', staffId)
   if (error) throw new Error(error.message)
   revalidatePath('/revenue', 'layout')
@@ -393,6 +403,7 @@ export async function excludeOrder(orderId: string, note?: string | null): Promi
   if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
   const why = typeof note === 'string' ? note.trim().slice(0, 500) : ''
   const supabase = await client()
+  await assertBillsNotClosed(supabase, [orderId])
   const { data, error } = await supabase.rpc('revenue_exclude_order', { p_order_id: orderId, p_note: why || null })
   if (error) throw new Error(error.message)
   revalidatePath('/revenue', 'layout')
@@ -408,6 +419,7 @@ export async function includeOrder(orderId: string): Promise<BillCountResult> {
   await requirePermission('revenue')
   if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
   const supabase = await client()
+  await assertBillsNotClosed(supabase, [orderId])
   const { data, error } = await supabase.rpc('revenue_include_order', { p_order_id: orderId })
   if (error) throw new Error(error.message)
   revalidatePath('/revenue', 'layout')
@@ -435,7 +447,10 @@ export async function setManualMargin(orderId: string, marginPct: number | null)
   const order = orderRow as { period_month: string; sales_import_batches: { sub_department_id: string } } | null
   if (!order) throw new Error('Order not found')
 
-  await assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id)
+  await Promise.all([
+    assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id),
+    assertBillsNotClosed(supabase, [orderId]),
+  ])
 
   const { error } = await supabase
     .from('sales_orders')
