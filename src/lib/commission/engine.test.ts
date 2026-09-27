@@ -801,12 +801,14 @@ describe('KPI items a bill carries — the flat allowance, 2026-09-27', () => {
     expect(ta.kpiCommission).toBe(0)
   })
 
-  it('stops the main sales at 0 when the add-ons come to more, and says so', () => {
+  // Not a warning: every warning blocks Apply, and an exchange is no error.
+  it('pays a bill whose sales cannot cover its KPI items as sales, with no KPI', () => {
     const r = run({ orders: [bill([mattress(100, 50), bedframe(['HB Straight'])])], kpiItems: [HB_STRAIGHT] })
     const ta = find(r.statements, 'ta')
-    expect(ta.productRevenue).toBe(0)
-    expect(ta.kpiCommission).toBe(200)
-    expect(r.warnings.join(' ')).toMatch(/KPI items \(200\.00\) come to more than its commissionable sales \(100\.00\)/)
+    expect(ta.productRevenue).toBe(100)
+    expect(ta.kpiQty).toBe(0)
+    expect(ta.kpiCommission).toBe(0)
+    expect(r.warnings).toEqual([])
   })
 
   it('counts two bed frames as two add-ons toward the quantity ladder', () => {

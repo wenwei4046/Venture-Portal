@@ -158,7 +158,21 @@ describe("KPI items in the cart — paid flat as KPI, outside the margin", () =>
     expect(r.margin).toBeCloseTo(60, 10);
   });
 
-  it("refuses a price that does not cover the KPI items", () => {
+  it("judges a price that does not cover the KPI items whole, and pays no KPI — as the run does", () => {
+    const r = calculateQuote(
+      quote([one("y04-q")], { bedframe: { specials: ["HB Straight"] } }, "150"),
+      products,
+      bands,
+      { costDivisor: 1, kpiItems: [HB_STRAIGHT] },
+      pricing,
+    );
+    expect(r.valid).toBe(true);
+    expect(r.kpiAmount).toBe(0);
+    expect(r.kpiNotPaid).toBe(200);
+    expect(r.margin).toBeCloseTo(((150 - 800) / 150) * 100, 10);
+  });
+
+  it("asks for more when the KPI items take the whole price", () => {
     const r = calculateQuote(
       quote([one("y04-q")], { bedframe: { specials: ["HB Straight"] } }, "200"),
       products,
@@ -167,7 +181,7 @@ describe("KPI items in the cart — paid flat as KPI, outside the margin", () =>
       pricing,
     );
     expect(r.valid).toBe(false);
-    expect(r.error).toMatch(/RM 200\.00 of KPI items/);
+    expect(r.error).toMatch(/take the whole price/);
   });
 });
 

@@ -248,8 +248,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
   // what its KPI items take off (paid flat as KPI instead).
   const split = orderRevenueSplit({ lines: salesLines }, kpiIndex, groupIndex)
   const commissionable = split.main
+  // Every item the bill carries is shown; one its sales cannot cover is not paid.
   const hitsByLine = new Map<string, KpiHit[]>()
-  for (const hit of split.kpiHits) hitsByLine.set(hit.lineId, [...(hitsByLine.get(hit.lineId) ?? []), hit])
+  for (const hit of split.foundHits) hitsByLine.set(hit.lineId, [...(hitsByLine.get(hit.lineId) ?? []), hit])
   const excluded = classed
     .filter(c => c.cls === 'excluded_group' || c.cls === 'unknown_group')
     .reduce((a, c) => a + Number(c.line.line_amount), 0)
@@ -482,9 +483,15 @@ export default async function OrderDetailPage({ params }: PageProps) {
                         {CLASS_LABEL[cls]}
                       </span>
                       {(hitsByLine.get(l.id) ?? []).map(hit => (
-                        <span key={hit.itemKey} className="chip accent ml-1" title="Paid flat as KPI, off the bill's commissionable sales">
+                        <span
+                          key={hit.itemKey}
+                          className={`chip ${split.uncovered ? 'info' : 'accent'} ml-1`}
+                          title={split.uncovered
+                            ? "Not paid: the bill's sales do not cover its KPI items"
+                            : "Paid flat as KPI, off the bill's commissionable sales"}
+                        >
                           <span className="dot" />
-                          KPI · {kpiItemLabel(hit.item)} {formatMoney(hit.amount)}
+                          KPI · {kpiItemLabel(hit.item)} {formatMoney(hit.amount)}{split.uncovered ? ' · not paid' : ''}
                         </span>
                       ))}
                     </td>
@@ -530,7 +537,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
           Commissionable {formatMoney(commissionable)} · KPI items {formatMoney(split.kpiAmount)} · not commissionable{' '}
           {formatMoney(excluded)}. A KPI item&apos;s amount comes off the bill&apos;s sales and is paid flat as KPI
           instead of a rate; transport and disposal earn nothing either way.
-          {split.capped ? ' Its KPI items come to more than its sales, so its own commission is taken on 0.' : ''}
+          {split.uncovered
+            ? ' Its sales do not cover the KPI items it carries, so none is paid on it — it is paid as sales.'
+            : ''}
         </p>
       </section>
 

@@ -1690,6 +1690,12 @@ export default function MemberQuoteBuilder({
               </p>
             )}
             {result?.boundary && <p className={s.error}>{result.boundary}</p>}
+            {result?.valid && (result.kpiNotPaid ?? 0) > 0 && (
+              <p className={s.caption}>
+                The price does not cover its KPI items ({money(result.kpiNotPaid ?? 0)}), so
+                none is paid as KPI — the whole price counts as the sale.
+              </p>
+            )}
             {result?.valid && (result.kpiAmount ?? 0) > 0 && (
               <p className={s.caption}>
                 KPI items{" "}

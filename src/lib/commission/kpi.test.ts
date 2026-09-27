@@ -4,7 +4,7 @@ import {
   kpiAmountOf,
   kpiItemKey,
   lineSpecialsOf,
-  mainAfterKpi,
+  coverKpi,
   orderKpiHits,
   type KpiItem,
   type KpiLine,
@@ -100,18 +100,25 @@ describe('orderKpiHits — what a bill carries', () => {
   })
 })
 
-describe('mainAfterKpi — never past zero', () => {
-  it('takes the KPI items off', () => {
-    expect(mainAfterKpi(10_000, 200)).toEqual({ main: 9_800, capped: false })
+describe('coverKpi — a bill pays its KPI items only when its sales cover them', () => {
+  it('takes the KPI items off a bill that covers them', () => {
+    expect(coverKpi(10_000, 200)).toEqual({ main: 9_800, covered: true })
+    expect(coverKpi(200, 200)).toEqual({ main: 0, covered: true })
   })
 
-  it('stops at zero when the add-ons come to more than the bill', () => {
-    expect(mainAfterKpi(100, 200)).toEqual({ main: 0, capped: true })
+  // Two RM 0.00 exchanges in September 2026 still print the sofa's specials.
+  it('pays a bill that cannot cover them as sales, taking nothing off', () => {
+    expect(coverKpi(0, 150)).toEqual({ main: 0, covered: false })
+    expect(coverKpi(100, 200)).toEqual({ main: 100, covered: false })
   })
 
-  it('leaves a credit note alone unless the KPI flips its sign', () => {
-    expect(mainAfterKpi(-1_000, -200)).toEqual({ main: -800, capped: false })
-    expect(mainAfterKpi(-100, -200)).toEqual({ main: 0, capped: true })
+  it('reads a credit note the same way round', () => {
+    expect(coverKpi(-1_000, -200)).toEqual({ main: -800, covered: true })
+    expect(coverKpi(-100, -200)).toEqual({ main: -100, covered: false })
+  })
+
+  it('always covers nothing', () => {
+    expect(coverKpi(0, 0)).toEqual({ main: 0, covered: true })
   })
 })
 

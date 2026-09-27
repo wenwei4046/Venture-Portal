@@ -15,7 +15,8 @@
  *
  * The ERP cannot say how much of a bill an add-on is — a bed frame line is
  * RM 0.00 on 96% of bills, its value folded into the mattress — so the amount
- * is the Principal's figure, not the line's.
+ * is the Principal's figure, not the line's. A bill pays its KPI items only
+ * when its sales cover them (`coverKpi`).
  *
  * FOUND, not typed: a SKU by its product code; a special by the options the
  * line carries (`raw.variants`, else the ERP's own `description2` grammar —
@@ -221,13 +222,17 @@ export function kpiAmountOf(hits: readonly KpiHit[]): number {
 }
 
 /**
- * The bill's main commissionable sales once its KPI items are off: never past
- * zero. A RM 100 bill cannot give away RM 200 of add-ons — the allowance is
- * still paid in full (it is for moving the item), the main part stops at 0.
+ * Whether a bill's sales COVER its KPI items, and its main sales.
+ *
+ * The KPI part is part of the bill: its amount comes out of the bill's
+ * commissionable sales. A bill whose sales do not cover it — a RM 0.00
+ * exchange that still prints the sofa's specials (two in September 2026) —
+ * sold no add-on: none of its KPI items is paid, and it is paid as the sales
+ * it has. Not a run warning: every warning blocks Apply, and an exchange is
+ * not an error to be fixed before payroll.
  */
-export function mainAfterKpi(commissionable: number, kpiAmount: number): { main: number; capped: boolean } {
+export function coverKpi(commissionable: number, kpiAmount: number): { main: number; covered: boolean } {
   const main = round2(commissionable - kpiAmount)
-  if (commissionable >= 0 && main < 0) return { main: 0, capped: true }
-  if (commissionable < 0 && main > 0) return { main: 0, capped: true }
-  return { main, capped: false }
+  const covered = commissionable >= 0 ? main >= 0 : main <= 0
+  return covered ? { main, covered } : { main: round2(commissionable), covered }
 }

@@ -282,6 +282,8 @@ export interface QuoteResult {
    */
   kpiAmount?: number;
   kpiItems?: { label: string; qty: number; amount: number }[];
+  /** KPI items the price does not cover, RM — not paid; the whole price is the sale. */
+  kpiNotPaid?: number;
   version: string;
   inputKey: string;
   customerText?: string;

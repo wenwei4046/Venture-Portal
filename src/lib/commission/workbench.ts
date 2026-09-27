@@ -1,6 +1,6 @@
 import {
   billMargin, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, indexItemGroups,
-  indexKpiItems, isDepositMet, marginBase, orderKpiHits, orderRevenueSplit, penaltyBandFor, round2,
+  indexKpiItems, isDepositMet, marginBase, orderRevenueSplit, penaltyBandFor, round2,
 } from './engine'
 import { kpiItemLabel, kpiSourceOf } from './kpi'
 import type { EngineInput, EngineResult, MarginSource, OpenBillTag, SalesOrder, Statement } from './types'
@@ -331,10 +331,11 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     for (const order of input.orders.filter(order => order.staffId === person.staffId)) {
       const row = rows.get(order.id)!
       // Found with every configured item, KPI pay on or off: what was SOLD.
-      // What was PAID is the engine's — an eligible bill, KPI switched on —
-      // and it paid each item exactly its hit's amount.
-      const hits = orderKpiHits(order, configuredKpiIndex)
-      const paid = row.status === 'eligible' && input.scheme.enableKpi
+      // What was PAID is the engine's — an eligible bill, KPI switched on,
+      // its sales covering its items — and it paid each exactly its amount.
+      const found = orderRevenueSplit(order, configuredKpiIndex, groupIndex)
+      const hits = found.foundHits
+      const paid = row.status === 'eligible' && input.scheme.enableKpi && !found.uncovered
       const bases = hits.map(hit => (paid ? hit.amount : 0))
       const bonuses = allocateCommissionAmount(row.kpiBonus, bases)
       hits.forEach((hit, index) => {

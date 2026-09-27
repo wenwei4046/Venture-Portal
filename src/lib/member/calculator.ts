@@ -393,11 +393,15 @@ export function calculateQuote(
     { lines: cartKpiLines(selected.map(({ line, product }) => ({ line, product: product! })), input.build) },
     kpiIndex,
   );
-  const kpi = kpiHits.reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
+  const kpiFound = kpiHits.reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
+  // Paid only when the price covers them, as the run pays them (coverKpi):
+  // otherwise the whole price is the sale and no KPI is paid.
+  const covered = price - kpiFound >= 0;
+  const kpi = covered ? kpiFound : 0;
   const main = price - kpi;
   if (main <= 0)
     return invalid(
-      `The price must be more than the RM ${(kpi / 100).toFixed(2)} of KPI items in the cart, which is paid as KPI.`,
+      `The KPI items (RM ${(kpi / 100).toFixed(2)}) take the whole price. Raise it to see a margin.`,
     );
   const margin = ((main - cost) / main) * 100,
     band = brand
@@ -464,6 +468,7 @@ export function calculateQuote(
     boundary,
     kpiAmount: kpi / 100,
     kpiItems: kpiHits.map((hit) => ({ label: kpiItemLabel(hit.item), qty: hit.qty, amount: hit.amount })),
+    kpiNotPaid: covered ? 0 : kpiFound / 100,
     version: productVersions(selected.map(({ product }) => product!)),
     inputKey: quoteInputKey(input),
     suggestions,

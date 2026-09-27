@@ -44,10 +44,10 @@ import { earnedFloor, promotesTo, titleCanRecruit } from './titles'
 import { computeIrGroups, type IrGroupsResult } from './ir-groups'
 import {
   EMPTY_KPI_INDEX,
+  coverKpi,
   indexKpiItems,
   kpiAmountOf,
   kpiItemLabel,
-  mainAfterKpi,
   orderKpiHits,
   type KpiHit,
   type KpiIndex,
@@ -107,14 +107,16 @@ function inGoodsScope(line: SalesLine, groupIndex: Map<string, boolean>): boolea
 export interface RevenueSplit {
   /** Σ the bill's commissionable lines, as billed. */
   commissionable: number
-  /** The KPI items the bill carries. */
+  /** Every KPI item the bill carries. */
+  foundHits: KpiHit[]
+  /** The ones paid on it: all of them, or none when its sales cannot cover them. */
   kpiHits: KpiHit[]
-  /** What they take off: Σ qty × each item's amount — paid as KPI instead. */
+  /** What the paid ones take off: Σ qty × each item's amount — paid as KPI instead. */
   kpiAmount: number
-  /** What the rate is paid on: commissionable − kpiAmount, never past 0. */
+  /** What the rate is paid on: commissionable − kpiAmount. */
   main: number
-  /** The KPI items came to more than the bill had; the main part stopped at 0. */
-  capped: boolean
+  /** It carries KPI items its sales do not cover: none is paid, it is paid as sales. */
+  uncovered: boolean
 }
 
 /**
@@ -132,10 +134,10 @@ export function orderRevenueSplit(
   const commissionable = sum(
     order.lines.filter(l => classifyLine(l, groupIndex) === 'commissionable').map(l => l.lineAmount),
   )
-  const kpiHits = orderKpiHits(order, kpiIndex)
-  const kpiAmount = kpiAmountOf(kpiHits)
-  const { main, capped } = mainAfterKpi(commissionable, kpiAmount)
-  return { commissionable, kpiHits, kpiAmount, main, capped }
+  const foundHits = orderKpiHits(order, kpiIndex)
+  const { main, covered } = coverKpi(commissionable, kpiAmountOf(foundHits))
+  const kpiHits = covered ? foundHits : []
+  return { commissionable, foundHits, kpiHits, kpiAmount: kpiAmountOf(kpiHits), main, uncovered: !covered }
 }
 
 /** Product revenue of one order: its commissionable sales less its KPI items. */
@@ -233,7 +235,7 @@ export function marginBase(
       byBrand.set(line.brandCode, round2((byBrand.get(line.brandCode) ?? 0) + line.lineAmount))
     }
   }
-  if (kpiIndex.size > 0) revenue = mainAfterKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
+  if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
 
   let brandCode: string | null = null
   let best = -Infinity
@@ -912,11 +914,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     for (const order of draft.eligibleOrders) {
       const split = orderRevenueSplit(order, kpiIndex, groupIndex)
       const opr = split.main
-      if (split.capped) {
-        warnings.push(
-          `Order ${order.orderNo}: its KPI items (${split.kpiAmount.toFixed(2)}) come to more than its commissionable sales (${split.commissionable.toFixed(2)}) — its own commission was taken on 0 and the KPI paid in full.`,
-        )
-      }
       const carried = order.periodMonth !== input.periodMonth
       const carriedNote = carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''
 
