@@ -29,6 +29,7 @@ describe('commission workbench server metadata', () => {
         data: table === 'sales_orders' ? [{ id: 'order-a', fair_event_id: 'fair-aug' }]
           : [{ id: 'person-a', employee_name: 'Anthony', employee_code: 'A' }], error: null,
       }) }) }),
+      rpc: () => Promise.resolve({ data: null, error: null }),
     } as unknown as SupabaseClient
     const order = {
       orderId: 'order-a', orderDate: '2026-09-15', eventDate: '2026-09-15',
@@ -43,5 +44,24 @@ describe('commission workbench server metadata', () => {
     }])
     expect(result.payRows).toEqual([])
     expect(result.payUnavailable).toBe(true)
+    expect(result.payLinesClosed).toBeNull()
+  })
+
+  it('says why the month’s pay lines can no longer change (2026-09-27)', async () => {
+    mocks.input.mockResolvedValue({ input: { hierarchy: [], orders: [] }, currentHierarchy: [], currentRules: {}, unmatchedOrderNos: [] })
+    mocks.calendar.mockResolvedValue([])
+    mocks.pay.mockResolvedValue({ runStatus: 'computed', runId: 'run', rows: [], missing: 0 })
+    const rpc = vi.fn(() => Promise.resolve({ data: 'Payroll for Aug 2026 has already been submitted.', error: null }))
+    const db = { from: () => ({ select: () => ({ in: () => Promise.resolve({ data: [], error: null }) }) }), rpc } as unknown as SupabaseClient
+    const result = await loadCommissionWorkbench(db, 'sub-1', '2026-08-01', [])
+    expect(rpc).toHaveBeenCalledWith('revenue_pay_lines_closed', { p_period: '2026-08-01' })
+    expect(result.payUnavailable).toBe(false)
+    expect(result.payLinesClosed).toBe('Payroll for Aug 2026 has already been submitted.')
+
+    // The All bills page reads commission only: no salary, no question asked.
+    rpc.mockClear()
+    const bills = await loadCommissionWorkbench(db, 'sub-1', '2026-08-01', [], undefined, { pay: false })
+    expect(rpc).not.toHaveBeenCalled()
+    expect(bills.payLinesClosed).toBeNull()
   })
 })

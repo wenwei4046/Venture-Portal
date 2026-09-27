@@ -975,6 +975,35 @@ since the same day (it was *Exclude*, a review draft that changed nothing —
 user: 真正 don't count): *Don't count*, answered on the same notice with the
 same Undo; *Show not counted* lists that person's bills taken out by hand.
 
+### 4.11 Pay lines — what HR adds to a salesperson's month (2026-09-27)
+
+Commission is not all of a salesperson's pay. **The pencil on *Salary
+calculation · current preview*, under their ledger on Comm Cal, adds lines to
+the month** (user 2026-09-27: 他可能有一个 special claim，我就选 special claim，
+然后 key in 金额。这个就是 edit 他的 payroll、add 他的 salary 的地方).
+
+| Kind | What it does to the pay |
+|---|---|
+| Special claim · Allowance · Incentive | EARNINGS — added to gross in full: never pro-rated, outside the statutory wage (no EPF / SOCSO / EIS), like the non-statutory allowance. Revenue PCB is read on the basic alone, so they never move it; a withholding-tax salesperson pays the rate on them with the rest of gross. Being gross, they are in the CTC the payroll run asks Finance to fund, and they are paid in the salary PV's commission-balance line |
+| Deduction | off TAKE-HOME pay only, like SKBBK — gross, statutory and tax untouched |
+
+Each line has an optional description, which is what the payslip prints
+(*Special claim · Petrol, Penang fair*). They belong to the person and the
+month, not to a sub-department: a person in Fair and IR sees the same lines on
+both pages.
+
+| | |
+|---|---|
+| The fact | `revenue_pay_lines` (person, month, kind, description, amount, version) |
+| In payroll | `hr_monthly_payroll.pay_line_earnings` / `pay_line_deductions` — DERIVED: both payroll triggers re-read them from the lines on every compute of a Revenue row, and a CHECK holds them at 0 on every other row. A row made after the lines (Create Period, the run's sync) picks them up; saving lines moves an existing draft row through the totals trigger alone, so the saved statutory figures stand |
+| The writer | `revenue_save_pay_lines` — the person's whole month at once, in one transaction with the payroll row; before and after to `access_log` |
+| Refused | anybody but Principal / HR; a month `assert_commission_payroll_open` refuses (payroll submitted, funding or a voucher raised, the period locked); a person not on the Revenue payroll, or whose row is not a draft Revenue row; an editor opened on lines somebody has since changed (the `id:version` it opened no longer matches) |
+| Preview | `lib/revenue-pay.ts` adds them the way the triggers do; the rules and the editor's arithmetic are `lib/revenue-pay-lines.ts` |
+| Shown | the salary preview (earnings above *Gross pay*, deductions after the tax), the payslip's walk to net pay, a *PAY LINES* chip on the pay board, HR's paycheck window and printable payslip (read-only there) |
+
+A month whose lines can no longer change keeps the pencil, dimmed; pressing it
+says why. Mig `20260927060000`.
+
 ---
 
 ## 5. Tax — Withholding instead of PCB

@@ -6,11 +6,14 @@ vi.mock('server-only', () => ({}))
 import { loadPayBeforeRun, previewWageWindow } from './pay-preview-before-run'
 import { loadPayBoard } from './pay-preview'
 
-function mockClient(options: { salary?: number; tax?: string; rpcFailure?: string; noHistoricalMembers?: boolean } = {}) {
+function mockClient(options: {
+  salary?: number; tax?: string; rpcFailure?: string; noHistoricalMembers?: boolean; payLines?: Record<string, unknown>[]
+} = {}) {
   const tableReads: string[] = []
   const rpcReads: { name: string; args: Record<string, unknown> }[] = []
   const resultFor = (table: string) => {
-    const rows: Record<string, unknown>[] = table === 'comm_hierarchy' ? (options.noHistoricalMembers ? [] : [{ staff_id: 'person-a' }])
+    const rows: Record<string, unknown>[] = table === 'revenue_pay_lines' ? (options.payLines ?? [])
+      : table === 'comm_hierarchy' ? (options.noHistoricalMembers ? [] : [{ staff_id: 'person-a' }])
       : table === 'hr_staff_costs' ? [{
         id: 'person-a', employee_name: 'Anthony', employee_code: 'A', designation: 'Sales', employment_type: 'full_time',
         basic_salary: options.salary ?? 3000, allowances: 100, non_statutory_allowance: 50,
@@ -84,6 +87,27 @@ describe('salary before a saved commission run', () => {
     const denied = mockClient({ rpcFailure: 'revenue_pay_preview' })
     await expect(loadPayBoard(denied.client, 'sub-1', '2026-09-01', { allowWithoutRun: true })).rejects.toThrow('Individual pay')
     expect(denied.tableReads).toEqual(['comm_runs'])
+  })
+
+  it('adds the month’s pay lines to the preview, and reads them only past the salary gate', async () => {
+    const db = mockClient({ payLines: [
+      { id: 'l1', staff_id: 'person-a', kind: 'special_claim', description: 'Petrol', amount: '500.00', version: 1, sort_order: 1 },
+      { id: 'l2', staff_id: 'person-a', kind: 'deduction', description: null, amount: '120.00', version: 2, sort_order: 2 },
+      { id: 'l3', staff_id: 'somebody-else', kind: 'allowance', description: null, amount: '99.00', version: 1, sort_order: 1 },
+    ] })
+    const board = await loadPayBoard(db.client, 'sub-1', '2026-09-01', { allowWithoutRun: true })
+    const row = board.rows[0]
+    expect(row.input).toMatchObject({ payLineEarnings: 500, payLineDeductions: 120 })
+    expect(row.lines).toEqual([
+      { id: 'l1', kind: 'special_claim', description: 'Petrol', amount: 500, version: 1 },
+      { id: 'l2', kind: 'deduction', description: null, amount: 120, version: 2 },
+    ])
+    expect(row.pay.payLineEarnings).toBe(500)
+    expect(row.pay.payLineDeductions).toBe(120)
+
+    const denied = mockClient({ rpcFailure: 'revenue_pay_preview', payLines: [{ id: 'l1' }] })
+    await expect(loadPayBoard(denied.client, 'sub-1', '2026-09-01', { allowWithoutRun: true })).rejects.toThrow('Individual pay')
+    expect(denied.tableReads).not.toContain('revenue_pay_lines')
   })
 
   it('can read salary inputs for the actual sellers when historical membership is absent', async () => {
