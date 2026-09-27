@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RULES_TABS, resolveRulesTab, visibleRulesTabs, type RulesSwitches } from './rules-tabs'
+import { RULES_TABS, resolveRulesTab, visibleRulesTabs, type RulesRecorded, type RulesSwitches } from './rules-tabs'
 
 const off: RulesSwitches = {
   enable_kpi: false,
@@ -13,7 +13,7 @@ const on: RulesSwitches = {
   enable_margin_penalty: true,
   enable_margin_incentive: true,
 }
-const nothing = { itemGroups: 0, promotionRules: 0 }
+const nothing: RulesRecorded = { itemGroups: 0, promotionRules: 0 }
 const keys = (scheme: RulesSwitches, recorded = nothing) => visibleRulesTabs(scheme, recorded).map(t => t.key)
 
 describe('visibleRulesTabs', () => {
@@ -23,8 +23,8 @@ describe('visibleRulesTabs', () => {
     expect(keys(off)).toEqual(['scheme', 'ladder', 'ranks'])
   })
 
-  it('Fair — every switch on and its policy recorded: all nine, in section order', () => {
-    expect(keys(on, { itemGroups: 7, promotionRules: 10 })).toEqual(RULES_TABS.map(t => t.key))
+  it('Fair — every switch on, its policy recorded, two directors: all ten, in section order', () => {
+    expect(keys(on, { itemGroups: 7, promotionRules: 10, directors: 2 })).toEqual(RULES_TABS.map(t => t.key))
   })
 
   it('KPI item allowance brings the three item tables', () => {
@@ -43,6 +43,12 @@ describe('visibleRulesTabs', () => {
 
   it('a classification the engine is applying is never hidden: item groups stay with KPI off', () => {
     expect(keys(off, { itemGroups: 7, promotionRules: 0 })).toEqual(['scheme', 'ladder', 'groups', 'ranks'])
+  })
+
+  // 2026-09-27: KRIS and PETER direct Fair, PETER IR — each pays its own.
+  it('Directors has no switch: it shows while the sub-department has a director, last', () => {
+    expect(keys(off, { ...nothing, directors: 1 })).toEqual(['scheme', 'ladder', 'ranks', 'directors'])
+    expect(keys(off)).not.toContain('directors')
   })
 
   it('Promotion criteria has no switch: it shows while something is recorded', () => {

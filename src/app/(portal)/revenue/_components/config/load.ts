@@ -8,6 +8,7 @@ import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
 import { officeDate } from '@/lib/office-clock'
 import type {
   CommissionSettingsData,
+  DirectorPayRow,
   DirectorRow,
   MemberCandidate,
   RankDefRow,
@@ -82,6 +83,23 @@ const loadCommissionTitles = cache(async () => {
     .order('name')
 })
 
+/**
+ * The Title ladder's picker (2026-09-27): the commission departments' titles
+ * WITH the one that heads the department — the Revenue Director's rung sets
+ * the rate of their own bills. Nobody climbs into it (the database refuses
+ * it a gate, 23DIR), and the membership pickers still leave it out.
+ */
+const loadLadderTitles = cache(async () => {
+  const supabase = await untyped()
+  return supabase
+    .from('titles')
+    .select('id, name, is_department_head, departments!inner (payroll_source)')
+    .eq('departments.payroll_source', 'commission')
+    .eq('is_active', true)
+    .order('is_department_head', { ascending: false })
+    .order('name')
+})
+
 export async function loadCommissionSettings(
   schemeId: string | null,
 ): Promise<CommissionSettingsData> {
@@ -94,14 +112,15 @@ export async function loadCommissionSettings(
     supabase.from('comm_schemes').select('id, sub_department_id, scheme_name').eq('is_active', true).is('effective_to', null),
     supabase.from('departments').select('id, name').eq('payroll_source', 'commission').order('name'),
     // The ladder's Tier column picks from these.
-    loadCommissionTitles(),
+    loadLadderTitles(),
   ])
 
   const shell = {
     scheme: null,
     rankDefs: [],
     ranks: [],
-    titles: rows<{ id: string; name: string }>(titles.data).map(t => ({ id: t.id, name: t.name })) satisfies TitleRow[],
+    titles: rows<{ id: string; name: string; is_department_head: boolean }>(titles.data)
+      .map(t => ({ id: t.id, name: t.name, isDepartmentHead: t.is_department_head })) satisfies TitleRow[],
     itemGroups: [],
     kpiItems: [],
     kpiThresholds: [],
@@ -112,6 +131,7 @@ export async function loadCommissionSettings(
     subDepartments: rows(subDepartments.data),
     allSchemes: rows(allSchemes.data),
     commissionDepartments: rows(departments.data),
+    directors: [],
   } satisfies CommissionSettingsData
 
   if (!schemeId) return shell
@@ -142,6 +162,39 @@ export async function loadCommissionSettings(
     supabase.from('comm_promotion_rules').select('*').eq('scheme_id', schemeId).order('from_rank_key').order('alternative_group'),
   ])
 
+  // Rules › Directors (2026-09-27): who the sub-department reports to, and
+  // what each is paid here.
+  const subDepartmentId = (scheme.data as SchemeRow | null)?.sub_department_id ?? null
+  const [directorRows, payRows] = subDepartmentId
+    ? await Promise.all([
+      supabase.from('comm_sub_department_directors')
+        .select('staff_id, hr_staff_costs (employee_name, employee_code, titles (name))')
+        .eq('sub_department_id', subDepartmentId),
+      supabase.from('comm_director_pay')
+        .select('staff_id, fixed_amount, sales_threshold, incentive_amount')
+        .eq('scheme_id', schemeId),
+    ])
+    : [{ data: [] }, { data: [] }]
+  const payByStaff = new Map(rows<{ staff_id: string; fixed_amount: number | string; sales_threshold: number | string | null; incentive_amount: number | string }>(payRows.data)
+    .map(p => [p.staff_id, p]))
+  type DirectorEmbed = { employee_name: string; employee_code: string | null; titles: { name: string } | { name: string }[] | null }
+  const directors: DirectorPayRow[] = rows<{ staff_id: string; hr_staff_costs: DirectorEmbed | DirectorEmbed[] | null }>(directorRows.data)
+    .map(d => {
+      const staff = Array.isArray(d.hr_staff_costs) ? d.hr_staff_costs[0] : d.hr_staff_costs
+      const title = staff ? (Array.isArray(staff.titles) ? staff.titles[0] : staff.titles) : null
+      const pay = payByStaff.get(d.staff_id)
+      return {
+        staffId: d.staff_id,
+        name: staff?.employee_name ?? d.staff_id,
+        employeeCode: staff?.employee_code ?? null,
+        titleName: title?.name ?? null,
+        fixedAmount: pay ? Number(pay.fixed_amount) : null,
+        salesThreshold: pay?.sales_threshold == null ? null : Number(pay.sales_threshold),
+        incentiveAmount: pay ? Number(pay.incentive_amount) : null,
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   return {
     ...shell,
     scheme: (scheme.data as SchemeRow | null) ?? null,
@@ -154,6 +207,7 @@ export async function loadCommissionSettings(
     brands: rows(brands.data),
     marginBands: rows(marginBands.data),
     promotionRules: rows(promotionRules.data),
+    directors,
   }
 }
 

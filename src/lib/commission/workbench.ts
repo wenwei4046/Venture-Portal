@@ -109,8 +109,13 @@ export interface WorkbenchPerson {
   overrideTotal: number
   /** Fixed group awards are monthly lines, never disguised as order commission. */
   monthlyGroupIncentive: number
+  /**
+   * A director's fixed amount and threshold incentive (Rules › Directors,
+   * 2026-09-27): monthly, never order commission. 0 for anybody else.
+   */
+  monthlyDirectorPay: number
   totalCommission: number
-  /** Must be zero: displayed rows plus monthly group award equal the engine. */
+  /** Must be zero: displayed rows plus the monthly awards equal the engine. */
   reconciliationDifference: number
 }
 
@@ -316,17 +321,21 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const personalTotal = sum(rows.map(row => row.totalCommission))
     const overrideTotal = sum(overridingRows.map(row => row.overrideAmount))
     const monthlyGroupIncentive = statement?.groupIncentive ?? 0
+    const monthlyDirectorPay = round2((statement?.directorFixed ?? 0) + (statement?.directorIncentive ?? 0))
     const totalCommission = statement?.totalCommission ?? 0
     return {
       staffId, name: nameOf(staffId), employeeCode: personMeta.get(staffId)?.employeeCode ?? null,
       titleLabel: titleOf(staffId), rankLabel: rankOf(staffId)?.label ?? null,
       productRate: statement?.productRate ?? rankOf(staffId)?.productRate ?? 0,
       statement, personalRows: rows, overridingRows, personalTotal, overrideTotal,
-      monthlyGroupIncentive, totalCommission,
-      reconciliationDifference: round2(totalCommission - personalTotal - overrideTotal - monthlyGroupIncentive),
+      monthlyGroupIncentive, monthlyDirectorPay, totalCommission,
+      reconciliationDifference: round2(totalCommission - personalTotal - overrideTotal - monthlyGroupIncentive - monthlyDirectorPay),
     }
   }).sort((a, b) => a.name.localeCompare(b.name))
 
+  // A department head is paid no KPI allowance on their own bills (their rate
+  // and nothing else, 2026-09-27): the KPI tab must not say otherwise.
+  const heads = new Set([...(input.departmentHeadIds ?? []), ...(input.directors ?? []).map(d => d.staffId)])
   const kpi: KpiAgentSummary[] = people.map(person => {
     const items = new Map<string, KpiItemSummary>()
     const rows = new Map(person.personalRows.map(row => [row.orderId, row]))
@@ -337,7 +346,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       // its sales covering its items — and it paid each exactly its amount.
       const found = orderRevenueSplit(order, configuredKpiIndex, groupIndex)
       const hits = found.foundHits
-      const paid = row.status === 'eligible' && input.scheme.enableKpi && !found.uncovered
+      const paid = row.status === 'eligible' && input.scheme.enableKpi && !found.uncovered && !heads.has(person.staffId)
       const bases = hits.map(hit => (paid ? hit.amount : 0))
       const bonuses = allocateCommissionAmount(row.kpiBonus, bases)
       hits.forEach((hit, index) => {

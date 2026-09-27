@@ -352,12 +352,38 @@ export interface EngineInput {
   priorMonths: PriorMonth[]
   /**
    * Whoever holds a title that HEADS the department — a Revenue Director
-   * (`titles.is_department_head`). Above the ladder, the database refuses them
-   * a rank (23DIR), so a bill they sell is theirs and earns nothing (user
-   * 2026-09-19: PETER's bills 单归他名下但一分不算). The run does not flag them
-   * as missing a rank — that 0% is the rule, not a gap (2026-09-27).
+   * (`titles.is_department_head`). They hold no membership and earn no
+   * override; the run does not flag them as missing a rank. What they ARE
+   * paid is `directors` (2026-09-27): without an entry there, a bill they sell
+   * is theirs and earns nothing (the 2026-09-19 rule).
    */
   departmentHeadIds?: string[]
+  /**
+   * What each department head is paid here (user 2026-09-27): their own bills
+   * at the rank of their title's rung on this ladder — that rate and nothing
+   * else — plus the Directors tab's fixed amount and, once the month's
+   * Commissionable value reaches the threshold, its incentive. Absent = the
+   * heads earn nothing.
+   */
+  directors?: DirectorTerms[]
+  /**
+   * The month's Commissionable value — Comm Cal's card, the directors'
+   * incentive threshold measure (`monthCommissionableValue`). Absent while no
+   * director has an incentive to judge.
+   */
+  monthCommissionableValue?: number
+}
+
+/** One department head's pay in this sub-department (Rules › Directors). */
+export interface DirectorTerms {
+  staffId: string
+  /** The rank their title's rung on this ladder holds; null = no rung, own bills earn nothing. */
+  rankKey: string | null
+  /** Their base commission, every month. */
+  fixedAmount: number
+  /** The month's Commissionable value at which the incentive is paid; null = none. */
+  salesThreshold: number | null
+  incentiveAmount: number
 }
 
 // ─── Results ────────────────────────────────────────────────────────────────
@@ -370,6 +396,10 @@ export type CommissionComponent =
   | 'override'
   | 'margin_incentive'
   | 'group_incentive'
+  /** A director's fixed amount (Rules › Directors, 2026-09-27). */
+  | 'director_fixed'
+  /** A director's incentive: the month's Commissionable value reached the threshold. */
+  | 'director_incentive'
 
 /**
  * One traceable contribution to a statement. The invariant the RPC enforces:
@@ -497,6 +527,10 @@ export interface Statement {
   /** Memo: commission the below-margin penalty removed. Already reflected in
    *  the line amounts, so it is NOT part of totalCommission. */
   marginPenaltyWithheld: number
+  /** A director's fixed amount; included in totalCommission (2026-09-27). */
+  directorFixed?: number
+  /** A director's threshold incentive; included in totalCommission. */
+  directorIncentive?: number
 
   totalCommission: number
 

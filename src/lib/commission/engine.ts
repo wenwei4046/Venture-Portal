@@ -42,6 +42,7 @@ import type {
 } from './types'
 import { earnedFloor, promotesTo, titleCanRecruit } from './titles'
 import { computeIrGroups, type IrGroupsResult } from './ir-groups'
+import { directorIncentiveEarned } from './director-pay'
 import {
   EMPTY_KPI_INDEX,
   coverKpi,
@@ -771,6 +772,19 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   const penalised: PenalisedOrder[] = []
   // A Revenue Director is never ranked: their 0% is the rule, not a gap.
   const heads = new Set(input.departmentHeadIds ?? [])
+  // What each head is paid here (user 2026-09-27): their title's rung sets
+  // the rate of their own bills, and the Directors tab adds a fixed amount and
+  // an incentive. A director with an amount to be paid gets a statement even
+  // in a month they sold nothing.
+  const directorTerms = new Map((input.directors ?? []).map(d => [d.staffId, d]))
+  for (const terms of directorTerms.values()) {
+    heads.add(terms.staffId)
+    if (terms.fixedAmount > 0 || terms.incentiveAmount > 0) staffIds.add(terms.staffId)
+  }
+  const directorRung = (staffId: string) => {
+    const key = directorTerms.get(staffId)?.rankKey
+    return key ? rankByKey.get(key) : undefined
+  }
 
   // ── Pass A: deposit gate + own revenue ─────────────────────────────────
   for (const staffId of staffIds) {
@@ -866,6 +880,14 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     warnings.push('A member holds a group-incentive rank but group incentives are switched off. Enable the scheme component before applying this run.')
   }
   for (const staffId of staffIds) {
+    // A director: their title's rung is the rate, and nothing climbs it — it
+    // carries no gate, so no month of volume moves them anywhere.
+    if (heads.has(staffId)) {
+      const rung = directorRung(staffId)
+      resolved.set(staffId, { effective: rung, base: rung, qualifiesFor: undefined })
+      rateOf.set(staffId, rung?.productRate ?? 0)
+      continue
+    }
     const node = nodes.get(staffId)
     if (!node) {
       rateOf.set(staffId, 0)
@@ -936,10 +958,31 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   let ordersWithoutCost = 0
 
   for (const draft of drafts.values()) {
-    // Not a flat KPI allowance, an Open Bill bonus or a margin incentive
-    // either: the scheme pays a head nothing on their own bills. Their sales
-    // still stand on the statement and the bills still close with the run.
-    if (heads.has(draft.staffId)) continue
+    // A department head's own bills pay the rate of their title's rung and
+    // NOTHING else — no KPI allowance, Open Bill bonus, margin penalty or
+    // incentive (user 2026-09-27: 如果自己有做 sales，就只拿自己的 rate 罢了).
+    // Without a rung, no rate: their sales still stand on the statement and
+    // the bills still close with the month.
+    if (heads.has(draft.staffId)) {
+      const headRate = rateOf.get(draft.staffId) ?? 0
+      if (!scheme.enableProductRevenue || headRate <= 0) continue
+      for (const order of draft.eligibleOrders) {
+        const opr = orderRevenueSplit(order, kpiIndex, groupIndex).main
+        if (opr === 0) continue
+        const carried = order.periodMonth !== input.periodMonth
+        draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr)
+        draft.lines.push({
+          component: 'product_revenue',
+          sourceOrderId: order.id,
+          basisAmount: opr,
+          rate: headRate,
+          qty: null,
+          amount: round2(opr * headRate),
+          note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · director's own bill`,
+        })
+      }
+      continue
+    }
     const rate = rateOf.get(draft.staffId) ?? 0
 
     for (const order of draft.eligibleOrders) {
@@ -1142,6 +1185,39 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     }
   }
 
+  // ── Directors: the fixed amount and the threshold incentive ───────────
+  // Per director and sub-department (Rules › Directors, 2026-09-27). The
+  // incentive reads the month's Commissionable value — Comm Cal's card.
+  for (const terms of directorTerms.values()) {
+    const draft = drafts.get(terms.staffId)
+    if (!draft) continue
+    if (terms.fixedAmount > 0) {
+      draft.lines.push({
+        component: 'director_fixed',
+        basisAmount: round2(terms.fixedAmount),
+        rate: null,
+        qty: null,
+        amount: round2(terms.fixedAmount),
+        note: 'Fixed amount · Rules › Directors',
+      })
+    }
+    if (terms.incentiveAmount > 0 && terms.salesThreshold !== null && terms.salesThreshold > 0) {
+      const monthValue = input.monthCommissionableValue
+      if (monthValue === undefined) {
+        warnings.push(`Staff ${terms.staffId}'s director incentive could not be judged — the month's Commissionable value was not read.`)
+      } else if (directorIncentiveEarned(terms, monthValue)) {
+        draft.lines.push({
+          component: 'director_incentive',
+          basisAmount: monthValue,
+          rate: null,
+          qty: null,
+          amount: round2(terms.incentiveAmount),
+          note: `Commissionable value ${monthValue.toFixed(2)} reached ${terms.salesThreshold.toFixed(2)}`,
+        })
+      }
+    }
+  }
+
   // ── Pass F: monthly margin incentive, every brand must clear ───────────
   const marginSummary = new Map<
     string,
@@ -1208,8 +1284,11 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     const overrideCommission = by('override')
     const marginIncentive = by('margin_incentive')
     const groupIncentive = by('group_incentive')
+    const directorFixed = by('director_fixed')
+    const directorIncentive = by('director_incentive')
     const totalCommission = round2(
-      productCommission + kpiCommission + openBillBonus + overrideCommission + marginIncentive + groupIncentive,
+      productCommission + kpiCommission + openBillBonus + overrideCommission + marginIncentive + groupIncentive
+        + directorFixed + directorIncentive,
     )
 
     const rank = resolved.get(d.staffId)
@@ -1249,7 +1328,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       rankTitleId: rank?.effective?.titleId ?? null,
       // The ratchet, previewed: null unless this month's rank sits under a
       // title above the one they hold. The RPC decides again at apply time.
-      promotesToTitleId: promotesTo(ranks, d.node?.titleId ?? null, rank?.effective?.titleId ?? null),
+      // A director's rung is their own; it never raises a title.
+      promotesToTitleId: heads.has(d.staffId) ? null : promotesTo(ranks, d.node?.titleId ?? null, rank?.effective?.titleId ?? null),
       productRate: rateOf.get(d.staffId) ?? 0,
       qualifiesForRankKey: rank?.qualifiesFor?.rankKey ?? null,
       uplineStaffId: d.node?.uplineStaffId ?? null,
@@ -1276,6 +1356,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       groupBreakdown: groupResults.get(d.staffId)?.groups ?? [],
       fullSpec: groupResults.get(d.staffId)?.fullSpec ?? false,
       marginPenaltyWithheld: d.marginPenaltyWithheld,
+      ...(directorTerms.has(d.staffId) ? { directorFixed, directorIncentive } : {}),
       totalCommission,
       lines: d.lines,
     })

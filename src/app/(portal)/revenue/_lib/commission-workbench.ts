@@ -15,7 +15,9 @@ export async function loadCommissionWorkbench(
   { pay: withPay = true }: { pay?: boolean } = {},
 ) {
   const [{ input, currentHierarchy, currentRules, unmatchedOrderNos }, calendar] = await Promise.all([
-    loadCommissionInput(period, subDepartmentId, db, { replayRunId: runId, includeCurrentRules: true }),
+    // The month's bills ride along for the directors' incentive: the page
+    // read them already, so the threshold is judged on the card's figure.
+    loadCommissionInput(period, subDepartmentId, db, { replayRunId: runId, includeCurrentRules: true, monthOrders }),
     loadFairCalendar(db),
   ])
   const ids = [...new Set([...input.hierarchy.map(n => n.staffId), ...currentHierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId)])]

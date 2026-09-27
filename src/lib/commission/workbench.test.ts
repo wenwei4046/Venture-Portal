@@ -54,6 +54,7 @@ function reconcile(workbench: CommissionWorkbench) {
   for (const person of workbench.people) {
     const displayed = person.personalRows.reduce((a, row) => a + row.totalCommission, 0)
       + person.overridingRows.reduce((a, row) => a + row.totalCommission, 0) + person.monthlyGroupIncentive
+      + person.monthlyDirectorPay
     expect(round2(displayed), person.staffId).toBe(person.totalCommission)
     expect(person.reconciliationDifference, person.staffId).toBe(0)
   }
@@ -244,6 +245,38 @@ describe('commission workbench ledger', () => {
     expect(board.personalRows.find(row => row.orderId === 'return')).toMatchObject({ kpiBase: -20, kpiBonus: -4 })
     expect(board.overridingRows.find(row => row.orderId === 'return')?.overrideAmount).toBe(-2.4) // −80 of 2,860
     reconcile(board)
+  })
+})
+
+// A Revenue Director (2026-09-27): own bills at the rung rate, the Directors
+// tab's amounts as a monthly line, and nothing that is not theirs.
+describe('a Revenue Director on the ledger', () => {
+  const directorInput = () => input({
+    ranks: [rank('agent', 0.05, 1), rank('leader', 0.08, 2), rank('rd_12', 0.12, 3, { titleId: 'title-rd', titleLabel: 'Revenue Director', label: 'Rank SS' })],
+    orders: [sale('one'), sale('mine', 2_000, { staffId: 'director' })],
+    departmentHeadIds: ['director'],
+    directors: [{ staffId: 'director', rankKey: 'rd_12', fixedAmount: 38_000, salesThreshold: 2_900, incentiveAmount: 5_000 }],
+    monthCommissionableValue: 3_000,
+  })
+
+  it('shows their bills at 12%, the fixed amount and incentive beside them, and adds up', () => {
+    const workbench = buildCommissionWorkbench(directorInput(), { people: [{ staffId: 'director', name: 'KRIS' }] })
+    reconcile(workbench)
+    const kris = workbench.people.find(person => person.staffId === 'director')!
+    expect(kris.titleLabel).toBe('Revenue Director')
+    expect(kris.rankLabel).toBe('Rank SS')
+    expect(kris.productRate).toBe(0.12)
+    // RM 2,000 less the RM 20 KPI pillow, at 12%; no KPI allowance, no Open Bill.
+    expect(kris.personalRows.map(row => [row.orderNo, row.productCommission, row.kpiBase, row.totalCommission])).toEqual([['SO-mine', 237.6, 0, 237.6]])
+    expect(kris.monthlyDirectorPay).toBe(43_000)
+    expect(kris.overrideTotal).toBe(0)
+    expect(kris.totalCommission).toBe(43_237.6)
+  })
+
+  it('leaves the incentive out in a month below the threshold', () => {
+    const workbench = buildCommissionWorkbench({ ...directorInput(), monthCommissionableValue: 2_899.99 })
+    reconcile(workbench)
+    expect(workbench.people.find(person => person.staffId === 'director')!.monthlyDirectorPay).toBe(38_000)
   })
 })
 

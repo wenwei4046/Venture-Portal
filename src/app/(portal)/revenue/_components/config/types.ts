@@ -86,6 +86,24 @@ export interface RankRow {
 export interface TitleRow {
   id: string
   name: string
+  /**
+   * Heads its department — the Revenue Director (2026-09-27: offered on the
+   * Title ladder, where its rung sets the rate of their own bills). Never
+   * offered as a membership title.
+   */
+  isDepartmentHead?: boolean
+}
+
+/** One director of the sub-department and what Rules › Directors pays them. */
+export interface DirectorPayRow {
+  staffId: string
+  name: string
+  employeeCode: string | null
+  titleName: string | null
+  /** Null until something has been saved for them. */
+  fixedAmount: number | null
+  salesThreshold: number | null
+  incentiveAmount: number | null
 }
 
 export interface ItemGroupRow {
@@ -257,7 +275,10 @@ export interface CommissionSettingsData {
   /** The Rank tab: every rank of the scheme, whether or not a title sits on it. */
   rankDefs: RankDefRow[]
   ranks: RankRow[]
-  /** Titles a rung may belong to: every active title of a commission department. */
+  /**
+   * Titles a rung may belong to: every active title of a commission
+   * department, the Revenue Director included (2026-09-27).
+   */
   titles: TitleRow[]
   itemGroups: ItemGroupRow[]
   kpiItems: KpiItemRow[]
@@ -272,4 +293,9 @@ export interface CommissionSettingsData {
   allSchemes: Array<{ id: string; sub_department_id: string; scheme_name: string }>
   /** Revenue-side departments a new sub-department can hang off. */
   commissionDepartments: Array<{ id: string; name: string }>
+  /**
+   * Who this sub-department reports to, and what each is paid here (Rules ›
+   * Directors, 2026-09-27). Empty while it has no director.
+   */
+  directors: DirectorPayRow[]
 }

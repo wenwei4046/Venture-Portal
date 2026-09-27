@@ -1120,6 +1120,33 @@ MELVIN keys later still moves her live override. Closing everybody at once
 (*Close all*) locks one consistent picture; closing one by one is safe as long
 as *moved since* is read before payroll.
 
+### 4.12 Revenue Director pay (2026-09-27)
+
+2026-09-11 put the Revenue Director above the ladder (no rung, no rank, no
+membership, no override) and 2026-09-19 left their own bills earning nothing.
+The user, 2026-09-27, keeps the no-override and changes the pay: "他可以有
+downline，他可以 recruit，但是他没有 overriding，只有自己的 basic；如果自己有做
+sales，就只拿自己的 rate 罢了" and "they have fix pay amount … One is a fixed
+amount. The other is a threshold … if the total sales order revenue reaches a
+threshold of 2 million, then that triggers an incentive." Asked, the user
+settled: the fixed amount is their base commission; the threshold reads the
+sub-department's Commissionable value; own bills pay the rate only; amounts are
+per director.
+
+| | |
+|---|---|
+| Own bills | at the rank of the Revenue Director's rung on the sub-department's Title ladder — that rate × their product revenue, deposit gate applied, and NOTHING else: no KPI allowance, Open Bill bonus, margin penalty or incentive. No rung = no rate (the 2026-09-19 rule) |
+| The rung | offered on the Title ladder as *Revenue Director · heads the department*; it takes no group target or streak (nobody climbs into it — a rung without a gate cannot be reached, `gateHolds`), no group package, and always recruits (`comm_ranks_director_rung`, 23DIR). No member may be placed at it (`comm_hierarchy_not_director_rung`) and the director still holds no membership |
+| Override | none, ever: the commission line stops below a head (`comm_sync_position`), so no downline's volume reaches them |
+| Fixed amount | Rules › Directors, per director and scheme (`comm_director_pay.fixed_amount`): into their commission every month — their base commission; the Revenue payroll carves the basic out of it, as it does anybody's |
+| Incentive | `incentive_amount`, paid in a month whose Commissionable value — Comm Cal's card, every live bill of the month — reaches `sales_threshold` (half a sen of rounding never decides it). One helper reads that figure for the card, the engine and the close the server recomputes: `monthCommissionableValue` (`lib/commission/director-pay.ts`) |
+| Statement | lines `director_fixed` / `director_incentive`; `Statement.directorFixed` / `directorIncentive` inside `totalCommission`; the ledger shows them as a monthly amount (`monthlyDirectorPay`) and explains them above the director's bills |
+| Payroll | a director is closed on Comm Cal like anybody, and the close carries the total to HR › Payroll |
+
+A director of two sub-departments (PETER: Fair and IR) is paid by each
+sub-department's own row; their commission in payroll is the sum of their
+closes. Mig `20260927080000`.
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total

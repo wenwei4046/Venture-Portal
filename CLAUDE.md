@@ -632,6 +632,33 @@ src/
 │   │   │                              Revenue person is dropped on one
 │   │   │                              (`LineResult.reportsTo` = what landed).
 │   │   │                              Mig `20260915020000`. CEO layer: later.
+│   │   │                              **REVENUE DIRECTOR PAY (2026-09-27):** the
+│   │   │                              head is still no member and earns no
+│   │   │                              override, but is now PAID: their title may
+│   │   │                              hold a gate-less rung on a ladder (Title
+│   │   │                              ladder picks *Revenue Director · heads the
+│   │   │                              department*; `comm_ranks_director_rung`,
+│   │   │                              23DIR: no gate, no package, always
+│   │   │                              recruits; no member may sit on it) whose
+│   │   │                              rank is the rate of their OWN bills — that
+│   │   │                              rate and nothing else, no KPI / Open Bill /
+│   │   │                              margin. Rules › **Directors** (10th tab,
+│   │   │                              shown while the sub-department has a
+│   │   │                              director; `comm_director_pay`, per scheme ×
+│   │   │                              director) adds a FIXED amount — their base
+│   │   │                              commission, the basic carved out of it as
+│   │   │                              anybody's — and an INCENTIVE once the
+│   │   │                              month's Commissionable value (Comm Cal's
+│   │   │                              card, `monthCommissionableValue` in
+│   │   │                              `lib/commission/director-pay.ts`, the ONE
+│   │   │                              reading the page, the engine and a close
+│   │   │                              share) reaches the threshold. Engine input
+│   │   │                              `directors` + `monthCommissionableValue`
+│   │   │                              (loaded in `commission-input.ts`); lines
+│   │   │                              `director_fixed` / `director_incentive`;
+│   │   │                              `WorkbenchPerson.monthlyDirectorPay`;
+│   │   │                              closed on Comm Cal like anybody → payroll.
+│   │   │                              Mig `20260927080000`.
 │   │   │                              **MEMBERSHIPS (2026-09-10, later):** a
 │   │   │                              sub-department is a world of its own —
 │   │   │                              one `comm_hierarchy` row per (person,
@@ -829,7 +856,8 @@ src/
 │   │   │                              person's statement), below-margin list,
 │   │   │                              hand-typed upsales. Engine: a department
 │   │   │                              head's own bills (KRIS / PETER, 23DIR) earn
-│   │   │                              NOTHING and raise no warning
+│   │   │                              NOTHING and raise no warning — a rung on the
+│   │   │                              ladder pays them since 2026-09-27 (above) —
 │   │   │                              (`EngineInput.departmentHeadIds`, read by
 │   │   │                              `loadCommissionInput`). **THE LADDER IS THE
 │   │   │                              BILL'S BRAND** (user: 主体是 Akemi 就跟 Akemi 的

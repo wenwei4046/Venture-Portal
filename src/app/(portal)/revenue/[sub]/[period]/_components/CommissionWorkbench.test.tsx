@@ -732,6 +732,30 @@ describe('CommissionWorkbench', () => {
       expect(within(bar()).queryByRole('list', { name: 'To settle before payroll' })).toBeNull()
     })
 
+    // 2026-09-27: a Revenue Director with a rung — own bills at its rate and
+    // nothing else, the Directors tab's amounts beside them, never an override.
+    it('shows a Revenue Director at their rung, with director pay in their total', () => {
+      const data = fixture()
+      data.input.ranks = [...data.input.ranks, rank('rd_12', 0.12, 3, 'Revenue Director')]
+      data.input.orders = [...data.input.orders, sale('kris-1', 2_980, { staffId: 'kris' })]
+      data.input.departmentHeadIds = ['kris']
+      data.input.directors = [{ staffId: 'kris', rankKey: 'rd_12', fixedAmount: 38_000, salesThreshold: 2_000_000, incentiveAmount: 5_000 }]
+      data.input.monthCommissionableValue = 1_500_000
+      data.people = [...data.people, { staffId: 'kris', name: 'KRIS', employeeCode: 'HV006' }]
+      board(data)
+      const row = within(screen.getByRole('table', { name: 'Salesperson commission summary' })).getByRole('row', { name: /KRIS/ })
+      expect(row).toHaveTextContent('Revenue Director')
+      expect(row).toHaveTextContent('own bills only · no override')
+      // (2,980 − the RM 20 pillow) × 12% = 355.20, plus the fixed 38,000; the
+      // month is short of the 2,000,000 threshold, so no incentive.
+      expect(within(row).getAllByRole('cell').at(-1)).toHaveTextContent('RM 38,355.20')
+      expect(within(row).getAllByRole('cell').at(-1)).toHaveTextContent('Includes RM 38,000.00 director pay')
+      choose('KRIS')
+      const note = screen.getByRole('note', { name: 'Director pay' })
+      expect(note).toHaveTextContent('Fixed amount RM 38,000.00')
+      expect(note).toHaveTextContent('not yet — RM 1,500,000.00, RM 500,000.00 to go')
+    })
+
     it('reads the month as saved, never what is only drafted on this screen', () => {
       board(fixture(), 'applied', [{ staffId: 'agent', total: 1_220.5 }, { staffId: 'leader', total: 88.8 }])
       fireEvent.click(screen.getByText(/^Calculation setup/))

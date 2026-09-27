@@ -110,7 +110,9 @@ describe('what a close keeps', () => {
 
   it('reads back a summary written by an older version without failing the page', () => {
     const summary = parseCloseSummary({ total: '12.50', bills: [{ id: 'x', total: 3 }, { nope: 1 }], overrides: 'bad' }, 'ADRIAN')
-    expect(summary).toMatchObject({ name: 'ADRIAN', total: 12.5, personal: 0, marginPct: null, groupRevenue: null })
+    // A close from before director pay (2026-09-27) reads it as nothing.
+    expect(summary).toMatchObject({ name: 'ADRIAN', total: 12.5, personal: 0, marginPct: null, groupRevenue: null, directorPay: 0 })
+    expect(parseCloseSummary({ total: 43_000, directorPay: '43000' }, 'KRIS').directorPay).toBe(43_000)
     expect(summary.bills).toEqual([{ id: 'x', no: 'x', status: 'eligible', total: 3 }])
     expect(summary.overrides).toEqual([])
     expect(parseCloseSummary(null, 'ADRIAN').total).toBe(0)

@@ -7,6 +7,7 @@ import { requirePermission } from '@/lib/auth'
 import { RESERVED_SUB_DEPT_SLUGS, subDeptSlug } from '@/lib/revenue'
 import { mintRankKey, rankName, rankLabelOf, rankPayError, rankPayOf, resequenceLadder } from '@/lib/commission/ranks'
 import { newSchemeSettings, type SchemeSettings } from '@/lib/commission/scheme-defaults'
+import { checkDirectorPay } from '@/lib/commission/director-pay'
 
 /**
  * Revenue → Rules. Every rule, threshold and per-person tick for the Revenue
@@ -428,8 +429,26 @@ export async function upsertRank(formData: FormData) {
     throw new Error('Months running must be a whole number of at least 1')
   }
 
+  // The Revenue Director's rung (2026-09-27) sets the rate of their own bills:
+  // nobody is promoted into it, so no gate; it always recruits; a percentage.
+  // The database refuses the same (23DIR) — this says it before the write.
+  const rungTitleId = id
+    ? ((await supabase.from('comm_ranks').select('title_id').eq('id', id).eq('scheme_id', schemeId).maybeSingle())
+      .data as { title_id: string | null } | null)?.title_id ?? null
+    : text(formData, 'title_id') || null
+  const directorRung = rungTitleId !== null && Boolean(
+    ((await supabase.from('titles').select('is_department_head').eq('id', rungTitleId).maybeSingle())
+      .data as { is_department_head: boolean } | null)?.is_department_head,
+  )
+  if (directorRung && (groupGate !== null || streakAmount !== null || streakMonths !== null)) {
+    throw new Error('The Revenue Director’s rung only sets the rate of their own bills — nobody is promoted into it, so leave the group target and the streak blank')
+  }
+
   const rank = (await loadRankDefs(supabase, schemeId)).find(d => d.id === rankDefId)
   if (!rank) throw new Error('Pick a rank — they are set on the Ranks tab')
+  if (directorRung && Number(rank.group_incentive_amount) > 0) {
+    throw new Error('A Revenue Director is paid a percentage on their own bills — pick a percentage rank, not a group package')
+  }
   if (Number(rank.group_incentive_amount) > 0) {
     const { data: packages, error: packageReadError } = await supabase.from('comm_ranks')
       .select('id').eq('scheme_id', schemeId).gt('group_incentive_amount', 0)
@@ -464,7 +483,8 @@ export async function upsertRank(formData: FormData) {
     group_subsidy_cap: Number(rank.group_subsidy_cap),
     label: rank.label,
     sort_order: rank.sort_order,
-    can_recruit: formData.get('can_recruit') === 'on',
+    // A director may always have people under them.
+    can_recruit: directorRung || formData.get('can_recruit') === 'on',
     group_sales_threshold: groupGate,
     personal_sales_threshold: streakAmount,
     consecutive_months: streakMonths,
@@ -556,6 +576,36 @@ async function resequenceRanks(supabase: SupabaseClient, schemeId: string): Prom
       'Could not re-letter the ranks',
     )
   }
+}
+
+// ─── Directors ──────────────────────────────────────────────────────────────
+
+/**
+ * Rules › Directors (2026-09-27): what this sub-department pays one of the
+ * directors it reports to — a fixed amount (their base commission) and an
+ * incentive paid in a month whose Commissionable value reaches the threshold.
+ * The database checks they direct the scheme's sub-department (23DIR); the
+ * engine adds both to their commission on Comm Cal.
+ */
+export async function upsertDirectorPay(formData: FormData) {
+  await requirePermission('revenue')
+  const supabase = await client()
+  const schemeId = required(formData, 'scheme_id', 'Scheme')
+  const staffId = required(formData, 'staff_id', 'Director')
+  const pay = checkDirectorPay({
+    fixedAmount: num(formData, 'fixed_amount'),
+    salesThreshold: num(formData, 'sales_threshold'),
+    incentiveAmount: num(formData, 'incentive_amount'),
+  })
+  const { error } = await supabase.from('comm_director_pay').upsert({
+    scheme_id: schemeId,
+    staff_id: staffId,
+    fixed_amount: pay.fixedAmount,
+    sales_threshold: pay.salesThreshold,
+    incentive_amount: pay.incentiveAmount,
+  }, { onConflict: 'scheme_id,staff_id' })
+  check(error, 'Could not save the director’s pay')
+  refresh()
 }
 
 // ─── Item groups ────────────────────────────────────────────────────────────

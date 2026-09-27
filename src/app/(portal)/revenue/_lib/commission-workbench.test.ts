@@ -36,7 +36,8 @@ describe('commission workbench server metadata', () => {
       venueGroupKey: 'VENUE', venueGroupName: 'Venue', venue: 'Venue', location: 'Warehouse', organizer: 'Old month organiser',
     } as MonthOrder
     const result = await loadCommissionWorkbench(db, 'sub-1', '2026-08-01', [order])
-    expect(mocks.input).toHaveBeenCalledWith('2026-08-01', 'sub-1', db, { replayRunId: undefined, includeCurrentRules: true })
+    // The month's bills ride along for the directors' incentive threshold (2026-09-27).
+    expect(mocks.input).toHaveBeenCalledWith('2026-08-01', 'sub-1', db, { replayRunId: undefined, includeCurrentRules: true, monthOrders: [order] })
     expect(result.orders).toEqual([{
       orderId: 'order-a', venue: 'Venue', location: 'Warehouse', organizer: 'Assigned organiser', eventName: '28–31 Aug',
       // The fair itself rides along, so Sales by venue can group on it (2026-09-26).
