@@ -82,6 +82,27 @@ describe('Modular model workspace', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('splits a category by branding, the unbranded together last, and steps in that order', () => {
+    const plain = { branding: null, brand: null, derivedBrand: null, skus: [] }
+    render(<ModularTab models={[
+      model({ erpId: 'm1', code: 'ALAMANDA', category: 'MATTRESS', ...plain }),
+      model({ erpId: 'm2', code: 'AMIRA', category: 'MATTRESS', branding: 'DUNLOPILLO', brand: 'DUNLOP', derivedBrand: 'DUNLOP', skus: [] }),
+      model({ erpId: 'm3', code: 'APEX', category: 'MATTRESS', branding: 'AKEMI', brand: 'AKEMI', derivedBrand: 'AKEMI', skus: [] }),
+      model({ erpId: 'm4', code: 'CUSHION', category: 'ACCESSORY', ...plain }),
+    ]} brands={[{ code: 'AKEMI', name: 'Akemi' }, { code: 'DUNLOP', name: 'Dunlopillo' }]} options={options} />)
+    const mattress = screen.getByRole('region', { name: 'Mattress models' })
+    expect(within(mattress).getAllByRole('group').map(g => g.getAttribute('aria-label'))).toEqual(['Mattress · AKEMI', 'Mattress · DUNLOP', 'Mattress · No branding'])
+    expect(within(screen.getByRole('group', { name: 'Mattress · DUNLOP' })).getByRole('button', { name: 'Configure AMIRA' })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'Mattress · No branding' })).getByRole('heading')).toHaveTextContent('No branding1 model')
+    expect(within(screen.getByRole('region', { name: 'Accessory models' })).queryAllByRole('group')).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Configure APEX' }))
+    expect(screen.getByRole('dialog', { name: /APEX/ })).toHaveTextContent('Modular · 2 of 4')
+    fireEvent.click(screen.getByRole('button', { name: 'Next model' }))
+    expect(screen.getByRole('region', { name: 'Configure model AMIRA' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next model' }))
+    expect(screen.getByRole('region', { name: 'Configure model ALAMANDA' })).toBeInTheDocument()
+  })
+
   it('keeps drafts while filtering and guards leaving a model with unsaved changes', () => {
     render(<ModularTab models={[model({ configured: true }), model({ erpId: 'model-b', code: '9999', name: 'Sofa 9999', skus: [] })]} brands={brands} options={options} />)
     fireEvent.click(screen.getByRole('button', { name: 'Configure 2376' }))
