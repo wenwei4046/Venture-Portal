@@ -963,8 +963,17 @@ so it will not calculate in this month's commission).
 | Refused | a month whose run has paid (23RUN); a bill already out for another reason (23EXC) |
 
 `revenue_exclude_order` / `revenue_include_order` own the write, one
-transaction each. The saved run, if any, still holds the bill until the month
-is computed again. Mig `20260927020000`.
+transaction each. Payroll follows when the month is sent (the payroll bar);
+a month already in payroll refuses the write until it is taken back. Mig `20260927020000`.
+
+The same right-click is on a salesperson's ledger on Comm Cal's month —
+Personal, Overriding and Below deposit — and on the month's Below deposit tab
+(user 2026-09-27: "right click 这个 order，然后选择它不算 commission"). A bill
+carried in from an earlier month is refused by THAT month's lock, and the menu
+says so before anybody tries. The ledger's own per-bill button does the same
+since the same day (it was *Exclude*, a review draft that changed nothing —
+user: 真正 don't count): *Don't count*, answered on the same notice with the
+same Undo; *Show not counted* lists that person's bills taken out by hand.
 
 ---
 

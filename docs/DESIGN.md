@@ -143,11 +143,21 @@ is not rewritten.
   categories retain their ordinary Price column.
 - Retain portal-owned price writes, permission checks and existing pricing
   semantics. No ERP source price becomes a portal cost through this restyle.
-- Modular is a board of model cards grouped by category, in the ERP's order. A
-  card opens the model in a floating one-sheet window with fixed save/cancel
-  controls; on phones the window fills the screen. Empty ERP allowlists are
-  unrestricted; empty portal selections mean none. Keep inactive saved
-  selections visible so they can be removed.
+- Modular is a board of model cards grouped by category, in the ERP's order, and
+  **inside a category by branding** (2026-09-27): the ERP's branding — the
+  model's own, else its SKUs' — named by the brand register's code when the
+  register knows it (DUNLOPILLO sits under DUNLOP, the word on its cards), A→Z,
+  the unbranded together last as *No branding*. Each run of cards opens on a
+  small heading: the eyebrow's orange dash (grey for *No branding*), the
+  branding in caps and its count, then a hairline to the edge. A category where
+  nothing is branded has no such headings. A heading counts its whole group
+  even while *Show more* holds some cards back, and ‹ › steps through the
+  models in the order they are drawn. The margin ladder chosen in a model's
+  window never moves its card — the branding is the ERP's fact
+  (`modular-board.ts`). A card opens the model in a floating one-sheet window
+  with fixed save/cancel controls; on phones the window fills the screen. Empty
+  ERP allowlists are unrestricted; empty portal selections mean none. Keep
+  inactive saved selections visible so they can be removed.
 - Maintenance keeps the ERP's Bedframe/Sofa pool order and values, with a separate
   fabric view. An option pool has no search box — the largest holds about twenty
   values and the ERP's Maintenance lists have none; the fabric view keeps its
@@ -694,6 +704,8 @@ Render every panel on the server and hand them to the client rail as nodes (`ope
 
 The bar shows the month **as saved**: a draft on the screen (bills excluded in review, unsaved Open Bill picks, previews) changes the cards and tables, never the amount on the button, and the bar says so. It is part of the month overview, so it hides on a salesperson's page like the cards do.
 
+**2026-09-27 — the workbench stands in the URL.** Every step inside it is a history entry, pushed the same way as a tab: `?view=` names the cut (`kpi` · `open` · `deposit` · `venue`; none is Total Sales Orders), `?person=` the salesperson whose ledger is open and `?orders=` which of their tables (`overriding` · `deposit`; none is Personal). Not `?tab=` — on this page that is the mid-page rail's. The table's search box, brand and sort ride along as `?q=` / `?brand=` / `?sort=`, written with `replaceState` as they change, so they never add an entry. Opening a bill therefore leaves an entry that says whose ledger it was, and Back lands there (it used to land on the list of people). A bill's link carries the way back (`?from=`), and the bill's page puts it first on its header — **← ANTHONY** (or *← Below deposit*), then *All bills* — as a `ReturnLink`: an ordinary link that steps Back instead when the previous history entry is that very page, so returning never stacks the ledger on top of itself. `lib/commission/workbench-nav.ts` owns the keys and checks `?from=` (a month page of the same sub-department, nothing else). The ledger's column choice is kept for the month in the tab's session.
+
 Tabs are for the **sections of one view**. Choosing between *views* of a thing (Comm Cal / Staff Hierarchy / Rules of a sub-department, the four People pages) is navigation and lives in the sidebar — see the 2026-09-01 removals in `nav-config.ts`.
 
 ---
@@ -834,6 +846,8 @@ or a month whose run has paid, shows the row disabled with its reason. After a
 write the table says what happened above itself, with *Undo* for a bill just
 taken out. An excluded row reads `Not counted` (tooltip: who, when, why) behind
 *Show excluded*.
+
+The same menu sits on a salesperson's ledger on Comm Cal's month (2026-09-27) — Personal, Overriding and Below deposit — and on the month's *Below deposit* tab: the same right-click, the same ⋯ (`useBillMenu`), the same notice with *Undo* (`BillCountNotice`). An Overriding row's heading names the downline who wrote the bill. An upsale or a drop is not a bill and has no menu. A bill carried in from an earlier month answers to that month's run: paid there, the write is disabled with the reason. The ledger's own per-bill button is the same lasting write since the same day (*Don't count*, a ghost button; it was a review draft that changed nothing) and answers on the same notice.
 
 Two rules the canvas keeps that the rest of the page does not: a card dropped
 on empty ground **stays there** (remembered per browser and scheme in
@@ -2226,8 +2240,10 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-27 (later)** — Comm Cal's workbench stands in the URL (`?view=` · `?person=` · `?orders=`, search / brand / sort as `?q=` `?brand=` `?sort=`), so Back from a bill returns to the salesperson's ledger it was opened from; bill links carry `?from=` and the bill page's header leads with **← NAME** (`ReturnLink`, which steps Back when that is where the reader came from), then *All bills*. The bill context menu joins a salesperson's Personal / Overriding / Below deposit tables and the month's Below deposit tab. See "Tabbed pages" and "Bill context menu".
 - **2026-09-27 v3.10 (latest)** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
 - **2026-09-27 (payroll bar)** — Comm Cal's month says what payroll holds. The folded *Payroll & source tools* section at the foot of the month (saved-run hero, warnings, *Recompute & sync payroll*, Open Bill cost / Upsales & drops rail, payroll adjustments) is removed; a **payroll bar** under the summary cards names the state (not sent · in payroll · moved since · closed · settled by hand) with a 4px tone rule and dot, lists what stops a send by name, carries one amount-bearing action (*Send RM X to payroll* / *Update payroll to RM X*) plus a ghost *Take back* with inline confirm, and holds the month's switches in a grey foot row. *Drops and upsells the ERP found* gains a *Paid in {month}* list with Undo. A salesperson's ledger keeps its per-bill button, now the real *Don't count* (a ghost button; the notice above the table carries Undo), and *Show not counted* opens a small table under the ledger with *Count again* per bill. The Brand column names the bill's own brand only. See "The payroll bar" under Tabbed pages.
+- **2026-09-27 (evening)** — Product List › Modular splits each category by branding. Under the category's chip every branding gets its own run of cards and a small heading (orange dash, the branding and its count, a hairline): Mattress reads AKEMI · DUNLOP · ERGOTEX · MYLATEX · *No branding*, Sofa ZANOTTI · *No branding*, and Accessory finds its AK- and DL- pieces by their SKUs' branding. The unbranded close the category together under a grey dash; a category with no branding at all is drawn as before. Category and branding headings count their whole group, and ‹ › follows the drawn order. See "Product List workspace".
 - **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List workspace".
 - **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List workspace".
 - **2026-09-27 v3.9** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".

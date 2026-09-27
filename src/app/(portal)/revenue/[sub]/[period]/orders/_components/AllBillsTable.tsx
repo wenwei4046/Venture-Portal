@@ -1,17 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useCallback, useMemo, useState, useTransition, type MouseEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
-import { includeOrder } from '../../../../run-actions'
-import type { MenuAnchor } from '../../../hierarchy/_components/ContextMenuPanel'
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
 import BillContextMenu, { type BillMenuOutcome } from './BillContextMenu'
+import BillCountNotice from './BillCountNotice'
 import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
+import { useBillMenu } from './useBillMenu'
 
 /** One bill, already resolved on the server — nothing here reads the database. */
 export interface BillRow {
@@ -98,15 +97,6 @@ interface Props {
   hasRun: boolean
 }
 
-interface OpenMenu {
-  row: BillRow
-  anchor: MenuAnchor
-  link: { href: string; label: string } | null
-  byRightClick: boolean
-}
-
-const ORDINAL = ['', '1st', '2nd', '3rd'] as const
-
 /**
  * Every bill of the month in the salesperson ledger's format (2026-09-25) —
  * the same toolbar, sticky order / total columns and Columns menu as a
@@ -120,17 +110,13 @@ const ORDINAL = ['', '1st', '2nd', '3rd'] as const
  * because a right-click alone is invisible on a phone and to a keyboard.
  */
 export default function AllBillsTable({ rows, team, openBillPaid, commissionNote, initialShowExcluded, monthLabel, hasRun }: Props) {
-  const router = useRouter()
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('')
   const [sort, setSort] = useState('date_asc')
   const [showExcluded, setShowExcluded] = useState(initialShowExcluded)
   const [hidden, setHidden] = useState<Column[]>(['location'])
-  const [menu, setMenu] = useState<OpenMenu | null>(null)
+  const { menu, closeMenu, onRowContextMenu, onMenuButton, isOpenOn } = useBillMenu<BillRow>(r => r.orderId, r => r.href)
   const [done, setDone] = useState<BillMenuOutcome | null>(null)
-  const [undoError, setUndoError] = useState<string | null>(null)
-  const [undoing, startUndo] = useTransition()
-  const closeMenu = useCallback(() => setMenu(null), [])
 
   const excludedCount = rows.filter(r => r.cancelled).length
   const brands = useMemo(() => [...new Set(rows.flatMap(r => r.brands))].sort(), [rows])
@@ -163,63 +149,9 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   const subtotalCommissionable = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.commissionable, 0))
   const subtotalCommission = round2(visible.reduce((a, r) => a + (r.commission?.total ?? 0), 0))
 
-  function openRowMenu(event: MouseEvent<HTMLTableRowElement>, row: BillRow) {
-    // A control with a right-click of its own (Share…), or the browser's menu on purpose.
-    if (event.isDefaultPrevented() || event.shiftKey) return
-    const target = event.target as HTMLElement
-    if (target.closest('input, select, textarea')) return
-    // Selected text: Copy is what the right-click is for.
-    if (window.getSelection()?.toString().trim()) return
-    event.preventDefault()
-    // Right-clicking a link keeps the browser's one useful answer for it.
-    const linkEl = target.closest('a')
-    const href = linkEl?.getAttribute('href')
-    const link = linkEl && href && href !== row.href ? { href, label: linkEl.textContent?.trim() || href } : null
-    // The keyboard's menu key fires at 0, 0: hang the menu from the row instead.
-    const rect = event.currentTarget.getBoundingClientRect()
-    const anchor = event.clientX === 0 && event.clientY === 0
-      ? { left: rect.left + 16, top: rect.top, bottom: rect.bottom }
-      : { left: event.clientX, top: event.clientY, bottom: event.clientY }
-    setMenu({ row, anchor, link, byRightClick: true })
-  }
-
-  function openButtonMenu(button: HTMLButtonElement, row: BillRow) {
-    if (menu?.row.orderId === row.orderId) return setMenu(null)
-    const rect = button.getBoundingClientRect()
-    setMenu({ row, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom }, link: null, byRightClick: false })
-  }
-
   function menuDone(outcome: BillMenuOutcome) {
-    setMenu(null)
-    setUndoError(null)
+    closeMenu()
     setDone(outcome.result.changed ? outcome : null)
-  }
-
-  function undo(outcome: BillMenuOutcome) {
-    setUndoError(null)
-    startUndo(async () => {
-      try {
-        const result = await includeOrder(outcome.orderId)
-        router.refresh()
-        setDone({ orderId: outcome.orderId, orderNo: outcome.orderNo, excluded: false, result })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'That did not save'
-        if (!message.includes('NEXT_REDIRECT')) setUndoError(message)
-      }
-    })
-  }
-
-  function doneMessage(outcome: BillMenuOutcome): string {
-    const rank = outcome.result.openBillRank
-    if (outcome.excluded) {
-      return `${outcome.orderNo} no longer counts in ${monthLabel}${rank ? ` and gave up its ${ORDINAL[rank]} Open Bill` : ''}.`
-        + (hasRun ? ' Compute the month again to take it out of the saved run.' : '')
-    }
-    if (outcome.result.counts === false) {
-      return `${outcome.orderNo} is no longer out by hand, but it still does not count: ${outcome.result.stillOut ?? 'it is excluded'}.`
-    }
-    return `${outcome.orderNo} counts again${rank ? `, back as the ${ORDINAL[rank]} Open Bill` : ''}.`
-      + (hasRun ? ' Compute the month again to put it back in the saved run.' : '')
   }
 
   function salesperson(r: BillRow) {
@@ -306,13 +238,8 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
       </details>
     </div>
     {commissionNote && <p className={s.notice} role="status">{commissionNote}</p>}
-    {done && <p className={s.notice} role="status">
-      {doneMessage(done)}
-      {done.excluded && <>{' '}<button type="button" className={s.ghostButton} disabled={undoing} onClick={() => undo(done)}>
-        {undoing ? 'Undoing…' : 'Undo'}
-      </button></>}
-      {undoError && <span className="text-danger"> {undoError}</span>}
-    </p>}
+    {done && <BillCountNotice key={`${done.orderId}:${done.excluded}`} outcome={done} monthLabel={monthLabel} hasRun={hasRun}
+      className={s.notice} buttonClassName={s.ghostButton} onChange={setDone} />}
 
     <div className={s.tableFrame}>
       <div className={s.tableScroll} role="region" aria-label="All bills, scroll horizontally" tabIndex={0}>
@@ -324,7 +251,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
             <th className={s.stickyTotal}>Total commission</th>
           </tr></thead>
           <tbody>{visible.map(r => <tr key={r.orderId} className={r.cancelled ? s.excluded : undefined}
-            onContextMenu={event => openRowMenu(event, r)}>
+            onContextMenu={event => onRowContextMenu(event, r)}>
             <td className={s.stickyFirst}>
               <div className={s.billCell}>
                 <div>
@@ -333,8 +260,8 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
                     title={r.exclusionDetail ?? undefined}>{r.status}</small>
                 </div>
                 <button type="button" className={s.rowMenuButton} aria-haspopup="menu" data-bill-menu-trigger
-                  aria-expanded={menu?.row.orderId === r.orderId} aria-label={`Actions for ${r.orderNo}`}
-                  title="Actions — or right-click the bill" onClick={event => openButtonMenu(event.currentTarget, r)}>
+                  aria-expanded={isOpenOn(r)} aria-label={`Actions for ${r.orderNo}`}
+                  title="Actions — or right-click the bill" onClick={event => onMenuButton(event.currentTarget, r)}>
                   ⋯
                 </button>
               </div>
