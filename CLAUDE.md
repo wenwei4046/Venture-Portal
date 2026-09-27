@@ -845,10 +845,26 @@ src/
 │   │   │                              accessories and bed frames are RIDERS, their
 │   │   │                              cost in the bill's margin on the bill's
 │   │   │                              ladder, whatever brand they carry; only a
-│   │   │                              bill with no brand (a bed frame or accessory
-│   │   │                              sold alone) reads its lines, and only a
-│   │   │                              month that pays margin asks about two priced
-│   │   │                              brands. The member app already grouped by
+│   │   │                              bill with no brand reads its lines, and only
+│   │   │                              a month that pays margin asks about two
+│   │   │                              priced brands. **A BILL OF RIDERS ALONE IS
+│   │   │                              STILL A BRAND'S (2026-09-27):** nothing is
+│   │   │                              sold on its own — a bed frame or a pillow is
+│   │   │                              a second bill at a brand's fair (user: 在
+│   │   │                              Akemi 的 fair 那个星期卖床架) — so the ERP asks
+│   │   │                              which brand when NOTHING on the bill names
+│   │   │                              one, not a line either (`vpBrand`,
+│   │   │                              skippable, the ERP's Branding untouched;
+│   │   │                              choices = our 4 ladders, ERP sync_config
+│   │   │                              `vp.brands`), and a bill that still has none
+│   │   │                              gets it here: right-click › *Brand for the
+│   │   │                              margin* (`sales_order_brand_picks`,
+│   │   │                              `revenue_set_order_brand`, 23BRD/23RUN).
+│   │   │                              The bill's brand is `erp_sync_order_brand`:
+│   │   │                              Branding when it names a brand → the ERP
+│   │   │                              pick → the pick made here → the fair
+│   │   │                              booth's brand → the lines. Contract §3.5,
+│   │   │                              mig `20260927080000`. The member app already grouped by
 │   │   │                              the bill's brand. The ledger's per-bill
 │   │   │                              button is now the REAL *Don't count this
 │   │   │                              bill* (`excludeOrder`, Undo on the notice;

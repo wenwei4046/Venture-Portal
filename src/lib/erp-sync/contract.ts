@@ -83,6 +83,12 @@ export interface ErpDelivery {
   salesperson?: { id?: unknown; name?: unknown; staff_code?: unknown; user_id?: unknown } | null
   /** The event the salesperson picked in the ERP (2026-09-27) — null when none. */
   fair?: Row | null
+  /**
+   * The brand the salesperson said the bill is for, when its products carry
+   * none (2026-09-28) — a `project_brands` name, or null when not asked or
+   * skipped. The ERP's own `branding` is untouched by it.
+   */
+  vpBrand?: unknown
 }
 
 /**
@@ -212,7 +218,14 @@ export interface CanonicalOrder {
   location: string | null
   /** Where the fair was held (`header.venue`). Not `location`, which is the warehouse. */
   venue: string | null
+  /** The ERP's Branding — worked out from the products. */
   brand: string | null
+  /**
+   * The brand the salesperson picked for a bill whose products name none (a
+   * bed frame or an accessory sold at a brand's fair, 2026-09-28). The bill's
+   * margin ladder follows it; see `ingest_erp_sales_order` for the order.
+   */
+  brandPick: string | null
   total: number
   balance: number | null
   createdAt: string | null
@@ -220,7 +233,7 @@ export interface CanonicalOrder {
   /** The event the salesperson picked in the ERP; null when none came, or it could not be read. */
   fair: CanonicalFair | null
   /** The delivery as received, minus PII — for re-deriving without asking again. */
-  raw: { header: Row | null; items: Row[]; payments: Row[]; salesperson: Row | null; fair: Row | null }
+  raw: { header: Row | null; items: Row[]; payments: Row[]; salesperson: Row | null; fair: Row | null; vpBrand: string | null }
 }
 
 export type ParseFailure = { ok: false; error: string; docNo: string | null }
@@ -385,12 +398,13 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
         location: null,
         venue: null,
         brand: null,
+        brandPick: null,
         total: 0,
         balance: null,
         createdAt: null,
         lines: [],
         fair: null,
-        raw: { header: null, items: [], payments: [], salesperson: null, fair: null },
+        raw: { header: null, items: [], payments: [], salesperson: null, fair: null, vpBrand: null },
       },
     }
   }
@@ -414,6 +428,8 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
 
   const total = senToRinggit(header.local_total_sen) ?? senToRinggit(header.subtotal_sen) ?? 0
   const balance = senToRinggit(header.balance_sen_live) ?? senToRinggit(header.balance_sen)
+  // A brand is a name; anything else is no pick — never a reason to refuse the sale.
+  const brandPick = typeof delivery.vpBrand === 'string' ? text(delivery.vpBrand) : null
 
   return {
     ok: true,
@@ -432,6 +448,7 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
       location: text(header.sales_location),
       venue: normaliseVenue(header.venue),
       brand: text(header.branding),
+      brandPick,
       total,
       balance,
       createdAt: isoTimestamp(header.created_at),
@@ -443,6 +460,7 @@ export function toCanonicalOrder(delivery: unknown): { ok: true; order: Canonica
         payments,
         salesperson,
         fair: isRow(delivery.fair) ? delivery.fair : null,
+        vpBrand: brandPick,
       },
     },
   }

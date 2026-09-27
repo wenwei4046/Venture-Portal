@@ -345,6 +345,37 @@ export async function includeOrder(orderId: string): Promise<BillCountResult> {
   return data as BillCountResult
 }
 
+/** What giving a bill a brand by hand — or taking the pick off — did. */
+export interface BillBrandResult {
+  orderNo: string
+  /** False when it was already that way and nothing was written. */
+  changed: boolean
+  /** The brand the bill follows now, whatever decided it. */
+  brandCode: string | null
+  /** The brand picked here, or null once the pick is off. */
+  picked: string | null
+}
+
+/**
+ * Give a bill a brand for its margin ladder, or take the pick off
+ * (2026-09-27, Sales orders › right-click › Brand for the margin) — only a
+ * bill nothing else names a brand for. The rule is the database's
+ * (`revenue_set_order_brand`, mig 20260927080000): a brand the portal has a
+ * ladder for, never over a brand the bill has of its own (23BRD), never in a
+ * month whose run has paid (23RUN). Kept through every ERP re-send.
+ */
+export async function setOrderBrand(orderId: string, brandCode: string | null): Promise<BillBrandResult> {
+  await requirePermission('revenue')
+  if (typeof orderId !== 'string' || !orderId) throw new Error('Which bill?')
+  const code = typeof brandCode === 'string' && brandCode.trim() ? brandCode.trim() : null
+  const supabase = await client()
+  await assertBillsNotClosed(supabase, [orderId])
+  const { data, error } = await supabase.rpc('revenue_set_order_brand', { p_order_id: orderId, p_brand_code: code })
+  if (error) throw new Error(error.message)
+  revalidatePath('/revenue', 'layout')
+  return data as BillBrandResult
+}
+
 /**
  * Key a bill's margin by hand. The stop-gap while the Product List fills up:
  * it OVERRIDES anything derived from line costs, so a human correction always

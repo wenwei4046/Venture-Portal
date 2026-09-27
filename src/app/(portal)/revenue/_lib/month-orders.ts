@@ -2,6 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
 import type { HandExclusion } from '@/lib/commission/bill-exclusion'
+import type { BrandOption } from '@/lib/commission/bill-brand'
 
 /**
  * A month's sales orders, as `revenue_month_orders` returns them.
@@ -245,6 +246,43 @@ export async function loadOrderExclusions(
       .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
   )
   return new Map(rows.map(r => [r.order_id, { note: r.note, byName: r.excluded_by_name, at: r.excluded_at }]))
+}
+
+// ─── Brands picked by hand (2026-09-27) ─────────────────────────────────────
+
+/**
+ * The brand somebody picked here for a bill nothing else names a brand for
+ * (`sales_order_brand_picks`, Sales orders › right-click › Brand for the
+ * margin), by order id. Chunked like the shares: a month is hundreds of ids.
+ */
+export async function loadOrderBrandPicks(
+  supabase: SupabaseClient,
+  orderIds: readonly string[],
+): Promise<Map<string, string>> {
+  type Row = { order_id: string; brand_code: string }
+  const rows = await fetchByKeys<Row, string>(orderIds, chunk =>
+    supabase
+      .from('sales_order_brand_picks')
+      .select('order_id, brand_code')
+      .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  )
+  return new Map(rows.map(r => [r.order_id, r.brand_code]))
+}
+
+/** The brands a bill can be given by hand: the scheme's margin-ladder brands. */
+export async function loadBrandOptions(
+  supabase: SupabaseClient,
+  schemeId: string | null,
+): Promise<BrandOption[]> {
+  if (!schemeId) return []
+  const { data, error } = await supabase
+    .from('comm_brands')
+    .select('code, name')
+    .eq('scheme_id', schemeId)
+    .eq('is_active', true)
+    .order('code')
+  if (error) throw new Error(`Could not read the brands: ${error.message}`)
+  return ((data ?? []) as Array<{ code: string; name: string | null }>).map(b => ({ code: b.code, name: b.name ?? b.code }))
 }
 
 // ─── Shared bills (2026-09-24) ──────────────────────────────────────────────
