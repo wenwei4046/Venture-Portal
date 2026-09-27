@@ -12,7 +12,7 @@
  *
  * `revenue_pay_lines` is the table and `revenue_save_pay_lines` its one writer;
  * the payroll triggers add the two totals into gross and net (mig
- * 20260927040000), and `lib/revenue-pay.ts` does the same for the preview. This
+ * 20260927060000), and `lib/revenue-pay.ts` does the same for the preview. This
  * file is the list of kinds, the sums, and the editor's arithmetic — pure, so
  * the rules are tested without a page in the way.
  */

@@ -934,7 +934,7 @@ both pages.
 | Shown | the salary preview (earnings above *Gross pay*, deductions after the tax), the payslip's walk to net pay, a *PAY LINES* chip on the pay board, HR's paycheck window and printable payslip (read-only there) |
 
 A month whose lines can no longer change keeps the pencil, dimmed; pressing it
-says why. Mig `20260927040000`.
+says why. Mig `20260927060000`.
 
 ---
 

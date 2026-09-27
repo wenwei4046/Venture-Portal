@@ -820,7 +820,7 @@ src/
 │   │   │                              read-only. The payslip (`pay/[staffId]`)
 │   │   │                              lost *Their bills*: the ledger it is opened
 │   │   │                              from already lists every bill. Mig
-│   │   │                              `20260927040000`.
+│   │   │                              `20260927060000`.
 │   │   │                              IR rules: commission spec §15; two layers,
 │   │   │                              repeated own sales per group, monthly
 │   │   │                              packages and a 4% fallback. SDL retains
