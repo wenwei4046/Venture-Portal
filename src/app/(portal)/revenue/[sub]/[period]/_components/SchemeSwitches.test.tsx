@@ -56,10 +56,10 @@ describe('SchemeSwitches', () => {
   })
 
   it('puts the switch back and says why when the month refuses', async () => {
-    setMonthOpenBill.mockRejectedValue(new Error('The 2026-08 run has paid. Reopen it before changing what it pays.'))
+    setMonthOpenBill.mockRejectedValue(new Error('The 2026-08 month is in payroll. Take it back from payroll before changing what it pays.'))
     render(<SchemeSwitches {...props} openBill={{ on: false, rules: false, month: null }} />)
     fireEvent.click(screen.getByRole('switch', { name: 'Open Bill' }))
-    expect(await screen.findByText(/run has paid/)).toBeVisible()
+    expect(await screen.findByRole('alert')).toHaveTextContent('month is in payroll')
     expect(screen.getByRole('switch', { name: 'Open Bill' })).toHaveAttribute('aria-checked', 'false')
   })
 })

@@ -173,6 +173,18 @@ describe('authoritative commission input', () => {
     expect(upsales.map(o => [o.orderNo, o.orderTotal])).toEqual([['UPSALE HC5315', 300], ['DROP HC13911', -2088]])
   })
 
+  // KRIS and PETER sell a few bills a month and hold no rank by rule (23DIR):
+  // the engine is told who they are, so their 0% is not read as a gap.
+  it('names whoever heads the department, and nobody else', async () => {
+    const data = fixture()
+    data.hr_staff_costs = [
+      { id: 'kris', titles: { is_department_head: true } },
+      { id: 'person-a', titles: { is_department_head: false } },
+    ]
+    const loaded = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)
+    expect(loaded.input.departmentHeadIds).toEqual(['kris'])
+  })
+
   it('refuses incomplete configuration instead of silently returning zero commission', async () => {
     const db = database(fixture(), 'comm_kpi_items')
     await expect(loadCommissionInput('2026-09-01', 'sub-1', db.client)).rejects.toThrow('Could not read KPI items')

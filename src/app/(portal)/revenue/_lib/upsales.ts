@@ -1,8 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * What the month page's Upsales tab reads (2026-09-24): the month's upsales and
- * the fairs one can have been sold at. The rules are `lib/commission/upsales.ts`.
+ * The month's drops and upsells (2026-09-24): those the ERP found and nobody has
+ * answered yet, and those paid into a month. The rules are
+ * `lib/commission/upsales.ts`.
  */
 
 export interface UpsaleView {
@@ -29,12 +30,6 @@ export interface UpsaleView {
   fairLabel: string | null
   originalRef: string
   note: string | null
-}
-
-export interface FairChoice {
-  id: string
-  label: string
-  startDate: string
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -160,27 +155,4 @@ export async function loadPendingAdjustments(
     .order('created_at')
   if (error) throw new Error(`Could not read the changes the ERP made: ${error.message}`)
   return ((data ?? []) as unknown as UpsaleRow[]).map(toView)
-}
-
-/**
- * The fairs an upsale recorded under this month can have been sold at: this
- * month's and last month's (a month-end fair is often paid the month after).
- */
-export async function loadFairChoices(supabase: SupabaseClient, period: string): Promise<FairChoice[]> {
-  const [y, m] = period.split('-').map(Number)
-  const from = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10)
-  const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
-  const { data, error } = await supabase
-    .from('comm_venue_events')
-    .select('id, venue_key, start_date, end_date, comm_venues (display_name), comm_organisers (name)')
-    .not('start_date', 'is', null)
-    .gte('start_date', from)
-    .lte('start_date', to)
-    .order('start_date')
-  if (error) throw new Error(`Could not read the fair calendar: ${error.message}`)
-  return ((data ?? []) as unknown as Array<FairEmbed & { id: string }>).map(f => ({
-    id: f.id,
-    label: labelOf(f) ?? f.venue_key,
-    startDate: f.start_date as string,
-  }))
 }

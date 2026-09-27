@@ -96,7 +96,7 @@ describe('AllBillsTable — the bill menu', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: "Don't count this bill" }))
 
     const notice = await screen.findByText(/HC-SO-013493 no longer counts in September 2026\./)
-    expect(notice).toHaveTextContent('Compute the month again to take it out of the saved run.')
+    expect(notice).toHaveTextContent('Payroll follows when the month is sent.')
     expect(screen.queryByRole('menu')).toBeNull()
 
     fireEvent.click(within(notice).getByRole('button', { name: 'Undo' }))

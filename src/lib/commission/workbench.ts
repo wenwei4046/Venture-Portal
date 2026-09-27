@@ -237,7 +237,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const personalRows: CommissionOrderRow[] = input.orders.map(order => {
     const statement = statements.get(order.staffId)
     const meta = orderMeta.get(order.id)
-    const base = marginBase(order.lines, kpiIndex, groupIndex, input.scheme.costDivisor ?? 1)
+    const base = marginBase(order.lines, kpiIndex, groupIndex, input.scheme.costDivisor ?? 1, order.brandCode ?? null)
     const margin = billMargin(order, base)
     const productRevenue = orderProductRevenue(order, kpiIndex, groupIndex)
     const status: CommissionOrderStatus = excluded.has(order.id) ? 'excluded'
@@ -259,7 +259,9 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       staffId: order.staffId, staffName: nameOf(order.staffId),
       venue: meta?.venue ?? null, eventName: meta?.eventName ?? null,
       organizer: meta?.organizer ?? null, location: meta?.location ?? null,
-      brands: [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
+      // The bill's brand is the one it was written under — a pillow of another
+      // brand riding on it does not make it that brand's too (2026-09-27).
+      brands: order.brandCode ? [order.brandCode] : [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
       categories: [...new Set(order.lines.map(line => line.itemGroup))],
       upsale: !!order.upsale, orderTotal: order.orderTotal,
       commissionableValue: orderCommissionableValue(order, kpiIndex, groupIndex),
