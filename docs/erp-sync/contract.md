@@ -97,7 +97,8 @@ with three small additions marked **(add)**:
   "fair": { "projectId": 2212, "venue": "PENANG WATERFRONT CONVENTION CENTRE",   // (add 2026-09-27)
             "organizer": "MLE", "startDate": "2026-09-25", "endDate": "2026-09-27", //  the event the
             "status": "confirmed", "brand": "ZANOTTI", "match": "PICKED",         //  salesperson picked;
-            "fairDate": "2026-09-25", "code": "…", "name": "…", "eventType": "exhibition" } // null when none
+            "fairDate": "2026-09-25", "code": "…", "name": "…", "eventType": "exhibition" }, // null when none
+  "vpBrand": "AKEMI"   // (add 2026-09-27) the brand the salesperson picked when the products name none; null when not asked / skipped
 }
 ```
 
@@ -132,7 +133,7 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | customer | `header.debtor_name`, `header.debtor_code` | |
 | branch | `header.sales_location` | the WAREHOUSE the goods ship from (KL / PG / SRW). Stored as `location`; descriptive only |
 | **venue** | `header.venue` | **the fair itself** — "SUNWAY PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB". Free text the ERP types (`venue_id` is present but never populated). Its own column since 2026-09-16, with sales grouped by it on the month page |
-| brand | `header.branding` | matched to `comm_brands` by code or name, case-insensitive; else from the lines' `branding`; else Item Code prefixes; else none (warning) |
+| brand | `header.branding`, then `vpBrand`, then `fair.brand` | matched to `comm_brands` by code or name, case-insensitive: the ERP's Branding when it names a brand; else the brand the salesperson picked (§3.5); else the brand of the fair booth (not a cancelled one); else from the lines' `branding`; else Item Code prefixes; else none (warning). `erp_sync_order_brand`, mig `20260927080000` |
 | sales value | `header.local_total_sen` / 100 | the list's "Amount" (`subtotal_sen` as fallback) |
 | balance | `header.balance_sen_live` / 100 (else `balance_sen`) | what the deposit gate measures |
 | created at | `header.created_at` | orders the 1st / 2nd / 3rd bill of the day |
@@ -141,6 +142,35 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | **line build** | `items[].variants` (since 2026-09-24) | ALLOWLISTED to `fabricCode`, `seatHeight`, `legHeight`, `divanHeight`, `gap`, `totalHeight`, `size`, `specials` (strings) and stored on the line's `raw.variants` — what the cost rule reads a sofa's seat height and a bed frame's options from before it ever parses `description2` (§9.4). The ERP's `variants` also carries money (`extraAddonAmountRM`) and free text; neither is kept, and the ERP's own builder now sends only the allowlist |
 | line cost | `items[].line_cost_sen` / 100 | stored on `raw.cost` only. **Since 2026-09-24 it decides no margin** — every line is priced from the Product List (§9) |
 | **fair** | `fair` (since 2026-09-27) | the event the salesperson picked — see §3.4. Pinned to the bill; its venue, organiser and days are the fair's everywhere on the portal |
+| **brand pick** | `vpBrand` (since 2026-09-27) | the brand the salesperson said the bill is for when its products name none — see §3.5. Stored on `raw.vpBrand` |
+
+### 3.5 The brand — what the salesperson picked (2026-09-27)
+
+A bill's margin ladder is its brand, and the ERP's `branding` is worked out from
+the products — so a bill of bed frames or accessories alone arrives as
+`BEDFRAME` / `SERVICE` / `NONE` / nothing. Those are never sold on their own
+(user 2026-09-27): a bed frame or a pillow is a SECOND bill at a brand's fair,
+and it follows that fair's brand. The fair picker (§3.4) names the brand when it
+matched a booth; it does not when the bill is keyed after the fair closed
+(`UNMATCHED`), at a hall with several booths (`AMBIGUOUS`), or before the picker
+existed.
+
+So when the products name no brand, the ERP's order form asks which brand the
+bill is for — the ERP's own `project_brands`, pre-set to the picked booth's
+brand — and the salesperson may skip it. The answer lives in its own column
+(`scm.mfg_sales_orders.vp_brand`) and travels as a top-level `vpBrand`; the
+ERP's `branding` is never changed by it.
+
+| Value | Means |
+|---|---|
+| a `project_brands` name (`AKEMI`, `DUNLOPILLO`, …) | the bill is that brand's — matched to `comm_brands` like Branding (`DUNLOPILLO` → `DUNLOP`) |
+| `null` / absent | not asked (the products name a brand), or skipped |
+
+Anything but a string is no pick — never a reason to refuse the sale. The
+bill's brand, in order: Branding when it names a brand → `vpBrand` → the
+fair's brand → the lines (`erp_sync_order_brand`). The pick and the fair come
+BEFORE the lines on purpose: a Dunlopillo pillow sold at an Ergotex fair is an
+Ergotex bill.
 
 
 ### 3.4 The fair — what the salesperson picked (2026-09-27)

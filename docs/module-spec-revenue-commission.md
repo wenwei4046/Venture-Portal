@@ -67,6 +67,17 @@ nothing on it takes one back either.
   only there can two priced brands be ambiguous; the question is asked only in
   a month that pays margin, because a ladder is all the brand chooses. The
   bill's Brand column shows that one brand.
+- **a bill of riders alone is still a brand's** (same day, later). Nothing is
+  sold on its own: a bed frame or a pillow is a second bill written at a
+  brand's fair, and it follows that fair's brand (user: 在 Akemi 的 fair 那个星期
+  卖床架 … if that fair is Akemi, it follows Akemi's margin ladder). When the
+  products name no brand, the ERP's order form asks which brand the bill is for
+  (skippable; the ERP's own Branding is not touched) and the delivery carries
+  it as `vpBrand` (contract §3.5). The bill's brand is then, in order: the
+  ERP's Branding when it names a brand → the salesperson's pick → the brand of
+  the fair booth the ERP's picker named → the lines (`erp_sync_order_brand`,
+  mig `20260927080000`). Of the ten September bills, the two whose fair was
+  picked (both AKEMI) took it at once; the other eight wait for their pick.
 
 **Don't count, from a salesperson's page too.** The ledger's per-bill button
 was a review draft on the screen (*Exclude*); it is now the real *Don't count

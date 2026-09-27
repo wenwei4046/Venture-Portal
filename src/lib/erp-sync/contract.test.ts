@@ -359,3 +359,29 @@ describe('the fair the ERP names', () => {
     expect(fairOf({ ...PWCC, organizer: ' ', fairDate: 'x' })).toMatchObject({ organizer: null, fairDate: null })
   })
 })
+
+// 2026-09-28: a bed frame or an accessory is never sold on its own — it is a
+// second bill at a brand's fair — so the ERP asks which brand when the
+// products name none, and the delivery carries the answer beside Branding.
+describe('the brand the salesperson picked', () => {
+  const bedFrameOnly = () => header({ branding: 'BEDFRAME' })
+
+  it('reads the pick beside the ERP’s own Branding, and keeps it as received', () => {
+    const r = toCanonicalOrder(delivery({ header: bedFrameOnly(), vpBrand: ' AKEMI ' }))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.order.brand).toBe('BEDFRAME')
+    expect(r.order.brandPick).toBe('AKEMI')
+    expect(r.order.raw.vpBrand).toBe('AKEMI')
+  })
+
+  it('has no pick when none was asked, it was skipped, or on a delete', () => {
+    for (const vpBrand of [undefined, null, '', '   ', 42]) {
+      const r = toCanonicalOrder(delivery({ header: bedFrameOnly(), vpBrand }))
+      expect(r.ok && r.order.brandPick).toBeNull()
+      expect(r.ok && r.order.raw.vpBrand).toBeNull()
+    }
+    const gone = toCanonicalOrder({ docNo: 'HC-SO-000001', deleted: true, vpBrand: 'AKEMI' })
+    expect(gone.ok && gone.order.brandPick).toBeNull()
+  })
+})
