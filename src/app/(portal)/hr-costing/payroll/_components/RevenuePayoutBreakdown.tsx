@@ -7,9 +7,13 @@ export default function RevenuePayoutBreakdown({ row }: { row: RevenuePayrollRow
   const employee = Number(row.epf_ee) + Number(row.socso_ee ?? 0) + Number(row.eis_ee ?? 0)
   const employer = Number(row.epf_er) + Number(row.socso_er ?? 0) + Number(row.eis_er ?? 0)
   const pcb = Number(row.pcb ?? 0)
-  const other = Math.round((split.totalPayout - (row.commission_amount - employee - employer - pcb)) * 100) / 100
+  // Pay lines added on Comm Cal (2026-09-27) get a line of their own, so what
+  // is left under "other" is still only the grid's own adjustments.
+  const payLines = Math.round((Number(row.pay_line_earnings ?? 0) - Number(row.pay_line_deductions ?? 0)) * 100) / 100
+  const other = Math.round((split.totalPayout - (row.commission_amount - employee - employer - pcb) - payLines) * 100) / 100
   const lines: [string, number][] = [
     ['Gross commission', row.commission_amount],
+    ...(payLines !== 0 ? [['Pay lines · added on Comm Cal', payLines] as [string, number]] : []),
     ...(other !== 0 ? [['Other payroll adjustments', other] as [string, number]] : []),
     ['Net basic · salary PV', split.basicPay],
     ['Employee EPF + SOCSO + EIS · statutory PVs', employee],

@@ -178,6 +178,15 @@ export default async function MonthPayPage({ params }: PageProps) {
                             </span>
                           </div>
                         ) : null}
+                        {r.pay.payLineEarnings > 0 || r.pay.payLineDeductions > 0 ? (
+                          <div className="mt-1">
+                            <span className="chip info">
+                              <span className="dot" />
+                              PAY LINES{r.pay.payLineEarnings > 0 ? ` +${formatMoney(r.pay.payLineEarnings)}` : ''}
+                              {r.pay.payLineDeductions > 0 ? ` −${formatMoney(r.pay.payLineDeductions)}` : ''}
+                            </span>
+                          </div>
+                        ) : null}
                         {r.differsFromPayroll ? (
                           <div className="mt-1">
                             <span className="chip danger">
@@ -249,8 +258,9 @@ export default async function MonthPayPage({ params }: PageProps) {
             <p className="text-xs mt-3 max-w-3xl">
               Gross commission is the whole month&apos;s — every programme that has applied a run, plus any
               reviewed payroll adjustment. The employer&apos;s EPF, SOCSO and EIS are funded from it, which is
-              why gross pay is lower than gross commission. Open a name for the payslip and the rules behind
-              each figure.
+              why gross pay is lower than gross commission. Pay lines — a special claim, allowance or
+              incentive, or a deduction, added on the salesperson&apos;s ledger — are in net pay. Open a name
+              for the payslip and the rules behind each figure.
             </p>
           </section>
         </>

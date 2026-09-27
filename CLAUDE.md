@@ -917,6 +917,32 @@ src/
 │   │   │                              PREVIEW until the run is synced, and
 │   │   │                              says so when payroll disagrees.
 │   │   │                              Migs `20260917020000` / `030000`.
+│   │   │                              **PAY LINES (2026-09-27):** the pencil on a
+│   │   │                              salesperson's *Salary calculation* (under
+│   │   │                              their ledger on Comm Cal) adds lines to the
+│   │   │                              month — Special claim / Allowance /
+│   │   │                              Incentive (EARNINGS: into gross in full,
+│   │   │                              never pro-rated, outside the statutory wage
+│   │   │                              — no EPF / SOCSO / EIS) or Deduction (off
+│   │   │                              take-home only, like SKBBK). The lines
+│   │   │                              (`revenue_pay_lines`) are the fact;
+│   │   │                              `hr_monthly_payroll.pay_line_earnings` /
+│   │   │                              `pay_line_deductions` are DERIVED by both
+│   │   │                              payroll triggers (re-read on every compute,
+│   │   │                              held at 0 on non-Revenue rows by CHECK), so
+│   │   │                              a row made later picks up lines typed
+│   │   │                              before it. One writer,
+│   │   │                              `revenue_save_pay_lines`: Principal / HR,
+│   │   │                              `assert_commission_payroll_open`, a stale
+│   │   │                              editor refused on id:version, before and
+│   │   │                              after in `access_log`. `lib/revenue-pay.ts`
+│   │   │                              adds them exactly as the triggers do; the
+│   │   │                              rules are `lib/revenue-pay-lines.ts`. HR's
+│   │   │                              paycheck window and payslip show them
+│   │   │                              read-only. The payslip (`pay/[staffId]`)
+│   │   │                              lost *Their bills*: the ledger it is opened
+│   │   │                              from already lists every bill. Mig
+│   │   │                              `20260927060000`.
 │   │   │                              IR rules: commission spec §15; two layers,
 │   │   │                              repeated own sales per group, monthly
 │   │   │                              packages and a 4% fallback. SDL retains
