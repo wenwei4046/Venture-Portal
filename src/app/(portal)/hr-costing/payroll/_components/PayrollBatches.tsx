@@ -33,9 +33,9 @@ export default function PayrollBatches({ period, batches, headline, closed }: Pr
             <thead>
               <tr>
                 <th>Batch</th>
-                <th>Sent</th>
+                <th className="m-hide">Sent</th>
                 <th className="m-hide">Who</th>
-                <th className="right">CTC</th>
+                <th className="right m-hide">CTC</th>
                 <th>Funding</th>
                 <th aria-hidden />
               </tr>
@@ -50,8 +50,11 @@ export default function PayrollBatches({ period, batches, headline, closed }: Pr
                       #{b.no}
                       {b.legacy ? <span className="block text-[11px] font-normal">the whole month</span> : null}
                       {b.topups > 0 ? <span className="block text-[11px] font-normal">{b.topups} resubmit{b.topups === 1 ? '' : 's'}</span> : null}
+                      {/* A phone keeps Batch · Funding; the day and the CTC ride here. */}
+                      <span className="block text-[11px] font-normal md:hidden">{dayTimeLabel(b.submittedAt)}</span>
+                      <span className="block text-xs font-mono tabular-nums md:hidden">{formatMoney(b.total)}</span>
                     </td>
-                    <td className="whitespace-nowrap">
+                    <td className="m-hide whitespace-nowrap">
                       {dayTimeLabel(b.submittedAt)}
                       {b.submittedBy ? <span className="block text-[11px]">{b.submittedBy}</span> : null}
                     </td>
@@ -59,9 +62,9 @@ export default function PayrollBatches({ period, batches, headline, closed }: Pr
                       {b.people} {b.people === 1 ? 'person' : 'people'}
                       {who ? <span className="block text-[11px]">{who}</span> : null}
                     </td>
-                    <td className="num">{formatMoney(b.total)}</td>
+                    <td className="num whitespace-nowrap m-hide">{formatMoney(b.total)}</td>
                     <td>
-                      <span className={`chip ${view.tone === 'muted' ? '' : view.tone}`}><span className="dot" />{view.label}</span>
+                      <span className={`chip whitespace-nowrap ${view.tone === 'muted' ? '' : view.tone}`}><span className="dot" />{view.label}</span>
                       {view.detail ? <span className="block text-[11px] mt-1">{view.detail}</span> : null}
                     </td>
                     <td className="right">
