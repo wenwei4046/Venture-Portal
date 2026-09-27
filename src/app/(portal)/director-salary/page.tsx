@@ -17,7 +17,7 @@ import {
 import dayjs from 'dayjs'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
-import SubmitDirectorSalaryButton from './_components/SubmitDirectorSalaryButton'
+import CompleteDirectorSalaryButton from './_components/CompleteDirectorSalaryButton'
 import ReopenDirectorSalaryButton from './_components/ReopenDirectorSalaryButton'
 import DirectorPayrollActualGrid, {
   DirectorPayrollEmptyState,
@@ -120,8 +120,12 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
     gross: Number(r.gross),
     net: Number(r.net),
     source: r.source,
+    status: r.status,
   }))
   const hasActualPayroll = actualRows.length > 0
+  const directorState = directorPayrollState(
+    (actualPayrollRows ?? []).map(r => ({ status: String(r.status), completed_at: r.completed_at })),
+  )
   const hasCtc = (ctcRows?.length ?? 0) > 0
 
   // Live preview totals for the Submission tab — computed from the InfoTech
@@ -172,8 +176,8 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
         </Link>
         <Link href={tabHref('submission')} aria-current={tab === 'submission' ? 'page' : undefined}>
           Director Payroll Submission
-          {submission ? (
-            <span className="chip ledger"><span className="dot" />submitted</span>
+          {directorState.chip ? (
+            <span className={`chip ${directorState.chip.tone}`}><span className="dot" />{directorState.chip.label}</span>
           ) : null}
         </Link>
       </nav>
@@ -237,7 +241,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
               <p className="text-sm">
                 Actual payroll run imported from InfoTech ·{' '}
                 <Link href={tabHref('submission')} className="text-accent hover:text-accent-hover">
-                  {submission ? 'View submission →' : 'Submit to Finance →'}
+                  {directorState.withFinance > 0 || directorState.completed > 0 ? 'View submission →' : 'Complete →'}
                 </Link>
               </p>
               <Link
@@ -264,6 +268,7 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
           hasActualPayroll={hasActualPayroll}
           hasCtc={hasCtc}
           liveTotals={liveTotals}
+          state={directorState}
           gapSettings={{
             savingPct: Number(dpSettings?.saving_pct ?? 0),
             gbPct: Number(dpSettings?.gb_pct ?? 0),
@@ -321,6 +326,7 @@ function SubmissionTab({
   hasActualPayroll,
   hasCtc,
   liveTotals,
+  state,
   gapSettings,
   gapDirectors,
   payrollRows,
@@ -334,6 +340,7 @@ function SubmissionTab({
   hasActualPayroll: boolean
   hasCtc: boolean
   liveTotals: SubmissionTotals | null
+  state: DirectorPayrollState
   gapSettings: GapSettings
   gapDirectors: GapDirector[]
   payrollRows: DirectorPayrollRowData[]
@@ -410,43 +417,42 @@ function SubmissionTab({
       {/* Status + CTA strip. The month is in the page eyebrow above. */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div className="min-w-0">
-          {submitted ? (
-            <>
-              <h2 className="sheet-heading">Submitted to Finance</h2>
-              <p className="sheet-subtitle">
-                {dayjs(submission.submitted_at).format('D MMM YYYY HH:mm')} ·{' '}
-                {totals?.directors} director{totals?.directors === 1 ? '' : 's'} · Finance sees
-                these totals + the per-subsidiary split on Billing
-              </p>
-              {fundingRequest ? (
-                <p className="sheet-subtitle flex flex-wrap items-center gap-2">
-                  <span>Funding request {formatMoney(Number(fundingRequest.amount))}</span>
-                  <FundingRequestStatus status={fundingRequest.status} />
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <h2 className="sheet-heading">Not submitted yet</h2>
-              <p className="sheet-subtitle">
-                {missing.length === 0
-                  ? 'Preview below — submitting sends the InfoTech payroll totals + per-subsidiary CTC split to Finance immediately'
-                  : `To submit: ${missing.join(' · ')}`}
-              </p>
-            </>
-          )}
+          <h2 className="sheet-heading">{state.heading}</h2>
+          <p className="sheet-subtitle">
+            {state.withFinance > 0 || state.completed > 0
+              ? <>
+                  {state.detail}{' '}
+                  <Link href={`/hr-costing/payroll/${period}`} className="text-accent hover:text-accent-hover">
+                    HR › Payroll →
+                  </Link>
+                </>
+              : missing.length === 0
+                ? 'Preview below — Complete locks the directors and lists them on HR › Payroll, where Submit to Finance sends them with the next batch'
+                : `To complete: ${missing.join(' · ')}`}
+          </p>
+          {submitted && submission ? (
+            <p className="sheet-subtitle">
+              Billing snapshot {dayjs(submission.submitted_at).format('D MMM YYYY HH:mm')} · Finance sees these totals +
+              the per-subsidiary split on Billing
+            </p>
+          ) : null}
+          {fundingRequest ? (
+            <p className="sheet-subtitle flex flex-wrap items-center gap-2">
+              <span>Funding request {formatMoney(Number(fundingRequest.amount))} (filed from this page, before batches)</span>
+              <FundingRequestStatus status={fundingRequest.status} />
+            </p>
+          ) : null}
         </div>
-        <div className="shrink-0">
-          {submitted ? (
-            <ReopenDirectorSalaryButton period={period} />
-          ) : (
-            <SubmitDirectorSalaryButton
+        <div className="shrink-0 flex flex-col items-end gap-2">
+          {state.draft > 0 && (
+            <CompleteDirectorSalaryButton
               period={period}
               totalGross={totals?.gross ?? 0}
               disabled={missing.length > 0}
               disabledHint={missing.length > 0 ? missing.join(' · ') : undefined}
             />
           )}
+          {state.completed > 0 && <ReopenDirectorSalaryButton period={period} />}
         </div>
       </div>
 
@@ -779,6 +785,54 @@ function SubmissionTab({
 
 const BILLING_NOTE =
   'Finance bills each subsidiary via Create Invoice → Director attribution; the modal auto-fills from these amounts.'
+
+export interface DirectorPayrollState {
+  draft: number
+  completed: number
+  submitted: number
+  paid: number
+  withFinance: number
+  heading: string
+  detail: string
+  chip: { label: string; tone: string } | null
+}
+
+/**
+ * Where the month's directors stand (unified Payroll, 2026-09-27): Complete
+ * here, then HR › Payroll's Submit to Finance sends them with a batch.
+ */
+function directorPayrollState(rows: Array<{ status: string; completed_at: string | null }>): DirectorPayrollState {
+  const count = (s: string) => rows.filter(r => r.status === s).length
+  const draft = count('draft')
+  const completed = count('completed')
+  const submitted = count('submitted')
+  const paid = count('paid')
+  const withFinance = submitted + paid
+  const last = rows.map(r => r.completed_at).filter((x): x is string => !!x).sort().pop()
+  const when = last ? dayjs(last).format('D MMM YYYY HH:mm') : ''
+  if (rows.length === 0 || (draft === rows.length)) {
+    return { draft, completed, submitted, paid, withFinance, heading: 'Not completed yet', detail: '', chip: null }
+  }
+  if (withFinance === 0) {
+    return {
+      draft, completed, submitted, paid, withFinance,
+      heading: when ? `Completed ${when}` : 'Completed',
+      detail: `${completed} director${completed === 1 ? '' : 's'} waiting to go to Finance — Submit to Finance on`,
+      chip: { label: 'completed', tone: 'accent' },
+    }
+  }
+  const allPaid = paid === rows.length
+  return {
+    draft, completed, submitted, paid, withFinance,
+    heading: allPaid ? 'Paid' : 'With Finance',
+    detail: [
+      `${withFinance} of ${rows.length} with Finance${paid ? ` (${paid} paid)` : ''}`,
+      completed ? `${completed} completed and waiting` : '',
+      draft ? `${draft} open for a resubmit` : '',
+    ].filter(Boolean).join(' · ') + ' — batches and resubmits live on',
+    chip: { label: allPaid ? 'paid' : 'with Finance', tone: allPaid ? 'ledger' : 'alert' },
+  }
+}
 
 // A funding request's state is a word on a wash, in the colour its words
 // always carried: amber while Finance has it, neutral while the PV waits on

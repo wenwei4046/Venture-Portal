@@ -42,6 +42,11 @@ export interface DirectorPayrollRowData {
   gross: number
   net: number
   source: string
+  /**
+   * draft → completed (Complete on the Submission tab) → submitted (a batch on
+   * HR › Payroll) → paid. Only a draft can be edited (unified Payroll).
+   */
+  status?: string
 }
 
 interface Props {
@@ -363,13 +368,15 @@ function DirectorPayrollRow({
     })
   }
 
+  const locked = (row.status ?? 'draft') !== 'draft'
   const cell = (name: keyof DirectorPayrollUpdate, w = 'w-24') => (
     <input
       type="number"
       step="0.01"
       min="0"
       value={edit[name] ?? 0}
-      disabled={isPending}
+      disabled={isPending || locked}
+      title={locked ? `${row.employee_name} is ${row.status} — reopen (or Resubmit on HR › Payroll) to change` : undefined}
       onChange={e => setEdit({ ...edit, [name]: parseFloat(e.target.value) || 0 })}
       className={`${w} text-right font-mono tabular text-[12px] bg-transparent border-b border-transparent focus:border-accent-border focus:outline-none px-1 py-1 disabled:opacity-50 disabled:cursor-not-allowed`}
     />
@@ -383,7 +390,7 @@ function DirectorPayrollRow({
             type="checkbox"
             aria-label={`Select ${row.employee_name}`}
             checked={selected}
-            disabled={selectDisabled}
+            disabled={selectDisabled || locked}
             onChange={onToggleSelect}
             className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
           />
@@ -398,6 +405,11 @@ function DirectorPayrollRow({
             )}
             {row.source === 'manual' && (
               <span className="chip alert"><span className="dot" />edited</span>
+            )}
+            {row.status && row.status !== 'draft' && (
+              <span className={`chip ${row.status === 'paid' ? 'ledger' : row.status === 'submitted' ? 'alert' : 'accent'}`}>
+                <span className="dot" />{row.status === 'completed' ? 'completed' : row.status === 'submitted' ? 'with Finance' : 'paid'}
+              </span>
             )}
           </div>
         </td>

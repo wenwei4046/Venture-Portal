@@ -25,8 +25,18 @@ export interface CycleVoucher {
 export type SalaryComponent = 'net' | 'basic' | 'commission'
 export interface CycleSalaryComponent {
   component: SalaryComponent
+  /** What is still to pay on it — the whole component, or a resubmit's remainder. */
   amount: number
   voucher: CycleVoucher | null
+  /**
+   * Unified Payroll (2026-09-27): false while the batch that asks for this
+   * money is not funded yet — shown, never offered for a PV. Absent on an
+   * older server (the month's funding decides, as before).
+   */
+  funded?: boolean
+  /** A resubmit's remainder: what earlier vouchers already cover / paid. */
+  covered_before?: number
+  paid_before?: number
   recipient_account: BankAccountSelection | null
   bank_name: string | null
   bank_account_no: string | null
@@ -69,6 +79,8 @@ export interface CyclePerson {
   /** Same person's net in the previous month, null when they were not paid then. */
   prev_net: number | null
   voucher: CycleVoucher | null
+  /** What of each scheme is funded (unified Payroll): statutory PVs pay that, less what is covered. */
+  statutory_funded?: Partial<Record<Scheme, number>> | null
 }
 
 export interface CycleFunding {
@@ -82,6 +94,9 @@ export interface CycleFunding {
   pv_date: string | null
   paid_amount?: number | null
   target_pool?: string | null
+  /** Unified Payroll: the month's funding is the sum of its batches'. */
+  batches?: number
+  batches_funded?: number
 }
 
 export interface CycleStatutoryVoucher {
@@ -166,6 +181,8 @@ export function normaliseCycle(raw: unknown): PaymentCycle {
       pv_date: x.pv_date ?? null,
       paid_amount: x.paid_amount == null ? null : n(x.paid_amount),
       target_pool: x.target_pool ?? null,
+      batches: x.batches == null ? undefined : n(x.batches),
+      batches_funded: x.batches_funded == null ? undefined : n(x.batches_funded),
     }
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -186,6 +203,8 @@ export function normaliseCycle(raw: unknown): PaymentCycle {
     components: Array.isArray(p.components) ? p.components.map((c: CycleSalaryComponent) => ({
       component: c.component, amount: n(c.amount), voucher: voucher(c.voucher),
       recipient_account: c.recipient_account ?? null, bank_name: c.bank_name ?? null, bank_account_no: c.bank_account_no ?? null,
+      ...(typeof c.funded === 'boolean' ? { funded: c.funded } : {}),
+      ...(c.covered_before != null ? { covered_before: n(c.covered_before), paid_before: n(c.paid_before) } : {}),
     })) : undefined,
     gross: n(p.gross),
     net: n(p.net),
@@ -199,6 +218,9 @@ export function normaliseCycle(raw: unknown): PaymentCycle {
     skbbk: n(p.skbbk),
     prev_net: p.prev_net == null ? null : n(p.prev_net),
     voucher: voucher(p.voucher),
+    statutory_funded: p.statutory_funded && typeof p.statutory_funded === 'object'
+      ? Object.fromEntries(Object.entries(p.statutory_funded as Record<string, unknown>).map(([k, v]) => [k, n(v)]))
+      : null,
   }))
   return {
     period: String(r.period ?? ''),
@@ -249,11 +271,15 @@ export function salaryComponents(person: CyclePerson): CycleSalaryComponent[] {
 export function unpaidSalaryComponents(person: CyclePerson): CycleSalaryComponent[] {
   return salaryComponents(person).filter(c => c.amount > 0 && (!c.voucher || c.voucher.status === 'voided'))
 }
+/** Of those, what can be generated NOW: its batch is funded. */
+export function payableSalaryComponents(person: CyclePerson): CycleSalaryComponent[] {
+  return unpaidSalaryComponents(person).filter(c => c.funded !== false)
+}
 export function salaryPaidAmount(person: CyclePerson): number {
-  return round2(salaryComponents(person).reduce((sum, c) => sum + (c.voucher?.status === 'paid' ? c.amount : 0), 0))
+  return round2(salaryComponents(person).reduce((sum, c) => sum + (c.voucher?.status === 'paid' ? c.amount : 0) + (c.paid_before ?? 0), 0))
 }
 export function salaryCoveredAmount(person: CyclePerson): number {
-  return round2(salaryComponents(person).reduce((sum, c) => sum + (c.voucher && c.voucher.status !== 'voided' ? c.amount : 0), 0))
+  return round2(salaryComponents(person).reduce((sum, c) => sum + (c.voucher && c.voucher.status !== 'voided' ? c.amount : 0) + (c.covered_before ?? 0), 0))
 }
 export function salaryFullyCovered(person: CyclePerson): boolean {
   const due = salaryComponents(person).filter(c => c.amount > 0)
@@ -314,6 +340,12 @@ export interface DeptGroup {
   /** The one voucher when the department was compiled as a single PV. */
   deptVoucher: CycleVoucher | null
   blockers: number
+  /** People with money that can be generated now (their batch is funded). */
+  fundable: number
+  /** People whose remaining money waits on a batch Finance has not funded yet. */
+  awaitingFunding: number
+  /** Components carry their own funding (unified Payroll); false on an older server. */
+  batchFunding: boolean
 }
 
 function stageOf(g: Pick<DeptGroup, 'headcount' | 'generated' | 'paid' | 'pending' | 'vouchers'>): DeptStage {
@@ -355,6 +387,9 @@ export function groupDepartments(people: CyclePerson[]): DeptGroup[] {
         vouchers: [],
         deptVoucher: null,
         blockers: 0,
+        fundable: 0,
+        awaitingFunding: 0,
+        batchFunding: false,
       }
       map.set(key, g)
     }
@@ -372,6 +407,9 @@ export function groupDepartments(people: CyclePerson[]): DeptGroup[] {
     g.prev_count = withPrev.length
     g.prev_net = withPrev.length ? round2(withPrev.reduce((s, p) => s + (p.prev_net ?? 0), 0)) : null
     g.blockers = payable.filter((p) => bankIssue(p) != null).length
+    g.batchFunding = g.people.some(p => salaryComponents(p).some(c => typeof c.funded === 'boolean'))
+    g.fundable = payable.filter(p => payableSalaryComponents(p).length > 0).length
+    g.awaitingFunding = payable.filter(p => unpaidSalaryComponents(p).some(c => c.funded === false)).length
     const seen = new Map<string, CycleVoucher>()
     let emp = 0
     let dept = 0
@@ -511,6 +549,33 @@ export interface StatutoryRow {
 const carriesDirectors = (v: CycleStatutoryVoucher) => /directors\)\s*$/.test(String(v.description ?? ''))
 const isDirectorOnly = (v: CycleStatutoryVoucher) => /\(directors\)\s*$/.test(String(v.description ?? ''))
 
+/**
+ * Whether a group's salary PVs can be raised now. With batch funding
+ * (unified Payroll) that is a fact per person — a funded batch pays while a
+ * later one waits; an older server answers for the whole scope.
+ */
+export function groupFunded(g: DeptGroup, scopeFunded: boolean): boolean {
+  if (!g.batchFunding) return scopeFunded
+  return g.fundable > 0 || g.generated >= g.headcount
+}
+
+/** What statutory vouchers already cover of one person's scheme. */
+export function coveredStatutory(coverage: readonly StatutoryCoverage[], p: Pick<CyclePerson, 'scope' | 'row_id'>, scheme: Scheme): number {
+  return round2(coverage.filter(c => c.scope === p.scope && c.row_id === p.row_id && c.scheme === scheme).reduce((t, c) => t + c.amount, 0))
+}
+
+/** Still to raise for a scheme: what was submitted, less what is covered. */
+export function statutoryRemaining(coverage: readonly StatutoryCoverage[], p: CyclePerson, scheme: Scheme): number {
+  return Math.max(0, round2(schemeAmount(p, scheme) - coveredStatutory(coverage, p, scheme)))
+}
+
+/** Of that, what can be raised now: the funded part, less what is covered. */
+export function statutoryPayable(coverage: readonly StatutoryCoverage[], p: CyclePerson, scheme: Scheme): number {
+  const owed = schemeAmount(p, scheme)
+  const funded = p.statutory_funded ? Math.min(owed, p.statutory_funded[scheme] ?? 0) : owed
+  return Math.max(0, round2(funded - coveredStatutory(coverage, p, scheme)))
+}
+
 /** Compatibility for old responses; the current RPC uses sources and exact lines. */
 export function statutoryCoverage(cycle: PaymentCycle): StatutoryCoverage[] {
   const live = cycle.statutory_vouchers.filter(v => v.status !== 'voided')
@@ -537,9 +602,9 @@ export function statutoryRows(cycle: PaymentCycle, groups: DeptGroup[]): Statuto
     const topup = forPayee.find((v) => isDirectorOnly(v) && v.id !== pv?.id) ?? null
     const staffAmt = round2(staff.reduce((t, p) => t + schemeAmount(p, s.scheme), 0))
     const dirAmt = round2(dirs.reduce((t, p) => t + schemeAmount(p, s.scheme), 0))
-    const covered = new Set(coverage.filter(c => c.scheme === s.scheme).map(c => `${c.scope}:${c.row_id}`))
-    const remainingAmount = round2(cycle.people.filter(p => !covered.has(`${p.scope}:${p.row_id}`))
-      .reduce((t, p) => t + Math.max(0, schemeAmount(p, s.scheme)), 0))
+    // Amounts, not presence: a resubmit's difference is still to raise after
+    // the first voucher (unified Payroll, 2026-09-27).
+    const remainingAmount = round2(cycle.people.reduce((t, p) => t + statutoryRemaining(coverage, p, s.scheme), 0))
     const stage: StatStage = !forPayee.length ? 'not_generated' : remainingAmount > 0 ? 'partial'
       : forPayee.every(v => v.status === 'paid') ? 'paid'
       : forPayee.every(v => v.status === 'paid' || v.status === 'approved') ? 'approved' : 'pending'
@@ -556,7 +621,7 @@ export function statutoryRows(cycle: PaymentCycle, groups: DeptGroup[]): Statuto
       due: statutoryDue(cycle.period, s.scheme),
       pv,
       topup,
-      directorsCovered: dirAmt > 0 && dirs.filter(p => schemeAmount(p, s.scheme) > 0).every(p => covered.has(`directors:${p.row_id}`)),
+      directorsCovered: dirAmt > 0 && dirs.filter(p => schemeAmount(p, s.scheme) > 0).every(p => statutoryRemaining(coverage, p, s.scheme) === 0),
       stage,
       vouchers: forPayee,
       generatedAmount: round2(forPayee.reduce((t, v) => t + v.amount, 0)),

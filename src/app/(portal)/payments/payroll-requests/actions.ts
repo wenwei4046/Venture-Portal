@@ -340,6 +340,32 @@ export async function financeCancelRequest(
 // per voucher with HR's own dates. This page's statutory section is read-only.
 
 /**
+ * Unified Payroll (2026-09-27): a month reaches Finance in BATCHES, and
+ * Finance sends back one batch at a time — its request is cancelled, its
+ * accrual JVs reversed, its people wait on HR › Payroll as Completed again
+ * (HR unlocks whoever needs a change). Refused once its funding PV exists.
+ */
+export async function sendBackPayrollBatch(batchId: string, reason?: string): Promise<void> {
+  await requirePermission('treasury')
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchId)) throw new Error('Which batch?')
+  const supabase = await createClient()
+  const { data: batch } = await supabase.from('payroll_batches').select('period_month').eq('id', batchId).maybeSingle()
+  const { error } = await supabase.rpc('payroll_send_back_batch', {
+    p_batch_id: batchId,
+    p_reason: (reason ?? '').trim().slice(0, 500) || undefined,
+  })
+  if (error) throw new Error(`打回失败：${error.message}`)
+
+  revalidatePath('/payments/payroll-requests')
+  revalidatePath('/payments')
+  revalidatePath('/hr-costing/payroll')
+  if (batch?.period_month) revalidatePath(`/hr-costing/payroll/${batch.period_month}`)
+  revalidatePath('/hr-costing/payment')
+  revalidatePath('/billing')
+  revalidatePath('/dashboard')
+}
+
+/**
  * 防盗墙 (user 2026-09-15 "把权限放在 finance 这边"): Finance sends a
  * submitted STAFF payroll run back to HR for edits. Wraps reopen_payroll_run
  * (role gate finance/principal since mig 20260915040000): the auto-filed

@@ -534,3 +534,73 @@ describe('monthRail (BambooHR pay-date rail)', () => {
     expect(rail.map((m) => `${m.mon} ${m.year}`)).toEqual(['Nov 2026', 'Dec 2026', 'Jan 2027', 'Feb 2027'])
   })
 })
+
+// ── Unified Payroll (2026-09-27): funding per batch, top-ups pay the difference ──
+import {
+  groupFunded,
+  payableSalaryComponents,
+  salaryCoveredAmount,
+  salaryPaidAmount,
+  statutoryPayable,
+  statutoryRemaining,
+} from './payment-cycle'
+import { payrollComponentSelection } from './payroll-selection'
+
+describe('batch funding on HR › Payment', () => {
+  const voucher = { id: 'pv1', no: 'HV-PV-202609-0435', status: 'paid', payment_date: '2026-09-28', created_at: null, approved_at: null, granularity: 'employee', group_id: null }
+  const cycle = () => normaliseCycle({
+    period: '2026-09-01',
+    people: [
+      // Batch #1, funded and paid.
+      { row_id: 'fin', scope: 'staff', name: 'CHEW WEE HO', dept_id: 'finance', dept_name: 'Finance', bank_name: 'Maybank', bank_account_no: '123',
+        net: 5854.5, gross: 7000, epf_er: 910, epf_ee: 770,
+        components: [{ component: 'net', amount: 5854.5, voucher, funded: true, covered_before: 0, paid_before: 0 }] },
+      // Batch #1 paid its 2,649.35; the resubmit's 1,247.45 is funded and waits for a PV.
+      { row_id: 'low', scope: 'staff', name: 'LOW CHENG AN', dept_id: 'finance', dept_name: 'Finance', bank_name: 'AmBank', bank_account_no: '456',
+        net: 3896.8, gross: 4700, epf_er: 611, epf_ee: 517,
+        components: [{ component: 'net', amount: 1247.45, voucher: null, funded: true, covered_before: 2649.35, paid_before: 2649.35 }],
+        statutory_funded: { KWSP: 1128, SOCSO: 0, EIS: 0, PCB: 0, SKBBK: 0 } },
+      // Batch #2, not funded yet.
+      { row_id: 'hr', scope: 'staff', name: 'HR PERSON', dept_id: 'hr', dept_name: 'HR', bank_name: 'CIMB', bank_account_no: '789',
+        net: 3518.9, gross: 4000, epf_er: 520, epf_ee: 440,
+        components: [{ component: 'net', amount: 3518.9, voucher: null, funded: false }],
+        statutory_funded: { KWSP: 0, SOCSO: 0, EIS: 0, PCB: 0, SKBBK: 0 } },
+    ],
+  })
+
+  it('reads a resubmit as the remainder still to pay, with what went before', () => {
+    const [, low] = cycle().people
+    expect(payableSalaryComponents(low).map(c => c.amount)).toEqual([1247.45])
+    expect(salaryPaidAmount(low)).toBe(2649.35)
+    expect(salaryCoveredAmount(low)).toBe(2649.35)
+  })
+
+  it('pays a funded batch while a later one waits', () => {
+    const groups = groupDepartments(cycle().people)
+    const finance = groups.find(g => g.name === 'Finance')!
+    const hr = groups.find(g => g.name === 'HR')!
+    expect(finance).toMatchObject({ batchFunding: true, fundable: 1, awaitingFunding: 0 })
+    expect(hr).toMatchObject({ batchFunding: true, fundable: 0, awaitingFunding: 1 })
+    // The month is not "funded" (batch #2 waits), yet Finance can pay.
+    expect(groupFunded(finance, false)).toBe(true)
+    expect(groupFunded(hr, false)).toBe(false)
+  })
+
+  it('never offers an unfunded component for a PV, and offers only the remainder of a resubmit', () => {
+    const people = cycle().people
+    const selection = payrollComponentSelection(people, null, 'employee')
+    expect(selection.eligible.map(l => `${l.person.row_id}:${l.amount}`)).toEqual(['low:1247.45'])
+    expect(selection.componentSelections[0]).toMatchObject({ payroll_row_id: 'low', component: 'net', expected_amount: 1247.45 })
+  })
+
+  it('raises statutory for what is funded, less what vouchers cover', () => {
+    const [, low, hr] = cycle().people
+    const coverage = [{ row_id: 'low', scope: 'staff' as const, scheme: 'KWSP' as const, voucher_id: 'k1', amount: 1000 }]
+    // KWSP owed 1,128 (611 + 517), covered 1,000: 128 left, all of it funded.
+    expect(statutoryRemaining(coverage, low, 'KWSP')).toBe(128)
+    expect(statutoryPayable(coverage, low, 'KWSP')).toBe(128)
+    // HR's batch is not funded: owed, but nothing to raise yet.
+    expect(statutoryRemaining(coverage, hr, 'KWSP')).toBe(960)
+    expect(statutoryPayable(coverage, hr, 'KWSP')).toBe(0)
+  })
+})

@@ -96,7 +96,9 @@ export async function previewInfotechImport(
     if (existing && existing.status !== 'draft') {
       skipped.push({
         rowIndex: idx,
-        reason: `Payroll row is ${existing.status} — reopen the run first`,
+        reason: existing.status === 'completed'
+          ? `Payroll row is completed — unlock it on the grid first`
+          : `Payroll row is ${existing.status} — already with Finance; Resubmit it on the grid to change it`,
         code,
         name,
       })

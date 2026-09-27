@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { sendBackPayrollRun } from '../actions'
+import { sendBackPayrollBatch, sendBackPayrollRun } from '../actions'
 
 // 打回 HR 重做 (2026-09-15): Finance-side reopen of a submitted staff payroll
 // run. Two-click confirm; the RPC does the real guarding (no funding PV yet,
 // period open) and the accrual reversal.
-export default function SendBackButton({ period, periodLabel }: { period: string; periodLabel: string }) {
+export default function SendBackButton({ period, periodLabel, batchId = null }: { period: string; periodLabel: string; batchId?: string | null }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [armed, setArmed] = useState(false)
@@ -28,7 +28,9 @@ export default function SendBackButton({ period, periodLabel }: { period: string
     setArmed(false)
     startTransition(async () => {
       try {
-        await sendBackPayrollRun(period)
+        // A batch goes back on its own; a request from before batches, the month.
+        if (batchId) await sendBackPayrollBatch(batchId)
+        else await sendBackPayrollRun(period)
         router.refresh()
       } catch (e) {
         setError(e instanceof Error ? e.message : '打回失败')
@@ -42,7 +44,7 @@ export default function SendBackButton({ period, periodLabel }: { period: string
         type="button"
         onClick={handle}
         disabled={isPending}
-        title="把这期 payroll 打回给 HR 改：request 作废、已开的薪水账自动冲掉，HR 改好重新 submit"
+        title="把这一批打回给 HR 改：request 作废、这批的薪水账自动冲掉，这批的人回到 Completed，HR 改好重新 submit"
         className={`text-xs font-serif italic rounded px-2 py-1 transition-colors disabled:opacity-50 ${
           armed ? 'bg-danger text-white' : 'text-muted hover:text-danger'
         }`}

@@ -44,7 +44,9 @@ export function payrollComponentSelection(
       : getStaffBankAccount(person, account)
     return { key, person, ...component, voucher: liveVoucher, account, recipient }
   }))
-  const eligible = lines.filter(line => line.amount > 0 && !line.voucher)
+  // Funded (unified Payroll): a component whose batch Finance has not funded
+  // yet is shown, never offered — the server would refuse it anyway.
+  const eligible = lines.filter(line => line.amount > 0 && !line.voucher && line.funded !== false)
   const selected = eligible.filter(line => wanted == null || wanted.has(line.key) || wanted.has(line.person.row_id))
   const rowIds = [...new Set(selected.map(line => line.person.row_id))]
   const selectedPeople = people.filter(person => rowIds.includes(person.row_id))

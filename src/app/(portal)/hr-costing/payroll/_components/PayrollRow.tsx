@@ -20,7 +20,9 @@ import AmountInput from './AmountInput'
 import PaycheckWindow from './PaycheckWindow'
 import RevenueCommissionEditor from './RevenueCommissionEditor'
 import { adjustRevenueCommission, type RevenueCommissionAdjustmentInput } from '../commission-actions'
+import type { StatusView } from '@/lib/payroll-lifecycle'
 import type { PayrollRowData } from './PayrollGrid'
+import type { RowMenuAnchor } from './PayrollRowMenu'
 
 interface Props {
   row: PayrollRowData
@@ -33,6 +35,8 @@ interface Props {
   /** Department folded away. Hidden, not unmounted, so unsaved edits survive. */
   hidden: boolean
   showRevenueSplit?: boolean
+  /** Where this person's pay stands — the frozen Status column. */
+  status: StatusView
   /** This row's paycheck window is up. */
   open: boolean
   onOpen: () => void
@@ -41,6 +45,10 @@ interface Props {
   selected: boolean
   onToggleSelect: () => void
   selectDisabled: boolean
+  /** Why the tick box is disabled (a submitted row, a salesperson, a director). */
+  selectHint?: string
+  /** Open this person's menu — right-click, or the ⋯ button. */
+  onMenu: (anchor: RowMenuAnchor, byRightClick: boolean) => void
 }
 
 /**
@@ -56,6 +64,7 @@ export default function PayrollRow({
   alt,
   hidden,
   showRevenueSplit = false,
+  status,
   open,
   onOpen,
   onClose,
@@ -63,6 +72,8 @@ export default function PayrollRow({
   selected,
   onToggleSelect,
   selectDisabled,
+  selectHint,
+  onMenu,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -79,7 +90,10 @@ export default function PayrollRow({
   const wasOpen = useRef(false)
   const savedEditRef = useRef(editFromRow(row))
 
-  const locked = row.status !== 'draft'
+  // Directors are keyed on Director Salary; everybody past draft waits in
+  // their batch (Unlock, or Resubmit, to change them).
+  const director = row.scope === 'directors'
+  const locked = row.status !== 'draft' || director
   const revenuePayroll = row.revenue_payroll ?? row.source === 'commission'
   const split = revenuePayroll ? calculateRevenuePayrollSplit(row) : null
   const reviewedCommissionSource = row.commission_confirmed_amount ?? row.commission_synced_amount
@@ -89,7 +103,6 @@ export default function PayrollRow({
   const regularDirty = dirtyList.some(field => field !== 'commission_amount' || !row.commission_is_derived)
   const dirty = dirtyList.length > 0 || commissionDirty
   const statementHref = row.commission_statements?.[0]?.href ?? row.commission_statement_href
-  const sourceLinked = row.source === 'commission' && Boolean(row.commission_statements?.length || row.commission_statement_href)
 
   // Sync clean fields after a server refresh while retaining the user's
   // unsaved work, including a Gross Commission amount awaiting review.
@@ -243,32 +256,49 @@ export default function PayrollRow({
       <tr
         ref={trRef}
         hidden={hidden}
-        className={cn('pg-row', alt && 'alt', open && 'open', dirty && !locked && 'dirty')}
+        className={cn('pg-row', alt && 'alt', open && 'open', dirty && !locked && 'dirty', director && 'director')}
+        onContextMenu={event => {
+          if (event.shiftKey) return
+          event.preventDefault()
+          onMenu({ left: event.clientX, top: event.clientY, bottom: event.clientY }, true)
+        }}
       >
         <td className="pg-st l0 pg-chk">
           <input
             type="checkbox"
             aria-label={`Select ${row.staff_name}`}
             checked={selected}
-            disabled={locked || sourceLinked || selectDisabled}
+            disabled={selectDisabled}
             onChange={onToggleSelect}
             className="w-3.5 h-3.5 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:outline-none"
-            title={locked ? `Cannot delete — status is ${row.status}` : sourceLinked ? 'Revenue rows are managed from the commission calculation' : undefined}
+            title={selectHint}
           />
         </td>
         <td className="pg-st l1 pg-name">
-          <button
-            type="button"
-            className="pg-name-btn"
-            onClick={open ? onClose : onOpen}
-            title={`${row.staff_name} — open paycheck`}
-          >
-            {row.staff_name}
-          </button>
+          {director ? (
+            <a className="pg-name-btn" href={row.director_href ?? undefined} title={`${row.staff_name} — keyed on Director Salary`}>
+              {row.staff_name}
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="pg-name-btn"
+              onClick={open ? onClose : onOpen}
+              title={`${row.staff_name} — open paycheck`}
+            >
+              {row.staff_name}
+            </button>
+          )}
         </td>
-        {num(row.gross, 'pg-st l2 pg-gross')}
-        {num(row.net, 'pg-st l3 pg-net')}
-        <td className="pg-st l4 pg-act">
+        <td className="pg-st l2 pg-status" title={status.detail}>
+          <span className={cn('chip', status.tone !== 'muted' && status.tone)}>
+            <span className="dot" />
+            {status.label}
+          </span>
+        </td>
+        {num(row.gross, 'pg-st l3 pg-gross')}
+        {num(row.net, 'pg-st l4 pg-net')}
+        <td className="pg-st l5 pg-act">
           {dirty && !locked && (
             <button
               ref={saveRef}
@@ -286,15 +316,31 @@ export default function PayrollRow({
               !
             </span>
           )}
+          {!director && (
+            <button
+              ref={chevRef}
+              type="button"
+              className="icon-btn chev"
+              aria-expanded={open}
+              aria-label={open ? 'Close paycheck' : 'Open paycheck'}
+              onClick={open ? onClose : onOpen}
+            >
+              ▾
+            </button>
+          )}
           <button
-            ref={chevRef}
             type="button"
-            className="icon-btn chev"
-            aria-expanded={open}
-            aria-label={open ? 'Close paycheck' : 'Open paycheck'}
-            onClick={open ? onClose : onOpen}
+            className="icon-btn more"
+            aria-haspopup="menu"
+            data-payroll-menu-trigger
+            aria-label={`Actions for ${row.staff_name}`}
+            title="Actions — or right-click the row"
+            onClick={event => {
+              const r = event.currentTarget.getBoundingClientRect()
+              onMenu({ left: r.left, top: r.top, bottom: r.bottom }, false)
+            }}
           >
-            ▾
+            ⋯
           </button>
         </td>
 

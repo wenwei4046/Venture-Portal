@@ -13,8 +13,6 @@ import {
   type PayoutMode,
 } from '@/lib/salary'
 import { notifyDirectorSalaryCalculated } from '@/lib/slack'
-import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 
 // ─── Save CTC ──────────────────────────────────────────────────────
@@ -645,68 +643,47 @@ export async function resetDirectorStatutoryToLookup(payoutId: string) {
   revalidatePath('/director-salary')
 }
 
-// ─── Director Payroll Submission (mig 279) ─────────────────────────
+// ─── Complete (unified Payroll, 2026-09-27) ─────────────────────────
 //
-// Replaces the old Confirm step: submitting flips draft payouts to
-// 'confirmed' AND writes the aggregate-only submission snapshot (totals +
-// per-subsidiary CTC) that Finance reads — no Principal approval involved.
+// Director Salary's Submit to Finance became Complete (user's choice): the
+// directors' pay is checked and locked, the billing snapshot Finance invoices
+// the subsidiaries from is written as before — and the money goes to Finance
+// with HR › Payroll's Submit to Finance, in the same batches as everybody
+// else, funded from the Director pool. Their accrual JVs post with the batch.
 
-export async function submitDirectorSalaryToFinance(period: string) {
-  const user = await requirePermission('director_salary')
+export async function completeDirectorSalary(period: string) {
+  await requirePermission('director_salary')
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
-
   await assertPeriodOpen(supabase, periodNorm)
 
-  const { error } = await supabase.rpc('submit_director_salary_to_finance', {
-    p_period: periodNorm,
-    p_user_id: user.id,
-  })
-
-  if (error) throw new Error(`Submit failed: ${error.message}`)
-
-  // Auto payroll accrual JV (user 2026-08-07): submitting director salary to
-  // Finance books the Director segment's salary JV, dated back to the payroll
-  // month-end. The submission stands even if the JV fails — surface loudly.
-  try {
-    await postPayrollAccrualJVs(supabase as unknown as SupabaseClient, {
-      periodMonth: periodNorm,
-      kind: 'director',
-      userId: user.id,
-    })
-  } catch (e) {
-    throw new Error(
-      `Submitted ✓ but the auto accrual JV failed: ${e instanceof Error ? e.message : 'unknown'}`,
-    )
-  }
+  const { error } = await supabase.rpc('director_payroll_complete', { p_period: periodNorm })
+  if (error) throw new Error(`Complete failed: ${error.message}`)
 
   revalidatePath('/director-salary')
+  revalidatePath(`/hr-costing/payroll/${periodNorm}`)
   revalidatePath('/billing')
   revalidatePath('/dashboard')
 }
 
 /**
- * Pull a submission back so HR can recalculate / edit statutory. Confirmed
- * payouts flip to draft and the snapshot row is deleted. The RPC blocks once
- * any payout is paid or disbursement PVs exist.
+ * Take a Complete back before the directors went to Finance: they are
+ * editable again, and the billing snapshot goes unless somebody is already
+ * with Finance. Anybody already sent is resubmitted from HR › Payroll.
  */
 export async function reopenDirectorSalary(period: string) {
-  const user = await requirePermission('director_salary')
+  await requirePermission('director_salary')
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
-
   await assertPeriodOpen(supabase, periodNorm)
 
-  const { error } = await supabase.rpc('reopen_director_salary', {
-    p_period: periodNorm,
-    p_user_id: user.id,
-  })
-
+  const { error } = await supabase.rpc('director_payroll_uncomplete', { p_period: periodNorm })
   if (error) throw new Error(`Reopen failed: ${error.message}`)
 
   revalidatePath('/director-salary')
+  revalidatePath(`/hr-costing/payroll/${periodNorm}`)
   revalidatePath('/billing')
   revalidatePath('/dashboard')
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normaliseCycle, groupDepartments, statutoryCoverage, statutoryRows, cycleHeadline, monthRail } from './payment-cycle'
+import { normaliseCycle, groupDepartments, schemeAmount, statutoryCoverage, statutoryRows, cycleHeadline, monthRail } from './payment-cycle'
 import { statutorySelection } from './statutory-selection'
 
 const cycle = () => normaliseCycle({ period: '2026-08-01', people: [
@@ -89,7 +89,8 @@ describe('statutory coverage and reporting', () => {
       id: `${s}-${p.row_id}`, no: null, payee: `PERKESO (${s})`, status: 'pending_approval' as const, amount: i ? 2 : 13,
       payment_date: null, description: null, created_at: null, approved_at: null,
     })))
-    c.statutory_coverage = ['SOCSO', 'EIS'].flatMap(s => c.people.slice(0, 2).map(p => ({ row_id: p.row_id, scope: p.scope, scheme: s as 'SOCSO' | 'EIS', voucher_id: `${s}-${p.row_id}`, amount: 1 })))
+    // Coverage is an AMOUNT (unified Payroll, 2026-09-27): these PVs cover each person's scheme in full.
+    c.statutory_coverage = ['SOCSO', 'EIS'].flatMap(s => c.people.slice(0, 2).map(p => ({ row_id: p.row_id, scope: p.scope, scheme: s as 'SOCSO' | 'EIS', voucher_id: `${s}-${p.row_id}`, amount: schemeAmount(p, s as 'SOCSO' | 'EIS') })))
     const groups = groupDepartments(c.people)
     const h = cycleHeadline({ cycle: c, groups, rows: statutoryRows(c, groups), phase: 'funded', staffFunded: true, directorsFunded: true, today: '2026-09-10', plannedStaffDate: '2026-09-05', plannedDirectorDate: '2026-09-05' })
     expect(h.word).toBe('Statutory with Principal')

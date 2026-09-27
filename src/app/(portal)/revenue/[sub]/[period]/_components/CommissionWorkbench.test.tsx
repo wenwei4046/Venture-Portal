@@ -613,6 +613,21 @@ describe('CommissionWorkbench', () => {
     expect(saveOpenPicks).not.toHaveBeenCalled()
   })
 
+  // The unified Payroll (2026-09-27): the month is open, but a salesperson who
+  // is closed (Completed) or already with Finance cannot take new pay lines —
+  // the pencil says why and where to go before anything is typed.
+  it('locks one person’s pay lines once their payroll moved on from draft', () => {
+    const data = salaryFixture()
+    data.payRows = data.payRows.map(p => ({ ...p, payrollExists: true, payrollStatus: 'completed' }))
+    renderBoard(data)
+    choose('Anthony')
+    const pencil = screen.getByRole('button', { name: 'Edit Anthony’s pay lines' })
+    expect(pencil).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(pencil)
+    expect(screen.queryByRole('group', { name: /Pay lines/ })).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('Anthony is closed for the month. Reopen their close first')
+  })
+
   // A run that was computed and never sent holds nothing in payroll — which is
   // how September looked like paid money when it was not (2026-09-27).
   it('says what payroll holds for a person only once the month is in it', () => {
@@ -685,6 +700,8 @@ describe('CommissionWorkbench', () => {
       expect(bar()).toHaveTextContent('it goes salesperson by salesperson, as each one is sent.')
       expect(within(bar()).getByText('This month pays switches')).toBeVisible()
       expect(within(bar()).queryByRole('button')).toBeNull()
+      // Unified Payroll (2026-09-27): where a sent salesperson lands.
+      expect(within(bar()).getByRole('link', { name: 'HR › Payroll →' })).toHaveAttribute('href', '/hr-costing/payroll/2026-08-01')
     })
 
     it('names what has to be settled first, by name', () => {

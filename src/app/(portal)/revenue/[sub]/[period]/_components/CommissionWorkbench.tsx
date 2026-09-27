@@ -14,6 +14,7 @@ import {
 } from '@/lib/commission/workbench-nav'
 import { formatMoney } from '@/lib/utils'
 import { computeRevenuePay } from '@/lib/revenue-pay'
+import { personPayLinesLock } from '@/lib/revenue-pay-lines'
 import type { FairSales } from '@/lib/venues'
 import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
@@ -622,7 +623,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {monthOverview}
     <CommissionMonthSummary stats={monthStats} peopleCount={board.people.length} totalCommission={board.totalCommission}
       status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Live calculation'} />
-    {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} state={payrollView} draft={drafting} switches={payroll.switches} />}
+    {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} period={period} state={payrollView} draft={drafting} switches={payroll.switches} />}
     <div className={s.tabs} role="tablist" aria-label="Commission views">
       {TABS.map(([key, text]) =>
         <button type="button" role="tab" aria-selected={tab === key} aria-controls={`commission-panel-${key}`} id={`commission-tab-${key}`} key={key}
@@ -787,7 +788,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           HR adds to it (2026-09-27). Keyed so one person's unsaved lines never
           follow the page to the next person. */}
       <SalaryCalculation key={selected.staffId} staffName={selected.name} period={period} commission={selected.totalCommission}
-        source={salarySource} payUnavailable={data.payUnavailable} closedReason={data.payLinesClosed ?? null} />
+        source={salarySource} payUnavailable={data.payUnavailable}
+        closedReason={data.payLinesClosed ?? personPayLinesLock(salarySource?.payrollStatus, selected.name)} />
     </>}
 
     {tab === 'kpi' && <>

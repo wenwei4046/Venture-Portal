@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { getPeriodMonth } from '@/lib/utils'
@@ -18,7 +19,6 @@ import {
   statutoryRows,
   type HeadlineInput,
 } from '@/lib/payment-cycle'
-import RequestPayrollPaymentButton, { type RequestState } from '../payroll/_components/RequestPayrollPaymentButton'
 import MonthRail from './_components/MonthRail'
 import PaymentBoard from './_components/PaymentBoard'
 import type { Facts } from './_components/Overview'
@@ -145,13 +145,13 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
     statPaidDate: rows.map((r) => r.pv?.payment_date).filter((x): x is string => !!x).sort().pop() ?? null,
   }
 
-  // Funding request state for the re-file / status button (unchanged flow).
-  let requestState: RequestState = { kind: 'none' }
-  if (fs) {
-    if (fs.status === 'submitted') requestState = { kind: 'submitted', requestId: fs.id, requestedAt: fs.requested_at ?? '' }
-    else if (fs.status === 'pv_generated') requestState = { kind: 'pv_generated', pvId: fs.pv_id ?? '', requestId: fs.id, paidAmount: round2(fs.paid_amount ?? 0) }
-    else if (fs.status === 'completed') requestState = { kind: 'completed', pvId: fs.pv_id ?? '', completedAt: null }
-  }
+  // Funding is filed per batch on HR › Payroll (unified Payroll, 2026-09-27);
+  // here it is a count and a way there.
+  const fundingSlot = run ? (
+    <Link href={`/hr-costing/payroll/${period}`} className="pay-btn sec" title="Each batch's funding request lives with the batch on HR › Payroll">
+      {fs?.batches ? `${fs.batches_funded ?? 0} of ${fs.batches} batch${fs.batches === 1 ? '' : 'es'} funded` : 'Funding requests'} · Payroll →
+    </Link>
+  ) : null
 
   return (
     <div className="pay-board payment-statement">
@@ -187,7 +187,7 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
         payoutBank={cycle.payout_bank}
         today={today}
         defaultDate={defaultDate}
-        fundingSlot={run ? <RequestPayrollPaymentButton runId={run.id} totalAmount={run.total_amount} state={requestState} /> : null}
+        fundingSlot={fundingSlot}
       />
     </div>
   )

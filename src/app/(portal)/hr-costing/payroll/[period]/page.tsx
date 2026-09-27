@@ -1,43 +1,35 @@
 import Link from 'next/link'
-import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { round2 } from '@/lib/payroll-funding'
+import {
+  batchesHeadline,
+  closeReadiness,
+  normaliseMonthStatus,
+  statusCounts,
+  submitPreview,
+  type LifecycleRow,
+  type RowStatus,
+} from '@/lib/payroll-lifecycle'
 import PayrollGrid, { type PayrollRowData } from '../_components/PayrollGrid'
 import CopyFromLastMonthButton from '../_components/CopyFromLastMonthButton'
 import CreatePeriodButton from '../_components/CreatePeriodButton'
 import SubmitToFinanceButton from '../_components/SubmitToFinanceButton'
 import SaveAllButton from '../_components/SaveAllButton'
+import TotalCloseButton from '../_components/TotalCloseButton'
+import PayrollBatches from '../_components/PayrollBatches'
 import { PayrollDraftProvider } from '../_components/PayrollDraftContext'
 import MoreActionsDropdown from '../_components/MoreActionsDropdown'
 import { deletePayrollPeriod } from '../actions'
 import PeriodPicker from '../_components/PeriodPicker'
-import RequestPayrollPaymentButton, {
-  type RequestState,
-} from '../_components/RequestPayrollPaymentButton'
-import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 interface PageProps {
   params: Promise<{ period: string }>
-}
-
-interface DirectorPayoutRow {
-  id: string
-  director_id: string
-  status: string
-  director_code: string
-  director_name: string
-  gross_amount: number
-  payroll_gross: number
-  payroll_net: number
-  payroll_epf_er: number
-  payroll_socso_er: number
-  payroll_eis_er: number
-  payroll_pcb: number
 }
 
 function formatPeriodLabel(period: string): string {
@@ -45,23 +37,43 @@ function formatPeriodLabel(period: string): string {
   return d.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 }
 
-export default async function PayrollGridPage({ params }: PageProps) {
-  await requirePermission('hr_costing')
-  const { period } = await params
+interface LineRow {
+  scope: 'staff' | 'directors'
+  row_id: string
+  ctc: number | string
+  payroll_batches: { batch_no: number; status: string } | null
+}
 
-  // Validate period is YYYY-MM-01 format
+/**
+ * HR › Payroll for one month — the unified Payroll (2026-09-27).
+ *
+ * Everybody's pay on one grid: staff keyed here, the Revenue team closed on
+ * Comm Cal, Directors Completed on Director Salary. Each person moves
+ * draft → completed → submitted → paid; Submit to Finance sends the Completed
+ * as a batch and stays pressable for the next one; where each batch's money
+ * stands is shown beside it (Submissions), never on the button. Right-click
+ * somebody already sent to Resubmit them; Total Close ends the month.
+ */
+export default async function PayrollGridPage({ params }: PageProps) {
+  const user = await requirePermission('hr_costing')
+  const { period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
   const supabase = await createClient()
+  const monthName = formatPeriodLabel(period)
 
-  // The live run is the single non-rejected one (partial unique index
-  // guarantees <= 1). Rejected rows accumulate via the HR reopen flow
-  // (mig 278) — the latest one drives the reopened/rejected notice.
-  const [{ data: rows, error: payrollError }, { data: run }, { data: lastRejected }, { data: directorRows }] = await Promise.all([
+  const [
+    { data: rows, error: payrollError },
+    { data: directorRows, error: directorError },
+    { data: statusRaw, error: statusError },
+    { data: lineRows, error: lineError },
+    { data: closeRows },
+    { data: commRunRows },
+  ] = await Promise.all([
     supabase
       .from('hr_monthly_payroll')
       .select(`
-        id, staff_id, period_month, status, source,
+        id, staff_id, period_month, status, source, completed_at, topup_opened_at,
         basic_salary, statutory_allowance, non_statutory_allowance,
         ot_hours, ot_amount, commission_amount, commission_balance, payout_split_version, basic_pay_net, pcb_override_amount, unpaid_leave_days,
         commission_synced_amount, commission_adjustment_amount, commission_adjustment_reason, commission_adjusted_at,
@@ -74,56 +86,69 @@ export default async function PayrollGridPage({ params }: PageProps) {
       .eq('period_month', period)
       .order('id'),
     supabase
-      .from('payroll_runs')
-      .select('id, status, total_amount, submitted_at, approved_at, paid_at, rejection_reason, rejected_at')
-      .eq('period_month', period)
-      .neq('status', 'rejected')
-      .maybeSingle(),
-    supabase
-      .from('payroll_runs')
-      .select('id, rejection_reason, rejected_at')
-      .eq('period_month', period)
-      .eq('status', 'rejected')
-      .order('rejected_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('director_payouts')
+      .from('director_monthly_payroll')
       .select(`
-        id, director_id, status,
-        gross_amount, payroll_gross, payroll_net,
-        payroll_epf_er, payroll_socso_er, payroll_eis_er,
-        payroll_pcb,
-        directors (code, name)
+        id, director_id, employee_name, status, completed_at, topup_opened_at,
+        basic_salary, statutory_allowance, non_statutory_allowance, ot_amount, commission_amount,
+        no_pay_amount, deduction_amount, skbbk_amount,
+        epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, gross, net
       `)
       .eq('period_month', period)
-      .order('director_id'),
+      .order('employee_name'),
+    supabase.rpc('payroll_month_status', { p_period: period }),
+    supabase
+      .from('payroll_batch_lines')
+      .select('scope, row_id, ctc, payroll_batches (batch_no, status)')
+      .eq('period_month', period),
+    // A salesperson's standing close on Comm Cal is their Complete.
+    // (comm_* postdates database.types.ts — untyped-client convention.)
+    (supabase as unknown as SupabaseClient)
+      .from('comm_salesperson_closes')
+      .select('staff_id, closed_at, total_commission, comm_sub_departments (name)')
+      .eq('period_month', period)
+      .is('reopened_at', null),
+    supabase
+      .from('comm_runs')
+      .select('id, comm_sub_departments (name)')
+      .eq('period_month', period)
+      .in('status', ['applied', 'locked']),
   ])
   if (payrollError) throw new Error(`Could not load payroll: ${payrollError.message}`)
+  if (directorError) throw new Error(`Could not load director payroll: ${directorError.message}`)
+  if (statusError) throw new Error(`Could not load the month's batches: ${statusError.message}`)
+  if (lineError) throw new Error(`Could not load the month's batch lines: ${lineError.message}`)
 
-  // Which salespeople have a statement behind this month's Commission figure.
-  // The badge on a derived row links to it; without a computed run there is
-  // nothing to link to yet and the cell says so instead.
-  //
-  // The statement lives under its own sub-department's slug, so the run's
-  // sub-department comes along and the link is built per person — two
-  // sub-departments can both have a run for the same month.
-  const { data: commRunRows } = await supabase
-    .from('comm_runs')
-    .select('id, comm_sub_departments (name)')
-    .eq('period_month', period)
-    .in('status', ['applied', 'locked'])
-  const commRuns = (commRunRows ?? []) as unknown as Array<{
-    id: string
-    comm_sub_departments: { name: string } | null
-  }>
+  const monthStatus = normaliseMonthStatus(statusRaw)
+  const closed = monthStatus.closed
+
+  // What each person's standing batches already sent, and which batches.
+  const sent = new Map<string, { ctc: number; nos: number[] }>()
+  for (const l of (lineRows ?? []) as unknown as LineRow[]) {
+    const batch = Array.isArray(l.payroll_batches) ? l.payroll_batches[0] : l.payroll_batches
+    if (!batch || batch.status !== 'submitted') continue
+    const key = `${l.scope}:${l.row_id}`
+    const s = sent.get(key) ?? { ctc: 0, nos: [] }
+    s.ctc = round2(s.ctc + Number(l.ctc))
+    s.nos.push(batch.batch_no)
+    sent.set(key, s)
+  }
+  for (const s of sent.values()) s.nos.sort((a, b) => a - b)
+
+  // Comm Cal: the sub-department(s) a salesperson was closed in, for the link.
+  const closes = new Map<string, { at: string; subs: string[] }>()
+  for (const c of (closeRows ?? []) as unknown as Array<{ staff_id: string; closed_at: string; comm_sub_departments: { name: string } | null }>) {
+    const x = closes.get(c.staff_id) ?? { at: c.closed_at, subs: [] }
+    if (c.closed_at > x.at) x.at = c.closed_at
+    if (c.comm_sub_departments?.name) x.subs.push(c.comm_sub_departments.name)
+    closes.set(c.staff_id, x)
+  }
+
+  // Statements of an applied run (the whole-month path, retired 2026-09-27):
+  // older months still link their commission to them.
+  const commRuns = (commRunRows ?? []) as unknown as Array<{ id: string; comm_sub_departments: { name: string } | null }>
   const subDeptOfRun = new Map(commRuns.map(r => [r.id, r.comm_sub_departments?.name ?? null]))
-
   const { data: commStatementRows } = commRuns.length
-    ? await supabase
-        .from('comm_statements')
-        .select('staff_id, run_id, total_commission')
-        .in('run_id', commRuns.map(r => r.id))
+    ? await supabase.from('comm_statements').select('staff_id, run_id, total_commission').in('run_id', commRuns.map(r => r.id))
     : { data: null }
   const statementsByStaff = new Map<string, { label: string; href: string }[]>()
   const confirmedCommissionByStaff = new Map<string, number>()
@@ -137,78 +162,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
     }
   }
 
-  // Latest payment request for this run (if run exists). Order by created_at
-  // desc so we can spot an active one first; uniqueness is enforced at DB,
-  // so at most one non-terminal row exists.
-  const { data: requestRows } = run
-    ? await supabase
-        .from('payroll_payment_requests')
-        .select('id, status, pv_id, requested_at, created_at')
-        .eq('payroll_run_id', run.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
-    : { data: null }
-
-  const directorPayouts: DirectorPayoutRow[] = (directorRows ?? []).map(d => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const director = (d as any).directors
-    return {
-      id: d.id,
-      director_id: d.director_id,
-      status: String(d.status),
-      director_code: director?.code ?? '?',
-      director_name: director?.name ?? '?',
-      gross_amount: Number(d.gross_amount ?? 0),
-      payroll_gross: Number(d.payroll_gross ?? 0),
-      payroll_net: Number(d.payroll_net ?? 0),
-      payroll_epf_er: Number(d.payroll_epf_er ?? 0),
-      payroll_socso_er: Number(d.payroll_socso_er ?? 0),
-      payroll_eis_er: Number(d.payroll_eis_er ?? 0),
-      payroll_pcb: Number(d.payroll_pcb ?? 0),
-    }
-  })
-  const hasDirectorPayouts = directorPayouts.length > 0
-
-  if (!rows || rows.length === 0) {
-    return (
-      <div>
-        <div className="page-head">
-          <div>
-            <div className="page-eyebrow">
-              <em>I.</em> HR · PAYROLL · {formatPeriodLabel(period).toUpperCase()}
-            </div>
-            <h1 className="page-title">{formatPeriodLabel(period)}</h1>
-          </div>
-          <div className="flex flex-col items-end gap-3">
-            <PeriodPicker period={period} />
-          </div>
-        </div>
-        {/* Act on THIS month directly — create draft rows from the staff
-            master, or import the InfoTech file for this period. The picker
-            above switches months. The sheet's empty state: the line that
-            says so, then the two ways out. */}
-        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center mb-12">
-          <p className="text-sm mb-4">No staff rows for this period yet.</p>
-          <div className="flex items-start justify-center gap-3 flex-wrap">
-            <CreatePeriodButton period={period} />
-            <Link
-              href={`/hr-costing/payroll/${period}/import`}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-            >
-              Import InfoTech →
-            </Link>
-          </div>
-        </div>
-        {hasDirectorPayouts && (
-          <DirectorSalarySection rows={directorPayouts} period={period} />
-        )}
-      </div>
-    )
-  }
-
-  const gridRows: PayrollRowData[] = rows.map(r => {
+  const staffRows: PayrollRowData[] = (rows ?? []).map(r => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const staff = (r as any).hr_staff_costs
+    const revenue = r.source === 'commission' || staff?.departments?.payroll_source === 'commission'
+    const close = closes.get(r.staff_id)
+    const s = sent.get(`staff:${r.id}`)
+    const commCalSub = close?.subs[0] ?? null
     return {
       id: r.id,
       staff_id: r.staff_id,
@@ -216,6 +176,13 @@ export default async function PayrollGridPage({ params }: PageProps) {
       dept_name: staff?.departments?.name ?? '—',
       status: r.status,
       source: r.source,
+      scope: 'staff',
+      origin: revenue ? 'revenue' : 'staff',
+      completed_at: r.completed_at,
+      topup_opened_at: r.topup_opened_at,
+      batch_nos: s?.nos ?? [],
+      submitted_ctc: s?.ctc ?? 0,
+      comm_cal_href: revenue && commCalSub ? `${revenuePath(subDeptSlug(commCalSub), period)}?person=${r.staff_id}` : null,
       basic_salary: Number(r.basic_salary),
       statutory_allowance: Number(r.statutory_allowance),
       non_statutory_allowance: Number(r.non_statutory_allowance),
@@ -249,239 +216,177 @@ export default async function PayrollGridPage({ params }: PageProps) {
       gross: Number(r.gross),
       net: Number(r.net),
       revenue_payroll: r.source === 'commission' && r.commission_balance != null,
-      commission_is_derived: r.source === 'commission' || staff?.departments?.payroll_source === 'commission',
+      commission_is_derived: revenue,
       commission_statements: statementsByStaff.get(r.staff_id) ?? [],
       commission_statement_href: statementsByStaff.get(r.staff_id)?.[0]?.href ?? null,
     }
   })
 
-  // Combined totals: staff paycheck figures + director 75% payroll portion.
-  // The director's 25% invoice + 5% saving do NOT flow through this page —
-  // they're handled by the Director Salary engine + Invoice Pool. The
-  // approval amount (Principal-side) includes the full director gross_amount
-  // via the RPC, which is intentionally broader than this paycheck summary.
-  const directorTotals = directorPayouts.reduce(
-    (acc, d) => ({
-      gross: acc.gross + d.payroll_gross,
-      net: acc.net + d.payroll_net,
-      epf_er: acc.epf_er + d.payroll_epf_er,
-      socso_er: acc.socso_er + d.payroll_socso_er,
-      eis_er: acc.eis_er + d.payroll_eis_er,
-      pcb: acc.pcb + d.payroll_pcb,
-    }),
-    { gross: 0, net: 0, epf_er: 0, socso_er: 0, eis_er: 0, pcb: 0 },
-  )
+  // Directors: worked out and Completed on Director Salary, read-only here.
+  const directorHref = `/director-salary?period=${period.slice(0, 7)}&tab=submission`
+  const directors: PayrollRowData[] = (directorRows ?? []).map(d => {
+    const s = sent.get(`directors:${d.id}`)
+    return {
+      id: d.id,
+      staff_id: d.director_id ?? d.id,
+      staff_name: d.employee_name,
+      dept_name: 'Director',
+      status: d.status,
+      source: 'director',
+      scope: 'directors',
+      origin: 'director',
+      completed_at: d.completed_at,
+      topup_opened_at: d.topup_opened_at,
+      batch_nos: s?.nos ?? [],
+      submitted_ctc: s?.ctc ?? 0,
+      director_href: directorHref,
+      basic_salary: Number(d.basic_salary),
+      statutory_allowance: Number(d.statutory_allowance),
+      non_statutory_allowance: Number(d.non_statutory_allowance),
+      ot_hours: 0,
+      ot_amount: Number(d.ot_amount),
+      commission_amount: Number(d.commission_amount),
+      unpaid_leave_days: 0,
+      deduction_amount: round2(Number(d.deduction_amount) + Number(d.no_pay_amount)),
+      skbbk_amount: Number(d.skbbk_amount),
+      prorata_days_worked: 0,
+      prorata_days_in_month: 0,
+      epf_er: Number(d.epf_er),
+      epf_ee: Number(d.epf_ee),
+      socso_er: Number(d.socso_er),
+      socso_ee: Number(d.socso_ee),
+      eis_er: Number(d.eis_er),
+      eis_ee: Number(d.eis_ee),
+      pcb: Number(d.pcb),
+      withholding_tax: 0,
+      gross: Number(d.gross),
+      net: Number(d.net),
+      commission_is_derived: false,
+      commission_statement_href: null,
+    }
+  })
+
+  const gridRows = [...staffRows, ...directors]
+
+  if (gridRows.length === 0) {
+    return (
+      <div>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow">
+              <em>I.</em> HR · PAYROLL · {monthName.toUpperCase()}
+            </div>
+            <h1 className="page-title">{monthName}</h1>
+          </div>
+          <div className="flex flex-col items-end gap-3">
+            <PeriodPicker period={period} />
+          </div>
+        </div>
+        {/* Act on THIS month directly — create draft rows from the staff
+            master, or import the InfoTech file for this period. */}
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center mb-12">
+          <p className="text-sm mb-4">No staff rows for this period yet.</p>
+          <div className="flex items-start justify-center gap-3 flex-wrap">
+            {closed ? null : <CreatePeriodButton period={period} />}
+            <Link
+              href={`/hr-costing/payroll/${period}/import`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+            >
+              Import InfoTech →
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const lifecycle: LifecycleRow[] = gridRows.map(r => ({
+    id: r.id,
+    scope: r.scope,
+    origin: r.origin,
+    status: r.status as RowStatus,
+    name: r.staff_name,
+    dept: r.dept_name,
+    ctc: round2(r.gross + r.epf_er + r.socso_er + r.eis_er),
+    submittedCtc: r.submitted_ctc,
+    batchNos: r.batch_nos,
+    completedAt: r.completed_at,
+    topupOpenedAt: r.topup_opened_at,
+  }))
+  const preview = submitPreview(lifecycle)
+  const counts = statusCounts(lifecycle)
+  const readiness = closeReadiness(lifecycle, !!closed)
+  const headline = batchesHeadline(monthStatus.batches)
+  const standingBatches = monthStatus.batches.filter(b => b.status === 'submitted').length
 
   const totals = {
-    staff: gridRows.length,
-    directors: directorPayouts.length,
-    gross: gridRows.reduce((s, r) => s + r.gross, 0) + directorTotals.gross,
-    net: gridRows.reduce((s, r) => s + r.net, 0) + directorTotals.net,
-    epf_er: gridRows.reduce((s, r) => s + r.epf_er, 0) + directorTotals.epf_er,
-    socso_er: gridRows.reduce((s, r) => s + r.socso_er, 0) + directorTotals.socso_er,
-    eis_er: gridRows.reduce((s, r) => s + r.eis_er, 0) + directorTotals.eis_er,
-    pcb: gridRows.reduce((s, r) => s + r.pcb, 0) + directorTotals.pcb,
+    staff: staffRows.length,
+    directors: directors.length,
+    gross: gridRows.reduce((s, r) => s + r.gross, 0),
+    net: gridRows.reduce((s, r) => s + r.net, 0),
+    epf_er: gridRows.reduce((s, r) => s + r.epf_er, 0),
+    socso_er: gridRows.reduce((s, r) => s + r.socso_er, 0),
+    eis_er: gridRows.reduce((s, r) => s + r.eis_er, 0),
+    pcb: gridRows.reduce((s, r) => s + r.pcb, 0),
   }
-  // Cost to Company = gross + employer statutory (EPF/SOCSO/EIS ER). This is
-  // HV's full cost per the source file's "TTL CTC" column and the basis on
-  // which shared-services staff are recharged to the subsidiaries — the number
-  // that actually matters, more than gross alone. (HRDF is not stored; it's 0
-  // across HV payroll, so CTC = gross + the three employer contributions.)
+  // Cost to Company = gross + employer statutory: what Finance funds, and the
+  // basis on which shared-services staff are recharged to the subsidiaries.
   const totalCtc = totals.gross + totals.epf_er + totals.socso_er + totals.eis_er
-
-  // ─── Derive the period's phase from run + latest request ─────────────────
-  // Each phase maps to a distinct UI (no Principal approval since mig 278 —
-  // Submit lands the run directly in 'approved'):
-  //   drafting              → HR editing rows; show Submit to Finance
-  //   awaiting-approval     → legacy-only: rows submitted but no live run
-  //   approved-no-request   → Submitted to Finance; show Request + Reopen
-  //   request-submitted     → HR requested payment; Finance hasn't generated PV
-  //   request-pv-generated  → Finance generated PV; awaiting Principal PV approval
-  //   completed             → PV approved + executed (HR Pool funded)
-  //   legacy-paid           → Run paid under the old monolithic RPC (pre-refactor)
-  type Phase =
-    | 'drafting'
-    | 'awaiting-approval'
-    | 'approved-no-request'
-    | 'request-submitted'
-    | 'request-pv-generated'
-    | 'completed'
-    | 'legacy-paid'
-
-  const allDraft = gridRows.every(r => r.status === 'draft')
-  const requests = requestRows ?? []
-  const activeRequest = requests.find(
-    r => r.status === 'submitted' || r.status === 'pv_generated' || r.status === 'completed',
-  )
-
-  let phase: Phase = 'drafting'
-  if (!run) {
-    phase = allDraft ? 'drafting' : 'awaiting-approval'
-  } else if (run.status === 'submitted') {
-    phase = 'awaiting-approval'
-  } else if (run.status === 'paid') {
-    phase = 'legacy-paid'
-  } else if (run.status === 'approved') {
-    if (!activeRequest) phase = 'approved-no-request'
-    else if (activeRequest.status === 'submitted') phase = 'request-submitted'
-    else if (activeRequest.status === 'pv_generated') phase = 'request-pv-generated'
-    else if (activeRequest.status === 'completed') phase = 'completed'
-  }
-
-  // Reopened / legacy-rejected notice — only relevant while back in drafting.
-  const REOPEN_MARKER = 'Reopened by HR for edits'
-  const showReopenedNote =
-    phase === 'drafting' && lastRejected?.rejection_reason === REOPEN_MARKER
-  const showLegacyRejectedNote =
-    phase === 'drafting' && !!lastRejected && lastRejected.rejection_reason !== REOPEN_MARKER
-
-  // Paid-so-far across this request's funding PVs. Partial funding (bank
-  // balance short of the full amount) splits one request into several
-  // vouchers — some may already be paid while the rest sit with Principal,
-  // so the badge shows 已付/总额 instead of just the request total. RPC
-  // (mig 20260725) because payment_vouchers SELECT is finance/principal-only.
-  let paidAmount = 0
-  if (activeRequest?.status === 'pv_generated') {
-    const { data: paidSum } = await supabase.rpc('get_payroll_funding_paid', {
-      p_request_id: activeRequest.id,
-    })
-    paidAmount = round2(Number(paidSum ?? 0))
-  }
-
-  // Build RequestState prop for the button component
-  let requestState: RequestState
-  if (!activeRequest) {
-    requestState = { kind: 'none' }
-  } else if (activeRequest.status === 'submitted') {
-    requestState = {
-      kind: 'submitted',
-      requestId: activeRequest.id,
-      requestedAt: activeRequest.requested_at,
-    }
-  } else if (activeRequest.status === 'pv_generated') {
-    requestState = {
-      kind: 'pv_generated',
-      pvId: activeRequest.pv_id ?? '',
-      requestId: activeRequest.id,
-      paidAmount,
-    }
-  } else if (activeRequest.status === 'completed') {
-    requestState = {
-      kind: 'completed',
-      pvId: activeRequest.pv_id ?? '',
-      completedAt: null,
-    }
-  } else {
-    requestState = { kind: 'cancelled' }
-  }
+  const peopleNote = `${totals.staff} staff${totals.directors > 0 ? ` · ${totals.directors} director${totals.directors > 1 ? 's' : ''}` : ''}`
 
   return (
     <PayrollDraftProvider>
     <div>
-      {/* Reopened notice — HR pulled the figures back via Reopen (mig 278).
-          The sheet's peach note: something to know, nothing wrong. */}
-      {showReopenedNote ? (
-        <div className="sheet-notice flex items-start gap-3">
-          <span className="text-lg leading-none" aria-hidden>↺</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold">
-              Reopened for edits
-              {lastRejected?.rejected_at ? (
-                <span className="font-mono text-xs font-normal ml-2">
-                  · {new Date(lastRejected.rejected_at).toLocaleString('en-MY', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              ) : null}
-            </p>
-            <p className="text-xs mt-1">
-              Finance can&apos;t see this period&apos;s figures until you click{' '}
-              <strong className="font-bold">Submit to Finance</strong> again.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Legacy rejection banner — runs rejected by Principal under the old
-          approval flow (pre-mig 278). A rejection keeps the red wash. */}
-      {showLegacyRejectedNote ? (
-        <div className="bg-danger-bg border border-danger/40 rounded-lg px-[14px] py-3 mb-6 flex items-start gap-3">
-          <span className="text-danger text-lg leading-none" aria-hidden>✕</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-danger">
-              Rejected by Principal
-              {lastRejected?.rejected_at ? (
-                <span className="font-mono text-xs font-normal text-ink ml-2">
-                  · {new Date(lastRejected.rejected_at).toLocaleString('en-MY', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              ) : null}
-            </p>
-            {lastRejected?.rejection_reason ? (
-              <p className="text-sm mt-1 whitespace-pre-wrap">
-                {lastRejected.rejection_reason}
-              </p>
-            ) : (
-              <p className="text-sm mt-1">
-                No reason provided.
-              </p>
-            )}
-            <p className="text-xs mt-2">
-              Fix the rows below, then click <strong className="font-bold">Submit to Finance</strong> again.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Row 1 — title + period picker + primary CTA varies by phase */}
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> HR · PAYROLL · {formatPeriodLabel(period).toUpperCase()}
+            <em>I.</em> HR · PAYROLL · {monthName.toUpperCase()}
           </div>
-          <h1 className="page-title">{formatPeriodLabel(period)}</h1>
-          <p className="text-sm mt-3">
-            {totals.staff} staff
-            {totals.directors > 0 ? ` · ${totals.directors} director${totals.directors > 1 ? 's' : ''}` : ''}
-            {' · '}
-            <PhaseLabel phase={phase} />
+          <h1 className="page-title">{monthName}</h1>
+          <p className="pay-status-line text-sm mt-3">
+            <span>{peopleNote}</span>
+            {closed ? (
+              <span className="chip ledger"><span className="dot" />Closed for good · {new Date(closed.at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}{closed.by ? ` · ${closed.by}` : ''}</span>
+            ) : (
+              <>
+                {counts.draft > 0 && <span className="chip"><span className="dot" />{counts.draft} draft</span>}
+                {counts.completed > 0 && <span className="chip accent"><span className="dot" />{counts.completed} completed</span>}
+                {counts.submitted > 0 && <span className="chip alert"><span className="dot" />{counts.submitted} with Finance</span>}
+                {counts.paid > 0 && <span className="chip ledger"><span className="dot" />{counts.paid} paid</span>}
+                {counts.topups > 0 && <span className="chip accent"><span className="dot" />{counts.topups} resubmitting</span>}
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-col items-end gap-3">
           <PeriodPicker period={period} />
-          <PhaseCta
-            phase={phase}
-            period={period}
-            runId={run?.id}
-            totalCtc={totalCtc}
-            totalAmount={Number(run?.total_amount ?? totalCtc)}
-            requestState={requestState}
-          />
+          <div className="flex items-start gap-2 flex-wrap justify-end">
+            {!closed && <SaveAllButton />}
+            {!closed && <SubmitToFinanceButton period={period} preview={preview} />}
+            <TotalCloseButton
+              period={period}
+              monthName={monthName}
+              readiness={readiness}
+              closed={closed}
+              canReopen={user.role === 'principal'}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Row 2 — secondary actions. Import is always available; Copy-from-last
-          is drafting/rejected only since it overwrites rows. */}
+      {/* Secondary actions. Import is always available; Copy-from-last only
+          while nothing of the month has gone to Finance, since it overwrites. */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">
-          <Link
-            href={`/hr-costing/payroll/${period}/import`}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
-          >
-            Import InfoTech
-          </Link>
-          {phase === 'drafting' && (
-            <CopyFromLastMonthButton period={period} />
+          {!closed && (
+            <Link
+              href={`/hr-costing/payroll/${period}/import`}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
+            >
+              Import InfoTech
+            </Link>
           )}
+          {!closed && standingBatches === 0 && <CopyFromLastMonthButton period={period} />}
           <Link
             href={`/hr-costing/allocation/${period}`}
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
@@ -492,11 +397,11 @@ export default async function PayrollGridPage({ params }: PageProps) {
         </div>
         <MoreActionsDropdown
           dangerAction={
-            phase === 'drafting' && gridRows.length > 0
+            !closed && standingBatches === 0 && staffRows.length > 0
               ? {
                   label: 'Delete imported / manual draft rows',
                   confirmText:
-                    `Delete imported and manual draft payroll rows for ${formatPeriodLabel(period)}? Revenue commission rows stay linked to Commission Calculation. ` +
+                    `Delete imported and manual draft payroll rows for ${monthName}? Revenue commission rows stay linked to Commission Calculation. ` +
                     `This wipes the whole month — use it for test/wrongly-created periods. ` +
                     `Re-create via Import InfoTech or Create Period.`,
                   action: deletePayrollPeriod.bind(null, period),
@@ -504,260 +409,31 @@ export default async function PayrollGridPage({ params }: PageProps) {
               : undefined
           }
           actions={[
-            {
-              label: 'Bank CSV (Alliance Bank)',
-              href: `/hr-costing/payroll/${period}/bank-transfer?format=alliance`,
-              title: 'Bulk payment file for the Alliance Bank portal',
-            },
-            {
-              label: 'KWSP file',
-              href: `/hr-costing/payroll/${period}/statutory?file=kwsp`,
-            },
-            {
-              label: 'SOCSO file',
-              href: `/hr-costing/payroll/${period}/statutory?file=socso`,
-            },
-            {
-              label: 'EIS file',
-              href: `/hr-costing/payroll/${period}/statutory?file=eis`,
-            },
-            {
-              label: 'LHDN CP39 file',
-              href: `/hr-costing/payroll/${period}/statutory?file=pcb`,
-            },
+            { label: 'Bank CSV (Alliance Bank)', href: `/hr-costing/payroll/${period}/bank-transfer?format=alliance`, title: 'Bulk payment file for the Alliance Bank portal' },
+            { label: 'KWSP file', href: `/hr-costing/payroll/${period}/statutory?file=kwsp` },
+            { label: 'SOCSO file', href: `/hr-costing/payroll/${period}/statutory?file=socso` },
+            { label: 'EIS file', href: `/hr-costing/payroll/${period}/statutory?file=eis` },
+            { label: 'LHDN CP39 file', href: `/hr-costing/payroll/${period}/statutory?file=pcb` },
           ]}
         />
       </div>
 
-      {/* Summary cards — staff paycheck figures + director 75% payroll portion.
-          Total CTC leads, as the sheet's one walnut card: it's HV's full cost
-          (gross + employer statutory) and the recharge basis to subsidiaries;
-          gross/net are components. */}
-      <StatCards label={`Payroll totals for ${formatPeriodLabel(period)}`}>
+      {/* Staff + Directors. Total CTC leads: HV's full cost and what Finance funds. */}
+      <StatCards label={`Payroll totals for ${monthName}`}>
         <StatCard label="Total CTC" value={formatMoney(totalCtc)} icon="coin" tone="primary" note="Gross + employer statutory" />
-        <StatCard
-          label="Total gross"
-          value={formatMoney(totals.gross)}
-          icon="wallet"
-          note={`${totals.staff} staff${totals.directors > 0 ? ` · ${totals.directors} director${totals.directors > 1 ? 's' : ''}` : ''}`}
-        />
+        <StatCard label="Total gross" value={formatMoney(totals.gross)} icon="wallet" note={peopleNote} />
         <StatCard label="Total net" value={formatMoney(totals.net)} icon="bank" note="To the bank" />
         <StatCard label="EPF ER" value={formatMoney(totals.epf_er)} icon="shield" note="Employer" />
         <StatCard label="SOCSO + EIS ER" value={formatMoney(totals.socso_er + totals.eis_er)} icon="layers" note="Employer" />
         <StatCard label="Total PCB" value={formatMoney(totals.pcb)} icon="receipt" note="Tax withheld" />
       </StatCards>
 
-      <PayrollGrid rows={gridRows} period={period} />
-
-      {hasDirectorPayouts && (
-        <DirectorSalarySection rows={directorPayouts} period={period} />
+      {monthStatus.batches.length > 0 && (
+        <PayrollBatches period={period} batches={monthStatus.batches} headline={headline} closed={!!closed} />
       )}
+
+      <PayrollGrid rows={gridRows} period={period} monthClosed={!!closed} />
     </div>
     </PayrollDraftProvider>
-  )
-}
-
-function DirectorSalarySection({
-  rows,
-  period,
-}: {
-  rows: DirectorPayoutRow[]
-  period: string
-}) {
-  return (
-    <section className="mt-12">
-      <div className="sect-head">
-        <h2>Director Salary</h2>
-        <span className="rule" aria-hidden />
-        <span className="count">75% PAYROLL PORTION · READ-ONLY HERE</span>
-      </div>
-      <p className="text-sm -mt-2 mb-4">
-        Edited via{' '}
-        <Link href={`/director-salary?period=${period}`} className="text-accent hover:text-accent-hover">
-          Director Salary →
-        </Link>
-      </p>
-      <div className="overflow-x-auto">
-        <table className="ledger-table">
-          <thead>
-            <tr>
-              <th>Director</th>
-              <th className="right m-hide">Pool Slice</th>
-              <th className="right m-hide">Gross (75%)</th>
-              <th className="right m-hide">EPF ER</th>
-              <th className="right m-hide">SOCSO+EIS ER</th>
-              <th className="right m-hide">PCB</th>
-              <th className="right">Net</th>
-              <th className="m-hide">Status</th>
-              <th className="right m-hide"></th>
-              <th className="lt-toggle" aria-hidden />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(d => (
-              <LedgerRow key={d.id}>
-                <td>
-                  <div className="font-medium">{d.director_code}</div>
-                  <div className="text-[11px] mt-0.5">{d.director_name}</div>
-                </td>
-                <td className="num m-hide" data-label="Pool Slice">{formatMoney(d.gross_amount)}</td>
-                <td className="num m-hide" data-label="Gross (75%)">{formatMoney(d.payroll_gross)}</td>
-                <td className="num m-hide" data-label="EPF ER">{formatMoney(d.payroll_epf_er)}</td>
-                <td className="num m-hide" data-label="SOCSO+EIS ER">{formatMoney(d.payroll_socso_er + d.payroll_eis_er)}</td>
-                <td className="num m-hide" data-label="PCB">{formatMoney(d.payroll_pcb)}</td>
-                <td className="num font-bold">{formatMoney(d.payroll_net)}</td>
-                <td className="m-hide" data-label="Status">
-                  <span className={`chip ${d.status === 'draft' ? 'alert' : d.status === 'confirmed' ? 'ledger' : ''}`}>
-                    <span className="dot" />
-                    {d.status}
-                  </span>
-                </td>
-                <td className="right m-hide">
-                  <Link
-                    href={`/director-salary/${d.director_id}?period=${period}`}
-                    className="text-sm text-accent hover:text-accent-hover"
-                  >
-                    Detail
-                  </Link>
-                </td>
-              </LedgerRow>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
-
-function PhaseLabel({
-  phase,
-}: {
-  phase:
-    | 'drafting'
-    | 'awaiting-approval'
-    | 'approved-no-request'
-    | 'request-submitted'
-    | 'request-pv-generated'
-    | 'completed'
-    | 'legacy-paid'
-}) {
-  // Where the month stands, as a word on a wash: orange while the next step
-  // is HR's, amber while it waits on Finance or Principal, green once done.
-  const [tone, text] = ((): [string, string] => {
-    switch (phase) {
-      case 'drafting':
-        return ['accent', 'Drafts editable inline']
-      case 'awaiting-approval':
-        return ['alert', 'Rows submitted — no live run (legacy state)']
-      case 'approved-no-request':
-        return ['accent', 'Submitted to Finance — request payroll payment next']
-      case 'request-submitted':
-        return ['alert', 'Payment request sent to Finance']
-      case 'request-pv-generated':
-        return ['alert', 'PV generated by Finance — awaiting Principal approval']
-      case 'completed':
-        return ['ledger', 'HR Pool funded · ready to pay staff']
-      case 'legacy-paid':
-        return ['ledger', 'Completed under the old flow']
-    }
-  })()
-  return (
-    <span className={`chip ${tone}`}>
-      <span className="dot" />
-      {text}
-    </span>
-  )
-}
-
-function PhaseCta({
-  phase,
-  period,
-  runId,
-  totalCtc,
-  totalAmount,
-  requestState,
-}: {
-  phase:
-    | 'drafting'
-    | 'awaiting-approval'
-    | 'approved-no-request'
-    | 'request-submitted'
-    | 'request-pv-generated'
-    | 'completed'
-    | 'legacy-paid'
-  period: string
-  runId?: string
-  totalCtc: number
-  totalAmount: number
-  requestState: RequestState
-}) {
-  if (phase === 'drafting') {
-    // total_amount the submit RPC computes is CTC (gross + employer statutory),
-    // not gross — show that so the confirm dialog matches what Finance funds.
-    return (
-      <div className="flex items-start gap-2">
-        <SaveAllButton />
-        <SubmitToFinanceButton period={period} totalAmount={totalCtc} />
-      </div>
-    )
-  }
-  if (phase === 'awaiting-approval') {
-    return (
-      <PhaseStatus tone="alert" word="Submitted">
-        RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-      </PhaseStatus>
-    )
-  }
-  if (
-    phase === 'approved-no-request' ||
-    phase === 'request-submitted' ||
-    phase === 'request-pv-generated' ||
-    phase === 'completed'
-  ) {
-    if (!runId) return null
-    return (
-      <div className="flex flex-col items-end gap-2">
-        <RequestPayrollPaymentButton
-          runId={runId}
-          totalAmount={totalAmount}
-          state={requestState}
-        />
-        {/* 防盗墙 (2026-09-15): reopening is Finance's call now
-            (reopen_payroll_run gate finance/principal). HR sees where to ask
-            instead of a button, for as long as the run is still reopenable
-            (no funding PV yet). */}
-        {(phase === 'approved-no-request' || phase === 'request-submitted') && (
-          <p className="text-xs text-right max-w-xs">
-            要改数字？请 Finance 在 Payroll Requests 页「打回 HR 重做」— 打回后这里会回到 draft。
-          </p>
-        )}
-      </div>
-    )
-  }
-  if (phase === 'legacy-paid') {
-    return (
-      <PhaseStatus tone="ledger" word="Completed">
-        RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-      </PhaseStatus>
-    )
-  }
-  return null
-}
-
-// A settled phase in the header's action slot: the state as a chip over the
-// amount it settled, where a button stands while there is something to do.
-function PhaseStatus({ tone, word, children }: {
-  tone: 'alert' | 'ledger'
-  word: string
-  children: ReactNode
-}) {
-  return (
-    <div className="flex flex-col items-end gap-1 bg-surface border border-hairline rounded-lg px-3 py-2">
-      <span className={`chip ${tone}`}>
-        <span className="dot" />
-        {word}
-      </span>
-      <span className="font-mono text-xs tabular-nums">{children}</span>
-    </div>
   )
 }

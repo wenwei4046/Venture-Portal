@@ -49,6 +49,15 @@ close. `send_commission_to_payroll` stays in the database, unused, until that
 step decides whether to call it. Nothing on the page applies a run any more, so
 nothing on it takes one back either.
 
+**The per-person close is the send (the unified Payroll, same day).** A
+salesperson closed on Comm Cal (`comm_salesperson_closes`) reaches payroll by
+trigger (`comm_close_sync_payroll`): their HR › Payroll row takes the standing
+closes' commission and turns **Completed**, and the close's bills are released
+under the month's run. HR's *Submit to Finance* sends them on in a batch;
+reopening a close sets the row back to draft, and is refused once the person
+is with Finance (Resubmit on HR › Payroll first). `send_commission_to_payroll`
+now raises 23PAY. See CLAUDE.md › THE UNIFIED PAYROLL.
+
 **Two of September's warnings were rules, not gaps**, and no longer stop a month:
 
 - a **department head's** own bills (KRIS, PETER — Revenue Director, never
@@ -1084,9 +1093,12 @@ salesperson keeps their figure as it stood when somebody checked it and said
 be built from the closes instead of a fresh calculation: the engine statement
 in `save_commission_run`'s own element shape, the bills it releases, holds and
 cuts for margin, the row as shown (`summary`, versioned JSON) and the ids of
-the person's own bills. Nothing reads it yet but this page — sending the month
-to payroll still computes live; wiring it to the closes is the next piece
-(user). `lib/commission/closes.ts`, `close-actions.ts`,
+the person's own bills. **The payroll step came the same day** (the unified
+Payroll): a close IS the salesperson's Complete — trigger
+`comm_close_sync_payroll` sets their HR › Payroll row's commission to the
+standing closes' total, marks it Completed and releases the close's bills
+under the month's run; a reopen sets the row back to draft and is refused
+once they are with Finance. `lib/commission/closes.ts`, `close-actions.ts`,
 `_lib/salesperson-closes.ts`, mig `20260927040000`.
 
 **Bills paid on but priced RM 0 (2026-09-27).** A bill whose goods the ERP

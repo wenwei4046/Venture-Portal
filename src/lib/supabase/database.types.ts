@@ -3072,6 +3072,11 @@ export type Database = {
         Row: {
           basic_salary: number
           commission_amount: number
+          completed_at: string | null
+          completed_by: string | null
+          status: string
+          topup_opened_at: string | null
+          topup_opened_by: string | null
           created_at: string
           created_by: string | null
           deduction_amount: number
@@ -3101,6 +3106,11 @@ export type Database = {
         Insert: {
           basic_salary?: number
           commission_amount?: number
+          completed_at?: string | null
+          completed_by?: string | null
+          status?: string
+          topup_opened_at?: string | null
+          topup_opened_by?: string | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number
@@ -3130,6 +3140,11 @@ export type Database = {
         Update: {
           basic_salary?: number
           commission_amount?: number
+          completed_at?: string | null
+          completed_by?: string | null
+          status?: string
+          topup_opened_at?: string | null
+          topup_opened_by?: string | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number
@@ -4070,6 +4085,10 @@ export type Database = {
           basic_salary: number
           commission_amount: number
           commission_synced_amount: number | null
+          completed_at: string | null
+          completed_by: string | null
+          topup_opened_at: string | null
+          topup_opened_by: string | null
           commission_adjustment_amount: number
           commission_adjustment_reason: string | null
           commission_adjusted_at: string | null
@@ -4114,6 +4133,10 @@ export type Database = {
           basic_salary?: number
           commission_amount?: number
           commission_synced_amount?: number | null
+          completed_at?: string | null
+          completed_by?: string | null
+          topup_opened_at?: string | null
+          topup_opened_by?: string | null
           commission_adjustment_amount?: number
           commission_adjustment_reason?: string | null
           commission_adjusted_at?: string | null
@@ -4158,6 +4181,10 @@ export type Database = {
           basic_salary?: number
           commission_amount?: number
           commission_synced_amount?: number | null
+          completed_at?: string | null
+          completed_by?: string | null
+          topup_opened_at?: string | null
+          topup_opened_by?: string | null
           commission_adjustment_amount?: number
           commission_adjustment_reason?: string | null
           commission_adjusted_at?: string | null
@@ -5727,9 +5754,229 @@ export type Database = {
           { foreignKeyName: "revenue_payroll_commission_adjustments_adjusted_by_fkey"; columns: ["adjusted_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
         ]
       }
+      payroll_batch_lines: {
+        Row: {
+          batch_id: string
+          bucket: string
+          basic_pay_net: number
+          commission_balance: number
+          eis_ee: number
+          eis_er: number
+          epf_ee: number
+          epf_er: number
+          gross: number
+          net: number
+          non_statutory_allowance: number
+          pcb: number
+          skbbk: number
+          socso_ee: number
+          socso_er: number
+          withholding_tax: number
+          created_at: string
+          ctc: number | null
+          department_id: string | null
+          department_name: string
+          director_id: string | null
+          employee_code: string | null
+          employee_name: string
+          id: string
+          is_topup: boolean
+          period_month: string
+          row_id: string
+          scope: string
+          segment_key: string
+          snapshot: Json
+          split_version: number | null
+          staff_id: string | null
+        }
+        Insert: {
+          batch_id: string
+          bucket: string
+          basic_pay_net?: number
+          commission_balance?: number
+          eis_ee?: number
+          eis_er?: number
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          net?: number
+          non_statutory_allowance?: number
+          pcb?: number
+          skbbk?: number
+          socso_ee?: number
+          socso_er?: number
+          withholding_tax?: number
+          created_at?: string
+          department_id?: string | null
+          department_name: string
+          director_id?: string | null
+          employee_code?: string | null
+          employee_name: string
+          id?: string
+          is_topup?: boolean
+          period_month: string
+          row_id: string
+          scope: string
+          segment_key: string
+          snapshot?: Json
+          split_version?: number | null
+          staff_id?: string | null
+        }
+        Update: {
+          batch_id?: string
+          bucket?: string
+          basic_pay_net?: number
+          commission_balance?: number
+          eis_ee?: number
+          eis_er?: number
+          epf_ee?: number
+          epf_er?: number
+          gross?: number
+          net?: number
+          non_statutory_allowance?: number
+          pcb?: number
+          skbbk?: number
+          socso_ee?: number
+          socso_er?: number
+          withholding_tax?: number
+          created_at?: string
+          department_id?: string | null
+          department_name?: string
+          director_id?: string | null
+          employee_code?: string | null
+          employee_name?: string
+          id?: string
+          is_topup?: boolean
+          period_month?: string
+          row_id?: string
+          scope?: string
+          segment_key?: string
+          snapshot?: Json
+          split_version?: number | null
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_batch_lines_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_batches: {
+        Row: {
+          batch_no: number
+          departments: Json
+          director_office_total: number
+          director_total: number
+          finance_total: number
+          hr_total: number
+          id: string
+          it_total: number
+          legacy: boolean
+          marketing_total: number
+          people: number
+          period_month: string
+          revenue_total: number
+          run_id: string
+          sent_back_at: string | null
+          sent_back_by: string | null
+          sent_back_by_name: string | null
+          sent_back_reason: string | null
+          status: string
+          submitted_at: string
+          submitted_by: string | null
+          submitted_by_name: string | null
+          topups: number
+          total_amount: number | null
+        }
+        Insert: {
+          batch_no: number
+          departments?: Json
+          director_office_total?: number
+          director_total?: number
+          finance_total?: number
+          hr_total?: number
+          id?: string
+          it_total?: number
+          legacy?: boolean
+          marketing_total?: number
+          people?: number
+          period_month: string
+          revenue_total?: number
+          run_id: string
+          sent_back_at?: string | null
+          sent_back_by?: string | null
+          sent_back_by_name?: string | null
+          sent_back_reason?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitted_by_name?: string | null
+          topups?: number
+        }
+        Update: {
+          batch_no?: number
+          departments?: Json
+          director_office_total?: number
+          director_total?: number
+          finance_total?: number
+          hr_total?: number
+          id?: string
+          it_total?: number
+          legacy?: boolean
+          marketing_total?: number
+          people?: number
+          period_month?: string
+          revenue_total?: number
+          run_id?: string
+          sent_back_at?: string | null
+          sent_back_by?: string | null
+          sent_back_by_name?: string | null
+          sent_back_reason?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitted_by_name?: string | null
+          topups?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_batches_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_month_closes: {
+        Row: {
+          closed_at: string
+          closed_by: string | null
+          closed_by_name: string | null
+          period_month: string
+        }
+        Insert: {
+          closed_at?: string
+          closed_by?: string | null
+          closed_by_name?: string | null
+          period_month: string
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string | null
+          closed_by_name?: string | null
+          period_month?: string
+        }
+        Relationships: []
+      }
       payroll_payment_requests: {
         Row: {
           amount: number
+          batch_id: string | null
           cancellation_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
@@ -5748,6 +5995,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          batch_id?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -5766,6 +6014,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          batch_id?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -5783,6 +6032,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payroll_payment_requests_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payroll_payment_requests_cancelled_by_fkey"
             columns: ["cancelled_by"]
@@ -7867,6 +8123,83 @@ export type Database = {
         }
         Returns: string
       }
+      director_payroll_complete: {
+        Args: { p_period: string }
+        Returns: Json
+      }
+      director_payroll_uncomplete: {
+        Args: { p_period: string }
+        Returns: number
+      }
+      get_payroll_accrual_totals_for: {
+        Args: { p_reference_id: string }
+        Returns: {
+          segment: string
+          total_amount: number
+        }[]
+      }
+      payroll_batch_accrual_sums: {
+        Args: { p_batch_id: string }
+        Returns: {
+          segment: string
+          gross: number
+          non_statutory_allowance: number
+          epf_er: number
+          epf_ee: number
+          socso_er: number
+          socso_ee: number
+          eis_er: number
+          eis_ee: number
+          pcb: number
+          withholding_tax: number
+          net: number
+          skbbk: number
+        }[]
+      }
+      payroll_cancel_topup: {
+        Args: { p_scope: string; p_row_id: string }
+        Returns: undefined
+      }
+      payroll_close_month: {
+        Args: { p_period: string }
+        Returns: undefined
+      }
+      payroll_complete_rows: {
+        Args: { p_period: string; p_row_ids: string[] }
+        Returns: Json
+      }
+      payroll_month_closed: {
+        Args: { p_period: string }
+        Returns: boolean
+      }
+      payroll_month_status: {
+        Args: { p_period: string }
+        Returns: Json
+      }
+      payroll_open_topup: {
+        Args: { p_scope: string; p_row_id: string }
+        Returns: undefined
+      }
+      payroll_reopen_month: {
+        Args: { p_period: string; p_reason: string }
+        Returns: undefined
+      }
+      payroll_row_delta: {
+        Args: { p_scope: string; p_row_id: string }
+        Returns: Json
+      }
+      payroll_send_back_batch: {
+        Args: { p_batch_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      payroll_submit_batch: {
+        Args: { p_period: string; p_expected_people: number; p_expected_total: number }
+        Returns: string
+      }
+      payroll_uncomplete_rows: {
+        Args: { p_period: string; p_row_ids: string[] }
+        Returns: number
+      }
       submit_payroll_to_principal: {
         Args: { p_period: string; p_user_id: string }
         Returns: string
@@ -8049,7 +8382,7 @@ export type Database = {
         | "manual"
         | "carried_forward"
         | "commission"
-      hr_monthly_payroll_status: "draft" | "submitted" | "paid"
+      hr_monthly_payroll_status: "draft" | "completed" | "submitted" | "paid"
       hr_staff_status: "active" | "inactive"
       hr_tax_mode: "pcb" | "withholding" | "none"
       hv_fund_txn_type:
@@ -8365,7 +8698,7 @@ export const Constants = {
         "carried_forward",
         "commission",
       ],
-      hr_monthly_payroll_status: ["draft", "submitted", "paid"],
+      hr_monthly_payroll_status: ["draft", "completed", "submitted", "paid"],
       hr_staff_status: ["active", "inactive"],
       hr_tax_mode: ["pcb", "withholding", "none"],
       hv_fund_txn_type: [
