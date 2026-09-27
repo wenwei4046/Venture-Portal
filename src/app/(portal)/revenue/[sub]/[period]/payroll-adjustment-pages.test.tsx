@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), requireSubDepartment: vi.fn() }))
 vi.mock('server-only', () => ({}))
 // The month page now ends in a client tab rail, so the render needs the
@@ -14,7 +14,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/app/(portal)/revenue/_lib/sub-departments', () => ({ requireSubDepartment: mocks.requireSubDepartment }))
-vi.mock('./_components/RunControls', () => ({ default: () => <div>Run controls</div> }))
 import CommissionPeriodPage from './page'
 import CommissionStatementPage from './statement/[staffId]/page'
 
@@ -57,21 +56,19 @@ beforeEach(() => {
   mocks.requireSubDepartment.mockResolvedValue({ id:'sub-id',slug:'fair',name:'Fair',schemeId:null })
 })
 describe('Revenue pages preserve source commission while reading monthly payroll adjustments', () => {
-  it('shows the monthly adjustment in the calculation page without changing the source hero', async () => {
+  // *Payroll & source tools* went on 2026-09-27 — the saved run's hero, its
+  // warnings, Recompute & sync, the Open Bill cost, the hand-typed upsales and
+  // this reconciliation with it (user: 下面这整个东西就不需要存在了). What payroll
+  // holds is the payroll bar's; a person's adjustment stays on their statement.
+  it('keeps the month page to the live month: no saved-run section, no payroll rows read', async () => {
     const { from,rpc } = database()
     const { container } = render(await CommissionPeriodPage({ params:Promise.resolve({ sub:'fair',period:'2026-09-01' }) }))
-    fireEvent.click(screen.getByText('Payroll & source tools · saved run, costs and upsales'))
-    expect(container.querySelector('.hero-walnut')).toHaveTextContent('RM 10,000.00')
-    expect(container.querySelector('.hero-walnut')).not.toHaveTextContent('RM 12,500.00')
-    // The saved run's per-person table went on 2026-09-26: the live table at
-    // the top of the page carries every column of it, Group sales included.
-    expect(screen.queryByRole('columnheader', { name:'Source total' })).toBeNull()
-    expect(screen.queryByText('Waiting on a deposit')).toBeNull()
-    expect(screen.queryByRole('button', { name:/Sales by person/ })).toBeNull()
-    expect(screen.getByRole('table', { name:'Monthly payroll adjustments by salesperson' })).toHaveTextContent('RM 12,500.00')
-    expect(screen.getByText('DN from cancelled sale')).toBeVisible()
-    expect(rpc).toHaveBeenCalledWith('revenue_payroll_adjustments',{p_sub_department_id:'sub-id',p_period:'2026-09-01',p_staff_id:null})
-    // The point of the RPC: payroll is never read row by row from this page.
+    expect(screen.queryByText(/Payroll & source tools/)).toBeNull()
+    expect(container.querySelector('.hero-walnut')).toBeNull()
+    expect(screen.queryByRole('button', { name:/Recompute/ })).toBeNull()
+    expect(screen.queryByText(/Upsales & drops/)).toBeNull()
+    expect(screen.queryByRole('table', { name:'Monthly payroll adjustments by salesperson' })).toBeNull()
+    expect(rpc).not.toHaveBeenCalledWith('revenue_payroll_adjustments', expect.anything())
     expect(from).not.toHaveBeenCalledWith('hr_monthly_payroll')
     expect(mocks.requirePermission).toHaveBeenCalledWith('revenue')
   })

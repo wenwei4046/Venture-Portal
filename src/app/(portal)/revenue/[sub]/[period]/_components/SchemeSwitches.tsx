@@ -26,13 +26,15 @@ const ITEMS: { key: SchemeSwitch; label: string; hint: string }[] = [
 ]
 
 /**
- * What the run pays, beside the button that runs it (2026-09-24).
+ * What the month pays, under the button that sends it to payroll (2026-09-24;
+ * one row of the payroll bar since 2026-09-27).
  *
  * Open Bill is THIS month's (2026-09-26 — user: "open for august, not
  * september"): switching it here sets the month alone, over Rules, and Follow
  * Rules hands it back. Margin and KPI are still Rules › Scheme rules, reached
  * from the month so trying a month with and without one is two clicks. Off =
- * that component pays nothing on the next compute.
+ * that component pays nothing: the commission above follows at once, payroll
+ * when the month is sent again.
  */
 export default function SchemeSwitches({ schemeId, subDepartmentId, period, monthLabel, openBill, margin, kpi }: Props) {
   const router = useRouter()
@@ -71,36 +73,32 @@ export default function SchemeSwitches({ schemeId, subDepartmentId, period, mont
   }
 
   return (
-    <div className="w-full border border-hairline rounded-card bg-surface p-3">
-      <div className="font-mono text-[10.5px] uppercase tracking-wide text-graphite mb-2">
-        This run pays
-      </div>
-      <ul className="space-y-1.5">
+    <div className="w-full">
+      <ul className="flex flex-wrap items-center gap-x-5 gap-y-2" aria-label="This month pays">
+        <li className="text-[10px] font-medium uppercase tracking-[0.09em]">This month pays</li>
         {ITEMS.map(item => {
           const on = state[item.key]
           return (
-            <li key={item.key}>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-ink" title={item.hint}>
-                  {item.label}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={on}
-                  aria-label={item.label}
-                  disabled={isPending}
-                  onClick={() => flip(item.key)}
-                  className={[
-                    'font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-control border transition-colors disabled:opacity-40 min-w-[3.25rem]',
-                    on ? 'bg-accent border-accent text-white' : 'bg-paper border-hairline text-muted hover:text-graphite',
-                  ].join(' ')}
-                >
-                  {on ? 'On' : 'Off'}
-                </button>
-              </div>
+            <li key={item.key} className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-ink" title={item.hint}>
+                {item.label}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={on}
+                aria-label={item.label}
+                disabled={isPending}
+                onClick={() => flip(item.key)}
+                className={[
+                  'font-mono text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-control border transition-colors disabled:opacity-40 min-w-[3.25rem]',
+                  on ? 'bg-accent border-accent text-white' : 'bg-paper border-hairline text-muted hover:text-graphite',
+                ].join(' ')}
+              >
+                {on ? 'On' : 'Off'}
+              </button>
               {item.key === 'open_bill' && openBill.month !== null ? (
-                <div className="flex items-center justify-between gap-3 mt-0.5">
+                <>
                   <span className="font-mono text-[10px] text-graphite">
                     {monthLabel} only · Rules: {openBill.rules ? 'On' : 'Off'}
                   </span>
@@ -108,21 +106,21 @@ export default function SchemeSwitches({ schemeId, subDepartmentId, period, mont
                     type="button"
                     disabled={isPending}
                     onClick={() => save('open_bill', openBill.rules, () => setMonthOpenBill(subDepartmentId, period, null))}
-                    className="font-mono text-[10px] uppercase tracking-wide text-accent hover:underline disabled:opacity-40"
+                    className="font-mono text-[10px] uppercase tracking-wide text-accent underline-offset-2 hover:underline disabled:opacity-40"
                   >
                     Follow Rules
                   </button>
-                </div>
+                </>
               ) : null}
             </li>
           )
         })}
       </ul>
-      <p className="font-serif italic text-muted text-xs mt-2 mb-0">
+      <p className="text-[11px] leading-relaxed mt-1.5 mb-0">
         Open Bill is set for {monthLabel} alone; margin and KPI are Rules › Scheme rules for every month.
-        Compute again after changing one.
+        The commission above follows a switch at once — payroll when the month is sent again.
       </p>
-      {error ? <p className="font-serif italic text-danger text-xs mt-1 mb-0">{error}</p> : null}
+      {error ? <p className="text-danger text-xs mt-1 mb-0" role="alert">{error}</p> : null}
     </div>
   )
 }

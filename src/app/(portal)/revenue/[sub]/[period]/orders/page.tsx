@@ -376,13 +376,13 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               it, click a solid one to clear it. Ranks are held per salesperson per event day, so
               claiming a taken rank moves it off the bill that held it.{' '}
               <Link
-                href={`${revenuePath(subDept.slug, period)}?tab=open-bill`}
+                href={revenuePath(subDept.slug, period)}
                 className="text-accent hover:underline"
               >
                 What the picks add up to
               </Link>{' '}
-              — how many of each, whose, and the uplift they paid — is on the month.
-              {runLocked ? ' This month has paid — reopen the run to change a pick.' : ''}
+              — every pick, whose, and the bonus it pays — is the month&apos;s Open Bill tab.
+              {runLocked ? ' This month is in payroll — take it back on the month to change a pick.' : ''}
             </>
           ) : null}
         </p>

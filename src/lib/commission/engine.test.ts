@@ -138,6 +138,8 @@ interface OrderOpts {
   alreadyReleased?: boolean
   periodMonth?: string
   manualMarginPct?: number
+  /** The brand the bill was written under (the ERP's Branding). */
+  brandCode?: string
 }
 
 function order(
@@ -160,6 +162,7 @@ function order(
     paidAmount: opts.paidAmount ?? total,
     alreadyReleased: opts.alreadyReleased,
     manualMarginPct: opts.manualMarginPct,
+    brandCode: opts.brandCode,
     lines: lines.map(([itemGroup, productCode, qty, lineAmount, costAmount, brandCode], i) => ({
       id: `${id}-L${i + 1}`,
       itemGroup,
@@ -1057,6 +1060,36 @@ describe('margin base', () => {
     expect(base.mixedBrand).toBe(false)
     expect(base.cost).toBe(7_000)
   })
+
+  // HC-SO-2609-011 (2026-09-27): a DUNLOP mattress, an AKEMI pillow given away.
+  it('reads a gift of another brand at RM 0 as a gift, not as a second brand', () => {
+    const base = marginBase(order('1', 'rs', [
+      ['MATTRESS', 'DUNLOPILLO CLASSIC DREAM VALLEY MATT (Q)', 1, 4_888, 2_400, 'DUNLOP'],
+      ['ACC', 'NTYR-CL MX MICR PIL', 1, 0, 40, 'AKEMI'],
+    ]).lines, kpiIndex, groupIndex)
+    expect(base.brandCode).toBe('DUNLOP')
+    expect(base.mixedBrand).toBe(false)
+    // The gift's cost still counts against the margin.
+    expect(base.cost).toBe(2_440)
+  })
+
+  it('takes the bill\'s own brand over whatever its lines carry', () => {
+    const base = marginBase(order('1', 'rs', [
+      ['SOFA', 'Z-SOFA', 1, 3_000, 1_500, 'ZANOTTI'],
+      ['BEDFRAME', 'TRION (K)', 1, 5_000, 3_300, 'AKEMI'],
+    ]).lines, kpiIndex, groupIndex, 1, 'ZANOTTI')
+    expect(base).toEqual({ revenue: 8_000, cost: 4_800, complete: true, brandCode: 'ZANOTTI', mixedBrand: false })
+  })
+
+  it('still calls it two brands when every branded line is a gift', () => {
+    const base = marginBase(order('1', 'rs', [
+      // A rider with no brand of its own carries the bill.
+      ['BEDFRAME', 'NB-KHJ50 (K)', 1, 5_000],
+      ['ACC', 'P1', 1, 0, 40, 'AKEMI'],
+      ['ACC', 'P2', 1, 0, 40, 'DUNLOP'],
+    ]).lines, kpiIndex, groupIndex)
+    expect(base.mixedBrand).toBe(true)
+  })
 })
 
 describe('penaltyBandFor — the most severe match wins', () => {
@@ -1328,6 +1361,59 @@ describe('monthly margin incentive, end to end', () => {
     expect(r.warnings.join(' ')).toMatch(/more than one brand/)
   })
 
+  // User 2026-09-27: 主体是 Akemi 就跟 Akemi 的 margin ladder — the bill's own
+  // brand, whatever rides on it. A Dunlopillo pillow given away on an Akemi
+  // bill costs the Akemi margin; it does not make the bill Dunlopillo's.
+  it('measures a bill on the ladder of the brand it was written under, riders\' cost included', () => {
+    const r = run({
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'AKEMI M1', 1, 5_000, 2_500, 'AKEMI'],
+        ['ACC', 'DL-PILLOW', 1, 0, 300, 'DUNLOP'],
+      ], { brandCode: 'AKEMI' })],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand).toEqual([{ brandCode: 'AKEMI', revenue: 5_000, cost: 2_800, marginPct: 0.44 }])
+    expect(rs.marginIncentive).toBe(2_500) // 44% clears Akemi's 36% and 43%
+    expect(r.warnings.join(' ')).not.toMatch(/more than one brand/)
+  })
+
+  // The same goods, two bills: the ladder moves with the bill's brand. A bed
+  // frame that out-sells the sofa is still a rider on a Zanotti bill.
+  it('lets a rider follow the bill it is sold on, even when it carries the money', () => {
+    const lines: Array<[string, string, number, number, number, string]> = [
+      ['SOFA', 'Z-SOFA', 1, 3_000, 1_500, 'ZANOTTI'],
+      ['BEDFRAME', 'TRION (K)', 1, 5_000, 3_300, 'AKEMI'],
+    ]
+    const zanotti = find(run({ orders: [order('1', 'rs', lines, { brandCode: 'ZANOTTI' })] }).statements, 'rs')
+    expect(zanotti.marginByBrand.map(b => b.brandCode)).toEqual(['ZANOTTI'])
+    expect(zanotti.marginIncentive).toBe(2_500) // 40% clears Zanotti's 33% and 40%
+    const akemi = find(run({ orders: [order('1', 'rs', lines, { brandCode: 'AKEMI' })] }).statements, 'rs')
+    expect(akemi.marginIncentive).toBe(1_000) // the same 40% is only Akemi's Tier 1
+  })
+
+  // HC-SO-2609-011 and four more September bills (2026-09-27): a DUNLOP
+  // mattress with an AKEMI pillow given away. The customer bought one brand.
+  it('does not stop the run over a gift of another brand', () => {
+    const r = run({
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'DUNLOPILLO CLASSIC DREAM VALLEY MATT (Q)', 1, 4_888, 2_400, 'DUNLOP'],
+        ['ACC', 'NTYR-CL MX MICR PIL', 1, 0, 40, 'AKEMI'],
+      ])],
+    })
+    expect(r.warnings.join(' ')).not.toMatch(/more than one brand/)
+  })
+
+  it('asks nothing about the brand in a month that pays no margin', () => {
+    const r = run({
+      scheme: { ...SCHEME, enableMarginPenalty: false, enableMarginIncentive: false },
+      orders: [order('1', 'rs', [
+        ['MATTRESS', 'M1', 1, 6_000, 3_000, 'AKEMI'],
+        ['SOFA', 'S1', 1, 4_000, 2_000, 'ZANOTTI'],
+      ])],
+    })
+    expect(r.warnings).toEqual([])
+  })
+
   it('keeps the line-sum invariant with an incentive present', () => {
     const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]])] })
     for (const st of r.statements) {
@@ -1346,6 +1432,44 @@ describe('unranked salesperson', () => {
 
   it('warns loudly so the run cannot be applied blind', () => {
     expect(result.warnings.join(' ')).toMatch(/no rank \/ hierarchy row/)
+  })
+
+  // KRIS and PETER, September 2026: a Revenue Director cannot hold a rank
+  // (23DIR), so their bills are theirs and earn nothing — by the rule.
+  it('does not flag a department head, whose 0% is the rule', () => {
+    const r = run({
+      orders: [order('1', 'director', [['MATTRESS', 'M1', 1, 9_500]])],
+      departmentHeadIds: ['director'],
+    })
+    expect(r.warnings).toEqual([])
+    expect(find(r.statements, 'director').totalCommission).toBe(0)
+    // Somebody merely unplaced is still flagged beside them.
+    const both = run({
+      orders: [order('1', 'director', [['MATTRESS', 'M1', 1, 9_500]]), order('2', 'stranger', [['MATTRESS', 'M2', 1, 1_000]])],
+      departmentHeadIds: ['director'],
+    })
+    expect(both.warnings.filter(w => /no rank/.test(w))).toEqual([
+      expect.stringMatching(/^Staff stranger has sales this period but no rank/),
+    ])
+  })
+
+  it('pays a head nothing on their own bills, whatever the month switches on', () => {
+    const r = run({
+      scheme: { ...SCHEME, openBillBasis: 'pct_of_revenue' },
+      orders: [order('1', 'director', [
+        ['MATTRESS', 'M1', 1, 10_000, 5_000, 'AKEMI'],
+        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0, 0, 'AKEMI'],
+      ])],
+      openBillTags: [{ orderId: '1', rank: 1 }],
+      departmentHeadIds: ['director'],
+    })
+    const s = find(r.statements, 'director')
+    // The sale is theirs and stays on the record…
+    expect(s.productRevenue).toBe(10_000)
+    // …and earns no KPI allowance, Open Bill bonus or margin incentive.
+    expect(s.lines).toEqual([])
+    expect(s.totalCommission).toBe(0)
+    expect(r.warnings).toEqual([])
   })
 
   it('still pays flat KPI allowances, which do not depend on rate', () => {

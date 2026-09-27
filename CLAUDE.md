@@ -297,7 +297,7 @@ src/
 │   │   │                              `comm_open_bill_on(sub, month)` is the rule
 │   │   │                              the engine input, the pick guard, the
 │   │   │                              feed's suggestions and a file commit all
-│   │   │                              ask. The month page's *This run pays* Open
+│   │   │                              ask. The month page's *This month pays* Open
 │   │   │                              Bill switch sets the month (Follow Rules
 │   │   │                              hands it back); margin and KPI there are
 │   │   │                              still Rules. A month before the cutover
@@ -306,6 +306,19 @@ src/
 │   │   │                              and it was paid by hand — its page shows
 │   │   │                              the rules applied to its bills, nothing
 │   │   │                              more. Mig `20260926030000`.
+│   │   │                              **NO HAND-TYPED UPSALES (2026-09-27):** the
+│   │   │                              form below went (user: 所有的 order 都只会从 ERP
+│   │   │                              那边抽过来，这边不需要自己调动 — the one thing adjusted in
+│   │   │                              the portal is whether a bill counts,
+│   │   │                              right-click *Don't count this bill*). Every
+│   │   │                              drop and upsell comes from the ERP feed
+│   │   │                              (above); the rows typed in, August's claim
+│   │   │                              form among them, stay and still count.
+│   │   │                              `recordUpsale` / `updateUpsale` /
+│   │   │                              `deleteUpsale` / `parseUpsaleInput` are
+│   │   │                              gone; confirmed ERP finds are listed under
+│   │   │                              *Paid in {month}* on the ERP panel, with
+│   │   │                              Undo.
 │   │   │                              **UPSALES (2026-09-24):** a customer adds to
 │   │   │                              an earlier order and ONLY THE ADDED AMOUNT
 │   │   │                              earns. The ERP has no upsale concept (a new
@@ -338,7 +351,7 @@ src/
 │   │   │                              under the salesperson on `[period]/orders`;
 │   │   │                              a person's page lists bills shared TO them;
 │   │   │                              Sales by person credits the parts. The
-│   │   │                              month page's *This run pays* switches (Open
+│   │   │                              month page's *This month pays* switches (Open
 │   │   │                              Bill / Margin incentive & penalty / KPI) are
 │   │   │                              the SAME scheme columns as Rules. Member
 │   │   │                              Insight/Arena do not read shares yet. Mig
@@ -637,9 +650,62 @@ src/
 │   │   │                              per-person table, the old *Waiting on a
 │   │   │                              deposit* section and *Sales by person* are
 │   │   │                              gone (user 2026-09-26). The bottom rail
-│   │   │                              below keeps only Open Bill (cost) and
-│   │   │                              Upsales & drops.
-│   │   │                              **THE MONTH ENDS IN A RAIL (2026-09-17,
+│   │   │                              went with *Payroll & source tools*
+│   │   │                              (2026-09-27, below).
+│   │   │                              **SEND TO PAYROLL (2026-09-27):** the month
+│   │   │                              is worked out LIVE every time the page
+│   │   │                              opens; payroll holds only what was SENT, and
+│   │   │                              the page never said so — the button was
+│   │   │                              *Recompute & sync payroll* at the foot of a
+│   │   │                              folded *Payroll & source tools* section, so
+│   │   │                              the user read the live figure as synced
+│   │   │                              (本来它就一直都在 sync 的，不是吗？). September, the first
+│   │   │                              paying month, had never gone: six warnings,
+│   │   │                              all rules not gaps. Now a **payroll bar**
+│   │   │                              under the cards (`PayrollBar`,
+│   │   │                              `lib/commission/payroll-send.ts`) says not
+│   │   │                              sent / in payroll (matching or moved since)
+│   │   │                              / closed / settled by hand, lists what stops
+│   │   │                              a send BY NAME (engine warnings + unmatched
+│   │   │                              agents — what the send checks), and sends
+│   │   │                              with one click: `send_commission_to_payroll`
+│   │   │                              refuses a warning before anything moves and
+│   │   │                              replaces a run already in payroll (reopen +
+│   │   │                              save + apply) in ONE transaction; *Take
+│   │   │                              back* = `reopen_commission_run`;
+│   │   │                              `commission_payroll_closed(period)` asks the
+│   │   │                              writes' guard (HR cannot read payroll_runs /
+│   │   │                              period_locks). The bar sends the month AS
+│   │   │                              SAVED, never the screen's draft. The month's
+│   │   │                              switches (*This month pays*) sit in its
+│   │   │                              foot. The whole foot section is gone —
+│   │   │                              saved-run hero, warnings list, Open Bill
+│   │   │                              cost, payroll-adjustment table (still on a
+│   │   │                              person's statement), below-margin list,
+│   │   │                              hand-typed upsales. Engine: a department
+│   │   │                              head's own bills (KRIS / PETER, 23DIR) earn
+│   │   │                              NOTHING and raise no warning
+│   │   │                              (`EngineInput.departmentHeadIds`, read by
+│   │   │                              `loadCommissionInput`). **THE LADDER IS THE
+│   │   │                              BILL'S BRAND** (user: 主体是 Akemi 就跟 Akemi 的
+│   │   │                              margin ladder): `SalesOrder.brandCode` =
+│   │   │                              `sales_orders.brand_code` (the ERP's
+│   │   │                              Branding) is what `marginBase` answers to —
+│   │   │                              accessories and bed frames are RIDERS, their
+│   │   │                              cost in the bill's margin on the bill's
+│   │   │                              ladder, whatever brand they carry; only a
+│   │   │                              bill with no brand (a bed frame or accessory
+│   │   │                              sold alone) reads its lines, and only a
+│   │   │                              month that pays margin asks about two priced
+│   │   │                              brands. The member app already grouped by
+│   │   │                              the bill's brand. The ledger's per-bill
+│   │   │                              button is now the REAL *Don't count this
+│   │   │                              bill* (`excludeOrder`, Undo on the notice;
+│   │   │                              *Show not counted* lists that person's bills
+│   │   │                              with *Count again*) — the session-only
+│   │   │                              *Exclude* draft is gone. Mig
+│   │   │                              `20260927030000`.
+│   │   │                              **THE MONTH ENDS IN A RAIL (2026-09-17, GONE 2026-09-27,
 │   │   │                              trimmed 2026-09-26):** `[period]` closed on
 │   │   │                              three cuts of the same bills, one
 │   │   │                              `SlidingTabs` rail (`?tab=`,
@@ -1078,7 +1144,7 @@ Finance CANNOT access the Director Salary module or Director Pool at all. (Direc
 HR CAN access Director Pool v2 (standalone calculator — full per-director detail; granted by user 2026-07-21)
 Only HR and Principal can see individual salary details
 Member catalogue & margin cost basis (2026-09-12, catalogue 2026-09-24)
-The member Quote page sells from the Product List, not a list of its own: `member_catalogue()` (mig `20260924040000`) answers every SKU ticked on **Product List › Modular** (`catalogue_skus.offered`, and its model's `catalogue_models.offered`), still ACTIVE in the ERP, under a brand the member's calculator scheme sells — "10 SKUs, 7 ticked → the calculator offers 7" (user 2026-09-24). Both snapshots read it UNPRICED (names, sizes, the sofa grid's height × tier choices, each sofa / bed frame model's dropdowns = the portal's ticks ∩ what the ERP still allows ∩ the live Maintenance pool) and return `catalogueModels`; the quote reads it PRICED through the service role only (`lib/member/server.ts`, after `member_quote_context` authorised the session) — no price ever reaches a browser. The cart carries ONE sofa build (seat height, tier, leg, specials) and ONE bed frame build (divan, leg, total, gap, specials); a dropdown offers only what every model of that kind in the cart was ticked for (`lib/member/build.ts`), and the server refuses anything else. The calculator costs the way the run does (`lib/member/calculator.ts` `costLines` over `lib/catalogue/*`): SKU price at the build + option surcharges, a matched priced combo costed as the combo. People › Member Services › Product options is now a pointer to Modular (`comm_products` / `member_product_options` are no longer read by the member app). **Riders**: bed frames and accessories carry NO brand — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (engine `marginBase`) — and so does anything marked *Rider* on Modular (`catalogue_models.brand_code = 'RIDER'`, read as no brand, never as one). A mattress or sofa is never a rider by default: one whose ERP branding matches no brand (MYLATEX, or none — 170 SKUs on 2026-09-24) is not offered until a Margin ladder is chosen for it, and Modular says so (`isRiderModel`, `lib/catalogue/options.ts`). A model's dropdown with an EMPTY ERP list is the whole Maintenance pool — the ERP's own "no restriction" (`erpAllows`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
+The member Quote page sells from the Product List, not a list of its own: `member_catalogue()` (mig `20260924040000`) answers every SKU ticked on **Product List › Modular** (`catalogue_skus.offered`, and its model's `catalogue_models.offered`), still ACTIVE in the ERP, under a brand the member's calculator scheme sells — "10 SKUs, 7 ticked → the calculator offers 7" (user 2026-09-24). Both snapshots read it UNPRICED (names, sizes, the sofa grid's height × tier choices, each sofa / bed frame model's dropdowns = the portal's ticks ∩ what the ERP still allows ∩ the live Maintenance pool) and return `catalogueModels`; the quote reads it PRICED through the service role only (`lib/member/server.ts`, after `member_quote_context` authorised the session) — no price ever reaches a browser. The cart carries ONE sofa build (seat height, tier, leg, specials) and ONE bed frame build (divan, leg, total, gap, specials); a dropdown offers only what every model of that kind in the cart was ticked for (`lib/member/build.ts`), and the server refuses anything else. The calculator costs the way the run does (`lib/member/calculator.ts` `costLines` over `lib/catalogue/*`): SKU price at the build + option surcharges, a matched priced combo costed as the combo. People › Member Services › Product options is now a pointer to Modular (`comm_products` / `member_product_options` are no longer read by the member app). **Riders**: bed frames and accessories carry NO brand — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (in the run: the bill's own brand, the ERP's Branding — `SalesOrder.brandCode` into `marginBase`, 2026-09-27) — and so does anything marked *Rider* on Modular (`catalogue_models.brand_code = 'RIDER'`, read as no brand, never as one). A mattress or sofa is never a rider by default: one whose ERP branding matches no brand (MYLATEX, or none — 170 SKUs on 2026-09-24) is not offered until a Margin ladder is chosen for it, and Modular says so (`isRiderModel`, `lib/catalogue/options.ts`). A model's dropdown with an EMPTY ERP list is the whole Maintenance pool — the ERP's own "no restriction" (`erpAllows`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
 Development Phases
 Phase 1 (✅ Shipped 2026-04-10): Treasury Core
 Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,
