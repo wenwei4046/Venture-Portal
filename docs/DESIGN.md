@@ -795,16 +795,18 @@ read-only, the name a link to Director Salary). The page's rules:
   (accent) sends the people Completed since the last press and stays there for
   the next group; with nobody Completed it is disabled with *Nobody completed and
   waiting* beneath. Its confirmation is an inline panel, not a modal: headcount,
-  CTC, a department × people × CTC table and one sentence on resubmits. *Total
+  CTC, a department × people × CTC table and one sentence on top-ups (`1 resubmit
+  · 1 second payroll send only the difference`). *Total
   Close* (hairline button) sits beside it, disabled with the names still waiting
   in its tooltip; a closed month shows a ledger chip in the status line and, for
   the Principal alone, *Reopen month* (asks why).
 - **The status line** under the title: `N staff · M directors` then one chip
   per state present — `draft` (plain), `completed` (accent), `with Finance`
-  (alert), `paid` (ledger), `resubmitting` (accent).
+  (alert), `paid` (ledger), `resubmitting` (accent), `second payroll` (accent).
 - **Submitted to Finance** (a `.sect-head` section between the cards and the
   grid, only once a batch exists): one `.ledger-table` row per batch — `#N`
-  (`the whole month` under a batch from before batches, `2 resubmits`), when and
+  (`the whole month` under a batch from before batches, `2 resubmits · 1 second
+  payroll`), when and
   by whom, who (`Finance 3 · HR 5`, department headcounts only — never a
   name, never a person's pay), CTC, and the funding as a chip + one line:
   *Waiting for Finance* (alert) · *Funding PV with Principal* (alert, `RM x of y
@@ -823,6 +825,14 @@ read-only, the name a link to Director Salary). The page's rules:
   Requests* label each request `BATCH #2 · HR 5`, and *打回 HR 重做* sends back
   that batch alone. HR › Payment's funding slot links to the batches; a
   resubmitted person reads as the remainder still to pay.
+- **Resubmit and Second payroll** (2026-09-27, later): the row menu offers both on
+  somebody already sent, two adjacent items with their own inline
+  confirmations — *Resubmit…* (small: *A correction to what was sent*) and
+  *Second payroll…* (small: *A planned second payment for {month} (e.g. the
+  15th)*). They unlock alike; only the words differ, and the status chip says
+  which (*Second payroll · editing* / *Second payroll ready*). A row that can
+  take neither shows one disabled *Resubmit · Second payroll* item with the
+  reason.
 
 ### Org chart canvas (v3.4, 2026-09-09 — Revenue › Staff Hierarchy)
 
@@ -2338,6 +2348,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-27 (second payroll)** — HR › Payroll's row menu gains *Second payroll…* beside *Resubmit…*: the same unlock, recorded as a planned second payment (a sub-department that pays on the 15th) rather than a correction. The status chip, the header's status line, the Submit confirmation, *Submitted to Finance* and Finance's request labels name each kind (`1 resubmit · 1 second payroll`). See "Payroll batches".
 - **2026-09-27 (unified Payroll)** — HR › Payroll holds everybody's pay and moves it person by person. The grid gains a frozen **Status** column (`td.pg-status`, offsets `.l0`–`.l5`), a ⋯ and right-click menu per row (*Resubmit…*), a *Director* band, and a selection bar of *Complete / Unlock / Delete*; the header's *Submit to Finance · N* stays pressable after every batch, *Total Close* sits beside it, and a new **Submitted to Finance** section lists each batch with its funding. Director Salary's *Submit to Finance* is *Complete*; Comm Cal's payroll bar (no button since the entry below) gains one line — a salesperson sent from here shows on *HR › Payroll →* as Completed — and names a Total Closed month as such. See "Payroll batches".
 - **2026-09-27 (night)** — The payroll bar sends nothing. Its whole-month *Send RM X to payroll* / *Update payroll* / *Take back* lived a few hours: the user's Send is per salesperson (tick five and send them, or send everybody not yet sent — somebody already sent is never sent again), which is the per-person close's, not a card about the month. The bar keeps its state, its reasons by name, the draft note and *This month pays*; `.payrollActions` / `.payrollConfirm` / `.payrollDone` / `.payrollError` went with the button.
 - **2026-09-27 v3.11** — Product List gains **Costing Setting** and **Add-on / KPI Items**, per sub-department: a chip row for the sub-department, a card for its own figure (the cost ratio at work on RM 1,000, or the KPI switch with a link to Rules), and a peach picker panel above the table while editing. Both scroll with the page. See "Product List workspace".

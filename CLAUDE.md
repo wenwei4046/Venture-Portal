@@ -125,8 +125,14 @@ src/
 │   │   │                              Finance*, never on the button. The month keeps
 │   │   │                              ONE payroll_run = Σ standing batches, so
 │   │   │                              billing and dashboards read it as before.
-│   │   │                              Right-click → *Resubmit* (`payroll_open_topup`)
-│   │   │                              unlocks somebody already sent; amounts may only
+│   │   │                              Right-click → *Resubmit* or *Second payroll*
+│   │   │                              (`payroll_open_topup(scope, row, kind)`) unlocks
+│   │   │                              somebody already sent — the same move, recorded
+│   │   │                              apart (a correction vs a planned second payment,
+│   │   │                              e.g. a sub-department paying on the 15th:
+│   │   │                              `topup_kind` on the row and the batch line,
+│   │   │                              `payroll_batches.second_payrolls`; mig
+│   │   │                              `20260927070000`); amounts may only
 │   │   │                              go UP and the next batch carries the
 │   │   │                              difference — Finance funds the CTC delta,
 │   │   │                              HR › Payment pays the net delta

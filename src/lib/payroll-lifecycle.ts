@@ -4,9 +4,11 @@
 //   Staff are ticked and Completed on the grid. A salesperson completes when
 //   they are closed on Comm Cal; a Director when Director Salary is Completed.
 //   Submit to Finance sends everybody Completed since the last press as one
-//   BATCH; a Resubmit (right-click) unlocks somebody already sent, whose
-//   amounts may then only go up — the next batch carries the difference.
-//   Total Close ends the month.
+//   BATCH; a Resubmit or a Second payroll (right-click) unlocks somebody
+//   already sent, whose amounts may then only go up — the next batch carries
+//   the difference. The two differ only in WHY (a correction, or a planned
+//   second payment such as a sub-department that pays on the 15th), which is
+//   recorded so it can be traced (2026-09-27). Total Close ends the month.
 //
 // The database enforces every rule (payroll_* functions, the lifecycle
 // guard); this module decides what the page OFFERS and says, so it can be
@@ -19,6 +21,32 @@ export type RowScope = 'staff' | 'directors'
 /** Where the row's pay is worked out — and therefore where it is Completed. */
 export type RowOrigin = 'staff' | 'revenue' | 'director'
 export type Tone = 'muted' | 'accent' | 'alert' | 'ledger' | 'danger'
+/** Why somebody already sent was unlocked: a correction, or a planned second payment. */
+export type TopupKind = 'resubmit' | 'second_payroll'
+
+export const TOPUP_KINDS: readonly TopupKind[] = ['resubmit', 'second_payroll']
+
+export function isTopupKind(value: unknown): value is TopupKind {
+  return value === 'resubmit' || value === 'second_payroll'
+}
+
+/** "Resubmit" / "Second payroll" — how the page names each kind. */
+export function topupKindLabel(kind: TopupKind | null | undefined): string {
+  return kind === 'second_payroll' ? 'Second payroll' : 'Resubmit'
+}
+
+/**
+ * "1 resubmit · 2 second payrolls" — what a batch's top-ups were. `topups`
+ * counts both kinds; the resubmits are the rest. Empty when there were none.
+ */
+export function topupSummary(topups: number, secondPayrolls: number): string {
+  const second = Math.max(0, Math.min(secondPayrolls, topups))
+  const resubmits = topups - second
+  const parts: string[] = []
+  if (resubmits > 0) parts.push(`${resubmits} resubmit${resubmits === 1 ? '' : 's'}`)
+  if (second > 0) parts.push(`${second} second payroll${second === 1 ? '' : 's'}`)
+  return parts.join(' · ')
+}
 
 export interface LifecycleRow {
   id: string
@@ -34,8 +62,10 @@ export interface LifecycleRow {
   /** Numbers of the standing batches that carried it, oldest first. */
   batchNos: number[]
   completedAt: string | null
-  /** Set while the row is unlocked for a Resubmit. */
+  /** Set while the row is unlocked for a Resubmit or a Second payroll. */
   topupOpenedAt: string | null
+  /** Which of the two it was unlocked for (null while not unlocked). */
+  topupKind?: TopupKind | null
   /** Revenue: when their standing Comm Cal close was made (null = still open there). */
   commCalClosedAt?: string | null
   /** Revenue: a draft row with statement links or a close cannot simply be deleted. */
@@ -93,7 +123,7 @@ export function rowStatusView(row: LifecycleRow): StatusView {
     case 'completed': {
       const when = dayLabel(row.completedAt)
       if (isTopup(row)) {
-        return { label: 'Resubmit ready', detail: `Completed ${when} · the next batch sends the difference`, tone: 'accent' }
+        return { label: `${topupKindLabel(row.topupKind)} ready`, detail: `Completed ${when} · the next batch sends the difference`, tone: 'accent' }
       }
       return {
         label: when ? `Completed ${when}` : 'Completed',
@@ -107,7 +137,7 @@ export function rowStatusView(row: LifecycleRow): StatusView {
     default:
       if (isTopup(row)) {
         return {
-          label: 'Resubmit · editing',
+          label: `${topupKindLabel(row.topupKind)} · editing`,
           detail: where
             ? `Unlocked ${dayLabel(row.topupOpenedAt)} — change it on ${where}; amounts can only go up`
             : `Unlocked ${dayLabel(row.topupOpenedAt)} — amounts can only go up, then Complete`,
@@ -146,7 +176,7 @@ export function rowActions(row: LifecycleRow, monthClosed: boolean): RowActions 
   }
   if (!actions.complete && !actions.unlock && !actions.remove) {
     actions.hint = row.status === 'submitted' || row.status === 'paid'
-      ? 'Already with Finance — right-click to Resubmit'
+      ? 'Already with Finance — right-click to Resubmit or add a Second payroll'
       : row.origin === 'revenue' ? 'Completed from Comm Cal'
       : row.origin === 'director' ? 'Completed from Director Salary'
       : null
@@ -162,7 +192,10 @@ export interface DeptShare {
 
 export interface SubmitPreview {
   people: number
+  /** Resubmits and second payrolls together — each sends only its difference. */
   topups: number
+  /** How many of `topups` are second payrolls. */
+  secondPayrolls: number
   /** What the batch asks Finance to fund: CTC, the difference for a resubmit. */
   ctc: number
   byDept: DeptShare[]
@@ -184,6 +217,7 @@ export function submitPreview(rows: LifecycleRow[]): SubmitPreview {
   return {
     people: waiting.length,
     topups: waiting.filter(r => r.batchNos.length > 0).length,
+    secondPayrolls: waiting.filter(r => r.batchNos.length > 0 && r.topupKind === 'second_payroll').length,
     ctc,
     byDept: [...byDept.values()].sort((a, b) => a.dept.localeCompare(b.dept)),
   }
@@ -216,14 +250,20 @@ export interface StatusCounts {
   completed: number
   submitted: number
   paid: number
+  /** Unlocked for a Resubmit or a Second payroll, not sent yet. */
   topups: number
+  /** How many of `topups` are second payrolls. */
+  secondPayrolls: number
 }
 
 export function statusCounts(rows: LifecycleRow[]): StatusCounts {
-  const c: StatusCounts = { draft: 0, completed: 0, submitted: 0, paid: 0, topups: 0 }
+  const c: StatusCounts = { draft: 0, completed: 0, submitted: 0, paid: 0, topups: 0, secondPayrolls: 0 }
   for (const r of rows) {
     c[r.status] += 1
-    if (isTopup(r)) c.topups += 1
+    if (isTopup(r)) {
+      c.topups += 1
+      if (r.topupKind === 'second_payroll') c.secondPayrolls += 1
+    }
   }
   return c
 }
@@ -249,7 +289,10 @@ export interface PayrollBatch {
   submittedAt: string | null
   submittedBy: string | null
   people: number
+  /** Resubmits and second payrolls it carried (each only a difference). */
   topups: number
+  /** How many of `topups` were second payrolls. */
+  secondPayrolls: number
   total: number
   departments: Array<{ name: string; people: number }>
   sentBackAt: string | null
@@ -284,6 +327,7 @@ export function normaliseMonthStatus(raw: unknown): PayrollMonthStatus {
     submittedBy: b.submitted_by ?? null,
     people: num(b.people),
     topups: num(b.topups),
+    secondPayrolls: num(b.second_payrolls),
     total: num(b.total),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     departments: Array.isArray(b.departments) ? b.departments.map((d: any) => ({ name: String(d.name ?? ''), people: num(d.people) })) : [],

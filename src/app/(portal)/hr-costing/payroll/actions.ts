@@ -10,6 +10,7 @@ import {
 } from '@/lib/commission/derived-commission'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postPayrollBatchAccrualJVs } from '@/lib/payroll-accrual'
+import { isTopupKind, type TopupKind } from '@/lib/payroll-lifecycle'
 import { seedPayrollRows } from '@/lib/payroll-period'
 
 // ─── The unified Payroll (2026-09-27) ───────────────────────────────────────
@@ -143,17 +144,25 @@ export async function retryPayrollBatchAccruals(period: string, batchId: string)
 }
 
 /**
- * Resubmit (right-click on somebody already sent): unlock them for a second
- * payment. Their amounts may then only go up; Complete and Submit again and
- * the next batch carries the difference.
+ * Resubmit or Second payroll (right-click on somebody already sent): unlock
+ * them for another payment. Their amounts may then only go up; Complete and
+ * Submit again and the next batch carries the difference. The kind is what
+ * the payment is FOR — a correction, or a planned second payment (a
+ * sub-department that pays on the 15th) — recorded so it can be traced.
  */
-export async function resubmitPayrollRow(period: string, scope: 'staff' | 'directors', rowId: string): Promise<void> {
+export async function resubmitPayrollRow(
+  period: string,
+  scope: 'staff' | 'directors',
+  rowId: string,
+  kind: TopupKind = 'resubmit',
+): Promise<void> {
   await requirePermission('hr_costing')
   assertPeriod(period)
   if ((scope !== 'staff' && scope !== 'directors') || !UUID.test(rowId)) throw new Error('Which person?')
+  if (!isTopupKind(kind)) throw new Error('Resubmit or Second payroll?')
   const supabase = await createClient()
   await assertPeriodOpen(supabase, period)
-  const { error } = await supabase.rpc('payroll_open_topup', { p_scope: scope, p_row_id: rowId })
+  const { error } = await supabase.rpc('payroll_open_topup', { p_scope: scope, p_row_id: rowId, p_kind: kind })
   if (error) throw new Error(error.message)
   revalidatePayroll(period)
 }

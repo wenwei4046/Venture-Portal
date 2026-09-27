@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { round2 } from '@/lib/payroll-funding'
+import { topupSummary } from '@/lib/payroll-lifecycle'
 import GeneratePvForm, { type PoolBreakdownRow } from './_components/GeneratePvForm'
 import StatutorySection, { type StatutoryPeriod } from './_components/StatutorySection'
 import SendBackButton from './_components/SendBackButton'
@@ -39,13 +40,13 @@ interface FundingInfo {
 /** "Batch #2 · HR 5" — which people a request funds (department totals only). */
 function batchLabel(raw: unknown): string | null {
   const b = (Array.isArray(raw) ? raw[0] : raw) as
-    | { batch_no: number; people: number; topups: number; legacy: boolean; departments: Array<{ name: string; people: number }> | null }
+    | { batch_no: number; people: number; topups: number; second_payrolls?: number | null; legacy: boolean; departments: Array<{ name: string; people: number }> | null }
     | null
     | undefined
   if (!b) return null
   if (b.legacy) return 'Whole month'
   const who = (b.departments ?? []).map(d => `${d.name} ${d.people}`).join(' · ')
-  return `Batch #${b.batch_no}${who ? ` · ${who}` : ''}${b.topups ? ` · ${b.topups} resubmit${b.topups === 1 ? '' : 's'}` : ''}`
+  return `Batch #${b.batch_no}${who ? ` · ${who}` : ''}${b.topups ? ` · ${topupSummary(b.topups, b.second_payrolls ?? 0)}` : ''}`
 }
 
 export default async function PayrollRequestsPage() {
@@ -58,7 +59,7 @@ export default async function PayrollRequestsPage() {
       .select(`
         id, amount, status, requested_at, payroll_run_id, period_month, batch_id,
         payroll_runs (period_month),
-        payroll_batches (batch_no, people, topups, legacy, departments),
+        payroll_batches (batch_no, people, topups, second_payrolls, legacy, departments),
         users:requested_by (name)
       `)
       .in('status', ['submitted', 'pv_generated'])

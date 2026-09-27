@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoneyBare } from '@/lib/utils'
-import type { SubmitPreview } from '@/lib/payroll-lifecycle'
+import { topupSummary, type SubmitPreview } from '@/lib/payroll-lifecycle'
 import { submitPayrollBatch } from '../actions'
 import { usePayrollDraft } from './PayrollDraftContext'
 
@@ -79,7 +79,7 @@ export default function SubmitToFinanceButton({ period, preview }: Props) {
           </table>
           <p className="text-xs mt-2">
             Only people Completed since the last batch go; the rest stay here.
-            {preview.topups > 0 ? ` ${preview.topups} resubmit${preview.topups === 1 ? '' : 's'} send${preview.topups === 1 ? 's' : ''} only the difference.` : ''}
+            {preview.topups > 0 ? ` ${topupSummary(preview.topups, preview.secondPayrolls)} send${preview.topups === 1 ? 's' : ''} only the difference.` : ''}
             {' '}Finance funds the CTC (gross + employer statutory) of this batch alone.
           </p>
           <div className="flex items-center justify-end gap-3 mt-3">
