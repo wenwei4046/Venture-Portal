@@ -161,8 +161,8 @@ export default function OpenBillBoard({ orders, rates, readOnly }: Props) {
 
       {readOnly ? (
         <p className="sheet-notice max-w-3xl">
-          This month is in payroll. Take it back — the payroll bar on the month — before changing the
-          picks; otherwise the statements would describe bills that no longer earned what they say they did.
+          This month is in payroll, so its picks cannot change — the statements would describe bills that
+          no longer earned what they say they did.
         </p>
       ) : null}
 

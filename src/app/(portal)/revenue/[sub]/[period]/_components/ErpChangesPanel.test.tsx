@@ -72,7 +72,7 @@ describe('ErpChangesPanel', () => {
 
   it('pays nothing into a month that is in payroll', () => {
     render(<ErpChangesPanel period="2026-09-01" pending={[DROP]} locked />)
-    expect(screen.getByText(/September 2026 is in payroll — open a later month to pay these, or take this one back first/)).toBeVisible()
+    expect(screen.getByText(/September 2026 is in payroll — open a later month to pay these\./)).toBeVisible()
     expect(screen.getByRole('button', { name: 'Pay in Sep 2026' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Not a change' })).toBeEnabled()
   })

@@ -55,10 +55,8 @@ const HEAD_NOTE = 'Own bills earn no commission'
  * (2026-09-27). Absent on a page that sends nothing — the bar is not drawn.
  */
 export interface PayrollBarFacts {
-  subDepartmentId: string
   /** "September 2026". */
   monthLabel: string
-  runId: string | null
   sentAt: string | null
   /** "September 2026" — the first month the portal pays — for a month settled by hand. */
   settledBefore: string | null
@@ -424,7 +422,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         await saveOpenBillPicks(changed.map(orderId => ({ orderId, before: before.get(orderId) ?? null, after: after.get(orderId) ?? null })))
         setPicks(null)
         setPicksSource(null)
-        setNotice('Open Bill picks saved. Payroll changes only when the month is sent — the payroll bar above.')
+        setNotice('Open Bill picks saved. Payroll takes them as each salesperson is sent.')
         router.refresh()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not save picks. Refresh before retrying.')
@@ -489,7 +487,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             {visibleColumns.map(([key]) => <td key={key} className={NUMERIC_COLUMNS.includes(key) ? s.numeric : undefined}>{cell(row, key, overriding)}</td>)}
             <td>{row.upsale ? <span className={s.muted}>Not a bill</span>
               : <button type="button" className={s.ghostButton} disabled={lockedMonths.has(row.periodMonth) || billPending}
-                title={lockedMonths.has(row.periodMonth) ? `${monthName(row.periodMonth)} is in payroll — take it back before a bill can leave it` : 'Take this bill out of the commission; it stays out whatever the ERP sends next'}
+                title={lockedMonths.has(row.periodMonth) ? `${monthName(row.periodMonth)} is in payroll — a bill cannot leave it now` : 'Take this bill out of the commission; it stays out whatever the ERP sends next'}
                 onClick={() => dontCount(row)}>{billBusy === row.orderId ? 'Taking out…' : 'Don’t count'}</button>}</td>
             <td className={s.stickyTotal}>{money(row.totalCommission)}{overriding && <small>{pct((row as OverrideOrderRow).overrideRate)} overriding</small>}</td>
           </tr>)}</tbody>
@@ -547,8 +545,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {monthOverview}
     <CommissionMonthSummary stats={monthStats} peopleCount={board.people.length} totalCommission={board.totalCommission}
       status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks || Object.keys(previewFeatures).length ? 'Draft calculation' : 'Live calculation'} />
-    {payroll && payrollView && <PayrollBar period={period} monthLabel={payroll.monthLabel} subDepartmentId={payroll.subDepartmentId}
-      runId={payroll.runId} state={payrollView} draft={drafting} switches={payroll.switches} />}
+    {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} state={payrollView} draft={drafting} switches={payroll.switches} />}
     <div className={s.tabs} role="tablist" aria-label="Commission views">
       {TABS.map(([key, text]) =>
         <button type="button" role="tab" aria-selected={tab === key} aria-controls={`commission-panel-${key}`} id={`commission-tab-${key}`} key={key}
@@ -664,7 +661,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             <td>{b.orderDate}</td>
             <td className={s.numeric}>{money(b.orderTotal)}</td>
             <td><button type="button" className={s.ghostButton} disabled={lockedMonths.has(period) || billPending}
-              title={lockedMonths.has(period) ? `${monthLabel} is in payroll — take it back before a bill can return to it` : undefined}
+              title={lockedMonths.has(period) ? `${monthLabel} is in payroll — a bill cannot return to it now` : undefined}
               onClick={() => countAgain(b)}>{billBusy === b.orderId ? 'Counting…' : 'Count again'}</button></td>
           </tr>)}</tbody>
         </table>
@@ -713,7 +710,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {tab === 'open' && <>
       <div className={s.topLine}><div><h2 className={s.sectionHeading}>Open Bill allocation</h2><p className={s.subtitle}>Review every selected bill across the team. One rank per salesperson, per event day.</p></div><div className={s.overviewTotal}><span>Total Open Bill bonus</span><strong>{money(totals.open)}</strong></div></div>
       {!openEnabled && <p className={s.notice}>Open Bill payout is switched off for this month. Saved picks remain visible and pay zero.</p>}
-      {locked && <p className={s.notice}>This month is in payroll. Take it back — the payroll bar above — before changing Open Bill picks.</p>}
+      {locked && <p className={s.notice}>This month is in payroll, so its Open Bill picks cannot change.</p>}
       <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}><td className={s.stickyFirst}>{r.orderNo}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
       <div className={s.footerTotal}><span>All selected bills · allocated bonus</span><strong>{money(totals.open)}</strong></div>

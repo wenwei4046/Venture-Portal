@@ -27,9 +27,8 @@ one computed run carried six warnings, and any warning stops the sync.
 | | |
 |---|---|
 | Where | the **payroll bar** under the month's cards: *Not in payroll yet* · *In payroll · RM X* (matching, or moved since — by how much and for how many people) · the month's payroll closed · *Settled by hand* |
-| Send | **Send RM X to payroll** — `send_commission_to_payroll`: refuses any warning before anything moves; a month already in payroll is taken back and replaced in the same transaction (*Update payroll to RM X*) |
-| Take back | takes this sub-department's share back out of the month's payroll (`reopen_commission_run`) so its bills and picks can change again |
-| What stops it | listed in the bar, live and by NAME — the engine's warnings plus unmatched agents, the same list the send checks |
+| Send | **not in the bar** — see *Send is per salesperson* below |
+| What stops it | listed in the bar, live and by NAME — the engine's warnings plus unmatched agents |
 | Closed | `commission_payroll_closed(period)` asks the guard the writes use; HR cannot read `payroll_runs` or `period_locks` itself |
 | What the month pays | the scheme switches sit in the bar (*This month pays*) |
 
@@ -38,6 +37,17 @@ warnings, *Recompute & sync payroll*, the Open Bill cost tab, the payroll
 adjustments table, the below-margin list and the hand-typed upsales (§4.8) is
 gone (user: 下面这整个东西就不需要存在了). A person's payroll adjustment stays on
 their statement page.
+
+**Send is per salesperson (same day).** The bar shipped with a whole-month
+*Send RM X to payroll* (`send_commission_to_payroll`: refuse any warning,
+replace a run already in payroll in one transaction) and *Take back*
+(`reopen_commission_run`). Both went within hours: the user's Send is
+**Complete, per salesperson** — tick five people and send them, or send
+everybody not yet sent, and somebody already sent is never sent again. One
+button for the month cannot say that, so the send belongs to the per-person
+close. `send_commission_to_payroll` stays in the database, unused, until that
+step decides whether to call it. Nothing on the page applies a run any more, so
+nothing on it takes one back either.
 
 **Two of September's warnings were rules, not gaps**, and no longer stop a month:
 
@@ -963,8 +973,8 @@ so it will not calculate in this month's commission).
 | Refused | a month whose run has paid (23RUN); a bill already out for another reason (23EXC) |
 
 `revenue_exclude_order` / `revenue_include_order` own the write, one
-transaction each. Payroll follows when the month is sent (the payroll bar);
-a month already in payroll refuses the write until it is taken back. Mig `20260927020000`.
+transaction each. Payroll follows when the bill's salesperson is sent; a
+month already in payroll refuses the write. Mig `20260927020000`.
 
 The same right-click is on a salesperson's ledger on Comm Cal's month —
 Personal, Overriding and Below deposit — and on the month's Below deposit tab

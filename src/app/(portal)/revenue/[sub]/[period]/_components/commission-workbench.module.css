@@ -349,10 +349,6 @@
 .payrollNote { margin-top: 6px; max-width: 820px; font-size: 12px; line-height: 1.65; }
 .payrollBlockers { margin: 8px 0 0; padding-left: 18px; list-style: disc; font-size: 12px; line-height: 1.6; }
 .payrollBlockers li + li { margin-top: 3px; }
-.payrollDone { margin-top: 8px; font-size: 12px; color: rgb(var(--ledger)); }
-.payrollError { margin-top: 8px; font-size: 12px; color: rgb(var(--danger)); }
-.payrollActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.payrollConfirm { display: grid; gap: 10px; max-width: 360px; padding: 12px 14px; border: 1px solid rgb(var(--accent)); border-radius: 8px; background: rgb(var(--accent-bg)); font-size: 12px; line-height: 1.6; }
 .payrollSwitches { padding: 11px 18px; border-top: 1px solid rgb(var(--hairline)); border-radius: 0 0 12px 12px; background: rgb(var(--work-filter)); }
 
 @media (pointer: coarse) {

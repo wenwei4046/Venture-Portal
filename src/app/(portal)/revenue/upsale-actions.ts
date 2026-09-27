@@ -36,7 +36,7 @@ async function assertMonthOpen(supabase: SupabaseClient, subDepartmentId: string
   })
   if (error) throw new Error(`Could not check the commission run: ${error.message}`)
   if (locked) {
-    throw new Error(`The ${period.slice(0, 7)} month is in payroll. Take it back before changing its drops and upsells.`)
+    throw new Error(`The ${period.slice(0, 7)} month is in payroll, so its drops and upsells cannot change.`)
   }
 }
 
