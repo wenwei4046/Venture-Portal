@@ -189,7 +189,8 @@ is not rewritten.
   specials, at the amount typed beside the search. Added rows land at the top
   on the peach wash with a NEW chip; a row being removed fades and says so,
   with *Keep* to undo. Nothing is written until Save; a failed save keeps
-  every draft.
+  every draft, and a good one keeps them on screen, read-only, until the
+  refreshed list arrives — never the list from before the save.
 - **One screen, not the remainder (2026-09-27).** SKU Master and Costing gaps
   hold the count row, its notes and the table in a stage exactly one screen tall
   (`.sku-stage`) instead of the space the filters leave: the page scrolls again,

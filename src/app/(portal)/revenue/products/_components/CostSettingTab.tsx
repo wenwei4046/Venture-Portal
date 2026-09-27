@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { parseRatio, teamCost, validateCostSetting, type CostSettingEdit } from '@/lib/catalogue/rule-edits'
@@ -81,9 +81,41 @@ export default function CostSettingTab({
   const [query, setQuery] = useState('')
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
   const [pickRatio, setPickRatio] = useState('')
-  const [saving, startSaving] = useTransition()
+  const [pending, startSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+
+  const reset = useCallback(() => {
+    setDivisorDraft(null)
+    setDrafts(new Map())
+    setAdded([])
+    setTicked(new Set())
+    setQuery('')
+    setPickRatio('')
+  }, [])
+
+  // A save leaves its drafts on screen, read-only, until the refreshed rows
+  // arrive; clearing them at once showed the rows from before the save for a
+  // moment (prod, 2026-09-27). Settled when the server's rows change — or,
+  // should the refresh never land, a little later.
+  const [settling, setSettling] = useState(false)
+  const settleFrom = useRef<{ ratios: CostRatioRow[]; divisor: number } | null>(null)
+  const settle = useCallback(() => {
+    settleFrom.current = null
+    setSettling(false)
+    setEditing(false)
+    reset()
+  }, [reset])
+  useEffect(() => {
+    const from = settleFrom.current
+    if (settling && from && (from.ratios !== ratios || from.divisor !== divisor)) settle()
+  }, [settling, ratios, divisor, settle])
+  useEffect(() => {
+    if (!settling) return
+    const timer = window.setTimeout(settle, 15_000)
+    return () => window.clearTimeout(timer)
+  }, [settling, settle])
+  const saving = pending || settling
 
   const skuById = useMemo(() => new Map(skus.map(s => [s.erpId, s])), [skus])
   const lines = useMemo<Line[]>(() => {
@@ -144,15 +176,6 @@ export default function CostSettingTab({
   )
   const shown = matches.slice(0, PICK_LIMIT)
   const tickable = shown.filter(s => !onList.has(s.erpId))
-
-  function reset() {
-    setDivisorDraft(null)
-    setDrafts(new Map())
-    setAdded([])
-    setTicked(new Set())
-    setQuery('')
-    setPickRatio('')
-  }
 
   function cancel() {
     if (saving) return
@@ -220,11 +243,12 @@ export default function CostSettingTab({
     }
     setError(null)
     setNotice(null)
+    const before = { ratios, divisor }
     startSaving(async () => {
       try {
         await saveCostSetting(schemeId, edit)
-        reset()
-        setEditing(false)
+        settleFrom.current = before
+        setSettling(true)
         setNotice(
           'Saved. The calculator judges margins at these ratios from now on; a month already computed moves when its run is computed again.',
         )
@@ -286,7 +310,7 @@ export default function CostSettingTab({
                 Cancel changes
               </button>
               <button type="button" className="sku-primary-button" disabled={saving || dirty === 0} onClick={save}>
-                {saving ? 'Saving…' : dirty === 0 ? 'Save changes' : `Save ${dirty} change${dirty === 1 ? '' : 's'}`}
+                {pending ? 'Saving…' : settling ? 'Saved' : dirty === 0 ? 'Save changes' : `Save ${dirty} change${dirty === 1 ? '' : 's'}`}
               </button>
             </>
           ) : (
