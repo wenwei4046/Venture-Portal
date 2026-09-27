@@ -78,4 +78,9 @@ export async function loadCommissionWorkbench(
   }
 }
 
-export type CommissionWorkbenchData = Awaited<ReturnType<typeof loadCommissionWorkbench>>
+/**
+ * `payLinesClosed` is optional to its readers (absent reads as "the month is
+ * open"), so a hand-built fixture or an older caller stays valid.
+ */
+export type CommissionWorkbenchData = Omit<Awaited<ReturnType<typeof loadCommissionWorkbench>>, 'payLinesClosed'>
+  & { payLinesClosed?: string | null }

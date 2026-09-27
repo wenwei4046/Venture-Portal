@@ -679,7 +679,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           HR adds to it (2026-09-27). Keyed so one person's unsaved lines never
           follow the page to the next person. */}
       <SalaryCalculation key={selected.staffId} staffName={selected.name} period={period} commission={selected.totalCommission}
-        source={salarySource} payUnavailable={data.payUnavailable} closedReason={data.payLinesClosed} />
+        source={salarySource} payUnavailable={data.payUnavailable} closedReason={data.payLinesClosed ?? null} />
     </>}
 
     {tab === 'kpi' && <>

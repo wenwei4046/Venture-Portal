@@ -86,7 +86,7 @@ function fixture(): CommissionWorkbenchData {
   return {
     input, currentHierarchy: input.hierarchy,
     currentRules: { hierarchy: input.hierarchy, kpiItems: input.kpiItems, kpiThresholds: input.kpiThresholds, openBillRules: input.openBillRules },
-    unmatchedOrderNos: [], payRows: [], payUnavailable: true, payLinesClosed: null,
+    unmatchedOrderNos: [], payRows: [], payUnavailable: true,
     people: [
       { staffId: 'agent', name: 'Anthony', employeeCode: 'HV001' },
       { staffId: 'leader', name: 'Alex', employeeCode: 'HV002' },
