@@ -80,10 +80,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
 
   return (
     <div>
-      <Link
-        href="/team/people"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
-      >
+      <Link href="/team/people" className="inline-block mb-3 text-sm hover:text-accent transition-colors">
         ← Back to People
       </Link>
 
@@ -93,16 +90,19 @@ export default async function StaffDetailPage({ params }: PageProps) {
             <em>I.</em> PEOPLE · {deptName.toUpperCase()}
           </div>
           <h1 className="page-title">{staff.employee_name}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {staff.employee_code && (
-              <span className="font-mono text-sm text-muted mr-2">{staff.employee_code}</span>
-            )}
-            {titleName && <em className="mr-2">{titleName}</em>}
+          <p className="text-sm mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {staff.employee_code && <span className="font-mono">{staff.employee_code}</span>}
+            {staff.employee_code && titleName ? <span aria-hidden>·</span> : null}
+            {titleName && <span>{titleName}</span>}
+            {/* Resigned is a state, so it is a word on the red wash. */}
             {staff.resignation_date && (
-              <em className="text-danger">Resigned {staff.resignation_date}</em>
+              <span className="chip danger">
+                <span className="dot" aria-hidden />
+                Resigned {staff.resignation_date}
+              </span>
             )}
             {!staff.employee_code && !titleName && !staff.resignation_date && (
-              <em>Active employee.</em>
+              <span>Active employee.</span>
             )}
           </p>
         </div>
@@ -112,21 +112,21 @@ export default async function StaffDetailPage({ params }: PageProps) {
           {viewer.role === 'principal' && !account ? (
             <Link
               href={`/team/people/invite?staff=${staff.id}`}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
             >
               Invite
             </Link>
           ) : null}
           <Link
             href={`/team/people/${staff.id}/edit`}
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Edit
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-2 max-w-5xl">
         <Section title="Assignment">
           <Field label="Title" value={titleName} />
           <Field label="Department" value={deptName} />
@@ -233,10 +233,15 @@ export default async function StaffDetailPage({ params }: PageProps) {
   )
 }
 
+// A section is the sheet's section head — the title over its rule — and a
+// label/value list under it.
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <h2 className="font-serif italic text-ink text-md mb-4 pb-2 border-b border-hairline">{title}</h2>
+    <section className="mb-8">
+      <div className="sect-head">
+        <h2>{title}</h2>
+        <span className="rule" aria-hidden />
+      </div>
       <dl className="space-y-3">{children}</dl>
     </section>
   )
@@ -256,11 +261,10 @@ function Field({
   const isEmpty = value == null || value === ''
   return (
     <div className="grid grid-cols-[140px_1fr] gap-4 items-baseline">
-      <dt className="font-sans text-xs uppercase tracking-wide text-graphite">{label}</dt>
+      <dt className="text-[10px] font-medium uppercase tracking-[0.06em]">{label}</dt>
       <dd
         className={[
-          mono ? 'font-mono tabular text-sm' : 'font-serif text-sm',
-          isEmpty ? 'text-muted italic' : 'text-ink',
+          mono && !isEmpty ? 'font-mono tabular text-[12.5px]' : 'text-sm',
           multiline ? 'whitespace-pre-line' : '',
         ].join(' ')}
       >

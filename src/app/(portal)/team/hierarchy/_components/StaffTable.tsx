@@ -10,6 +10,9 @@ import LedgerRow from '@/components/LedgerRow'
 import { setReportsTo, undoHierarchyMove, type UndoMoveInput } from '../actions'
 import type { ChartPerson } from './TeamOrgChart'
 
+/** A link-button on the sheet: underlined at rest, never coloured. */
+const SHEET_LINK = 'underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink'
+
 /** No filter on this facet. */
 const ALL = '__all__'
 /** Only the people the facet is blank for — the rows this table exists to fix. */
@@ -213,14 +216,10 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
   return (
     <div className="mb-12">
       <ErrorNote error={error} />
+      {/* A saved line is the sheet's peach notice; a refused or half-done undo
+          its amber warning. Both in black — the wash says which. */}
       {note ? (
-        <div
-          className={`rounded-md p-3 mb-4 text-sm font-sans border ${
-            warn
-              ? 'bg-alert-bg border-alert/40 text-alert'
-              : 'bg-accent-bg border-accent-border text-accent'
-          }`}
-        >
+        <div className={warn ? 'sheet-warning' : 'sheet-notice'}>
           {note}
           {undo ? (
             <button
@@ -236,22 +235,23 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
       ) : null}
 
       {/* Same idiom as the roster's filter bar on People Management — one list,
-          narrowed. It stacks on a phone and beside the panel on a wide screen,
-          because this column is only ever half the page. */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+          narrowed — in the sheet's toolbar panel, which draws the fields
+          (white, hairline, 36px). The search takes the whole first line on a
+          phone and the dropdowns wrap under it. */}
+      <div className="sheet-toolbar">
         <input
           type="search"
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Search a name…"
           aria-label="Search staff by name"
-          className="flex-1 sm:max-w-xs px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border font-sans"
+          className="w-full sm:w-auto sm:flex-1 sm:max-w-xs focus:outline-none"
         />
         <select
           value={dept}
           onChange={e => setDept(e.target.value)}
           aria-label="Filter by department"
-          className="px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent-border font-sans"
+          className="focus:outline-none"
         >
           <option value={ALL}>All departments</option>
           {departments.values.map(d => (
@@ -265,7 +265,7 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
           value={title}
           onChange={e => setTitle(e.target.value)}
           aria-label="Filter by title"
-          className="px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent-border font-sans"
+          className="focus:outline-none"
         >
           <option value={ALL}>All titles</option>
           {titles.values.map(t => (
@@ -275,37 +275,34 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
           ))}
           {titles.hasNone ? <option value={NONE}>— No title</option> : null}
         </select>
-      </div>
 
-      {/* The count is the filter's receipt: without it a short table is
-          indistinguishable from a small company. `aria-live` because the
-          number changes under a reader who is typing, not clicking. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 px-3 py-2 bg-surface border border-hairline rounded-control font-mono text-mono-xs text-muted">
-        <span aria-live="polite">
-          <b className="text-num-ink font-semibold">{rows.length}</b>
-          {filtering ? ` of ${people.length} ` : ' '}
-          {people.length === 1 && !filtering ? 'person' : 'people'}
+        {/* The count is the filter's receipt: without it a short table is
+            indistinguishable from a small company. `aria-live` because the
+            number changes under a reader who is typing, not clicking. It sits
+            at the toolbar's right end, with the way back beside it. */}
+        <span className="ml-auto flex items-center gap-4 text-xs">
+          <span aria-live="polite">
+            <b className="font-semibold tabular-nums">{rows.length}</b>
+            {filtering ? ` of ${people.length} ` : ' '}
+            {people.length === 1 && !filtering ? 'person' : 'people'}
+          </span>
+          {filtering ? (
+            <button type="button" onClick={clearFilters} className={SHEET_LINK}>
+              Clear filters
+            </button>
+          ) : null}
         </span>
-        {filtering ? (
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="ml-auto font-sans text-sm text-accent hover:text-accent-hover transition-colors"
-          >
-            Clear filters
-          </button>
-        ) : null}
       </div>
 
       {rows.length === 0 ? (
-        <div className="py-12 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif italic text-graphite text-sm">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">
             No matches for those filters.
           </p>
           <button
             type="button"
             onClick={clearFilters}
-            className="mt-3 border border-hairline rounded-control px-4 py-2 font-sans text-sm text-graphite hover:text-ink transition-colors"
+            className="mt-3 border border-hairline rounded-control bg-surface px-4 py-2 text-sm hover:bg-surface-2 transition-colors"
           >
             Clear filters to see all
           </button>
@@ -334,20 +331,20 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
                 const saving = pending && busy === p.id
 
                 return (
-                  <LedgerRow key={p.id} className={broken ? 'bg-danger-bg/40' : undefined}>
+                  // A line the ladder refuses tints its row. `!` because the
+                  // sheet's zebra and hover paint every row's background.
+                  <LedgerRow key={p.id} className={broken ? '!bg-danger-bg/40' : undefined}>
                     <td>
-                      <span className="text-ink">{p.name}</span>
+                      <span className="font-medium">{p.name}</span>
                       {p.code ? (
-                        <span className="ml-2 font-mono text-mono-xs text-muted">{p.code}</span>
+                        <span className="ml-2 font-mono text-[11px]">{p.code}</span>
                       ) : null}
                     </td>
                     <td className="m-hide" data-label="Title">
-                      <span className="font-serif italic text-sm text-graphite">
-                        {p.title ?? <span className="text-muted">—</span>}
-                      </span>
+                      <span>{p.title ?? '—'}</span>
                       {p.levelRank !== null ? (
                         <span
-                          className="ml-2 font-mono not-italic text-[10px] text-muted"
+                          className="ml-2 font-mono text-[10px]"
                           title={`Level ${p.levelRank} · ${p.levelName}`}
                         >
                           L{p.levelRank}
@@ -355,9 +352,7 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
                       ) : null}
                     </td>
                     <td className="m-hide" data-label="Department">
-                      <span className="font-serif italic text-sm text-graphite">
-                        {p.department ?? <span className="text-muted">—</span>}
-                      </span>
+                      <span>{p.department ?? '—'}</span>
                     </td>
                     <td data-label="Reports to">
                       <select
@@ -395,13 +390,16 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
                           ))}
                       </select>
                       {broken ? (
-                        <div className="mt-1 font-serif italic text-[11px] text-danger">
-                          the ladder would refuse this line
+                        <div className="mt-1">
+                          <span className="chip danger">
+                            <span className="dot" aria-hidden />
+                            the ladder would refuse this line
+                          </span>
                         </div>
                       ) : null}
                       {reportsToHeads(p) ? (
                         <div
-                          className="mt-1 font-serif italic text-[11px] text-muted"
+                          className="mt-1 text-[11px]"
                           title="The top of a tree reports to the sub-department's Revenue Director — set on Revenue, a reporting line only, no override."
                         >
                           reports to {headsLabel(p.leadIds.map(id => byId.get(id)?.name).filter((name): name is string => !!name))} · the department&rsquo;s director
@@ -416,11 +414,12 @@ export default function StaffTable({ people }: { people: ChartPerson[] }) {
         </div>
       )}
 
-      <p className="mt-3 font-serif italic text-muted text-xs max-w-3xl leading-relaxed">
+      {/* Nothing on the sheet is italic: a stressed word is bold. */}
+      <p className="mt-3 text-xs max-w-3xl leading-relaxed">
         The rows read the ladder top down — the most senior title first, the same title together,
         names A→Z. Revenue Directors can report to company managers at the same or a higher
         L level; their reporting lines carry no commission override. For other Revenue members,
-        <em> Reports to</em> is also who earns the override on their sales, and the picker offers
+        <strong> Reports to</strong> is also who earns the override on their sales, and the picker offers
         only titles that may hold downlines. What a
         month actually pays somebody is not a column here: it belongs to a run, and it is read on
         Revenue.

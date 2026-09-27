@@ -43,18 +43,28 @@ interface Props {
 
 const ZERO = '0.00'
 
+// The sheet's form panel (DESIGN.md › "Sheet theme"): white fields on a tinted
+// card, black lettering throughout — hierarchy from size and weight. A
+// disabled field fades on the sheet by itself, so the locked pay fields and
+// the code preview need no colour of their own.
 const textInput =
-  'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border'
+  'w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border'
 const monoInput =
-  'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border'
+  'w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border'
 const readOnlyMono =
-  'w-full px-3 py-2 bg-surface-2 border border-hairline rounded-md text-sm font-mono text-muted'
+  'w-full px-3 py-2 bg-surface-2 border border-hairline rounded-control text-sm font-mono'
 const moneyInput =
-  'w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border disabled:bg-surface-2 disabled:text-muted disabled:cursor-not-allowed'
-const labelBase = 'block text-sm font-sans font-medium text-graphite mb-1.5'
-const hintBase = 'text-xs text-muted ml-1 font-normal'
+  'w-full pl-10 pr-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono tabular font-medium focus:outline-none focus:border-accent-border disabled:bg-surface-2 disabled:cursor-not-allowed'
+const labelBase = 'block text-sm font-medium mb-1.5'
+const hintBase = 'text-xs ml-1 font-normal'
+const helpText = 'text-xs mt-1'
 const rmPrefix =
-  'absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted pointer-events-none'
+  'absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono pointer-events-none'
+/** A tick that changes what the form asks: peach and edged in orange while on. */
+const tickTile = (on: boolean) =>
+  `flex items-start gap-3 border rounded-card p-3 mb-4 cursor-pointer transition-colors ${
+    on ? 'bg-accent-bg border-accent' : 'bg-surface border-hairline'
+  }`
 
 /**
  * Add Staff.
@@ -193,7 +203,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
       ref={formRef}
       id="add-staff-form"
       action={handleSubmit}
-      className="bg-surface border border-hairline rounded-md p-6 max-w-2xl"
+      className="bg-surface-2 border border-hairline rounded-card p-6 max-w-2xl"
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -247,7 +257,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
               )
             })}
           </select>
-          <p id="staff-sub-department-hint" className="font-serif italic text-muted text-xs mt-1">
+          <p id="staff-sub-department-hint" className={helpText}>
             {departmentId === ''
               ? 'Pick a department first.'
               : subChoices.length === 0
@@ -278,7 +288,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
               </option>
             ))}
           </select>
-          <p id="staff-upline-hint" className="font-serif italic text-muted text-xs mt-1">
+          <p id="staff-upline-hint" className={helpText}>
             {departmentId === ''
               ? 'Pick a department first.'
               : isCommissionDept
@@ -306,13 +316,13 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
             ))}
           </select>
           {departmentId === '' ? (
-            <p className="font-serif italic text-muted text-xs mt-1">
+            <p className={helpText}>
               Pick a department first — titles belong to one.
             </p>
           ) : titleChoices.length === 0 ? (
-            <p className="font-serif italic text-muted text-xs mt-1">
+            <p className={helpText}>
               No titles for {department?.name} yet —{' '}
-              <Link href="/team/roles" className="text-accent hover:underline">
+              <Link href="/team/roles" className="underline underline-offset-2 hover:no-underline">
                 add one under Role &amp; Permission
               </Link>
               .
@@ -331,7 +341,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
             aria-describedby="staff-code-hint"
             className={readOnlyMono}
           />
-          <p id="staff-code-hint" className="font-serif italic text-muted text-xs mt-1">
+          <p id="staff-code-hint" className={helpText}>
             {nextCode
               ? 'The next number after the highest on the roster.'
               : 'HV + the next number after the highest on the roster.'}
@@ -342,10 +352,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
       <div className="border-t border-hairline my-6" />
 
       {isCommissionDept && department ? (
-        <label
-          htmlFor="staff-full-commission"
-          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-4 cursor-pointer"
-        >
+        <label htmlFor="staff-full-commission" className={tickTile(fullCommission)}>
           <input
             id="staff-full-commission"
             type="checkbox"
@@ -355,10 +362,10 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
             className="w-4 h-4 accent-accent mt-0.5 shrink-0"
           />
           <span>
-            <span className="block text-sm font-sans font-medium text-ink">
+            <span className="block text-sm font-medium">
               Fully commission based
             </span>
-            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+            <span className="block text-xs mt-0.5">
               {department.name} staff carry no basic salary and no statutory allowance — 100% of
               pay is commission from the sales import. EPF / SOCSO / EIS come out at 0 on their
               own; Withholding Tax is ticked per person on the sub-department&apos;s Staff
@@ -369,10 +376,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
       ) : null}
 
       {isDirectorDept && department ? (
-        <label
-          htmlFor="staff-variable-pay"
-          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-4 cursor-pointer"
-        >
+        <label htmlFor="staff-variable-pay" className={tickTile(variablePay)}>
           <input
             id="staff-variable-pay"
             type="checkbox"
@@ -382,8 +386,8 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
             className="w-4 h-4 accent-accent mt-0.5 shrink-0"
           />
           <span>
-            <span className="block text-sm font-sans font-medium text-ink">Variable pay</span>
-            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+            <span className="block text-sm font-medium">Variable pay</span>
+            <span className="block text-xs mt-0.5">
               Calculated by variable — a {department.name} salary is worked out every month by
               the Director Salary engine and keyed in for that month, so there is no basic
               salary or allowance to file here. EPF / SOCSO / EIS follow whatever is keyed.
@@ -459,7 +463,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
 
       <div className="border-t border-hairline my-6" />
 
-      <h3 className="font-serif text-md text-ink mb-1">
+      <h3 className="sheet-heading mb-1">
         Account 1{' '}
         <span className={hintBase}>default receiving bank account</span>
       </h3>
@@ -499,8 +503,8 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
 
       <div className="border-t border-hairline my-6" />
 
-      <h3 className="font-serif text-md text-ink mb-1">Account 2 <span className={hintBase}>optional</span></h3>
-      <p className="text-xs text-muted">Enter both the bank and account number, or leave both blank.</p>
+      <h3 className="sheet-heading">Account 2 <span className={hintBase}>optional</span></h3>
+      <p className="sheet-subtitle">Enter both the bank and account number, or leave both blank.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <div>
           <label htmlFor="staff-bank-2" className={labelBase}>Account 2 bank</label>
@@ -514,7 +518,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
 
       <div className="border-t border-hairline my-6" />
 
-      <h3 className="font-serif text-md text-ink mb-1">
+      <h3 className="sheet-heading mb-1">
         Contact <span className={hintBase}>optional, editable later</span>
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
@@ -558,7 +562,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
 
       <div className="border-t border-hairline my-6" />
 
-      <h3 className="font-serif text-md text-ink mb-1">
+      <h3 className="sheet-heading mb-1">
         Emergency Contact <span className={hintBase}>optional</span>
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
@@ -598,15 +602,17 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mt-6">
+      {/* A refusal is the sheet's red callout, on a line of its own under the
+          button so a long database message has the width to be read. */}
+      <div className="flex flex-wrap items-center gap-3 mt-6">
         <button
           type="submit"
           disabled={isPending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-ink text-sm font-medium px-4 py-2 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? 'Adding...' : 'Add Staff'}
         </button>
-        {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+        {error && <p className="sheet-danger basis-full m-0">{error}</p>}
       </div>
     </form>
   )

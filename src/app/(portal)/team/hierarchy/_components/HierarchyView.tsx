@@ -98,7 +98,9 @@ export default function HierarchyView({
             <em>I.</em> PEOPLE · HIERARCHY
           </div>
           <h1 className="page-title">Hierarchy</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          {/* The sheet's intro line: plain and upright, like the Revenue
+              hierarchy's (DESIGN.md › "Sheet theme"). */}
+          <p className="text-sm mt-3 max-w-2xl">
             {tab === 'levels' ? (
               <>
                 Which title stands on which level — one scale for the whole company. The chart
@@ -126,9 +128,9 @@ export default function HierarchyView({
       {tab === 'levels' ? (
         <LevelsBoard rungs={rungs} titles={titles} breaks={breaks.length} />
       ) : people.length === 0 ? (
-        <div className="py-16 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif text-2xl text-ink mb-3">Nobody to chart yet.</p>
-          <p className="font-serif italic text-muted text-sm max-w-md mx-auto">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-md font-bold mb-2">Nobody to chart yet.</p>
+          <p className="text-sm max-w-md mx-auto">
             Add people under People → People Management first.
           </p>
         </div>

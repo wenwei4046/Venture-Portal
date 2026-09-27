@@ -76,9 +76,9 @@ export default function InviteUserForm({
 
   if (prefill?.alreadyHasAccount) {
     return (
-      <div className="border border-hairline rounded-card bg-surface p-6 max-w-2xl">
-        <p className="font-serif text-lg text-ink">{prefill.name} already has an account.</p>
-        <p className="font-serif italic text-muted text-sm mt-2">
+      <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center max-w-2xl">
+        <p className="text-md font-bold">{prefill.name} already has an account.</p>
+        <p className="text-sm mt-2">
           One person, one login. Nothing to do here.
         </p>
       </div>
@@ -101,16 +101,13 @@ export default function InviteUserForm({
       }}
       className="max-w-2xl"
     >
-      {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-5 text-sm font-sans">
-          {error}
-        </div>
-      ) : null}
+      {error ? <div className="sheet-danger mt-0 mb-5">{error}</div> : null}
 
       {prefill ? <input type="hidden" name="staff_id" value={prefill.staffId} /> : null}
 
-      <section className="border border-hairline rounded-card bg-surface p-5 mb-5">
-        <h2 className="font-serif italic text-ink text-md mb-4 pb-2 border-b border-hairline">
+      {/* The sheet's form panels: white fields on a tinted card. */}
+      <section className="border border-hairline rounded-card bg-surface-2 p-5 mb-5">
+        <h2 className="sheet-heading mb-4 pb-2 border-b border-hairline">
           The person
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -118,7 +115,7 @@ export default function InviteUserForm({
           <Field label="Phone" name="phone" type="tel" defaultValue={prefill?.phone} />
 
           <label className="block">
-            <span className="block font-sans text-xs uppercase tracking-wide text-graphite mb-1">
+            <span className={LABEL}>
               Department
             </span>
             <select
@@ -138,7 +135,7 @@ export default function InviteUserForm({
           </label>
 
           <label className="block">
-            <span className="block font-sans text-xs uppercase tracking-wide text-graphite mb-1">
+            <span className={LABEL}>
               Title
             </span>
             <select name="title_id" defaultValue={prefill?.titleId ?? ''} className={SELECT}>
@@ -150,14 +147,14 @@ export default function InviteUserForm({
               ))}
             </select>
             {departmentId === '' ? (
-              <span className="block font-serif italic text-muted text-xs mt-1">
+              <span className={HINT}>
                 Pick a department first — titles belong to one.
               </span>
             ) : null}
           </label>
 
           <label className="block sm:col-span-2">
-            <span className="block font-sans text-xs uppercase tracking-wide text-graphite mb-1">
+            <span className={LABEL}>
               Reports to
             </span>
             <select name="reports_to" defaultValue="" className={SELECT}>
@@ -173,8 +170,8 @@ export default function InviteUserForm({
         </div>
       </section>
 
-      <section className="border border-hairline rounded-card bg-surface p-5 mb-5">
-        <h2 className="font-serif italic text-ink text-md mb-4 pb-2 border-b border-hairline">
+      <section className="border border-hairline rounded-card bg-surface-2 p-5 mb-5">
+        <h2 className="sheet-heading mb-4 pb-2 border-b border-hairline">
           The login
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -197,7 +194,7 @@ export default function InviteUserForm({
           />
 
           <label className="block sm:col-span-2">
-            <span className="block font-sans text-xs uppercase tracking-wide text-graphite mb-1">
+            <span className={LABEL}>
               Role
             </span>
             <select name="role" defaultValue="" required className={SELECT}>
@@ -208,7 +205,7 @@ export default function InviteUserForm({
               <option value="dept_manager">Dept Manager — their own department only</option>
               <option value="revenue_member">Revenue Member — own account, quotes and requests</option>
             </select>
-            <span className="block font-serif italic text-muted text-xs mt-1">
+            <span className={HINT}>
               What the portal lets them touch today. The permission matrix on
               Permissions will take this over.
             </span>
@@ -220,7 +217,7 @@ export default function InviteUserForm({
         <button
           type="submit"
           disabled={pending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-control transition-colors disabled:opacity-50"
+          className="bg-accent hover:bg-accent-hover text-ink text-sm font-medium px-5 py-2.5 rounded-control transition-colors disabled:opacity-50"
         >
           {pending ? 'Creating…' : 'Create account'}
         </button>
@@ -228,7 +225,7 @@ export default function InviteUserForm({
           type="button"
           onClick={() => router.push('/team/people')}
           disabled={pending}
-          className="text-sm text-graphite hover:text-ink font-sans transition-colors disabled:opacity-50"
+          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2.5 rounded-control transition-colors disabled:opacity-50"
         >
           Cancel
         </button>
@@ -237,9 +234,19 @@ export default function InviteUserForm({
   )
 }
 
+// Black lettering on the sheet: the small uppercase label, the field, a line
+// of help. Placeholders keep the sheet's own faded ink — a `placeholder:`
+// colour here would print them as black as a real value.
+const LABEL = 'block text-xs font-medium uppercase tracking-wide mb-1'
+const HINT = 'block text-xs mt-1'
 const INPUT =
-  'w-full px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border'
-const SELECT = 'w-full px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink'
+  'w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border'
+/** A field the page has already filled and will not change: no white fill, so
+ *  it reads as the panel's own value rather than something to type into. */
+const INPUT_READONLY =
+  'w-full px-3 py-2 bg-transparent border border-hairline rounded-control text-sm focus:outline-none'
+const SELECT =
+  'w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border'
 
 function Field({
   label,
@@ -264,7 +271,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block font-sans text-xs uppercase tracking-wide text-graphite mb-1">
+      <span className={LABEL}>
         {label}
       </span>
       <input
@@ -275,11 +282,9 @@ function Field({
         minLength={minLength}
         autoComplete={autoComplete}
         defaultValue={defaultValue}
-        className={`${INPUT} ${readOnly ? 'text-graphite' : ''}`}
+        className={readOnly ? INPUT_READONLY : INPUT}
       />
-      {hint ? (
-        <span className="block font-serif italic text-muted text-xs mt-1">{hint}</span>
-      ) : null}
+      {hint ? <span className={HINT}>{hint}</span> : null}
     </label>
   )
 }

@@ -36,7 +36,7 @@ export default async function EditStaffPage({ params }: PageProps) {
     <div>
       <Link
         href="/team/people"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+        className="text-sm hover:text-accent transition-colors"
       >
         ← Back to Staff Costs
       </Link>
@@ -47,8 +47,8 @@ export default async function EditStaffPage({ params }: PageProps) {
             <em>I.</em> PEOPLE · EDIT PERSON
           </div>
           <h1 className="page-title">Edit Staff</h1>
-          <p className="font-serif italic text-graphite text-base mt-3">
-            {staff.employee_name} · <em className="text-muted">{deptName}</em>
+          <p className="text-sm mt-3">
+            <span className="font-medium">{staff.employee_name}</span> · {deptName}
           </p>
         </div>
       </div>

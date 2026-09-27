@@ -5,20 +5,30 @@
 // lighter orange for actions and markers, summary cards, and tables with an
 // uppercase header band. The user asked for the rest of the portal to follow,
 // HR's view first — the pages under HR Costing, Director Salary, Director Pool,
-// Revenue and Claims. PortalFrame draws the sheet for every path listed here,
+// Revenue and Claims (#166), then the rest of HR's sidebar: the Overview and
+// the People section. PortalFrame draws the sheet for every path listed here,
 // so a page's detail routes, print previews and loading skeleton land on it
 // too, and the sheet stays put while one of these pages replaces another.
+//
+// The Overview is one route for every role — Principal, Finance, HR and a
+// department manager each get their own dashboard under `/dashboard` — so all
+// four moved onto the sheet together.
 //
 // The Product List keeps its own workspace (`.product-theme`), which re-tones
 // the shell as well and decides its own scrolling per tab (`productTabScroll`).
 
 /** Route prefixes that render on the sheet — a prefix covers its whole subtree. */
 export const SHEET_ROUTE_PREFIXES = [
+  '/dashboard',
   '/hr-costing',
   '/director-salary',
   '/director-pool',
   '/revenue',
   '/claims',
+  // People: People Management, Hierarchy, Roles, Permissions (and a login
+  // account's page, reached from the roster) live under /team.
+  '/team',
+  '/member-admin',
 ] as const
 
 /** Routes under a prefix that keep a workspace of their own. */

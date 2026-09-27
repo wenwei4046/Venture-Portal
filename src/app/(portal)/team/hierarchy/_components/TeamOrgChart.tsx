@@ -36,6 +36,21 @@ import { useCompanyHierarchySpaces } from './CompanyHierarchySpaces'
 import { COMPANY_CARD_HEIGHT, companyChartStructure, companyStaffId, companyZoneId } from '@/lib/company-chart-structure'
 import type { CompanyLevelRole } from '@/lib/company-hierarchy-levels'
 
+// The furniture around the canvas, in the sheet's tone (DESIGN.md › "Sheet
+// theme") — the same pieces the Revenue hierarchy wears (HierarchySpaces).
+// Written here rather than through the shared `.space-jumps` / `.space-tidy` /
+// `.space-memberships` / `.company-role-switcher` rules, which give a hovered
+// or picked button orange lettering — and orange is never lettering on the
+// sheet. The canvas itself keeps its own palette.
+/** A department pill: the sheet's filter chip, white, the picked one peach. */
+const JUMP_PILL = 'inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 text-xs transition-colors hover:border-accent aria-pressed:border-accent aria-pressed:bg-accent-bg aria-pressed:font-bold max-[700px]:min-h-[44px]'
+/** A small outline button. */
+const TOOL_BUTTON = 'inline-flex items-center gap-2 rounded-control border border-hairline bg-surface px-3 py-[7px] text-xs transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 max-[700px]:min-h-[44px]'
+/** A refusal: `.sheet-notice`'s geometry on the danger wash. */
+const DANGER_NOTE = 'my-3.5 rounded-md border border-danger/50 bg-danger-bg px-3.5 py-[11px] text-[12px] leading-[1.65] text-danger'
+/** A link on the sheet reads as one by its underline, never by colour. */
+const SHEET_LINK = 'underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink'
+
 export interface ChartPerson {
   id: string
   /** A staff identity may hold several independently titled scheme roles. */
@@ -709,16 +724,14 @@ function Chart({
   return (
     <div>
       {error ? (
-        <div role="alert" className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
+        <div role="alert" className={DANGER_NOTE}>
           {error}
         </div>
       ) : null}
+      {/* A saved move is the sheet's peach notice; a refused or half-done
+          undo is its amber warning. Both in black — the wash says which. */}
       {note && !error ? (
-        <div
-          className={`rounded-md p-3 mb-4 text-sm font-sans border ${
-            warn ? 'bg-alert-bg border-alert/40 text-alert' : 'bg-surface-2 border-hairline text-ink'
-          }`}
-        >
+        <div className={warn ? 'sheet-warning' : 'sheet-notice'}>
           {note}
           {undo ? (
             <button
@@ -752,9 +765,12 @@ function Chart({
         </div>
       ) : null}
 
-      <div className="space-toolbar">
-        <div className="space-jumps" aria-label="Filter by department">
-          <button type="button" onClick={() => {
+      {/* The sheet's toolbar panel (`.sheet-toolbar`'s look, spelled out so the
+          search keeps its own 16px face on a phone): the department pills on
+          the left, search, Expand all, Tidy and zoom on the right. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hairline bg-surface-2 p-3.5">
+        <div className="flex flex-wrap items-center gap-[7px]" aria-label="Filter by department">
+          <button type="button" className={JUMP_PILL} onClick={() => {
             onFocus(null)
             setExpandedTeams(new Set())
             setExpandedZones(new Set())
@@ -764,13 +780,15 @@ function Chart({
             setArrangementVersion(version => version + 1)
           }} aria-pressed={focusDept === ALL_DEPARTMENTS}>Whole company</button>
           {departmentFilters.map(department => <button
-            key={department.id} type="button"
+            key={department.id} type="button" className={JUMP_PILL}
             onClick={() => chooseDepartment(focusDept === department.id ? ALL_DEPARTMENTS : department.id)}
             aria-pressed={focusDept === department.id}
           >{department.name}</button>)}
         </div>
         <div className="space-actions">
       <div className="space-search">
+        {/* `.space-search input` draws the field (white, hairline, 16px on a
+            phone); the placeholder is left to the sheet, which fades it. */}
         <input
           type="search"
           value={find}
@@ -784,12 +802,12 @@ function Chart({
           }}
           placeholder="Find a person…"
           aria-label="Find somebody on the chart by name"
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-control text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border font-sans"
+          className="focus:outline-none focus:border-accent-border"
         />
         {find.trim() ? (
           <div className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto border border-hairline rounded-control bg-surface shadow-md">
             {matches.length === 0 ? (
-              <p className="px-3 py-2 font-serif italic text-xs text-muted">
+              <p className="px-3 py-2 text-xs">
                 Nobody on the chart matches that.
               </p>
             ) : (
@@ -800,8 +818,8 @@ function Chart({
                   onClick={() => reveal(m.id)}
                   className="w-full text-left px-3 py-2 hover:bg-surface-2 border-b border-hairline last:border-b-0"
                 >
-                  <span className="block font-serif text-sm text-ink truncate">{m.name}</span>
-                  <span className="block font-mono text-[0.58rem] uppercase tracking-wide text-muted truncate">
+                  <span className="block text-[13px] font-medium truncate">{m.name}</span>
+                  <span className="block text-[11px] truncate">
                     {m.title ?? 'no title'} · {m.subDepartment ?? m.department ?? 'no department'}
                   </span>
                 </button>
@@ -811,12 +829,12 @@ function Chart({
         ) : null}
       </div>
 
-          <button type="button" className="space-tidy" onClick={() => {
+          <button type="button" className={TOOL_BUTTON} onClick={() => {
             setExpandedZones(new Set(departmentDefinitions.map(department => department.id)))
             setExpandedTeams(new Set(structure.teams.map(team => team.id)))
             setArrangementVersion(version => version + 1)
           }}>Expand all</button>
-          <button type="button" className="space-tidy" onClick={() => {
+          <button type="button" className={`${TOOL_BUTTON} font-medium`} onClick={() => {
             spaces.tidy()
             setArrangementVersion(version => version + 1)
           }} title="Align roles by L level within the department zones">Tidy</button>
@@ -828,34 +846,46 @@ function Chart({
         </div>
       </div>
 
+      {/* The canvas's receipt. A count that needs somebody — a line leaving
+          the focused department, a line the ladder refuses — is a word on a
+          wash, not coloured words in the sentence. */}
       <div className="space-overview">
-        <p className="font-serif italic text-muted text-xs">
+        <p className="text-xs">
           {new Set(scoped.map(companyStaffId)).size} people · {scoped.length} roles
           {' · '}{new Set(scoped.map(person => departmentKey(person.department))).size} departments
           {' · '}{structure.teams.filter(team => visibleDepartmentIds === null || visibleDepartmentIds.includes(team.departmentId)).length} teams · {unplaced} reporting to nobody
           {directed > 0 ? ` · ${directed} at the top of a tree under a director` : ''}
           {outside > 0 ? (
-            <span className="text-alert">
-              {' '}
-              · {outside} {outside === 1 ? 'reports' : 'report'} outside {focusDept}
-            </span>
+            <>
+              {' · '}
+              <span className="chip alert">
+                <span className="dot" aria-hidden />
+                {outside} {outside === 1 ? 'reports' : 'report'} outside {focusDept}
+              </span>
+            </>
           ) : null}
           {hidden > 0 ? ` · ${hidden} roles in other departments` : ''}
           {broken > 0 ? (
-            <span className="text-danger">
-              {' '}
-              · {broken} {broken === 1 ? 'line breaks' : 'lines break'} the ladder
-            </span>
+            <>
+              {' · '}
+              <span className="chip danger">
+                <span className="dot" aria-hidden />
+                {broken} {broken === 1 ? 'line breaks' : 'lines break'} the ladder
+              </span>
+            </>
           ) : null}
           {pending ? ' · saving…' : ''}
         </p>
         <span>{pending ? 'Saving reporting line…' : 'Height follows L level · Higher levels above'}</span>
       </div>
 
-      {selectedPerson && selectedRoles.length > 1 ? <div className="company-role-switcher" aria-label={`Roles held by ${selectedPerson.name}`}>
-        <strong>{selectedPerson.name} · {selectedRoles.length} roles</strong>
-        <div className="space-memberships">{selectedRoles.map(role => <button type="button" key={role.id}
-          aria-pressed={selected === role.id} onClick={() => reveal(role.id)}>
+      {/* Somebody who holds several roles: a white panel with one pill per
+          role, the one on screen picked in peach — the department pills'
+          vocabulary. */}
+      {selectedPerson && selectedRoles.length > 1 ? <div className="mb-3 rounded-lg border border-hairline bg-surface px-3.5 py-3" aria-label={`Roles held by ${selectedPerson.name}`}>
+        <strong className="mb-2 block text-xs font-medium">{selectedPerson.name} · {selectedRoles.length} roles</strong>
+        <div className="flex flex-wrap gap-1.5">{selectedRoles.map(role => <button type="button" key={role.id}
+          className={JUMP_PILL} aria-pressed={selected === role.id} onClick={() => reveal(role.id)}>
           {role.subDepartment ?? role.department ?? 'No department'} · {role.title ?? 'No title'}
         </button>)}</div>
       </div> : null}
@@ -898,9 +928,9 @@ function Chart({
       </div>
 
       <div className="space-footer">
-        <span className="text-xs text-muted">Expand a department, then a team. Drag headings left or right; L levels determine height.</span>
+        <span className="text-xs">Expand a department, then a team. Drag headings left or right; L levels determine height.</span>
         {selectedPerson?.secondaryRole && selectedPerson.membershipHref ? (
-          <Link href={selectedPerson.membershipHref} className="text-xs text-accent hover:underline">
+          <Link href={selectedPerson.membershipHref} className={`text-xs ${SHEET_LINK}`}>
             Edit {selectedPerson.name}&rsquo;s {selectedPerson.subDepartment} role on Revenue →
           </Link>
         ) : selected && visibleIds.has(selected) ? (
@@ -908,26 +938,28 @@ function Chart({
             type="button"
             disabled={pending}
             onClick={() => move(selected, null)}
-            className="text-xs font-sans text-accent hover:underline"
+            className={`text-xs ${SHEET_LINK}`}
           >
             Detach {byId.get(selected)?.name} to the top level
           </button>
         ) : (
-          <span className="font-serif italic text-muted text-xs">
+          <span className="text-xs">
             Click a card to select it, then detach it if it should report to nobody.
           </span>
         )}
       </div>
 
+      {/* The legend. Each line's sample carries its colour — the red one
+          included — so the words beside them stay black. */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3">
-        <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
+        <span className="inline-flex items-center gap-2 text-xs">
           <svg width="26" height="6" aria-hidden>
             <line x1="0" y1="3" x2="26" y2="3" stroke="var(--hairline-strong, #b9b0a2)" strokeWidth="1.5" />
           </svg>
           Manager → report
         </span>
         {directed > 0 ? (
-          <span className="inline-flex items-center gap-2 font-serif italic text-xs text-graphite">
+          <span className="inline-flex items-center gap-2 text-xs">
             <svg width="26" height="6" aria-hidden>
               <line x1="0" y1="3" x2="26" y2="3" stroke="var(--hairline-strong, #b9b0a2)" strokeWidth="1.5" strokeDasharray="5 4" />
             </svg>
@@ -935,7 +967,7 @@ function Chart({
           </span>
         ) : null}
         {broken > 0 ? (
-          <span className="inline-flex items-center gap-2 font-serif italic text-xs text-danger">
+          <span className="inline-flex items-center gap-2 text-xs">
             <svg width="26" height="6" aria-hidden>
               <line x1="0" y1="3" x2="26" y2="3" stroke="rgb(var(--danger))" strokeWidth="1.75" />
             </svg>
@@ -943,7 +975,7 @@ function Chart({
             <Link
               href="/team/hierarchy?tab=levels"
               scroll={false}
-              className="ml-1 not-italic font-sans text-[11px] text-accent hover:underline"
+              className={`ml-1 text-[11px] ${SHEET_LINK}`}
             >
               see Levels →
             </Link>
@@ -954,14 +986,14 @@ function Chart({
         {commissionHref ? (
           <Link
             href={commissionHref}
-            className="font-sans text-[11px] text-accent hover:underline"
+            className={`text-[11px] ${SHEET_LINK}`}
           >
             Commission hierarchy on Revenue →
           </Link>
         ) : null}
       </div>
 
-      <p className="font-serif italic text-muted text-xs mt-3 max-w-3xl">
+      <p className="text-xs mt-3 max-w-3xl leading-relaxed">
         Cards with the same L level share a row, even when one reports to another. Arrows show the reporting direction.
         Each card represents one role. A person with appointments in multiple sub-departments
         appears in each, with that role&rsquo;s title and reporting line. Select a card to

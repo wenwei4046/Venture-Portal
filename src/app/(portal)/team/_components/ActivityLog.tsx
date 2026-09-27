@@ -49,42 +49,54 @@ export default async function ActivityLog({
       </div>
 
       {rows.length === 0 ? (
-        <div className="py-10 text-center border border-hairline rounded-card bg-surface">
-          <p className="font-serif italic text-muted text-sm">
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+          <p className="text-sm">
             Nothing recorded yet. Page visits are logged from the moment they
             next sign in.
           </p>
         </div>
       ) : (
-        <ol className="border-t border-hairline">
-          {rows.map((row, i) => {
-            const line = describeActivity(row, labels)
-            const at = dayjs(row.created_at)
-            return (
-              <li
-                key={`${row.created_at}-${i}`}
-                className="py-2.5 border-b border-hairline last:border-0 flex items-baseline justify-between gap-4"
-              >
-                <div className="min-w-0">
-                  <span className="font-sans text-xs uppercase tracking-wide text-graphite mr-2">
-                    {line.verb}
-                  </span>
-                  <span className="font-serif text-md text-ink">{line.target}</span>
-                  {line.detail ? (
-                    <span className="font-mono text-[11px] text-muted ml-2">{line.detail}</span>
-                  ) : null}
-                </div>
-                <time
-                  dateTime={row.created_at}
-                  className="font-mono text-xs text-muted shrink-0"
-                  title={at.format('D MMM YYYY HH:mm:ss')}
-                >
-                  {at.format('D MMM HH:mm')}
-                </time>
-              </li>
-            )
-          })}
-        </ol>
+        // One line per visit or read, newest first, in the sheet's table —
+        // the same three columns as the person card's Activity tab.
+        <div className="table-scroll">
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th className="w-[112px]">When</th>
+                <th className="w-[104px]">Action</th>
+                <th>Where</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const line = describeActivity(row, labels)
+                const at = dayjs(row.created_at)
+                return (
+                  <tr key={`${row.created_at}-${i}`}>
+                    <td className="whitespace-nowrap">
+                      <time
+                        dateTime={row.created_at}
+                        className="font-mono text-[11px]"
+                        title={at.format('D MMM YYYY HH:mm:ss')}
+                      >
+                        {at.format('D MMM HH:mm')}
+                      </time>
+                    </td>
+                    <td className="text-[10.5px] font-medium uppercase tracking-[0.06em]">
+                      {line.verb}
+                    </td>
+                    <td>
+                      {line.target}
+                      {line.detail ? (
+                        <span className="font-mono text-[11px] ml-2">{line.detail}</span>
+                      ) : null}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   )

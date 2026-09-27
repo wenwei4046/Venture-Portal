@@ -164,30 +164,32 @@ export default async function PeopleManagementPage() {
             <em>I.</em> PEOPLE · MANAGEMENT
           </div>
           <h1 className="page-title">People</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          <p className="text-sm mt-3 max-w-2xl">
             Everyone on the payroll, the title they hold and the department it
             sits under. An account is what lets somebody sign in — most of the
             roster has none yet.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        {/* One orange action — adding somebody; the other two are the sheet's
+            outlined buttons. */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {user.role === 'principal' ? (
             <Link
               href="/team/people/invite"
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
             >
               Invite user
             </Link>
           ) : null}
           <Link
             href="/team/people/import"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             Import InfoTech
           </Link>
           <Link
             href="/team/people/new"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
             + Add person
           </Link>

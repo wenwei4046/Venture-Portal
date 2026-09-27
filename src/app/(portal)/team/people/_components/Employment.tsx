@@ -47,30 +47,28 @@ export default function Employment({
   return (
     <div className="mt-6 pt-4 border-t border-hairline flex flex-wrap items-start gap-x-4 gap-y-2">
       <div className="min-w-0 flex-1">
-        <div className="font-sans text-[10px] uppercase tracking-[0.14em] text-accent">
-          Employment
-        </div>
-        <div className="font-serif text-sm text-ink mt-1.5">
+        <div className="text-[10px] font-bold uppercase tracking-[0.1em]">Employment</div>
+        <div className="text-sm mt-1.5">
           {active ? (
             confirming ? (
               <>
-                Deactivate <span className="text-ink">{personName}</span>? They leave the org
+                Deactivate <span className="font-bold">{personName}</span>? They leave the org
                 charts and every active list. Nothing is deleted.
               </>
             ) : (
-              <span className="italic text-muted">
+              <>
                 Active. Deactivating takes them off both hierarchy charts and moves them to the
                 roster&rsquo;s Inactive tab.
-              </span>
+              </>
             )
           ) : (
-            <span className="italic text-muted">
+            <>
               Inactive. Their record is intact — reactivating puts them back on the charts where
               they left off.
-            </span>
+            </>
           )}
         </div>
-        {error ? <div className="font-serif italic text-danger text-xs mt-1.5">{error}</div> : null}
+        {error ? <div className="sheet-danger mt-2 mb-0">{error}</div> : null}
       </div>
 
       {!active ? (
@@ -78,17 +76,19 @@ export default function Employment({
           type="button"
           onClick={() => run(reactivateStaff)}
           disabled={pending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {pending ? 'Reactivating…' : 'Reactivate'}
         </button>
       ) : confirming ? (
         <div className="flex items-center gap-3">
+          {/* Red, not orange: this is the one destructive step, and red on
+              white carries white lettering at a readable contrast. */}
           <button
             type="button"
             onClick={() => run(deactivateStaff)}
             disabled={pending}
-            className="bg-danger hover:bg-danger-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-danger hover:bg-danger/90 text-white text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {pending ? 'Deactivating…' : 'Confirm'}
           </button>
@@ -96,7 +96,7 @@ export default function Employment({
             type="button"
             onClick={() => setConfirming(false)}
             disabled={pending}
-            className="font-serif italic text-sm text-muted hover:text-ink transition-colors"
+            className="text-sm hover:underline underline-offset-[3px]"
           >
             Cancel
           </button>
@@ -105,7 +105,7 @@ export default function Employment({
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="font-serif italic text-sm text-muted hover:text-danger transition-colors px-4 py-2"
+          className="border border-hairline bg-surface hover:border-danger hover:bg-danger-bg hover:text-danger text-sm px-4 py-2 rounded-control transition-colors"
         >
           Deactivate
         </button>

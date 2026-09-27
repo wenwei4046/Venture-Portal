@@ -25,12 +25,31 @@ describe('isSheetRoute', () => {
     }
   })
 
+  it('puts the rest of HR’s sidebar on the sheet: the Overview and People', () => {
+    for (const path of [
+      '/dashboard',
+      '/team/people',
+      '/team/people/new',
+      '/team/people/import',
+      '/team/people/invite',
+      '/team/people/94982346-42aa-4ad7-b84c-c1a1ff858f38',
+      '/team/people/94982346-42aa-4ad7-b84c-c1a1ff858f38/edit',
+      '/team/accounts/abc',
+      '/team/hierarchy',
+      '/team/roles',
+      '/team/permissions',
+      '/member-admin',
+    ]) {
+      expect(isSheetRoute(path), path).toBe(true)
+    }
+  })
+
   it('leaves the Product List in its own workspace', () => {
     expect(isSheetRoute('/revenue/products')).toBe(false)
   })
 
   it('leaves the rest of the portal as it is', () => {
-    for (const path of ['/dashboard', '/payments', '/team/people', '/reports/ledger', '/settings', '/hr-costingx', '/revenue-x']) {
+    for (const path of ['/payments', '/approvals', '/reports/ledger', '/settings', '/hr-costingx', '/revenue-x', '/teams', '/dashboards']) {
       expect(isSheetRoute(path), path).toBe(false)
     }
   })

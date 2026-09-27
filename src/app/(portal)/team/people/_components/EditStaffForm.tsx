@@ -65,6 +65,13 @@ interface Props {
   onCancel?: () => void
 }
 
+/** A tick that changes what the form asks: peach and edged in orange while on
+ *  (DESIGN.md › "Sheet theme"). */
+const tickTile = (on: boolean) =>
+  `flex items-start gap-3 border rounded-card p-3 mb-6 cursor-pointer transition-colors ${
+    on ? 'bg-accent-bg border-accent' : 'bg-surface border-hairline'
+  }`
+
 export default function EditStaffForm({ staff, titles, embedded, onSaved, onCancel }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -120,39 +127,43 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
   }
 
   return (
-    <form ref={formRef} action={handleSubmit} className={embedded ? '' : 'bg-surface border border-hairline rounded-md p-6 max-w-3xl'}>
+    // On its own page the form is the sheet's form panel — white fields on a
+    // tinted card; embedded, the person card is the panel.
+    <form ref={formRef} action={handleSubmit} className={embedded ? '' : 'bg-surface-2 border border-hairline rounded-card p-6 max-w-3xl'}>
       {/* Section 1 — Identity */}
-      <h3 className="font-serif text-lg text-ink mb-4">Identity</h3>
+      <h3 className="sheet-heading mb-4">Identity</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>
+          <label className="block text-sm font-medium mb-1.5">Name</label>
           <input
             name="name"
             required
             defaultValue={staff.employee_name}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Department</label>
+          <label className="block text-sm font-medium mb-1.5">Department</label>
+          {/* Disabled, so the sheet fades it: the department is shown here,
+              not edited. */}
           <input
             value={staff.department_name}
             readOnly
             disabled
-            className="w-full px-3 py-2 bg-surface-2 border border-hairline rounded-md text-sm font-sans text-muted italic"
+            className="w-full px-3 py-2 bg-surface-2 border border-hairline rounded-control text-sm"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          <label className="block text-sm font-medium mb-1.5">
             Designation{' '}
-            <span className="text-xs text-muted ml-1 font-normal">
+            <span className="text-xs ml-1 font-normal">
               (a title from Role &amp; Permission)
             </span>
           </label>
           <select
             name="title_id"
             defaultValue={staff.title_id ?? ''}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           >
             <option value="">— None</option>
             {titleChoices.map(t => (
@@ -164,8 +175,8 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           </select>
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Employee Code <span className="text-xs text-muted ml-1 font-normal">(unique · blank keeps it)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Employee Code <span className="text-xs ml-1 font-normal">(unique · blank keeps it)</span>
           </label>
           {/* Numbered by the database (HV + max + 1, 2026-09-12); a blank
               here keeps the code they have — a code is never cleared, only
@@ -174,13 +185,13 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             name="employee_code"
             defaultValue={staff.employee_code ?? ''}
             placeholder="HV001"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+          <label className="block text-sm font-medium mb-1.5">
             InfoTech No{' '}
-            <span className="text-xs text-muted ml-1 font-normal">
+            <span className="text-xs ml-1 font-normal">
               (InfoTech&apos;s own code · the imports match on it)
             </span>
           </label>
@@ -192,12 +203,12 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             name="infotech_code"
             defaultValue={staff.infotech_code ?? ''}
             placeholder="HV022"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            NRIC <span className="text-xs text-muted ml-1 font-normal">(12 digits, for statutory files)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            NRIC <span className="text-xs ml-1 font-normal">(12 digits, for statutory files)</span>
           </label>
           {/* The dash in the pattern has to be escaped: unescaped between `9`
               and `\s` the browser reads it as a range, throws under the `v`
@@ -207,16 +218,16 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             defaultValue={staff.nric ?? ''}
             placeholder="850101141234"
             pattern="[0-9\-\s]*"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
           />
         </div>
         {staff.commission_dept || staff.director_dept ? null : (
           <div>
-            <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Employment Type</label>
+            <label className="block text-sm font-medium mb-1.5">Employment Type</label>
             <select
               name="employment_type"
               defaultValue={staff.employment_type}
-              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
             >
               <option value="salaried">Salaried (fixed basic)</option>
               <option value="commission_eligible">Commission-eligible (basic + commission rules)</option>
@@ -224,25 +235,25 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           </div>
         )}
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Hire Date <span className="text-xs text-muted ml-1 font-normal">(nullable)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Hire Date <span className="text-xs ml-1 font-normal">(nullable)</span>
           </label>
           <input
             name="hire_date"
             type="date"
             defaultValue={staff.hire_date ?? ''}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Resignation Date <span className="text-xs text-muted ml-1 font-normal">(leave blank if active)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Resignation Date <span className="text-xs ml-1 font-normal">(leave blank if active)</span>
           </label>
           <input
             name="resignation_date"
             type="date"
             defaultValue={staff.resignation_date ?? ''}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>
@@ -252,12 +263,9 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           not on the form, and the save leaves the categories as they were.
           In the Director department "Variable pay" hides only the three pay
           fields — the statutory categories stay, and are written. */}
-      <h3 className="font-serif text-lg text-ink mb-4">Salary</h3>
+      <h3 className="sheet-heading mb-4">Salary</h3>
       {staff.commission_dept ? (
-        <label
-          htmlFor="edit-full-commission"
-          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-6 cursor-pointer"
-        >
+        <label htmlFor="edit-full-commission" className={tickTile(fullCommission)}>
           <input
             id="edit-full-commission"
             type="checkbox"
@@ -267,10 +275,10 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             className="w-4 h-4 accent-accent mt-0.5 shrink-0"
           />
           <span>
-            <span className="block text-sm font-sans font-medium text-ink">
+            <span className="block text-sm font-medium">
               Fully commission based
             </span>
-            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+            <span className="block text-xs mt-0.5">
               No basic salary and no allowances — 100% of pay is commission from the sales
               import, so EPF / SOCSO / EIS come out at 0. Untick to give them a basic and set
               their statutory categories. Withholding Tax is ticked per person on the
@@ -280,10 +288,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         </label>
       ) : null}
       {staff.director_dept ? (
-        <label
-          htmlFor="edit-variable-pay"
-          className="flex items-start gap-3 bg-surface-2 border border-hairline rounded-md p-3 mb-6 cursor-pointer"
-        >
+        <label htmlFor="edit-variable-pay" className={tickTile(variablePay)}>
           <input
             id="edit-variable-pay"
             type="checkbox"
@@ -293,8 +298,8 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             className="w-4 h-4 accent-accent mt-0.5 shrink-0"
           />
           <span>
-            <span className="block text-sm font-sans font-medium text-ink">Variable pay</span>
-            <span className="block font-serif italic text-graphite text-xs mt-0.5">
+            <span className="block text-sm font-medium">Variable pay</span>
+            <span className="block text-xs mt-0.5">
               Calculated by variable — the figure is worked out every month by the Director
               Salary engine and keyed in for that month, so there is no basic salary or
               allowance on the record. Statutory follows whatever is keyed, by the categories
@@ -304,22 +309,22 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         </label>
       ) : null}
       {fullCommission ? (
-        <p className="font-serif italic text-muted text-sm mb-6">
+        <p className="sheet-notice mt-0 mb-6">
           Saved as fully commission based — basic, statutory allowance and non-statutory
           allowance all 0.00.
         </p>
       ) : (
         <>
       {variablePay ? (
-        <p className="font-serif italic text-muted text-sm mb-6">
+        <p className="sheet-notice mt-0 mb-6">
           Saved as variable pay — basic, statutory allowance and non-statutory allowance all
           0.00; the month&apos;s figure is keyed on that month&apos;s payroll.
         </p>
       ) : (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Basic <span className="text-xs text-muted ml-1 font-normal">(RM)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Basic <span className="text-xs ml-1 font-normal">(RM)</span>
           </label>
           <input
             name="basic_salary"
@@ -328,12 +333,12 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             min="0"
             required
             defaultValue={staff.basic_salary}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono tabular font-medium focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Statutory Allow. <span className="text-xs text-muted ml-1 font-normal">(RM, EPF)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Statutory Allow. <span className="text-xs ml-1 font-normal">(RM, EPF)</span>
           </label>
           <input
             name="allowances"
@@ -341,12 +346,12 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             step="0.01"
             min="0"
             defaultValue={staff.allowances}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono tabular font-medium focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Non-Stat. Allow. <span className="text-xs text-muted ml-1 font-normal">(RM, no EPF)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Non-Stat. Allow. <span className="text-xs ml-1 font-normal">(RM, no EPF)</span>
           </label>
           <input
             name="non_statutory_allowance"
@@ -354,21 +359,21 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             step="0.01"
             min="0"
             defaultValue={staff.non_statutory_allowance ?? 0}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono tabular font-medium focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>
       )}
 
       {/* Section 3 — Statutory categories */}
-      <h3 className="font-serif text-lg text-ink mb-4">Statutory</h3>
+      <h3 className="sheet-heading mb-4">Statutory</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">EPF Category</label>
+          <label className="block text-sm font-medium mb-1.5">EPF Category</label>
           <select
             name="epf_category"
             defaultValue={staff.epf_category}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           >
             <option value="A">Part A (MYR citizen, under 60)</option>
             <option value="C">Part C (MYR citizen, 60+)</option>
@@ -377,7 +382,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           </select>
         </div>
         <div className="flex items-center pt-6">
-          <label className="flex items-center gap-2 text-sm font-sans text-ink cursor-pointer">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
               name="is_epf_exempt"
@@ -385,15 +390,15 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
               className="w-4 h-4 accent-accent"
             />
             <span>EPF Exempt</span>
-            <span className="text-xs text-muted italic ml-1">(contract, intern, etc.)</span>
+            <span className="text-xs ml-1">(contract, intern, etc.)</span>
           </label>
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">SOCSO Category</label>
+          <label className="block text-sm font-medium mb-1.5">SOCSO Category</label>
           <select
             name="socso_category"
             defaultValue={staff.socso_category}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           >
             <option value="first">First (under 60, citizen/PR)</option>
             <option value="second">Second (60+ or non-citizen)</option>
@@ -401,11 +406,11 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         </div>
         <div>{/* spacer */}</div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">PCB Category</label>
+          <label className="block text-sm font-medium mb-1.5">PCB Category</label>
           <select
             name="pcb_category"
             defaultValue={staff.pcb_category}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           >
             <option value="KA1">KA1 (Single / unmarried)</option>
             <option value="KA2">KA2 (Married, spouse not working)</option>
@@ -413,8 +418,8 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           </select>
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Children <span className="text-xs text-muted ml-1 font-normal">(for PCB relief)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Children <span className="text-xs ml-1 font-normal">(for PCB relief)</span>
           </label>
           <input
             name="children_count"
@@ -422,7 +427,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             min="0"
             step="1"
             defaultValue={staff.children_count ?? 0}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono tabular font-medium focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>
@@ -430,50 +435,50 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
       )}
 
       {/* Section 4 — Bank account (Spec 5) */}
-      <h3 className="font-serif text-lg text-ink mb-4">Account 1 <span className="text-xs text-muted font-normal">Default receiving bank account</span></h3>
+      <h3 className="sheet-heading mb-4">Account 1 <span className="text-xs ml-1 font-normal">Default receiving bank account</span></h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
-          <label htmlFor="edit-staff-bank" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Account 1 bank <span className="text-xs text-muted ml-1 font-normal">(e.g. Maybank, Hong Leong)</span>
+          <label htmlFor="edit-staff-bank" className="block text-sm font-medium mb-1.5">
+            Account 1 bank <span className="text-xs ml-1 font-normal">(e.g. Maybank, Hong Leong)</span>
           </label>
           <input
             name="bank_name"
             id="edit-staff-bank"
             defaultValue={staff.bank_name ?? ''}
             placeholder="Maybank"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label htmlFor="edit-staff-bank-account" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Account 1 number <span className="text-xs text-muted ml-1 font-normal">(digits only)</span>
+          <label htmlFor="edit-staff-bank-account" className="block text-sm font-medium mb-1.5">
+            Account 1 number <span className="text-xs ml-1 font-normal">(digits only)</span>
           </label>
           <input
             name="bank_account_no"
             id="edit-staff-bank-account"
             defaultValue={staff.bank_account_no ?? ''}
             placeholder="1234567890"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>
 
-      <h3 className="font-serif text-lg text-ink mb-1">Account 2 <span className="text-xs text-muted font-normal">Optional</span></h3>
-      <p className="text-xs text-muted mb-4">Enter both the bank and account number, or leave both blank.</p>
+      <h3 className="sheet-heading">Account 2 <span className="text-xs ml-1 font-normal">Optional</span></h3>
+      <p className="sheet-subtitle mb-4">Enter both the bank and account number, or leave both blank.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
-          <label htmlFor="edit-staff-bank-2" className="block text-sm font-sans font-medium text-graphite mb-1.5">Account 2 bank</label>
+          <label htmlFor="edit-staff-bank-2" className="block text-sm font-medium mb-1.5">Account 2 bank</label>
           <input
             id="edit-staff-bank-2"
             name="bank_name_2"
             defaultValue={staff.bank_name_2 ?? ''}
             autoComplete="off"
             placeholder="Maybank"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label htmlFor="edit-staff-bank-account-2" className="block text-sm font-sans font-medium text-graphite mb-1.5">Account 2 number <span className="text-xs text-muted ml-1 font-normal">(digits only)</span></label>
+          <label htmlFor="edit-staff-bank-account-2" className="block text-sm font-medium mb-1.5">Account 2 number <span className="text-xs ml-1 font-normal">(digits only)</span></label>
           <input
             id="edit-staff-bank-account-2"
             name="bank_account_no_2"
@@ -481,77 +486,77 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             inputMode="numeric"
             autoComplete="off"
             placeholder="1234567890"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>
 
       {/* Section 5 — Contact */}
-      <h3 className="font-serif text-lg text-ink mb-4">Contact</h3>
+      <h3 className="sheet-heading mb-4">Contact</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Phone <span className="text-xs text-muted ml-1 font-normal">(Malaysian format)</span>
+          <label className="block text-sm font-medium mb-1.5">
+            Phone <span className="text-xs ml-1 font-normal">(Malaysian format)</span>
           </label>
           <input
             name="contact_number"
             type="tel"
             defaultValue={staff.contact_number ?? ''}
             placeholder="012-345 6789"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Email</label>
+          <label className="block text-sm font-medium mb-1.5">Email</label>
           <input
             name="email"
             type="email"
             defaultValue={staff.email ?? ''}
             placeholder="name@example.com"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Address</label>
+          <label className="block text-sm font-medium mb-1.5">Address</label>
           <textarea
             name="address"
             rows={2}
             defaultValue={staff.address ?? ''}
             placeholder="Street, city, postcode"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border resize-y"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border resize-y"
           />
         </div>
       </div>
 
       {/* Section 6 — Emergency Contact */}
-      <h3 className="font-serif text-lg text-ink mb-4">Emergency Contact</h3>
+      <h3 className="sheet-heading mb-4">Emergency Contact</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Name</label>
+          <label className="block text-sm font-medium mb-1.5">Name</label>
           <input
             name="emergency_contact_name"
             defaultValue={staff.emergency_contact_name ?? ''}
             placeholder="Full name"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Relationship</label>
+          <label className="block text-sm font-medium mb-1.5">Relationship</label>
           <input
             name="emergency_contact_relationship"
             defaultValue={staff.emergency_contact_relationship ?? ''}
             placeholder="Spouse, Parent, Sibling…"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
           />
         </div>
         <div>
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">Phone</label>
+          <label className="block text-sm font-medium mb-1.5">Phone</label>
           <input
             name="emergency_contact_phone"
             type="tel"
             defaultValue={staff.emergency_contact_phone ?? ''}
             placeholder="012-345 6789"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm font-mono focus:outline-none focus:border-accent-border"
           />
         </div>
       </div>
@@ -562,9 +567,12 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
           `-mb-5 pb-5` pulls it over the scroll area's own bottom padding:
           without that the padding stays transparent and the next field scrolls
           through the gap under the bar, which reads as a bar that is not fixed
-          to anything. */}
+          to anything. `bg-paper` is the person card's own ground, so the bar
+          reads as part of the card it sticks to. A save says so with a chip; a
+          refusal is the sheet's red callout on a line of its own, still inside
+          the bar so it stays in view. */}
       <div
-        className={`flex items-center gap-3 pt-4 border-t border-hairline ${
+        className={`flex flex-wrap items-center gap-3 pt-4 border-t border-hairline ${
           embedded
             ? 'sticky bottom-0 z-10 -mx-5 -mb-5 px-5 pb-5 bg-paper shadow-[0_-10px_16px_-12px_rgba(0,0,0,0.28)]'
             : ''
@@ -573,7 +581,7 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
         <button
           type="submit"
           disabled={isPending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-accent hover:bg-accent-hover text-ink text-sm font-medium px-4 py-2 rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? 'Saving...' : 'Save changes'}
         </button>
@@ -582,13 +590,18 @@ export default function EditStaffForm({ staff, titles, embedded, onSaved, onCanc
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-3 py-2 rounded-md transition-colors disabled:opacity-50"
+            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
         ) : null}
-        {saved && <span className="text-sm font-serif italic text-ledger">Saved.</span>}
-        {error && <span className="text-sm font-serif italic text-danger">{error}</span>}
+        {saved && (
+          <span className="chip ledger">
+            <span className="dot" aria-hidden />
+            Saved
+          </span>
+        )}
+        {error && <p className="sheet-danger basis-full m-0">{error}</p>}
       </div>
     </form>
   )

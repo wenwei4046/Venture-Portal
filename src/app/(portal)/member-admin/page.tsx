@@ -15,13 +15,19 @@ export default async function MemberAdminPage() {
   const result = await adminMemberAction({ action: "list" });
   if (!result.ok)
     return (
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">REVENUE · MEMBER SERVICES</div>
-          <h1 className="page-title">Member services</h1>
-          <p className="text-graphite mt-4">{result.error}</p>
+      <div>
+        <div className="page-head">
+          <div>
+            <div className="page-eyebrow">
+              <em>I.</em> PEOPLE · MEMBER SERVICES
+            </div>
+            <h1 className="page-title">Member services</h1>
+          </div>
         </div>
+        <div className="sheet-danger">{result.error}</div>
       </div>
     );
-  return <MemberAdmin initialData={result.data} />;
+  // `portal`: this page sits on the portal's white sheet (lib/sheet-routes.ts),
+  // so it wears the portal's page head and tabs rather than the member app's.
+  return <MemberAdmin initialData={result.data} portal />;
 }

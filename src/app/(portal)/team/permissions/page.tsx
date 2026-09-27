@@ -89,7 +89,7 @@ export default async function PermissionsPage() {
             <em>I.</em> PEOPLE · PERMISSIONS
           </div>
           <h1 className="page-title">Permissions</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          <p className="text-sm mt-3 max-w-2xl">
             What each title is allowed to do. A title with no permissions of its
             own falls back to the role each holder&apos;s account was created
             with; a person can be granted or denied one thing more on their own

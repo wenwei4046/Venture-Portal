@@ -63,7 +63,7 @@ export default async function InviteUserPage({ searchParams }: PageProps) {
     <div>
       <Link
         href="/team/people"
-        className="text-sm text-muted hover:text-accent font-sans transition-colors"
+        className="text-sm hover:text-accent transition-colors"
       >
         ← Back to People
       </Link>
@@ -74,7 +74,7 @@ export default async function InviteUserPage({ searchParams }: PageProps) {
             <em>I.</em> PEOPLE · INVITE USER
           </div>
           <h1 className="page-title">{target ? `Invite ${target.employee_name}` : 'Invite user'}</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          <p className="text-sm mt-3 max-w-2xl">
             Creates a login they can sign in with straight away — there is no
             email step, so tell them the password yourself.
           </p>

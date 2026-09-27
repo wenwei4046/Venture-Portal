@@ -68,16 +68,12 @@ export default function PersonPermissions({
         </span>
       </div>
 
-      <p className="font-serif italic text-muted text-sm mb-4 max-w-2xl">
+      <p className="text-sm mb-4 max-w-2xl">
         Inherited from {source}. An exception applies to this person alone and
         overrides it either way.
       </p>
 
-      {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
-          {error}
-        </div>
-      ) : null}
+      {error ? <div className="sheet-danger mt-0 mb-4">{error}</div> : null}
 
       <div className="table-scroll">
         <table className="ledger-table">
@@ -125,71 +121,76 @@ function PermissionSection({
 }) {
   return (
     <>
-      <tr className="bg-surface">
-        <td colSpan={4}>
-          <span className="font-serif italic text-accent text-sm">{section}</span>
+      {/* A band row between sections, in the sheet's band tone. */}
+      <tr>
+        <td colSpan={4} className="bg-chrome/50 text-[10px] font-semibold uppercase tracking-[0.06em]">
+          {section}
         </td>
       </tr>
       {rows.map(r => {
         const effective = r.override ?? r.inherited
         return (
           <tr key={r.key}>
-            <td>
-              <span className="font-serif text-sm text-ink">{r.label}</span>
-            </td>
+            <td>{r.label}</td>
             <td className="text-center">
-              {r.inherited ? (
-                <span className="text-ledger">✓</span>
-              ) : (
-                <span className="text-muted">·</span>
-              )}
+              {r.inherited ? <span className="text-ledger">✓</span> : <span>·</span>}
             </td>
+            {/* An exception is the heavier glyph: a grant is a bold tick, a
+                denial a bold red dot — the Exception column says it in words. */}
             <td className="text-center">
               {effective ? (
-                <span className={r.override === true ? 'text-accent' : 'text-ledger'}>✓</span>
+                <span className={r.override === true ? 'text-ledger font-bold' : 'text-ledger'}>✓</span>
               ) : (
-                <span className={r.override === false ? 'text-danger' : 'text-muted'}>·</span>
+                <span className={r.override === false ? 'text-danger font-bold' : undefined}>·</span>
               )}
             </td>
             <td className="text-right whitespace-nowrap">
-              {canEdit ? (
-                <span className="inline-flex items-center gap-2">
-                  {r.override !== null ? (
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => onSet(r.key, null)}
-                      className="text-xs font-sans text-graphite hover:text-ink disabled:opacity-50"
-                    >
-                      {busy === r.key ? '…' : 'Follow title'}
-                    </button>
-                  ) : null}
-                  {r.override !== true && r.inherited === false ? (
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => onSet(r.key, true)}
-                      className="text-xs font-sans text-accent hover:underline disabled:opacity-50"
-                    >
-                      Grant
-                    </button>
-                  ) : null}
-                  {r.override !== false && r.inherited === true ? (
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => onSet(r.key, false)}
-                      className="text-xs font-sans text-danger hover:underline disabled:opacity-50"
-                    >
-                      Deny
-                    </button>
-                  ) : null}
-                </span>
-              ) : (
-                <span className="font-serif italic text-muted text-xs">
-                  {r.override === true ? 'granted' : r.override === false ? 'denied' : '—'}
-                </span>
-              )}
+              <span className="inline-flex items-center gap-2">
+                {/* The exception itself, as a word on a wash. */}
+                {r.override === true ? (
+                  <span className="chip accent">
+                    <span className="dot" aria-hidden />
+                    granted
+                  </span>
+                ) : r.override === false ? (
+                  <span className="chip danger">
+                    <span className="dot" aria-hidden />
+                    denied
+                  </span>
+                ) : canEdit ? null : (
+                  '—'
+                )}
+                {canEdit && r.override !== null ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onSet(r.key, null)}
+                    className="text-xs px-2 py-0.5 rounded-control border border-hairline bg-surface hover:bg-surface-2 transition-colors disabled:opacity-50"
+                  >
+                    {busy === r.key ? '…' : 'Follow title'}
+                  </button>
+                ) : null}
+                {canEdit && r.override !== true && r.inherited === false ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onSet(r.key, true)}
+                    className="text-xs px-2 py-0.5 rounded-control border border-accent bg-surface hover:bg-accent transition-colors disabled:opacity-50"
+                  >
+                    Grant
+                  </button>
+                ) : null}
+                {canEdit && r.override !== false && r.inherited === true ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onSet(r.key, false)}
+                    className="text-xs px-2 py-0.5 rounded-control border border-danger/40 bg-surface text-danger hover:bg-danger-bg transition-colors disabled:opacity-50"
+                  >
+                    Deny
+                  </button>
+                ) : null}
+              </span>
             </td>
           </tr>
         )

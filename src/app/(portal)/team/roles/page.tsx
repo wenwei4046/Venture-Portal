@@ -61,17 +61,22 @@ export default async function RolesPage() {
             <em>I.</em> PEOPLE · ROLES
           </div>
           <h1 className="page-title">Roles</h1>
-          <p className="font-serif italic text-graphite text-base mt-3 max-w-2xl">
+          {/* On the sheet a link in running text is black and underlined —
+              orange is never lettering (DESIGN.md › "Sheet theme"). */}
+          <p className="text-sm mt-3 max-w-2xl">
             A title says what somebody is called and which department that role
             belongs under. How high it stands is the ladder, under{' '}
             <Link
               href="/team/hierarchy?tab=levels"
-              className="text-accent hover:underline not-italic"
+              className="underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink"
             >
               Hierarchy → Levels
             </Link>
             ; what it is allowed to do is on{' '}
-            <Link href="/team/permissions" className="text-accent hover:underline not-italic">
+            <Link
+              href="/team/permissions"
+              className="underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink"
+            >
               Permissions
             </Link>
             .
