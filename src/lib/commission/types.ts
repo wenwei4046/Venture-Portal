@@ -16,6 +16,11 @@
  */
 
 import type { IrGroup } from './ir-groups'
+import type { KpiItem } from './kpi'
+import type { CostRatio } from './cost-basis'
+
+export type { KpiItem, KpiOptionPool } from './kpi'
+export type { CostRatio } from './cost-basis'
 
 // ─── Imported facts ─────────────────────────────────────────────────────────
 
@@ -24,7 +29,7 @@ export interface SalesLine {
   /** ERP `Item Group`, e.g. MATTRESS / SOFA / ACC / TRANS. Drives whether the
    *  line's revenue is commissionable at all. */
   itemGroup: string
-  /** ERP `Item Code` — matched against KPI items at compute time. */
+  /** ERP `Item Code` — matched against KPI items and cost ratios at compute time. */
   productCode: string
   productName?: string
   qty: number
@@ -44,6 +49,13 @@ export interface SalesLine {
    * rather than quietly paying full commission on a bad-margin bill.
    */
   costAmount?: number
+  /**
+   * The specials the line carries as printed (`parseLineFacts`: the ERP's
+   * `raw.variants`, else its `description2` grammar) — how a bed frame's HB
+   * Straight or a sofa's Wooden Arm is found as a KPI item. Loaded for bed
+   * frame and sofa lines only; absent = none.
+   */
+  specials?: string[]
   /**
    * The one line of an upsale HR recorded by hand (`comm_upsales`, 2026-09-24).
    * Always commissionable whatever the scheme's item groups say, never a KPI
@@ -113,13 +125,6 @@ export interface SalesOrder {
 export interface ItemGroupRule {
   group: string
   commissionable: boolean
-}
-
-/** A product that pays a flat KPI allowance instead of counting as revenue. */
-export interface KpiItem {
-  productCode: string
-  /** RM per unit, e.g. 50 or 60. */
-  kpiAmount: number
 }
 
 /** Ladder rung: sell `minQty` KPI units or more → uplift the whole KPI base. */
@@ -319,6 +324,12 @@ export interface CommissionScheme {
    * or 1 keeps the cost as imported.
    */
   costDivisor?: number
+  /**
+   * SKUs whose cost is divided by their OWN ratio instead (Product List ›
+   * Costing Setting, 2026-09-27: some SKUs divide by 0.6). Matched on the
+   * line's product code. Absent = every line at `costDivisor`.
+   */
+  costRatios?: CostRatio[]
 }
 
 export interface EngineInput {

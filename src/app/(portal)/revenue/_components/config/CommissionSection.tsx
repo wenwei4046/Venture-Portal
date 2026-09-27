@@ -1,10 +1,13 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { formatMoneyBare } from '@/lib/utils'
+import { PRODUCT_LIST_PATH } from '@/lib/revenue'
+import { kpiItemKind } from '@/lib/commission/kpi'
 import { compareRankPay, rankLetters, rankPayLabelOf, rankPayOf } from '@/lib/commission/ranks'
 import {
-  deleteKpiItem,
   deleteKpiThreshold,
   deleteMarginBand,
   deleteRankDef,
@@ -12,7 +15,6 @@ import {
   updateScheme,
   upsertBrand,
   upsertItemGroup,
-  upsertKpiItem,
   upsertKpiThreshold,
   upsertMarginBand,
   upsertRank,
@@ -134,7 +136,7 @@ export default function CommissionSection({
             Each sub-department calculates differently, so every rule on this page belongs to{' '}
             <em>{subDept.name}</em> alone — the sidebar is what switches between them. A new
             sub-department can <em>follow</em> an existing one&apos;s rules — every rank, item group,
-            KPI item, threshold, Open Bill rate, brand and margin band is copied — or start blank for
+            KPI item, SKU cost ratio, threshold, Open Bill rate, brand and margin band is copied — or start blank for
             a ruleset of its own, with every switch off and every table empty until you write it.
           </Hint>
           <NewSubDepartmentForm data={data} onDone={() => setShowNewSub(false)} />
@@ -146,7 +148,7 @@ export default function CommissionSection({
           <p className="text-sm">{subDept.name} has no scheme yet.</p>
         </div>
       ) : tab === 'scheme' ? (
-        <SchemeRules scheme={scheme} />
+        <SchemeRules scheme={scheme} subSlug={subDept.slug} />
       ) : tab === 'ladder' ? (
         <TitleLadder data={data} scheme={scheme} onRanks={() => goTo('ranks')} />
       ) : tab === 'ranks' ? (
@@ -154,7 +156,7 @@ export default function CommissionSection({
       ) : tab === 'groups' ? (
         <ItemGroups data={data} scheme={scheme} />
       ) : tab === 'kpi' ? (
-        <KpiItems data={data} scheme={scheme} />
+        <KpiItems data={data} subSlug={subDept.slug} />
       ) : tab === 'thresholds' ? (
         <KpiThresholds data={data} scheme={scheme} />
       ) : tab === 'open-bill' ? (
@@ -191,7 +193,7 @@ function IrParameter() {
   )
 }
 
-function SchemeRules({ scheme }: { scheme: SchemeRow }) {
+function SchemeRules({ scheme, subSlug }: { scheme: SchemeRow; subSlug: string }) {
   // One row per rule, keyed. The ORDER is the saved scheme's — the IR
   // parameters, then what is on, then what is off, Default rate mode last
   // (`orderSchemeRules`); a row moves when Save lands, not while a box is ticked.
@@ -326,7 +328,15 @@ function SchemeRules({ scheme }: { scheme: SchemeRow }) {
           />
           <span className="ml-2">
             the cost every margin rule judges, in the member calculator and the monthly run alike.
-            0.7 turns a RM 1,000 cost into RM 1,428.57; 1 keeps the cost as keyed.
+            0.7 turns a RM 1,000 cost into RM 1,428.57; 1 keeps the cost as keyed. A SKU can have a
+            ratio of its own, on{' '}
+            <Link
+              href={`${PRODUCT_LIST_PATH}?tab=costing&sub=${encodeURIComponent(subSlug)}`}
+              className="underline underline-offset-2"
+            >
+              Product List › Costing Setting
+            </Link>
+            , which sets this figure too.
           </span>
         </td>
       </tr>
@@ -759,78 +769,77 @@ function ItemGroups({ data, scheme }: { data: CommissionSettingsData; scheme: Sc
 
 // ─── IV. KPI items ───────────────────────────────────────────────────────────
 
-function KpiItems({ data, scheme }: { data: CommissionSettingsData; scheme: SchemeRow }) {
+/**
+ * Read here, set on Product List › Add-on / KPI Items (2026-09-27). A KPI item
+ * is a SKU from the SKU Master or a bed frame's or sofa's special from
+ * Maintenance — lists only the Product List holds — and its amount is dated:
+ * a change starts today, and a month already run keeps what it was run at.
+ * The row editor this section had could type a code and nothing else, and
+ * changed an amount in place under every month.
+ */
+function KpiItems({ data, subSlug }: { data: CommissionSettingsData; subSlug: string }) {
+  const href = `${PRODUCT_LIST_PATH}?tab=kpi&sub=${encodeURIComponent(subSlug)}`
+  const items = [...data.kpiItems].sort(
+    (a, b) => kpiOrder(a) - kpiOrder(b) || kpiLabel(a).localeCompare(kpiLabel(b)),
+  )
   return (
     <section>
-      <SectionHead title="IV. KPI items" count={`${data.kpiItems.length} ITEMS`} />
+      <SectionHead title="IV. KPI items" count={`${items.length} ITEMS`} />
       <Hint>
-        A KPI item pays a flat amount per unit and its <em>revenue leaves the commission
-        base</em> — the allowance already paid for it. Most are bundled free in the ERP
-        (quantity, zero price), which is exactly the case this exists to reward.
+        When a bill carries one of these, its amount comes off the bill&apos;s sales — the margin is
+        judged on what is left — and is paid flat as KPI: a SKU per unit, a bed frame special per bed
+        frame, a sofa special once per bill. They are set on{' '}
+        <Link href={href} className="underline underline-offset-2">Product List › Add-on / KPI Items</Link>{' '}
+        (Principal); the quantity bonus on top is the next tab.
       </Hint>
       <div className="overflow-x-auto table-scroll">
         <table className="ledger-table">
           <thead>
             <tr>
-              <th>Item code</th>
-              <th>Name</th>
+              <th>Item</th>
+              <th>Kind</th>
+              <th>Counted</th>
               <th className="right">KPI amount</th>
               <th className="w-32">From</th>
-              <th className="w-32"></th>
             </tr>
           </thead>
           <tbody>
-            {data.kpiItems.map(k => (
-              <RowForm key={k.id} action={upsertKpiItem}>
-                {({ pending }) => (
-                  <tr>
-                    <td className="font-mono text-xs">
-                      <Hidden name="id" value={k.id} />
-                      <Hidden name="scheme_id" value={scheme.id} />
-                      <Hidden name="product_code" value={k.product_code} />
-                      <Hidden name="effective_from" value={k.effective_from} />
-                      {k.product_code}
-                    </td>
-                    <td><Field name="product_name" defaultValue={k.product_name} /></td>
-                    <td className="num"><Field name="kpi_amount" type="number" step="0.01" width="w-24" defaultValue={k.kpi_amount} /></td>
-                    <td className="font-mono text-xs">{k.effective_from}</td>
-                    {/* The flex lives inside the cell: a `display: flex` <td>
-                        stops being a table cell, and its rule and zebra no
-                        longer reach the row's full height. */}
-                    <td className="whitespace-nowrap">
-                      <span className="inline-flex items-center gap-3">
-                        <SaveButton pending={pending} />
-                        <ActionButton
-                          run={() => deleteKpiItem(k.id)}
-                          label="Remove"
-                          danger
-                          confirm={`Stop paying a KPI allowance on ${k.product_code}?`}
-                        />
-                      </span>
-                    </td>
-                  </tr>
-                )}
-              </RowForm>
-            ))}
-            <RowForm action={upsertKpiItem}>
-              {({ pending }) => (
-                <tr className="bg-surface-2/40">
+            {items.map(k => {
+              const { kind, counted } = kpiItemKind({ source: k.source, optionPool: k.option_pool })
+              return (
+                <tr key={k.id}>
                   <td>
-                    <Hidden name="scheme_id" value={scheme.id} />
-                    <Field name="product_code" placeholder="ERP item code" width="w-56" required />
+                    <span className="font-mono text-xs">{kpiLabel(k)}</span>
+                    {k.source !== 'option' && k.product_name ? <span className="block text-xs">{k.product_name}</span> : null}
                   </td>
-                  <td><Field name="product_name" placeholder="name" /></td>
-                  <td className="num"><Field name="kpi_amount" type="number" step="0.01" width="w-24" placeholder="50" required /></td>
-                  <td><Field name="effective_from" type="date" width="w-36" /></td>
-                  <td><SaveButton pending={pending} label="Add" /></td>
+                  <td>{kind}</td>
+                  <td>{counted}</td>
+                  <td className="num">{formatMoneyBare(k.kpi_amount)}</td>
+                  <td className="font-mono text-xs">{k.effective_from}</td>
                 </tr>
-              )}
-            </RowForm>
+              )
+            })}
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center text-sm py-6">
+                  No KPI items. Add them on{' '}
+                  <Link href={href} className="underline underline-offset-2">Product List › Add-on / KPI Items</Link>.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
     </section>
   )
+}
+
+function kpiLabel(k: CommissionSettingsData['kpiItems'][number]): string {
+  return (k.source === 'option' ? k.option_value : k.product_code) ?? '—'
+}
+
+function kpiOrder(k: CommissionSettingsData['kpiItems'][number]): number {
+  return k.source !== 'option' ? 2 : k.option_pool === 'bedframe_specials' ? 0 : 1
 }
 
 // ─── V. KPI threshold ladder ─────────────────────────────────────────────────

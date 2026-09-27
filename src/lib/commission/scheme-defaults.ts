@@ -36,6 +36,12 @@ export interface SchemeSettings extends Record<SchemeSwitch, boolean> {
   /** 0–1 share of the order total; null = no deposit gate. */
   deposit_threshold_pct: number | string | null
   default_rate_mode: 'fixed' | 'variable'
+  /**
+   * Revenue Team cost = cost ÷ this (Fair 0.7). A follower keeps its source's
+   * — before 2026-09-27 it fell to the column default, 1, and a copy of Fair
+   * judged every margin on a cost 30% lower than Fair's.
+   */
+  revenue_cost_divisor?: number | string | null
 }
 
 /**
@@ -58,6 +64,7 @@ export function blankSchemeSettings(): SchemeSettings {
     deposit_threshold_pct: null,
     open_bill_basis: 'uplift_on_commission',
     default_rate_mode: 'variable',
+    revenue_cost_divisor: 1,
   }
 }
 
@@ -78,6 +85,7 @@ export function copiedSchemeSettings(source: SchemeSettings): SchemeSettings {
     deposit_threshold_pct: source.deposit_threshold_pct,
     open_bill_basis: source.open_bill_basis,
     default_rate_mode: source.default_rate_mode,
+    revenue_cost_divisor: source.revenue_cost_divisor ?? 1,
   }
 }
 

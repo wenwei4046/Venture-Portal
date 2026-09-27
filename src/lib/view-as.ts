@@ -15,6 +15,55 @@ export function isViewAsRole(value: string): value is ViewAsRole {
   return (VIEW_AS_ROLES as readonly string[]).includes(value)
 }
 
+// ONE COOKIE, EVERY TAB (2026-09-27). The mask is a cookie, so switching one
+// tab switches the whole browser — while every other open tab still shows the
+// shell it was drawn with. A Principal with the member app in one tab (Revenue
+// View) and the Product List in another clicked Costing gaps and landed on
+// Overview: the tab said Principal, the server judged the click as a
+// salesperson, `requirePermission('product_list')` failed and redirected.
+//
+// So the Revenue View belongs to the member app, where it is drawn: the member
+// app reads the caller with `getMemberUser()`, which honours it, and every
+// other surface with `getUser()`, which does not. The portal is always the
+// Principal's own, or HR's / Finance's when that is the view — and a portal
+// tab follows those when another tab switches (`VIEW_AS_MIRROR_COOKIE`,
+// `useViewAsSync`).
+
+/** Where a request is being answered: the member app, or anywhere else. */
+export type ViewSurface = 'portal' | 'member'
+
+/** The mask a request on `surface` honours — null when it honours none. */
+export function honouredViewAs(value: string | null | undefined, surface: ViewSurface): ViewAsRole | null {
+  if (!value || !isViewAsRole(value)) return null
+  if (value === 'revenue_member' && surface !== 'member') return null
+  return value
+}
+
+/**
+ * A readable copy of the view (never read by the server, never trusted): the
+ * mask cookie is httpOnly, so this is how a tab learns that ANOTHER tab
+ * switched the view. Written as `principal` when switching back rather than
+ * deleted, so "switched back" and "never switched" read differently.
+ */
+export const VIEW_AS_MIRROR_COOKIE = 'vp-view'
+
+export type PortalView = 'principal' | 'hr' | 'finance'
+
+/** Which view a portal page is drawn in for this cookie value. */
+export function portalView(value: string | null | undefined): PortalView {
+  return value === 'hr' || value === 'finance' ? value : 'principal'
+}
+
+/**
+ * Whether a portal tab drawn as `rendered` must redraw, given the mirror
+ * cookie now. No mirror = nobody switched since sign-in (or the session is
+ * older than the mirror), so there is nothing to follow.
+ */
+export function viewAsChanged(mirror: string | null | undefined, rendered: UserRole): boolean {
+  if (mirror == null || mirror === '') return false
+  return portalView(mirror) !== rendered
+}
+
 export type MaskableUser = { role: UserRole; actualRole?: UserRole }
 
 // The switcher shows for the Principal account whether or not it is currently

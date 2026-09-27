@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
+import { normalisePayLine, payLineKind, payLineLabel } from '@/lib/revenue-pay-lines'
 import { round2 } from '@/lib/payroll-funding'
 import PrintButton from './_components/PrintButton'
 import EditableStatLine from './_components/EditableStatLine'
@@ -50,7 +51,7 @@ export default async function PayslipPage({ params }: PageProps) {
       basic_salary, statutory_allowance, non_statutory_allowance,
       ot_hours, ot_amount, commission_amount, commission_balance, payout_split_version, basic_pay_net, pcb_override_amount, unpaid_leave_days,
       commission_synced_amount, commission_adjustment_amount, commission_adjustment_reason,
-      deduction_amount, skbbk_amount,
+      deduction_amount, skbbk_amount, pay_line_earnings, pay_line_deductions,
       prorata_days_worked, prorata_days_in_month,
       epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
       gross, net, status, statutory_overridden_at,
@@ -72,14 +73,33 @@ export default async function PayslipPage({ params }: PageProps) {
   const split = row.source === 'commission' && row.commission_balance != null ? calculateRevenuePayrollSplit(row) : null
   const netBasicSplit = row.payout_split_version === 2
 
+  // A Revenue row's pay lines (2026-09-27) — a special claim, an allowance, an
+  // incentive, a deduction, typed on the salesperson's ledger on Comm Cal. The
+  // row carries only their totals; the slip names each one.
+  const payLineEarnings = Number(row.pay_line_earnings ?? 0)
+  const payLineDeductions = Number(row.pay_line_deductions ?? 0)
+  const { data: lineRows, error: lineError } = row.source === 'commission' && (payLineEarnings > 0 || payLineDeductions > 0)
+    ? await supabase
+        .from('revenue_pay_lines')
+        .select('id, staff_id, kind, description, amount, version')
+        .eq('staff_id', staffId)
+        .eq('period_month', period)
+        .order('sort_order')
+        .order('created_at')
+    : { data: [], error: null }
+  if (lineError) throw new Error(`Could not load the pay lines: ${lineError.message}`)
+  const payLines = (lineRows ?? []).map(normalisePayLine)
+  const earningLines = payLines.filter(line => !payLineKind(line.kind).deduction)
+  const deductionLines = payLines.filter(line => payLineKind(line.kind).deduction)
+
   // PCB and Withholding Tax are mutually exclusive — whichever the staff record
   // selects applies and the other is 0 — but both belong in the total, or a
   // Revenue salesperson's payslip would show a Net Pay that does not equal
-  // Gross minus Total Deductions.
+  // Gross minus Total Deductions. Deduction pay lines come off net the same way.
   const withholding = Number(row.withholding_tax ?? 0)
   const totalDeductions =
     Number(row.epf_ee) + Number(row.socso_ee) + Number(row.eis_ee) + Number(row.pcb) +
-    withholding + Number(row.skbbk_amount ?? 0)
+    withholding + Number(row.skbbk_amount ?? 0) + payLineDeductions
   const totalEr = Number(row.epf_er) + Number(row.socso_er) + Number(row.eis_er)
 
   const prorated = `${row.prorata_days_worked}/${row.prorata_days_in_month} days`
@@ -141,6 +161,7 @@ export default async function PayslipPage({ params }: PageProps) {
             <Line label={netBasicSplit ? 'Commission after basic and employer statutory' : split ? 'Commission after basic and employer EPF' : 'Commission'} value={netBasicSplit && split
               ? round2(Number(row.commission_amount) - split.basicGross - totalEr)
               : split ? round2(split.commissionBalance + Number(row.epf_ee)) : row.commission_amount} />
+            {earningLines.map(line => <Line key={line.id} label={payLineLabel(line)} value={line.amount} />)}
             {Number(row.unpaid_leave_days) > 0 && (
               <Line label={`Unpaid Leave (${row.unpaid_leave_days} days)`} value={0} muted />
             )}
@@ -207,6 +228,12 @@ export default async function PayslipPage({ params }: PageProps) {
                 <span className="num">{formatMoney(Number(row.skbbk_amount))}</span>
               </div>
             )}
+            {deductionLines.map(line => (
+              <div key={line.id} className="flex items-baseline justify-between">
+                <span>{payLineLabel(line)}</span>
+                <span className="num">{formatMoney(line.amount)}</span>
+              </div>
+            ))}
             <div className="border-t border-hairline pt-2 mt-2 flex justify-between">
               <span className="font-bold">Total Deductions</span>
               <span className="num text-num-ink font-bold">{formatMoney(totalDeductions)}</span>

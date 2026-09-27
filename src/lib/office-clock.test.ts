@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getGreeting, officeClock } from './office-clock'
+import { getGreeting, officeClock, officeDate } from './office-clock'
 
 /**
  * Every case here is a moment where UTC and Kuala Lumpur disagree — which is
@@ -70,5 +70,13 @@ describe('getGreeting', () => {
     expect(getGreeting(17)).toBe('Good afternoon')
     expect(getGreeting(18)).toBe('Good evening')
     expect(getGreeting(23)).toBe('Good evening')
+  })
+})
+
+describe('officeDate', () => {
+  it("is the office's day, eight hours ahead of UTC", () => {
+    expect(officeDate(new Date('2026-09-26T15:59:00Z'))).toBe('2026-09-26')
+    expect(officeDate(new Date('2026-09-26T16:00:00Z'))).toBe('2026-09-27')
+    expect(officeDate(new Date('2026-12-31T16:30:00Z'))).toBe('2027-01-01')
   })
 })

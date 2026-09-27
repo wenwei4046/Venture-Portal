@@ -145,7 +145,12 @@ describe('computeRevenuePay', () => {
   })
 
   it('agrees with the payroll split the payslip already uses', () => {
-    for (const input of [fullCommission(), withBasic(), withBasic({ pcb: 88.4, skbbkAmount: 50 })]) {
+    for (const input of [
+      fullCommission(),
+      withBasic(),
+      withBasic({ pcb: 88.4, skbbkAmount: 50 }),
+      withBasic({ payLineEarnings: 650, payLineDeductions: 120 }),
+    ]) {
       const pay = computeRevenuePay(input)
       const split = computeRevenuePayrollSplit({
         grossCommission: input.commission,
@@ -158,13 +163,65 @@ describe('computeRevenuePay', () => {
         eisEe: input.eisEe,
         pcb: pay.pcb,
         withholdingTax: pay.withholdingTax,
-        otherEarnings: pay.proratedStatutoryAllowance + pay.proratedOt + input.nonStatutoryAllowance,
-        otherDeductions: input.deductionAmount + input.skbbkAmount,
+        otherEarnings: pay.proratedStatutoryAllowance + pay.proratedOt + input.nonStatutoryAllowance
+          + (input.payLineEarnings ?? 0),
+        otherDeductions: input.deductionAmount + input.skbbkAmount + (input.payLineDeductions ?? 0),
       })
       expect(pay.net).toBeCloseTo(split.totalPayout, 2)
       expect(pay.basicPayNet).toBeCloseTo(split.basicPay, 2)
       expect(pay.commissionBalance).toBeCloseTo(split.commissionBalance, 2)
     }
+  })
+})
+
+// Pay lines (2026-09-27): what HR adds to the month on Comm Cal. The figures
+// below are the ones the payroll triggers produced on the live schema in the
+// migration's rolled-back dry run, so the twin and the triggers are held to
+// the same numbers.
+describe('computeRevenuePay · pay lines', () => {
+  it('adds an earning to gross and a deduction to take-home only — as the trigger did on CHEA HUAN’s row', () => {
+    // September's placeholder row: no commission yet, a RM 500 special claim
+    // and a RM 200 deduction → trigger wrote gross 500, net 300, balance 300.
+    const pay = computeRevenuePay(fullCommission({ commission: 0, payLineEarnings: 500, payLineDeductions: 200 }))
+    expect(pay.gross).toBe(500)
+    expect(pay.net).toBe(300)
+    expect(pay.commissionBalance).toBe(300)
+    expect(pay.payLineEarnings).toBe(500)
+    expect(pay.payLineDeductions).toBe(200)
+    expect(pay.totalDeductions).toBe(200)
+  })
+
+  it('pays the earnings in full on a part month and keeps them out of the statutory wage', () => {
+    const base = computeRevenuePay(withBasic({ daysWorked: 15 }))
+    const pay = computeRevenuePay(withBasic({ daysWorked: 15, payLineEarnings: 500 }))
+    expect(pay.statutoryWages).toBe(base.statutoryWages)
+    expect(pay.employerContributions).toBe(base.employerContributions)
+    expect(pay.pcb).toBe(base.pcb)
+    expect(pay.gross).toBeCloseTo(base.gross + 500, 2)
+    expect(pay.net).toBeCloseTo(base.net + 500, 2)
+    expect(pay.basicPayNet).toBe(base.basicPayNet)
+  })
+
+  it('leaves gross, statutory and tax alone for a deduction', () => {
+    const base = computeRevenuePay(withBasic({ pcb: 120.5 }))
+    const pay = computeRevenuePay(withBasic({ pcb: 120.5, payLineDeductions: 350.25 }))
+    expect(pay.gross).toBe(base.gross)
+    expect(pay.pcb).toBe(base.pcb)
+    expect(pay.net).toBeCloseTo(base.net - 350.25, 2)
+    expect(pay.commissionBalance).toBeCloseTo(base.commissionBalance - 350.25, 2)
+  })
+
+  it('charges withholding on the earnings with the rest of gross, never on a deduction', () => {
+    const pay = computeRevenuePay(withBasic({ taxMode: 'withholding', payLineEarnings: 1_000, payLineDeductions: 400 }))
+    // 2% of (9,552.45 + 1,000)
+    expect(pay.withholdingTax).toBe(211.05)
+    expect(pay.net).toBeCloseTo(9_552.45 + 1_000 - 330 - 14.75 - 5.9 - 211.05 - 400, 2)
+  })
+
+  it('shows a deduction bigger than the pay as a shortfall, not a floor', () => {
+    const pay = computeRevenuePay(fullCommission({ commission: 100, payLineDeductions: 300 }))
+    expect(pay.net).toBe(-200)
+    expect(pay.shortfall).toBe(200)
   })
 })
 
@@ -208,6 +265,16 @@ describe('buildPayRow', () => {
 
   it('accepts a payroll row that agrees to the cent', () => {
     const row = buildPayRow(source({ payrollExists: true, payrollNet: 5_000 }))
+    expect(row.differsFromPayroll).toBe(false)
+  })
+
+  it('carries the month’s pay lines into the preview, and agrees with a payroll row that holds them', () => {
+    const { input } = source()
+    const withLines = { ...input, payLineEarnings: 500, payLineDeductions: 200 }
+    const row = buildPayRow(source({ input: withLines, payrollExists: true, payrollNet: 5_300 }))
+    expect(row.commission).toBe(5_000)
+    expect(row.pay.gross).toBe(5_500)
+    expect(row.pay.net).toBe(5_300)
     expect(row.differsFromPayroll).toBe(false)
   })
 })

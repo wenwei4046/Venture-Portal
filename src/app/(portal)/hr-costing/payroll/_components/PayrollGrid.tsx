@@ -35,6 +35,9 @@ export interface PayrollRowData {
   unpaid_leave_days: number
   deduction_amount: number
   skbbk_amount: number
+  /** Revenue rows: the pay lines added on Comm Cal (2026-09-27). Read-only here. */
+  pay_line_earnings?: number
+  pay_line_deductions?: number
   prorata_days_worked: number
   prorata_days_in_month: number
   epf_er: number

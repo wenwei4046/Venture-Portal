@@ -97,8 +97,12 @@ export interface ItemGroupRow {
 
 export interface KpiItemRow {
   id: string
-  product_code: string
+  /** 'sku' = a code on a line; 'option' = a bed frame's or sofa's special (2026-09-27). */
+  source: 'sku' | 'option'
+  product_code: string | null
   product_name: string | null
+  option_pool: 'bedframe_specials' | 'sofa_specials' | null
+  option_value: string | null
   kpi_amount: number
   effective_from: string
   effective_to: string | null
