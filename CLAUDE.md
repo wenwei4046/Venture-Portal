@@ -306,6 +306,37 @@ src/
 │   │   │                              and it was paid by hand — its page shows
 │   │   │                              the rules applied to its bills, nothing
 │   │   │                              more. Mig `20260926030000`.
+│   │   │                              **CLOSING A SALESPERSON (2026-09-27):** the
+│   │   │                              month's list has a tick per name and a close
+│   │   │                              bar (*Close N ticked* / *Close the N still
+│   │   │                              open* / *Reopen N*, inline confirm); a
+│   │   │                              ledger's walnut header has *Close NAME* and
+│   │   │                              *Close & next*. A close LOCKS that person's
+│   │   │                              figure (`comm_salesperson_closes`, one
+│   │   │                              standing row per person-month, reopen keeps
+│   │   │                              history, no DELETE, locked columns refused
+│   │   │                              23CLS). The figure is computed on the SERVER
+│   │   │                              from the month as saved and must equal what
+│   │   │                              the page showed, or nobody closes. It keeps
+│   │   │                              `save_commission_run`'s statement shape and
+│   │   │                              the bills released / held / cut — for the
+│   │   │                              payroll step (user: 后续怎么接 payroll 我后面
+│   │   │                              再接着写), which still computes live today.
+│   │   │                              While closed: a confirmed upsale/drop into
+│   │   │                              that month is refused by TRIGGER (pending
+│   │   │                              ERP rows never are); a pick / share /
+│   │   │                              exclusion / keyed margin on their bills is
+│   │   │                              refused by the ACTIONS
+│   │   │                              (`_lib/salesperson-closes.ts`) — the ERP
+│   │   │                              receiver writes those tables and must never
+│   │   │                              be refused. Live ≠ closed shows as *moved
+│   │   │                              since*. `lib/commission/closes.ts`, spec
+│   │   │                              §4.11, mig `20260927040000`. A bill PAID
+│   │   │                              but priced RM 0 in the ERP earns nothing:
+│   │   │                              the month names it above the list, tags the
+│   │   │                              row, and Close asks first — a reminder, not
+│   │   │                              an ERP block (user). `lib/commission/
+│   │   │                              unpriced.ts`.
 │   │   │                              **NO HAND-TYPED UPSALES (2026-09-27):** the
 │   │   │                              form below went (user: 所有的 order 都只会从 ERP
 │   │   │                              那边抽过来，这边不需要自己调动 — the one thing adjusted in

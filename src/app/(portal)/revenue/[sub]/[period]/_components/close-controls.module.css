@@ -1,0 +1,197 @@
+/* Closing a salesperson's month (2026-09-27): the bar above the list, the
+   tick and tag in the list's first column, and the control in a ledger's
+   walnut header. The sheet's own tokens throughout (globals.css › "Sheet
+   theme"); orange is a surface, never a text colour. */
+
+/* ── The bar above the list ── */
+.bar {
+  margin: 0 0 14px;
+  padding: 13px 16px;
+  border: 1px solid rgb(var(--sheet-table-border, var(--hairline)));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+}
+.bar[data-complete] { border-color: rgb(var(--ledger) / 0.35); background: rgb(var(--ledger-bg) / 0.45); }
+.barHead { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; }
+.barIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgb(var(--accent-bg));
+}
+.bar[data-complete] .barIcon { background: rgb(var(--ledger-bg)); color: rgb(var(--ledger)); }
+.barIcon svg { width: 17px; height: 17px; }
+.barProgress { display: grid; gap: 3px; flex: 1 1 260px; min-width: 0; }
+.barProgress > strong { font-size: 13px; font-weight: 600; }
+.barProgress > span { font-size: 11px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.meter { overflow: hidden; height: 4px; margin-top: 4px; max-width: 360px; border-radius: 99px; background: rgb(var(--sheet-divider, var(--hairline))); }
+.meter > span { display: block; height: 100%; border-radius: inherit; background: rgb(var(--walnut)); transition: width 200ms ease; }
+.bar[data-complete] .meter > span { background: rgb(var(--ledger)); }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.ask {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  flex: 1 1 420px;
+  justify-content: flex-end;
+  padding: 9px 12px;
+  border: 1px solid rgb(var(--accent-border));
+  border-radius: 8px;
+  background: rgb(var(--accent-bg));
+}
+.ask > p { flex: 1 1 260px; margin: 0; font-size: 12px; line-height: 1.55; }
+
+.primary,
+.secondary,
+.quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 13px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.primary { border-color: rgb(var(--accent)); background: rgb(var(--accent)); color: rgb(var(--ink)); }
+.primary:hover:not(:disabled) { border-color: rgb(var(--accent-hover)); background: rgb(var(--accent-hover)); }
+.secondary { border-color: rgb(var(--hairline)); background: rgb(var(--surface)); color: rgb(var(--ink)); }
+.secondary:hover:not(:disabled) { background: rgb(var(--surface-2)); }
+.quiet { min-height: 30px; padding: 5px 8px; background: transparent; color: rgb(var(--ink)); text-decoration: underline; text-underline-offset: 3px; }
+
+.hint,
+.changed,
+.notice,
+.error { margin: 10px 0 0; font-size: 11.5px; line-height: 1.55; }
+.changed { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 6px; background: rgb(var(--alert-bg)); }
+.changed svg { flex: none; width: 15px; height: 15px; margin-top: 1px; color: rgb(var(--alert)); }
+.notice { padding: 8px 10px; border-radius: 6px; background: rgb(var(--ledger-bg) / 0.7); }
+.error { padding: 8px 10px; border-radius: 6px; background: rgb(var(--danger-bg)); }
+
+/* ── The list's first column: a tick beside the name, a tag under it ── */
+.nameCell { display: flex; align-items: center; gap: 8px; }
+.nameCell > input[type='checkbox'] { flex: none; }
+.closedTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgb(var(--ledger) / 0.35);
+  border-radius: 4px;
+  background: rgb(var(--ledger-bg));
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.closedTag svg { width: 11px; height: 11px; }
+.movedTag { background: rgb(var(--alert-bg)); border-color: rgb(var(--alert) / 0.4); }
+.rowClosed > td { background-image: linear-gradient(rgb(var(--ledger-bg) / 0.35), rgb(var(--ledger-bg) / 0.35)); }
+.live { display: block; margin-top: 4px; font-size: 10px; font-weight: 500; }
+
+/* ── The ledger's walnut header ── */
+.hero { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; margin-left: auto; }
+.heroButtons { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.heroPrimary,
+.heroSecondary,
+.heroQuiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 15px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+/* `.hero` in front: the month page sets every button's text black
+   (`.page :is(button, …)`), and these sit on walnut. */
+.hero .heroPrimary { border-color: #ffe1bd; background: #ffe1bd; color: #3b271a; }
+.hero .heroPrimary:hover:not(:disabled) { background: #ffd29d; border-color: #ffd29d; }
+.heroPrimary svg { width: 15px; height: 15px; }
+.hero .heroSecondary { border-color: #a08876; background: transparent; color: #fffaf5; }
+.hero .heroSecondary:hover:not(:disabled) { background: rgb(255 255 255 / 8%); }
+.hero .heroQuiet { min-height: 30px; padding: 5px 10px; border-color: #a08876; background: transparent; color: #f4e8de; font-size: 11.5px; }
+.hero .heroQuiet:hover:not(:disabled) { background: rgb(255 255 255 / 8%); }
+.heroNote { margin: 0; color: #e6d7ca; font-size: 11px; text-align: right; }
+.stamp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid #9fc3a6;
+  border-radius: 8px;
+  background: rgb(33 72 48 / 55%);
+  color: #e3f3e6;
+}
+.stamp svg { flex: none; width: 18px; height: 18px; }
+.stamp strong { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.stamp span { display: block; margin-top: 2px; font-size: 11px; color: #cfe5d3; }
+.heroLive { margin: 0; padding: 4px 8px; border-radius: 5px; background: rgb(255 214 150 / 18%); color: #ffe1bd; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* ── What moved since the close, above a closed ledger ── */
+.moved { margin: 0 0 16px; padding: 12px 14px; border: 1px solid rgb(var(--alert) / 0.35); border-radius: 8px; background: rgb(var(--alert-bg) / 0.6); font-size: 12px; line-height: 1.6; }
+.moved > strong { display: block; margin-bottom: 4px; font-weight: 600; }
+.moved ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; }
+.moved li { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 767px) {
+  .bar { padding: 12px; }
+  .actions { width: 100%; margin-left: 0; }
+  .actions > button { flex: 1 1 auto; }
+  .ask { flex-basis: 100%; }
+  .hero { width: 100%; align-items: stretch; margin-left: 0; }
+  .heroButtons { justify-content: stretch; }
+  .heroButtons > button { flex: 1 1 auto; justify-content: center; }
+  .heroNote { text-align: left; }
+}
+
+@media print {
+  .bar,
+  .hero,
+  .nameCell > input[type='checkbox'] { display: none; }
+}
+
+/* ── Bills paid on but priced RM 0 in the ERP (2026-09-27) ──
+   Above the list, a tag on the row, a banner and a note in the ledger: they
+   earn nothing until the ERP has prices, so they are named before anybody
+   closes at a figure that leaves them out. */
+.unpriced {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid rgb(var(--alert) / 0.35);
+  border-radius: 10px;
+  background: rgb(var(--alert-bg) / 0.6);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.unpricedHead { display: flex; align-items: flex-start; gap: 10px; }
+.unpricedHead > svg { flex: none; width: 17px; height: 17px; margin-top: 2px; color: rgb(var(--alert)); }
+.unpricedHead strong { display: block; font-size: 13px; font-weight: 600; }
+.unpricedHead p { margin: 2px 0 0; max-width: 760px; }
+.unpricedList { display: grid; gap: 4px; margin: 10px 0 0 27px; padding: 0; list-style: none; }
+.unpricedList > li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; font-variant-numeric: tabular-nums; }
+.unpricedList > li > a { font-family: var(--font-mono, 'Chivo Mono'), monospace; font-size: 11.5px; text-decoration: underline; text-underline-offset: 3px; }
+.unpricedList .quiet { min-height: 24px; padding: 2px 4px; }
+.unpricedPaid { font-weight: 600; }
+.unpricedTag { background: rgb(var(--alert-bg)); border-color: rgb(var(--alert) / 0.4); }
+.unpricedNote { color: rgb(var(--alert)); font-weight: 600; }
+.askWarn { flex-basis: 100%; margin: 0; padding: 6px 9px; border-radius: 6px; background: rgb(var(--alert-bg)); font-size: 11.5px; }
+.heroAsk { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; max-width: 360px; }
+.heroAsk > p { margin: 0; padding: 7px 10px; border-radius: 6px; background: rgb(255 214 150 / 18%); color: #ffe1bd; font-size: 11.5px; line-height: 1.5; text-align: right; }
+
+@media (max-width: 767px) {
+  .unpricedList { margin-left: 0; }
+  .heroAsk { max-width: none; align-items: stretch; }
+  .heroAsk > p { text-align: left; }
+}

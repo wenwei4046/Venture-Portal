@@ -1063,6 +1063,51 @@ says why. Mig `20260927060000`.
 
 ---
 
+### 4.11 Closing a salesperson's month — their commission, locked (2026-09-27)
+
+Comm Cal works the month out live every time it opens. **Closing** a
+salesperson keeps their figure as it stood when somebody checked it and said
+"done" (user 2026-09-27: 我 15 号按 complete close 时，他们全部人的 commission
+就会被 lock 住。后续怎么接 payroll 那边，我后面再接着写).
+
+| | |
+|---|---|
+| Where | the month's **Total Sales Orders** list — a tick beside every name, a bar above: *Close N ticked*, *Close the N still open* / *Close all N*, *Reopen N*, "12 of 30 closed · RM … locked", and "September 2026 is closed — all 30 salespeople" once nobody is left; and a salesperson's **ledger** — *Close NAME* and *Close & next →* in the walnut header |
+| Asks first | closing or reopening several; one person from their own ledger does not |
+| What is locked | the figure on screen, computed again on the SERVER from the month as saved (the run the page replays, no draft) and refused if it differs from what the page showed — nobody is closed then |
+| While closed | their row shows the closed figures with a **Closed** tag; the live month may move (an ERP re-save, a cost, a downline's late bill) — then the tag reads *Closed · moved since*, the row adds *Live now RM …*, the bar names who moved, and the ledger lists which bills and which downlines' overrides moved. The closed figure stands until somebody reopens |
+| Refused while closed | a confirmed upsale or drop in that month (trigger `comm_upsales_closed_month`, 23CLS — it is paid in its own month, so it would be paid nowhere; pending ERP rows are never refused); an Open Bill pick, share, *Don't count this bill* / *Count again* or keyed margin on one of their bills (the actions, `assertBillsNotClosed` — the ERP receiver writes those tables too and must never be refused). The ledger's bill menu and the Open Bill tickboxes say so before anybody tries |
+| Not closable | a month settled before the portal pays (`comm_cutovers`, 23CLS); a month with no effective ranks; a page holding a draft (exclusions, unsaved picks, previews) |
+| Reopen | stamps the close as history; the live figure counts again; closing again writes a new row |
+
+`comm_salesperson_closes` keeps what the **payroll step** will need, so it can
+be built from the closes instead of a fresh calculation: the engine statement
+in `save_commission_run`'s own element shape, the bills it releases, holds and
+cuts for margin, the row as shown (`summary`, versioned JSON) and the ids of
+the person's own bills. Nothing reads it yet but this page — sending the month
+to payroll still computes live; wiring it to the closes is the next piece
+(user). `lib/commission/closes.ts`, `close-actions.ts`,
+`_lib/salesperson-closes.ts`, mig `20260927040000`.
+
+**Bills paid on but priced RM 0 (2026-09-27).** A bill whose goods the ERP
+prices at RM 0 while the customer has paid earns nothing — the engine pays on
+what a bill is priced at. September had four: three came over from AutoCount
+at RM 0 on the 7 Sep cutover, one (HC-SO-2609-114) was confirmed in the ERP
+with its prices never keyed. The user chose a reminder over a block in the
+ERP: the month lists them above the salespeople (*N bills are paid but priced
+RM 0 in the ERP*), the row carries a tag, the ledger a banner and a note on
+the bill, the bulk close strip names whose, and one person's Close asks
+before locking. Filling the price in the ERP re-sends the bill and the month
+updates by itself. Goods = lines in groups the scheme pays on; a free
+replacement (RM 0, nothing paid) and a service-only order are not these.
+`lib/commission/unpriced.ts`.
+
+**Why a close can move (and what it means).** An override depends on the
+downline's bills, and group sales on the whole tree: close KAR JUN, and a bill
+MELVIN keys later still moves her live override. Closing everybody at once
+(*Close all*) locks one consistent picture; closing one by one is safe as long
+as *moved since* is read before payroll.
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total
