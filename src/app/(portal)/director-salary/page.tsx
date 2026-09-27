@@ -828,8 +828,8 @@ function directorPayrollState(rows: Array<{ status: string; completed_at: string
     detail: [
       `${withFinance} of ${rows.length} with Finance${paid ? ` (${paid} paid)` : ''}`,
       completed ? `${completed} completed and waiting` : '',
-      draft ? `${draft} open for a resubmit` : '',
-    ].filter(Boolean).join(' · ') + ' — batches and resubmits live on',
+      draft ? `${draft} open for a resubmit or second payroll` : '',
+    ].filter(Boolean).join(' · ') + ' — batches, resubmits and second payrolls live on',
     chip: { label: allPaid ? 'paid' : 'with Finance', tone: allPaid ? 'ledger' : 'alert' },
   }
 }

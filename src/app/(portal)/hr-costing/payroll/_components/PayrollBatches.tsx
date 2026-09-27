@@ -1,5 +1,5 @@
 import { formatMoney } from '@/lib/utils'
-import { batchFundingView, dayTimeLabel, type PayrollBatch, type Tone } from '@/lib/payroll-lifecycle'
+import { batchFundingView, dayTimeLabel, topupSummary, type PayrollBatch, type Tone } from '@/lib/payroll-lifecycle'
 import RefileBatchButton from './RefileBatchButton'
 
 interface Props {
@@ -49,7 +49,7 @@ export default function PayrollBatches({ period, batches, headline, closed }: Pr
                     <td className="font-medium whitespace-nowrap">
                       #{b.no}
                       {b.legacy ? <span className="block text-[11px] font-normal">the whole month</span> : null}
-                      {b.topups > 0 ? <span className="block text-[11px] font-normal">{b.topups} resubmit{b.topups === 1 ? '' : 's'}</span> : null}
+                      {b.topups > 0 ? <span className="block text-[11px] font-normal">{topupSummary(b.topups, b.secondPayrolls)}</span> : null}
                       {/* A phone keeps Batch · Funding; the day and the CTC ride here. */}
                       <span className="block text-[11px] font-normal md:hidden">{dayTimeLabel(b.submittedAt)}</span>
                       <span className="block text-xs font-mono tabular-nums md:hidden">{formatMoney(b.total)}</span>
@@ -79,7 +79,7 @@ export default function PayrollBatches({ period, batches, headline, closed }: Pr
         <div className="table-frame-foot">
           <span>
             Each batch is funded on its own: Finance raises its funding PV, the Principal approves it, and its people
-            can be paid on HR › Payment. A resubmit&apos;s batch carries only the difference.
+            can be paid on HR › Payment. A resubmit&apos;s or a second payroll&apos;s batch carries only the difference.
           </span>
         </div>
       </div>

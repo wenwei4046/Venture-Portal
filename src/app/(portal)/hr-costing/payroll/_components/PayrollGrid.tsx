@@ -11,7 +11,7 @@ import {
   neighbourId,
 } from '@/lib/payroll-grid'
 import { round2 } from '@/lib/payroll-funding'
-import { rowActions, rowStatusView, type LifecycleRow, type RowStatus } from '@/lib/payroll-lifecycle'
+import { isTopupKind, rowActions, rowStatusView, type LifecycleRow, type RowStatus } from '@/lib/payroll-lifecycle'
 import { completePayrollRows, deletePayrollRows, unlockPayrollRows } from '../actions'
 import PayrollRow from './PayrollRow'
 import PayrollRowMenu, { type RowMenuAnchor } from './PayrollRowMenu'
@@ -29,6 +29,8 @@ export interface PayrollRowData {
   origin: 'staff' | 'revenue' | 'director'
   completed_at: string | null
   topup_opened_at: string | null
+  /** While unlocked: a correction (resubmit) or a planned second payment (second_payroll). */
+  topup_kind?: string | null
   /** Standing batches that carried this person, oldest first. */
   batch_nos: number[]
   /** CTC those batches already sent — a resubmit sends the rest. */
@@ -143,6 +145,7 @@ export function lifecycleOf(r: PayrollRowData): LifecycleRow {
     batchNos: r.batch_nos,
     completedAt: r.completed_at,
     topupOpenedAt: r.topup_opened_at,
+    topupKind: isTopupKind(r.topup_kind) ? r.topup_kind : null,
     sourceLinked: r.source === 'commission' && Boolean(r.commission_statements?.length || r.commission_statement_href),
   }
 }
@@ -153,7 +156,7 @@ export function lifecycleOf(r: PayrollRowData): LifecycleRow {
  * columns scrolling under them; rows grouped by department under a band that
  * carries the subtotal. Since the unified Payroll (2026-09-27) the Status
  * column says where each person's pay stands; tick people to Complete,
- * Unlock or Delete them, right-click somebody to Resubmit.
+ * Unlock or Delete them, right-click somebody to Resubmit or add a Second payroll.
  */
 export default function PayrollGrid({ rows, period, monthClosed = false }: Props) {
   const router = useRouter()
@@ -550,7 +553,8 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
         Edit a draft in the row and click Save, or open a name for the paycheck — same figures either way.
         Tick people and <strong className="font-bold">Complete</strong> them when checked; <strong className="font-bold">Submit to Finance</strong>
         {' '}sends everybody Completed as one batch, and can be pressed again for the next group. Right-click somebody already sent to
-        {' '}<strong className="font-bold">Resubmit</strong> them — a second payment that sends only the difference.
+        {' '}<strong className="font-bold">Resubmit</strong> them (a correction) or give them a <strong className="font-bold">Second payroll</strong>
+        {' '}(a planned second payment) — either way the next batch sends only the difference.
       </p>
 
       {menu && menuRow && menuView && (

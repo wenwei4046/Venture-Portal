@@ -9,6 +9,8 @@ import {
   rowStatusView,
   statusCounts,
   submitPreview,
+  topupKindLabel,
+  topupSummary,
   type LifecycleRow,
   type PayrollBatch,
 } from './payroll-lifecycle'
@@ -23,7 +25,7 @@ function row(over: Partial<LifecycleRow> = {}): LifecycleRow {
 function batch(over: Partial<PayrollBatch> = {}): PayrollBatch {
   return {
     id: 'b1', no: 1, status: 'submitted', legacy: false, submittedAt: '2026-09-27T08:40:00Z', submittedBy: 'HR Manager',
-    people: 3, topups: 0, total: 23700.35, departments: [{ name: 'Finance', people: 3 }],
+    people: 3, topups: 0, secondPayrolls: 0, total: 23700.35, departments: [{ name: 'Finance', people: 3 }],
     sentBackAt: null, sentBackBy: null, sentBackReason: null,
     request: { id: 'q1', status: 'submitted', amount: 23700.35, requestedAt: '2026-09-27T08:40:00Z', cancelledAt: null, cancellationReason: null, paidAmount: 0, pvCount: 0 },
     ...over,
@@ -54,6 +56,32 @@ describe('rowStatusView', () => {
     expect(rowStatusView(open).label).toBe('Resubmit · editing')
     expect(rowStatusView({ ...open, status: 'completed', completedAt: '2026-09-28T03:00:00Z' }).label).toBe('Resubmit ready')
   })
+
+  // User 2026-09-27: a planned second payment (a sub-department that pays on
+  // the 15th) is told apart from a correction, so it can be traced later.
+  it('names a second payroll as such, in progress and ready', () => {
+    const open = row({ status: 'draft', batchNos: [1], topupOpenedAt: '2026-09-28T02:00:00Z', topupKind: 'second_payroll' })
+    expect(rowStatusView(open).label).toBe('Second payroll · editing')
+    expect(rowStatusView({ ...open, status: 'completed', completedAt: '2026-09-28T03:00:00Z' }).label).toBe('Second payroll ready')
+    expect(rowStatusView({ ...open, topupKind: 'resubmit' }).label).toBe('Resubmit · editing')
+  })
+})
+
+describe('top-up kinds', () => {
+  it('names each kind, a missing one as a Resubmit', () => {
+    expect(topupKindLabel('second_payroll')).toBe('Second payroll')
+    expect(topupKindLabel('resubmit')).toBe('Resubmit')
+    expect(topupKindLabel(null)).toBe('Resubmit')
+  })
+
+  it("says what a batch's top-ups were, the resubmits being the rest", () => {
+    expect(topupSummary(0, 0)).toBe('')
+    expect(topupSummary(1, 0)).toBe('1 resubmit')
+    expect(topupSummary(1, 1)).toBe('1 second payroll')
+    expect(topupSummary(3, 1)).toBe('2 resubmits · 1 second payroll')
+    expect(topupSummary(2, 2)).toBe('2 second payrolls')
+    expect(topupSummary(1, 5)).toBe('1 second payroll')
+  })
 })
 
 describe('rowActions', () => {
@@ -72,6 +100,7 @@ describe('rowActions', () => {
 
   it('offers Resubmit only to somebody a batch carried', () => {
     expect(rowActions(row({ status: 'submitted', batchNos: [2] }), false).resubmit).toBe(true)
+    expect(rowActions(row({ status: 'submitted', batchNos: [2] }), false).hint).toBe('Already with Finance — right-click to Resubmit or add a Second payroll')
     expect(rowActions(row({ status: 'paid', batchNos: [1] }), false).resubmit).toBe(true)
     // Paid before batches existed (a director of July): nothing to add to.
     expect(rowActions(row({ status: 'paid', batchNos: [] }), false).resubmit).toBe(false)
@@ -100,13 +129,22 @@ describe('submitPreview', () => {
     expect(submitPreview(rows)).toEqual({
       people: 3,
       topups: 1,
+      secondPayrolls: 0,
       ctc: 15234.2,
       byDept: [{ dept: 'Finance', people: 2, ctc: 9634.2 }, { dept: 'HR', people: 1, ctc: 5600 }],
     })
   })
 
   it('is empty when nobody is completed', () => {
-    expect(submitPreview([row()])).toEqual({ people: 0, topups: 0, ctc: 0, byDept: [] })
+    expect(submitPreview([row()])).toEqual({ people: 0, topups: 0, secondPayrolls: 0, ctc: 0, byDept: [] })
+  })
+
+  it('counts the second payrolls among the top-ups it sends', () => {
+    const rows = [
+      row({ id: 'a', status: 'completed', ctc: 8470, submittedCtc: 7910, batchNos: [1], topupKind: 'second_payroll', topupOpenedAt: '2026-09-28T02:00:00Z' }),
+      row({ id: 'b', status: 'completed', ctc: 4112, submittedCtc: 4000, batchNos: [1], topupKind: 'resubmit', topupOpenedAt: '2026-09-28T02:00:00Z' }),
+    ]
+    expect(submitPreview(rows)).toMatchObject({ people: 2, topups: 2, secondPayrolls: 1, ctc: 672 })
   })
 })
 
@@ -125,7 +163,10 @@ describe('statusCounts', () => {
     expect(statusCounts([
       row(), row({ status: 'completed' }), row({ status: 'submitted' }), row({ status: 'paid' }),
       row({ status: 'draft', batchNos: [1], topupOpenedAt: '2026-09-28T00:00:00Z' }),
-    ])).toEqual({ draft: 2, completed: 1, submitted: 1, paid: 1, topups: 1 })
+    ])).toEqual({ draft: 2, completed: 1, submitted: 1, paid: 1, topups: 1, secondPayrolls: 0 })
+    expect(statusCounts([
+      row({ status: 'draft', batchNos: [1], topupOpenedAt: '2026-09-28T00:00:00Z', topupKind: 'second_payroll' }),
+    ])).toMatchObject({ topups: 1, secondPayrolls: 1 })
   })
 })
 
@@ -160,11 +201,11 @@ describe('normaliseMonthStatus', () => {
   it('reads the RPC, money as numbers', () => {
     const s = normaliseMonthStatus({
       closed: null,
-      batches: [{ id: 'b', no: 1, status: 'submitted', legacy: true, total: '109770.21', people: 22, departments: [{ name: 'HR', people: 4 }],
+      batches: [{ id: 'b', no: 1, status: 'submitted', legacy: true, total: '109770.21', people: 22, topups: 3, second_payrolls: 2, departments: [{ name: 'HR', people: 4 }],
         request: { id: 'q', status: 'completed', amount: '109770.21', paid_amount: '109770.21', pv_count: 1 } }],
       director_legacy_request: { status: 'completed', amount: '64311.63' },
     })
-    expect(s.batches[0]).toMatchObject({ no: 1, legacy: true, total: 109770.21, request: { status: 'completed', paidAmount: 109770.21 } })
+    expect(s.batches[0]).toMatchObject({ no: 1, legacy: true, total: 109770.21, topups: 3, secondPayrolls: 2, request: { status: 'completed', paidAmount: 109770.21 } })
     expect(s.directorLegacyRequest).toEqual({ status: 'completed', amount: 64311.63, requestedAt: null })
     expect(s.closed).toBeNull()
   })

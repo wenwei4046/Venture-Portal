@@ -24,7 +24,7 @@ function renderButtons() {
     <PayrollDraftProvider>
       <DraftProbe />
       <SaveAllButton />
-      <SubmitToFinanceButton period="2026-09-01" preview={{ people: 2, topups: 0, ctc: 10000, byDept: [{ dept: 'Finance', people: 2, ctc: 10000 }] }} />
+      <SubmitToFinanceButton period="2026-09-01" preview={{ people: 2, topups: 0, secondPayrolls: 0, ctc: 10000, byDept: [{ dept: 'Finance', people: 2, ctc: 10000 }] }} />
     </PayrollDraftProvider>,
   )
 }

@@ -9,6 +9,7 @@ import { round2 } from '@/lib/payroll-funding'
 import {
   batchesHeadline,
   closeReadiness,
+  isTopupKind,
   normaliseMonthStatus,
   statusCounts,
   submitPreview,
@@ -52,7 +53,7 @@ interface LineRow {
  * draft → completed → submitted → paid; Submit to Finance sends the Completed
  * as a batch and stays pressable for the next one; where each batch's money
  * stands is shown beside it (Submissions), never on the button. Right-click
- * somebody already sent to Resubmit them; Total Close ends the month.
+ * somebody already sent to Resubmit them or add a Second payroll; Total Close ends the month.
  */
 export default async function PayrollGridPage({ params }: PageProps) {
   const user = await requirePermission('hr_costing')
@@ -73,7 +74,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
     supabase
       .from('hr_monthly_payroll')
       .select(`
-        id, staff_id, period_month, status, source, completed_at, topup_opened_at,
+        id, staff_id, period_month, status, source, completed_at, topup_opened_at, topup_kind,
         basic_salary, statutory_allowance, non_statutory_allowance,
         ot_hours, ot_amount, commission_amount, commission_balance, payout_split_version, basic_pay_net, pcb_override_amount, unpaid_leave_days,
         commission_synced_amount, commission_adjustment_amount, commission_adjustment_reason, commission_adjusted_at,
@@ -88,7 +89,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
     supabase
       .from('director_monthly_payroll')
       .select(`
-        id, director_id, employee_name, status, completed_at, topup_opened_at,
+        id, director_id, employee_name, status, completed_at, topup_opened_at, topup_kind,
         basic_salary, statutory_allowance, non_statutory_allowance, ot_amount, commission_amount,
         no_pay_amount, deduction_amount, skbbk_amount,
         epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, gross, net
@@ -180,6 +181,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
       origin: revenue ? 'revenue' : 'staff',
       completed_at: r.completed_at,
       topup_opened_at: r.topup_opened_at,
+      topup_kind: r.topup_kind,
       batch_nos: s?.nos ?? [],
       submitted_ctc: s?.ctc ?? 0,
       comm_cal_href: revenue && commCalSub ? `${revenuePath(subDeptSlug(commCalSub), period)}?person=${r.staff_id}` : null,
@@ -237,6 +239,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
       origin: 'director',
       completed_at: d.completed_at,
       topup_opened_at: d.topup_opened_at,
+      topup_kind: d.topup_kind,
       batch_nos: s?.nos ?? [],
       submitted_ctc: s?.ctc ?? 0,
       director_href: directorHref,
@@ -312,6 +315,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
     batchNos: r.batch_nos,
     completedAt: r.completed_at,
     topupOpenedAt: r.topup_opened_at,
+    topupKind: isTopupKind(r.topup_kind) ? r.topup_kind : null,
   }))
   const preview = submitPreview(lifecycle)
   const counts = statusCounts(lifecycle)
@@ -353,7 +357,8 @@ export default async function PayrollGridPage({ params }: PageProps) {
                 {counts.completed > 0 && <span className="chip accent"><span className="dot" />{counts.completed} completed</span>}
                 {counts.submitted > 0 && <span className="chip alert"><span className="dot" />{counts.submitted} with Finance</span>}
                 {counts.paid > 0 && <span className="chip ledger"><span className="dot" />{counts.paid} paid</span>}
-                {counts.topups > 0 && <span className="chip accent"><span className="dot" />{counts.topups} resubmitting</span>}
+                {counts.topups > counts.secondPayrolls && <span className="chip accent"><span className="dot" />{counts.topups - counts.secondPayrolls} resubmitting</span>}
+                {counts.secondPayrolls > 0 && <span className="chip accent"><span className="dot" />{counts.secondPayrolls} second payroll</span>}
               </>
             )}
           </p>
