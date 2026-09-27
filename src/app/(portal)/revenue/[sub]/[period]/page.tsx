@@ -10,7 +10,7 @@ import { salesByFair } from '@/lib/venues'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import SchemeSwitches from './_components/SchemeSwitches'
 import { requireSubDepartment } from '../../_lib/sub-departments'
-import { loadMonthOrders } from '../../_lib/month-orders'
+import { loadBrandOptions, loadMonthOrders, loadOrderBrandPicks } from '../../_lib/month-orders'
 import { monthCommissionableValue } from '@/lib/commission/director-pay'
 import { loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
@@ -194,6 +194,17 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     return earlier.filter((_, i) => answers[i].data === true)
   })
 
+  // Brand for the margin (2026-09-27): the brands a bill with none can be
+  // given by hand, and which of the ledgers' bills already were.
+  const brandMenuRead = workbenchRead.then(async workbench => {
+    if (!workbench) return null
+    const [options, picks] = await Promise.all([
+      loadBrandOptions(supabase, subDept.schemeId),
+      loadOrderBrandPicks(supabase, workbench.input.orders.filter(o => !o.upsale).map(o => o.id)),
+    ])
+    return { options, picked: Object.fromEntries(picks) }
+  })
+
   // Who has been closed this month (2026-09-27): their row shows what was
   // locked, and the list says how far the month has been closed. A failed
   // read turns closing off for the visit rather than taking the month down.
@@ -214,6 +225,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     payrollClosed,
     earlierLocks,
     closes,
+    brandMenu,
   ] = await Promise.all([
     batchRowRead,
     monthOrdersRead,
@@ -249,6 +261,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     payrollClosedRead,
     earlierLocksRead,
     closesRead,
+    brandMenuRead,
   ])
   if (monthLock.error) throw new Error(`Could not check the commission run: ${monthLock.error.message}`)
 
@@ -424,6 +437,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         // A bill's menu answers to its OWN month's run (#170): this month's lock,
         // and every earlier month a ledger carries bills in from.
         lockedPeriods={monthLock.data ? [period, ...earlierLocks] : earlierLocks}
+        brandMenu={brandMenu}
         closes={{
           subDepartmentId: subDept.id,
           closes: closes.rows,

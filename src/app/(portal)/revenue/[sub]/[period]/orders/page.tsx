@@ -9,9 +9,12 @@ import { venueKey } from '@/lib/venues'
 import { buildCommissionWorkbench } from '@/lib/commission/workbench'
 import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
 import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
+import { billBrandAction } from '@/lib/commission/bill-brand'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
 import {
+  loadBrandOptions,
   loadMonthOrders,
+  loadOrderBrandPicks,
   loadOrderExclusions,
   loadOrderShares,
   loadShareTeam,
@@ -87,10 +90,14 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
 
   // Who else holds a part of each bill, who a bill may be shared with, and
   // who took a bill out of the month by hand — only an excluded bill can be.
-  const [shares, team, exclusions] = await Promise.all([
+  // …and which bills were given their brand here (2026-09-27): only a live
+  // bill can be, and only where the scheme has a ladder to pick from.
+  const [shares, team, exclusions, brandOptions, brandPicks] = await Promise.all([
     loadOrderShares(supabase, all.map(o => o.orderId)),
     loadShareTeam(supabase, subDept.schemeId),
     loadOrderExclusions(supabase, all.filter(o => o.cancelled).map(o => o.orderId)),
+    loadBrandOptions(supabase, subDept.schemeId),
+    loadOrderBrandPicks(supabase, all.filter(o => !o.cancelled).map(o => o.orderId)),
   ])
   const sharesByOrder = new Map<string, typeof shares>()
   for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
@@ -211,6 +218,10 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       cancelled: o.cancelled,
       exclusionDetail: byHand ? describeExclusion(byHand) : null,
       countAction: billCountAction({ ...o, excludedByHand: Boolean(byHand) }, { runLocked, monthLabel }),
+      brandAction: billBrandAction(
+        { brandCode: o.brandCode, picked: brandPicks.get(o.orderId) ?? null, cancelled: o.cancelled },
+        { runLocked, closedReason: null, monthLabel, hasOptions: brandOptions.length > 0 },
+      ),
       staff: o.staffId
         ? {
             id: o.staffId,
@@ -353,6 +364,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
             initialShowExcluded={includeExcluded}
             monthLabel={monthLabel}
             hasRun={hasRun}
+            brandOptions={brandOptions}
           />
         )}
 

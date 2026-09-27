@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
+import { brandOutcomeMessage, type BillBrandAction, type BrandOption } from '@/lib/commission/bill-brand'
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
-import BillContextMenu, { type BillMenuOutcome } from './BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome } from './BillContextMenu'
 import BillCountNotice from './BillCountNotice'
 import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
@@ -48,6 +49,8 @@ export interface BillRow {
   exclusionDetail: string | null
   /** What the row's right-click menu may do about whether the bill counts. */
   countAction: BillCountAction
+  /** *Brand for the margin* on the right-click: only for a bill nothing names a brand for (2026-09-27). */
+  brandAction: BillBrandAction | null
   staff: { id: string; name: string; code: string | null; href: string } | null
   /** Set when no salesperson is matched: the ERP's agent string. */
   agent: { name: string; ignored: boolean } | null
@@ -95,6 +98,8 @@ interface Props {
   monthLabel: string
   /** The month has a saved run, which taking a bill out leaves behind until it is computed again. */
   hasRun: boolean
+  /** The brands a bill with none can be given by hand (2026-09-27). */
+  brandOptions?: readonly BrandOption[]
 }
 
 /**
@@ -109,7 +114,7 @@ interface Props {
  * (`BillContextMenu`). The ⋯ beside the order number opens the same menu,
  * because a right-click alone is invisible on a phone and to a keyboard.
  */
-export default function AllBillsTable({ rows, team, openBillPaid, commissionNote, initialShowExcluded, monthLabel, hasRun }: Props) {
+export default function AllBillsTable({ rows, team, openBillPaid, commissionNote, initialShowExcluded, monthLabel, hasRun, brandOptions = [] }: Props) {
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('')
   const [sort, setSort] = useState('date_asc')
@@ -117,6 +122,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   const [hidden, setHidden] = useState<Column[]>(['location'])
   const { menu, closeMenu, onRowContextMenu, onMenuButton, isOpenOn } = useBillMenu<BillRow>(r => r.orderId, r => r.href)
   const [done, setDone] = useState<BillMenuOutcome | null>(null)
+  const [brandDone, setBrandDone] = useState<string | null>(null)
 
   const excludedCount = rows.filter(r => r.cancelled).length
   const brands = useMemo(() => [...new Set(rows.flatMap(r => r.brands))].sort(), [rows])
@@ -151,7 +157,15 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
 
   function menuDone(outcome: BillMenuOutcome) {
     closeMenu()
+    setBrandDone(null)
     setDone(outcome.result.changed ? outcome : null)
+  }
+
+  function brandMenuDone(outcome: BillBrandOutcome) {
+    closeMenu()
+    setDone(null)
+    const nameOf = (code: string) => brandOptions.find(o => o.code === code)?.name ?? code
+    setBrandDone(outcome.result.changed ? brandOutcomeMessage(outcome.result, nameOf) : null)
   }
 
   function salesperson(r: BillRow) {
@@ -240,6 +254,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     {commissionNote && <p className={s.notice} role="status">{commissionNote}</p>}
     {done && <BillCountNotice key={`${done.orderId}:${done.excluded}`} outcome={done} monthLabel={monthLabel} hasRun={hasRun}
       className={s.notice} buttonClassName={s.ghostButton} onChange={setDone} />}
+    {brandDone && <p className={s.notice} role="status">{brandDone}</p>}
 
     <div className={s.tableFrame}>
       <div className={s.tableScroll} role="region" aria-label="All bills, scroll horizontally" tabIndex={0}>
@@ -295,6 +310,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
         exclusionDetail: menu.row.exclusionDetail,
       }}
       anchor={menu.anchor} link={menu.link} byRightClick={menu.byRightClick} monthLabel={monthLabel}
-      onClose={closeMenu} onDone={menuDone} />}
+      brand={menu.row.brandAction ? { action: menu.row.brandAction, options: brandOptions } : null}
+      onClose={closeMenu} onDone={menuDone} onBrandDone={brandMenuDone} />}
   </div>
 }

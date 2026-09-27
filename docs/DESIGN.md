@@ -918,6 +918,18 @@ write the table says what happened above itself, with *Undo* for a bill just
 taken out. An excluded row reads `Not counted` (tooltip: who, when, why) behind
 *Show excluded*.
 
+*Brand for the margin…* (2026-09-27) is the menu's second write, and it is
+there only for a live bill that NOTHING names a brand for — no Branding, no
+pick in the ERP, no branded fair, no branded line — or one given its brand here.
+Its small line says which: *Nothing on this bill names a brand* / *Picked here:
+Zanotti*. It opens an adjacent panel, like the confirmation: the heading
+*Which brand is ORDER for?*, one sentence (pick the fair's brand; it stays
+through every ERP re-send), one plain button per brand the scheme has a margin
+ladder for (the picked one disabled and marked *(picked)*), *Take the pick off*
+when there is one, and Cancel. One click writes it; the table then says
+*ORDER now follows Zanotti's margin ladder.* A paid month or a closed
+salesperson shows the row disabled with the reason.
+
 The same menu sits on a salesperson's ledger on Comm Cal's month (2026-09-27) — Personal, Overriding and Below deposit — and on the month's *Below deposit* tab: the same right-click, the same ⋯ (`useBillMenu`), the same notice with *Undo* (`BillCountNotice`). An Overriding row's heading names the downline who wrote the bill. An upsale or a drop is not a bill and has no menu. A bill carried in from an earlier month answers to that month's run: paid there, the write is disabled with the reason. The ledger's own per-bill button is the same lasting write since the same day (*Don't count*, a ghost button; it was a review draft that changed nothing) and answers on the same notice.
 
 Two rules the canvas keeps that the rest of the page does not: a card dropped
@@ -2349,6 +2361,7 @@ If adding a new component to vocabulary, update this doc first.
 ## Change Log
 
 - **2026-09-27 (director pay)** — Revenue Directors are paid. Rules gains a tenth tab, **Directors** (section X, shown while the sub-department has a director): one `.ledger-table` row per director — name with title · code under it, *Fixed amount · RM*, *Incentive when Commissionable value reaches · RM*, *Incentive · RM*, the row's Save — and a foot line naming the Revenue Director rung's rate (or a `sheet-warning` when the ladder has none). The Title ladder's title picker offers only titles without a rung, the head as *Revenue Director · heads the department*; its row reads *Always* under Can recruit and *Own bills only · no override · no gate* across the two gate columns. Comm Cal: a director with a rung reads *Revenue Director* / *Rank SS · 12% · own bills only · no override* in the Title / rank cell and the hero, the total adds *Includes RM X director pay*, and a `.notice` above their ledger (`DirectorPayNote`) names the fixed amount and whether the month's Commissionable value has reached the incentive threshold, and by how much it is short.
+- **2026-09-27 (brand)** — A bill with no brand gets one by hand. The bill menu on Sales orders and on a salesperson’s ledger gains *Brand for the margin…*, shown only on a live bill that nothing names a brand for (or one given its brand there): an adjacent panel with one plain button per margin-ladder brand, *Take the pick off*, and Cancel, the same paper as the *Don’t count* confirmation. The result is one status line above the table. See “Bill context menu”.
 - **2026-09-27 (second payroll)** — HR › Payroll's row menu gains *Second payroll…* beside *Resubmit…*: the same unlock, recorded as a planned second payment (a sub-department that pays on the 15th) rather than a correction. The status chip, the header's status line, the Submit confirmation, *Submitted to Finance* and Finance's request labels name each kind (`1 resubmit · 1 second payroll`). See "Payroll batches".
 - **2026-09-27 (unified Payroll)** — HR › Payroll holds everybody's pay and moves it person by person. The grid gains a frozen **Status** column (`td.pg-status`, offsets `.l0`–`.l5`), a ⋯ and right-click menu per row (*Resubmit…*), a *Director* band, and a selection bar of *Complete / Unlock / Delete*; the header's *Submit to Finance · N* stays pressable after every batch, *Total Close* sits beside it, and a new **Submitted to Finance** section lists each batch with its funding. Director Salary's *Submit to Finance* is *Complete*; Comm Cal's payroll bar (no button since the entry below) gains one line — a salesperson sent from here shows on *HR › Payroll →* as Completed — and names a Total Closed month as such. See "Payroll batches".
 - **2026-09-27 (night)** — The payroll bar sends nothing. Its whole-month *Send RM X to payroll* / *Update payroll* / *Take back* lived a few hours: the user's Send is per salesperson (tick five and send them, or send everybody not yet sent — somebody already sent is never sent again), which is the per-person close's, not a card about the month. The bar keeps its state, its reasons by name, the draft note and *This month pays*; `.payrollActions` / `.payrollConfirm` / `.payrollDone` / `.payrollError` went with the button.
