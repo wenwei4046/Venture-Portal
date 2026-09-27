@@ -954,6 +954,13 @@ so it will not calculate in this month's commission).
 transaction each. The saved run, if any, still holds the bill until the month
 is computed again. Mig `20260927020000`.
 
+The same right-click is on a salesperson's ledger on Comm Cal's month —
+Personal, Overriding and Below deposit — and on the month's Below deposit tab
+(user 2026-09-27: "right click 这个 order，然后选择它不算 commission"). A bill
+carried in from an earlier month is refused by THAT month's lock, and the menu
+says so before anybody tries. It is not the ledger's *Exclude*, which is a
+review draft that changes nothing.
+
 ---
 
 ## 5. Tax — Withholding instead of PCB

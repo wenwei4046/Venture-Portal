@@ -1,16 +1,44 @@
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { EngineInput, Rank, SalesOrder } from '@/lib/commission/types'
 import { buildPayRow } from '@/lib/revenue-pay'
 import { upsalesToOrders } from '@/lib/commission/upsales'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench from './CommissionWorkbench'
 
-const { saveOpenPicks, refresh } = vi.hoisted(() => ({ saveOpenPicks: vi.fn(), refresh: vi.fn() }))
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
+const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, url } = vi.hoisted(() => {
+  // Next re-renders `useSearchParams` from the browser's own pushState and
+  // replaceState; the stand-in does the same through this subscription.
+  const listeners = new Set<() => void>()
+  return {
+    saveOpenPicks: vi.fn(), refresh: vi.fn(), push: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn(),
+    url: {
+      subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
+      changed() { for (const listener of listeners) listener() },
+    },
+  }
+})
+vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder }))
+vi.mock('next/navigation', async () => {
+  const { useMemo, useSyncExternalStore } = await import('react')
+  return {
+    useRouter: () => ({ refresh, push }),
+    useSearchParams: () => {
+      const search = useSyncExternalStore(url.subscribe, () => window.location.search, () => '')
+      return useMemo(() => new URLSearchParams(search), [search])
+    },
+  }
+})
 vi.mock('next/link', () => ({ default: ({ children, href, ...props }: { children: ReactNode; href: string }) => <a href={href} {...props}>{children}</a> }))
+
+const originalPush = window.history.pushState.bind(window.history)
+const originalReplace = window.history.replaceState.bind(window.history)
+/** What Back (or a reload) does to the month page: the same page, on the URL it had. */
+function visit(search: string) {
+  originalReplace(null, '', `/revenue/fair/2026-08-01${search}`)
+  act(() => url.changed())
+}
 
 const rank = (rankKey: string, productRate: number, sortOrder: number, titleLabel: string): Rank => ({
   rankKey, productRate, sortOrder, titleId: rankKey, titleLabel, label: `${productRate * 100}%`,
@@ -100,8 +128,16 @@ beforeEach(() => {
   sessionStorage.clear()
   vi.clearAllMocks()
   saveOpenPicks.mockResolvedValue(undefined)
+  excludeOrder.mockResolvedValue({ orderNo: 'SO-one', changed: true, openBillRank: 1 })
+  includeOrder.mockResolvedValue({ orderNo: 'SO-one', changed: true, counts: true, stillOut: null, openBillRank: 1 })
+  originalReplace(null, '', '/revenue/fair/2026-08-01')
+  vi.spyOn(window.history, 'pushState').mockImplementation((data, unused, next) => { originalPush(data, unused, next); url.changed() })
+  vi.spyOn(window.history, 'replaceState').mockImplementation((data, unused, next) => { originalReplace(data, unused, next); url.changed() })
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('CommissionWorkbench', () => {
   it('opens an agent as a focused page and restores the month overview on return', () => {
@@ -253,7 +289,8 @@ describe('CommissionWorkbench', () => {
     expect(cells[6]).toHaveTextContent('RM 100.005% of the bill')
     expect(cells[7]).toHaveTextContent('RM 600.0030% of the bill')
     expect(cells[8]).toHaveTextContent('RM 500.00')
-    expect(within(row).getByRole('link', { name: 'SO-two' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders/two')
+    expect(within(row).getByRole('link', { name: 'SO-two' })).toHaveAttribute('href',
+      `/revenue/fair/2026-08-01/orders/two?from=${encodeURIComponent('/revenue/fair/2026-08-01?view=deposit')}`)
     expect(screen.getByText('Still to collect', { selector: 'span' }).parentElement).toHaveTextContent('RM 500.00')
 
     fireEvent.click(within(row).getByRole('button', { name: 'Anthony' }))
@@ -329,7 +366,8 @@ describe('CommissionWorkbench', () => {
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Home Fair')
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Fair Co')
     expect(within(table).getByRole('columnheader', { name: 'Total commission' })).toBeVisible()
-    expect(within(table).getByRole('link', { name: 'SO-one' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders/one')
+    expect(within(table).getByRole('link', { name: 'SO-one' })).toHaveAttribute('href',
+      `/revenue/fair/2026-08-01/orders/one?from=${encodeURIComponent('/revenue/fair/2026-08-01?person=agent')}`)
     expect(screen.getAllByText('RM 1,220.50').length).toBeGreaterThan(0)
   })
 
@@ -611,5 +649,169 @@ describe('CommissionWorkbench', () => {
     expect(screen.queryByRole('button', { name: 'Save Open Bill picks' })).toBeNull()
     expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-two' })).toHaveValue('3')
     expect(saveOpenPicks).not.toHaveBeenCalled()
+  })
+})
+
+describe('CommissionWorkbench — where it stands is the URL (user 2026-09-27)', () => {
+  // "I clicked into Anthony, then his order, pressed Back and it went straight
+  // to the home page." Opening a bill unmounts the month; Back mounts it again
+  // on the URL it left — so that URL has to say whose ledger it was.
+  it('comes back from a bill to the ledger and the table it was opened from', () => {
+    const { unmount } = renderBoard()
+    choose('Alex')
+    fireEvent.click(screen.getByRole('tab', { name: /^Overriding/ }))
+    expect(window.location.search).toBe('?person=leader&orders=overriding')
+    const table = screen.getByRole('table', { name: 'Overriding commission by downline order' })
+    expect(within(table).getByRole('link', { name: 'SO-one' })).toHaveAttribute('href',
+      `/revenue/fair/2026-08-01/orders/one?from=${encodeURIComponent('/revenue/fair/2026-08-01?person=leader&orders=overriding')}`)
+
+    unmount() // the bill's page
+    renderBoard() // Back
+    expect(screen.getByRole('heading', { name: 'Alex' })).toBeVisible()
+    expect(screen.getByRole('tab', { name: /^Overriding/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('table', { name: 'Overriding commission by downline order' })).toBeVisible()
+    expect(screen.queryByRole('table', { name: 'Salesperson commission summary' })).toBeNull()
+  })
+
+  it('makes every table a step of its own, so Back walks out the way it came in', () => {
+    renderBoard()
+    fireEvent.click(screen.getByRole('tab', { name: /^KPI Items/ }))
+    fireEvent.click(within(screen.getByRole('table', { name: 'KPI expense by salesperson' })).getByRole('button', { name: 'Anthony ↗' }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Below deposit/ }))
+    expect(vi.mocked(window.history.pushState).mock.calls.map(call => call[2]))
+      .toEqual(['?view=kpi', '?person=agent', '?person=agent&orders=deposit'])
+
+    visit('?person=agent')
+    expect(screen.getByRole('tab', { name: /^Personal/ })).toHaveAttribute('aria-selected', 'true')
+    visit('?view=kpi')
+    expect(screen.getByRole('table', { name: 'KPI expense by salesperson' })).toBeVisible()
+    visit('')
+    expect(screen.getByRole('table', { name: 'Salesperson commission summary' })).toBeVisible()
+  })
+
+  it('keeps the search, brand and order in the entry they were set on, without adding entries', () => {
+    const { unmount } = renderBoard()
+    choose('Anthony')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort sales orders' }), { target: { value: 'commission_desc' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search sales orders' }), { target: { value: 'SO-t' } })
+    expect(window.location.search).toBe('?person=agent&q=SO-t&sort=commission_desc')
+    expect(window.history.pushState).toHaveBeenCalledTimes(1) // Anthony, and only Anthony
+
+    unmount()
+    renderBoard()
+    expect(screen.getByRole('combobox', { name: 'Sort sales orders' })).toHaveValue('commission_desc')
+    expect(screen.getByRole('textbox', { name: 'Search sales orders' })).toHaveValue('SO-t')
+    expect(within(personalTable()).queryByRole('link', { name: 'SO-one' })).toBeNull()
+    expect(within(personalTable()).getByRole('link', { name: 'SO-two' })).toBeVisible()
+  })
+
+  it('starts a salesperson opened from the list on a clean search, and the list keeps its own', () => {
+    renderBoard()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search salesperson' }), { target: { value: 'Anth' } })
+    choose('Anthony')
+    expect(window.location.search).toBe('?person=agent')
+    expect(screen.getByRole('textbox', { name: 'Search sales orders' })).toHaveValue('')
+    visit('?q=Anth') // Back to the list
+    expect(screen.getByRole('textbox', { name: 'Search salesperson' })).toHaveValue('Anth')
+    expect(screen.queryByRole('button', { name: /^Alex$/ })).toBeNull()
+  })
+
+  it('leaves the keys it does not own alone', () => {
+    visit('?tab=upsales')
+    renderBoard()
+    choose('Anthony')
+    expect(window.location.search).toBe('?tab=upsales&person=agent')
+    fireEvent.click(screen.getByRole('button', { name: '← Sales people' }))
+    expect(window.location.search).toBe('?tab=upsales')
+  })
+
+  it('opens the list for a salesperson the month does not have', () => {
+    visit('?person=nobody')
+    renderBoard()
+    expect(screen.getByRole('table', { name: 'Salesperson commission summary' })).toBeVisible()
+  })
+
+  it('keeps the columns chosen for the month when the ledger is opened again', () => {
+    const { unmount } = renderBoard()
+    choose('Anthony')
+    fireEvent.click(screen.getByText('Columns', { exact: true }))
+    fireEvent.click(screen.getByLabelText('Organizer', { exact: true }))
+    expect(within(personalTable()).queryByRole('columnheader', { name: 'Organizer' })).toBeNull()
+    unmount()
+    renderBoard()
+    expect(within(personalTable()).queryByRole('columnheader', { name: 'Organizer' })).toBeNull()
+    expect(within(personalTable()).getByRole('columnheader', { name: 'Venue' })).toBeVisible()
+  })
+})
+
+describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () => {
+  // "I want the right-click, the same as on All bills: right-click the order,
+  // choose that it does not count, and it is out of the commission."
+  it("right-clicks a salesperson's bill for All bills' menu and takes it out of the month", async () => {
+    renderBoard(fixture(), 'computed')
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    const menu = screen.getByRole('menu', { name: 'Actions for SO-one' })
+    expect(menu).toHaveTextContent('SO-one · Anthony')
+    expect(within(menu).getByRole('menuitem', { name: 'Open bill' })).toBeVisible()
+
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Don't count this bill/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: "Don't count this bill" }))
+    await waitFor(() => expect(excludeOrder).toHaveBeenCalledWith('one', ''))
+    expect(refresh).toHaveBeenCalled()
+    const notice = await screen.findByText(/SO-one no longer counts in August 2026 and gave up its 1st Open Bill\./)
+    expect(notice).toHaveTextContent('Compute the month again to take it out of the saved run.')
+    expect(screen.queryByRole('menu')).toBeNull()
+    // The review draft's Exclude is a different thing, and nothing touched it.
+    expect(sessionStorage.getItem('commission-draft:fair:2026-08-01')).toContain('"excluded":[]')
+
+    fireEvent.click(within(notice).getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(includeOrder).toHaveBeenCalledWith('one'))
+    expect(await screen.findByText(/SO-one counts again, back as the 1st Open Bill\./)).toBeInTheDocument()
+  })
+
+  it('opens the same menu from the ⋯ beside the order number, and from a downline bill', () => {
+    renderBoard()
+    choose('Alex')
+    fireEvent.click(screen.getByRole('tab', { name: /^Overriding/ }))
+    const table = screen.getByRole('table', { name: 'Overriding commission by downline order' })
+    const more = within(salesRow(table, 'SO-two')).getByRole('button', { name: 'Actions for SO-two' })
+    fireEvent.click(more)
+    // Whose bill it is: the downline who wrote it, not the upline reading it.
+    expect(screen.getByRole('menu', { name: 'Actions for SO-two' })).toHaveTextContent('SO-two · Anthony')
+    expect(more).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it("will not take a bill out of a month whose run has paid, and says whose run", () => {
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus="applied" savedTotals={[]}
+      monthStats={monthStats} lockedPeriods={['2026-08-01']} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    const item = within(screen.getByRole('menu', { name: 'Actions for SO-one' })).getByRole('menuitem', { name: /Don't count this bill/ })
+    expect(item).toBeDisabled()
+    expect(item).toHaveTextContent('The run for August 2026 has paid')
+  })
+
+  it('offers no menu on an upsale or a drop — they are not bills', () => {
+    const data = fixture()
+    data.input.orders = [...data.input.orders, ...upsalesToOrders([
+      { id: 'up', staff_id: 'agent', amount: 300, sold_on: '2026-08-20', original_ref: 'HC5315' },
+    ], '2026-08-01')]
+    renderBoard(data)
+    choose('Anthony')
+    const upsale = salesRow(personalTable(), 'UPSALE HC5315')
+    expect(within(upsale).queryByRole('button', { name: /^Actions for/ })).toBeNull()
+    expect(fireEvent.contextMenu(within(upsale).getByText('UPSALE HC5315'), { clientX: 10, clientY: 10 })).toBe(true)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('puts the menu on the month’s Below deposit list too', () => {
+    const data = fixture()
+    data.input.orders = [sale('one'), sale('two', 2_000, { paidAmount: 100 })]
+    renderBoard(data)
+    fireEvent.click(screen.getByRole('tab', { name: /^Below deposit/ }))
+    const row = salesRow(screen.getByRole('table', { name: 'Orders below deposit' }), 'SO-two')
+    fireEvent.contextMenu(within(row).getAllByRole('cell')[4], { clientX: 300, clientY: 300 })
+    expect(screen.getByRole('menu', { name: 'Actions for SO-two' })).toHaveTextContent('SO-two · Anthony')
   })
 })

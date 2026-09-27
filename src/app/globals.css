@@ -3657,6 +3657,18 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 .modular-card-name { font-size: 12px; overflow-wrap: anywhere; }
 .modular-card-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; font-size: 11px; }
 .modular-card-meta [data-flag] { font-weight: 600; }
+/* Inside a category, one run of cards per branding (user 2026-09-27): a small
+   heading — the eyebrow's orange dash, the branding and its count, as the
+   category's own heading has, then a hairline to the edge. A→Z; the unbranded
+   close the category under a grey dash, in plain words. */
+.modular-brand + .modular-brand { margin-top: 18px; }
+.modular-brand-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 11px; font-weight: 400; }
+.modular-brand-head::before { content: ''; flex: none; width: 14px; height: 2px; background: rgb(var(--accent)); }
+.modular-brand-head[data-none]::before { background: rgb(var(--product-table-rule)); }
+.modular-brand-name { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; overflow-wrap: anywhere; }
+.modular-brand-head[data-none] .modular-brand-name { letter-spacing: 0; text-transform: none; }
+.modular-brand-rule { flex: 1; min-width: 12px; height: 1px; background: rgb(var(--product-divider)); }
+.modular-brand-count { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Modular: one model in a floating window, on one sheet (design A, 2026-09-26). */
 dialog.modular-win {

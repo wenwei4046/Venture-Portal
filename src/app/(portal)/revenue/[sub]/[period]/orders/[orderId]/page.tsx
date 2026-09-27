@@ -22,14 +22,22 @@ import { kpiItemLabel, lineSpecialsOf } from '@/lib/commission/kpi'
 import { toKpiItems, type CostRatioRow, type KpiItemRow } from '@/lib/commission/run-payload'
 import { costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
+import ReturnLink from '@/components/layout/ReturnLink'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { describeExclusion } from '@/lib/commission/bill-exclusion'
+import { parseWorkbenchReturn } from '@/lib/commission/workbench-nav'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions } from '../../../../_lib/month-orders'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string; orderId: string }>
+  /** `from`: the month page the bill was opened from — a salesperson's ledger, say. */
+  searchParams: Promise<{ from?: string | string[] }>
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const BUTTON = 'bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors'
 
 function label(period: string): string {
   return new Date(period + 'T00:00:00Z').toLocaleString('en-US', {
@@ -105,12 +113,17 @@ interface PaymentRow {
  * Read straight from `sales_orders`, never from a run: this is the evidence a
  * run is checked against.
  */
-export default async function OrderDetailPage({ params }: PageProps) {
+export default async function OrderDetailPage({ params, searchParams }: PageProps) {
   await requirePermission('revenue')
   const { sub, period, orderId } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
   const subDept = await requireSubDepartment(sub)
+  // Where the reader came from (2026-09-27): a bill opened on ANTHONY's ledger
+  // goes back to ANTHONY's ledger, on the table it was opened from. Only a
+  // month page of this sub-department is honoured (lib/commission/workbench-nav.ts).
+  const { from } = await searchParams
+  const back = parseWorkbenchReturn(typeof from === 'string' ? from : null, subDept.slug)
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const { data: orderData } = await supabase
@@ -154,7 +167,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
   if (!order || order.period_month !== period) notFound()
 
   const asAt = periodEnd(period)
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }] =
+  // The ledger's owner, when it is not the bill's own salesperson (an upline
+  // reading a downline's bill on Overriding).
+  const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -198,6 +214,9 @@ export default async function OrderDetailPage({ params }: PageProps) {
       // SKUs judged at their own cost ratio (Product List › Costing Setting).
       subDept.schemeId
         ? supabase.from('comm_cost_ratios').select('product_code, ratio').eq('scheme_id', subDept.schemeId)
+        : Promise.resolve({ data: null }),
+      backPerson
+        ? supabase.from('hr_staff_costs').select('employee_name').eq('id', backPerson).maybeSingle()
         : Promise.resolve({ data: null }),
     ])
   const byHand = exclusions?.get(orderId) ?? null
@@ -280,6 +299,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   const payments = Array.isArray(order.raw?.payments) ? order.raw.payments : []
 
+  const backLabel = !back
+    ? null
+    : back.personId
+      ? (back.personId === order.staff_id
+          ? order.hr_staff_costs?.employee_name
+          : (backPersonData as { employee_name: string } | null)?.employee_name) ?? 'Salesperson'
+      : back.tab === 'deposit'
+        ? 'Below deposit'
+        : label(back.period)
+
   return (
     <div>
       <div className="page-head">
@@ -295,12 +324,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
             {order.sequence_in_day ? ` · bill #${order.sequence_in_day} of the day` : ''}
           </p>
         </div>
-        <Link
-          href={revenuePath(subDept.slug, period, 'orders')}
-          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-        >
-          ← All bills
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {back ? (
+            <ReturnLink href={back.href} className={BUTTON}>
+              ← {backLabel}
+            </ReturnLink>
+          ) : null}
+          <Link href={revenuePath(subDept.slug, period, 'orders')} className={BUTTON}>
+            {back ? 'All bills' : '← All bills'}
+          </Link>
+        </div>
       </div>
 
       {order.cancelled ? (
