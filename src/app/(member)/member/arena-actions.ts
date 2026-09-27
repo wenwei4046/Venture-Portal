@@ -1,6 +1,6 @@
 "use server";
 
-import { getUser } from "@/lib/auth";
+import { getMemberUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isPrincipalAccount } from "@/lib/view-as";
@@ -12,7 +12,7 @@ import type { ArenaHistorySnapshot } from "@/lib/member/arena-history";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function validPeriod(period: string) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(period); }
 async function client(context?: MemberReadContext, write = false) {
-  const user = await getUser();
+  const user = await getMemberUser();
   if (!user?.is_active || (!isPrincipalAccount(user) && !user.permissions.includes("member_insight"))) throw new Error("Arena is not enabled for this account.");
   if (write && isPrincipalAccount(user)) throw new Error("Brand weeks can only be saved by the member from their own account.");
   const principal = principalReadContext(user, context);
