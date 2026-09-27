@@ -163,6 +163,8 @@ describe('SKU Master price workspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Save failed')
     expect(screen.getByRole('textbox', { name: '2376-1S at 24 PRICE_2' })).toHaveValue('1234')
     expect(screen.getByRole('textbox', { name: '2376-1S at 75CM PRICE_2' })).toHaveValue('')
+    // The error lands inside the save; Cancel stays disabled until its transition has ended.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Edit Prices' }))

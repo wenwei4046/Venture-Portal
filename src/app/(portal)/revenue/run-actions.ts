@@ -8,44 +8,18 @@ import { openBillOnFor } from './_lib/open-bill-month'
 import { fetchByKeys } from '@/lib/paginate'
 
 /**
- * Taking a month's commission back out of payroll (the whole-month send it
- * paired with was retired by the unified Payroll, 2026-09-27), plus the
- * month's Open Bill picks and the bills counted by hand.
+ * What a commission month's people change by hand: Open Bill picks, shares,
+ * bills that do not count, keyed margins, a month's costs. Every write is one
+ * SQL function or a guarded row write; none of them does commission maths.
  *
- * The shape here follows the hybrid pattern the user chose for the salary
- * engine: the arithmetic is TypeScript (`src/lib/commission/engine.ts`, tested
- * against hand-worked examples), the WRITE is a single SQL function so a
- * half-written run is impossible. This file is the courier between them and
- * does no maths of its own beyond picking which rows to load.
- *
- * The month page works the commission out live every time it opens; payroll
- * holds only what was SENT (2026-09-27 — the page had read as if the two were
- * the same, and September had never been sent).
+ * Sending to payroll is not here any more (2026-09-27): the whole-month send
+ * went the day it came — the user's Send is per salesperson (Send = Complete),
+ * which is the per-person close's job.
  *
  * comm_* / sales_* postdate database.types.ts — untyped-client convention.
  */
 async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
-}
-
-
-// The whole-month send (sendToPayroll) was retired by the unified Payroll
-// (2026-09-27): a salesperson goes to payroll when closed on Comm Cal.
-
-/**
- * Take this sub-department's commission back out of the month's payroll, so
- * its bills and picks can change again. Other sub-departments' shares and the
- * titles already raised stay.
- */
-export async function takeBackFromPayroll(runId: string): Promise<void> {
-  await requirePermission('revenue')
-  const supabase = await client()
-
-  const { error } = await supabase.rpc('reopen_commission_run', { p_run_id: runId })
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/revenue', 'layout')
-  revalidatePath('/hr-costing/payroll', 'layout')
 }
 
 // ─── Review-board edits ─────────────────────────────────────────────────────
@@ -408,7 +382,7 @@ async function assertRunOpen(supabase: SupabaseClient, periodMonth: string, subD
   if (error) throw new Error(`Could not check the commission run: ${error.message}`)
   if (locked) {
     throw new Error(
-      `These ${periodMonth.slice(0, 7)} sales are in payroll. Take the month back from payroll (its payroll bar) before making changes.`,
+      `These ${periodMonth.slice(0, 7)} sales are in payroll, so they cannot change until the month comes out of payroll.`,
     )
   }
 }

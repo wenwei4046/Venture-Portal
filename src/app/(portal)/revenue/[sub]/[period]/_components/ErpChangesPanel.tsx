@@ -15,7 +15,7 @@ interface Props {
    * waiting (Undo) until the month is in payroll.
    */
   paid?: UpsaleView[]
-  /** This month is in payroll: nothing is paid into it, or sent back, until it is taken back. */
+  /** This month is in payroll: nothing is paid into it, or sent back. */
   locked: boolean
   /**
    * "September 2026" when this month was settled by hand, before the first
@@ -127,7 +127,7 @@ export default function ErpChangesPanel({ period, pending, paid = [], locked, se
         </p>
       ) : locked && pending.length > 0 ? (
         <p className="font-serif italic text-sm text-ink mb-3">
-          {monthName(period, 'long')} is in payroll — open a later month to pay these, or take this one back first.
+          {monthName(period, 'long')} is in payroll — open a later month to pay these.
         </p>
       ) : null}
       {pending.length > 0 ? (

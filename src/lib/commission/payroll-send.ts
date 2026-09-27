@@ -9,8 +9,11 @@
  *
  *   settled  — a month before the portal pays: settled by hand, nothing to send
  *   closed   — the month's payroll has left draft: nothing here can change it
- *   not_sent — nothing in payroll yet; sendable once nothing is left to settle
+ *   not_sent — nothing in payroll yet, and what has to be settled first
  *   sent     — in payroll, and whether the live figure still matches it
+ *
+ * It only SAYS. The sending is per salesperson (user 2026-09-27: Send =
+ * Complete — tick five and send them, or send everybody not yet sent).
  *
  * Pure, so the rule is tested where it is written.
  */
@@ -20,7 +23,7 @@ export type RunStatus = 'draft' | 'computed' | 'applied' | 'locked'
 /**
  * The one thing the server adds to the engine's list: bills whose seller is
  * nobody on the roster never reach the engine, so its result would look clean
- * while quietly leaving real sales out. The page and the send say it the same.
+ * while quietly leaving real sales out.
  */
 export function unmatchedWarnings(orderNos: readonly string[]): string[] {
   return orderNos.length > 0
@@ -56,7 +59,7 @@ export interface PayrollFacts {
   payrollClosed: string | null
 }
 
-/** What sending now would put in payroll. */
+/** The month as the page works it out now. */
 export interface LiveFigure {
   total: number
   byStaff: ReadonlyMap<string, number>

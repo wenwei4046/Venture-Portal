@@ -754,11 +754,12 @@ src/
 │   │   │                              gone (user 2026-09-26). The bottom rail
 │   │   │                              went with *Payroll & source tools*
 │   │   │                              (2026-09-27, below).
-│   │   │                              (The Send below was RETIRED the same day by
-│   │   │                              the unified Payroll — a salesperson goes to
-│   │   │                              payroll when CLOSED; the bar now says so and
-│   │   │                              links HR › Payroll; Take back stays for an
-│   │   │                              old applied run.)
+│   │   │                              (Unified Payroll, the same day: a salesperson
+│   │   │                              goes to payroll when CLOSED here — their row
+│   │   │                              on HR › Payroll turns Completed; the bar
+│   │   │                              links HR › Payroll and names a Total Closed
+│   │   │                              month; `send_commission_to_payroll` now
+│   │   │                              raises 23PAY.)
 │   │   │                              **SEND TO PAYROLL (2026-09-27):** the month
 │   │   │                              is worked out LIVE every time the page
 │   │   │                              opens; payroll holds only what was SENT, and
@@ -772,17 +773,19 @@ src/
 │   │   │                              under the cards (`PayrollBar`,
 │   │   │                              `lib/commission/payroll-send.ts`) says not
 │   │   │                              sent / in payroll (matching or moved since)
-│   │   │                              / closed / settled by hand, lists what stops
-│   │   │                              a send BY NAME (engine warnings + unmatched
-│   │   │                              agents — what the send checks), and sends
-│   │   │                              with one click: `send_commission_to_payroll`
-│   │   │                              refuses a warning before anything moves and
-│   │   │                              replaces a run already in payroll (reopen +
-│   │   │                              save + apply) in ONE transaction; *Take
-│   │   │                              back* = `reopen_commission_run`;
+│   │   │                              / closed / settled by hand, lists what has
+│   │   │                              to be settled first BY NAME (engine warnings
+│   │   │                              + unmatched agents), and SENDS NOTHING: its
+│   │   │                              whole-month *Send to payroll* / *Take back*
+│   │   │                              lived a few hours on 2026-09-27 and went —
+│   │   │                              the user's Send is per SALESPERSON (Send =
+│   │   │                              Complete: tick five and send them, or send
+│   │   │                              everybody not yet sent), the per-person
+│   │   │                              close's job. `send_commission_to_payroll`
+│   │   │                              is still in the DB, unused.
 │   │   │                              `commission_payroll_closed(period)` asks the
 │   │   │                              writes' guard (HR cannot read payroll_runs /
-│   │   │                              period_locks). The bar sends the month AS
+│   │   │                              period_locks). The bar reads the month AS
 │   │   │                              SAVED, never the screen's draft. The month's
 │   │   │                              switches (*This month pays*) sit in its
 │   │   │                              foot. The whole foot section is gone —

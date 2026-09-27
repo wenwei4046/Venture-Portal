@@ -1,52 +1,64 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import PayrollBar from './PayrollBar'
 
-const { takeBackFromPayroll, refresh } = vi.hoisted(() => ({
-  takeBackFromPayroll: vi.fn(), refresh: vi.fn(),
-}))
-vi.mock('../../../run-actions', () => ({ takeBackFromPayroll }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
-
-const base = { period: '2026-09-01', monthLabel: 'September 2026', subDepartmentId: 'sub-fair', runId: null }
 const bar = () => screen.getByRole('region', { name: 'Payroll · September 2026' })
 
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(cleanup)
 
 describe('PayrollBar', () => {
-  it('sends nothing for a month settled by hand (August 2026)', () => {
-    render(<PayrollBar {...base} monthLabel="September 2026" state={{ kind: 'settled', settledBefore: 'September 2026' }} />)
-    expect(bar()).toHaveTextContent('Settled by hand')
-    expect(bar()).toHaveTextContent('The portal pays from September 2026, so nothing on this page goes to payroll')
+  // User 2026-09-27: Send = Complete, per salesperson — tick five and send
+  // them, or send everybody not yet sent. One button for the month cannot.
+  it('says the month is not in payroll yet, and sends nothing itself', () => {
+    render(<PayrollBar monthLabel="September 2026" state={{ kind: 'not_sent', total: 91_971.9, blockers: [] }} />)
+    expect(bar()).toHaveTextContent('Not in payroll yet')
+    expect(bar()).toHaveTextContent('it goes salesperson by salesperson, as each one is sent.')
     expect(screen.queryByRole('button')).toBeNull()
   })
 
+  it('lists what has to be settled first', () => {
+    render(<PayrollBar monthLabel="September 2026" state={{ kind: 'not_sent', total: 10, blockers: ['Staff NEWBIE has sales this period but no rank.'] }} />)
+    expect(bar()).toHaveTextContent('one thing has to be settled first')
+    expect(screen.getByRole('list', { name: 'To settle before payroll' })).toHaveTextContent('Staff NEWBIE has sales this period but no rank.')
+  })
+
+  it('says what payroll holds once a month is in it, and whether the page has moved since', () => {
+    render(<PayrollBar monthLabel="September 2026" state={{
+      kind: 'sent', sentTotal: 300, sentAt: '2026-10-15T02:30:00Z', total: 320, current: false, changedPeople: 1, blockers: [],
+    }} />)
+    expect(bar()).toHaveTextContent('In payroll · RM 300.00')
+    expect(bar()).toHaveTextContent(/Sent 15 Oct 2026, 10:30/)
+    expect(bar()).toHaveTextContent('RM 320.00, RM 20.00 more · 1 person changed')
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('sends nothing for a month settled by hand (August 2026)', () => {
+    render(<PayrollBar monthLabel="September 2026" state={{ kind: 'settled', settledBefore: 'September 2026' }} />)
+    expect(bar()).toHaveTextContent('Settled by hand')
+    expect(bar()).toHaveTextContent('The portal pays from September 2026, so nothing on this page goes to payroll')
+  })
+
   it('says why a closed payroll month takes nothing, in the guard\'s own words', () => {
-    render(<PayrollBar {...base} runId="run-1" state={{
+    render(<PayrollBar monthLabel="September 2026" state={{
       kind: 'closed', sentTotal: 91_971.9,
       closedAs: 'Payroll for Sep 2026 has already been submitted. Reopen payroll before changing commission',
     }} />)
     expect(bar()).toHaveTextContent('In payroll · RM 91,971.90')
     expect(bar()).toHaveTextContent('Payroll for Sep 2026 has already been submitted. Reopen payroll before changing commission. Until then nothing here can change the September 2026 payroll.')
-    expect(screen.queryByRole('button')).toBeNull()
   })
 
-  // Unified Payroll (2026-09-27): no whole-month send — a salesperson goes
-  // to payroll when closed here, and HR submits them from HR › Payroll.
-  it('offers no whole-month send, only the way to HR › Payroll', () => {
-    render(<PayrollBar {...base} state={{ kind: 'not_sent', total: 91_971.9, blockers: [] }} />)
-    expect(bar()).toHaveTextContent('Goes to payroll person by person')
-    expect(bar()).toHaveTextContent('A salesperson goes to payroll when you close them here')
-    expect(screen.queryByRole('button', { name: /Send/ })).toBeNull()
+  // The unified Payroll (2026-09-27): where a sent salesperson lands, and a month HR has closed for good.
+  it('points at HR › Payroll while the month can still take people', () => {
+    render(<PayrollBar monthLabel="September 2026" period="2026-09-01" state={{ kind: 'not_sent', total: 10, blockers: [] }} />)
     expect(screen.getByRole('link', { name: 'HR › Payroll →' })).toHaveAttribute('href', '/hr-costing/payroll/2026-09-01')
+    expect(bar()).toHaveTextContent("shows on HR › Payroll → as Completed; HR's Submit to Finance sends them on.")
   })
 
-  it('lets a month an old run put in payroll be taken back, never updated', async () => {
-    takeBackFromPayroll.mockResolvedValue(undefined)
-    render(<PayrollBar {...base} runId="run-1" state={{ kind: 'sent', sentTotal: 89_460.99, sentAt: '2026-09-26T14:29:04Z', total: 91_971.9, current: false, changedPeople: 3, blockers: [] }} />)
-    expect(screen.queryByRole('button', { name: /Update payroll/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Take back' }))
-    fireEvent.click(screen.getAllByRole('button', { name: 'Take back' })[0])
-    await waitFor(() => expect(takeBackFromPayroll).toHaveBeenCalledWith('run-1'))
+  it('names a Total Closed month as such, and offers no way in', () => {
+    render(<PayrollBar monthLabel="September 2026" period="2026-09-01" state={{
+      kind: 'closed', sentTotal: null, closedAs: 'Payroll for September 2026 is closed for good',
+    }} />)
+    expect(bar()).toHaveTextContent('HR has closed the September 2026 payroll for good (Total Close), so nothing here can change it. Only the Principal can reopen the month.')
+    expect(screen.queryByRole('link')).toBeNull()
   })
 })

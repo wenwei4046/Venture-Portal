@@ -153,10 +153,11 @@ describe('Add-on / KPI Items', () => {
     click('Add No Side Panel')
     click('Save 1 change')
     expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
+    // The notice lands inside the save; the button says Saved only once its transition has ended.
+    expect(await screen.findByRole('button', { name: 'Saved' })).toBeDisabled()
     expect(refresh).toHaveBeenCalled()
     expect(bodyRows()[0]).toHaveTextContent('No Side Panel')
     expect(within(bodyRows()[0]).getByRole('textbox', { name: 'No Side Panel KPI amount' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled()
 
     const saved: KpiItemSetting = { id: '33333333-3333-4333-8333-333333333333', source: 'option', erpId: null, code: null, name: null,
       optionPool: 'bedframe_specials', optionValue: 'No Side Panel', amount: 120, from: '2026-09-27', to: null }

@@ -266,7 +266,7 @@ export default function ErpSyncPanel({ data }: { data: ErpSyncPanelData }) {
           <Hint>
             The ERP changed these orders after the month went to payroll, while the month was
             closed to the feed, or after the month was imported from a file. Nothing was written.
-            Take the month back from payroll or reopen it to the feed, then replay.
+            Replay once the month is open to the feed again and out of payroll.
           </Hint>
           <div className="overflow-x-auto">
             <table className="ledger-table tight">
