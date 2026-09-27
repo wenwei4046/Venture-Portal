@@ -155,9 +155,14 @@ matched a booth; it does not when the bill is keyed after the fair closed
 (`UNMATCHED`), at a hall with several booths (`AMBIGUOUS`), or before the picker
 existed.
 
-So when the products name no brand, the ERP's order form asks which brand the
-bill is for — the ERP's own `project_brands`, pre-set to the picked booth's
-brand — and the salesperson may skip it. The answer lives in its own column
+So when NOTHING on the bill names a brand — not its `branding`, not one of its
+lines (user 2026-09-27) — the ERP's order form asks which brand the bill is for,
+after the save that makes it a live order (a create, a draft confirmed), and the
+salesperson may skip it. The choices are the brands this portal has a margin
+ladder for — the ERP's `scm.sync_config` `vp.brands`, seeded
+`AKEMI,DUNLOPILLO,ERGOTEX,ZANOTTI` (user: "just follow VP"; a new ladder here is
+a one-row UPDATE there) — cut to the company's `project_brands`, the picked
+booth's brand first. The answer lives in its own column
 (`scm.mfg_sales_orders.vp_brand`) and travels as a top-level `vpBrand`; the
 ERP's `branding` is never changed by it.
 
@@ -167,10 +172,12 @@ ERP's `branding` is never changed by it.
 | `null` / absent | not asked (the products name a brand), or skipped |
 
 Anything but a string is no pick — never a reason to refuse the sale. The
-bill's brand, in order: Branding when it names a brand → `vpBrand` → the
-fair's brand → the lines (`erp_sync_order_brand`). The pick and the fair come
-BEFORE the lines on purpose: a Dunlopillo pillow sold at an Ergotex fair is an
-Ergotex bill.
+bill's brand, in order: Branding when it names a brand → `vpBrand` → a brand
+picked on the portal (Sales orders › right-click › *Brand for the margin*, only
+on a bill nothing else names a brand for; `sales_order_brand_picks`, kept
+through every re-send) → the fair's brand → the lines (`erp_sync_order_brand`).
+The picks and the fair come BEFORE the lines on purpose: a Dunlopillo pillow sold
+at an Ergotex fair is an Ergotex bill.
 
 
 ### 3.4 The fair — what the salesperson picked (2026-09-27)

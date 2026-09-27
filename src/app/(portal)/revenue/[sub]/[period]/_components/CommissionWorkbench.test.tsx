@@ -10,19 +10,20 @@ import CommissionWorkbench, { type PayrollBarFacts } from './CommissionWorkbench
 // The salary preview's pay-line editor saves through a server action (its own tests are SalaryCalculation.test).
 vi.mock('../../../pay-line-actions', () => ({ savePayLines: vi.fn() }))
 
-const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, url } = vi.hoisted(() => {
+const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, setOrderBrand, url } = vi.hoisted(() => {
   // Next re-renders `useSearchParams` from the browser's own pushState and
   // replaceState; the stand-in does the same through this subscription.
   const listeners = new Set<() => void>()
   return {
     saveOpenPicks: vi.fn(), refresh: vi.fn(), push: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn(),
+    setOrderBrand: vi.fn(),
     url: {
       subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
       changed() { for (const listener of listeners) listener() },
     },
   }
 })
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder }))
+vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, setOrderBrand }))
 vi.mock('../../../close-actions', () => ({ closeSalespeople: vi.fn(), reopenSalespeople: vi.fn() }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
@@ -913,5 +914,40 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     const row = salesRow(screen.getByRole('table', { name: 'Orders below deposit' }), 'SO-two')
     fireEvent.contextMenu(within(row).getAllByRole('cell')[4], { clientX: 300, clientY: 300 })
     expect(screen.getByRole('menu', { name: 'Actions for SO-two' })).toHaveTextContent('SO-two · Anthony')
+  })
+
+  // 2026-09-27: a bill nothing names a brand for gets *Brand for the margin*
+  // on a salesperson's ledger too — the same row All bills offers.
+  it('offers a brand for the margin on a brandless bill of the ledger, never on one with its own', async () => {
+    setOrderBrand.mockResolvedValue({ orderNo: 'SO-two', changed: true, brandCode: 'ZANOTTI', picked: 'ZANOTTI' })
+    const data = fixture()
+    data.input.orders = [sale('one', 1_000, { brandCode: 'AKEMI' }), sale('two', 2_000)]
+    render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus="computed" savedTotals={[]}
+      monthStats={monthStats}
+      brandMenu={{ options: [{ code: 'AKEMI', name: 'Akemi' }, { code: 'ZANOTTI', name: 'Zanotti' }], picked: {} }} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getAllByRole('cell')[2], { clientX: 400, clientY: 260 })
+    expect(screen.getByRole('menu', { name: 'Actions for SO-one' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Brand for the margin/ })).toBeNull()
+    fireEvent.pointerDown(document.body)
+
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-two')).getAllByRole('cell')[2], { clientX: 400, clientY: 300 })
+    fireEvent.click(screen.getByRole('menuitem', { name: /Brand for the margin/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Brand for SO-two' })).getByRole('button', { name: 'Zanotti' }))
+    await waitFor(() => expect(setOrderBrand).toHaveBeenCalledWith('two', 'ZANOTTI'))
+    expect(await screen.findByText('SO-two now follows Zanotti’s margin ladder.')).toBeInTheDocument()
+  })
+
+  it('locks the brand row for a closed month', () => {
+    const data = fixture()
+    data.input.orders = [sale('one')]
+    render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus="applied" savedTotals={[]}
+      monthStats={monthStats} lockedPeriods={['2026-08-01']}
+      brandMenu={{ options: [{ code: 'AKEMI', name: 'Akemi' }], picked: {} }} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getAllByRole('cell')[2], { clientX: 400, clientY: 260 })
+    const row = screen.getByRole('menuitem', { name: /Brand for the margin/ })
+    expect(row).toBeDisabled()
+    expect(row).toHaveTextContent('The run for August 2026 has paid')
   })
 })

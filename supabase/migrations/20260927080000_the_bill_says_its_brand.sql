@@ -13,53 +13,287 @@
 -- and it follows that fair's brand. So the bill's brand, in order:
 --
 --   1. the ERP's Branding, when it names a brand (the products decide);
---   2. the brand the salesperson picked — the ERP now asks, when the products
---      name none, which brand the bill is for, and may be skipped
---      (`vpBrand` in the delivery, contract §3.5; the ERP's own Branding is
---      left as it is);
---   3. the brand of the fair it was written at (the booth the ERP's fair
---      picker named, contract §3.4) — unless that booth was cancelled;
---   4. the lines, as before.
+--   2. the brand the salesperson picked in the ERP — asked when nothing on the
+--      bill names a brand, skippable, the ERP's own Branding left as it is
+--      (`vpBrand` in the delivery, contract §3.5);
+--   3. the brand somebody picked HERE for a bill nothing else names a brand
+--      for — Sales orders › right-click › Brand for the margin (user: 没有任何
+--      brand 存在的单，可以在这边 allocate) — kept through every ERP re-send;
+--   4. the brand of the fair it was written at (the booth the ERP's fair picker
+--      named, contract §3.4) — unless that booth was cancelled;
+--   5. the lines, as before.
 --
--- 2 and 3 come before the lines on purpose: a Dunlopillo pillow sold at an
--- Ergotex fair is an Ergotex bill.
+-- 2–4 come before the lines on purpose: a Dunlopillo pillow sold at an Ergotex
+-- fair is an Ergotex bill.
 --
--- 1. erp_sync_order_brand(order) — steps 1–3.
--- 2. ingest_erp_sales_order — 20260927010000's verbatim, the brand block
---    marked (20260927080000) calling it.
--- 3. The bills already stored: a brandless bill whose delivery named a branded
+-- 1. sales_order_brand_picks — step 3's answers, one per bill, refused for a
+--    month whose run has paid (23RUN).
+-- 2. erp_sync_order_brand(order, bill) — steps 1–4.
+-- 3. sales_order_lines_brand / sales_order_restamp_brand — step 5, and the
+--    whole chain applied to a stored bill.
+-- 4. revenue_set_order_brand(bill, brand) — the right-click: a brand the
+--    portal has a ladder for, only on an ERP bill that has no brand of its own
+--    (or one picked here, to change or take off). 23BRD otherwise.
+-- 5. ingest_erp_sales_order — 20260927010000's verbatim, the brand block
+--    marked (20260927080000) calling erp_sync_order_brand.
+-- 6. The bills already stored: a brandless bill whose delivery named a branded
 --    fair takes that brand (two on 2026-09-27, HC-SO-2609-123 / -219, both
 --    AKEMI), lines without a brand with it. A month whose run has paid, or one
 --    settled by hand, is left alone.
 --
--- Rollback: re-apply 20260927010000's ingest body, DROP FUNCTION
--- erp_sync_order_brand(JSONB), and `UPDATE sales_orders SET brand_code = NULL
--- WHERE order_no IN ('HC-SO-2609-123', 'HC-SO-2609-219')` (and their lines)
--- if the two back-filled bills should go back to no brand.
+-- Rollback: re-apply 20260927010000's ingest body; DROP FUNCTION
+-- revenue_set_order_brand(UUID, TEXT), sales_order_restamp_brand(UUID),
+-- sales_order_lines_brand(UUID), erp_sync_order_brand(JSONB, UUID); DROP TABLE
+-- sales_order_brand_picks (its answers go with it); and `UPDATE sales_orders
+-- SET brand_code = NULL WHERE order_no IN ('HC-SO-2609-123', 'HC-SO-2609-219')`
+-- (and their lines) if the two back-filled bills should go back to no brand.
 -- ════════════════════════════════════════════════════════════════════════════
 
--- ─── 1. The bill's own words about its brand ────────────────────────────────
+-- ─── 1. The brands picked here ──────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION erp_sync_order_brand(p_order JSONB)
+CREATE TABLE IF NOT EXISTS sales_order_brand_picks (
+    order_id       UUID        PRIMARY KEY REFERENCES sales_orders (id) ON DELETE CASCADE,
+    brand_code     TEXT        NOT NULL,
+    picked_by      UUID        REFERENCES users (id) ON DELETE SET NULL,
+    picked_by_name TEXT,
+    picked_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT sales_order_brand_picks_code CHECK (BTRIM(brand_code) <> '')
+);
+
+COMMENT ON TABLE sales_order_brand_picks IS
+    'The brand somebody picked on the portal for a bill nothing else names a brand for (2026-09-27, Sales orders › right-click › Brand for the margin). It comes after the ERP''s Branding and the salesperson''s own pick and before the fair''s brand and the lines (erp_sync_order_brand), and it is kept through every ERP re-send. Written by revenue_set_order_brand.';
+
+ALTER TABLE sales_order_brand_picks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS sales_order_brand_picks_hr_all ON sales_order_brand_picks;
+CREATE POLICY sales_order_brand_picks_hr_all ON sales_order_brand_picks
+    FOR ALL
+    USING ((SELECT has_scope(ARRAY['hr'])))
+    WITH CHECK ((SELECT has_scope(ARRAY['hr'])));
+
+DROP POLICY IF EXISTS sales_order_brand_picks_principal_all ON sales_order_brand_picks;
+CREATE POLICY sales_order_brand_picks_principal_all ON sales_order_brand_picks
+    FOR ALL
+    USING ((SELECT has_scope(ARRAY['admin'])))
+    WITH CHECK ((SELECT has_scope(ARRAY['admin'])));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON sales_order_brand_picks TO authenticated;
+
+-- A month whose run has paid keeps the brands it was paid on.
+CREATE OR REPLACE FUNCTION sales_order_brand_picks_guard()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+    v_order_id UUID;
+    v_sub      UUID;
+    v_month    DATE;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        v_order_id := OLD.order_id;
+    ELSE
+        v_order_id := NEW.order_id;
+    END IF;
+    IF TG_OP = 'UPDATE' AND NEW.order_id <> OLD.order_id THEN
+        RAISE EXCEPTION 'A brand pick belongs to one bill; take it off and pick again';
+    END IF;
+
+    SELECT b.sub_department_id, o.period_month INTO v_sub, v_month
+      FROM sales_orders o JOIN sales_import_batches b ON b.id = o.batch_id
+     WHERE o.id = v_order_id;
+
+    IF FOUND AND commission_order_period_locked(v_sub, v_month) THEN
+        RAISE EXCEPTION 'The run for % has paid. Reopen it before changing a bill''s brand.',
+            TO_CHAR(v_month, 'FMMonth YYYY')
+            USING ERRCODE = '23RUN';
+    END IF;
+
+    -- NOT FOUND on a DELETE: the bill itself went first (ON DELETE CASCADE).
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS sales_order_brand_picks_guard ON sales_order_brand_picks;
+CREATE TRIGGER sales_order_brand_picks_guard
+    BEFORE INSERT OR UPDATE OR DELETE ON sales_order_brand_picks
+    FOR EACH ROW EXECUTE FUNCTION sales_order_brand_picks_guard();
+
+-- ─── 2. The bill's own words about its brand ────────────────────────────────
+--
+-- SECURITY DEFINER for the reason sales_order_excluded_by_hand is: every
+-- writer — the service-role receiver, an HR replay, a Principal's right-click —
+-- must read the picks made here and reach the same brand.
+
+CREATE OR REPLACE FUNCTION erp_sync_order_brand(p_order JSONB, p_order_id UUID DEFAULT NULL)
 RETURNS TEXT
 LANGUAGE sql
 STABLE
+SECURITY DEFINER
 SET search_path = public
 AS $$
     SELECT COALESCE(
         erp_sync_brand_code(p_order->>'brand'),
         erp_sync_brand_code(p_order->>'brandPick'),
+        (SELECT p.brand_code FROM sales_order_brand_picks p WHERE p.order_id = p_order_id),
         CASE WHEN LOWER(COALESCE(p_order->'fair'->>'status', '')) <> 'cancelled'
              THEN erp_sync_brand_code(p_order->'fair'->>'brand') END);
 $$;
 
-COMMENT ON FUNCTION erp_sync_order_brand(JSONB) IS
-    'A canonical order''s brand from its own words: the ERP''s Branding when it names a brand, else the brand the salesperson picked (brandPick, asked when the products name none), else the brand of the fair booth it was written at (not a cancelled one). NULL when none of them names a brand the portal knows — the ingest then reads the lines.';
+COMMENT ON FUNCTION erp_sync_order_brand(JSONB, UUID) IS
+    'A bill''s brand from everything but its lines: the ERP''s Branding when it names a brand, else the brand the salesperson picked in the ERP (brandPick, asked when the products name none), else the brand picked on the portal for this bill (sales_order_brand_picks), else the brand of the fair booth it was written at (not a cancelled one). NULL when none of them names a brand the portal knows — then the lines decide.';
 
-REVOKE ALL ON FUNCTION erp_sync_order_brand(JSONB) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION erp_sync_order_brand(JSONB) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION erp_sync_order_brand(JSONB, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION erp_sync_order_brand(JSONB, UUID) TO authenticated, service_role;
 
--- ─── 2. The receiver ─────────────────────────────────────────────────────────
+-- ─── 3. The lines, and the whole chain on a stored bill ─────────────────────
+
+-- The receiver's own last resort, kept identical: the brand most of the
+-- bill's money is in, from each line's Branding else its Item Code prefix.
+CREATE OR REPLACE FUNCTION sales_order_lines_brand(p_order_id UUID)
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $$
+    SELECT x.brand
+      FROM (SELECT COALESCE(erp_sync_brand_code(l.raw->>'brand'), erp_sync_brand_by_prefix(l.product_code)) AS brand,
+                   SUM(l.line_amount) AS amount
+              FROM sales_order_lines l
+             WHERE l.order_id = p_order_id
+             GROUP BY 1) x
+     WHERE x.brand IS NOT NULL
+     ORDER BY x.amount DESC, x.brand
+     LIMIT 1;
+$$;
+
+-- A stored ERP bill's brand worked out again from its delivery (raw) and the
+-- picks, written onto the bill and onto its lines exactly as the receiver
+-- writes them. For a pick made or taken off here, between two deliveries.
+CREATE OR REPLACE FUNCTION sales_order_restamp_brand(p_order_id UUID)
+RETURNS TEXT
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+    v_order sales_orders%ROWTYPE;
+    v_brand TEXT;
+BEGIN
+    SELECT o.* INTO v_order FROM sales_orders o WHERE o.id = p_order_id;
+    IF NOT FOUND THEN
+        RETURN NULL;
+    END IF;
+    v_brand := COALESCE(
+        erp_sync_order_brand(JSONB_BUILD_OBJECT(
+            'brand', v_order.raw->'header'->>'branding',
+            'brandPick', v_order.raw->>'vpBrand',
+            'fair', v_order.raw->'fair'), p_order_id),
+        sales_order_lines_brand(p_order_id));
+    UPDATE sales_orders SET brand_code = v_brand
+     WHERE id = p_order_id AND brand_code IS DISTINCT FROM v_brand;
+    UPDATE sales_order_lines l
+       SET brand_code = COALESCE(erp_sync_brand_code(l.raw->>'brand'), v_brand, erp_sync_brand_by_prefix(l.product_code))
+     WHERE l.order_id = p_order_id;
+    RETURN v_brand;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION sales_order_lines_brand(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION sales_order_lines_brand(UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION sales_order_restamp_brand(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION sales_order_restamp_brand(UUID) TO authenticated, service_role;
+
+-- ─── 4. Brand for the margin (right-click) ──────────────────────────────────
+
+CREATE OR REPLACE FUNCTION revenue_set_order_brand(p_order_id UUID, p_brand_code TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+    v_order  sales_orders%ROWTYPE;
+    v_sub    UUID;
+    v_code   TEXT;
+    v_picked TEXT;
+    v_new    TEXT;
+BEGIN
+    SELECT o.* INTO v_order FROM sales_orders o WHERE o.id = p_order_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'That bill is no longer in the portal. Refresh the page.';
+    END IF;
+    SELECT b.sub_department_id INTO v_sub FROM sales_import_batches b WHERE b.id = v_order.batch_id;
+    -- One writer per month at a time: the lock every write to its orders takes.
+    PERFORM lock_commission_order_periods(v_sub, ARRAY[v_order.period_month]);
+    SELECT o.* INTO v_order FROM sales_orders o WHERE o.id = p_order_id FOR UPDATE;
+
+    IF commission_order_period_locked(v_sub, v_order.period_month) THEN
+        RAISE EXCEPTION 'The run for % has paid. Reopen it before changing a bill''s brand.',
+            TO_CHAR(v_order.period_month, 'FMMonth YYYY')
+            USING ERRCODE = '23RUN';
+    END IF;
+    IF v_order.source IS DISTINCT FROM 'erp_sync' THEN
+        RAISE EXCEPTION '% came from a file, not the ERP: its brand is the file''s.', v_order.order_no
+            USING ERRCODE = '23BRD';
+    END IF;
+
+    IF NULLIF(BTRIM(COALESCE(p_brand_code, '')), '') IS NOT NULL THEN
+        SELECT b.code INTO v_code
+          FROM comm_brands b
+         WHERE b.is_active AND UPPER(BTRIM(b.code)) = UPPER(BTRIM(p_brand_code))
+         ORDER BY b.created_at
+         LIMIT 1;
+        IF v_code IS NULL THEN
+            RAISE EXCEPTION '% is not a brand the portal has a margin ladder for.', BTRIM(p_brand_code)
+                USING ERRCODE = '23BRD';
+        END IF;
+    END IF;
+
+    SELECT p.brand_code INTO v_picked FROM sales_order_brand_picks p WHERE p.order_id = p_order_id;
+
+    -- Only a bill nothing else names a brand for is picked here; a pick made
+    -- here can be changed or taken off.
+    IF v_code IS NOT NULL AND v_picked IS NULL AND v_order.brand_code IS NOT NULL THEN
+        RAISE EXCEPTION '% already follows %: that is its own brand, not one picked here.',
+            v_order.order_no, v_order.brand_code
+            USING ERRCODE = '23BRD';
+    END IF;
+
+    IF v_code IS NOT DISTINCT FROM v_picked THEN
+        RETURN JSONB_BUILD_OBJECT('orderNo', v_order.order_no, 'changed', FALSE,
+                                  'brandCode', v_order.brand_code, 'picked', v_picked);
+    END IF;
+
+    IF v_code IS NULL THEN
+        DELETE FROM sales_order_brand_picks WHERE order_id = p_order_id;
+    ELSE
+        INSERT INTO sales_order_brand_picks (order_id, brand_code, picked_by, picked_by_name)
+        SELECT p_order_id, v_code, u.id, u.name
+          FROM (SELECT 1) one
+          LEFT JOIN users u ON u.id = auth.uid()
+        ON CONFLICT (order_id) DO UPDATE
+           SET brand_code = EXCLUDED.brand_code,
+               picked_by = EXCLUDED.picked_by,
+               picked_by_name = EXCLUDED.picked_by_name,
+               picked_at = NOW();
+    END IF;
+
+    v_new := sales_order_restamp_brand(p_order_id);
+    RETURN JSONB_BUILD_OBJECT('orderNo', v_order.order_no, 'changed', TRUE,
+                              'brandCode', v_new, 'picked', v_code);
+END;
+$$;
+
+COMMENT ON FUNCTION revenue_set_order_brand(UUID, TEXT) IS
+    'Give a bill a brand for its margin ladder by hand (Sales orders › right-click › Brand for the margin, 2026-09-27) — only an ERP bill that has no brand of its own, or one picked here (to change it, or NULL to take it off). The brand must be one the portal has a ladder for (comm_brands). Kept through every ERP re-send, after the ERP''s Branding and the salesperson''s own pick. Refuses a month whose run has paid (23RUN) and anything else (23BRD).';
+
+REVOKE ALL ON FUNCTION revenue_set_order_brand(UUID, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION revenue_set_order_brand(UUID, TEXT) TO authenticated;
+
+-- ─── 5. The receiver ─────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION ingest_erp_sales_order(p_order JSONB, p_replay_of UUID DEFAULT NULL)
 RETURNS JSONB
@@ -332,11 +566,12 @@ BEGIN
     END IF;
 
     -- ── Brand: the ERP's Branding first, then the lines, then the prefixes ──
-    -- (20260927080000) Between them: the brand the salesperson picked for a
-    -- bill whose products name none, then the brand of the fair it was written
+    -- (20260927080000) Between them: the brand the salesperson picked in the
+    -- ERP for a bill whose products name none, the brand somebody picked here
+    -- (right-click on Sales orders), then the brand of the fair it was written
     -- at — a bed frame or an accessory is a second bill at a brand's fair and
     -- follows that brand's margin ladder (erp_sync_order_brand).
-    v_brand := erp_sync_order_brand(p_order);
+    v_brand := erp_sync_order_brand(p_order, v_existing.id);
     IF v_brand IS NULL THEN
         FOR v_line IN SELECT * FROM JSONB_ARRAY_ELEMENTS(v_lines) LOOP
             v_line_brand := COALESCE(erp_sync_brand_code(v_line->>'brand'),
@@ -504,9 +739,9 @@ END;
 $$;
 
 COMMENT ON FUNCTION ingest_erp_sales_order(JSONB, UUID) IS
-    'The ERP live feed''s one write: upserts one sales order (canonical shape from src/lib/erp-sync/contract.ts) into its month''s erp_sync batch, replaces its lines, re-derives the day''s Open Bill suggestions, refreshes the batch counters and logs the outcome. A new order lands in its order date''s month; a re-sent order that has a fair keeps the month it is in (only the fair calendar moves it), one without a fair follows its order date. The fair the ERP names in the delivery (20260927010000) is kept in comm_venue_events by erp_sync_fair and pinned to the bill (fair_source erp). The bill''s brand is erp_sync_order_brand — Branding, else the salesperson''s pick, else the fair''s brand (20260927080000) — and only then the lines. A month that is closed to the feed (erp_feed_closed_months, or before comm_cutovers) or whose run has paid holds the delivery, payload kept, until it is reopened and replayed — and what changed on a settled bill becomes a pending drop or upsell (erp_sync_note_adjustment). Never raises for a business outcome — see erp_sync_events.status.';
+    'The ERP live feed''s one write: upserts one sales order (canonical shape from src/lib/erp-sync/contract.ts) into its month''s erp_sync batch, replaces its lines, re-derives the day''s Open Bill suggestions, refreshes the batch counters and logs the outcome. A new order lands in its order date''s month; a re-sent order that has a fair keeps the month it is in (only the fair calendar moves it), one without a fair follows its order date. The fair the ERP names in the delivery (20260927010000) is kept in comm_venue_events by erp_sync_fair and pinned to the bill (fair_source erp). The bill''s brand is erp_sync_order_brand — Branding, else the salesperson''s pick, else a pick made on the portal, else the fair''s brand (20260927080000) — and only then the lines. A month that is closed to the feed (erp_feed_closed_months, or before comm_cutovers) or whose run has paid holds the delivery, payload kept, until it is reopened and replayed — and what changed on a settled bill becomes a pending drop or upsell (erp_sync_note_adjustment). Never raises for a business outcome — see erp_sync_events.status.';
 
--- ─── 3. The bills already stored ────────────────────────────────────────────
+-- ─── 6. The bills already stored ────────────────────────────────────────────
 
 DO $$
 DECLARE
@@ -514,7 +749,7 @@ DECLARE
     v_lines  INTEGER;
 BEGIN
     WITH picked AS (
-        SELECT o.id, erp_sync_order_brand(JSONB_BUILD_OBJECT('fair', o.raw->'fair')) AS brand
+        SELECT o.id, erp_sync_order_brand(JSONB_BUILD_OBJECT('fair', o.raw->'fair'), o.id) AS brand
           FROM sales_orders o
           JOIN sales_import_batches b ON b.id = o.batch_id
          WHERE o.brand_code IS NULL

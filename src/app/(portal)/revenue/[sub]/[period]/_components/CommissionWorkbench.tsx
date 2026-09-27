@@ -20,8 +20,9 @@ import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench
 import { excludeOrder, includeOrder, saveOpenBillPicks } from '../../../run-actions'
 import { nameWarnings, payrollState, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
 import { useEntryScroll } from '@/components/layout/useEntryScroll'
-import BillContextMenu, { type BillMenuOutcome } from '../orders/_components/BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome } from '../orders/_components/BillContextMenu'
 import BillCountNotice from '../orders/_components/BillCountNotice'
+import { billBrandAction, brandOutcomeMessage, type BrandOption } from '@/lib/commission/bill-brand'
 import { useBillMenu } from '../orders/_components/useBillMenu'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
 import SalaryCalculation from './SalaryCalculation'
@@ -111,6 +112,11 @@ interface Props {
    */
   lockedPeriods?: readonly string[]
   /**
+   * *Brand for the margin* on a bill's right-click (2026-09-27): the brands a
+   * bill with none can be given, and which bills were given theirs here.
+   */
+  brandMenu?: { options: readonly BrandOption[]; picked: Readonly<Record<string, string>> } | null
+  /**
    * Closing salespeople's month (2026-09-27): who is closed, and whether this
    * month can be closed at all. Absent: no ticks, bar or Close button.
    */
@@ -137,7 +143,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, notCounted = [], lockedPeriods = [], closes: closeFacts }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -170,6 +176,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [billDone, setBillDone] = useState<BillMenuOutcome | null>(null)
+  const [brandDone, setBrandDone] = useState<string | null>(null)
   // The ledger's own button is the real Don't count too (user 2026-09-27): it
   // answers on the same notice, with the same Undo, as the right-click menu.
   const [billPending, startBill] = useTransition()
@@ -434,7 +441,31 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   }
   function billMenuDone(outcome: BillMenuOutcome) {
     billMenu.closeMenu()
+    setBrandDone(null)
     setBillDone(outcome.result.changed ? outcome : null)
+  }
+  // Brand for the margin: only a bill nothing names a brand for, or one given
+  // its brand here — the same row All bills offers (2026-09-27).
+  const brandOptions = brandMenu?.options ?? []
+  const brandOf = new Map(data.input.orders.map(o => [o.id, o.brandCode ?? null]))
+  function brandActionFor(row: CommissionOrderRow | OverrideOrderRow) {
+    return billBrandAction(
+      { brandCode: brandOf.get(row.orderId) ?? null, picked: brandMenu?.picked[row.orderId] ?? null, cancelled: false },
+      {
+        runLocked: lockedMonths.has(row.periodMonth),
+        closedReason: closer.closedById.has(row.staffId)
+          ? `${row.staffName}’s ${monthLabel} is closed — reopen it before changing a bill’s brand`
+          : null,
+        monthLabel: monthName(row.periodMonth),
+        hasOptions: brandOptions.length > 0,
+      },
+    )
+  }
+  function brandMenuDone(outcome: BillBrandOutcome) {
+    billMenu.closeMenu()
+    setBillDone(null)
+    const nameOf = (code: string) => brandOptions.find(o => o.code === code)?.name ?? code
+    setBrandDone(outcome.result.changed ? brandOutcomeMessage(outcome.result, nameOf) : null)
   }
   /** The first cell of a bill's row: its number, the notes under it, and its ⋯. */
   function billCell(row: CommissionOrderRow | OverrideOrderRow, notes: ReactNode) {
@@ -612,6 +643,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {notice && isPersonView && <p className={s.notice} role="status">{notice}</p>}
     {billDone && <BillCountNotice key={`${billDone.orderId}:${billDone.excluded}`} outcome={billDone} monthLabel={monthLabel}
       hasRun={runStatus !== null} className={s.notice} buttonClassName={s.ghostButton} onChange={setBillDone} />}
+    {brandDone && <p className={s.notice} role="status">{brandDone}</p>}
     {error && <p className={s.warning} role="alert">{error}</p>}
     {stalePicks && <p className={s.warning} role="alert">Saved Open Bill picks changed while this draft was open. Reset draft to use the latest picks before saving.</p>}
     {picks && <div className={s.toolbar}><button className={s.primaryButton} disabled={saving || locked || stalePicks || !data.input.scheme.enableOpenBill} onClick={savePicks}>{saving ? 'Saving…' : 'Save Open Bill picks'}</button><span className={s.muted}>{data.input.scheme.enableOpenBill ? 'Unsaved until you save them — payroll is unchanged.' : 'Open Bill is preview-only while switched off for this month. Switch it on under This month pays, in the payroll bar, before saving picks.'}</span></div>}
@@ -850,7 +882,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         exclusionDetail: null,
       }}
       anchor={billMenu.menu.anchor} link={billMenu.menu.link} byRightClick={billMenu.menu.byRightClick} monthLabel={monthLabel}
-      onClose={billMenu.closeMenu} onDone={billMenuDone} />}
+      brand={(() => {
+        const action = brandActionFor(billMenu.menu.row)
+        return action ? { action, options: brandOptions } : null
+      })()}
+      onClose={billMenu.closeMenu} onDone={billMenuDone} onBrandDone={brandMenuDone} />}
   </section>
 }
 
