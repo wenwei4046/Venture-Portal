@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { payrollComponentSelection, type SalaryComponentSelection } from '@/lib/payroll-selection'
 import type { BankAccountSelection } from '@/lib/staff-bank-accounts'
 import {
+  groupFunded, SCHEMES, statutoryPayable,
   type BodyKey, type ContributionTotals, type CycleTotals, type DeptGroup,
   type Granularity, type Headline, type Milestone, type StatutoryCoverage, type Phase,
   type StatutoryRow, type VarianceSummary,
@@ -58,7 +59,12 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
   const [busy, setBusy] = useState<string | null>(null)
   const submitting = useRef(false)
   const [error, setError] = useState<string | null>(null)
-  const fundedFor = (g: DeptGroup) => g.scope === 'directors' ? directorsFunded : staffFunded
+  // Funding is per batch since the unified Payroll (2026-09-27): a group can
+  // pay its funded people while a later batch waits on Finance.
+  const fundedFor = (g: DeptGroup) => groupFunded(g, g.scope === 'directors' ? directorsFunded : staffFunded)
+  const statutoryFundedFor = (g: DeptGroup) => (g.scope === 'directors' ? directorsFunded : staffFunded)
+    || g.people.some(p => SCHEMES.some(s => statutoryPayable(statutoryCoverage, p, s.scheme) > 0))
+  const statutoryFunded = staffFunded || groups.some(statutoryFundedFor)
   const bankName = payoutBank ? `${payoutBank.name} ···${payoutBank.last4}` : 'the Alliance payroll account'
 
   function openSalary(g: DeptGroup, mode: Granularity | 'view') {
@@ -167,13 +173,13 @@ export default function PaymentBoard({ period, periodLabel, periodRange, prevMon
       <div id="payment-statutory-panel" role="tabpanel" aria-labelledby="payment-statutory-tab" hidden={tab !== 'statutory'}>
         <section className="payment-section" aria-label="Statutory PVs">
           <div className="sect-head"><h2>Statutory PVs</h2><span className="rule" aria-hidden /><span className="count">Contributions &amp; deductions · MYR</span></div>
-          <StatutoryRows rows={rows} today={today} busy={busy} staffFunded={staffFunded}
+          <StatutoryRows rows={rows} today={today} busy={busy} staffFunded={statutoryFunded}
             onGenerate={openStatutory} onOpen={body => { setError(null); setWin({ kind: 'body', key: body }) }} />
         </section>
       </div>
       {generator ? <StatutoryGenerator key={`${generator.body}:${generator.mode}`} period={period} body={generator.body}
         mode={generator.mode} groups={groups} rows={rows} coverage={statutoryCoverage}
-        fundedFor={fundedFor} onClose={() => setGenerator(null)} /> : null}
+        fundedFor={statutoryFundedFor} onClose={() => setGenerator(null)} /> : null}
     </> : null}
     {openGroup ? <DeptWindow key={`${openGroup.key}:${openMode}`} group={openReview?.group ?? openGroup} period={period} periodLabel={periodLabel}
       prevMonthName={prevMonthName} gran={openReview?.granularity ?? (openMode === 'department' ? 'department' : 'employee')}

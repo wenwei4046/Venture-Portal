@@ -19,6 +19,7 @@ function makeRow(overrides: Partial<PayrollRowData>): PayrollRowData {
   return {
     id: 'finance', staff_id: 'staff-finance', staff_name: 'Finance employee',
     dept_name: 'Finance', status: 'draft', source: 'infotech',
+    scope: 'staff', origin: 'staff', completed_at: null, topup_opened_at: null, batch_nos: [], submitted_ctc: 0,
     basic_salary: 3000, statutory_allowance: 0, non_statutory_allowance: 0,
     ot_hours: 0, ot_amount: 0, commission_amount: 0, unpaid_leave_days: 0,
     deduction_amount: 0, skbbk_amount: 0, prorata_days_worked: 30,
@@ -32,7 +33,7 @@ function makeRow(overrides: Partial<PayrollRowData>): PayrollRowData {
 
 const basicRevenue = makeRow({
   id: 'revenue-basic', staff_id: 'staff-revenue-basic', staff_name: 'Revenue basic',
-  dept_name: 'Revenue', source: 'commission', revenue_payroll: true,
+  dept_name: 'Revenue', source: 'commission', origin: 'revenue', revenue_payroll: true,
   basic_salary: 5000, commission_amount: 10000, epf_er: 650, epf_ee: 550,
   gross: 9350, net: 8800, commission_is_derived: true,
   commission_statements: [{ label: 'Fair', href: '/revenue/fair/2026-09-01/statement/staff-revenue-basic' }],
@@ -179,7 +180,7 @@ describe('PayrollGrid Revenue integration', () => {
     fireEvent.change(screen.getByLabelText('Department'), { target: { value: 'Revenue' } })
     expect(screen.queryByRole('button', { name: 'Finance employee' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Revenue basic' })).toBeVisible()
-    expect(screen.getByText('Total · 1 staff')).toBeVisible()
+    expect(screen.getByText('Total · 1 person')).toBeVisible()
     expect(screen.getByLabelText('Pending edits').textContent).toContain('3200')
 
     fireEvent.change(screen.getByLabelText('Department'), { target: { value: 'Finance' } })
@@ -187,7 +188,7 @@ describe('PayrollGrid Revenue integration', () => {
     expect(screen.queryByRole('columnheader', { name: 'Gross Commission' })).toBeNull()
     expect(screen.getByRole('columnheader', { name: 'Comm.' })).toBeVisible()
     fireEvent.change(screen.getByLabelText('Department'), { target: { value: '' } })
-    expect(screen.getByText('Total · 2 staff')).toBeVisible()
+    expect(screen.getByText('Total · 2 people')).toBeVisible()
   })
 
   it('shows gross commission beside net basic and the saved balance under Earnings', () => {
@@ -210,14 +211,15 @@ describe('PayrollGrid Revenue integration', () => {
     expect(full.querySelector('[data-label="Basic pay"]')).toHaveTextContent('0.00')
     expect(full.querySelector('[data-label="Gross Commission"]')).toHaveTextContent('10,000.00')
     expect(full.querySelector('[data-label="Balance"]')).toHaveTextContent('10,000.00')
-    const footer = screen.getByText('Total · 2 staff').closest('tr')!
+    const footer = screen.getByText('Total · 2 people').closest('tr')!
     expect(footer.cells[5]).toHaveTextContent('20,000.00')
     expect(footer.cells[10]).toHaveTextContent('14,253.45')
-    const department = screen.getByRole('button', { name: 'Revenue, 2 staff' }).closest('tr')!
-    expect(department.cells[5]).toHaveTextContent('20,000.00')
-    expect(department.cells[7]).toHaveTextContent('14,253.45')
+    const department = screen.getByRole('button', { name: 'Revenue, 2 people' }).closest('tr')!
+    // The band carries a Status cell (unified Payroll) before Gross.
+    expect(department.cells[6]).toHaveTextContent('20,000.00')
+    expect(department.cells[8]).toHaveTextContent('14,253.45')
     expect(within(basic).getByLabelText('Select Revenue basic')).toBeDisabled()
-    expect(screen.getByLabelText('Select all draft rows')).toBeDisabled()
+    expect(screen.getByLabelText('Select everyone who can be completed, unlocked or deleted')).toBeDisabled()
     expect(within(basic).getByRole('link', { name: '10,000.00' })).toHaveAttribute('href', basicRevenue.commission_statements![0].href)
   })
 
@@ -230,10 +232,10 @@ describe('PayrollGrid Revenue integration', () => {
     expect(ordinary.querySelector('[data-label="Balance"]')).toBeNull()
     expect(within(ordinary).getByLabelText('Commission — Finance employee')).toHaveValue('120.00')
     expect(within(ordinary).getByLabelText('Select Finance employee')).toBeEnabled()
-    fireEvent.click(screen.getByLabelText('Select all draft rows'))
+    fireEvent.click(screen.getByLabelText('Select everyone who can be completed, unlocked or deleted'))
     expect(within(ordinary).getByLabelText('Select Finance employee')).toBeChecked()
     expect(screen.getByLabelText('Select Revenue basic')).not.toBeChecked()
-    const footer = screen.getByText('Total · 2 staff').closest('tr')!
+    const footer = screen.getByText('Total · 2 people').closest('tr')!
     expect(footer.cells[5]).toHaveTextContent('10,000.00')
     expect(footer.cells[10]).toHaveTextContent('3,920.00')
   })
@@ -252,12 +254,12 @@ describe('PayrollGrid Revenue integration', () => {
     expect(screen.getByLabelText('Select Unlinked Revenue')).toBeEnabled()
     expect(screen.getByLabelText('Select Revenue basic')).toBeDisabled()
     expect(screen.getByLabelText('Select Revenue with statement link')).toBeDisabled()
-    const band = screen.getByRole('button', { name: 'Revenue Department, 3 staff' })
+    const band = screen.getByRole('button', { name: 'Revenue Department, 3 people' })
     expect(band).toHaveAttribute('title', 'Revenue Department')
     expect(band.querySelector('.count')).toHaveTextContent('3')
     expect(band.querySelector('.tag')).toBeNull()
 
-    fireEvent.click(screen.getByLabelText('Select all draft rows'))
+    fireEvent.click(screen.getByLabelText('Select everyone who can be completed, unlocked or deleted'))
     expect(screen.getByLabelText('Select Unlinked Revenue')).toBeChecked()
     expect(screen.getByLabelText('Select Revenue basic')).not.toBeChecked()
     const originalConfirm = window.confirm

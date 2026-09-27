@@ -5,12 +5,12 @@ import SaveAllButton from './SaveAllButton'
 import SubmitToFinanceButton from './SubmitToFinanceButton'
 import { PayrollDraftProvider, usePayrollDraft } from './PayrollDraftContext'
 
-const { updatePayrollRows, submitToFinance, refresh } = vi.hoisted(() => ({
+const { updatePayrollRows, submitPayrollBatch, refresh } = vi.hoisted(() => ({
   updatePayrollRows: vi.fn(),
-  submitToFinance: vi.fn(),
+  submitPayrollBatch: vi.fn(),
   refresh: vi.fn(),
 }))
-vi.mock('../actions', () => ({ updatePayrollRows, submitToFinance }))
+vi.mock('../actions', () => ({ updatePayrollRows, submitPayrollBatch }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 let draft: ReturnType<typeof usePayrollDraft>
@@ -24,7 +24,7 @@ function renderButtons() {
     <PayrollDraftProvider>
       <DraftProbe />
       <SaveAllButton />
-      <SubmitToFinanceButton period="2026-09-01" totalAmount={10000} />
+      <SubmitToFinanceButton period="2026-09-01" preview={{ people: 2, topups: 0, ctc: 10000, byDept: [{ dept: 'Finance', people: 2, ctc: 10000 }] }} />
     </PayrollDraftProvider>,
   )
 }
@@ -143,7 +143,7 @@ describe('Save All payroll drafts', () => {
     expect(updatePayrollRows).not.toHaveBeenCalled()
     expect(refresh).not.toHaveBeenCalled()
     expect(screen.queryByText('✓ Saved')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Submit to Finance' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^Submit to Finance/ })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Save 2 rows' }))
     await waitFor(() => expect(updatePayrollRows).toHaveBeenCalledWith([
       { id: 'finance', fields: { basic_salary: 3500 } },
@@ -160,13 +160,13 @@ describe('Save All payroll drafts', () => {
       return true
     })
     act(() => draft.setCommissionReview('revenue', review))
-    expect(screen.getByRole('button', { name: 'Submit to Finance' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^Submit to Finance/ })).toBeDisabled()
     expect(screen.getByText('1 unsaved row — save first')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Save 1 row' }))
     await waitFor(() => expect(screen.getByText('✓ Saved')).toBeVisible())
     expect(updatePayrollRows).not.toHaveBeenCalled()
-    expect(submitToFinance).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Submit to Finance' })).toBeEnabled()
+    expect(submitPayrollBatch).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /^Submit to Finance/ })).toBeEnabled()
   })
 
   it('keeps a failed review dirty and does not continue to batch save', async () => {
@@ -180,7 +180,7 @@ describe('Save All payroll drafts', () => {
     expect(updatePayrollRows).not.toHaveBeenCalled()
     expect(refresh).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Save 2 rows' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Submit to Finance' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^Submit to Finance/ })).toBeDisabled()
   })
 
   it('preserves ordinary errors without showing full success', async () => {
@@ -209,7 +209,7 @@ describe('Payroll draft review registration', () => {
     expect(screen.getByLabelText('Dirty rows')).toHaveTextContent('1')
     act(() => draft.setRowEdit('revenue', null))
     expect(screen.getByLabelText('Dirty rows')).toHaveTextContent('0')
-    expect(screen.getByRole('button', { name: 'Submit to Finance' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /^Submit to Finance/ })).toBeEnabled()
   })
 
   it('provides safe no-op defaults outside a draft provider', () => {

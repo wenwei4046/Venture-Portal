@@ -761,7 +761,48 @@ project memory. Everything below lives in `globals.css` under "Payroll grid".
 | `.pg-well > .pg-scroll > table.ledger-table.payroll-grid` | Frozen panes: ✓ · Name · Gross · Net · ▾ stay put on the left (`.pg-st.l0`–`.l4`, offsets derived from the `--w-*` column widths so they cannot drift), the eleven working columns scroll under them in three groups (Earnings · Deductions · Employer, each opened by a `.g1` hairline), the two header rows pin to the top and the totals row to the bottom. The well is its own scroll box in both directions, because a sticky edge only holds inside the element that scrolls. `border-collapse: separate` is load-bearing; frozen cells are painted with the row's own `--row-bg`, an opaque pre-mixed zebra, because a translucent tint shows the scrolled cells through | Any grid where a row is a form and the answer columns must stay in view. Below `md` only ✓ · Name stay frozen and the well stops scrolling inside itself |
 | `.pg-in` | The editable figure: `3,000.00` in Chivo Mono like the computed cells beside it, on a `--paper` field one step below the surface so it reads as a recessed box; `.dirty` tints it alert until saved, `.zero` fades a 0.00 to muted so the figures that are actually there stand out. A computed figure stays a bare `.num` with no box — that contrast is how "you can change this one" is told | Figures HR types; never on a computed figure |
 | `.pg-band` (`.group-btn` in `td.group-cell`) | The roster's department band, with the Gross / Net subtotal sitting in the frozen block directly under the two columns it sums | Grouped money grids |
+| `td.pg-status` (the frozen **Status** column, `--w-status` 138px, since 2026-09-27) | Where each person's pay stands, as one chip: `Draft` (muted) · `Open on Comm Cal` / `On Director Salary` (muted — completed elsewhere) · `Completed 27 Sep` (ledger) · `Submitted #2` (alert — with Finance) · `Paid` (ledger) · `Resubmit · editing` / `Resubmit ready` (accent). The detail — when, by which batch, what happens next — is the cell's tooltip. The band's status cell says `3 sent · 2 ready`; the frozen offsets run `.l0`–`.l5` | Any grid whose rows move through a lifecycle |
+| `.icon-btn.more` + right-click | Every row's ⋯ (beside the paycheck ▾) and a right-click anywhere on the row open the same paper menu (`PayrollRowMenu`, on the hierarchy's `MenuPanel` — see "Bill context menu"): *Open paycheck* / *Open on Comm Cal* / *Open on Director Salary*, *Complete*, *Unlock*, **Resubmit…** (adjacent confirmation, then the row unlocks: amounts only go up, the next batch sends the difference) and *Put back as sent*. Shift + right-click keeps the browser's menu | Rows with more than one action |
 | `.pg-win` + `.pg-scrim` | One person's paycheck as a floating window over a scrim (`--scrim` at .42): header with n / N, the month and department, ‹ › to step through people and × / Esc to close; a payslip-shaped body (Earnings · Deductions inputs, a Computed column of ER / EE, PCB or WHT, cost to company, net to bank) and a footer with Payslip and Save. It is a second view of the row's figures, never a copy — the inputs write the row's own edit state, so a change in either place shows in both | Opening a row from a dense grid. The first inline version sat in the same paper tones as the table and read as part of it; the scrim is what makes it unmistakably in front |
+
+### Payroll batches (2026-09-27 — HR › Payroll, the unified Payroll)
+
+HR › Payroll holds everybody's pay: staff keyed here, the Revenue team closed on
+Comm Cal, Directors Completed on Director Salary (a *Director* department band,
+read-only, the name a link to Director Salary). The page's rules:
+
+- **The header's actions never turn into a state.** `Submit to Finance · N`
+  (accent) sends the people Completed since the last press and stays there for
+  the next group; with nobody Completed it is disabled with *Nobody completed and
+  waiting* beneath. Its confirmation is an inline panel, not a modal: headcount,
+  CTC, a department × people × CTC table and one sentence on resubmits. *Total
+  Close* (hairline button) sits beside it, disabled with the names still waiting
+  in its tooltip; a closed month shows a ledger chip in the status line and, for
+  the Principal alone, *Reopen month* (asks why).
+- **The status line** under the title: `N staff · M directors` then one chip
+  per state present — `draft` (plain), `completed` (accent), `with Finance`
+  (alert), `paid` (ledger), `resubmitting` (accent).
+- **Submitted to Finance** (a `.sect-head` section between the cards and the
+  grid, only once a batch exists): one `.ledger-table` row per batch — `#N`
+  (`the whole month` under a batch from before batches, `2 resubmits`), when and
+  by whom, who (`Finance 3 · HR 5`, department headcounts only — never a
+  name, never a person's pay), CTC, and the funding as a chip + one line:
+  *Waiting for Finance* (alert) · *Funding PV with Principal* (alert, `RM x of y
+  funded`) · *Funded* (ledger) · *No funding request* (danger, with *File request
+  again*) · *Sent back by Finance* (danger, the row at 60%). The approval state
+  lives here, per batch.
+- **Selection** is for what the page itself can do: tick → *Complete N* (accent),
+  *Unlock N* (hairline), *Delete N* (danger wash), *Clear*; a row with none of
+  those has a disabled tick whose tooltip says where it is completed. A
+  completed or submitted row shows bare figures, like any submitted row always
+  did.
+- **Director Salary** renames its Submit to *Complete*; its Submission tab's
+  heading follows the directors (*Not completed yet* · *Completed 27 Sep 2026
+  16:40* · *With Finance* · *Paid*) with a link to HR › Payroll, and the InfoTech
+  grid shows a status chip and locks a director past draft. Finance's *Payroll
+  Requests* label each request `BATCH #2 · HR 5`, and *打回 HR 重做* sends back
+  that batch alone. HR › Payment's funding slot links to the batches; a
+  resubmitted person reads as the remainder still to pay.
 
 ### Org chart canvas (v3.4, 2026-09-09 — Revenue › Staff Hierarchy)
 
@@ -2239,6 +2280,8 @@ If adding a new component to vocabulary, update this doc first.
 ---
 
 ## Change Log
+
+- **2026-09-27 (unified Payroll)** — HR › Payroll holds everybody's pay and moves it person by person. The grid gains a frozen **Status** column (`td.pg-status`, offsets `.l0`–`.l5`), a ⋯ and right-click menu per row (*Resubmit…*), a *Director* band, and a selection bar of *Complete / Unlock / Delete*; the header's *Submit to Finance · N* stays pressable after every batch, *Total Close* sits beside it, and a new **Submitted to Finance** section lists each batch with its funding. Director Salary's *Submit to Finance* is *Complete*; Comm Cal's payroll bar loses *Send / Update* (a salesperson goes to payroll when closed) and links HR › Payroll. See "Payroll batches".
 
 - **2026-09-27 (later)** — Comm Cal's workbench stands in the URL (`?view=` · `?person=` · `?orders=`, search / brand / sort as `?q=` `?brand=` `?sort=`), so Back from a bill returns to the salesperson's ledger it was opened from; bill links carry `?from=` and the bill page's header leads with **← NAME** (`ReturnLink`, which steps Back when that is where the reader came from), then *All bills*. The bill context menu joins a salesperson's Personal / Overriding / Below deposit tables and the month's Below deposit tab. See "Tabbed pages" and "Bill context menu".
 - **2026-09-27 v3.10 (latest)** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".

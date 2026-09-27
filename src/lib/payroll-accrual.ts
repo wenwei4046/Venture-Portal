@@ -129,6 +129,104 @@ export interface AccrualPostResult {
   skipped: string[]
 }
 
+interface BatchSegmentSums {
+  segment: string
+  gross: number | string
+  non_statutory_allowance: number | string
+  epf_er: number | string
+  epf_ee: number | string
+  socso_er: number | string
+  socso_ee: number | string
+  eis_er: number | string
+  eis_ee: number | string
+  pcb: number | string
+  withholding_tax: number | string
+  net: number | string
+  skbbk: number | string
+}
+
+/** One segment of a batch's lines → the accrual JV's figures. */
+export function batchAccrualSums(s: BatchSegmentSums): AccrualSums {
+  const n = (v: number | string) => r2(Number(v ?? 0))
+  return {
+    basicEtc: r2(n(s.gross) - n(s.non_statutory_allowance)),
+    nonStatAllowance: n(s.non_statutory_allowance),
+    epfEr: n(s.epf_er),
+    socsoEr: n(s.socso_er),
+    eisEr: n(s.eis_er),
+    net: n(s.net),
+    epfBoth: r2(n(s.epf_er) + n(s.epf_ee)),
+    socsoBoth: r2(n(s.socso_er) + n(s.socso_ee)),
+    skbbk: n(s.skbbk),
+    eisBoth: r2(n(s.eis_er) + n(s.eis_ee)),
+    pcb: n(s.pcb),
+    withholdingTax: n(s.withholding_tax),
+  }
+}
+
+/**
+ * The accrual JVs of ONE payroll batch (unified Payroll, 2026-09-27): one per
+ * segment, dated to the payroll month's end, tagged with the batch as its
+ * reference — so a first batch books its people in full and a resubmit books
+ * only the difference it carries, directors included (segment 'director').
+ * Idempotent per (batch, segment); a conflicting existing JV fails loud.
+ * Sending the batch back reverses them (payroll_send_back_batch).
+ */
+export async function postPayrollBatchAccrualJVs(
+  supabase: SupabaseClient,
+  opts: { periodMonth: string; batchId: string; userId: string },
+): Promise<AccrualPostResult> {
+  const period = dayjs(opts.periodMonth).startOf('month').format('YYYY-MM-DD')
+  const monthEnd = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  const monthLabel = dayjs(period).format("MMM[']YY")
+
+  const [sumsRes, existingRes, batchRes] = await Promise.all([
+    supabase.rpc('payroll_batch_accrual_sums', { p_batch_id: opts.batchId }),
+    supabase.rpc('get_payroll_accrual_totals_for', { p_reference_id: opts.batchId }),
+    supabase.from('payroll_batches').select('batch_no').eq('id', opts.batchId).single(),
+  ])
+  if (sumsRes.error) throw new Error(`Failed to read the batch: ${sumsRes.error.message}`)
+  if (existingRes.error) throw new Error(`Failed to check existing accrual JVs: ${existingRes.error.message}`)
+  if (batchRes.error) throw new Error(`Failed to read the batch: ${batchRes.error.message}`)
+  const batchNo = (batchRes.data as { batch_no: number }).batch_no
+
+  const existing = new Map<string, number>(
+    ((existingRes.data ?? []) as Array<{ segment: string | null; total_amount: number | null }>).map(e => [
+      e.segment ?? '',
+      Number(e.total_amount ?? 0),
+    ]),
+  )
+
+  const result: AccrualPostResult = { posted: [], skipped: [] }
+  for (const row of (sumsRes.data ?? []) as BatchSegmentSums[]) {
+    const segment = row.segment
+    const sums = batchAccrualSums(row)
+    const total = accrualTotal(sums)
+    if (total <= 0.005) continue
+    const prior = existing.get(segment)
+    if (prior !== undefined) {
+      if (Math.abs(prior - total) <= 0.01) {
+        result.skipped.push(segment)
+        continue
+      }
+      throw new Error(
+        `${SEGMENT_LABEL[segment] ?? segment} already has an accrual JV for batch #${batchNo} at RM ${prior.toFixed(2)}, but the batch totals RM ${total.toFixed(2)} — reverse the old JV first, then retry.`,
+      )
+    }
+    await postJournalEntry(supabase, {
+      transactionDate: monthEnd,
+      description: `${SEGMENT_LABEL[segment] ?? segment} Salary - ${monthLabel} · batch #${batchNo}`,
+      referenceType: 'payroll_accrual',
+      referenceId: opts.batchId,
+      segment,
+      lines: buildAccrualLines(sums, monthLabel),
+      createdBy: opts.userId,
+    })
+    result.posted.push(segment)
+  }
+  return result
+}
+
 /**
  * Post the per-segment accrual JVs for one payroll month.
  * kind 'staff' → hr_monthly_payroll grouped by department (4 segments)

@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
@@ -10,74 +9,217 @@ import {
   type DerivedCommissionRow,
 } from '@/lib/commission/derived-commission'
 import { assertPeriodOpen } from '@/lib/period-lock'
-import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
+import { postPayrollBatchAccrualJVs } from '@/lib/payroll-accrual'
 import { seedPayrollRows } from '@/lib/payroll-period'
 
-/**
- * HR submits the month's payroll straight to Finance — NO Principal approval.
- * Wraps submit_payroll_to_principal RPC (name kept for compatibility; since
- * migration 278 it lands the run directly in status='approved' so Finance's
- * billing view + payment-request flow unlock immediately).
- */
-export async function submitToFinance(period: string): Promise<void> {
-  const user = await requirePermission('hr_costing')
-  const supabase = await createClient()
+// ─── The unified Payroll (2026-09-27) ───────────────────────────────────────
+// A person's pay moves draft → completed → submitted → paid. HR completes
+// staff here; a salesperson completes when closed on Comm Cal, a Director
+// when Director Salary is Completed. Submit to Finance sends everybody
+// Completed as one BATCH (its own funding request, its own accrual JVs) and
+// can be pressed again for the next group; Resubmit unlocks somebody already
+// sent so a second batch can pay the difference; Total Close ends the month.
+// Every rule lives in the payroll_* database functions — these wrap them.
 
-  // Period-lock gate — RPC assumes caller already checked.
-  await assertPeriodOpen(supabase, period)
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const PERIOD = /^\d{4}-(0[1-9]|1[0-2])-01$/
 
-  const { data, error } = await supabase.rpc('submit_payroll_to_principal', {
-    p_period: period,
-    p_user_id: user.id,
-  })
+function assertPeriod(period: unknown): asserts period is string {
+  if (typeof period !== 'string' || !PERIOD.test(period)) throw new Error('A payroll month is its first day, e.g. 2026-09-01')
+}
 
-  if (error) throw new Error(`Submit failed: ${error.message}`)
-  if (!data) throw new Error('Submit failed: no run id returned')
+function assertIds(ids: unknown, what: string): asserts ids is string[] {
+  if (!Array.isArray(ids) || ids.length === 0) throw new Error(`Tick somebody to ${what}.`)
+  if (ids.length > 500 || ids.some(id => typeof id !== 'string' || !UUID.test(id)) || new Set(ids).size !== ids.length) {
+    throw new Error('Refresh the page and try again — the selection did not come through.')
+  }
+}
 
-  // Post the per-segment staff accrual JVs HERE (2026-09-03): since mig 278
-  // the run lands directly in 'approved', so the Principal-approval page —
-  // which used to carry this call — never fires for the direct-submit path.
-  // August's staff accruals were missed entirely that way and had to be
-  // backfilled by hand (JE-202608-0580..0584). Idempotent per (period,
-  // segment); a genuine amount conflict with an existing JV fails LOUD, same
-  // as on the approval path — reverse the stale JV, then resubmit.
-  await postPayrollAccrualJVs(supabase as unknown as SupabaseClient, {
-    periodMonth: period,
-    kind: 'staff',
-    runId: data as string,
-    userId: user.id,
-  })
-
+function revalidatePayroll(period: string) {
+  revalidatePath(`/hr-costing/payroll/${period}`)
   revalidatePath('/hr-costing/payroll')
+  revalidatePath('/hr-costing/payment')
+  revalidatePath('/director-salary')
+  revalidatePath('/payments/payroll-requests')
   revalidatePath('/billing')
   revalidatePath('/dashboard')
-  redirect(`/hr-costing/payroll/${period}`)
+}
+
+/** Tick → Complete: the figures are checked and wait for the next batch. */
+export async function completePayrollRows(period: string, ids: string[]): Promise<{ completed: number; unchanged: number }> {
+  await requirePermission('hr_costing')
+  assertPeriod(period)
+  assertIds(ids, 'complete')
+  const supabase = await createClient()
+  await assertPeriodOpen(supabase, period)
+  const { data, error } = await supabase.rpc('payroll_complete_rows', { p_period: period, p_row_ids: ids })
+  if (error) throw new Error(error.message)
+  revalidatePayroll(period)
+  const result = (data ?? {}) as { completed?: number; unchanged?: number }
+  return { completed: Number(result.completed ?? 0), unchanged: Number(result.unchanged ?? 0) }
+}
+
+/** Completed but not yet sent: back to an editable draft. */
+export async function unlockPayrollRows(period: string, ids: string[]): Promise<{ unlocked: number }> {
+  await requirePermission('hr_costing')
+  assertPeriod(period)
+  assertIds(ids, 'unlock')
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('payroll_uncomplete_rows', { p_period: period, p_row_ids: ids })
+  if (error) throw new Error(error.message)
+  revalidatePayroll(period)
+  return { unlocked: Number(data ?? 0) }
+}
+
+export interface SubmittedBatch {
+  batchId: string
+  batchNo: number
+  people: number
+  total: number
+  /** Accrual JVs posted, by segment ("hr", "director", …). */
+  accruals: string[]
 }
 
 /**
- * HR pulls a submitted (auto-approved) run back to draft for edits — the
- * replacement for the removed Principal reject path. Wraps reopen_payroll_run
- * RPC (migration 278): flips the run to 'rejected' with the marker reason
- * 'Reopened by HR for edits' and hr_monthly_payroll rows back to 'draft'.
- * Blocked once a payment request is in flight.
+ * Submit to Finance: everybody Completed, as one batch. The page sends what
+ * it showed (headcount and CTC); the database refuses if that moved since.
+ * The batch's accrual JVs are posted here (per batch, idempotent), dated to
+ * the payroll month — a top-up batch books only its difference.
  */
-export async function reopenPayroll(period: string): Promise<void> {
+export async function submitPayrollBatch(period: string, expectedPeople: number, expectedTotal: number): Promise<SubmittedBatch> {
   const user = await requirePermission('hr_costing')
+  assertPeriod(period)
+  if (!Number.isInteger(expectedPeople) || expectedPeople < 1 || !Number.isFinite(expectedTotal)) {
+    throw new Error('Refresh the page and try again — the batch preview did not come through.')
+  }
   const supabase = await createClient()
-
   await assertPeriodOpen(supabase, period)
 
-  const { error } = await supabase.rpc('reopen_payroll_run', {
+  const { data: batchId, error } = await supabase.rpc('payroll_submit_batch', {
     p_period: period,
-    p_user_id: user.id,
+    p_expected_people: expectedPeople,
+    p_expected_total: Math.round(expectedTotal * 100) / 100,
   })
+  if (error) throw new Error(error.message)
+  if (!batchId) throw new Error('Submit failed: no batch came back')
 
-  if (error) throw new Error(`Reopen failed: ${error.message}`)
+  const { data: batch, error: readError } = await supabase
+    .from('payroll_batches')
+    .select('batch_no, people, total_amount')
+    .eq('id', batchId as string)
+    .single()
+  if (readError) throw new Error(`Submitted, but the batch could not be read back: ${readError.message}`)
 
-  revalidatePath('/hr-costing/payroll')
-  revalidatePath('/billing')
-  revalidatePath('/dashboard')
-  redirect(`/hr-costing/payroll/${period}`)
+  // The money has gone to Finance; a JV problem must not pretend otherwise.
+  let accruals: string[] = []
+  try {
+    const posted = await postPayrollBatchAccrualJVs(supabase as unknown as SupabaseClient, {
+      periodMonth: period,
+      batchId: batchId as string,
+      userId: user.id,
+    })
+    accruals = posted.posted
+  } catch (err) {
+    revalidatePayroll(period)
+    throw new Error(
+      `Batch #${batch.batch_no} went to Finance, but its accrual JVs did not post: ${err instanceof Error ? err.message : String(err)}. ` +
+      'Ask Finance to post them, or press Retry accruals on the batch.',
+    )
+  }
+
+  revalidatePayroll(period)
+  return { batchId: batchId as string, batchNo: batch.batch_no, people: batch.people, total: Number(batch.total_amount), accruals }
+}
+
+/** A batch whose accrual JVs failed to post: try again (idempotent). */
+export async function retryPayrollBatchAccruals(period: string, batchId: string): Promise<string[]> {
+  const user = await requirePermission('hr_costing')
+  assertPeriod(period)
+  if (!UUID.test(batchId)) throw new Error('Which batch?')
+  const supabase = await createClient()
+  const posted = await postPayrollBatchAccrualJVs(supabase as unknown as SupabaseClient, { periodMonth: period, batchId, userId: user.id })
+  revalidatePayroll(period)
+  return posted.posted
+}
+
+/**
+ * Resubmit (right-click on somebody already sent): unlock them for a second
+ * payment. Their amounts may then only go up; Complete and Submit again and
+ * the next batch carries the difference.
+ */
+export async function resubmitPayrollRow(period: string, scope: 'staff' | 'directors', rowId: string): Promise<void> {
+  await requirePermission('hr_costing')
+  assertPeriod(period)
+  if ((scope !== 'staff' && scope !== 'directors') || !UUID.test(rowId)) throw new Error('Which person?')
+  const supabase = await createClient()
+  await assertPeriodOpen(supabase, period)
+  const { error } = await supabase.rpc('payroll_open_topup', { p_scope: scope, p_row_id: rowId })
+  if (error) throw new Error(error.message)
+  revalidatePayroll(period)
+}
+
+/** Put an unlocked row back as it was sent — only while nothing changed. */
+export async function cancelPayrollResubmit(period: string, scope: 'staff' | 'directors', rowId: string): Promise<void> {
+  await requirePermission('hr_costing')
+  assertPeriod(period)
+  if ((scope !== 'staff' && scope !== 'directors') || !UUID.test(rowId)) throw new Error('Which person?')
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('payroll_cancel_topup', { p_scope: scope, p_row_id: rowId })
+  if (error) throw new Error(error.message)
+  revalidatePayroll(period)
+}
+
+/** Total Close: the month can no longer change. */
+export async function closePayrollMonth(period: string): Promise<void> {
+  await requirePermission('hr_costing')
+  assertPeriod(period)
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('payroll_close_month', { p_period: period })
+  if (error) throw new Error(error.message)
+  revalidatePayroll(period)
+}
+
+/** The Principal's way back into a closed month (audited, with a reason). */
+export async function reopenPayrollMonth(period: string, reason: string): Promise<void> {
+  await requirePermission('hr_costing')
+  assertPeriod(period)
+  const why = typeof reason === 'string' ? reason.trim() : ''
+  if (!why) throw new Error('Say why the month is being reopened.')
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('payroll_reopen_month', { p_period: period, p_reason: why.slice(0, 500) })
+  if (error) throw new Error(error.message)
+  revalidatePayroll(period)
+}
+
+/** A batch whose funding request was cancelled: file it again, for the same amount. */
+export async function refilePayrollBatchRequest(period: string, batchId: string): Promise<void> {
+  const user = await requirePermission('hr_costing')
+  assertPeriod(period)
+  if (!UUID.test(batchId)) throw new Error('Which batch?')
+  const supabase = await createClient()
+  const { data: batch, error: readError } = await supabase
+    .from('payroll_batches')
+    .select('id, run_id, status, total_amount, batch_no')
+    .eq('id', batchId)
+    .maybeSingle()
+  if (readError) throw new Error(`Could not read the batch: ${readError.message}`)
+  if (!batch || batch.status !== 'submitted') throw new Error('That batch is no longer with Finance — refresh the page.')
+  const amount = Number(batch.total_amount)
+  if (!(amount > 0)) throw new Error(`Batch #${batch.batch_no} carries no money — there is nothing to fund.`)
+  const { error } = await supabase.from('payroll_payment_requests').insert({
+    payroll_run_id: batch.run_id,
+    batch_id: batch.id,
+    period_month: period,
+    requested_by: user.id,
+    amount,
+    target_pool: 'dept_pool_hr',
+    status: 'submitted',
+  })
+  if (error) {
+    if (error.code === '23505') throw new Error(`Batch #${batch.batch_no} already has a live funding request.`)
+    throw new Error(`Could not file the request: ${error.message}`)
+  }
+  revalidatePayroll(period)
 }
 
 export interface PayrollRowUpdate {
@@ -372,11 +514,13 @@ export async function deletePayrollRows(
   const supabase = await createClient()
   await assertPeriodOpen(supabase, period)
 
+  // A draft under Resubmit has already been paid once — it cannot go.
   const { error, count } = await supabase
     .from('hr_monthly_payroll')
     .delete({ count: 'exact' })
     .in('id', ids)
     .eq('status', 'draft')
+    .is('topup_opened_at', null)
     .eq('period_month', period)
 
   if (error) throw new Error(`Failed to delete payroll rows: ${error.message}`)
@@ -391,10 +535,8 @@ export async function deletePayrollRows(
  * Delete the ENTIRE month's payroll — every draft row for the period.
  * For wiping test/wrongly-created months before anything downstream exists.
  *
- * Blocked when a live (non-rejected) payroll_run exists: the month has been
- * submitted to Finance and its total is referenced by billing/payment flows —
- * reopen the run first, then delete. Only draft rows are removed, so any
- * submitted/paid rows (which can only exist under a live run anyway) survive.
+ * Blocked once anybody of the month has gone to Finance (a batch stands):
+ * from then on rows leave one at a time, and only while still drafts.
  */
 export async function deletePayrollPeriod(period: string): Promise<{ deleted: number }> {
   await requirePermission('hr_costing')
@@ -402,16 +544,15 @@ export async function deletePayrollPeriod(period: string): Promise<{ deleted: nu
 
   await assertPeriodOpen(supabase, period)
 
-  const { data: run, error: runErr } = await supabase
-    .from('payroll_runs')
-    .select('id, status')
+  const { count: standing, error: batchErr } = await supabase
+    .from('payroll_batches')
+    .select('id', { count: 'exact', head: true })
     .eq('period_month', period)
-    .neq('status', 'rejected')
-    .maybeSingle()
-  if (runErr) throw new Error(`Failed to check payroll run: ${runErr.message}`)
-  if (run) {
+    .eq('status', 'submitted')
+  if (batchErr) throw new Error(`Failed to check the month's batches: ${batchErr.message}`)
+  if ((standing ?? 0) > 0) {
     throw new Error(
-      `Cannot delete this month — its payroll run is already ${run.status}. Reopen the run first, then delete.`,
+      'Cannot delete this month — some of it is already with Finance. Remove draft rows one at a time instead.',
     )
   }
 
@@ -420,6 +561,7 @@ export async function deletePayrollPeriod(period: string): Promise<{ deleted: nu
     .delete({ count: 'exact' })
     .eq('period_month', period)
     .eq('status', 'draft')
+    .is('topup_opened_at', null)
     .neq('source', 'commission')
 
   if (error) throw new Error(`Failed to delete payroll month: ${error.message}`)
@@ -476,70 +618,9 @@ export async function createPayrollPeriod(period: string): Promise<{ created: nu
 }
 
 /**
- * Stage D — HR requests payroll payment.
- * Creates a payroll_payment_requests row (status='submitted') linked to an
- * approved payroll_run. Finance then generates a PV against this request
- * (Stage E). The DB trigger validates that the run is in 'approved' state
- * and that the amount matches total_amount exactly.
- *
- * Fails if:
- *   - the run is not status='approved' (trigger raises)
- *   - there's already an active request (UNIQUE partial index raises 23505)
- */
-export async function requestPayrollPayment(runId: string): Promise<string> {
-  const user = await requirePermission('hr_costing')
-  const supabase = await createClient()
-
-  const { data: run, error: readErr } = await supabase
-    .from('payroll_runs')
-    .select('id, period_month, status, total_amount')
-    .eq('id', runId)
-    .maybeSingle()
-
-  if (readErr) throw new Error(`Failed to read payroll run: ${readErr.message}`)
-  if (!run) throw new Error('Payroll run not found')
-  if (run.status !== 'approved') {
-    throw new Error(
-      `Cannot request payment — run status is ${run.status}, must be approved`,
-    )
-  }
-
-  const amount = Number(run.total_amount ?? 0)
-  if (amount <= 0) {
-    throw new Error('Payroll run has no total_amount recorded; cannot request payment')
-  }
-
-  const { data: inserted, error: insertErr } = await supabase
-    .from('payroll_payment_requests')
-    .insert({
-      payroll_run_id: run.id,
-      requested_by: user.id,
-      amount,
-      target_pool: 'dept_pool_hr',
-      status: 'submitted',
-    })
-    .select('id')
-    .single()
-
-  if (insertErr) {
-    if (insertErr.code === '23505') {
-      throw new Error(
-        'A payment request is already active for this payroll run. Cancel it first if you need to re-submit.',
-      )
-    }
-    throw new Error(`Failed to create payment request: ${insertErr.message}`)
-  }
-
-  revalidatePath(`/hr-costing/payroll/${run.period_month}`)
-  revalidatePath('/hr-costing/payroll')
-  revalidatePath('/dashboard')
-  revalidatePath('/payments')
-  return inserted.id
-}
-
-/**
- * Stage D cancel — HR withdraws a still-submitted payment request before
- * Finance has generated a PV. RLS enforces ownership + submitted status.
+ * HR withdraws a batch's still-submitted funding request before Finance has
+ * generated a PV (misfiled, wrong day). The batch stays with Finance, marked
+ * "No funding request" until it is filed again. RLS enforces ownership.
  */
 export async function cancelPayrollPaymentRequest(
   requestId: string,
@@ -633,6 +714,7 @@ export async function copyFromLastMonth(period: string): Promise<{ copied: numbe
       .eq('staff_id', r.staff_id)
       .eq('period_month', period)
       .eq('status', 'draft')
+      .is('topup_opened_at', null)
       .neq('source', 'commission')
     if (!error) copied++
   }

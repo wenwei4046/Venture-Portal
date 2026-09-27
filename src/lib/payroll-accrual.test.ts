@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildAccrualLines, sumPayrollRows, accrualTotal, type AccrualSums } from './payroll-accrual'
+import { batchAccrualSums, buildAccrualLines, sumPayrollRows, accrualTotal, type AccrualSums } from './payroll-accrual'
 
 // June Finance — the known-good fixture, verified to the sen against the
 // manually-booked JE-202606-0228.
@@ -67,5 +67,31 @@ describe('sumPayrollRows', () => {
     expect(s.skbbk).toBe(40.85)
     expect(s.eisBoth).toBe(21.8)
     expect(accrualTotal(s)).toBe(6466.25) // June DO JV total (JE-202606-0227)
+  })
+})
+
+describe('batchAccrualSums (unified Payroll, one batch)', () => {
+  it('books a resubmit — only the difference — as a balanced JV', () => {
+    // The dry-run top-up of 2026-09-27: basic +1,500 on one Finance row.
+    const sums = batchAccrualSums({
+      segment: 'finance', gross: 1500, non_statutory_allowance: 0,
+      epf_er: 195, epf_ee: 165, socso_er: 26.2, socso_ee: 7.5, eis_er: 3, eis_ee: 3,
+      pcb: 77.05, withholding_tax: 0, net: 1247.45, skbbk: 0,
+    })
+    expect(accrualTotal(sums)).toBe(1724.2)
+    const lines = buildAccrualLines(sums, "Sep'26")
+    const dr = lines.reduce((s, l) => s + (l.debit ?? 0), 0)
+    const cr = lines.reduce((s, l) => s + (l.credit ?? 0), 0)
+    expect(Math.round(dr * 100)).toBe(Math.round(cr * 100))
+    expect(lines.find(l => l.accountCode === '4070')?.credit).toBe(1247.45)
+  })
+
+  it('reads the RPC\'s numeric strings', () => {
+    const sums = batchAccrualSums({
+      segment: 'director', gross: '14400.00', non_statutory_allowance: '0', epf_er: '1872.00', epf_ee: '1584.00',
+      socso_er: '0', socso_ee: '0', eis_er: '0', eis_ee: '0', pcb: '1816.00', withholding_tax: '0', net: '11000.00', skbbk: '0',
+    })
+    expect(sums).toMatchObject({ basicEtc: 14400, epfEr: 1872, epfBoth: 3456, net: 11000 })
+    expect(accrualTotal(sums)).toBe(16272)
   })
 })

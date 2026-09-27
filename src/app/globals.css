@@ -1671,9 +1671,11 @@ table.ledger-table tr.lt-detail {
 table.ledger-table.payroll-grid {
   --w-chk: 36px;
   --w-name: 196px;
+  /* Where each person's pay stands (unified Payroll, 2026-09-27). */
+  --w-status: 138px;
   --w-gross: 96px;
   --w-net: 104px;
-  --w-act: 60px;
+  --w-act: 64px;
   border: 0;
   border-radius: 0;
   /* .ledger-table clips itself for its rounded corners; here the WELL does
@@ -1697,6 +1699,7 @@ table.ledger-table.payroll-grid {
    the two cannot drift apart. */
 table.payroll-grid col.col-chk { width: var(--w-chk); }
 table.payroll-grid col.col-name { width: var(--w-name); }
+table.payroll-grid col.col-status { width: var(--w-status); }
 table.payroll-grid col.col-gross { width: var(--w-gross); }
 table.payroll-grid col.col-net { width: var(--w-net); }
 table.payroll-grid col.col-act { width: var(--w-act); }
@@ -1771,17 +1774,18 @@ table.payroll-grid tfoot .pg-st { z-index: 3; }
 table.payroll-grid .l0 { left: 0; }
 table.payroll-grid .l1 { left: var(--w-chk); }
 table.payroll-grid .l2 { left: calc(var(--w-chk) + var(--w-name)); }
-table.payroll-grid .l3 { left: calc(var(--w-chk) + var(--w-name) + var(--w-gross)); }
-table.payroll-grid .l4 { left: calc(var(--w-chk) + var(--w-name) + var(--w-gross) + var(--w-net)); }
+table.payroll-grid .l3 { left: calc(var(--w-chk) + var(--w-name) + var(--w-status)); }
+table.payroll-grid .l4 { left: calc(var(--w-chk) + var(--w-name) + var(--w-status) + var(--w-gross)); }
+table.payroll-grid .l5 { left: calc(var(--w-chk) + var(--w-name) + var(--w-status) + var(--w-gross) + var(--w-net)); }
 table.payroll-grid tbody td.pg-st { background: var(--row-bg); }
 table.payroll-grid th.g1,
 table.payroll-grid td.g1 { border-left: 1px solid rgb(var(--hairline)); }
-table.payroll-grid .l2 { box-shadow: inset 1px 0 0 rgb(var(--hairline)); }
-table.payroll-grid .l4 { box-shadow: inset -1px 0 0 rgb(var(--hairline)); }
-table.payroll-grid tr.pg-band .l4 { box-shadow: none; }
+table.payroll-grid .l3 { box-shadow: inset 1px 0 0 rgb(var(--hairline)); }
+table.payroll-grid .l5 { box-shadow: inset -1px 0 0 rgb(var(--hairline)); }
+table.payroll-grid tr.pg-band .l5 { box-shadow: none; }
 /* A soft shadow off the frozen edge, only once the working columns have
    scrolled under it. */
-table.payroll-grid .l4::after {
+table.payroll-grid .l5::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1793,7 +1797,14 @@ table.payroll-grid .l4::after {
   opacity: 0;
   transition: opacity 0.15s;
 }
-.pg-scroll.scrolled table.payroll-grid .l4::after { opacity: 1; }
+.pg-scroll.scrolled table.payroll-grid .l5::after { opacity: 1; }
+
+/* The Status column: a chip that fits, the detail in its tooltip. */
+table.payroll-grid td.pg-status { padding: 0 6px; }
+table.payroll-grid td.pg-status .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.payroll-grid tr.pg-band td.pg-band-state { font-weight: 400; font-size: 11px; color: rgb(var(--graphite)); padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Directors are keyed on Director Salary: read here, never typed. */
+table.payroll-grid tr.pg-row.director .pg-name-btn { text-decoration: underline dotted rgb(var(--hairline)); text-underline-offset: 4px; }
 
 /* Department band — the roster's .group-btn, with the subtotal sitting
    right under the Gross / Net columns it belongs to. */
@@ -1862,6 +1873,9 @@ table.payroll-grid .icon-btn.chev { transition: transform 0.18s ease, color 0.14
 table.payroll-grid tr.pg-row.open .icon-btn.chev { color: rgb(var(--accent)); opacity: 1; transform: rotate(180deg); }
 /* Save takes the chevron's place while the row has unsaved figures. */
 table.payroll-grid tr.pg-row.dirty .icon-btn.chev { display: none; }
+table.payroll-grid .icon-btn.more { opacity: 0.55; }
+table.payroll-grid tr.pg-row:hover .icon-btn.more,
+table.payroll-grid .icon-btn.more:focus-visible { opacity: 1; }
 .pg-save {
   font-family: var(--font-sans), 'Inter', sans-serif;
   font-size: 11px;
@@ -1967,8 +1981,9 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 @media (max-width: 767px) {
   table.payroll-grid .l2,
   table.payroll-grid .l3,
-  table.payroll-grid .l4 { position: static; box-shadow: none; }
-  table.payroll-grid .l4::after { display: none; }
+  table.payroll-grid .l4,
+  table.payroll-grid .l5 { position: static; box-shadow: none; }
+  table.payroll-grid .l5::after { display: none; }
   .pg-scroll { max-height: none; }
   table.payroll-grid thead th { position: static; }
   table.payroll-grid tfoot td { position: static; }

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useTransition, type ReactNode } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import type { PayrollState } from '@/lib/commission/payroll-send'
-import { sendToPayroll, takeBackFromPayroll } from '../../../run-actions'
+import { takeBackFromPayroll } from '../../../run-actions'
 import s from './commission-workbench.module.css'
 
 interface Props {
@@ -40,8 +41,14 @@ function difference(now: number, before: number): string {
 }
 
 /**
- * Payroll, for this month — what it holds of this page, and the one button
- * that puts it there (2026-09-27).
+ * Payroll, for this month — what it holds of this page (2026-09-27).
+ *
+ * Since the unified Payroll (user 2026-09-27) a salesperson goes to payroll
+ * the moment they are CLOSED on this page: their row on HR › Payroll takes
+ * the close's commission and shows Completed, and HR's Submit to Finance
+ * sends them in a batch. The whole-month Send this bar carried is retired
+ * (the database refuses it); Take back remains for a month an old run put in
+ * payroll.
  *
  * The commission above is worked out LIVE every time the page opens. Payroll
  * gets it only when it is sent, and the page used to leave that to a button
@@ -49,7 +56,7 @@ function difference(now: number, before: number): string {
  * live figure read as money already in payroll, and September never went.
  * This bar says which it is, and what is still in the way.
  */
-export default function PayrollBar({ period, monthLabel, subDepartmentId, runId, state, draft = false, switches }: Props) {
+export default function PayrollBar({ period, monthLabel, runId, state, draft = false, switches }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -70,12 +77,6 @@ export default function PayrollBar({ period, monthLabel, subDepartmentId, runId,
       }
     })
   }
-
-  const send = () =>
-    act(async () => {
-      const sent = await sendToPayroll(period, subDepartmentId)
-      return `${formatMoney(sent.totalCommission)} is in the ${monthLabel} payroll · ${sent.staffCount} ${sent.staffCount === 1 ? 'person' : 'people'}.`
-    })
 
   const takeBack = () =>
     act(async () => {
@@ -111,14 +112,14 @@ export default function PayrollBar({ period, monthLabel, subDepartmentId, runId,
     case 'not_sent':
       blockers = state.blockers
       tone = blockers.length ? 'blocked' : 'idle'
-      title = 'Not in payroll yet'
-      body = <>The commission above is worked out live from the ERP bills every time this page opens. Payroll only gets it when it is sent{blockers.length
-        ? <> — and {blockers.length === 1 ? 'one thing has' : `${blockers.length} things have`} to be settled first:</>
-        : <>. Send it once the month is settled; sending again later replaces what was sent.</>}</>
+      title = 'Goes to payroll person by person'
+      body = <>The commission above is worked out live from the ERP bills. A salesperson goes to payroll when you close
+        them here: their row on HR › Payroll takes the close&apos;s figure and shows Completed, and HR&apos;s Submit to
+        Finance sends them{blockers.length
+        ? <> — {blockers.length === 1 ? 'one thing is' : `${blockers.length} things are`} worth settling before you close anybody:</>
+        : <>.</>}</>
       actions = (
-        <button type="button" className={s.primaryButton} disabled={isPending || blockers.length > 0} onClick={send}>
-          {isPending ? 'Sending…' : blockers.length ? 'Send to payroll' : `Send ${formatMoney(state.total)} to payroll`}
-        </button>
+        <Link href={`/hr-costing/payroll/${period}`} className={s.ghostButton}>HR › Payroll →</Link>
       )
       break
     case 'sent':
@@ -129,14 +130,9 @@ export default function PayrollBar({ period, monthLabel, subDepartmentId, runId,
         ? <>The commission above matches it. While it is in payroll, {monthLabel}&apos;s bills, Open Bill picks and ERP changes stay as they are — take it back to change them.</>
         : <>The commission above has moved since: {formatMoney(state.total)}, {difference(state.total, state.sentTotal)}{state.changedPeople > 0 ? ` · ${state.changedPeople} ${state.changedPeople === 1 ? 'person' : 'people'} changed` : ''}.</>}
         {blockers.length ? <> Payroll keeps what was sent until {blockers.length === 1 ? 'this is' : 'these are'} settled:</> : null}</>
-      actions = <>
-        {!state.current && (
-          <button type="button" className={s.primaryButton} disabled={isPending || blockers.length > 0} onClick={send}>
-            {isPending ? 'Updating…' : `Update payroll to ${formatMoney(state.total)}`}
-          </button>
-        )}
-        {takeBackButton}
-      </>
+      // A month an old whole-month run put in payroll: it can be taken back,
+      // not updated — salespeople are closed one by one now.
+      actions = <>{takeBackButton}</>
       break
   }
 

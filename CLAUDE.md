@@ -100,6 +100,52 @@ src/
 │   │   │                              includes exact coverage and completion;
 │   │   │                              lib/payment-cycle.ts drives reporting.
 │   │   │                              DESIGN.md: Payment statement (v3.7).
+│   │   │                              **THE UNIFIED PAYROLL (2026-09-27):** payroll/
+│   │   │                              [period] is everybody's pay on one grid —
+│   │   │                              staff keyed here, the Revenue team closed on
+│   │   │                              Comm Cal, Directors Completed on Director
+│   │   │                              Salary — and a person moves draft → completed
+│   │   │                              → submitted → paid (enum value `completed`,
+│   │   │                              mig 20260927060000). Tick → *Complete* (staff
+│   │   │                              only; a salesperson completes when their
+│   │   │                              `comm_salesperson_closes` row stands — trigger
+│   │   │                              `comm_close_sync_payroll` sets the row's
+│   │   │                              commission to Σ standing closes and records the
+│   │   │                              close's bills in `comm_order_releases` under
+│   │   │                              the month's run; a Director on
+│   │   │                              `director_payroll_complete`, which still writes
+│   │   │                              the billing snapshot). *Submit to Finance* =
+│   │   │                              `payroll_submit_batch`: everybody Completed, as
+│   │   │                              one BATCH (`payroll_batches` + a line per
+│   │   │                              person in `payroll_batch_lines`), its own
+│   │   │                              funding request and accrual JVs (reference =
+│   │   │                              the batch) — pressable again for the next group
+│   │   │                              (user: Finance 3 today, HR 5 next week); what
+│   │   │                              each batch waits on is shown in *Submitted to
+│   │   │                              Finance*, never on the button. The month keeps
+│   │   │                              ONE payroll_run = Σ standing batches, so
+│   │   │                              billing and dashboards read it as before.
+│   │   │                              Right-click → *Resubmit* (`payroll_open_topup`)
+│   │   │                              unlocks somebody already sent; amounts may only
+│   │   │                              go UP and the next batch carries the
+│   │   │                              difference — Finance funds the CTC delta,
+│   │   │                              HR › Payment pays the net delta
+│   │   │                              (`payroll_salary_entitlements`: submitted,
+│   │   │                              FUNDED, covered, paid per component; statutory
+│   │   │                              the same). *Total Close* (`payroll_close_month`)
+│   │   │                              locks the month; only the Principal reopens
+│   │   │                              (`payroll_reopen_month`). Finance sends back
+│   │   │                              ONE batch (`payroll_send_back_batch`: request
+│   │   │                              cancelled, JVs reversed, its people Completed
+│   │   │                              again). Every status move goes through those
+│   │   │                              functions (guard `guard_payroll_row_lifecycle`,
+│   │   │                              `app.payroll_lifecycle`). Retired: the
+│   │   │                              whole-month `submit_payroll_to_principal`,
+│   │   │                              Director Salary's own Submit to Finance and
+│   │   │                              Comm Cal's whole-month Send (they raise
+│   │   │                              23PAY). June–August are batch #1 (legacy) of
+│   │   │                              their month. `lib/payroll-lifecycle.ts`, mig
+│   │   │                              `20260927061000`, DESIGN.md › Payroll batches.
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
@@ -674,6 +720,11 @@ src/
 │   │   │                              gone (user 2026-09-26). The bottom rail
 │   │   │                              went with *Payroll & source tools*
 │   │   │                              (2026-09-27, below).
+│   │   │                              (The Send below was RETIRED the same day by
+│   │   │                              the unified Payroll — a salesperson goes to
+│   │   │                              payroll when CLOSED; the bar now says so and
+│   │   │                              links HR › Payroll; Take back stays for an
+│   │   │                              old applied run.)
 │   │   │                              **SEND TO PAYROLL (2026-09-27):** the month
 │   │   │                              is worked out LIVE every time the page
 │   │   │                              opens; payroll holds only what was SENT, and

@@ -7,20 +7,20 @@ import { upsalesToOrders } from '@/lib/commission/upsales'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench, { type PayrollBarFacts } from './CommissionWorkbench'
 
-const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, sendToPayroll, takeBackFromPayroll, url } = vi.hoisted(() => {
+const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, takeBackFromPayroll, url } = vi.hoisted(() => {
   // Next re-renders `useSearchParams` from the browser's own pushState and
   // replaceState; the stand-in does the same through this subscription.
   const listeners = new Set<() => void>()
   return {
     saveOpenPicks: vi.fn(), refresh: vi.fn(), push: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn(),
-    sendToPayroll: vi.fn(), takeBackFromPayroll: vi.fn(),
+    takeBackFromPayroll: vi.fn(),
     url: {
       subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
       changed() { for (const listener of listeners) listener() },
     },
   }
 })
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, sendToPayroll, takeBackFromPayroll }))
+vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, takeBackFromPayroll }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
   return {
@@ -672,22 +672,21 @@ describe('CommissionWorkbench', () => {
     const bar = () => screen.getByRole('region', { name: 'Payroll · August 2026' })
 
     beforeEach(() => {
-      sendToPayroll.mockResolvedValue({ runId: 'run-1', periodMonth: '2026-08-01', staffCount: 2, totalCommission: 1313, deferredCount: 0, releasedCount: 2 })
       takeBackFromPayroll.mockResolvedValue(undefined)
     })
 
-    it('says the live figure is not in payroll until it is sent, and sends it', async () => {
+    // Unified Payroll (2026-09-27): a salesperson goes to payroll when closed
+    // here; the whole-month send is retired.
+    it('says each salesperson goes to payroll when closed, and offers no whole-month send', () => {
       board()
-      expect(bar()).toHaveTextContent('Not in payroll yet')
-      expect(bar()).toHaveTextContent('worked out live from the ERP bills every time this page opens')
+      expect(bar()).toHaveTextContent('Goes to payroll person by person')
+      expect(bar()).toHaveTextContent('worked out live from the ERP bills')
       expect(within(bar()).getByText('This month pays switches')).toBeVisible()
-      fireEvent.click(within(bar()).getByRole('button', { name: 'Send RM 1,313.00 to payroll' }))
-      await waitFor(() => expect(refresh).toHaveBeenCalledOnce())
-      expect(sendToPayroll).toHaveBeenCalledWith('2026-08-01', 'sub-fair')
-      expect(within(bar()).getByRole('status')).toHaveTextContent('RM 1,313.00 is in the August 2026 payroll · 2 people.')
+      expect(within(bar()).queryByRole('button', { name: /Send/ })).toBeNull()
+      expect(within(bar()).getByRole('link', { name: 'HR › Payroll →' })).toHaveAttribute('href', '/hr-costing/payroll/2026-08-01')
     })
 
-    it('names what stops a send, by name, and will not send until it is settled', () => {
+    it('names what is worth settling before anybody is closed', () => {
       const data = fixture()
       const newbie = '6c1f5d0e-3b1a-4c2d-9e8f-1a2b3c4d5e6f'
       data.input.orders = [...data.input.orders, sale('three', 500, { staffId: newbie })]
@@ -699,12 +698,11 @@ describe('CommissionWorkbench', () => {
         '1 order(s) carry an agent who is not a salesperson in the portal and were excluded. Match them in the import wizard.',
         'Staff NEWBIE has sales this period but no rank / hierarchy row — commission computed at 0%.',
       ])
-      expect(bar()).toHaveTextContent('2 things have to be settled first')
-      expect(within(bar()).getByRole('button', { name: 'Send to payroll' })).toBeDisabled()
+      expect(bar()).toHaveTextContent('2 things are worth settling before you close anybody')
     })
 
     // KRIS and PETER in September: their own bills, no rank by rule — not a gap.
-    it('lists a department head at no commission and does not hold the send for them', () => {
+    it('lists a department head at no commission and does not flag them', () => {
       const data = fixture()
       data.input.orders = [...data.input.orders, sale('kris-1', 2_980, { staffId: 'kris' })]
       data.input.departmentHeadIds = ['kris']
@@ -714,27 +712,24 @@ describe('CommissionWorkbench', () => {
       expect(row).toHaveTextContent('Department headOwn bills earn no commission')
       expect(within(row).getAllByRole('cell').at(-1)).toHaveTextContent('RM 0.00')
       expect(within(bar()).queryByRole('list', { name: 'To settle before payroll' })).toBeNull()
-      expect(within(bar()).getByRole('button', { name: 'Send RM 1,313.00 to payroll' })).toBeEnabled()
     })
 
-    it('sends the month as saved, never what is only drafted on this screen', () => {
+    it('says a draft on this screen is not what payroll holds', () => {
       board()
       fireEvent.click(screen.getByText(/^Calculation setup/))
       fireEvent.click(screen.getByRole('checkbox', { name: 'KPI incentive' }))
       expect(within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' }))
         .toHaveTextContent('RM 1,265.00')
-      expect(within(bar()).getByRole('button', { name: 'Send RM 1,313.00 to payroll' })).toBeEnabled()
       expect(bar()).toHaveTextContent('This screen holds a draft')
     })
 
-    it('says a month in payroll has moved since, and updates it in one click', async () => {
+    it('says a month an old run put in payroll has moved since, and never offers to update it', () => {
       board(fixture(), 'applied', [{ staffId: 'agent', total: 1_223 }, { staffId: 'leader', total: 80 }], { ...PAYROLL, runId: 'run-1', sentAt: '2026-09-15T02:30:00Z' })
       expect(bar()).toHaveTextContent('In payroll · RM 1,303.00')
       // Malaysia time, whatever the machine's zone.
       expect(bar()).toHaveTextContent(/Sent 15 Sept? 2026, 10:30/)
       expect(bar()).toHaveTextContent('RM 1,313.00, RM 10.00 more · 1 person changed')
-      fireEvent.click(within(bar()).getByRole('button', { name: 'Update payroll to RM 1,313.00' }))
-      await waitFor(() => expect(sendToPayroll).toHaveBeenCalledWith('2026-08-01', 'sub-fair'))
+      expect(within(bar()).queryByRole('button', { name: /Update payroll/ })).toBeNull()
     })
 
     it('takes a month back out of payroll only after asking', async () => {

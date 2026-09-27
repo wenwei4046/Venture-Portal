@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import PayrollBar from './PayrollBar'
 
-const { sendToPayroll, takeBackFromPayroll, refresh } = vi.hoisted(() => ({
-  sendToPayroll: vi.fn(), takeBackFromPayroll: vi.fn(), refresh: vi.fn(),
+const { takeBackFromPayroll, refresh } = vi.hoisted(() => ({
+  takeBackFromPayroll: vi.fn(), refresh: vi.fn(),
 }))
-vi.mock('../../../run-actions', () => ({ sendToPayroll, takeBackFromPayroll }))
+vi.mock('../../../run-actions', () => ({ takeBackFromPayroll }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 const base = { period: '2026-09-01', monthLabel: 'September 2026', subDepartmentId: 'sub-fair', runId: null }
@@ -31,12 +31,22 @@ describe('PayrollBar', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('keeps what the send refused visible, and payroll unchanged', async () => {
-    sendToPayroll.mockRejectedValue(new Error('Payroll for Sep 2026 has already been submitted. Reopen payroll before changing commission'))
+  // Unified Payroll (2026-09-27): no whole-month send — a salesperson goes
+  // to payroll when closed here, and HR submits them from HR › Payroll.
+  it('offers no whole-month send, only the way to HR › Payroll', () => {
     render(<PayrollBar {...base} state={{ kind: 'not_sent', total: 91_971.9, blockers: [] }} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Send RM 91,971.90 to payroll' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('has already been submitted')
-    expect(refresh).not.toHaveBeenCalled()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Send RM 91,971.90 to payroll' })).toBeEnabled())
+    expect(bar()).toHaveTextContent('Goes to payroll person by person')
+    expect(bar()).toHaveTextContent('A salesperson goes to payroll when you close them here')
+    expect(screen.queryByRole('button', { name: /Send/ })).toBeNull()
+    expect(screen.getByRole('link', { name: 'HR › Payroll →' })).toHaveAttribute('href', '/hr-costing/payroll/2026-09-01')
+  })
+
+  it('lets a month an old run put in payroll be taken back, never updated', async () => {
+    takeBackFromPayroll.mockResolvedValue(undefined)
+    render(<PayrollBar {...base} runId="run-1" state={{ kind: 'sent', sentTotal: 89_460.99, sentAt: '2026-09-26T14:29:04Z', total: 91_971.9, current: false, changedPeople: 3, blockers: [] }} />)
+    expect(screen.queryByRole('button', { name: /Update payroll/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Take back' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Take back' })[0])
+    await waitFor(() => expect(takeBackFromPayroll).toHaveBeenCalledWith('run-1'))
   })
 })
