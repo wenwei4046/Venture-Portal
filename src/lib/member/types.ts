@@ -1,4 +1,5 @@
 import type { QuotePricing } from "./calculator";
+import type { KpiItem } from "@/lib/commission/kpi";
 export type MemberPage =
   | "today"
   | "insight"
@@ -251,6 +252,17 @@ export interface QuoteRules {
    * the calculator and in the commission run alike. 1 = the cost as keyed.
    */
   costDivisor: number;
+  /**
+   * SKUs judged at their own ratio instead (Product List › Costing Setting,
+   * 2026-09-27), by product code. Absent = every SKU at `costDivisor`.
+   */
+  costRatios?: { productCode: string; ratio: number }[];
+  /**
+   * The department's KPI items while its KPI pay is on (Product List ›
+   * Add-on / KPI Items, 2026-09-27): a cart carrying one has that amount off
+   * its price for the margin — the run pays it flat as KPI. Absent = none.
+   */
+  kpiItems?: KpiItem[];
 }
 export interface QuoteResult {
   valid: boolean;
@@ -264,6 +276,14 @@ export interface QuoteResult {
   nextPrice: number | null;
   nextThreshold: number | null;
   boundary: string | null;
+  /**
+   * What the cart's KPI items take off its price, RM — paid flat as KPI,
+   * outside this margin (2026-09-27). 0 when it carries none.
+   */
+  kpiAmount?: number;
+  kpiItems?: { label: string; qty: number; amount: number }[];
+  /** KPI items the price does not cover, RM — not paid; the whole price is the sale. */
+  kpiNotPaid?: number;
   version: string;
   inputKey: string;
   customerText?: string;

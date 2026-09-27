@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { VIEW_AS_COOKIE } from "@/lib/view-as";
+import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE } from "@/lib/view-as";
 import MemberLoginScreen from "@/components/member/MemberLoginScreen";
 
 export const metadata = { title: "Sign In · HOUZS Venture" };
@@ -35,6 +35,7 @@ export default async function LoginPage({
 
     // A fresh sign-in starts in the account's own view, not a previous mask.
     (await cookies()).delete(VIEW_AS_COOKIE);
+    (await cookies()).delete(VIEW_AS_MIRROR_COOKIE);
     redirect(profile.role === "revenue_member" ? "/member" : "/dashboard");
   }
 

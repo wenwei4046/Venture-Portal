@@ -4,7 +4,7 @@ import { readKpiSummary, type MemberKpiSummary } from "./kpi-summary";
 
 const mocks = vi.hoisted(() => ({ getUser: vi.fn(), createClient: vi.fn(), rpc: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/auth", () => ({ getUser: mocks.getUser }));
+vi.mock("@/lib/auth", () => ({ getMemberUser: mocks.getUser }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 const schemeId = "10000000-0000-4000-8000-000000000001";
 const summary: MemberKpiSummary = {

@@ -7,10 +7,11 @@ import type { ProductTab } from './ProductListTabs'
  * How a tab scrolls. SKU Master and Combo Pricing are wide sheets: a window
  * fixed to the screen that you drag both ways. Modular and Maintenance only
  * ever grow downward, so they grow with the page and its own scrollbar moves
- * them, the way the ERP's Products page does (user 2026-09-27).
+ * them, the way the ERP's Products page does (user 2026-09-27) — and so do the
+ * two settings tabs, Costing Setting and Add-on / KPI Items.
  */
 export function productTabScroll(tab: ProductTab): 'page' | 'window' {
-  return tab === 'modular' || tab === 'maintenance' ? 'page' : 'window'
+  return tab === 'modular' || tab === 'maintenance' || tab === 'costing' || tab === 'kpi' ? 'page' : 'window'
 }
 
 type DraftState = { dirty: boolean; saving: boolean }

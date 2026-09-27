@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { priceGridOf, type PriceCell } from '@/lib/catalogue/pricing'
 import { calcCategoryOf, defaultGift, skuOptionLabel } from '@/lib/catalogue/options'
 import { normaliseComboModules } from '@/lib/catalogue/combos'
+import { officeDate } from '@/lib/office-clock'
 
 /**
  * What the Product List reads: the ERP's catalogue as mirrored (`erp_*`, items
@@ -625,4 +626,130 @@ export async function loadCostingGaps(from: string, to: string): Promise<Costing
     reason: String(r.reason ?? 'unpriced'),
     erp_product_id: str(r.erp_product_id),
   }))
+}
+
+// ─── Costing Setting · Add-on / KPI Items ───────────────────────────────────
+// Per sub-department (2026-09-27): each reads one scheme's rows. Written by
+// `catalogue_save_cost_setting` / `catalogue_save_kpi_items`.
+
+export interface SchemeRules {
+  /** Revenue Team cost = cost ÷ this (`comm_schemes.revenue_cost_divisor`). */
+  divisor: number
+  /** The KPI item allowance switch — Rules › Scheme rules. */
+  enableKpi: boolean
+}
+
+export async function loadSchemeRules(schemeId: string): Promise<SchemeRules | null> {
+  const sb = await untyped()
+  const { data, error } = await sb
+    .from('comm_schemes')
+    .select('revenue_cost_divisor, enable_kpi')
+    .eq('id', schemeId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  const row = data as Row
+  return { divisor: num(row.revenue_cost_divisor) ?? 1, enableKpi: row.enable_kpi === true }
+}
+
+/** A SKU as the two tabs' pickers and tables need it — no grid, no ticks. */
+export interface PickSku {
+  erpId: string
+  code: string
+  description: string | null
+  category: string | null
+  model: string | null
+  /** The Product List cost: the SKU's one price, else its grid's lowest and highest. */
+  price: number | null
+  priceLow: number | null
+  priceHigh: number | null
+  active: boolean
+  removed: boolean
+}
+
+export function toPickSku(s: CatalogueSku): PickSku {
+  const cells = (s.grid ?? []).map(c => c.price).filter((p): p is number => typeof p === 'number')
+  return {
+    erpId: s.erpId,
+    code: s.code,
+    description: s.description,
+    category: s.category,
+    model: s.modelCode ?? s.modelName,
+    price: s.price,
+    priceLow: cells.length > 0 ? Math.min(...cells) : null,
+    priceHigh: cells.length > 0 ? Math.max(...cells) : null,
+    active: s.active,
+    removed: s.removed,
+  }
+}
+
+export interface CostRatioRow {
+  erpId: string
+  /** The code the ratio was set under: what a sales line has to carry. */
+  code: string
+  ratio: number
+  updatedAt: string | null
+}
+
+export async function loadCostRatios(schemeId: string): Promise<CostRatioRow[]> {
+  const sb = await untyped()
+  const rows = await all((f, t) =>
+    sb
+      .from('comm_cost_ratios')
+      .select('erp_product_id, product_code, ratio, updated_at')
+      .eq('scheme_id', schemeId)
+      .order('product_code')
+      .order('erp_product_id')
+      .range(f, t),
+  )
+  return rows.map(r => ({
+    erpId: String(r.erp_product_id),
+    code: String(r.product_code),
+    ratio: num(r.ratio) ?? 1,
+    updatedAt: str(r.updated_at),
+  }))
+}
+
+export interface KpiItemSetting {
+  id: string
+  source: 'sku' | 'option'
+  erpId: string | null
+  code: string | null
+  name: string | null
+  optionPool: 'bedframe_specials' | 'sofa_specials' | null
+  optionValue: string | null
+  amount: number
+  from: string
+  to: string | null
+}
+
+/** The items in force today or later — a closed row is history, and hidden. */
+export async function loadKpiItems(schemeId: string): Promise<KpiItemSetting[]> {
+  const sb = await untyped()
+  const today = officeDate()
+  const rows = await all((f, t) =>
+    sb
+      .from('comm_kpi_items')
+      .select('id, source, erp_product_id, product_code, product_name, option_pool, option_value, kpi_amount, effective_from, effective_to')
+      .eq('scheme_id', schemeId)
+      .or(`effective_to.is.null,effective_to.gte.${today}`)
+      .order('effective_from')
+      .order('id')
+      .range(f, t),
+  )
+  return rows.map(r => {
+    const pool = str(r.option_pool)
+    return {
+      id: String(r.id),
+      source: r.source === 'option' ? 'option' : 'sku',
+      erpId: str(r.erp_product_id),
+      code: str(r.product_code),
+      name: str(r.product_name),
+      optionPool: pool === 'bedframe_specials' || pool === 'sofa_specials' ? pool : null,
+      optionValue: str(r.option_value),
+      amount: num(r.kpi_amount) ?? 0,
+      from: String(r.effective_from),
+      to: str(r.effective_to),
+    }
+  })
 }

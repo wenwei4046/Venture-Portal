@@ -3,8 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ProductWorkspace, { productTabScroll, useProductDraftGuard, useProductDraftState } from './ProductWorkspace'
 import ProductListTabs, { type ProductTab } from './ProductListTabs'
 
-const { push } = vi.hoisted(() => ({ push: vi.fn() }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/revenue/products', useRouter: () => ({ push }) }))
+const { push, query } = vi.hoisted(() => ({ push: vi.fn(), query: { current: '' } }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/revenue/products',
+  useRouter: () => ({ push }),
+  useSearchParams: () => new URLSearchParams(query.current),
+}))
 
 function Draft({ dirty = false, saving = false }: { dirty?: boolean; saving?: boolean }) {
   useProductDraftGuard(dirty, saving)
@@ -18,7 +22,7 @@ function Workspace({ dirty = false, saving = false, active = 'sku', editor = tru
   return <ProductWorkspace><ProductListTabs active={active} />{editor ? <Draft dirty={dirty} saving={saving} /> : null}<State /></ProductWorkspace>
 }
 
-beforeEach(() => { push.mockReset(); vi.stubGlobal('confirm', vi.fn()); window.history.replaceState({}, '', '/revenue/products') })
+beforeEach(() => { push.mockReset(); query.current = ''; vi.stubGlobal('confirm', vi.fn()); window.history.replaceState({}, '', '/revenue/products') })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('Product List scrolling', () => {
@@ -28,6 +32,8 @@ describe('Product List scrolling', () => {
     expect(productTabScroll('sku')).toBe('window')
     expect(productTabScroll('combos')).toBe('window')
     expect(productTabScroll('gaps')).toBe('window')
+    expect(productTabScroll('costing')).toBe('page')
+    expect(productTabScroll('kpi')).toBe('page')
   })
 
   it("marks the workspace with its tab's mode, the fixed window when no tab is named", () => {
@@ -51,6 +57,15 @@ describe('Product List draft navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'SKU Master' }))
     expect(push).toHaveBeenLastCalledWith('/revenue/products', { scroll: false })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('carries the sub-department between the two settings tabs, and nowhere else', () => {
+    query.current = 'tab=costing&sub=ir'
+    render(<Workspace active="costing" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add-on / KPI Items' }))
+    expect(push).toHaveBeenLastCalledWith('/revenue/products?tab=kpi&sub=ir', { scroll: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Combo Pricing' }))
+    expect(push).toHaveBeenLastCalledWith('/revenue/products?tab=combos', { scroll: false })
   })
 
   it('keeps the dirty tab until the user explicitly discards or stays', () => {

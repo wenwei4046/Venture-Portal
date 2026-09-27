@@ -624,12 +624,15 @@ Computed for one salesperson `S` in one calendar month `P`.
 Every `sales_order_lines` row is classified at **compute time** (not import
 time, so re-configuring KPI items or item groups re-computes cleanly):
 
-1. **KPI line** — `product_code` matches an active `comm_kpi_items` row.
-2. **Commissionable** — `item_group` is marked commissionable.
-3. **Excluded** — `item_group` is marked non-commissionable.
-4. **Unknown group** — not in `comm_item_groups` at all → treated as **not**
+1. **Commissionable** — `item_group` is marked commissionable.
+2. **Excluded** — `item_group` is marked non-commissionable.
+3. **Unknown group** — not in `comm_item_groups` at all → treated as **not**
    commissionable **and raises a run warning**. A new ERP group can never
    silently start or stop paying.
+
+A KPI item is no longer a kind of line (2026-09-27): it is found on the BILL —
+a SKU on one of its lines, or a special printed on its bed frame or sofa — and
+its amount comes off the bill's commissionable sales (§4.3).
 
 Item-group policy (user, 2026-08-31):
 
@@ -644,8 +647,9 @@ Item-group policy (user, 2026-08-31):
 | **OTHER** (disposal, misc) | ❌ | 2,210.00 |
 
 > `PR(S)` = **product revenue** = Σ `line_amount` over S's *commissionable,
-> non-KPI, deposit-cleared* lines. July's commissionable base is
-> **RM2,831,707.30** of RM2,861,361.30 booked — RM29,654.00 dropped.
+> deposit-cleared* lines, less the KPI items those bills carry (§4.3). July's
+> commissionable base is **RM2,831,707.30** of RM2,861,361.30 booked —
+> RM29,654.00 dropped.
 
 ### 4.1 The deposit gate
 
@@ -673,22 +677,56 @@ before any of it counts (user, 2026-08-31).
 C1 = PR(S) × effectiveRate(S)
 ```
 
-### 4.3 C2 — KPI items
+### 4.3 C2 — KPI items (Product List › Add-on / KPI Items, 2026-09-27)
+
+A KPI item is a **SKU** from the SKU Master (a pillow, a protector) or a
+**special** from Maintenance — a bed frame's *HB Straight*, a sofa's *Wooden
+Arm*: not a product but a choice printed on the bed frame's or the sofa's own
+line — with ONE amount, per sub-department. When a bill carries one, **that
+amount comes off the bill's commissionable sales and is paid flat as KPI**
+(user 2026-09-27, "Flat KPI allowance"):
 
 ```
-KPIqty  = Σ qty                       over KPI lines
-KPIbase = Σ (qty × kpi_unit_amount)   over KPI lines     e.g. pillow → RM50
+RM 10,000 bill with HB Straight at RM 200, rate 7%
+  main   9,800 × 7% = 686.00      its margin judged on 9,800
+  KPI    RM 200 flat               + the monthly quantity bonus below
+
+KPIqty  = Σ qty                   over the KPI items S's bills carry
+KPIbase = Σ (qty × kpi_amount)    e.g. HB Straight → RM 200, a pillow → RM 50
 bonus%  = highest comm_kpi_thresholds rung whose min_qty ≤ KPIqty  (else 0)
 C2      = KPIbase × (1 + bonus%)
+PR(S)   = Σ over bills (commissionable sales − that bill's KPIbase)
 ```
 
 The brief's worked example: 10 × RM50 = RM500, +20% on top = **RM600**. ✅
 
-KPI-item revenue is **excluded from `PR`** — the item already earns its
-allowance, so counting it twice would double-pay. In practice most KPI items are
-**bundled free** (see §6), which is precisely the case a flat allowance exists
-to reward. Modelled as a ladder, not a single threshold, so a `Tier 2` can be
-added later without a schema change.
+**Found, not typed** (`lib/commission/kpi.ts` `orderKpiHits`; its SQL twin
+`comm_kpi_hits`, which the month page and the member app read): a SKU by its
+product code, per unit; a special among the specials a BEDFRAME or SOFA line
+carries (`raw.variants`, else the ERP's `description2` grammar
+`SPECIAL: a + b`), its exact spelling first, else without a trailing "(…)",
+and only in its own category. A **bed frame** special counts per bed frame
+(the line's qty); a **sofa** special **once per bill** — the ERP prints it on
+every module. Hand-typed AutoCount-era text ("HEADBOARD DO STRAIGHT") parses to
+nothing and is not found.
+
+**Only when the bill's sales cover them** (`coverKpi`). A RM 0.00 exchange
+that still prints the sofa's specials sold no add-on: it pays no KPI and keeps
+its sales, nothing off. Not a run warning — every warning blocks Apply.
+
+The ERP cannot say what an add-on is worth — a bed frame line is RM 0.00 on
+most bills, its value folded into the mattress — so the amount is the
+Principal's figure, not the line's. (Before 2026-09-27 a KPI SKU's own LINE
+left the sales; on a free pillow the two are the same.) The calculator takes
+the same amount off a quote before it judges the margin, and says so.
+
+Items are **dated**: an added item starts today; a new amount — or a removal —
+of an item begun before today closes it yesterday and opens today's
+(`catalogue_save_kpi_items`, one transaction), so a month already run keeps the
+amount it was run at; the run reads the list as at the month's end. The
+switch (`enable_kpi`) and the threshold ladder stay on Rules, where the KPI
+items tab is read-only since. Modelled as a ladder, not a single threshold, so
+a `Tier 2` can be added later without a schema change.
 
 ### 4.4 C3 — Open Bill (1st / 2nd / 3rd bill of the event day)
 
@@ -799,6 +837,15 @@ margins in the snapshot RPCs and the engine (`marginBase`) all divide by the
 same figure, so a salesperson's "36% margin" at the fair is the 36% the run
 pays on. Set on Rules › Scheme rules; 1 keeps the cost as keyed. A hand-keyed
 `manual_margin_pct` is already a team-basis margin and is not divided again.
+
+**A SKU's own ratio (2026-09-27).** "部分 SKU 它的除法 rate 不一样，比如可能是除以
+0.6": `comm_cost_ratios` (per scheme and SKU, matched on the line's product
+code, which the row keeps beside the SKU id) divides that SKU's lines by its
+own ratio instead — in the engine (`costDivisorFor`, per line), the month page,
+the member facts and the calculator alike. Both figures are set on Product
+List › Costing Setting, per sub-department (the scheme's also on Rules ›
+Scheme rules); saving a SKU the ERP renamed follows it to its new code. A new
+sub-department that follows another copies its ratio and its SKUs' ratios.
 
 The price that reaches a threshold *t* is **cost ÷ (1 − t)**, never
 cost × (1 + t): 33% on RM 1,000 of team cost is RM 1,492.54, 67% is
@@ -1123,7 +1170,8 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 | `comm_schemes` | knobs, component switches, deposit threshold, default rate mode, `cloned_from_scheme_id` |
 | `comm_ranks` | `title_id` → `titles` (replaced `tier_key` / `tier_label` 2026-09-03), rank, rate, `can_recruit`, the monthly `group_sales_threshold`, the earned `personal_sales_threshold` × `consecutive_months` |
 | `comm_item_groups` | ERP group → commissionable? |
-| `comm_kpi_items` / `comm_kpi_thresholds` | KPI products and the qty ladder |
+| `comm_kpi_items` / `comm_kpi_thresholds` | KPI items — a SKU (`product_code`) or a special (`option_pool` / `option_value`), effective-dated — and the qty ladder |
+| `comm_cost_ratios` | a SKU's own Revenue Team cost ratio, per scheme (2026-09-27) |
 | `comm_open_bill_rules` | 50 / 40 / 30% |
 | `comm_brands` | Akemi / Zanotti / Ergotex + the Item-Code prefixes that identify them |
 | `comm_margin_bands` | each brand's margin ladder (incentive / reference / penalty) |
@@ -1365,7 +1413,9 @@ OTHER              [ ]              2,210.00
 ```
 
 **IV. KPI items** — pick from the ERP's product codes; qty and value from last
-month shown so the cost of a rate is visible before it is saved.
+month shown so the cost of a rate is visible before it is saved. *(2026-09-27:
+set on Product List › Add-on / KPI Items — SKUs and Maintenance specials,
+effective-dated; this tab lists them read-only. §4.3.)*
 
 ```
 ITEM CODE                     NAME                    KPI AMOUNT   ACTIVE   JULY QTY
