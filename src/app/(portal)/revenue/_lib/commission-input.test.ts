@@ -178,6 +178,31 @@ describe('authoritative commission input', () => {
     await expect(loadCommissionInput('2026-09-01', 'sub-1', db.client)).rejects.toThrow('Could not read KPI items')
   })
 
+  // Product List › Costing Setting and › Add-on / KPI Items (2026-09-27).
+  it("reads the scheme's SKU ratios, its KPI specials, and the specials a line carries", async () => {
+    const data = fixture()
+    data.comm_cost_ratios = [{ scheme_id: 'scheme-1', erp_product_id: 'mfg-1', product_code: 'SOFA-1', ratio: '0.6000' }]
+    data.comm_kpi_items = [{
+      id: 'kpi-hb', scheme_id: 'scheme-1', source: 'option', product_code: null, product_name: null,
+      option_pool: 'bedframe_specials', option_value: 'HB Straight', kpi_amount: '200.00', effective_from: '2026-09-01', effective_to: null,
+    }]
+    data.sales_order_lines = [
+      { id: 'line-1', order_id: 'current', item_group: 'SOFA', product_code: 'SOFA-1', qty: 1, line_amount: 1000, cost_amount: 600 },
+      { id: 'line-2', order_id: 'current', item_group: 'bedframe', product_code: 'TRION (A)-(K)', qty: 1, line_amount: 0, cost_amount: 0,
+        description2: 'PC151-01 / DIVAN 8" + NO LEG / SPECIAL: HB Straight', variants: null },
+      { id: 'line-3', order_id: 'current', item_group: 'bedframe', product_code: 'CODY-(Q)', qty: 1, line_amount: 0, cost_amount: 0,
+        description2: 'ignored when variants arrive', variants: { specials: ['Hydraulic'] } },
+    ]
+    data.comm_order_releases = []
+    const loaded = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)
+    expect(loaded.input.scheme.costRatios).toEqual([{ productCode: 'SOFA-1', ratio: 0.6 }])
+    expect(loaded.input.kpiItems).toEqual([
+      { source: 'option', optionPool: 'bedframe_specials', optionValue: 'HB Straight', label: null, kpiAmount: 200 },
+    ])
+    const lines = loaded.input.orders.find(o => o.id === 'current')!.lines
+    expect(lines.map(l => l.specials)).toEqual([undefined, ['HB Straight'], ['Hydraulic']])
+  })
+
   it('returns the current team separately without silently replacing missing historical membership', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-24T10:00:00Z'))
@@ -200,7 +225,7 @@ describe('authoritative commission input', () => {
       expect(loaded.currentHierarchy).toMatchObject([{ staffId: 'person-a', baseRankKey: 'r5', titleId: 'title-1' }])
       expect(loaded.currentRules).toEqual({
         hierarchy: loaded.currentHierarchy,
-        kpiItems: [{ productCode: 'PILLOW', kpiAmount: 20 }],
+        kpiItems: [{ source: 'sku', productCode: 'PILLOW', label: null, kpiAmount: 20 }],
         kpiThresholds: [{ minQty: 10, bonusPct: 0.2 }],
         openBillRules: [{ rank: 1, pct: 0.5 }],
       })

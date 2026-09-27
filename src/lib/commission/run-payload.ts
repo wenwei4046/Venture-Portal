@@ -29,11 +29,13 @@
 import { splitOrdersByShares } from './shares'
 import { upsalesToOrders, type UpsaleRow } from './upsales'
 import {
+  EMPTY_KPI_INDEX,
   indexItemGroups,
   indexKpiItems,
   orderProductRevenue,
   round2,
 } from './engine'
+import { isKpiOptionPool, lineSpecialsOf } from './kpi'
 import type {
   EngineInput,
   EngineResult,
@@ -112,9 +114,24 @@ export interface ItemGroupRow {
   commissionable: boolean
 }
 
+/**
+ * A KPI item: a SKU (`product_code`) or a Maintenance special
+ * (`option_pool` + `option_value`) — Product List › Add-on / KPI Items.
+ * Rows written before 2026-09-27 carry no `source` and are SKUs.
+ */
 export interface KpiItemRow {
-  product_code: string
+  source?: 'sku' | 'option' | null
+  product_code: string | null
+  product_name?: string | null
+  option_pool?: string | null
+  option_value?: string | null
   kpi_amount: Num
+}
+
+/** A SKU's own cost ratio (`comm_cost_ratios`, Product List › Costing Setting). */
+export interface CostRatioRow {
+  product_code: string
+  ratio: Num
 }
 
 export interface KpiThresholdRow {
@@ -164,6 +181,9 @@ export interface SalesLineRow {
   line_amount: Num
   brand_code: string | null
   cost_amount: Num
+  /** The ERP's option summary and structured variants — where specials are read. */
+  description2?: string | null
+  variants?: unknown
 }
 
 export interface SalesOrderRow {
@@ -199,6 +219,8 @@ export interface RunSourceRows {
   shares?: OrderShareRow[]
   /** `comm_upsales` recorded under this month. Absent = none. */
   upsales?: UpsaleRow[]
+  /** `comm_cost_ratios` of this scheme. Absent = every SKU at the default. */
+  costRatios?: CostRatioRow[]
 }
 
 /** A `sales_order_shares` row. */
@@ -238,6 +260,29 @@ function isBillRank(n: number): n is OpenBillRank {
 
 // ─── rows → EngineInput ─────────────────────────────────────────────────────
 
+/**
+ * KPI item rows as the engine reads them. A row that names neither a code nor
+ * a known pool's option cannot be found on any bill and is dropped.
+ */
+export function toKpiItems(rows: readonly KpiItemRow[]): KpiItem[] {
+  return rows.flatMap((k): KpiItem[] => {
+    const kpiAmount = num(k.kpi_amount)
+    const label = k.product_name ?? null
+    if ((k.source ?? 'sku') === 'sku') {
+      return k.product_code ? [{ source: 'sku', productCode: k.product_code, label, kpiAmount }] : []
+    }
+    return k.option_pool && isKpiOptionPool(k.option_pool) && k.option_value
+      ? [{ source: 'option', optionPool: k.option_pool, optionValue: k.option_value, label, kpiAmount }]
+      : []
+  })
+}
+
+/** A bed frame's or a sofa's specials — how an option KPI item is found. */
+function lineSpecials(l: SalesLineRow): { specials?: string[] } {
+  const specials = lineSpecialsOf(l.item_group, l.description2, l.variants)
+  return specials ? { specials } : {}
+}
+
 export function toEngineInput(rows: RunSourceRows): EngineInput {
   const released = new Set(rows.releasedOrderNos)
 
@@ -271,10 +316,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     commissionable: g.commissionable,
   }))
 
-  const kpiItems: KpiItem[] = rows.kpiItems.map(k => ({
-    productCode: k.product_code,
-    kpiAmount: num(k.kpi_amount),
-  }))
+  const kpiItems = toKpiItems(rows.kpiItems)
 
   const kpiThresholds: KpiThreshold[] = rows.kpiThresholds.map(t => ({
     minQty: t.min_qty,
@@ -346,6 +388,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         lineAmount: num(l.line_amount),
         brandCode: l.brand_code ?? undefined,
         costAmount: numOrNull(l.cost_amount) ?? undefined,
+        ...lineSpecials(l),
       })),
     }))
 
@@ -378,6 +421,10 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       depositThresholdPct: numOrNull(rows.scheme.deposit_threshold_pct),
       defaultRateMode: rows.scheme.default_rate_mode,
       costDivisor: numOrNull(rows.scheme.revenue_cost_divisor) ?? 1,
+      costRatios: (rows.costRatios ?? []).flatMap(r => {
+        const ratio = numOrNull(r.ratio)
+        return ratio !== null && ratio > 0 ? [{ productCode: r.product_code, ratio }] : []
+      }),
     },
     ranks,
     orders,
@@ -476,9 +523,7 @@ export interface RunPayload {
  */
 export function releasedOrders(input: EngineInput, result: EngineResult): ReleasedOrderDto[] {
   const held = new Set(result.deferred.map(d => d.orderId))
-  const kpiIndex = input.scheme.enableKpi
-    ? indexKpiItems(input.kpiItems)
-    : new Map<string, number>()
+  const kpiIndex = input.scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
 
   // One release per BILL: a shared bill reaches the engine as one part per

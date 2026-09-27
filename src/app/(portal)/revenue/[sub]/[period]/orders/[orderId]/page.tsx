@@ -6,7 +6,20 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
-import { classifyLine, normaliseCode, type LineClass } from '@/lib/commission/engine'
+import {
+  classifyLine,
+  costBasisOf,
+  EMPTY_KPI_INDEX,
+  indexKpiItems,
+  marginBase as marginBaseOf,
+  normaliseCode,
+  orderRevenueSplit,
+  type KpiHit,
+  type LineClass,
+  type SalesLine,
+} from '@/lib/commission/engine'
+import { kpiItemLabel, lineSpecialsOf } from '@/lib/commission/kpi'
+import { toKpiItems, type CostRatioRow, type KpiItemRow } from '@/lib/commission/run-payload'
 import { costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -32,19 +45,23 @@ function pct(v: number | null): string {
 
 const CLASS_LABEL: Record<LineClass, string> = {
   commissionable: 'Commissionable',
-  kpi: 'KPI item',
   excluded_group: 'Not commissionable',
   unknown_group: 'Group not classified',
 }
 
-/** A line's class as a word on a wash — KPI giveaways in the sheet's orange,
- *  groups that earn nothing grey, an unclassified group red (the run refuses
- *  to pay the month until somebody classifies it). */
+/** A line's class as a word on a wash — groups that earn nothing grey, an
+ *  unclassified group red (the run refuses to pay the month until somebody
+ *  classifies it). A KPI item the line carries is a second chip, in the
+ *  sheet's orange. */
 const CLASS_CHIP: Record<LineClass, string> = {
   commissionable: '',
-  kpi: 'accent',
   excluded_group: 'info',
   unknown_group: 'danger',
+}
+
+function periodEnd(period: string): string {
+  const [year, month] = period.split('-').map(Number)
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10)
 }
 
 interface LineRow {
@@ -64,6 +81,8 @@ interface LineRow {
   cost_source?: string | null
   /** How it was priced, or why nothing could — 20260924030000; absent before it. */
   cost_detail?: unknown
+  /** The ERP's own line — `variants` is where a bed frame's specials are. */
+  raw?: { variants?: unknown } | null
 }
 
 interface PaymentRow {
@@ -134,7 +153,8 @@ export default async function OrderDetailPage({ params }: PageProps) {
 
   if (!order || order.period_month !== period) notFound()
 
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions] =
+  const asAt = periodEnd(period)
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -146,8 +166,14 @@ export default async function OrderDetailPage({ params }: PageProps) {
       subDept.schemeId
         ? supabase.from('comm_item_groups').select('item_group, commissionable').eq('scheme_id', subDept.schemeId)
         : Promise.resolve({ data: null }),
+      // The KPI items the run reads: in force at the month's end.
       subDept.schemeId
-        ? supabase.from('comm_kpi_items').select('product_code, kpi_amount').eq('scheme_id', subDept.schemeId)
+        ? supabase
+            .from('comm_kpi_items')
+            .select('source, product_code, product_name, option_pool, option_value, kpi_amount')
+            .eq('scheme_id', subDept.schemeId)
+            .lte('effective_from', asAt)
+            .or(`effective_to.is.null,effective_to.gte.${asAt}`)
         : Promise.resolve({ data: null }),
       supabase.from('sales_order_open_bill_tags').select('bill_rank, auto_suggested').eq('order_id', orderId).maybeSingle(),
       // The organiser is a fact about the FAIR this bill was written at, not
@@ -163,12 +189,16 @@ export default async function OrderDetailPage({ params }: PageProps) {
       subDept.schemeId
         ? supabase
             .from('comm_schemes')
-            .select('deposit_threshold_pct, revenue_cost_divisor')
+            .select('deposit_threshold_pct, revenue_cost_divisor, enable_kpi')
             .eq('id', subDept.schemeId)
             .maybeSingle()
         : Promise.resolve({ data: null }),
       // Who took it out of the month by hand, when and why (2026-09-27).
       order.excluded_reason === 'manual' ? loadOrderExclusions(supabase, [orderId]) : Promise.resolve(null),
+      // SKUs judged at their own cost ratio (Product List › Costing Setting).
+      subDept.schemeId
+        ? supabase.from('comm_cost_ratios').select('product_code, ratio').eq('scheme_id', subDept.schemeId)
+        : Promise.resolve({ data: null }),
     ])
   const byHand = exclusions?.get(orderId) ?? null
 
@@ -179,71 +209,68 @@ export default async function OrderDetailPage({ params }: PageProps) {
       g.commissionable,
     ]),
   )
-  const kpiIndex = new Map(
-    ((kpiData ?? []) as Array<{ product_code: string; kpi_amount: number | string }>).map(k => [
-      normaliseCode(k.product_code),
-      Number(k.kpi_amount),
-    ]),
-  )
   const tag = tagData as { bill_rank: number; auto_suggested: boolean } | null
   const organiser = (venueData as string | null) || null
   const scheme = schemeData as {
     deposit_threshold_pct: number | string | null
     revenue_cost_divisor: number | string | null
+    enable_kpi: boolean
   } | null
   const threshold = scheme?.deposit_threshold_pct
   const depositPct = threshold === null || threshold === undefined ? null : Number(threshold)
-  // The Revenue Team's cost basis — `marginBase()` divides every line's cost by
-  // it, so this page has to as well or it would explain the engine with a
-  // number the engine never used.
-  const rawDivisor = scheme?.revenue_cost_divisor
-  const costDivisor =
-    rawDivisor === null || rawDivisor === undefined || Number(rawDivisor) <= 0 ? 1 : Number(rawDivisor)
+  // The KPI items the run pays — none while the scheme has KPI switched off.
+  const kpiIndex = scheme?.enable_kpi
+    ? indexKpiItems(toKpiItems((kpiData ?? []) as KpiItemRow[]))
+    : EMPTY_KPI_INDEX
+  // The Revenue Team's cost basis — `marginBase()` divides every line's cost
+  // by its own SKU's ratio, else the scheme's, so this page has to as well or
+  // it would explain the engine with a number the engine never used.
+  const costBasis = costBasisOf(
+    scheme?.revenue_cost_divisor === null || scheme?.revenue_cost_divisor === undefined ? 1 : Number(scheme.revenue_cost_divisor),
+    ((ratioData ?? []) as CostRatioRow[]).map(r => ({ productCode: r.product_code, ratio: Number(r.ratio) })),
+  )
 
-  const classed = lines.map(l => ({
-    line: l,
-    cls: classifyLine(
-      {
-        id: l.id,
-        itemGroup: l.item_group,
-        productCode: l.product_code,
-        productName: l.product_name ?? undefined,
-        qty: Number(l.qty),
-        lineAmount: Number(l.line_amount),
-        brandCode: l.brand_code ?? undefined,
-        costAmount: l.cost_amount === null ? undefined : Number(l.cost_amount),
-      },
-      kpiIndex,
-      groupIndex,
-    ),
+  // The lines as the engine reads them.
+  const salesLines: SalesLine[] = lines.map(l => ({
+    id: l.id,
+    itemGroup: l.item_group,
+    productCode: l.product_code,
+    productName: l.product_name ?? undefined,
+    qty: Number(l.qty),
+    lineAmount: Number(l.line_amount),
+    brandCode: l.brand_code ?? undefined,
+    costAmount: l.cost_amount === null ? undefined : Number(l.cost_amount),
+    specials: lineSpecialsOf(l.item_group, l.description2, l.raw?.variants),
   }))
+  const classed = lines.map((l, i) => ({ line: l, cls: classifyLine(salesLines[i], groupIndex) }))
 
-  const commissionable = classed
-    .filter(c => c.cls === 'commissionable')
-    .reduce((a, c) => a + Number(c.line.line_amount), 0)
-  const kpiRevenue = classed.filter(c => c.cls === 'kpi').reduce((a, c) => a + Number(c.line.line_amount), 0)
+  // The bill, split the way the run splits it: its commissionable lines, less
+  // what its KPI items take off (paid flat as KPI instead).
+  const split = orderRevenueSplit({ lines: salesLines }, kpiIndex, groupIndex)
+  const commissionable = split.main
+  const hitsByLine = new Map<string, KpiHit[]>()
+  for (const hit of split.kpiHits) hitsByLine.set(hit.lineId, [...(hitsByLine.get(hit.lineId) ?? []), hit])
   const excluded = classed
     .filter(c => c.cls === 'excluded_group' || c.cls === 'unknown_group')
     .reduce((a, c) => a + Number(c.line.line_amount), 0)
   const unknownGroups = [...new Set(classed.filter(c => c.cls === 'unknown_group').map(c => c.line.item_group))]
 
   // The MARGIN BASE, as marginBase() builds it: every line in a commissionable
-  // group, KPI giveaways included because their cost is real and that is how
-  // giving one away is meant to hurt. The margin is unknowable the moment one
-  // of them has no cost — a part-costed bill is not a high-margin bill.
-  const marginBase = classed.filter(
-    c => c.cls === 'commissionable' || (c.cls === 'kpi' && groupIndex.get(normaliseCode(c.line.item_group)) === true),
-  )
-  const baseRevenue = marginBase.reduce((a, c) => a + Number(c.line.line_amount), 0)
-  const baseMissing = marginBase.filter(c => c.line.cost_amount === null).length
-  const cost = marginBase.reduce((a, c) => a + Number(c.line.cost_amount ?? 0) / costDivisor, 0)
+  // group, free giveaways included because their cost is real and that is how
+  // giving one away is meant to hurt; the revenue is the bill's main sales.
+  // The margin is unknowable the moment one of them has no cost — a
+  // part-costed bill is not a high-margin bill.
+  const goodsLines = classed.filter(c => c.cls === 'commissionable')
+  const base = marginBaseOf(salesLines, kpiIndex, groupIndex, costBasis)
+  const baseMissing = goodsLines.filter(c => c.line.cost_amount === null).length
+  const cost = base.cost
   const manualMargin = order.manual_margin_pct === null ? null : Number(order.manual_margin_pct)
   const margin =
     manualMargin !== null
       ? manualMargin
-      : baseMissing > 0 || baseRevenue <= 0
+      : baseMissing > 0 || base.revenue <= 0
         ? null
-        : (baseRevenue - cost) / baseRevenue
+        : (base.revenue - cost) / base.revenue
 
   const total = Number(order.order_total)
   const paid = Number(order.paid_amount ?? 0)
@@ -309,7 +336,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
           deposit gate holds the bill or a missing cost blinds its margin. */}
       <StatCards label={`Bill ${order.order_no} in figures`}>
         <StatCard label="Bill total" value={formatMoney(total)} icon="receipt" tone="primary" />
-        <StatCard label="Commissionable" value={formatMoney(commissionable)} icon="coin" note="Product lines only" />
+        <StatCard
+          label="Commissionable"
+          value={formatMoney(commissionable)}
+          icon="coin"
+          note={split.kpiAmount !== 0 ? `Product lines less ${formatMoney(split.kpiAmount)} of KPI items` : 'Product lines only'}
+        />
         <StatCard
           label="Paid"
           value={formatMoney(paid)}
@@ -331,7 +363,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
             manualMargin !== null
               ? 'Keyed by hand — it wins over the line costs'
               : baseMissing > 0
-                ? `${baseMissing} of ${marginBase.length} commissionable lines have no cost, so the bill cannot be judged`
+                ? `${baseMissing} of ${goodsLines.length} commissionable lines have no cost, so the bill cannot be judged`
                 : 'Every commissionable line carries a cost'
           }
           tone={margin === null ? 'danger' : undefined}
@@ -449,6 +481,12 @@ export default async function OrderDetailPage({ params }: PageProps) {
                         <span className="dot" />
                         {CLASS_LABEL[cls]}
                       </span>
+                      {(hitsByLine.get(l.id) ?? []).map(hit => (
+                        <span key={hit.itemKey} className="chip accent ml-1" title="Paid flat as KPI, off the bill's commissionable sales">
+                          <span className="dot" />
+                          KPI · {kpiItemLabel(hit.item)} {formatMoney(hit.amount)}
+                        </span>
+                      ))}
                     </td>
                     <td className="num m-hide" data-label="Qty">{Number(l.qty).toLocaleString()}</td>
                     <td className="num m-hide" data-label="Unit">{formatMoney(Number(l.unit_price))}</td>
@@ -489,9 +527,10 @@ export default async function OrderDetailPage({ params }: PageProps) {
           </table>
         </div>
         <p className="text-xs mt-3 max-w-3xl">
-          Commissionable {formatMoney(commissionable)} · KPI {formatMoney(kpiRevenue)} · not commissionable{' '}
-          {formatMoney(excluded)}. A KPI line pays its flat allowance instead of a rate, which is the point
-          when it is given away; transport and disposal earn nothing either way.
+          Commissionable {formatMoney(commissionable)} · KPI items {formatMoney(split.kpiAmount)} · not commissionable{' '}
+          {formatMoney(excluded)}. A KPI item&apos;s amount comes off the bill&apos;s sales and is paid flat as KPI
+          instead of a rate; transport and disposal earn nothing either way.
+          {split.capped ? ' Its KPI items come to more than its sales, so its own commission is taken on 0.' : ''}
         </p>
       </section>
 

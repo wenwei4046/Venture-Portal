@@ -28,7 +28,6 @@ import type {
   EngineResult,
   HierarchyNode,
   ItemGroupRule,
-  KpiItem,
   KpiThreshold,
   MarginBand,
   MarginSource,
@@ -43,8 +42,21 @@ import type {
 } from './types'
 import { earnedFloor, promotesTo, titleCanRecruit } from './titles'
 import { computeIrGroups, type IrGroupsResult } from './ir-groups'
+import {
+  EMPTY_KPI_INDEX,
+  indexKpiItems,
+  kpiAmountOf,
+  kpiItemLabel,
+  mainAfterKpi,
+  orderKpiHits,
+  type KpiHit,
+  type KpiIndex,
+} from './kpi'
+import { costBasisOf, costDivisorFor, type CostBasis } from './cost-basis'
 
 export * from './types'
+export { EMPTY_KPI_INDEX, indexKpiItems, orderKpiHits, type KpiHit, type KpiIndex } from './kpi'
+export { costBasisOf, costDivisorFor, type CostBasis } from './cost-basis'
 
 /** Guards against a hierarchy cycle that slipped past the DB trigger. */
 const MAX_UPLINE_DEPTH = 20
@@ -63,70 +75,76 @@ export function normaliseCode(code: string): string {
 
 // ─── Line classification ────────────────────────────────────────────────────
 
-/**
- * Index KPI items by product code. Codes are compared case-insensitively and
- * trimmed — ERP exports pad and vary case between reports.
- */
-export function indexKpiItems(items: KpiItem[]): Map<string, number> {
-  return new Map(items.map(i => [normaliseCode(i.productCode), i.kpiAmount]))
-}
-
 export function indexItemGroups(rules: ItemGroupRule[]): Map<string, boolean> {
   return new Map(rules.map(r => [normaliseCode(r.group), r.commissionable]))
 }
 
 /**
- * A line is a KPI line when its product code is a configured KPI item.
- * KPI lines pay a flat allowance and their revenue is excluded from the
- * product-revenue base — otherwise the same sale would be paid twice.
+ * Whether a line's item group earns commission. KPI items are not a class of
+ * line (2026-09-27): a bill CARRIES them — a SKU, or a special printed on a
+ * bed frame or sofa — and their amounts come off the bill as a whole
+ * (`orderRevenueSplit`), whatever line they sit on.
  */
-export function isKpiLine(productCode: string, kpiIndex: Map<string, number>): boolean {
-  return kpiIndex.has(normaliseCode(productCode))
-}
+export type LineClass = 'commissionable' | 'excluded_group' | 'unknown_group'
 
-export type LineClass = 'kpi' | 'commissionable' | 'excluded_group' | 'unknown_group'
-
-export function classifyLine(
-  line: SalesLine,
-  kpiIndex: Map<string, number>,
-  groupIndex: Map<string, boolean>,
-): LineClass {
+export function classifyLine(line: SalesLine, groupIndex: Map<string, boolean>): LineClass {
   // An upsale HR recorded is commissionable by definition: it is the amount
   // the salesperson added, whatever group the scheme would put it in.
   if (line.upsale) return 'commissionable'
-  if (isKpiLine(line.productCode, kpiIndex)) return 'kpi'
   const known = groupIndex.get(normaliseCode(line.itemGroup))
   if (known === undefined) return 'unknown_group'
   return known ? 'commissionable' : 'excluded_group'
 }
 
-/** True for any line whose item group earns commission — KPI lines included. */
-function inGoodsScope(
-  line: SalesLine,
-  kpiIndex: Map<string, number>,
-  groupIndex: Map<string, boolean>,
-): boolean {
+/** The goods a margin is judged on: commissionable groups, never an upsale. */
+function inGoodsScope(line: SalesLine, groupIndex: Map<string, boolean>): boolean {
   // An upsale carries no cost and is not goods the ERP billed; judging a
   // margin on it would only block the month's incentive.
   if (line.upsale) return false
-  const cls = classifyLine(line, kpiIndex, groupIndex)
-  if (cls === 'commissionable') return true
-  // A KPI line is a giveaway from a commissionable group; it belongs to the
-  // margin base (its cost is real) even though its revenue is usually 0.
-  return cls === 'kpi' && groupIndex.get(normaliseCode(line.itemGroup)) === true
+  return classifyLine(line, groupIndex) === 'commissionable'
 }
 
-/** Product revenue of one order: commissionable, non-KPI lines only. */
+export interface RevenueSplit {
+  /** Σ the bill's commissionable lines, as billed. */
+  commissionable: number
+  /** The KPI items the bill carries. */
+  kpiHits: KpiHit[]
+  /** What they take off: Σ qty × each item's amount — paid as KPI instead. */
+  kpiAmount: number
+  /** What the rate is paid on: commissionable − kpiAmount, never past 0. */
+  main: number
+  /** The KPI items came to more than the bill had; the main part stopped at 0. */
+  capped: boolean
+}
+
+/**
+ * One bill, split (user 2026-09-27): a RM 10,000 bill carrying HB Straight at
+ * RM 200 is 9,800 of main sales — the rate is paid on it, its margin judged on
+ * it — and RM 200 paid flat as KPI. The ERP cannot say how much of a bill an
+ * add-on is (its line is RM 0 on most bills), so the item's own amount is
+ * what comes off.
+ */
+export function orderRevenueSplit(
+  order: Pick<SalesOrder, 'lines' | 'upsale'>,
+  kpiIndex: KpiIndex,
+  groupIndex: Map<string, boolean>,
+): RevenueSplit {
+  const commissionable = sum(
+    order.lines.filter(l => classifyLine(l, groupIndex) === 'commissionable').map(l => l.lineAmount),
+  )
+  const kpiHits = orderKpiHits(order, kpiIndex)
+  const kpiAmount = kpiAmountOf(kpiHits)
+  const { main, capped } = mainAfterKpi(commissionable, kpiAmount)
+  return { commissionable, kpiHits, kpiAmount, main, capped }
+}
+
+/** Product revenue of one order: its commissionable sales less its KPI items. */
 export function orderProductRevenue(
-  order: SalesOrder,
-  kpiIndex: Map<string, number>,
+  order: Pick<SalesOrder, 'lines' | 'upsale'>,
+  kpiIndex: KpiIndex,
   groupIndex: Map<string, boolean>,
 ): number {
-  return sum(
-    order.lines
-      .filter(l => classifyLine(l, kpiIndex, groupIndex) === 'commissionable')
-      .map(l => l.lineAmount),
-  )
+  return orderRevenueSplit(order, kpiIndex, groupIndex).main
 }
 
 // ─── Deposit gate ───────────────────────────────────────────────────────────
@@ -183,32 +201,39 @@ export interface MarginBase {
  * Margin base of a set of lines: revenue and cost of the GOODS only.
  *
  * Transport and disposal are excluded — they are pass-through service charges
- * and are not commissionable either. Free bundled KPI items ARE included: a
+ * and are not commissionable either. A free bundled item IS included: a
  * giveaway pillow has real cost and no revenue, which is exactly how giving
  * them away is supposed to hurt the margin.
+ *
+ * The revenue is the bill's MAIN sales (2026-09-27): what its KPI items take
+ * off is paid flat as KPI and is not the main product's price, so a RM 10,000
+ * bill with HB Straight at RM 200 is judged on 9,800 — the items' cost stays.
+ * Every line's cost is divided by its own SKU's ratio, else the sub-
+ * department's (`cost-basis.ts`).
  */
 export function marginBase(
   lines: SalesLine[],
-  kpiIndex: Map<string, number>,
+  kpiIndex: KpiIndex,
   groupIndex: Map<string, boolean>,
-  /** Revenue Team basis: each line's cost ÷ this (`CommissionScheme.costDivisor`). */
-  costDivisor = 1,
+  /** Revenue Team basis: a line's cost ÷ its ratio. A number is the one default. */
+  costBasis: CostBasis | number = 1,
 ): MarginBase {
   let revenue = 0
   let cost = 0
   let complete = true
   const byBrand = new Map<string, number>()
-  const divisor = Number.isFinite(costDivisor) && costDivisor > 0 ? costDivisor : 1
+  const basis = typeof costBasis === 'number' ? costBasisOf(costBasis) : costBasis
 
   for (const line of lines) {
-    if (!inGoodsScope(line, kpiIndex, groupIndex)) continue
+    if (!inGoodsScope(line, groupIndex)) continue
     revenue = round2(revenue + line.lineAmount)
     if (line.costAmount === undefined || line.costAmount === null) complete = false
-    else cost = round2(cost + line.costAmount / divisor)
+    else cost = round2(cost + line.costAmount / costDivisorFor(line.productCode, basis))
     if (line.brandCode) {
       byBrand.set(line.brandCode, round2((byBrand.get(line.brandCode) ?? 0) + line.lineAmount))
     }
   }
+  if (kpiIndex.size > 0) revenue = mainAfterKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
 
   let brandCode: string | null = null
   let best = -Infinity
@@ -642,7 +667,9 @@ interface Draft {
 export function computeCommissionRun(input: EngineInput): EngineResult {
   const warnings: string[] = []
   const { scheme } = input
-  const kpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : new Map<string, number>()
+  const kpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX
+  // Every line's cost ÷ its own SKU's ratio, else the sub-department's.
+  const costBasis = costBasisOf(scheme.costDivisor, scheme.costRatios)
   const groupIndex = indexItemGroups(scheme.itemGroups)
   const ranks = [...input.ranks].sort((a, b) => a.sortOrder - b.sortOrder)
   const rankByKey = new Map(ranks.map(r => [r.rankKey, r]))
@@ -698,7 +725,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   const unknownGroups = new Set<string>()
   for (const order of input.orders) {
     for (const line of order.lines) {
-      if (classifyLine(line, kpiIndex, groupIndex) === 'unknown_group') {
+      if (classifyLine(line, groupIndex) === 'unknown_group') {
         unknownGroups.add(line.itemGroup)
       }
     }
@@ -758,7 +785,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       eligibleOrders.push(order)
       productRevenue = round2(productRevenue + opr)
       for (const line of order.lines) {
-        const cls = classifyLine(line, kpiIndex, groupIndex)
+        const cls = classifyLine(line, groupIndex)
         if (cls === 'excluded_group' || cls === 'unknown_group') {
           excludedRevenue = round2(excludedRevenue + line.lineAmount)
         }
@@ -883,13 +910,19 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     const rate = rateOf.get(draft.staffId) ?? 0
 
     for (const order of draft.eligibleOrders) {
-      const opr = orderProductRevenue(order, kpiIndex, groupIndex)
+      const split = orderRevenueSplit(order, kpiIndex, groupIndex)
+      const opr = split.main
+      if (split.capped) {
+        warnings.push(
+          `Order ${order.orderNo}: its KPI items (${split.kpiAmount.toFixed(2)}) come to more than its commissionable sales (${split.commissionable.toFixed(2)}) — its own commission was taken on 0 and the KPI paid in full.`,
+        )
+      }
       const carried = order.periodMonth !== input.periodMonth
       const carriedNote = carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''
 
       // A sales order never crosses brands (user 2026-08-31); if one does, the
       // import has a problem and the margin ladder becomes ambiguous.
-      const base = marginBase(order.lines, kpiIndex, groupIndex, scheme.costDivisor ?? 1)
+      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis)
       if (base.mixedBrand) {
         warnings.push(
           `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
@@ -941,24 +974,22 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         })
       }
 
-      // C2 inputs — one line per KPI line item. The flat allowance is for
-      // moving the item and is NOT margin-scaled.
-      for (const line of order.lines) {
-        if (classifyLine(line, kpiIndex, groupIndex) !== 'kpi') continue
-        const unit = kpiIndex.get(normaliseCode(line.productCode)) ?? 0
-        draft.kpiRevenue = round2(draft.kpiRevenue + line.lineAmount)
-        draft.kpiQty += line.qty
-        const amount = round2(line.qty * unit)
-        draft.kpiBase = round2(draft.kpiBase + amount)
+      // C2 — one line per KPI item the bill carries: its amount came off the
+      // main sales above and is paid here, flat. The allowance is for moving
+      // the item and is NOT margin-scaled (user 2026-09-27).
+      for (const hit of split.kpiHits) {
+        draft.kpiRevenue = round2(draft.kpiRevenue + hit.amount)
+        draft.kpiQty += hit.qty
+        draft.kpiBase = round2(draft.kpiBase + hit.amount)
         draft.lines.push({
           component: 'kpi_item',
           sourceOrderId: order.id,
-          sourceLineId: line.id,
-          basisAmount: line.lineAmount,
+          sourceLineId: hit.lineId,
+          basisAmount: hit.amount,
           rate: null,
-          qty: line.qty,
-          amount,
-          note: `${order.orderNo} · ${line.productName ?? line.productCode} × ${line.qty} @ ${unit}`,
+          qty: hit.qty,
+          amount: hit.amount,
+          note: `${order.orderNo} · ${kpiItemLabel(hit.item)} × ${hit.qty} @ ${hit.item.kpiAmount}`,
         })
       }
 

@@ -1,7 +1,8 @@
 import {
-  billMargin, classifyLine, computeCommissionRun, indexItemGroups, indexKpiItems,
-  isDepositMet, marginBase, normaliseCode, orderProductRevenue, penaltyBandFor, round2,
+  billMargin, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, indexItemGroups,
+  indexKpiItems, isDepositMet, marginBase, orderKpiHits, orderRevenueSplit, penaltyBandFor, round2,
 } from './engine'
+import { kpiItemLabel, kpiSourceOf } from './kpi'
 import type { EngineInput, EngineResult, MarginSource, OpenBillTag, SalesOrder, Statement } from './types'
 
 /** Display metadata only; financial facts always come from EngineInput. */
@@ -130,6 +131,10 @@ export interface KpiAgentSummary {
 }
 
 export interface KpiItemSummary {
+  /** `kpiItemKey`: one row per item, a SKU or a special. */
+  itemKey: string
+  source: 'sku' | 'option'
+  /** The SKU's code, or the special as its pool spells it. */
   productCode: string
   productName: string
   /** Quantity sold. Shared order parts sum back to the whole bill's quantity. */
@@ -159,23 +164,19 @@ function sum(values: readonly number[]): number {
 }
 
 /**
- * What on a bill earns commission (2026-09-26): every line the engine pays a
- * rate on or a KPI amount for. A transport charge, a disposal request, any
- * group the scheme marks as not commissionable and any group it has never
- * heard of earn nothing, so they are the difference between this and the
- * bill's total. Pass the KPI index the engine is using — with KPI switched
- * off a KPI item is judged by its group like any other line.
+ * What on a bill earns commission (2026-09-26): every line in a commissionable
+ * group — its main sales earn the rate and its KPI items' amounts are paid as
+ * KPI, both out of these lines (2026-09-27). A transport charge, a disposal
+ * request, any group the scheme marks as not commissionable and any group it
+ * has never heard of earn nothing, so they are the difference between this
+ * and the bill's total.
  */
 export function orderCommissionableValue(
   order: Pick<SalesOrder, 'lines'>,
-  kpiIndex: Map<string, number>,
   groupIndex: Map<string, boolean>,
 ): number {
   return sum(order.lines
-    .filter(line => {
-      const kind = classifyLine(line, kpiIndex, groupIndex)
-      return kind === 'commissionable' || kind === 'kpi'
-    })
+    .filter(line => classifyLine(line, groupIndex) === 'commissionable')
     .map(line => line.lineAmount))
 }
 
@@ -222,8 +223,9 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const orderMeta = new Map((options.orders ?? []).map(order => [order.orderId, order]))
   const hierarchy = new Map(input.hierarchy.map(node => [node.staffId, node]))
   const configuredKpiIndex = indexKpiItems(input.kpiItems)
-  const kpiIndex = input.scheme.enableKpi ? configuredKpiIndex : new Map<string, number>()
+  const kpiIndex = input.scheme.enableKpi ? configuredKpiIndex : EMPTY_KPI_INDEX
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
+  const costBasis = costBasisOf(input.scheme.costDivisor, input.scheme.costRatios)
   const tagByOrder = new Map(tags.map(tag => [tag.orderId, tag.rank]))
   const openBillRates = new Map(input.openBillRules.map(rule => [rule.rank, rule.pct]))
   const nameOf = (staffId: string) => personMeta.get(staffId)?.name ?? staffId
@@ -237,9 +239,10 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const personalRows: CommissionOrderRow[] = input.orders.map(order => {
     const statement = statements.get(order.staffId)
     const meta = orderMeta.get(order.id)
-    const base = marginBase(order.lines, kpiIndex, groupIndex, input.scheme.costDivisor ?? 1)
+    const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis)
     const margin = billMargin(order, base)
-    const productRevenue = orderProductRevenue(order, kpiIndex, groupIndex)
+    const split = orderRevenueSplit(order, kpiIndex, groupIndex)
+    const productRevenue = split.main
     const status: CommissionOrderStatus = excluded.has(order.id) ? 'excluded'
       : order.alreadyReleased ? 'already_released'
         : !order.upsale && !isDepositMet(order, input.scheme.depositThresholdPct) ? 'deposit_pending' : 'eligible'
@@ -250,7 +253,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const sourceLines = eligible ? statement?.lines.filter(line => line.sourceOrderId === order.id) ?? [] : []
     const component = (kind: 'product_revenue' | 'kpi_item' | 'open_bill') => sum(sourceLines.filter(line => line.component === kind).map(line => line.amount))
     const key = `${order.staffId}:${order.id}`
-    const kpiRevenue = sum(order.lines.filter(line => classifyLine(line, kpiIndex, groupIndex) === 'kpi').map(line => line.lineAmount))
+    const kpiRevenue = split.kpiAmount
     overrideBases.set(key, eligible ? round2(round2(productRevenue * multiplier) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
     const openBillRank = order.upsale ? null : tagByOrder.get(order.id) ?? null
     return {
@@ -262,7 +265,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       brands: [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
       categories: [...new Set(order.lines.map(line => line.itemGroup))],
       upsale: !!order.upsale, orderTotal: order.orderTotal,
-      commissionableValue: orderCommissionableValue(order, kpiIndex, groupIndex),
+      commissionableValue: orderCommissionableValue(order, groupIndex),
       paidAmount: order.paidAmount,
       productRevenue, marginRevenue: base.revenue,
       marginCost: margin.source === 'none' ? null : margin.cost,
@@ -327,26 +330,33 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const rows = new Map(person.personalRows.map(row => [row.orderId, row]))
     for (const order of input.orders.filter(order => order.staffId === person.staffId)) {
       const row = rows.get(order.id)!
-      const configuredLines = order.lines.filter(line => !line.upsale && configuredKpiIndex.has(normaliseCode(line.productCode)))
-      const paidLines = row.status === 'eligible'
-        ? (person.statement?.lines ?? []).filter(line => line.component === 'kpi_item' && line.sourceOrderId === order.id) : []
-      const bases = configuredLines.map(line => sum(paidLines.filter(paid => paid.sourceLineId === line.id).map(paid => paid.amount)))
+      // Found with every configured item, KPI pay on or off: what was SOLD.
+      // What was PAID is the engine's — an eligible bill, KPI switched on —
+      // and it paid each item exactly its hit's amount.
+      const hits = orderKpiHits(order, configuredKpiIndex)
+      const paid = row.status === 'eligible' && input.scheme.enableKpi
+      const bases = hits.map(hit => (paid ? hit.amount : 0))
       const bonuses = allocateCommissionAmount(row.kpiBonus, bases)
-      configuredLines.forEach((line, index) => {
-        const productCode = normaliseCode(line.productCode)
-        const item = items.get(productCode) ?? {
-          productCode, productName: line.productName ?? line.productCode,
+      hits.forEach((hit, index) => {
+        const lineName = order.lines.find(line => line.id === hit.lineId)?.productName
+        const item = items.get(hit.itemKey) ?? {
+          itemKey: hit.itemKey,
+          source: kpiSourceOf(hit.item),
+          productCode: kpiSourceOf(hit.item) === 'sku'
+            ? (hit.item.productCode ?? '').trim().toUpperCase()
+            : (hit.item.optionValue ?? '').trim(),
+          productName: kpiSourceOf(hit.item) === 'sku' && !hit.item.label && lineName ? lineName : kpiItemLabel(hit.item),
           qty: 0, heldQty: 0, excludedQty: 0, payableQty: 0,
-          unitAmount: configuredKpiIndex.get(productCode) ?? 0, base: 0, bonus: 0, total: 0,
+          unitAmount: hit.item.kpiAmount, base: 0, bonus: 0, total: 0,
         }
-        item.qty += line.qty
-        if (row.status === 'deposit_pending') item.heldQty += line.qty
-        if (row.status === 'excluded') item.excludedQty += line.qty
-        item.payableQty += paidLines.filter(paid => paid.sourceLineId === line.id).reduce((qty, paid) => qty + (paid.qty ?? 0), 0)
+        item.qty += hit.qty
+        if (row.status === 'deposit_pending') item.heldQty += hit.qty
+        if (row.status === 'excluded') item.excludedQty += hit.qty
+        if (paid) item.payableQty += hit.qty
         item.base = round2(item.base + bases[index])
         item.bonus = round2(item.bonus + bonuses[index])
         item.total = round2(item.base + item.bonus)
-        items.set(productCode, item)
+        items.set(hit.itemKey, item)
       })
     }
     const perItem = [...items.values()].sort((a, b) => a.productCode.localeCompare(b.productCode))
