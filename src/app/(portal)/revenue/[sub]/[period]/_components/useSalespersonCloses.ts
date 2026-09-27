@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
+import { useStickySelection } from '@/lib/useStickySelection'
 import type { SalespersonClose } from '@/lib/commission/closes'
 import { closeSalespeople, reopenSalespeople } from '../../../close-actions'
 
@@ -17,11 +18,19 @@ export interface CloseTarget {
  * The closes of one month on the page (2026-09-27): who is closed, who is
  * ticked on the list, and the two writes. Shared by the list's bar and the
  * ledger's header, so a close made in either shows in both at once.
+ *
+ * The ticks are DESIGN.md's multi-select: they outlive a drill-down (a bill
+ * opened from a ledger, and Back) and go with a move to another destination
+ * — `useStickySelection`, scoped to the month's own path.
  */
-export function useSalespersonCloses({ subDepartmentId, period, closes }: {
+export function useSalespersonCloses({ subDepartmentId, period, closes, scope, staffIds }: {
   subDepartmentId: string
   period: string
   closes: readonly SalespersonClose[]
+  /** The month page's path — the ticks' drill-down boundary. */
+  scope: string
+  /** Everybody on the month's list: a tick can only be one of them. */
+  staffIds: readonly string[]
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -29,31 +38,24 @@ export function useSalespersonCloses({ subDepartmentId, period, closes }: {
   const [kind, setKind] = useState<'close' | 'reopen'>('close')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [ticked, setTicked] = useState<ReadonlySet<string>>(() => new Set())
+  const { selected: ticked, toggle, replace, clear } = useStickySelection(scope, staffIds)
+  // The ticks as they stand now — a write that finishes later unticks from
+  // these, not from the ticks it started with.
+  const latest = useRef(ticked)
+  useEffect(() => { latest.current = ticked }, [ticked])
   const closedById = useMemo(() => new Map(closes.map(c => [c.staffId, c])), [closes])
 
-  function toggle(staffId: string) {
-    setTicked(prev => {
-      const next = new Set(prev)
-      if (next.has(staffId)) next.delete(staffId)
-      else next.add(staffId)
-      return next
-    })
+  function tickAll(ids: readonly string[], on: boolean) {
+    const next = new Set(latest.current)
+    for (const id of ids) {
+      if (on) next.add(id)
+      else next.delete(id)
+    }
+    replace([...next])
   }
 
-  function tickAll(staffIds: readonly string[], on: boolean) {
-    setTicked(prev => {
-      const next = new Set(prev)
-      for (const id of staffIds) {
-        if (on) next.add(id)
-        else next.delete(id)
-      }
-      return next
-    })
-  }
-
-  function untick(staffIds: readonly string[]) {
-    tickAll(staffIds, false)
+  function untick(ids: readonly string[]) {
+    tickAll(ids, false)
   }
 
   function run(kind: 'close' | 'reopen', write: () => Promise<string>, after?: () => void) {
@@ -103,7 +105,7 @@ export function useSalespersonCloses({ subDepartmentId, period, closes }: {
     ticked,
     toggle,
     tickAll,
-    clearTicks: () => setTicked(new Set()),
+    clearTicks: clear,
     close,
     reopen,
     busy: pending ? kind : null,

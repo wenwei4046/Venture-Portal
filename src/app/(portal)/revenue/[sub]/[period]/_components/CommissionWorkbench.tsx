@@ -209,7 +209,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   // A closed person's row shows what was locked; the live figure only rides
   // along when it has moved since. A close always locks the month AS SAVED,
   // so nobody can be closed while a draft is on screen.
-  const closer = useSalespersonCloses({ subDepartmentId: closeFacts?.subDepartmentId ?? '', period, closes: closeFacts?.closes ?? [] })
+  const listIds = useMemo(() => [...new Set([...board.people.map(p => p.staffId), ...(closeFacts?.closes ?? []).map(c => c.staffId)])], [board, closeFacts])
+  const closer = useSalespersonCloses({ subDepartmentId: closeFacts?.subDepartmentId ?? '', period, closes: closeFacts?.closes ?? [],
+    scope: `/revenue/${sub}/${period}`, staffIds: listIds })
   const monthLabel = monthName(period)
   const drafting = excluded.length > 0 || picks !== null || currentTeam || Object.keys(previewFeatures).length > 0
   const closeBlocked = closeFacts?.unavailable
@@ -344,6 +346,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const billMenu = useBillMenu<CommissionOrderRow | OverrideOrderRow>(row => row.key, orderHref)
   const lockedMonths = new Set(lockedPeriods)
   function countActionFor(row: CommissionOrderRow): BillCountAction {
+    // A closed salesperson's bills stay as they were closed (2026-09-27) —
+    // the action refuses them too; the menu says so before anybody tries.
+    if (closer.closedById.has(row.staffId)) {
+      return { kind: 'locked', excludedByHand: false, reason: `${row.staffName}’s ${monthLabel} is closed — reopen it before changing which bills count` }
+    }
     // Every bill on a ledger is live: an excluded one is not in the engine's input.
     return billCountAction(
       { cancelled: false, excludedReason: null, erpStatus: null, erpOnHold: false, excludedByHand: false },

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { EngineInput, Rank, SalesOrder } from '@/lib/commission/types'
 import { parseCloseSummary, type SalespersonClose } from '@/lib/commission/closes'
+import { resetSelections } from '@/lib/selection-store'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench, { type CloseFacts } from './CommissionWorkbench'
 
@@ -112,6 +113,9 @@ const bar = () => screen.getByRole('region', { name: 'Close September 2026' })
 beforeEach(() => {
   vi.clearAllMocks()
   sessionStorage.clear()
+  // Ticks live in the module-scope selection store: one test's must not
+  // greet the next.
+  resetSelections()
   originalReplace(null, '', '/revenue/fair/2026-09-01')
   vi.spyOn(window.history, 'pushState').mockImplementation((data, unused, next) => { originalPush(data, unused, next); url.changed() })
   vi.spyOn(window.history, 'replaceState').mockImplementation((data, unused, next) => { originalReplace(data, unused, next); url.changed() })
@@ -172,6 +176,15 @@ describe('closing salespeople from the list', () => {
     // 200), CHEA HUAN 240 — and ALEX, still open, whose override already
     // counts the late bill (3% of 4,000 = 120).
     expect(within(table()).getByRole('row', { name: /All salespeople/ })).toHaveTextContent('RM 510.00')
+  })
+
+  it('keeps the ticks through a trip to a bill and back', () => {
+    const first = renderBoard()
+    fireEvent.click(within(row('ANTHONY')).getByRole('checkbox', { name: 'Tick ANTHONY' }))
+    first.unmount()
+    renderBoard()
+    expect(within(row('ANTHONY')).getByRole('checkbox', { name: 'Tick ANTHONY' })).toBeChecked()
+    expect(within(bar()).getByRole('button', { name: 'Close 1 ticked' })).toBeVisible()
   })
 
   it('reopens a ticked closed person', async () => {
@@ -242,6 +255,15 @@ describe('closing one salesperson from their ledger', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show all orders to add picks' }))
     expect(screen.getByRole('checkbox', { name: 'Open Bill SO-one' })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: 'Open Bill SO-three' })).toBeEnabled()
+  })
+
+  it('says on a closed person’s bill menu that their bills stay as closed', () => {
+    renderBoard({ closes: [closed('agent', 'ANTHONY', 150, [['one', 'SO-one', 50], ['two', 'SO-two', 100]])] })
+    openLedger('ANTHONY')
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for SO-one' }))
+    const item = screen.getByRole('menuitem', { name: /Don't count this bill/ })
+    expect(item).toBeDisabled()
+    expect(item).toHaveTextContent('ANTHONY’s September 2026 is closed — reopen it before changing which bills count')
   })
 
   it('turns Close off while the page holds a draft', () => {

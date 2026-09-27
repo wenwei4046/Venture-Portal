@@ -1024,6 +1024,36 @@ Rules:
 
 ## Component Vocabulary
 
+### Closing — a lock you can see (2026-09-27 — Revenue › Comm Cal's month)
+
+A salesperson's month is **closed** when somebody has checked it: their
+commission is locked at that figure. Three pieces, in `close-controls.module.css`:
+
+- **The close bar** above Total Sales Orders' list: a lock tile (orange-bg),
+  "N of M closed" + "RM … locked" and a thin walnut meter; the actions on the
+  right — *Close N ticked* (accent), *Reopen N* (white), *Clear ticks* (quiet
+  underline), or with nothing ticked *Close the N still open* / *Close all N*.
+  Several at once never happen on one click: the actions give way to an
+  **inline confirm strip** (accent-bg, accent border) that names the people and
+  the RM, with *Close N* / *Cancel*. Done: the bar turns ledger-green, the
+  tile a check, "September 2026 is closed — all N salespeople". A reason it
+  cannot close (a draft on screen, a month settled by hand) sits under it and
+  disables the buttons; *moved since* gets an alert-bg line naming who.
+- **The list**: the tick lives in the first (sticky) cell beside the name, the
+  header tick takes every row shown (indeterminate when some are). A closed
+  row carries a small green **CLOSED** tag with a lock under the name, a faint
+  green wash, and the close's own figures; *Closed · moved since* (alert tag)
+  adds `Live now RM …` under the total. The ticks are the multi-select below —
+  `useStickySelection`, scoped to the month's path.
+- **The ledger's walnut header**, in the empty middle: *Close NAME* (cream
+  `#ffe1bd` on walnut, lock icon) and *Close & next →* (ghost), with "Locks RM …
+  for September 2026" under them — one person closes without asking. Closed:
+  a green stamp (CLOSED · when · who) and a ghost *Reopen*; the top-right pill
+  reads *Closed*, the total *Total commission · locked*, the take-home card
+  "Based on the closed commission"; a moved close adds `Live now RM … (+RM …)`
+  and an alert box above the cards listing the bills and overrides that moved.
+  Phone: the controls stack full width under the name.
+
 ### ERP link card (2026-09-13 — Revenue › Comm Cal, Fair only)
 
 A `.sect-head` section ("Houzs ERP link", counter `LINKED` / `NOT LINKED`)
@@ -2231,6 +2261,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-27 (close)** — Comm Cal's month can be **closed** salesperson by salesperson: ticks in the list's first column, a close bar above it (progress, *Close N ticked* / *Close the N still open* / *Reopen N* behind an inline confirm strip, green once everybody is closed), a **CLOSED** tag and the locked figures on a closed row, and *Close NAME* / *Close & next →* in the empty middle of the ledger's walnut header, which turns into a green CLOSED stamp with *Reopen*. See "Closing — a lock you can see".
 - **2026-09-27 (later)** — Comm Cal's workbench stands in the URL (`?view=` · `?person=` · `?orders=`, search / brand / sort as `?q=` `?brand=` `?sort=`), so Back from a bill returns to the salesperson's ledger it was opened from; bill links carry `?from=` and the bill page's header leads with **← NAME** (`ReturnLink`, which steps Back when that is where the reader came from), then *All bills*. The bill context menu joins a salesperson's Personal / Overriding / Below deposit tables and the month's Below deposit tab. See "Tabbed pages" and "Bill context menu".
 - **2026-09-27 v3.10 (latest)** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
 - **2026-09-27 (evening)** — Product List › Modular splits each category by branding. Under the category's chip every branding gets its own run of cards and a small heading (orange dash, the branding and its count, a hairline): Mattress reads AKEMI · DUNLOP · ERGOTEX · MYLATEX · *No branding*, Sofa ZANOTTI · *No branding*, and Accessory finds its AK- and DL- pieces by their SKUs' branding. The unbranded close the category together under a grey dash; a category with no branding at all is drawn as before. Category and branding headings count their whole group, and ‹ › follows the drawn order. See "Product List workspace".
