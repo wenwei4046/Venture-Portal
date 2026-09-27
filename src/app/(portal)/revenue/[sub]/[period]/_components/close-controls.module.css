@@ -161,3 +161,37 @@
   .hero,
   .nameCell > input[type='checkbox'] { display: none; }
 }
+
+/* ── Bills paid on but priced RM 0 in the ERP (2026-09-27) ──
+   Above the list, a tag on the row, a banner and a note in the ledger: they
+   earn nothing until the ERP has prices, so they are named before anybody
+   closes at a figure that leaves them out. */
+.unpriced {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid rgb(var(--alert) / 0.35);
+  border-radius: 10px;
+  background: rgb(var(--alert-bg) / 0.6);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.unpricedHead { display: flex; align-items: flex-start; gap: 10px; }
+.unpricedHead > svg { flex: none; width: 17px; height: 17px; margin-top: 2px; color: rgb(var(--alert)); }
+.unpricedHead strong { display: block; font-size: 13px; font-weight: 600; }
+.unpricedHead p { margin: 2px 0 0; max-width: 760px; }
+.unpricedList { display: grid; gap: 4px; margin: 10px 0 0 27px; padding: 0; list-style: none; }
+.unpricedList > li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; font-variant-numeric: tabular-nums; }
+.unpricedList > li > a { font-family: var(--font-mono, 'Chivo Mono'), monospace; font-size: 11.5px; text-decoration: underline; text-underline-offset: 3px; }
+.unpricedList .quiet { min-height: 24px; padding: 2px 4px; }
+.unpricedPaid { font-weight: 600; }
+.unpricedTag { background: rgb(var(--alert-bg)); border-color: rgb(var(--alert) / 0.4); }
+.unpricedNote { color: rgb(var(--alert)); font-weight: 600; }
+.askWarn { flex-basis: 100%; margin: 0; padding: 6px 9px; border-radius: 6px; background: rgb(var(--alert-bg)); font-size: 11.5px; }
+.heroAsk { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; max-width: 360px; }
+.heroAsk > p { margin: 0; padding: 7px 10px; border-radius: 6px; background: rgb(255 214 150 / 18%); color: #ffe1bd; font-size: 11.5px; line-height: 1.5; text-align: right; }
+
+@media (max-width: 767px) {
+  .unpricedList { margin-left: 0; }
+  .heroAsk { max-width: none; align-items: stretch; }
+  .heroAsk > p { text-align: left; }
+}

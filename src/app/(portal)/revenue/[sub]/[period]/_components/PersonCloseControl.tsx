@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { formatMoney } from '@/lib/utils'
 import type { SalespersonClose } from '@/lib/commission/closes'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
@@ -18,6 +19,8 @@ interface Props {
   nextName: string | null
   busy: 'close' | 'reopen' | null
   disabledReason: string | null
+  /** Their bills paid on but priced RM 0 in the ERP: closing asks first. */
+  unpriced?: readonly string[]
   onClose: () => void
   onCloseAndNext: () => void
   onReopen: () => void
@@ -35,8 +38,17 @@ function stamp(at: string): string {
  * for going down the list one person at a time. Closed: who closed it and
  * when, and Reopen.
  */
-export default function PersonCloseControl({ name, total, monthLabel, close, liveTotal, nextName, busy, disabledReason, onClose, onCloseAndNext, onReopen }: Props) {
+export default function PersonCloseControl({ name, total, monthLabel, close, liveTotal, nextName, busy, disabledReason, unpriced = [], onClose, onCloseAndNext, onReopen }: Props) {
   const working = busy !== null
+  // One person closes without asking — unless a bill of theirs would close at
+  // RM 0 because the ERP has no price for it yet.
+  const [ask, setAsk] = useState<'close' | 'next' | null>(null)
+  const go = (which: 'close' | 'next') => {
+    if (unpriced.length > 0 && ask !== which) { setAsk(which); return }
+    setAsk(null)
+    if (which === 'close') onClose()
+    else onCloseAndNext()
+  }
 
   if (close) {
     return (
@@ -58,14 +70,31 @@ export default function PersonCloseControl({ name, total, monthLabel, close, liv
     )
   }
 
+  if (ask) {
+    const list = unpriced.join(', ')
+    return (
+      <div className={c.hero}>
+        <div className={c.heroAsk} role="group" aria-label={`Confirm closing ${name}`}>
+          <p>{list} {unpriced.length === 1 ? 'is' : 'are'} paid but priced RM 0 in the ERP. Closed now, {unpriced.length === 1 ? 'it stays' : 'they stay'} at RM 0 in {name}&apos;s {monthLabel}.</p>
+          <div className={c.heroButtons}>
+            <button type="button" className={c.heroPrimary} disabled={working || !!disabledReason} onClick={() => go(ask)}>
+              <SheetIcon name="lock" />{busy === 'close' ? 'Closing…' : ask === 'next' ? 'Close anyway & next →' : 'Close anyway'}
+            </button>
+            <button type="button" className={c.heroSecondary} onClick={() => setAsk(null)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={c.hero}>
       <div className={c.heroButtons}>
-        <button type="button" className={c.heroPrimary} disabled={working || !!disabledReason} title={disabledReason ?? undefined} onClick={onClose}>
+        <button type="button" className={c.heroPrimary} disabled={working || !!disabledReason} title={disabledReason ?? undefined} onClick={() => go('close')}>
           <SheetIcon name="lock" />{busy === 'close' ? 'Closing…' : `Close ${name}`}
         </button>
         {nextName ? (
-          <button type="button" className={c.heroSecondary} disabled={working || !!disabledReason} title={disabledReason ?? `Close ${name}, then open ${nextName}`} onClick={onCloseAndNext}>
+          <button type="button" className={c.heroSecondary} disabled={working || !!disabledReason} title={disabledReason ?? `Close ${name}, then open ${nextName}`} onClick={() => go('next')}>
             Close &amp; next →
           </button>
         ) : null}

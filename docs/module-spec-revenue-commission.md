@@ -1079,6 +1079,19 @@ to payroll still computes live; wiring it to the closes is the next piece
 (user). `lib/commission/closes.ts`, `close-actions.ts`,
 `_lib/salesperson-closes.ts`, mig `20260927040000`.
 
+**Bills paid on but priced RM 0 (2026-09-27).** A bill whose goods the ERP
+prices at RM 0 while the customer has paid earns nothing — the engine pays on
+what a bill is priced at. September had four: three came over from AutoCount
+at RM 0 on the 7 Sep cutover, one (HC-SO-2609-114) was confirmed in the ERP
+with its prices never keyed. The user chose a reminder over a block in the
+ERP: the month lists them above the salespeople (*N bills are paid but priced
+RM 0 in the ERP*), the row carries a tag, the ledger a banner and a note on
+the bill, the bulk close strip names whose, and one person's Close asks
+before locking. Filling the price in the ERP re-sends the bill and the month
+updates by itself. Goods = lines in groups the scheme pays on; a free
+replacement (RM 0, nothing paid) and a service-only order are not these.
+`lib/commission/unpriced.ts`.
+
 **Why a close can move (and what it means).** An override depends on the
 downline's bills, and group sales on the whole tree: close KAR JUN, and a bill
 MELVIN keys later still moves her live override. Closing everybody at once

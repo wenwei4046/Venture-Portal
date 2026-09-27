@@ -331,7 +331,12 @@ src/
 │   │   │                              receiver writes those tables and must never
 │   │   │                              be refused. Live ≠ closed shows as *moved
 │   │   │                              since*. `lib/commission/closes.ts`, spec
-│   │   │                              §4.11, mig `20260927040000`.
+│   │   │                              §4.11, mig `20260927040000`. A bill PAID
+│   │   │                              but priced RM 0 in the ERP earns nothing:
+│   │   │                              the month names it above the list, tags the
+│   │   │                              row, and Close asks first — a reminder, not
+│   │   │                              an ERP block (user). `lib/commission/
+│   │   │                              unpriced.ts`.
 │   │   │                              **NO HAND-TYPED UPSALES (2026-09-27):** the
 │   │   │                              form below went (user: 所有的 order 都只会从 ERP
 │   │   │                              那边抽过来，这边不需要自己调动 — the one thing adjusted in

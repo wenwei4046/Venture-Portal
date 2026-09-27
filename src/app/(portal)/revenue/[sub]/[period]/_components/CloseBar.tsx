@@ -12,6 +12,8 @@ export interface CloseBarRow extends CloseTarget {
   closed: boolean
   /** Closed, and the live month has moved since. */
   changed: boolean
+  /** Their bills paid on but priced RM 0 in the ERP — they earn nothing yet. */
+  unpriced: number
 }
 
 interface Props {
@@ -29,7 +31,7 @@ interface Props {
   onClearTicks: () => void
 }
 
-type Ask = { kind: 'close' | 'reopen'; targets: CloseTarget[] } | null
+type Ask = { kind: 'close' | 'reopen'; targets: CloseBarRow[] } | null
 
 function names(targets: readonly CloseTarget[]): string {
   const shown = targets.slice(0, 4).map(t => t.name).join(', ')
@@ -84,6 +86,12 @@ export default function CloseBar({ monthLabel, rows, ticked, busy, disabledReaso
                 ? <>Close {ask.targets.length === 1 ? ask.targets[0].name : `${ask.targets.length} salespeople — ${names(ask.targets)} —`} and lock {formatMoney(ask.targets.reduce((a, t) => a + t.total, 0))} for {monthLabel}?</>
                 : <>Reopen {ask.targets.length === 1 ? ask.targets[0].name : `${ask.targets.length} salespeople — ${names(ask.targets)}`}? Their live figure counts again until they are closed.</>}
             </p>
+            {ask.kind === 'close' && ask.targets.some(t => t.unpriced > 0) ? (
+              <p className={c.askWarn} role="note">
+                {ask.targets.filter(t => t.unpriced > 0).map(t => `${t.name} (${t.unpriced} ${t.unpriced === 1 ? 'bill' : 'bills'})`).join(', ')}
+                {' '}— paid but priced RM 0 in the ERP. Closed now, those bills stay at RM 0.
+              </p>
+            ) : null}
             <button type="button" className={c.primary} onClick={confirm}>
               {ask.kind === 'close' ? `Close ${ask.targets.length}` : `Reopen ${ask.targets.length}`}
             </button>

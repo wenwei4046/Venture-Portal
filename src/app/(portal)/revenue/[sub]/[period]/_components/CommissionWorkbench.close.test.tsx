@@ -219,6 +219,51 @@ describe('closing salespeople from the list', () => {
   })
 })
 
+describe('bills paid on but priced RM 0 in the ERP', () => {
+  // HC-SO-2609-114's shape: goods keyed at RM 0, a payment recorded.
+  const unpricedSale = (): SalesOrder => ({ ...sale('rm0', 0, 'agent'), orderNo: 'HC-SO-2609-114', paidAmount: 2_839 })
+  const month = () => fixture([sale('one', 1_000, 'agent'), sale('two', 2_000, 'agent'), sale('three', 4_000, 'ch'), unpricedSale()])
+
+  it('names them above the list and tags the salesperson’s row', () => {
+    renderBoard({ data: month() })
+    const notice = screen.getByRole('region', { name: 'Bills priced RM 0 in the ERP' })
+    expect(notice).toHaveTextContent('1 bill is paid but priced RM 0 in the ERP')
+    expect(within(notice).getByRole('link', { name: 'HC-SO-2609-114' })).toBeVisible()
+    expect(notice).toHaveTextContent('paid RM 2,839.00')
+    expect(within(row('ANTHONY')).getByText('1 bill RM 0')).toBeVisible()
+    expect(within(row('CHEA HUAN')).queryByText(/RM 0$/)).toBeNull()
+  })
+
+  it('says so in the confirm before several are closed', () => {
+    renderBoard({ data: month() })
+    fireEvent.click(within(bar()).getByRole('button', { name: 'Close all 3' }))
+    const ask = within(bar()).getByRole('group', { name: 'Confirm close' })
+    expect(ask).toHaveTextContent('ANTHONY (1 bill) — paid but priced RM 0 in the ERP. Closed now, those bills stay at RM 0.')
+  })
+
+  it('asks before closing that salesperson from their ledger, and closes on the second click', async () => {
+    renderBoard({ data: month() })
+    fireEvent.click(within(row('ANTHONY')).getByRole('button', { name: /^ANTHONY$/ }))
+    expect(screen.getByRole('region', { name: 'Bills priced RM 0 in the ERP' })).toBeVisible()
+    expect(screen.getByText('Priced RM 0 in the ERP')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /Close ANTHONY/ }))
+    expect(closeSalespeople).not.toHaveBeenCalled()
+    const ask = screen.getByRole('group', { name: 'Confirm closing ANTHONY' })
+    expect(ask).toHaveTextContent('HC-SO-2609-114 is paid but priced RM 0 in the ERP. Closed now, it stays at RM 0')
+    fireEvent.click(within(ask).getByRole('button', { name: /Close anyway/ }))
+    await waitFor(() => expect(closeSalespeople).toHaveBeenCalledWith(expect.objectContaining({ people: [{ staffId: 'agent', expectedTotal: 150 }] })))
+  })
+
+  it('lets Cancel back out without closing', () => {
+    renderBoard({ data: month() })
+    fireEvent.click(within(row('ANTHONY')).getByRole('button', { name: /^ANTHONY$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Close ANTHONY/ }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Confirm closing ANTHONY' })).getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('button', { name: /Close ANTHONY/ })).toBeVisible()
+    expect(closeSalespeople).not.toHaveBeenCalled()
+  })
+})
+
 describe('closing one salesperson from their ledger', () => {
   function openLedger(name: string) {
     fireEvent.click(within(row(name)).getByRole('button', { name: new RegExp(`^${name}$`) }))

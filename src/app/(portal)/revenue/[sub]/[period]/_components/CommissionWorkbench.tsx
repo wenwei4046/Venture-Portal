@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } f
 import { useRouter, useSearchParams } from 'next/navigation'
 import { buildCommissionWorkbench, type CommissionOrderRow, type OverrideOrderRow, type WorkbenchPerson } from '@/lib/commission/workbench'
 import { closeDrift, nextOpenPerson, salespersonFigures, type CloseDrift, type SalespersonClose, type SalespersonFigures } from '@/lib/commission/closes'
+import { unpricedBills, unpricedByStaff } from '@/lib/commission/unpriced'
 import { depositRequired } from '@/lib/commission/engine'
 import { billCountAction, type BillCountAction } from '@/lib/commission/bill-exclusion'
 import {
@@ -28,6 +29,7 @@ import NoCommission, { COMMISSIONABLE_HINT, DEPOSIT_HINT, DROP_HINT, GROUP_SALES
 import CloseBar from './CloseBar'
 import PayrollBar from './PayrollBar'
 import PersonCloseControl from './PersonCloseControl'
+import UnpricedBillsNotice from './UnpricedBillsNotice'
 import { useSalespersonCloses } from './useSalespersonCloses'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
@@ -300,6 +302,12 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const openOrder = listRows.map(r => r.staffId)
   const nextId = selected ? nextOpenPerson(openOrder, selected.staffId, new Set(closer.closedById.keys())) : null
   const nextName = nextId ? listRows.find(r => r.staffId === nextId)?.figures.name ?? null : null
+  // Bills paid on but priced RM 0 in the ERP (2026-09-27): they earn nothing
+  // until the ERP has prices, so they are named before anybody is closed.
+  const unpriced = useMemo(() => unpricedBills(data.input), [data.input])
+  const unpricedOf = useMemo(() => unpricedByStaff(unpriced), [unpriced])
+  const unpricedIds = useMemo(() => new Set(unpriced.map(bill => bill.orderId)), [unpriced])
+  const staffName = (staffId: string) => data.people.find(p => p.staffId === staffId)?.name ?? staffId
   const workspaceRef = useRef<HTMLElement>(null)
   // Back to a ledger lands on the row it was left at, not at its top: the
   // portal scrolls `main` and the table scrolls in its frame, and the browser
@@ -552,7 +560,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             onContextMenu={row.upsale ? undefined : event => billMenu.onRowContextMenu(event, row)}>
             <td className={s.stickyFirst}>{billCell(row, <>
               {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}
-              {!overriding && <small>{statusLabel[(row as CommissionOrderRow).status]}</small>}</>)}</td>
+              {!overriding && <small>{statusLabel[(row as CommissionOrderRow).status]}</small>}
+              {!overriding && unpricedIds.has(row.orderId) && <small className={c.unpricedNote}>Priced RM 0 in the ERP</small>}</>)}</td>
             {overriding && <td>{(row as OverrideOrderRow).downlineName}</td>}
             {visibleColumns.map(([key]) => <td key={key} className={NUMERIC_COLUMNS.includes(key) ? s.numeric : undefined}>{cell(row, key, overriding)}</td>)}
             <td>{row.upsale ? <span className={s.muted}>Not a bill</span>
@@ -648,9 +657,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
 
     <div role={isPersonView ? undefined : "tabpanel"} id={`commission-panel-${tab}`} aria-labelledby={isPersonView ? undefined : `commission-tab-${tab}`}>
     {tab === 'sales' && !selected && <>
+      <UnpricedBillsNotice bills={unpriced} nameOf={staffName} hrefOf={orderHref} onPerson={id => choosePerson(id)} />
       {closeFacts && <CloseBar monthLabel={monthLabel} ticked={closer.ticked} busy={closer.busy} disabledReason={closeBlocked}
         error={closer.error} notice={closer.notice} onClearTicks={closer.clearTicks}
-        rows={listRows.map(r => ({ staffId: r.staffId, name: r.figures.name, total: r.figures.total, closed: !!r.close, changed: !!r.drift }))}
+        rows={listRows.map(r => ({ staffId: r.staffId, name: r.figures.name, total: r.figures.total, closed: !!r.close, changed: !!r.drift,
+          unpriced: unpricedOf.get(r.staffId)?.length ?? 0 }))}
         onClose={targets => closer.close(targets)} onReopen={targets => closer.reopen(targets)} />}
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Salesperson commission summary">
         <thead><tr><th className={s.stickyFirst}>{closeFacts ? <span className={c.nameCell}><input type="checkbox" aria-label="Tick every salesperson shown"
@@ -677,7 +688,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             <span className={c.nameCell}>{closeFacts && <input type="checkbox" aria-label={`Tick ${f.name}`} checked={closer.ticked.has(row.staffId)} onChange={() => closer.toggle(row.staffId)} />}
               <button className={s.ghostButton} onClick={open} disabled={!p}>{f.name} <span aria-hidden>↗</span></button></span>
             {row.close && <small><span className={`${c.closedTag} ${row.drift ? c.movedTag : ''}`} title={`Closed ${new Date(row.close.closedAt).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })}${row.close.closedByName ? ` by ${row.close.closedByName}` : ''}`}>
-              <SheetIcon name="lock" />{row.drift ? 'Closed · moved since' : 'Closed'}</span></small>}</td>
+              <SheetIcon name="lock" />{row.drift ? 'Closed · moved since' : 'Closed'}</span></small>}
+            {(unpricedOf.get(row.staffId)?.length ?? 0) > 0 && <small><span className={`${c.closedTag} ${c.unpricedTag}`} title="Paid, but priced RM 0 in the ERP — earns nothing until the ERP has prices">
+              <SheetIcon name="alert" />{unpricedOf.get(row.staffId)!.length} {unpricedOf.get(row.staffId)!.length === 1 ? 'bill' : 'bills'} RM 0</span></small>}</td>
           <td>{heads.has(row.staffId) ? <>{HEAD_TITLE}<small>{HEAD_NOTE}</small></> : <>{f.titleLabel}<small>{f.rankLabel} · {pct(f.productRate)}</small></>}
             {qualifies && <small><span className={s.badge}>Qualifies for {rankName(qualifies)}</span></small>}
             {promotes && <small><span className={s.badge}>{locked ? `Title raised to ${titleName(promotes)}` : `Title → ${titleName(promotes)} when sent`}</span></small>}</td>
@@ -703,7 +716,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         <div className={s.personHeroBody}><div className={s.avatar}>{selected.name.slice(0, 2)}</div><div className={s.personIdentity}><h2>{selected.name}</h2><p>{heads.has(selected.staffId)
           ? <>{HEAD_TITLE}<span>{HEAD_NOTE}</span></>
           : <>{selected.titleLabel ?? 'Title unassigned'}<span>{selected.rankLabel ?? 'Rank unassigned'} · {pct(selected.productRate)}</span></>}</p></div>
-          {closeFacts && <PersonCloseControl name={selected.name} total={selected.totalCommission} monthLabel={monthLabel}
+          {closeFacts && <PersonCloseControl key={selected.staffId} name={selected.name}
+            unpriced={(unpricedOf.get(selected.staffId) ?? []).map(bill => bill.orderNo)} total={selected.totalCommission} monthLabel={monthLabel}
             close={selectedClose} liveTotal={selectedDrift ? selectedDrift.liveTotal : null} nextName={nextName}
             busy={closer.busy} disabledReason={closeBlocked}
             onClose={() => closer.close([{ staffId: selected.staffId, name: selected.name, total: selected.totalCommission }])}
@@ -713,6 +727,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         </div>
       </div>
       {(closer.notice || closer.error) && <p className={closer.error ? s.warning : s.notice} role={closer.error ? 'alert' : 'status'}>{closer.error || closer.notice}</p>}
+      <UnpricedBillsNotice bills={unpricedOf.get(selected.staffId) ?? []} nameOf={staffName} hrefOf={orderHref} onPerson={id => choosePerson(id)} person={selected.name} />
       {selectedClose && selectedDrift && <div className={c.moved} role="note">
         <strong>Moved since {selected.name} was closed: {selectedDrift.delta >= 0 ? '+' : ''}{money(selectedDrift.delta)}</strong>
         The closed {money(selectedClose.total)} still stands — the bills below are live and now come to {money(selectedDrift.liveTotal)}. Reopen to take the new figure, or leave it for the payroll step to carry.

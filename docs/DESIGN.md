@@ -1081,6 +1081,13 @@ commission is locked at that figure. Three pieces, in `close-controls.module.css
   "Based on the closed commission"; a moved close adds `Live now RM … (+RM …)`
   and an alert box above the cards listing the bills and overrides that moved.
   Phone: the controls stack full width under the name.
+- **Bills priced RM 0** (paid, but the ERP prices their goods at RM 0 — they
+  earn nothing): an alert-bg box above the close bar (*N bills are paid but
+  priced RM 0 in the ERP*, each bill as a mono link, its salesperson as a
+  quiet link to the ledger, *paid RM …*), an alert tag *N bills RM 0* under
+  the name, the same box in the ledger and *Priced RM 0 in the ERP* under the
+  bill's number. The bulk confirm strip adds an alert line naming whose; one
+  person's *Close* turns into *Close anyway* / *Cancel* with the bills named.
 
 ### ERP link card (2026-09-13 — Revenue › Comm Cal, Fair only)
 
