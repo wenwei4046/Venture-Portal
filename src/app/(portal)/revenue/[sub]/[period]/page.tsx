@@ -422,18 +422,20 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           sentAt: run?.applied_at ?? null,
           settledBefore,
           payrollClosed,
-          switches: subDept.schemeId && scheme ? (
-            <SchemeSwitches
-              schemeId={subDept.schemeId}
-              subDepartmentId={subDept.id}
-              period={period}
-              monthLabel={label(period)}
-              openBill={openBillMonth}
-              margin={scheme.enable_margin_penalty || scheme.enable_margin_incentive}
-              kpi={scheme.enable_kpi}
-            />
-          ) : undefined,
         }}
+        // What the month pays: the scheme's real switches, in Review settings
+        // (2026-09-28 — the payroll bar's foot held them until then).
+        switches={subDept.schemeId && scheme ? (
+          <SchemeSwitches
+            schemeId={subDept.schemeId}
+            subDepartmentId={subDept.id}
+            period={period}
+            monthLabel={label(period)}
+            openBill={openBillMonth}
+            margin={scheme.enable_margin_penalty || scheme.enable_margin_incentive}
+            kpi={scheme.enable_kpi}
+          />
+        ) : undefined}
         // A bill's menu answers to its OWN month's run (#170): this month's lock,
         // and every earlier month a ledger carries bills in from.
         lockedPeriods={monthLock.data ? [period, ...earlierLocks] : earlierLocks}

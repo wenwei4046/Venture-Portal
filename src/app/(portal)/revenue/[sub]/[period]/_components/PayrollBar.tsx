@@ -15,8 +15,6 @@ interface Props {
    * figures in this bar leave it out.
    */
   draft?: boolean
-  /** What this month pays (the scheme switches), under the status. */
-  switches?: ReactNode
 }
 
 type Tone = 'ok' | 'stale' | 'blocked' | 'idle' | 'quiet'
@@ -50,11 +48,20 @@ function difference(now: number, before: number): string {
  * Where a sent salesperson goes (the unified Payroll, 2026-09-27): their row
  * on HR › Payroll takes the figure and shows Completed, and HR's Submit to
  * Finance sends them on in a batch. A month HR has Total Closed takes nothing.
+ *
+ * ONE LINE UNTIL ASKED (2026-09-28): the state is what a reader needs every
+ * visit; the sentences under it are for the first. Open, the bar was a card of
+ * three paragraphs above the tabs (user: 太显眼了), so it folds to its title —
+ * the dot, the state and, when there is one, a tag saying what needs a look —
+ * and opens on a click, the way Review settings does. The month's switches
+ * (*This month pays*) left its foot the same day for Review settings, where
+ * the preview-only copies of them had been: one set, in one place.
  */
-export default function PayrollBar({ monthLabel, period, state, draft = false, switches }: Props) {
+export default function PayrollBar({ monthLabel, period, state, draft = false }: Props) {
   let tone: Tone
   let title: string
   let body: ReactNode
+  let tag: string | null = null
   let blockers: string[] = []
 
   switch (state.kind) {
@@ -66,6 +73,7 @@ export default function PayrollBar({ monthLabel, period, state, draft = false, s
     case 'closed':
       tone = 'quiet'
       title = state.sentTotal === null ? 'Not in payroll' : `In payroll · ${formatMoney(state.sentTotal)}`
+      tag = 'Payroll closed'
       body = state.closedAs === 'locked'
         ? <>This month&apos;s commission is locked in payroll. Nothing here can change it now.</>
         : /closed for good/.test(state.closedAs)
@@ -84,19 +92,28 @@ export default function PayrollBar({ monthLabel, period, state, draft = false, s
       blockers = state.blockers
       tone = blockers.length ? 'blocked' : state.current ? 'ok' : 'stale'
       title = `In payroll · ${formatMoney(state.sentTotal)}`
+      tag = state.current ? null : 'Moved since'
       body = <>Sent {sentOn(state.sentAt)}. {state.current
         ? <>The commission above matches it.</>
         : <>The commission above has moved since: {formatMoney(state.total)}, {difference(state.total, state.sentTotal)}{state.changedPeople > 0 ? ` · ${state.changedPeople} ${state.changedPeople === 1 ? 'person' : 'people'} changed` : ''}.</>}
         {blockers.length ? <> Still to settle:</> : null}</>
       break
   }
+  // Something to settle outranks the rest: it is the one reason to open the bar.
+  if (blockers.length) tag = `${blockers.length} to settle`
 
   return (
     <section className={s.payroll} aria-label={`Payroll · ${monthLabel}`} data-tone={tone}>
-      <div className={s.payrollMain}>
-        <div className={s.payrollText}>
-          <div className={s.eyebrow}>Payroll · {monthLabel}</div>
-          <div className={s.payrollState}><span className={s.payrollDot} aria-hidden />{title}</div>
+      <details className={s.fold}>
+        <summary className={s.payrollSummary}>
+          <span className={s.foldMark} aria-hidden />
+          <span className={s.payrollLine}>
+            <span className={s.eyebrow}>Payroll · {monthLabel}</span>
+            <span className={s.payrollState}><span className={s.payrollDot} aria-hidden />{title}</span>
+            {tag ? <span className={s.payrollTag}>{tag}</span> : null}
+          </span>
+        </summary>
+        <div className={s.payrollBody}>
           <p className={s.payrollNote}>{body}</p>
           {blockers.length > 0 && (
             <ul className={s.payrollBlockers} aria-label="To settle before payroll">
@@ -112,12 +129,11 @@ export default function PayrollBar({ monthLabel, period, state, draft = false, s
           )}
           {draft && (state.kind === 'not_sent' || state.kind === 'sent') && (
             <p className={s.payrollNote}>
-              This screen holds a draft — Open Bill picks not yet saved, or a preview. The figures in this bar are the month as saved.
+              This screen holds a draft — Open Bill picks not yet saved, or the current-team preview. The figures in this bar are the month as saved.
             </p>
           )}
         </div>
-      </div>
-      {switches ? <div className={s.payrollSwitches}>{switches}</div> : null}
+      </details>
     </section>
   )
 }

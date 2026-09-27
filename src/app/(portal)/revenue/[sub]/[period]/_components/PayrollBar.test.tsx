@@ -1,12 +1,43 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import PayrollBar from './PayrollBar'
 
 const bar = () => screen.getByRole('region', { name: 'Payroll · September 2026' })
+/** The line the bar folds to. */
+const line = () => bar().querySelector('summary')!
 
 afterEach(cleanup)
 
 describe('PayrollBar', () => {
+  // User 2026-09-28 (太显眼了): three paragraphs above the tabs on every visit.
+  // The state is what a reader needs each time; the why is for the first.
+  it('folds to one line — the month and its state — and opens on a click', () => {
+    render(<PayrollBar monthLabel="September 2026" period="2026-09-01" state={{ kind: 'not_sent', total: 10, blockers: [] }} />)
+    expect(line()).toHaveTextContent(/^Payroll · September 2026\s*Not in payroll yet$/)
+    const why = screen.getByText(/worked out live from the ERP bills/)
+    expect(why).not.toBeVisible()
+    fireEvent.click(line())
+    expect(why).toBeVisible()
+    expect(screen.getByRole('link', { name: 'HR › Payroll →' })).toBeVisible()
+    fireEvent.click(line())
+    expect(why).not.toBeVisible()
+  })
+
+  it('tags the folded line with the one thing worth opening it for', () => {
+    const { rerender } = render(<PayrollBar monthLabel="September 2026" state={{ kind: 'not_sent', total: 10, blockers: ['a', 'b'] }} />)
+    expect(line()).toHaveTextContent('2 to settle')
+    rerender(<PayrollBar monthLabel="September 2026" state={{
+      kind: 'sent', sentTotal: 300, sentAt: null, total: 320, current: false, changedPeople: 1, blockers: [],
+    }} />)
+    expect(line()).toHaveTextContent('Moved since')
+    rerender(<PayrollBar monthLabel="September 2026" state={{
+      kind: 'sent', sentTotal: 300, sentAt: null, total: 300, current: true, changedPeople: 0, blockers: [],
+    }} />)
+    expect(line()).toHaveTextContent(/^Payroll · September 2026\s*In payroll · RM 300\.00$/)
+    rerender(<PayrollBar monthLabel="September 2026" state={{ kind: 'closed', sentTotal: null, closedAs: 'Payroll for September 2026 is closed for good' }} />)
+    expect(line()).toHaveTextContent('Payroll closed')
+  })
+
   // User 2026-09-27: Send = Complete, per salesperson — tick five and send
   // them, or send everybody not yet sent. One button for the month cannot.
   it('says the month is not in payroll yet, and sends nothing itself', () => {
