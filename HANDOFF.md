@@ -1404,6 +1404,49 @@ first read — "6月的不是有吗？" — and was right):
 Lesson recorded in memory: before splitting a PV's 40xx leg in place, check
 whether a reclass JV already moved that month's interest.
 
+### 2026-09-28 (later) — Aug'26 statement, the recon page, report order, HC's two accounts
+
+**PDF template fix (9b6d2e28)**: Aug'26 refused to load, parsed movements RM 2.00
+more negative than the statement's own opening→closing. Money cells are RIGHT
+aligned, so a short number starts ~1 unit right of a long one in the same
+column ("1.60" x 23.96 vs "100,000.00" x 22.71). Nearest-header-x put the two
+rebate CREDITS in Withdrawal (losing by 0.03) and the two service charges in
+Balance, dropping those rows. Now every money cell on a dated row is clustered
+document-wide into three bands tied to their headers. Real file: 26 deposits =
+528,689.20, 35 withdrawals = 630,104.27 — the statement's own footer totals.
+A refusal now also reports how many dated rows had no readable amount.
+
+**Recon (06b284ed, 8a1e30a8, 4035b6f3)**: the Matched tile counts ignored and
+contra lines as cleared (split printed underneath); statement-side CONTRA added
+(mig 20260928010000 — journal_line_id nullable + CHECK one side present,
+'contra' in match_kind), mirroring book-side contra: pick ≥2 statement lines
+summing to 0.00, own section with Dissolve, left out of the report like book
+contra; the month list counts any match_kind as cleared ("Cleared" column).
+User contra'd Aug's 4 waived-charge lines → Aug is 61/61.
+
+**Report layout order (72d77f3a)**: buildHierarchyRows re-sorted every level A→Z
+by name, so Discount Allowed (5999) led Revenue and Edit layout's order was
+discarded. Layout order now leads, unlisted follow A→Z, a parent takes the best
+rank beneath it; editor chips got ▲▼ (drop still appends). Monthly P&L and
+Monthly Cash Flow share the builder.
+
+**DATA — HOUZS Century had both 3056 (due from) and 4052 (due to)**: 3056 held
+only 4 rows and 185,156.32 of it was two fund-source repayments TO HC posted as
+a receivable — PV 202607-0145 (140,000 FUND RETURN TO HOUZS) and PV 202607-0178
+(45,156.32 Repayment - Conts). Same-day siblings PV 0149/0150 used 4052, and
+0149 had already been reassigned 3056→4052 on 2026-08-29 as a wrong account.
+Fixed via `reassign_voucher_gl_account` as Finance; the 2026-08-07 netting JE's
+Cr leg (45,000) moved 3056→4052 in place too (HC now sits in one account, so
+that entry nets within it). Result: **4052 = 595,313.38 Cr, 3056 = −300.00**,
+no unbalanced JEs. The −300 is invoice HV-INV-202609-0040 (2026-09-23,
+"Marketing Service - Sep'26"), whose five 300 lines use category_code 3059 /
+3053 / 3056 / 3051 / 3054 — the subsidiaries' due-from accounts as income
+categories. Left alone: that is Finance's own categorisation, not an obvious
+error. **Still open**: the opening JV-000010 (2026-03-29) carries 4052 Dr
+53,613.75 "FUND AT HOUZS CENTURY", and the 2026-08-07 netting says it cleared
+"HC repaying its 53,613.75" — possible double count, user asked to look at it
+after this.
+
 ## SESSION 2026-09-22 (later) — New loan / New fund source: one two-column deal form (c10a7fc5)
 
 **Ask**: "就你看 new loan 我需要往下滑，旁边其实有位置 然后排法很混乱" →
