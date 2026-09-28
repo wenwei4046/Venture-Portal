@@ -165,9 +165,18 @@ export default function ReconReview({
         </div>
         <div className="border border-hairline rounded-md bg-surface p-4">
           <div className="font-serif italic text-graphite text-sm mb-1">Matched</div>
+          {/* An ignored line is settled work too — a waived bank charge, a
+              contra that nets to zero — so it counts as cleared here and the
+              tile reads complete when nothing is left open (user 2026-09-28).
+              The count of ignored ones stays visible underneath. */}
           <div className="font-serif text-xl text-num-ink tabular">
-            {matched.length} / {statementLines.length}
+            {matched.length + ignored.length} / {statementLines.length}
           </div>
+          {ignored.length > 0 ? (
+            <div className="font-mono text-[11px] text-muted mt-1">
+              {matched.length} matched · {ignored.length} ignored
+            </div>
+          ) : null}
         </div>
         <div className="border border-hairline rounded-md bg-surface p-4">
           <div className="font-serif italic text-alert text-sm mb-1">Statement unmatched</div>
