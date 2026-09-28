@@ -229,7 +229,7 @@ export function buildSideMatrixRows(
     for (const c of cats) {
       const accs = (placed.byCategory.get(c.id) ?? []).map((code) => byCode.get(code)!)
       if (accs.length === 0) continue
-      rows.push(...categoryRows(`${sideKey}:${c.id}`, c.name || 'Untitled', accs, nCols))
+      rows.push(...categoryRows(`${sideKey}:${c.id}`, c.name || 'Untitled', accs, nCols, c.accounts))
     }
     if (placed.leftovers.length > 0) {
       const leftovers = placed.leftovers.map((code) => byCode.get(code)!)
@@ -244,8 +244,14 @@ export function buildSideMatrixRows(
 /** One category: its header row (totals on the row) + the COA tree beneath at
  *  depth 1. A single root named like the category IS the header row, its
  *  subtree lifted one level; a lone leaf likewise (nothing to expand). */
-function categoryRows(key: string, name: string, accs: SideAccount[], nCols: number): MatrixRow[] {
-  const tree = buildHierarchyRows(accs, key, 1)
+function categoryRows(
+  key: string,
+  name: string,
+  accs: SideAccount[],
+  nCols: number,
+  order?: string[],
+): MatrixRow[] {
+  const tree = buildHierarchyRows(accs, key, 1, order)
   const roots = tree.filter((r) => r.depth === 1)
   if (roots.length === 1 && sameName(roots[0].label, name)) {
     const [root, ...rest] = tree

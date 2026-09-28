@@ -97,6 +97,21 @@ export default function ReportLayoutEditor({
   const renameCategory = (id: string, name: string) =>
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)))
   const deleteCategory = (id: string) => setCategories((prev) => prev.filter((c) => c.id !== id))
+  /** Order inside a category is the report's order now (2026-09-28) — the
+   *  matrix used to re-sort every level A→Z, so "Discount Allowed" sat at the
+   *  top of Revenue whatever you did here. Drop appends; these nudge. */
+  const moveCodeWithin = (catId: string, code: string, dir: -1 | 1) =>
+    setCategories((prev) =>
+      prev.map((c) => {
+        if (c.id !== catId) return c
+        const i = c.accounts.indexOf(code)
+        const j = i + dir
+        if (i < 0 || j < 0 || j >= c.accounts.length) return c
+        const next = c.accounts.slice()
+        ;[next[i], next[j]] = [next[j], next[i]]
+        return { ...c, accounts: next }
+      }),
+    )
   const moveCategory = (id: string, dir: -1 | 1) =>
     setCategories((prev) => {
       const i = prev.findIndex((c) => c.id === id)
@@ -123,7 +138,19 @@ export default function ReportLayoutEditor({
 
   /** `ghost` = an account the category holds through one of its groups, not by
    *  name. Still draggable: dropping it elsewhere lists it explicitly there. */
-  const Chip = ({ code, ghost = false, via }: { code: string; ghost?: boolean; via?: string }) => {
+  const Chip = ({
+    code,
+    ghost = false,
+    via,
+    onUp,
+    onDown,
+  }: {
+    code: string
+    ghost?: boolean
+    via?: string
+    onUp?: () => void
+    onDown?: () => void
+  }) => {
     const group = groupByCode.get(code)
     return (
       <div
@@ -145,6 +172,28 @@ export default function ReportLayoutEditor({
         <span className={ghost ? 'text-graphite' : 'text-ink'}>{nameByCode.get(code) ?? code}</span>
         {group ? (
           <span className="font-mono text-[10px] text-accent">整组 · {group.size}</span>
+        ) : null}
+        {onUp || onDown ? (
+          <span className="flex items-center -mr-1 ml-0.5">
+            <button
+              type="button"
+              onClick={onUp}
+              disabled={!onUp}
+              className="px-1 text-[10px] leading-none text-muted hover:text-ink disabled:opacity-25"
+              title="往上排"
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              onClick={onDown}
+              disabled={!onDown}
+              className="px-1 text-[10px] leading-none text-muted hover:text-ink disabled:opacity-25"
+              title="往下排"
+            >
+              ▼
+            </button>
+          </span>
         ) : null}
       </div>
     )
@@ -170,7 +219,8 @@ export default function ReportLayoutEditor({
         <p className="font-serif italic text-muted text-sm max-w-2xl">
           Drag accounts into the categories you want. Subtotals on the report
           recompute automatically. Anything left in <em>Unassigned</em> still
-          shows on the report under its own group.
+          shows on the report under its own group. Inside a category the chips run in the
+          order you leave them — use ▲▼ on a chip; anything you do not list follows A→Z.
           {groups.length > 0 ? (
             <>
               {' '}
@@ -253,7 +303,14 @@ export default function ReportLayoutEditor({
                     <span className="text-sm font-serif italic text-muted px-1">Drag accounts here.</span>
                   ) : (
                     <>
-                      {cat.accounts.map((code) => <Chip key={code} code={code} />)}
+                      {cat.accounts.map((code, i) => (
+                        <Chip
+                          key={code}
+                          code={code}
+                          onUp={i > 0 ? () => moveCodeWithin(cat.id, code, -1) : undefined}
+                          onDown={i < cat.accounts.length - 1 ? () => moveCodeWithin(cat.id, code, 1) : undefined}
+                        />
+                      ))}
                       {inherited.map((code) => {
                         const via = viaOf(code)
                         return <Chip key={code} code={code} ghost via={via ? nameByCode.get(via) ?? via : undefined} />

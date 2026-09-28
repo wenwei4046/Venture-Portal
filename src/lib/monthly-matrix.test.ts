@@ -27,6 +27,44 @@ describe('buildHierarchyRows', () => {
     ])
   })
 
+  // 2026-09-28: the P&L showed "Discount Allowed" (5999) at the top of Revenue
+  // because D sorts before S, and re-ordering it in Edit layout did nothing.
+  // The layout's order now wins; anything it does not list follows, A→Z.
+  it('follows the layout order first, then A→Z for what it does not list', () => {
+    const smc = { code: '5030', name: 'Service Management Charge' }
+    const rows = buildHierarchyRows(
+      [
+        acc('5999', 'Discount Allowed', [-500]),
+        acc('5050', 'Salary Income', [16886.92]),
+        acc('5016', 'Commission Income', [37747.71], [smc]),
+        acc('5012', 'Revenue - Lead Gen', [87500], [smc]),
+        acc('5060', 'Other Income', [120]),
+      ],
+      'revenue',
+      1,
+      // Layout: the group first (via one of its children), then salary, then
+      // the discount last. 5060 is unlisted.
+      ['5012', '5016', '5050', '5999'],
+    )
+    expect(rows.map((r) => r.label)).toEqual([
+      'Service Management Charge',
+      'Revenue - Lead Gen',
+      'Commission Income',
+      'Salary Income',
+      'Discount Allowed',
+      'Other Income',
+    ])
+  })
+
+  it('without a layout order it still sorts A→Z', () => {
+    const rows = buildHierarchyRows(
+      [acc('5999', 'Discount Allowed', [-500]), acc('5050', 'Salary Income', [10])],
+      'revenue',
+      1,
+    )
+    expect(rows.map((r) => r.label)).toEqual(['Discount Allowed', 'Salary Income'])
+  })
+
   it('sorts A→Z by name within each level', () => {
     const rows = buildHierarchyRows(
       [acc('1', 'Zebra', [1]), acc('2', 'Apple', [1]), acc('3', 'Mango', [1])],

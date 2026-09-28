@@ -83,12 +83,20 @@ export interface HierAccount {
 
 /** Render a flat list of leaf accounts as their COA parent→child hierarchy:
  *  every parent that has ≥1 child present becomes a bold roll-up row (sum of its
- *  descendants), with children indented beneath it. Sorted A→Z by name within
- *  each level. `baseDepth` is the indent of the top level; children go deeper. */
+ *  descendants), with children indented beneath it. `baseDepth` is the indent
+ *  of the top level; children go deeper.
+ *
+ *  Order within a level: the layout's own order first, then A→Z by name for
+ *  whatever the layout does not list (user 2026-09-28 — the P&L put "Discount
+ *  Allowed" at the top of Revenue because D sorts before S, and dragging it in
+ *  Edit layout did nothing since this sorted by name regardless). `order` is
+ *  the category's account codes as the layout holds them; a parent takes the
+ *  best rank of anything beneath it, so pinning one child lifts its group. */
 export function buildHierarchyRows(
   accounts: HierAccount[],
   keyPrefix: string,
   baseDepth: number,
+  order?: string[],
 ): MatrixRow[] {
   if (accounts.length === 0) return []
   const n = accounts[0].values.length
@@ -125,8 +133,24 @@ export function buildHierarchyRows(
     return out
   }
 
+  const rankOf = new Map((order ?? []).map((code, i) => [code, i]))
+  const nodeRank = (node: Node): number => {
+    let best = node.leaf ? (rankOf.get(node.code) ?? Infinity) : Infinity
+    for (const c of node.children.values()) best = Math.min(best, nodeRank(c))
+    return best
+  }
+  const rankCache = new Map<Node, number>()
+  const rank = (node: Node): number => {
+    let r = rankCache.get(node)
+    if (r === undefined) { r = nodeRank(node); rankCache.set(node, r) }
+    return r
+  }
   const sorted = (level: Map<string, Node>) =>
-    [...level.values()].sort((a, b) => a.name.localeCompare(b.name))
+    [...level.values()].sort((a, b) => {
+      const ra = rank(a), rb = rank(b)
+      if (ra !== rb) return ra - rb
+      return a.name.localeCompare(b.name)
+    })
 
   const rows: MatrixRow[] = []
   const emit = (node: Node, depth: number) => {

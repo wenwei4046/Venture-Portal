@@ -152,7 +152,7 @@ export function buildCustomPnlRows(data: MonthlyPnlAccounts, layout: ReportLayou
     const listed = cat.accounts.map((c) => byCode.get(c)).filter((a): a is PnlAccount => !!a)
     const accs = [...listed, ...(autoByCat.get(cat.id) ?? [])]
     const sub = colSum(accs.map((a) => a.values), n)
-    rows.push(...buildHierarchyRows(accs, cat.id, 1))
+    rows.push(...buildHierarchyRows(accs, cat.id, 1, cat.accounts))
     rows.push({ key: `cat:${cat.id}`, label: cat.name, depth: 0, kind: 'subtotal', tone: 'auto', values: sub })
     for (let i = 0; i < n; i++) running[i] = r2(running[i] + (sub[i] ?? 0))
 
