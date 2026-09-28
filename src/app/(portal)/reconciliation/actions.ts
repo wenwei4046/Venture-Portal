@@ -346,6 +346,59 @@ export async function contraBookLines(
   return {}
 }
 
+/**
+ * Statement-side contra: a set of STATEMENT lines that cancel each other and
+ * never reach the books — the bank's own charge-and-waiver pairs (2026-09-28,
+ * Aug'26: Service Charge 1.60 then Rebates-Fees 1.60 the next day). Mirror of
+ * contraBookLines; the group is dissolved the same way.
+ */
+export async function contraStatementLines(
+  sessionId: string,
+  statementLineIds: string[],
+): Promise<{ error?: string }> {
+  await requirePermission('reconciliation')
+  const supabase = await reconClient()
+
+  const sIds = Array.from(new Set(statementLineIds.filter(Boolean)))
+  if (sIds.length < 2) return { error: 'Pick at least two statement lines that cancel out' }
+
+  const [{ data: sls }, { data: claimed }] = await Promise.all([
+    supabase.from('bank_recon_lines').select('id, amount, session_id').in('id', sIds),
+    supabase.from('bank_recon_matches').select('statement_line_id').in('statement_line_id', sIds),
+  ])
+  const rows = (sls ?? []) as Array<{ id: string; amount: number; session_id: string }>
+  if (rows.length !== sIds.length) return { error: 'Some statement lines were not found' }
+  if (rows.some(l => l.session_id !== sessionId)) {
+    return { error: 'Those lines belong to another statement' }
+  }
+  if ((claimed ?? []).length > 0) {
+    return { error: 'Some of those lines are already matched/contra elsewhere' }
+  }
+  const sum = r2(rows.reduce((s, l) => s + Number(l.amount), 0))
+  if (Math.abs(sum) > 0.005) {
+    return { error: `Contra selection must sum to 0.00 — currently ${sum.toFixed(2)}` }
+  }
+
+  const groupId = crypto.randomUUID()
+  const { error } = await supabase.from('bank_recon_matches').insert(
+    sIds.map(id => ({
+      statement_line_id: id,
+      journal_line_id: null,
+      match_group: groupId,
+      session_id: sessionId,
+    })),
+  )
+  if (error) return { error: error.message }
+  const { error: kindErr } = await supabase
+    .from('bank_recon_lines')
+    .update({ match_kind: 'contra' })
+    .in('id', sIds)
+  if (kindErr) return { error: kindErr.message }
+  revalidatePath('/reconciliation')
+  revalidatePath(`/reconciliation/${sessionId}`)
+  return {}
+}
+
 /** Dissolve a whole match/contra group by its group id. */
 export async function dissolveGroup(groupId: string): Promise<{ error?: string }> {
   await requirePermission('reconciliation')

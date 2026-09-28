@@ -68,7 +68,9 @@ export default async function ReconSessionPage({
     contraMap.set(c.match_group, list)
   }
   const contraGroups = [...contraMap.entries()].map(([id, journalLineIds]) => ({ id, journalLineIds }))
-  // Groups: N statement lines ↔ M journal lines with equal totals.
+  // Groups: N statement lines ↔ M journal lines with equal totals. A group
+  // with no journal line at all is a statement-side contra (mig 20260928010000)
+  // — the bank charged and waived, so it is shown on its own, not as a match.
   const groupMap = new Map<string, { statementLineIds: Set<string>; journalLineIds: string[] }>()
   for (const m of (matchRows ?? []) as Array<{
     statement_line_id: string
@@ -80,11 +82,15 @@ export default async function ReconSessionPage({
     if (m.journal_line_id) g.journalLineIds.push(m.journal_line_id)
     groupMap.set(m.match_group, g)
   }
-  const groups = [...groupMap.entries()].map(([id, g]) => ({
+  const allGroups = [...groupMap.entries()].map(([id, g]) => ({
     id,
     statementLineIds: [...g.statementLineIds],
     journalLineIds: g.journalLineIds,
   }))
+  const groups = allGroups.filter(g => g.journalLineIds.length > 0)
+  const statementContraGroups = allGroups
+    .filter(g => g.journalLineIds.length === 0)
+    .map(g => ({ id: g.id, statementLineIds: g.statementLineIds }))
 
   const statementLines: ReviewStatementLine[] = ((lines ?? []) as Array<{
     id: string
@@ -258,6 +264,7 @@ export default async function ReconSessionPage({
         statementLines={statementLines}
         groups={groups}
         contraGroups={contraGroups}
+        statementContraGroups={statementContraGroups}
         unmatchedBook={unmatchedBook}
         bookInfo={Object.fromEntries(bookInfoById)}
         statementOpening={session.statement_opening != null ? Number(session.statement_opening) : null}

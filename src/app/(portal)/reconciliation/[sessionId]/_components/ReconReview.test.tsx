@@ -5,6 +5,7 @@ import ReconReview from './ReconReview'
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('../../actions', () => ({
   contraBookLines: vi.fn(),
+  contraStatementLines: vi.fn(),
   dissolveGroup: vi.fn(),
   manualMatch: vi.fn(),
   setLineIgnored: vi.fn(),
@@ -52,5 +53,25 @@ describe('ReconReview summary tiles', () => {
     setup(['auto', null])
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
     expect(screen.queryByText(/ignored/)).toBeNull()
+  })
+
+  // 2026-09-28: a bank charge the bank waived cancels on the statement alone.
+  it('counts statement-side contra lines as cleared and lists the group', () => {
+    const lines = [line('l0', -1.6, 'contra'), line('l1', 1.6, 'contra'), line('l2', 500, 'auto')]
+    render(
+      <ReconReview
+        sessionId="s1"
+        periodMonth="2026-08-01"
+        statementLines={lines}
+        groups={[{ id: 'g1', statementLineIds: ['l2'], journalLineIds: ['j2'] }]}
+        contraGroups={[]}
+        statementContraGroups={[{ id: 'c1', statementLineIds: ['l0', 'l1'] }]}
+        unmatchedBook={[]}
+        bookInfo={{}}
+      />,
+    )
+    expect(screen.getByText('3 / 3')).toBeInTheDocument()
+    expect(screen.getByText('1 matched · 2 contra')).toBeInTheDocument()
+    expect(screen.getByText('Contra — bank charge waived (1)')).toBeInTheDocument()
   })
 })

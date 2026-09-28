@@ -4,7 +4,14 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
-import { contraBookLines, dissolveGroup, manualMatch, setLineIgnored, unmatchLine } from '../../actions'
+import {
+  contraBookLines,
+  contraStatementLines,
+  dissolveGroup,
+  manualMatch,
+  setLineIgnored,
+  unmatchLine,
+} from '../../actions'
 import LedgerRow from '@/components/LedgerRow'
 
 export interface ReviewStatementLine {
@@ -43,6 +50,7 @@ export default function ReconReview({
   statementLines,
   groups,
   contraGroups,
+  statementContraGroups = [],
   unmatchedBook,
   bookInfo,
   statementOpening = null,
@@ -56,6 +64,9 @@ export default function ReconReview({
   groups: ReviewMatchGroup[]
   /** Book-only Dr/Cr sets that never hit the bank (Σ = 0). */
   contraGroups: Array<{ id: string; journalLineIds: string[] }>
+  /** Statement-only sets that cancel each other (Σ = 0) — a bank charge the
+   *  bank waived, never booked either side (2026-09-28). */
+  statementContraGroups?: Array<{ id: string; statementLineIds: string[] }>
   unmatchedBook: ReviewBookLine[]
   bookInfo: Record<string, ReviewBookLine>
   statementOpening?: number | null
@@ -76,6 +87,7 @@ export default function ReconReview({
   const lineById = new Map(statementLines.map(l => [l.id, l]))
   const matched = statementLines.filter(l => l.matchKind === 'auto' || l.matchKind === 'manual')
   const ignored = statementLines.filter(l => l.matchKind === 'ignored')
+  const contraS = statementLines.filter(l => l.matchKind === 'contra')
   const openS = statementLines.filter(l => l.matchKind == null)
 
   // Prior-month rows: the window reaches only back to the bank's first recon
@@ -170,11 +182,13 @@ export default function ReconReview({
               tile reads complete when nothing is left open (user 2026-09-28).
               The count of ignored ones stays visible underneath. */}
           <div className="font-serif text-xl text-num-ink tabular">
-            {matched.length + ignored.length} / {statementLines.length}
+            {matched.length + ignored.length + contraS.length} / {statementLines.length}
           </div>
-          {ignored.length > 0 ? (
+          {ignored.length + contraS.length > 0 ? (
             <div className="font-mono text-[11px] text-muted mt-1">
-              {matched.length} matched · {ignored.length} ignored
+              {matched.length} matched
+              {contraS.length > 0 ? ` · ${contraS.length} contra` : ''}
+              {ignored.length > 0 ? ` · ${ignored.length} ignored` : ''}
             </div>
           ) : null}
         </div>
@@ -237,6 +251,17 @@ export default function ReconReview({
                   onClick={() => run(() => contraBookLines(sessionId, bSelLines.map(l => l.id)))}
                   className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40"
                   title="Book-only Dr/Cr that never hit the bank — selection must sum to 0.00"
+                >
+                  Mark contra (Σ=0) →
+                </button>
+              ) : null}
+              {bSelLines.length === 0 && sSelLines.length >= 2 ? (
+                <button
+                  type="button"
+                  disabled={Math.abs(sSum) > 0.005 || isPending}
+                  onClick={() => run(() => contraStatementLines(sessionId, sSelLines.map(l => l.id)))}
+                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors disabled:opacity-40"
+                  title="Statement lines that cancel each other — a charge the bank waived. Selection must sum to 0.00 and nothing is booked."
                 >
                   Mark contra (Σ=0) →
                 </button>
@@ -519,6 +544,48 @@ export default function ReconReview({
                         <span className="font-serif text-graphite">{b.description}</span>
                         <span className="font-mono text-[11px] text-ink ml-2">
                           {formatMoneyBare(b.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => run(() => dissolveGroup(g.id))}
+                    className="font-serif italic text-xs text-muted hover:text-danger shrink-0"
+                  >
+                    Dissolve
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ── Contra — statement lines that cancel each other (2026-09-28) ── */}
+      {statementContraGroups.length > 0 ? (
+        <section className="mb-10">
+          <h2 className="font-serif text-xl text-ink mb-2">
+            Contra — bank charge waived ({statementContraGroups.length})
+          </h2>
+          <div className="space-y-2 max-w-4xl">
+            {statementContraGroups.map(g => {
+              const ls = g.statementLineIds.map(id => lineById.get(id)).filter(Boolean) as ReviewStatementLine[]
+              return (
+                <div
+                  key={g.id}
+                  className="flex items-start justify-between gap-4 border border-hairline rounded-md bg-surface px-3 py-2"
+                >
+                  <div className="space-y-0.5">
+                    {ls.map(l => (
+                      <div key={l.id} className="text-sm">
+                        <span className="font-mono text-[11px] text-graphite mr-2">
+                          {dayjs(l.date).format('D MMM')}
+                        </span>
+                        <span className="font-serif text-graphite">{l.description || '—'}</span>
+                        <span className="font-mono text-[11px] text-ink ml-2">
+                          {formatMoneyBare(l.amount)}
                         </span>
                       </div>
                     ))}

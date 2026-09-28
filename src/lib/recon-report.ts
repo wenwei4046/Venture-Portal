@@ -6,7 +6,9 @@
 //   GL(month-end) = statement_closing
 //                 + Σ outstanding book lines (dated ≤ month-end, unclaimed OR
 //                   claimed by a LATER month's session — see as-at rule)
-//                 − Σ statement items not in books (unmatched or ignored lines
+//                 − Σ statement items not in books (unmatched or ignored lines;
+//                   'contra' lines cancel each other on the statement and are
+//                   left out, the way book-side contra groups are
 //                   of this bank's sessions up to this month)
 //
 // As-at rule: a book line claimed by a session whose month is AFTER the report
@@ -46,7 +48,7 @@ export type ReportStatementLine = {
   description: string
   /** Signed: deposit +, withdrawal −. */
   amount: number
-  matchKind: 'auto' | 'manual' | 'ignored' | null
+  matchKind: 'auto' | 'manual' | 'ignored' | 'contra' | null
 }
 
 export type ReconReportItem = {
