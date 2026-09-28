@@ -50,15 +50,17 @@ export default async function ReconciliationPage() {
   )
   const bankById = new Map(banks.map(b => [b.id, b]))
 
-  const countsBySession = new Map<string, { total: number; matched: number; ignored: number }>()
+  // Cleared = matched to the books, contra'd against other statement lines
+  // (a bank charge the bank waived — mig 20260928010000), or ignored. Only
+  // what is none of those is still open, the way the review page counts it.
+  const countsBySession = new Map<string, { total: number; cleared: number }>()
   for (const l of (lineRows ?? []) as Array<{
     session_id: string
     match_kind: string | null
   }>) {
-    const c = countsBySession.get(l.session_id) ?? { total: 0, matched: 0, ignored: 0 }
+    const c = countsBySession.get(l.session_id) ?? { total: 0, cleared: 0 }
     c.total++
-    if (l.match_kind === 'auto' || l.match_kind === 'manual') c.matched++
-    else if (l.match_kind === 'ignored') c.ignored++
+    if (l.match_kind != null) c.cleared++
     countsBySession.set(l.session_id, c)
   }
 
@@ -147,7 +149,7 @@ export default async function ReconciliationPage() {
                   <th>Bank</th>
                   <th>Month</th>
                   <th className="m-hide">File</th>
-                  <th className="num m-hide">Matched</th>
+                  <th className="num m-hide">Cleared</th>
                   <th className="num">Open items</th>
                   <th className="m-hide">Status</th>
                   <th className="right m-hide">Actions</th>
@@ -162,8 +164,8 @@ export default async function ReconciliationPage() {
                   source_filename: string | null
                   status: string
                 }>).map(s => {
-                  const c = countsBySession.get(s.id) ?? { total: 0, matched: 0, ignored: 0 }
-                  const open = c.total - c.matched - c.ignored
+                  const c = countsBySession.get(s.id) ?? { total: 0, cleared: 0 }
+                  const open = c.total - c.cleared
                   return (
                     <LedgerRow key={s.id}>
                       <td className="font-serif text-[15px] text-ink">
@@ -176,7 +178,7 @@ export default async function ReconciliationPage() {
                         {s.source_filename ?? '—'}
                       </td>
                       <td className="num m-hide" data-label="Matched">
-                        {c.matched} / {c.total}
+                        {c.cleared} / {c.total}
                       </td>
                       <td className={`num font-semibold ${open === 0 ? 'text-ledger' : 'text-alert'}`}>
                         {open === 0 ? '✓ 0' : open}
