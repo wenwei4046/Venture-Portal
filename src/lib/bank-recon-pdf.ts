@@ -12,6 +12,17 @@
 //   noise: bank refs (20260401HLBB…), page artifacts (23600599248_6 1),
 //   footer lines.
 //
+// Column classification (2026-09-28, "Venture - Aug'26.pdf"): the money cells
+// are RIGHT-aligned, so a short number's left edge sits far to the right of a
+// long one's — "1.60" in Deposit starts at x 23.96 while "100,000.00" starts
+// at 22.71. Nearest-header-x therefore mis-filed the small rows: August's two
+// rebate credits (1.60 + 0.40) were read as withdrawals (by 0.03 of a unit)
+// and its two service charges were read as the balance column and dropped.
+// Instead the x's of every money cell on a dated row are clustered across the
+// whole document — the three columns fall out as three tight, well-separated
+// bands — and each band is tied to its header. Long or short, a cell is then
+// classified by the band it sits in.
+//
 // Every parse is validated: opening + Σ(signed amounts) must equal closing to
 // the sen, else we refuse (fail-safe — never save a half-read statement).
 
@@ -70,36 +81,96 @@ function toRows(items: PdfTextItem[], tolerance = 0.3): PdfTextItem[][] {
   return rows
 }
 
+type MoneyColumn = 'deposit' | 'withdrawal' | 'balance'
+
+interface HeaderXs { deposit: number; withdrawal: number; balance: number }
+
+/** Header x's from the first page that carries a transaction table. */
+function headerXs(pages: PdfPageItems[]): HeaderXs | null {
+  for (const page of pages) {
+    let deposit = -1, withdrawal = -1, balance = -1
+    for (const item of page.items) {
+      const t = item.text.trim().toLowerCase()
+      if (t === 'deposit') deposit = item.x
+      if (t === 'withdrawal') withdrawal = item.x
+      if (t === 'balance') balance = item.x
+    }
+    if (deposit >= 0 && withdrawal >= 0 && balance >= 0) return { deposit, withdrawal, balance }
+  }
+  return null
+}
+
+/** Sorted x's → bands, split wherever the gap exceeds `gap` units. */
+function bandsFromXs(xs: number[], gap = 2): Array<{ lo: number; hi: number }> {
+  const sorted = [...xs].sort((a, b) => a - b)
+  const bands: Array<{ lo: number; hi: number }> = []
+  for (const x of sorted) {
+    const last = bands[bands.length - 1]
+    if (last && x - last.hi <= gap) last.hi = x
+    else bands.push({ lo: x, hi: x })
+  }
+  return bands
+}
+
+/**
+ * Build the classifier: cluster every money cell that sits on a dated row and
+ * tie each band to a column. Three bands read left→right as deposit /
+ * withdrawal / balance; otherwise each band takes the header nearest its left
+ * edge (where the column's longest — leftmost-starting — number sits).
+ * Falls back to plain nearest-header when there is nothing to cluster.
+ */
+function buildClassifier(pages: PdfPageItems[], h: HeaderXs): (x: number) => MoneyColumn {
+  const xs: number[] = []
+  for (const page of pages) {
+    for (const row of toRows(page.items)) {
+      if (!DATE_RE.test(row[0].text.trim())) continue
+      for (const item of row.slice(1)) if (parseNum(item.text) != null) xs.push(item.x)
+    }
+  }
+  const nearest = (x: number): MoneyColumn => {
+    const d = Math.abs(x - h.deposit), w = Math.abs(x - h.withdrawal), b = Math.abs(x - h.balance)
+    if (d <= w && d <= b) return 'deposit'
+    if (w <= b) return 'withdrawal'
+    return 'balance'
+  }
+  const bands = bandsFromXs(xs)
+  if (bands.length === 0) return nearest
+  const cols: MoneyColumn[] =
+    bands.length === 3
+      ? ['deposit', 'withdrawal', 'balance']
+      : bands.map((b) => nearest(b.lo))
+  return (x: number): MoneyColumn => {
+    for (let i = 0; i < bands.length; i++) {
+      if (x >= bands[i].lo - 0.5 && x <= bands[i].hi + 0.5) return cols[i]
+    }
+    // Outside every band (a stray cell): nearest band, else nearest header.
+    let best = -1, bestDist = Infinity
+    for (let i = 0; i < bands.length; i++) {
+      const dist = x < bands[i].lo ? bands[i].lo - x : x > bands[i].hi ? x - bands[i].hi : 0
+      if (dist < bestDist) { bestDist = dist; best = i }
+    }
+    return bestDist <= 2 ? cols[best] : nearest(x)
+  }
+}
+
 export function parseHlbPdf(pages: PdfPageItems[]): PdfParsedStatement | { error: string } {
   const lines: PdfParsedStatement['lines'] = []
   let opening: number | null = null
   let closing: number | null = null
   let skipped = 0
 
+  const headers = headerXs(pages)
+  if (!headers) {
+    return { error: 'No Deposit / Withdrawal / Balance columns found in the PDF — send this file to Claude to tune the template.' }
+  }
+  const classify = buildClassifier(pages, headers)
+
   for (const page of pages) {
     const rows = toRows(page.items)
 
-    // Column calibration from this page's header row.
-    let depositX = -1, withdrawalX = -1, balanceX = -1
-    for (const row of rows) {
-      for (const item of row) {
-        const t = item.text.trim().toLowerCase()
-        if (t === 'deposit') depositX = item.x
-        if (t === 'withdrawal') withdrawalX = item.x
-        if (t === 'balance') balanceX = item.x
-      }
-      if (depositX >= 0 && withdrawalX >= 0 && balanceX >= 0) break
-    }
-    if (depositX < 0 || withdrawalX < 0 || balanceX < 0) continue // page without a txn table
-
-    const classify = (x: number): 'deposit' | 'withdrawal' | 'balance' => {
-      const d = Math.abs(x - depositX)
-      const w = Math.abs(x - withdrawalX)
-      const b = Math.abs(x - balanceX)
-      if (d <= w && d <= b) return 'deposit'
-      if (w <= b) return 'withdrawal'
-      return 'balance'
-    }
+    // Pages without the transaction table (cover / terms) carry no money cells.
+    const hasTable = page.items.some((i) => /^(deposit|withdrawal|balance)$/i.test(i.text.trim()))
+    if (!hasTable) continue
 
     let currentLineIdx: number | null = null
 
@@ -167,7 +238,10 @@ export function parseHlbPdf(pages: PdfPageItems[]): PdfParsedStatement | { error
     const expected = r2(closing - opening)
     if (Math.abs(sum - expected) > 0.01) {
       return {
-        error: `Parsed movements (RM ${sum.toFixed(2)}) don't tie to the statement's opening→closing change (RM ${expected.toFixed(2)}) — send this file to Claude to tune the template.`,
+        error:
+          `Parsed movements (RM ${sum.toFixed(2)}) don't tie to the statement's opening→closing change (RM ${expected.toFixed(2)})` +
+          (skipped > 0 ? ` — ${skipped} dated row${skipped === 1 ? '' : 's'} had no readable amount` : '') +
+          ' — send this file to Claude to tune the template.',
       }
     }
   }

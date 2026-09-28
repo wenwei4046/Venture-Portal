@@ -69,6 +69,35 @@ describe('parseHlbPdf', () => {
     expect(r.skipped).toBe(0)
   })
 
+  // Regression, "Venture - Aug'26.pdf" (2026-09-28): the money cells are
+  // right-aligned, so RM 1.60 starts ~1 unit right of RM 100,000.00 in the same
+  // column. Nearest-header-x put the rebate credits in Withdrawal and the
+  // service charges in Balance (dropping them) — the statement then missed
+  // 2 deposits and refused to load. Same geometry as the real file.
+  it('files short right-aligned amounts by column band, not nearest header', () => {
+    const t = (x: number, y: number, text: string) => ({ x, y, text })
+    const page: PdfPageItems = {
+      items: [
+        t(22.25, 4.9, 'HLB PRIMEBIZ CURRENT ACCOUNT'),
+        t(3.93, 14.9, 'Date'), t(6.67, 14.9, 'Transaction Description'),
+        t(21.7, 14.9, 'Deposit'), t(26.2, 14.9, 'Withdrawal'), t(31.57, 14.9, 'Balance'),
+        t(6.13, 16.5, 'Balance from previous statement'), t(32.63, 16.5, '1,000.00'),
+        // Long numbers: deposit starts at 22.94, withdrawal at 27.89.
+        t(3.4, 17.2, '01-08-2026'), t(6.13, 17.2, 'Fund Transfer at DIO'), t(22.94, 17.2, '10,929.08'),
+        t(3.4, 18.2, '02-08-2026'), t(6.13, 18.2, 'Fund Transfer at DIO'), t(27.89, 18.2, '11,800.00'),
+        // Short numbers sit ~1 unit further right in the SAME columns.
+        t(3.4, 19.2, '03-08-2026'), t(6.13, 19.2, 'Service Charge - ePayment at KLM'), t(28.91, 19.2, '1.60'),
+        t(3.4, 20.2, '04-08-2026'), t(6.13, 20.2, 'Rebates-Fees/Loan Interest/Token'), t(23.96, 20.2, '0.40'),
+        t(32.63, 20.2, '127.88'),
+      ],
+    }
+    const r = parseHlbPdf([page])
+    if ('error' in r) throw new Error(r.error)
+    expect(r.lines.map(l => l.amount)).toEqual([10929.08, -11800, -1.6, 0.4])
+    expect(r.skipped).toBe(0)
+    expect(r.closing).toBe(127.88)
+  })
+
   it('refuses when movements do not tie to opening→closing', () => {
     const page = fixturePage()
     // Corrupt one amount so the sum check fails.
