@@ -1378,6 +1378,32 @@ file's verbatim statutory with recomputed JADUAL values — **31 of the 38 live
 rows move** if anyone runs a bulk `UPDATE hr_monthly_payroll SET x = x`. Do not
 do that without accounting for it.
 
+## SESSION 2026-09-28 — Wei Siang installment linked; director-interest legs reconciled to the lending book
+
+**PV HV-PV-202608-0275** (1,950, 2026-08-10, 4054) was unlinked — the only gap in
+[BI#5] Lim Wei Siang 90k (2025-05 → 2026-09 otherwise continuous). Linked to
+BI#5 with rows principal 1,500 + interest 450, `repayment_breakdown` set. BI#5
+now 17 installments, principal paid 25,500, outstanding 64,500.
+
+**Then reconciled 4054 / 4055 against the lending book** (the user challenged my
+first read — "6月的不是有吗？" — and was right):
+- 2026-06-12 **JE-202606-0106** is a reclass JV (Dr 6000 750 / Cr 4054 450 /
+  Cr 4055 300) that already pulled the June interest out for BOTH directors.
+  June was therefore correct all along.
+- **My 2026-09-21 error**: I also split Liang's June JE-202606-0059 in place, so
+  that 300 was counted twice (4055 300 high, 6000 300 high). Undone 2026-09-28 —
+  JE-202606-0059 is back to 4054-style single line 4055 Dr 1,300, the extra 6000
+  line and its PV source row deleted, entry description notes why. Liang's July /
+  August splits stay (no reclass covers those months).
+- Split in place (4054 principal + 6000 interest), no reclass JV:
+  PV 202607-0107 (Jul) 1,500 + 450 · PV 202608-0275 (Aug) 1,500 + 450 ·
+  PV 202606-0067 (2026-06-25 BI#30 partial refund 10,150) 10,000 + 150.
+- After: **4054 GL 102,000 = book 102,000**, **4055 GL 42,000 = book 42,000**,
+  no unbalanced JEs, 6000 52,477.77 → 53,227.77 (+450 +450 +150 −300).
+
+Lesson recorded in memory: before splitting a PV's 40xx leg in place, check
+whether a reclass JV already moved that month's interest.
+
 ## SESSION 2026-09-22 (later) — New loan / New fund source: one two-column deal form (c10a7fc5)
 
 **Ask**: "就你看 new loan 我需要往下滑，旁边其实有位置 然后排法很混乱" →
