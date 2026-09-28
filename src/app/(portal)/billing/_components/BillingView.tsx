@@ -92,7 +92,9 @@ export default async function BillingView({ searchParams }: Props) {
       .from('chart_of_accounts')
       .select('code, name, type, parent_code')
       .eq('is_active', true)
-      .order('sort_order'),
+      // By code — sort_order is unset on most rows, which left the pickers in
+      // insertion order (user 2026-09-28: "这个太乱了，应该顺序").
+      .order('code'),
     // For the batch-settle modal in InvoicesList.
     supabase
       .from('bank_accounts')

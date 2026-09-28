@@ -20,15 +20,24 @@ export default function ReassignInvoiceGlButton({
   invoiceNo,
   currentCategory,
   categories,
+  postedAccounts = [],
 }: {
   invoiceId: string
   invoiceNo: string | null
   currentCategory: string | null
   categories: CategoryOption[]
+  /** The accounts this invoice actually posted to, with their amounts. A split
+   *  invoice has several — HV-INV-202609-0040 put one recruitment bill across
+   *  five subsidiaries — and they can now be moved in one go (user 2026-09-28:
+   *  "我一次只能改一个?"). */
+  postedAccounts?: Array<{ code: string; amount: number }>
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [oldAccount, setOldAccount] = useState(currentCategory ?? '')
+  const multi = postedAccounts.length > 1
+  const [picked, setPicked] = useState<string[]>(() => postedAccounts.map((a) => a.code))
+  const labelOf = (code: string) => categories.find((c) => c.code === code)?.label ?? code
   const [newAccount, setNewAccount] = useState('')
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -38,11 +47,13 @@ export default function ReassignInvoiceGlButton({
   function submit() {
     setError(null)
     if (!newAccount) return setError('选新的 account')
-    if (oldAccount && newAccount === oldAccount) return setError('新旧 account 一样')
+    const from = multi ? picked.filter((c) => c !== newAccount) : oldAccount ? [oldAccount] : []
+    if (multi && from.length === 0) return setError('勾至少一个要改的 account')
+    if (!multi && oldAccount && newAccount === oldAccount) return setError('新旧 account 一样')
     if (!reason.trim()) return setError('写一句原因(会记进 GL 的审计注记)')
     const fd = new FormData()
     fd.set('id', invoiceId)
-    fd.set('old_account', oldAccount)
+    fd.set('old_account', from.join(','))
     fd.set('new_account', newAccount)
     fd.set('reason', reason.trim())
     startTransition(async () => {
@@ -81,23 +92,67 @@ export default function ReassignInvoiceGlButton({
               </p>
             </div>
             <div className="px-6 py-4 space-y-4">
-              <div>
-                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  现在的 account <span className="text-muted font-normal">(留空 = 自动侦测)</span>
-                </label>
-                <select
-                  value={oldAccount}
-                  onChange={(e) => setOldAccount(e.target.value)}
-                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-                >
-                  <option value="">自动侦测(单科目发票)</option>
-                  {categories.map((o) => (
-                    <option key={o.code} value={o.code}>
-                      {o.code} · {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {multi ? (
+                <div>
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <label className="block text-sm font-sans font-medium text-graphite">
+                      要改哪几个{' '}
+                      <span className="text-muted font-normal">(这张发票分了 {postedAccounts.length} 个科目)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPicked(picked.length === postedAccounts.length ? [] : postedAccounts.map((a) => a.code))
+                      }
+                      className="text-xs font-sans text-accent hover:underline"
+                    >
+                      {picked.length === postedAccounts.length ? '全部不选' : '全选'}
+                    </button>
+                  </div>
+                  <div className="border border-hairline rounded-md divide-y divide-hairline max-h-52 overflow-y-auto">
+                    {postedAccounts.map((a) => (
+                      <label
+                        key={a.code}
+                        className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-surface"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={picked.includes(a.code)}
+                          onChange={(e) =>
+                            setPicked((prev) =>
+                              e.target.checked ? [...prev, a.code] : prev.filter((c) => c !== a.code),
+                            )
+                          }
+                          className="h-4 w-4 accent-[var(--accent)]"
+                        />
+                        <span className="font-mono text-[11px] text-graphite">{a.code}</span>
+                        <span className="flex-1 text-ink truncate">{labelOf(a.code)}</span>
+                        <span className="font-mono tabular text-[12px] text-graphite">
+                          {a.amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                    现在的 account <span className="text-muted font-normal">(留空 = 自动侦测)</span>
+                  </label>
+                  <select
+                    value={oldAccount}
+                    onChange={(e) => setOldAccount(e.target.value)}
+                    className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                  >
+                    <option value="">自动侦测(单科目发票)</option>
+                    {categories.map((o) => (
+                      <option key={o.code} value={o.code}>
+                        {o.code} · {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-sans font-medium text-graphite mb-1.5">改去(对的 account)</label>
                 <select

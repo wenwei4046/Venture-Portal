@@ -148,6 +148,20 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     setSelectionPeriod(period)
     setSelectedIds(new Set())
   }
+  /** The distinct accounts an invoice's lines posted to, with their totals —
+   *  the reassign dialog ticks them off and moves them in one submit. */
+  const postedAccountsOf = (invoiceId: string) => {
+    const byCode = new Map<string, number>()
+    for (const l of invoiceLines[invoiceId] ?? []) {
+      if (!l.category_code) continue
+      const next = (byCode.get(l.category_code) ?? 0) + Number(l.amount)
+      byCode.set(l.category_code, Math.round(next * 100) / 100)
+    }
+    return [...byCode.entries()]
+      .map(([code, amount]) => ({ code, amount }))
+      .sort((a, b) => a.code.localeCompare(b.code))
+  }
+
   // code → account name, labels the detail modal's line categories.
   const catLabelByCode: Record<string, string> = Object.fromEntries(
     categories.map((c) => [c.code, c.label]),
@@ -658,6 +672,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                               invoiceNo={inv.invoice_no}
                               currentCategory={inv.category_code ?? null}
                               categories={categories.map((c) => ({ code: c.code, label: c.label }))}
+                              postedAccounts={postedAccountsOf(inv.id)}
                             />
                           </>
                         ) : null}

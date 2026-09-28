@@ -2505,18 +2505,38 @@ export async function reassignInvoiceGlAccount(
     if (!id || !newAccount) return { error: 'Invoice and new account are required' }
     if (!reason) return { error: 'Reason is required (goes into the audit note)' }
 
-    const { data, error } = await supabase.rpc('reassign_invoice_gl_account' as never, {
-      p_invoice_id: id,
-      p_new_account: newAccount,
-      p_reason: reason,
-      p_old_account: oldAccount || null,
-    } as never)
-    if (error) return { error: error.message }
+    // An invoice can post to several accounts at once (HV-INV-202609-0040 split
+    // one recruitment bill across five subsidiaries' due-from accounts), and the
+    // RPC moves one account per call. old_account may therefore be a list —
+    // "3051,3053,3056" — and each one is moved in turn (user 2026-09-28: "我一
+    // 次只能改一个?"). A blank keeps the single-account auto-detect.
+    const olds = oldAccount
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .filter((c) => c !== newAccount)
+    let changed = 0
+    let firstOld: string | undefined
+    for (const old of olds.length > 0 ? olds : [null]) {
+      const { data, error } = await supabase.rpc('reassign_invoice_gl_account' as never, {
+        p_invoice_id: id,
+        p_new_account: newAccount,
+        p_reason: reason,
+        p_old_account: old,
+      } as never)
+      if (error) {
+        return changed > 0
+          ? { error: `${changed} 条改好了，然后停在 ${old ?? '自动侦测'}：${error.message}` }
+          : { error: error.message }
+      }
+      const res = (data ?? {}) as { changed?: number; old_account?: string }
+      changed += Number(res.changed ?? 0)
+      firstOld = firstOld ?? res.old_account
+    }
 
-    const res = (data ?? {}) as { changed?: number; old_account?: string }
     revalidatePath('/billing')
     revalidatePath('/reports')
-    return { changed: Number(res.changed ?? 0), oldAccount: res.old_account }
+    return { changed, oldAccount: olds.length > 1 ? olds.join(', ') : firstOld }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Unknown error' }
   }

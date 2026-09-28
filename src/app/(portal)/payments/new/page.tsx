@@ -115,7 +115,6 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       .select('code, name, type, parent_code, is_active')
       .eq('is_active', true)
       .order('type')
-      .order('sort_order')
       .order('code'),
     listPayableFundSources().catch(() => []),
   ])

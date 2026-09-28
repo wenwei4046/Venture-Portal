@@ -291,7 +291,7 @@ async function RequestPaymentTabContent({
       .select('code, name, type')
       .in('type', ['expense', 'cost'])
       .eq('is_active', true)
-      .order('sort_order'),
+      .order('code'),
     supabase
       .from('dept_payment_requests')
       .select('id, amount, payee_name, description, status, requested_at, pv_id')
