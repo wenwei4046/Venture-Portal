@@ -1404,6 +1404,60 @@ first read — "6月的不是有吗？" — and was right):
 Lesson recorded in memory: before splitting a PV's 40xx leg in place, check
 whether a reclass JV already moved that month's interest.
 
+## SESSION 2026-09-29 — Reports read clean, and AR is per customer
+
+**Report chrome (db5f9c20)**: the sticky first column is a positioned element,
+so it painted over the table's collapsed borders — every row rule and the
+column's right edge vanished under the labels. Drawn on the cell now (inset
+shadows, `.mx-matrix` / `.cf-matrix`, gold category edge and the strong rows'
+gold rules stacked in). Row labels no longer wrap (matrix label cells +
+`.gl-report td:first-child`); the column grows to the longest name.
+
+**Reassign GL dialog (a89e3023)**: account pickers order by `code` — they were
+ordered by `sort_order`, which is a within-family sequence (10/20/30) repeated
+per family, so the families interleaved (also fixed on New payment and the
+Marketing dept pool). A split invoice can be moved in one submit: the dialog
+lists the accounts the invoice actually posted to with amounts, all ticked,
+and the action walks them (old_account is now a comma list).
+
+**AR BY CUSTOMER (81eec8e4, migs 20260929010000 + 20260929020000)** — user:
+"account receivable 我看不到 detail 是吗" → "做2，本身就应该要有顾客
+maintenance 的层面" → "对，我就是要 3030 不能记账了".
+- 3030 now has ten children: 3031 HC · 3032 CONTS · 3033 CAR · 3034 DC ·
+  3035 2990 · 3036 HK · 3037 OHN · 3038 CMI · 3039 external customers ·
+  3073 internal (dept recharges). Balances after the move: 259,502.50 /
+  3,978.30 / 24,212.19 / 16,925.48 / 12,495.30 / 3,105.15, the rest 0;
+  family total unchanged at 320,218.92 over 419 lines. **3030 itself is a
+  header now — the journal_lines guard blocks posting to it.**
+- Attribution came from each line's own record (invoice → counterparty;
+  receipt/void → settled invoice, else payee company; CN → its invoice), with
+  five reclass lines named explicitly in the migration. Cross-checked against
+  the invoices table's unpaid totals per company — equal to the sen.
+- Resolution lives in SQL: `ar_account_code_for(company, dept, freetext)`,
+  `ar_account_for_invoice`, `ar_account_for_voucher`, `ar_account_codes()`.
+  The three approve_voucher* functions were patched IN PLACE (their stored
+  definition, one literal each) to credit `ar_account_for_voucher(v_voucher.id)`.
+  Both reassign RPCs now guard the whole family.
+- TS: `src/lib/ar-accounts.ts` (`resolveArGlCode`, `accountFamily`) used by
+  billing/actions (9 sites: issue, bulk issue, inter-billing clear, settle,
+  CN), payments/actions (receipt legs), payments/[id] (hide the AR leg).
+  cfo-reports sums the family for AR **and Loans Receivable — 3020 had been
+  reading zero** since its children took the postings.
+- `companies.ar_account_code` is the maintenance point; Settings › Companies
+  shows it and edits it (validated: must be an active child of 3030). A
+  company without one falls through to 3039 rather than failing an invoice.
+- **Not done**: a real customer registry for external names (Rygis is the only
+  one today, all external invoices share 3039). Offered, user deferred.
+
+**Also answered**: Advertisement 20,409.48 on Cash Flow = four ad payments;
+the 12,079.57 recharged back was credited to 9095 itself (P&L net 11,139.92),
+one invoice still unpaid (HV-INV-202608-0021, 205.66). And invoice
+HV-INV-202609-0040 (1,500, HR) posts its five 300 lines to the subsidiaries'
+due-from accounts instead of an income account — flagged, user has not ruled.
+
+**Gates**: tsc clean, vitest 3,726 pass / 1 pre-existing failure in the other
+session's `erp-sync/catalogue.test.ts`, next build green.
+
 ### 2026-09-28 (later) — Aug'26 statement, the recon page, report order, HC's two accounts
 
 **PDF template fix (9b6d2e28)**: Aug'26 refused to load, parsed movements RM 2.00
