@@ -34,6 +34,26 @@ describe('ErpChangesPanel', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  // A tab of the month's workbench since 2026-09-30: always drawn, and says so when empty.
+  it('as a tab, says there is nothing to answer', () => {
+    render(<ErpChangesPanel period="2026-09-01" pending={[]} locked={false} inTab />)
+    expect(screen.getByRole('region', { name: 'Drops and upsells the ERP found' }))
+      .toHaveTextContent('Nothing to answer — the ERP has changed no settled bill since the last answer, and nothing it found is paid into September 2026.')
+    expect(screen.queryByRole('table')).toBeNull()
+  })
+
+  it('as a tab, sums up what waits and what was paid in', () => {
+    const PAID: UpsaleView = { ...DROP, id: 'p0', status: 'confirmed', amount: -300, originalRef: 'HC100' }
+    render(<ErpChangesPanel period="2026-09-01" pending={[DROP, UPSELL]} paid={[PAID]} locked={false} inTab />)
+    const panel = screen.getByRole('region', { name: 'Drops and upsells the ERP found' })
+    expect(panel).toHaveTextContent('To answer2')
+    expect(panel).toHaveTextContent('Drops waitingRM (2,088.00)')
+    expect(panel).toHaveTextContent('Upsells waitingRM 500.00')
+    expect(panel).toHaveTextContent('Paid in September 20261net RM (300.00)')
+    expect(within(screen.getByRole('table', { name: 'Drops and upsells to answer' })).getByRole('row', { name: /2 to answer/ }))
+      .toHaveTextContent('drops RM (2,088.00) · upsells RM 500.00RM (1,588.00)')
+  })
+
   it('shows each change against what was settled, drops and upsells apart (user 2026-09-26)', () => {
     render(<ErpChangesPanel period="2026-09-01" pending={[DROP, UPSELL]} locked={false} />)
     const panel = screen.getByRole('region', { name: 'Drops and upsells the ERP found' })

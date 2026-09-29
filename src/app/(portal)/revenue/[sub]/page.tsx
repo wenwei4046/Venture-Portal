@@ -238,9 +238,14 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
                           {label(b.period_month)}
                         </WarmLink>
                         {claimsByMonth.get(b.period_month) ? (
-                          <div className="text-[11px] font-medium text-danger mt-0.5">
+                          // Straight to the month's Double claims tab, where each
+                          // one says why it was flagged (2026-09-30).
+                          <Link
+                            href={`${revenuePath(subDept.slug, b.period_month)}?view=claims`}
+                            className="block text-[11px] font-medium text-danger mt-0.5 hover:underline"
+                          >
                             {claimsByMonth.get(b.period_month)} possible double claim{claimsByMonth.get(b.period_month) === 1 ? '' : 's'}
-                          </div>
+                          </Link>
                         ) : null}
                       </td>
                       <td className="num m-hide" data-label="Orders">{b.order_count}</td>

@@ -208,6 +208,8 @@
 .badge,
 .warningBadge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid rgb(var(--hairline)); border-radius: 5px; background: rgb(var(--surface-2)); font-size: 10px; font-weight: 500; white-space: nowrap; }
 .warningBadge { background: #fff4df; border-color: #e8c883; }
+/* A review tab's count while something in it waits on a person (2026-09-30). */
+.tabs .alertBadge { border-color: rgb(var(--alert) / 0.45); background: rgb(var(--alert-bg)); color: rgb(var(--alert)); font-weight: 600; }
 .notice,
 .warning { margin: 14px 0; padding: 11px 14px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--accent-bg)); font-size: 12px; line-height: 1.65; }
 .warning { border-color: #e8c883; background: #fff9ed; }

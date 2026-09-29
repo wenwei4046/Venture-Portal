@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import type { FairMove } from '../../../_lib/fair-calendar'
 import { moveConfirmedFairBills } from '../../../fair-actions'
+import s from './commission-workbench.module.css'
 
 interface Props {
   /** YYYY-MM-01 — the month on screen. */
@@ -40,7 +41,9 @@ function days(start: string | null, end: string | null): string {
  * Revenue › Venues beside the fair calendar nobody types into any more.
  *
  * Shown on the month the bills leave AND the month they belong to; the button
- * moves every confirmed bill of the sub-department, whichever months.
+ * moves every confirmed bill of the sub-department, whichever months. Since
+ * 2026-09-30 it sits in the month's *Drops & upsells* tab, under the ERP's
+ * drops and upsells — the other thing the ERP found that waits on a person.
  */
 export default function FairMovesPanel({ period, subDepartmentId, moves }: Props) {
   const router = useRouter()
@@ -79,9 +82,9 @@ export default function FairMovesPanel({ period, subDepartmentId, moves }: Props
   }
 
   return (
-    <section aria-label="Bills of another month's fair" className="mb-6 border border-hairline rounded-card bg-surface px-4 py-4">
+    <section aria-label="Bills of another month's fair" className="mt-8">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
-        <h2 className="text-[17px] font-bold tracking-[-0.015em]">Bills of another month&apos;s fair</h2>
+        <h2 className={s.sectionHeading}>Bills of another month&apos;s fair</h2>
         <span className="chip alert">
           <span className="dot" />
           {leaving.length > 0 ? `${leaving.length} belong elsewhere` : null}
@@ -89,53 +92,51 @@ export default function FairMovesPanel({ period, subDepartmentId, moves }: Props
           {arriving.length > 0 ? `${arriving.length} belong here` : null}
         </span>
       </div>
-      <p className="text-sm mb-3 max-w-3xl">
+      <p className={`${s.subtitle} mb-3`}>
         The ERP names the fair each bill was written at, and the fair decides the payroll. These sit in a
         different month from their fair — keyed after it closed, or before it was placed. Moving puts each
         bill in its fair&apos;s month; the runs of both months must then be computed again. A month whose run
         has paid, or that is closed to the feed, keeps its bills.
         {settled > 0 ? ` ${settled} more belong to a settled month's fair and stay where they are.` : ''}
       </p>
-      <div className="overflow-x-auto">
-        <table className="ledger-table">
+      <div className={s.tableFrame}><div className={s.tableScroll}>
+        <table className={s.table} aria-label="Bills of another month's fair">
           <thead>
             <tr>
-              <th>Bill</th>
-              <th className="m-hide">Salesperson</th>
-              <th className="m-hide">Fair</th>
+              <th className={s.stickyFirst}>Bill</th>
+              <th>Salesperson</th>
+              <th>Fair</th>
               <th>Move</th>
-              <th className="right">Sales value</th>
+              <th className={s.numeric}>Sales value</th>
             </tr>
           </thead>
           <tbody>
             {here.map(m => (
               <tr key={m.orderId}>
+                <td className={s.stickyFirst}>
+                  {m.orderNo}
+                  <small>keyed {m.orderDate}</small>
+                </td>
+                <td>{m.salesperson}</td>
                 <td>
-                  <span className="font-mono text-xs text-ink">{m.orderNo}</span>
-                  <small className="block font-mono text-[10px] mt-0.5">keyed {m.orderDate}</small>
-                </td>
-                <td className="m-hide" data-label="Salesperson">{m.salesperson}</td>
-                <td className="m-hide" data-label="Fair">
                   {m.venue ?? '—'}
-                  <small className="block text-[11px] mt-0.5">
-                    {[days(m.fairStart, m.fairEnd), m.organiser].filter(Boolean).join(' · ')}
-                  </small>
+                  <small>{[days(m.fairStart, m.fairEnd), m.organiser].filter(Boolean).join(' · ')}</small>
                 </td>
-                <td className="whitespace-nowrap">
+                <td>
                   {monthName(m.fromPeriod)} → {monthName(m.toPeriod)}
-                  <small className="block mt-1">
+                  <small>
                     <span className={`chip ${m.confirmed ? 'ledger' : 'alert'}`}>
                       <span className="dot" />
                       {m.confirmed ? 'Confirmed' : 'Guessed — stays'}
                     </span>
                   </small>
                 </td>
-                <td className="num">{formatMoney(m.orderTotal)}</td>
+                <td className={s.numeric}>{formatMoney(m.orderTotal)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </div></div>
       <div className="flex flex-wrap items-center gap-3 mt-3">
         <button
           type="button"
@@ -143,16 +144,16 @@ export default function FairMovesPanel({ period, subDepartmentId, moves }: Props
           onClick={() => {
             if (window.confirm(`Move ${movable.length} confirmed bill${movable.length === 1 ? '' : 's'} into their fair's month (${months.map(monthName).join(', ')})? Compute those runs again afterwards.`)) move()
           }}
-          className="bg-accent hover:bg-accent-hover text-sm px-4 py-2 rounded-control transition-colors disabled:opacity-40"
+          className={s.primaryButton}
         >
           {isPending ? 'Moving…' : `Move the ${movable.length} confirmed`}
         </button>
         {movable.length !== here.filter(m => m.confirmed).length ? (
-          <span className="text-xs">Includes bills of other months shown on their own pages.</span>
+          <span className={s.muted}>Includes bills of other months shown on their own pages.</span>
         ) : null}
-        {done ? <span role="status" className="text-sm text-ledger">{done}</span> : null}
+        {done ? <span role="status" className={s.muted}>{done}</span> : null}
       </div>
-      {error ? <p role="alert" className="sheet-danger">{error}</p> : null}
+      {error ? <p role="alert" className={s.warning}>{error}</p> : null}
     </section>
   )
 }

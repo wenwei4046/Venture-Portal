@@ -1,0 +1,122 @@
+/* Possible double claims, as a tab of the month's workbench (2026-09-30).
+   Each group is a card that answers "why is this here?" before anything else:
+   the verdict and one sentence, the findings, what to do, the bills side by
+   side, then every bill's history. Built on the workbench's own table and
+   type (`commission-workbench.module.css`); only the card, the findings and
+   the timeline are this file's. */
+
+.card {
+  margin-bottom: 18px;
+  border: 1px solid rgb(var(--work-table-border));
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.card[data-tone='danger'] { border-left: 4px solid rgb(var(--danger)); }
+.card[data-tone='alert'] { border-left: 4px solid rgb(var(--alert)); }
+.card[data-tone='quiet'] { border-left: 4px solid rgb(var(--info)); }
+
+.head { padding: 16px 18px 12px; border-bottom: 1px solid rgb(var(--hairline)); }
+.headTop { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.ref {
+  padding: 3px 8px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 5px;
+  background: rgb(var(--surface-2));
+  font-family: var(--font-mono, 'Chivo Mono'), monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.meta { font-size: 11px; line-height: 1.5; }
+.headline { margin-top: 10px; font-size: 15px; font-weight: 600; line-height: 1.45; letter-spacing: -0.01em; }
+
+.why { padding: 14px 18px 4px; }
+.why h4,
+.history h4 {
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.reasons { display: grid; gap: 6px; margin: 0; padding-left: 18px; list-style: disc; font-size: 12px; line-height: 1.65; }
+.reasons li { padding-left: 2px; }
+.reasons li::marker { color: rgb(var(--accent)); }
+.action {
+  margin: 12px 0 10px;
+  padding: 10px 13px;
+  border: 1px solid rgb(var(--accent) / 0.45);
+  border-radius: 8px;
+  background: rgb(var(--accent-bg));
+  font-size: 12px;
+  line-height: 1.65;
+}
+.action strong { font-weight: 600; }
+
+.compareWrap { margin: 10px 18px 0; }
+/* A dozen facts, all of them the point: the comparison is never cut to the
+   ledger's 520px scroll, only scrolled sideways on a narrow screen. */
+.compareWrap .unbounded { max-height: none; }
+/* The comparison reads down a column per bill, so its cells wrap and sit at the top. */
+.compareWrap .compare :is(th, td) { white-space: normal; vertical-align: top; }
+.compareWrap .compare tbody td { height: auto; min-width: 210px; max-width: 360px; line-height: 1.5; }
+.compareWrap .compare tbody th { height: auto; min-width: 150px; font-size: 11px; font-weight: 600; line-height: 1.5; }
+.compareWrap .compare thead th small { display: block; margin-top: 2px; font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.compareWrap .compare td small { overflow-wrap: anywhere; }
+.compareWrap .compare .match { min-width: 120px; white-space: nowrap; }
+.same,
+.differs,
+.unknown { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; }
+.same { color: rgb(var(--ledger)); }
+.differs { color: rgb(var(--danger)); }
+.unknown { color: rgb(var(--info)); font-weight: 500; }
+
+.histories { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; padding: 16px 18px 4px; }
+.history { min-width: 0; padding: 12px 14px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface-2)); }
+.history h4 a { text-decoration: underline; text-underline-offset: 3px; }
+.timeline { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.timeline li {
+  position: relative;
+  padding: 0 0 10px 16px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: rgb(var(--work-table-rule));
+}
+.timeline li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 15px;
+  bottom: 0;
+  width: 1px;
+  background: rgb(var(--hairline));
+}
+.timeline li[data-tone='paid']::before { background: rgb(var(--ledger)); }
+.timeline li[data-tone='alert']::before { background: rgb(var(--danger)); }
+.when { display: block; font-family: var(--font-mono, 'Chivo Mono'), monospace; font-size: 10px; line-height: 1.5; }
+
+.foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 12px 18px 14px; }
+
+.carried { margin-top: 22px; padding: 14px 16px; border: 1px solid rgb(var(--alert) / 0.45); border-radius: 10px; background: rgb(var(--alert-bg)); font-size: 12px; line-height: 1.65; }
+.carried h3 { margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+.carried ul { margin-top: 8px; font-family: var(--font-mono, 'Chivo Mono'), monospace; font-size: 11px; }
+
+.checked { margin-top: 18px; }
+
+@media (max-width: 767px) {
+  .head,
+  .why,
+  .foot { padding-left: 14px; padding-right: 14px; }
+  .compareWrap { margin: 10px 14px 0; }
+  .histories { padding-left: 14px; padding-right: 14px; }
+}

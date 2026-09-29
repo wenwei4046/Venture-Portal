@@ -361,6 +361,46 @@ describe('CommissionWorkbench', () => {
     expect(salesRow(table, 'Visible venues')).toHaveTextContent('RM 3,000.00')
   })
 
+  // The two panels that sat above the month's cards became the rail's last
+  // two tabs (user 2026-09-30: 把这两个 move 去 … 让它们形成两个 tab).
+  it('carries the month’s review panels as the last two tabs, counting what waits in each', () => {
+    const reviews = {
+      changes: { panel: <section aria-label="Drops and upsells the ERP found">HC13254 upsell</section>, count: 2 },
+      claims: { panel: <section aria-label="Possible double claims">HC11357 — already claimed</section>, count: 8 },
+    }
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
+      monthOverview={<h1>August 2026</h1>} reviews={reviews} />)
+    const tabs = within(screen.getByRole('tablist', { name: 'Commission views' })).getAllByRole('tab')
+    expect(tabs.slice(-2).map(t => t.textContent)).toEqual(['Drops & upsells2', 'Double claims8'])
+    // Not stacked above the cards any more: only in their tabs.
+    expect(screen.queryByRole('region', { name: 'Possible double claims' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Drops and upsells the ERP found' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: /^Double claims/ }))
+    expect(window.location.search).toBe('?view=claims')
+    expect(screen.getByRole('tab', { name: /^Double claims/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('region', { name: 'Possible double claims' })).toHaveTextContent('HC11357 — already claimed')
+    expect(screen.queryByRole('table', { name: 'Salesperson commission summary' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: /^Drops & upsells/ }))
+    expect(window.location.search).toBe('?view=changes')
+    expect(screen.getByRole('region', { name: 'Drops and upsells the ERP found' })).toBeVisible()
+    expect(screen.queryByRole('region', { name: 'Possible double claims' })).toBeNull()
+  })
+
+  it('opens straight on Double claims from a link, and on the first view when the page has no such panel', () => {
+    visit('?view=claims')
+    const { unmount } = render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
+      reviews={{ claims: { panel: <section aria-label="Possible double claims">nothing to check</section>, count: 0 } }} />)
+    expect(screen.getByRole('tab', { name: /^Double claims/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: /^Drops & upsells/ })).toBeNull()
+    unmount()
+
+    renderBoard()
+    expect(screen.queryByRole('tab', { name: /^Double claims/ })).toBeNull()
+    expect(screen.getByRole('tab', { name: /^Total Sales Orders/ })).toHaveAttribute('aria-selected', 'true')
+  })
+
   it('opens on salesperson selection, then shows one personal row per order with a reconcilable total', () => {
     renderBoard()
     expect(screen.getByRole('tab', { name: /^Total Sales Orders/ })).toHaveAttribute('aria-selected', 'true')

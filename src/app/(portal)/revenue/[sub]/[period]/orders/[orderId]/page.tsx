@@ -307,7 +307,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           : (backPersonData as { employee_name: string } | null)?.employee_name) ?? 'Salesperson'
       : back.tab === 'deposit'
         ? 'Below deposit'
-        : label(back.period)
+        : back.tab === 'claims'
+          ? 'Double claims'
+          : back.tab === 'changes'
+            ? 'Drops & upsells'
+            : label(back.period)
 
   return (
     <div>
