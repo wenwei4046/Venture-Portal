@@ -16,8 +16,9 @@ import { loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
 import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
 import { loadOpenBillMonthSetting, resolveOpenBill } from '../../_lib/open-bill-month'
-import { loadDoubleClaims } from '../../_lib/double-claims'
+import { loadDoubleClaimEvidence, loadDoubleClaims } from '../../_lib/double-claims'
 import { carriedFromUnpaidMonths, claimsInMonth } from '@/lib/commission/double-claims'
+import { explainDoubleClaim } from '@/lib/commission/double-claim-reasons'
 import CommissionWorkbench from './_components/CommissionWorkbench'
 import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
@@ -87,7 +88,11 @@ interface StatementRow {
  *
  * ONE RAIL AT THE TOP (2026-09-26): the workbench's tabs — Total Sales
  * Orders, KPI Items, Open Bill, Below deposit and Sales by venue — are every
- * cut of the month's bills, in one table design.
+ * cut of the month's bills, in one table design. Since 2026-09-30 the rail
+ * also carries the month's two review panels, which sat stacked above the
+ * cards: *Drops & upsells* (what the ERP changed on settled bills, and bills
+ * of another month's fair) and *Double claims*, where every group says why it
+ * was flagged and what each of its bills has been through.
  */
 export default async function CommissionPeriodPage({ params }: PageProps) {
   const { sub, period } = await params
@@ -250,7 +255,15 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     batchRowRead.then(hasBatch =>
       Promise.all([
         hasBatch ? loadErpFeedMonth(supabase, subDept.id, period) : Promise.resolve(null),
-        hasBatch ? loadDoubleClaims(supabase, subDept.id) : Promise.resolve(null),
+        // The groups this month asks about, then what the portal knows of their
+        // bills (2026-09-30) — only those bills, a dozen or two — so each group
+        // can say why it was flagged and what its bills have been through.
+        hasBatch
+          ? loadDoubleClaims(supabase, subDept.id).then(async read => {
+            const inMonth = claimsInMonth(read.groups, period)
+            return { ...read, inMonth, evidence: await loadDoubleClaimEvidence(supabase, subDept.id, subDept.schemeId, inMonth) }
+          })
+          : Promise.resolve(null),
         once(
           supabase.from('comm_runs').select('period_month')
             .eq('sub_department_id', subDept.id).in('status', ['applied', 'locked']),
@@ -319,25 +332,48 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
 
   const paidMonths = new Set(((paidRunRows ?? []) as Array<{ period_month: string }>).map(r => r.period_month))
   const carriedUnpaid = workbench ? carriedFromUnpaidMonths(workbench.input.orders, period, paidMonths) : []
+
+  // ── The month's two review panels (2026-09-30) ─────────────────────────
+  // Tabs at the end of the workbench's rail (user: 把这两个 move 去 … 让它们
+  // 形成两个 tab); alone on the page only when there is no workbench to hold
+  // them. Each tab's count is what waits on a person.
+  const inTab = Boolean(workbench)
+  const claimGroups = doubleClaims?.inMonth ?? []
+  // Why each group was flagged, in words, with its bills' history
+  // (user: 我要你全部都写原因 … 把过去的 history 拿出来).
+  const explanations = doubleClaims
+    ? Object.fromEntries(claimGroups.map(group => [group.billRef,
+      explainDoubleClaim(group, doubleClaims.evidence.evidence, doubleClaims.evidence.context)]))
+    : {}
   const doubleClaimPanel = doubleClaims ? (
     <DoubleClaimPanel
       key="double-claims"
       period={period}
       subDepartmentId={subDept.id}
       basePath={revenuePath(subDept.slug)}
-      groups={claimsInMonth(doubleClaims.groups, period)}
+      groups={claimGroups}
       carried={carriedUnpaid}
       unavailable={doubleClaims.unavailable}
+      explanations={explanations}
+      evidenceUnavailable={doubleClaims.evidence.unavailable}
+      returnTo={`${revenuePath(subDept.slug, period)}?view=claims`}
+      inTab={inTab}
     />
   ) : null
   // Keyed: handed to a client component as a list of server-built children.
   const erpChangesPanel = (
     <Fragment key="erp-changes">
       <ErpChangesPanel period={period} pending={pendingAdjustments} paid={paidAdjustments} locked={inPayroll}
-        settledBefore={settledBefore} />
+        settledBefore={settledBefore} inTab={inTab} />
       <FairMovesPanel period={period} subDepartmentId={subDept.id} moves={fairMoves} />
     </Fragment>
   )
+  // What each tab asks of somebody: the drops and upsells to answer, and the
+  // bills FairMovesPanel lists (a move touching this month that is not locked);
+  // the groups not yet checked, and the months that ride in unpaid.
+  const changesWaiting = pendingAdjustments.length
+    + fairMoves.filter(m => !m.locked && (m.fromPeriod === period || m.toPeriod === period)).length
+  const claimsWaiting = claimGroups.filter(group => !group.dismissed).length + carriedUnpaid.length
 
   const monthHeader = (
       <div key="month-head" className="page-head">
@@ -414,7 +450,11 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     <div className={workbenchStyles.page}>
       {workbench ? <CommissionWorkbench key={`${subDept.id}:${period}`} data={workbench}
         sub={subDept.slug} period={period} runStatus={run?.status ?? null}
-        monthOverview={<>{monthHeader}{erpChangesPanel}{doubleClaimPanel}</>}
+        monthOverview={monthHeader}
+        reviews={{
+          changes: { panel: erpChangesPanel, count: changesWaiting },
+          claims: doubleClaimPanel ? { panel: doubleClaimPanel, count: claimsWaiting } : undefined,
+        }}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
         venues={venueRows}

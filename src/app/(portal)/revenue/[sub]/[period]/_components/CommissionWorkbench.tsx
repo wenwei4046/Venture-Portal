@@ -10,7 +10,7 @@ import { depositRequired } from '@/lib/commission/engine'
 import { billCountAction, type BillCountAction } from '@/lib/commission/bill-exclusion'
 import {
   billHref, readWorkbenchLocation, sameWorkbenchView, workbenchSearch,
-  type LedgerSort, type LedgerView, type WorkbenchLocation,
+  type LedgerSort, type LedgerView, type WorkbenchLocation, type WorkbenchTab,
 } from '@/lib/commission/workbench-nav'
 import { formatMoney } from '@/lib/utils'
 import { computeRevenuePay } from '@/lib/revenue-pay'
@@ -40,11 +40,16 @@ import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
 import c from './close-controls.module.css'
 
-type Tab = 'sales' | 'kpi' | 'open' | 'deposit' | 'venue'
+type Tab = WorkbenchTab
 const TABS: [Tab, string][] = [
   ['sales', 'Total Sales Orders'], ['kpi', 'KPI Items'], ['open', 'Open Bill'],
   ['deposit', 'Below deposit'], ['venue', 'Sales by venue'],
+  // The month's two review panels, above the cards until 2026-09-30 (user:
+  // 把这两个 move 去 … 让它们形成两个 tab). Drawn only when the page hands them over.
+  ['changes', 'Drops & upsells'], ['claims', 'Double claims'],
 ]
+/** The tabs that are the page's panels rather than cuts of the workbench's own board. */
+const REVIEW_TABS: readonly Tab[] = ['changes', 'claims']
 type Column = 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 // Sales person (2026-09-30): the one column a person's own ledger rarely
 // needs — until a bill is shared, and then it names both holders.
@@ -81,6 +86,16 @@ export interface PayrollBarFacts {
   settledBefore: string | null
   /** Why the month's payroll can take no more commission (`commission_payroll_closed`), or null. */
   payrollClosed: string | null
+}
+
+/**
+ * A panel the month page builds on the server and hands over as a tab of its
+ * own (2026-09-30): what it shows, and how many things in it wait on a person
+ * — the count on the tab.
+ */
+export interface ReviewTab {
+  panel: ReactNode
+  count: number
 }
 
 /** A bill of the month taken out by hand (`excluded_reason = 'manual'`). */
@@ -140,6 +155,14 @@ interface Props {
    * sub-department's team, whom a bill may be shared with. Absent: no row.
    */
   shareTeam?: readonly { staffId: string; name: string }[]
+  /**
+   * The month's review panels as tabs at the end of the rail (2026-09-30):
+   * *Drops & upsells* — what the ERP changed on settled bills, and bills of
+   * another month's fair — and *Double claims*, each group with the reasons
+   * it was flagged and its bills' history. They sat stacked above the month's
+   * cards until then. A tab whose panel is absent is not drawn.
+   */
+  reviews?: { changes?: ReviewTab; claims?: ReviewTab }
 }
 
 /** What the month page hands over for closing salespeople. */
@@ -162,7 +185,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -170,7 +193,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   // ledger lands on that ledger — it used to land on the list of people.
   const searchParams = useSearchParams()
   const here = useMemo(() => readWorkbenchLocation(searchParams), [searchParams])
-  const { tab, personId, view } = here
+  const reviewOf = (key: Tab): ReviewTab | undefined => key === 'changes' ? reviews?.changes : key === 'claims' ? reviews?.claims : undefined
+  const drawn = (key: Tab) => !REVIEW_TABS.includes(key) || reviewOf(key) !== undefined
+  // A link to a review tab this page does not draw opens on the month's first view.
+  const tab: Tab = drawn(here.tab) ? here.tab : 'sales'
+  const { personId, view } = here
   // The search box, brand and order are typed here and written into the URL
   // as they change (a replace, not a new entry), so the entry Back returns to
   // carries them too. A step through history onto another table picks up
@@ -390,7 +417,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     open: new Set(tags.map(t => t.orderId)).size,
     deposit: heldTotals.bills,
     venue: venues.length,
+    changes: reviews?.changes?.count ?? 0,
+    claims: reviews?.claims?.count ?? 0,
   }
+  // A review tab's count is what waits on somebody: it stands out while it is not zero.
+  const waiting = (key: Tab) => (reviewOf(key)?.count ?? 0) > 0
   // The run's promotion preview rides on the title it would change (it lived
   // on the saved-run table until that table went, 2026-09-26).
   const rankName = (key: string) => data.input.ranks.find(r => r.rankKey === key)?.label ?? key
@@ -738,9 +769,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks ? 'Draft calculation' : 'Live calculation'} />
     {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} period={period} state={payrollView} draft={drafting} />}
     <div className={s.tabs} role="tablist" aria-label="Commission views">
-      {TABS.map(([key, text]) =>
+      {TABS.filter(([key]) => drawn(key)).map(([key, text]) =>
         <button type="button" role="tab" aria-selected={tab === key} aria-controls={`commission-panel-${key}`} id={`commission-tab-${key}`} key={key}
-          onClick={() => navigate(key)} className={tab === key ? s.activeTab : undefined}>{text}<span className={s.badge}>{badges[key]}</span></button>)}
+          onClick={() => navigate(key)} className={tab === key ? s.activeTab : undefined}>{text}<span className={waiting(key) ? `${s.badge} ${s.alertBadge}` : s.badge}>{badges[key]}</span></button>)}
     </div>
     <div className={tab === 'sales' ? s.reviewToolbar : undefined}>
     {tab === 'sales' && <input className={s.search} placeholder="Search salesperson…" aria-label="Search salesperson" value={query} onChange={e => setQuery(e.target.value)} />}
@@ -958,6 +989,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       {!shownVenues.length && <div className={s.empty}>{venues.length ? 'No venues match this search.' : 'No bills this month.'}</div>}
       </div><div className={s.tableFooter}><span>{venueTotals.bills} bills · {money(venueTotals.commissionable)} of it earns commission</span><span>A venue opens every bill written there →</span></div></div>
     </>}
+
+    {/* The page's own panels, server-built (2026-09-30). */}
+    {tab === 'changes' && reviews?.changes?.panel}
+    {tab === 'claims' && reviews?.claims?.panel}
     </div>
 
     {billMenu.menu && <BillContextMenu
