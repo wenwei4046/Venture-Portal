@@ -26,8 +26,9 @@ import ReturnLink from '@/components/layout/ReturnLink'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { describeExclusion } from '@/lib/commission/bill-exclusion'
 import { parseWorkbenchReturn } from '@/lib/commission/workbench-nav'
+import { holdersLine, holdersOf } from '@/lib/commission/bill-share'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
-import { loadOrderExclusions } from '../../../../_lib/month-orders'
+import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string; orderId: string }>
@@ -170,7 +171,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -218,8 +219,14 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       backPerson
         ? supabase.from('hr_staff_costs').select('employee_name').eq('id', backPerson).maybeSingle()
         : Promise.resolve({ data: null }),
+      // Who else holds a part of it (2026-09-30): a shared bill names them all.
+      order.staff_id ? loadOrderShares(supabase, [orderId]) : Promise.resolve([]),
     ])
   const byHand = exclusions?.get(orderId) ?? null
+  const holders = order.staff_id && shares.length > 0
+    ? holdersOf({ staffId: order.staff_id, name: order.hr_staff_costs?.employee_name ?? '—' },
+        shares.map(sh => ({ staffId: sh.staffId, name: sh.name, pct: sh.pct })))
+    : null
 
   const lines = (lineData ?? []) as unknown as LineRow[]
   const groupIndex = new Map(
@@ -323,7 +330,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           <h1 className="page-title">{order.order_no}</h1>
           <p className="text-sm mt-3">
             {order.customer_name ?? 'no customer name'} ·{' '}
-            {order.hr_staff_costs?.employee_name ?? `${order.agent_name} (unmatched)`} ·{' '}
+            {holders ? `shared ${holdersLine(holders)}` : order.hr_staff_costs?.employee_name ?? `${order.agent_name} (unmatched)`} ·{' '}
             {formatDate(order.order_date)}
             {order.sequence_in_day ? ` · bill #${order.sequence_in_day} of the day` : ''}
           </p>

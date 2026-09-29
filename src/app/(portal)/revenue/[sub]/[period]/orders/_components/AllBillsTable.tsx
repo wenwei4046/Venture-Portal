@@ -5,10 +5,12 @@ import { useMemo, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
 import { brandOutcomeMessage, type BillBrandAction, type BrandOption } from '@/lib/commission/bill-brand'
+import { billShareAction, holdersOf, type BillShareAction } from '@/lib/commission/bill-share'
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
-import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome } from './BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillShareOutcome } from './BillContextMenu'
 import BillCountNotice from './BillCountNotice'
+import BillShareNotice from './BillShareNotice'
 import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
 import { useBillMenu } from './useBillMenu'
@@ -109,7 +111,8 @@ interface Props {
  * table never needs: WHOSE bill it is. The Open Bill pick and *Share…* stay
  * on the row, because the evidence for both is the rest of the row.
  *
- * RIGHT-CLICK A BILL (2026-09-27) for its menu — open it, or *Don't count
+ * RIGHT-CLICK A BILL (2026-09-27) for its menu — open it, *Share this bill…*
+ * (2026-09-30, the same write as *Share…* under the name), or *Don't count
  * this bill*, which takes it out of the month the way an ERP cancellation does
  * (`BillContextMenu`). The ⋯ beside the order number opens the same menu,
  * because a right-click alone is invisible on a phone and to a keyboard.
@@ -123,6 +126,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   const { menu, closeMenu, onRowContextMenu, onMenuButton, isOpenOn } = useBillMenu<BillRow>(r => r.orderId, r => r.href)
   const [done, setDone] = useState<BillMenuOutcome | null>(null)
   const [brandDone, setBrandDone] = useState<string | null>(null)
+  const [shareDone, setShareDone] = useState<BillShareOutcome | null>(null)
 
   const excludedCount = rows.filter(r => r.cancelled).length
   const brands = useMemo(() => [...new Set(rows.flatMap(r => r.brands))].sort(), [rows])
@@ -158,14 +162,32 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
   function menuDone(outcome: BillMenuOutcome) {
     closeMenu()
     setBrandDone(null)
+    setShareDone(null)
     setDone(outcome.result.changed ? outcome : null)
   }
 
   function brandMenuDone(outcome: BillBrandOutcome) {
     closeMenu()
     setDone(null)
+    setShareDone(null)
     const nameOf = (code: string) => brandOptions.find(o => o.code === code)?.name ?? code
     setBrandDone(outcome.result.changed ? brandOutcomeMessage(outcome.result, nameOf) : null)
+  }
+
+  function shareMenuDone(outcome: BillShareOutcome) {
+    closeMenu()
+    setDone(null)
+    setBrandDone(null)
+    setShareDone(outcome)
+  }
+
+  /** *Share this bill…* on the right-click (2026-09-30): the same as *Share…* under the name. */
+  function shareActionOf(r: BillRow): BillShareAction | null {
+    if (!r.staff || r.cancelled) return null
+    return billShareAction(
+      { ownerStaffId: r.staff.id, ownerName: r.staff.name, parts: holdersOf({ staffId: r.staff.id, name: r.staff.name }, r.shares) },
+      { runLocked: r.shareDisabled, closedReason: null, monthLabel },
+    )
   }
 
   function salesperson(r: BillRow) {
@@ -255,6 +277,8 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
     {done && <BillCountNotice key={`${done.orderId}:${done.excluded}`} outcome={done} monthLabel={monthLabel} hasRun={hasRun}
       className={s.notice} buttonClassName={s.ghostButton} onChange={setDone} />}
     {brandDone && <p className={s.notice} role="status">{brandDone}</p>}
+    {shareDone && <BillShareNotice key={`${shareDone.orderId}:${shareDone.result.staffId}:${shareDone.result.after}:${shareDone.undone ? 'undone' : 'done'}`}
+      outcome={shareDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setShareDone} />}
 
     <div className={s.tableFrame}>
       <div className={s.tableScroll} role="region" aria-label="All bills, scroll horizontally" tabIndex={0}>
@@ -305,12 +329,18 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
         orderId: menu.row.orderId,
         orderNo: menu.row.orderNo,
         href: menu.row.href,
-        who: menu.row.staff?.name ?? menu.row.agent?.name ?? null,
+        who: menu.row.staff
+          ? [menu.row.staff.name, ...menu.row.shares.map(sh => sh.name)].join(' + ')
+          : menu.row.agent?.name ?? null,
         action: menu.row.countAction,
         exclusionDetail: menu.row.exclusionDetail,
       }}
       anchor={menu.anchor} link={menu.link} byRightClick={menu.byRightClick} monthLabel={monthLabel}
       brand={menu.row.brandAction ? { action: menu.row.brandAction, options: brandOptions } : null}
-      onClose={closeMenu} onDone={menuDone} onBrandDone={brandMenuDone} />}
+      share={(() => {
+        const action = shareActionOf(menu.row)
+        return action ? { action, candidates: team } : null
+      })()}
+      onClose={closeMenu} onDone={menuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} />}
   </div>
 }

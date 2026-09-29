@@ -10,7 +10,7 @@ import { salesByFair } from '@/lib/venues'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import SchemeSwitches from './_components/SchemeSwitches'
 import { requireSubDepartment } from '../../_lib/sub-departments'
-import { loadBrandOptions, loadMonthOrders, loadOrderBrandPicks } from '../../_lib/month-orders'
+import { loadBrandOptions, loadMonthOrders, loadOrderBrandPicks, loadShareTeam } from '../../_lib/month-orders'
 import { monthCommissionableValue } from '@/lib/commission/director-pay'
 import { loadMonthUpsales, loadPendingAdjustments } from '../../_lib/upsales'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
@@ -217,6 +217,10 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     .then(rows => ({ rows, error: null as string | null }))
     .catch((err: unknown) => ({ rows: [], error: err instanceof Error ? err.message : 'Could not read who is closed.' }))
 
+  // Share this bill (2026-09-30): the team a bill may be shared with. A failed
+  // read leaves the menu without the row rather than the month without a page.
+  const shareTeamRead = loadShareTeam(supabase, subDept.schemeId).catch(() => undefined)
+
   const [
     batchRow,
     monthOrders,
@@ -231,6 +235,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     earlierLocks,
     closes,
     brandMenu,
+    shareTeam,
   ] = await Promise.all([
     batchRowRead,
     monthOrdersRead,
@@ -275,6 +280,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     earlierLocksRead,
     closesRead,
     brandMenuRead,
+    shareTeamRead,
   ])
   if (monthLock.error) throw new Error(`Could not check the commission run: ${monthLock.error.message}`)
 
@@ -480,6 +486,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         // and every earlier month a ledger carries bills in from.
         lockedPeriods={monthLock.data ? [period, ...earlierLocks] : earlierLocks}
         brandMenu={brandMenu}
+        // Share this bill: whom a bill here may be shared with (2026-09-30).
+        shareTeam={shareTeam}
         closes={{
           subDepartmentId: subDept.id,
           closes: closes.rows,

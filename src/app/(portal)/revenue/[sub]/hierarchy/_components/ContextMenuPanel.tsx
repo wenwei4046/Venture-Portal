@@ -76,7 +76,10 @@ export default function MenuPanel({ id, label, anchor, submenu = false, hidden =
     return () => observer?.disconnect()
   }, [anchor, submenu, onStackedChange])
   useLayoutEffect(() => {
-    if (focus && !hidden) (ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)') ?? ref.current)?.focus({ preventScroll: true })
+    // A form panel names the control to start in (`data-autofocus`) — the
+    // first thing asked, not whichever button happens to come first.
+    if (focus && !hidden) (ref.current?.querySelector<HTMLElement>('[data-autofocus]:not(:disabled)')
+      ?? ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)') ?? ref.current)?.focus({ preventScroll: true })
   }, [focus, hidden, anchor])
 
   return <div ref={ref} id={id} role={dialog ? 'dialog' : 'menu'} tabIndex={-1} aria-label={label} className={styles.menu}
@@ -89,7 +92,7 @@ export default function MenuPanel({ id, label, anchor, submenu = false, hidden =
         if (event.key === 'Escape') { event.preventDefault(); onBack() }
         if (event.key === 'Tab') {
           event.preventDefault()
-          const controls = [...(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)') ?? [])]
+          const controls = [...(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled)') ?? [])]
           if (controls.length) {
             const current = controls.indexOf(document.activeElement as HTMLElement)
             controls[(current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus()
