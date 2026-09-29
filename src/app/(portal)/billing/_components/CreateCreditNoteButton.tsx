@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import { createCreditNote, type CreateInvoiceMode } from '../actions'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
@@ -167,7 +168,7 @@ export default function CreateCreditNoteButton({
       {open && (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => !isPending && setOpen(false)}
+          {...backdropDismiss(() => !isPending && setOpen(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-3xl max-h-[92vh] overflow-y-auto"

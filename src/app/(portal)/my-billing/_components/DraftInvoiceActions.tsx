@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import { updateDeptInvoice, deleteDeptInvoice } from '../actions'
 
@@ -88,7 +89,7 @@ export default function DraftInvoiceActions({ invoice }: Props) {
       {open ? (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => !isPending && setOpen(false)}
+          {...backdropDismiss(() => !isPending && setOpen(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-md text-left"

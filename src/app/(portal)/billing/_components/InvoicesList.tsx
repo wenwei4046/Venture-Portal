@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
@@ -701,7 +702,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
       {showSettleModal ? (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          onClick={() => !isPending && setShowSettleModal(false)}
+          {...backdropDismiss(() => !isPending && setShowSettleModal(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg my-12"
@@ -828,7 +829,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
       {showVoidModal ? (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          onClick={() => !isPending && setShowVoidModal(false)}
+          {...backdropDismiss(() => !isPending && setShowVoidModal(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg my-12"

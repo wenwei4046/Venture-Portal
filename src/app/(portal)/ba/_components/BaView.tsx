@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
 import { calcBa, daysBetween } from '@/lib/ba'
 import { formatMoneyBare } from '@/lib/utils'
@@ -216,7 +217,7 @@ function CalculatorModal({ open, onClose }: { open: boolean; onClose: () => void
   return (
     <div
       className="fixed inset-0 z-50 bg-scrim/45 flex items-start justify-center pt-24 px-4"
-      onClick={onClose}
+      {...backdropDismiss(onClose)}
     >
       <div
         className="bg-paper border border-hairline rounded-md shadow-lg max-w-xl w-full p-6"
@@ -727,7 +728,7 @@ function PvModal({
   return (
     <div
       className="fixed inset-0 z-50 bg-scrim/45 flex items-start justify-center pt-24 px-4"
-      onClick={onClose}
+      {...backdropDismiss(onClose)}
     >
       <div
         className="bg-paper border border-hairline rounded-md shadow-lg max-w-md w-full p-6"

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import {
@@ -147,7 +148,7 @@ export default function BatchDetailsModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
+      {...backdropDismiss(onClose)}
     >
       <div
         className="bg-paper border border-hairline rounded-panel shadow-xl max-w-3xl w-[92vw] max-h-[85vh] overflow-hidden flex flex-col"

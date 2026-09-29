@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
@@ -85,9 +86,7 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      {...backdropDismiss(onClose)}
     >
       <div
         role="dialog"

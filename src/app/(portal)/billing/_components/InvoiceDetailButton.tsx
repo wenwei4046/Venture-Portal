@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 
@@ -106,7 +107,7 @@ export default function InvoiceDetailButton({
       {open && (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setOpen(false)}
+          {...backdropDismiss(() => setOpen(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto"

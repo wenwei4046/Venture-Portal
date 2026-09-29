@@ -7,6 +7,7 @@
 // the loan page's 撤销 + re-record path applies instead.
 
 import { useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import { amendRepayment } from '../../fund-out/actions'
 
@@ -65,7 +66,7 @@ export default function AmendRepaymentButton({
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" onClick={() => !isPending && setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" {...backdropDismiss(() => !isPending && setOpen(false))}>
           <div className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-hairline">
               <div className="font-serif italic text-accent text-sm">Amend repayment</div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import {
   ACCOUNT_TYPES,
   CASH_FLOW_CATEGORIES,
@@ -184,7 +185,7 @@ export default function AccountsSection({ accounts }: Props) {
       {showCreate ? (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          onClick={() => !isPending && setShowCreate(false)}
+          {...backdropDismiss(() => !isPending && setShowCreate(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-2xl my-4"

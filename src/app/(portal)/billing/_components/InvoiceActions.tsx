@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useTransition, useState } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import {
@@ -287,7 +288,7 @@ export function EditInvoiceButton({
   const modal = open ? (
     <div
       className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={() => !isPending && setOpen(false)}
+      {...backdropDismiss(() => !isPending && setOpen(false))}
     >
       <div
         className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col"

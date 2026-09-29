@@ -7,6 +7,7 @@
 // candidate list if the invoice posted to several — then pick one here).
 
 import { useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import { reassignInvoiceGlAccount } from '../actions'
 
@@ -82,7 +83,7 @@ export default function ReassignInvoiceGlButton({
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" onClick={() => !isPending && setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" {...backdropDismiss(() => !isPending && setOpen(false))}>
           <div className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-hairline">
               <div className="font-serif italic text-accent text-sm">Reassign GL account</div>

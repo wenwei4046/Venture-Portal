@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
@@ -224,7 +225,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
-          onClick={() => setEdit(null)}
+          {...backdropDismiss(() => setEdit(null))}
         >
         <div
           className="bg-paper border border-hairline rounded-panel shadow-xl max-w-2xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-3"
@@ -377,7 +378,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
             className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
-            onClick={() => setSnapView(null)}
+            {...backdropDismiss(() => setSnapView(null))}
           >
             <div
               className="bg-paper border border-hairline rounded-panel shadow-xl max-w-3xl w-[92vw] max-h-[85vh] overflow-y-auto p-5 space-y-4"

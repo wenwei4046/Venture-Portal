@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import { fetchPayrollBillingDelta, generatePayrollAdjustmentInvoices } from '../actions'
@@ -91,7 +92,7 @@ function ReconcilePayrollBillingButtonBody({ currentPeriod }: Props) {
       {open && (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          onClick={() => !isPending && setOpen(false)}
+          {...backdropDismiss(() => !isPending && setOpen(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-3xl my-4"

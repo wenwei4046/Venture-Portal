@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import {
@@ -138,7 +139,7 @@ function GenerateConsolidatedInvoicesButtonBody({ currentPeriod, categories = []
       {open && (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          onClick={() => !isPending && setOpen(false)}
+          {...backdropDismiss(() => !isPending && setOpen(false))}
         >
           <div
             className="bg-paper border border-hairline rounded-panel shadow-xl w-full max-w-3xl my-4"

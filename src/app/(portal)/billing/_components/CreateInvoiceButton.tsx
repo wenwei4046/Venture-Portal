@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import {
@@ -543,7 +544,7 @@ function CreateInvoiceButtonBody({
       {open && (
         <div
           className="fixed inset-0 z-50 bg-scrim/45 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto"
-          onClick={() => !isPending && setOpen(false)}
+          {...backdropDismiss(() => !isPending && setOpen(false))}
         >
           <div
             ref={modalContentRef}
