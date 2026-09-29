@@ -16,8 +16,14 @@ import type { AccountType } from '@/lib/coa'
 // invoice billed to the internal Venture Office pseudo-dept, combining each
 // staff-attribution dept's HV own-share (the payroll NOT billed to any
 // subsidiary). Each dept recovers its own-share; Venture (Office) bears it.
-// Marketing is excluded (direct cost centre). Amounts are authoritative from
-// get_staff_own_share_allocation (read-only); Finance confirms the category.
+// Amounts are authoritative from get_staff_own_share_allocation (read-only);
+// Finance confirms the category.
+//
+// 2026-09-29: which departments bill back is no longer fixed in the program.
+// The dialog lists EVERY department with a residual and ticks the ones
+// Settings → Departments says to bill back; untick or tick one and it applies
+// to this run only, so a month where HR's leftover should go to Venture Office
+// after all does not need a settings change.
 
 interface Category {
   code: string
@@ -63,6 +69,8 @@ function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: P
   const [categoryCode, setCategoryCode] = useState('5050')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  // Seeded from the registry each time the preview loads.
+  const [ticked, setTicked] = useState<Set<string>>(new Set())
 
   const categoryOptions: AccountOption[] = useMemo(
     () =>
@@ -84,7 +92,9 @@ function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: P
     setPreview(null)
     fetchOwnShareInvoicePreview(dayjs(period + '-01').format('YYYY-MM-DD'))
       .then((p) => {
-        if (!cancelled) setPreview(p)
+        if (cancelled) return
+        setPreview(p)
+        setTicked(new Set(p.billBack))
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load own-share')
@@ -97,14 +107,31 @@ function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: P
     }
   }, [open, period])
 
-  const hasData = !!preview && preview.groups.length > 0
+  const hasResidual = !!preview && preview.groups.length > 0
+  const tickedGroups = preview ? preview.groups.filter((g) => ticked.has(g.segment)) : []
+  const hasData = tickedGroups.length > 0
+  const tickedTotal =
+    Math.round(tickedGroups.reduce((sum, g) => sum + groupTotal(g.components), 0) * 100) / 100
+
+  function toggle(segment: string) {
+    setTicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(segment)) next.delete(segment)
+      else next.add(segment)
+      return next
+    })
+  }
 
   function handleGenerate() {
     setError(null)
-    if (!hasData) return setError('No own-share to bill for this period')
+    if (!hasData) return setError('Tick at least one department to bill back')
     startTransition(async () => {
       try {
-        await generateOwnShareInvoice(dayjs(period + '-01').format('YYYY-MM-DD'), categoryCode.trim() || null)
+        await generateOwnShareInvoice(
+          dayjs(period + '-01').format('YYYY-MM-DD'),
+          categoryCode.trim() || null,
+          [...ticked],
+        )
         setOpen(false)
         router.refresh()
       } catch (err) {
@@ -175,7 +202,7 @@ function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: P
 
               {loading && <p className="font-serif italic text-muted text-sm">Loading own-share…</p>}
 
-              {!loading && preview && !hasData && (
+              {!loading && preview && !hasResidual && (
                 <div className="border border-hairline rounded-md bg-surface p-6 text-center">
                   <p className="font-serif italic text-muted text-sm">
                     No own-share for this period — every department&apos;s payroll was fully billed to
@@ -184,20 +211,33 @@ function GenerateOwnShareInvoiceButtonBody({ currentPeriod, categories = [] }: P
                 </div>
               )}
 
-              {!loading && hasData && preview && (
+              {!loading && hasResidual && preview && (
                 <div className="border border-hairline rounded-md bg-surface p-4">
                   <div className="flex items-baseline justify-between mb-3 pb-2 border-b border-hairline">
                     <div className="font-serif text-md text-ink">
                       Bill to <span className="font-sans">Venture (Office)</span>
                     </div>
-                    <div className="font-mono tabular text-sm text-ink">RM {fmt(preview.total)}</div>
+                    <div className="font-mono tabular text-sm text-ink">RM {fmt(tickedTotal)}</div>
                   </div>
+                  <p className="font-serif italic text-muted text-[11px] mb-3">
+                    Unticked departments keep their own share in their own pool. The ticks come
+                    from Settings → Departments; changing one here applies to this run only.
+                  </p>
                   <div className="space-y-3">
                     {preview.groups.map((g) => (
-                      <div key={g.segment}>
-                        <div className="text-[11px] font-sans font-medium uppercase tracking-wide text-accent mb-1">
-                          {g.deptLabel}
-                        </div>
+                      <div key={g.segment} className={ticked.has(g.segment) ? '' : 'opacity-45'}>
+                        <label className="flex items-center gap-2 mb-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ticked.has(g.segment)}
+                            onChange={() => toggle(g.segment)}
+                            disabled={isPending}
+                            className="accent-accent"
+                          />
+                          <span className="text-[11px] font-sans font-medium uppercase tracking-wide text-accent">
+                            {g.deptLabel}
+                          </span>
+                        </label>
                         <table className="w-full text-xs">
                           <tbody>
                             {COMPONENTS.filter(([k]) => g.components[k] > 0).map(([k, label]) => (

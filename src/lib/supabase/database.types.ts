@@ -2701,6 +2701,7 @@ export type Database = {
           id: string
           is_internal: boolean
           name: string
+          own_share_billback: boolean
           payroll_source: string
           pool_gl_code: string | null
           segment_key: string | null
@@ -2711,6 +2712,7 @@ export type Database = {
           id?: string
           is_internal?: boolean
           name: string
+          own_share_billback?: boolean
           payroll_source?: string
           pool_gl_code?: string | null
           segment_key?: string | null
@@ -2721,6 +2723,7 @@ export type Database = {
           id?: string
           is_internal?: boolean
           name?: string
+          own_share_billback?: boolean
           payroll_source?: string
           pool_gl_code?: string | null
           segment_key?: string | null

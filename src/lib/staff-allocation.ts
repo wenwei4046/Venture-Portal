@@ -151,14 +151,25 @@ export function buildAllocationInvoiceLines(
  *  user: "segment 不是infotech, 而是真的叫IT") — pool 1100. */
 export type PayrollSegment = 'hr' | 'finance' | 'director_office' | 'director' | 'it'
 
-/** The staff-attribution segments eligible for own-share → Venture (Office)
- *  inter-billing. Excludes marketing AND — since 2026-09-03 (user: "hr
- *  payroll 会用自己的pool,和marketing 一样,所以不用bill back,也不会bill to
- *  venture") — HR: both are direct cost centres whose pool bears their own
- *  payroll. HR stays in the consolidated-billing map so that IF its staff
- *  ever get subsidiary allocations again they bill out rather than being
- *  silently dropped. */
-export const OWN_SHARE_SEGMENTS: readonly PayrollSegment[] = ['finance', 'director_office', 'director', 'it']
+/** Which segments' own share goes back to Venture (Office) is NOT a constant
+ *  any more (2026-09-29): it is `departments.own_share_billback`, set in
+ *  Settings → Departments and overridable for a single run in the generate
+ *  dialog. A literal here silently dropped every department added later —
+ *  IT and Revenue Department both had to be chased down elsewhere for that
+ *  reason. The column was seeded with what this list used to hold:
+ *  finance, director_office, director, it.
+ *
+ *  The history it replaces: marketing was always excluded as a direct cost
+ *  centre, and HR joined it on 2026-09-03 (user: "hr payroll 会用自己的pool,
+ *  和marketing 一样,所以不用bill back,也不会bill to venture"). HR stays in the
+ *  consolidated-billing map either way, so that when its staff do get
+ *  subsidiary allocations again they bill out rather than being dropped. */
+
+/** One group total, rounded to the sen. The two generate dialogs each had
+ *  their own copy of this. */
+export function componentsTotal(c: AllocationComponents): number {
+  return Math.round((c.salary + c.allowance + c.epf + c.socso + c.eis) * 100) / 100
+}
 
 export interface DeptComponentGroup {
   /** Display label for the group header, e.g. "HR", "Finance", "Director Office". */

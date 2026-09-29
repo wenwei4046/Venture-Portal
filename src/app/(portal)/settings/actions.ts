@@ -311,6 +311,44 @@ export async function addDepartment(formData: FormData) {
   revalidatePath('/settings')
 }
 
+// Own-share bill-back (2026-09-29). Whatever payroll a department did not
+// bill to a subsidiary is its HV own share; this says whether that leftover
+// is inter-billed to Venture Office (the department recovers it, Venture
+// Office bears it) or simply stays in the department's own pool. It used to
+// be a literal in the code, so only a deploy could change it.
+export async function setDepartmentBillback(formData: FormData) {
+  await requirePermission('categories')
+  const supabase = await createClient()
+
+  const id = (formData.get('id') as string) ?? ''
+  const billback = String(formData.get('own_share_billback') ?? '') === 'true'
+  if (!id) throw new Error('Department id is required')
+
+  const { data: dept } = await supabase
+    .from('departments')
+    .select('name, segment_key, is_internal')
+    .eq('id', id)
+    .maybeSingle()
+  if (!dept) throw new Error('Department not found')
+  // A lightweight department has no segment, so nothing of its own to
+  // recover; Venture Office is the one that BEARS the bill-backs.
+  if (!dept.segment_key) {
+    throw new Error(`"${dept.name}" has no segment yet — 转正 it first`)
+  }
+  if (dept.is_internal) {
+    throw new Error(`"${dept.name}" is the department that bears the bill-backs; it cannot bill itself`)
+  }
+
+  const { error } = await supabase
+    .from('departments')
+    .update({ own_share_billback: billback })
+    .eq('id', id)
+  if (error) throw new Error(`Failed to save the bill-back setting: ${error.message}`)
+
+  revalidatePath('/settings')
+  revalidatePath('/billing')
+}
+
 // 转正 (2026-08-24): promote a lightweight department to a FULL one — the
 // provision_full_department RPC appends its gl_segment + billing_mode enum
 // values, opens its pool equity account (1030/1040/… block) and files the

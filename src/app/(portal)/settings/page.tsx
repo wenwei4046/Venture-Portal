@@ -194,6 +194,7 @@ export default async function SettingsPage({ searchParams }: Props) {
             segment_key: ((d as { segment_key?: string | null }).segment_key as string | null) ?? null,
             pool_gl_code: ((d as { pool_gl_code?: string | null }).pool_gl_code as string | null) ?? null,
             billing_mode_key: ((d as { billing_mode_key?: string | null }).billing_mode_key as string | null) ?? null,
+            own_share_billback: Boolean((d as { own_share_billback?: boolean }).own_share_billback),
           }))}
         />
       )}

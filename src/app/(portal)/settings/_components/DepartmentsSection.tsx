@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { addDepartment, provisionDepartment } from '../actions'
+import { addDepartment, provisionDepartment, setDepartmentBillback } from '../actions'
 
 // Departments management (2026-08-24, dynamic departments). ADD + 转正
 // (provision): a lightweight department books under Venture; provisioning
@@ -18,6 +18,7 @@ interface DeptRow {
   segment_key: string | null
   pool_gl_code: string | null
   billing_mode_key: string | null
+  own_share_billback: boolean
 }
 
 function slugOf(name: string): string {
@@ -42,6 +43,23 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
       try {
         await addDepartment(formData)
         setShowAdd(false)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      }
+    })
+  }
+
+  // Own-share bill-back (2026-09-29): does the payroll this department did
+  // not bill to a subsidiary go back to Venture Office, or stay in its own
+  // pool? Saved immediately — one switch, no form.
+  function handleBillback(d: DeptRow, next: boolean) {
+    setError(null)
+    startTransition(async () => {
+      try {
+        const fd = new FormData()
+        fd.set('id', d.id)
+        fd.set('own_share_billback', String(next))
+        await setDepartmentBillback(fd)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }
@@ -85,6 +103,10 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
       <p className="font-serif italic text-muted text-sm mb-4 max-w-2xl">
         普通部门:挂员工、挂 claims、被 inter-billing 开单,账记 Venture。按 <em>转正 Provision</em> 给它
         自己的 segment / P&amp;L / pool / 开单模式 — 全系统自动接上。名字不能改、部门不能删、转正不能撤销。
+      </p>
+      <p className="font-serif italic text-muted text-sm mb-4 max-w-2xl">
+        <em>Bill back 薪水</em>:这个部门没 bill 给子公司的那部分薪水,勾了就转给 Venture Office
+        承担(部门自己收回来),不勾就留在自己的 pool。开 own-share 单的时候照这里带出来,那一次可以临时改。
       </p>
 
       {error ? (
@@ -131,6 +153,7 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
               <th className="text-left py-3 px-4 font-medium">Segment</th>
               <th className="text-left py-3 px-4 font-medium">Pool GL</th>
               <th className="text-left py-3 px-4 font-medium">Billing mode</th>
+              <th className="text-center py-3 px-4 font-medium">Bill back 薪水</th>
               <th className="text-right py-3 px-4 font-medium">Actions</th>
             </tr>
           </thead>
@@ -154,6 +177,24 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
                   </td>
                   <td className="py-3 px-4 font-mono text-xs text-graphite">{d.pool_gl_code ?? '—'}</td>
                   <td className="py-3 px-4 font-mono text-xs text-graphite">{d.billing_mode_key ?? '—'}</td>
+                  <td className="py-3 px-4 text-center">
+                    {full && !d.is_internal ? (
+                      <input
+                        type="checkbox"
+                        checked={d.own_share_billback}
+                        onChange={(e) => handleBillback(d, e.target.checked)}
+                        disabled={isPending}
+                        className="accent-accent"
+                        title={
+                          d.own_share_billback
+                            ? d.name + ' 没 bill 给子公司的薪水 → 转给 Venture Office 承担'
+                            : d.name + ' 没 bill 给子公司的薪水 → 留在自己的 pool'
+                        }
+                      />
+                    ) : (
+                      <span className="text-muted font-mono text-xs">—</span>
+                    )}
+                  </td>
                   <td className="py-3 px-4 text-right">
                     {!full && !d.is_internal ? (
                       provisionId === d.id ? (

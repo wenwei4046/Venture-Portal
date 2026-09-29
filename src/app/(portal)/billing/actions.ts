@@ -18,7 +18,7 @@ import {
   buildConsolidatedInvoiceLines,
   periodShortLabel,
   PAYROLL_SEGMENT_LABEL,
-  OWN_SHARE_SEGMENTS,
+  componentsTotal,
   type DeptComponentGroup,
   type PayrollSegment,
 } from '@/lib/staff-allocation'
@@ -1875,17 +1875,37 @@ interface OwnShareRpcRow {
   eis_amount: number | string
 }
 
-// HR removed 2026-09-03 — its payroll is pool-borne like Marketing's (see
-// OWN_SHARE_SEGMENTS in lib/staff-allocation.ts).
-const OWN_SHARE_ORDER: PayrollSegment[] = ['finance', 'director_office', 'director', 'it']
+/** The segments whose own share is inter-billed to Venture Office, per the
+ *  department registry. Finance sets it in Settings → Departments; before
+ *  2026-09-29 it was a literal in lib/staff-allocation.ts. */
+async function ownShareBillbackSegments(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('departments')
+    .select('segment_key, own_share_billback')
+    .eq('own_share_billback', true)
+  if (error) throw new Error(`Failed to read the bill-back settings: ${error.message}`)
+  return new Set(
+    (data ?? [])
+      .map((d) => (d as { segment_key: string | null }).segment_key)
+      .filter((s): s is string => Boolean(s)),
+  )
+}
 
-function groupOwnShareAllocation(rows: OwnShareRpcRow[]): DeptComponentGroup[] {
+/** Every department with a residual this period, whether or not it bills the
+ *  residual back — the dialog needs the unticked ones too. `billBack` is the
+ *  registry's answer; pass a Set to filter, or null to keep them all. */
+function groupOwnShareAllocation(
+  rows: OwnShareRpcRow[],
+  billBack: Set<string> | null,
+): DeptComponentGroup[] {
   const groups: DeptComponentGroup[] = []
   for (const r of rows) {
     const seg = deptNameToSegment(r.department_name)
-    // Only the staff-attribution depts (hr/finance/director_office/director) —
-    // excludes Marketing (a direct cost centre) and anything unmapped.
-    if (!seg || !OWN_SHARE_SEGMENTS.includes(seg as PayrollSegment)) continue
+    // Anything the dept registry cannot map to a segment is not billable.
+    if (!seg) continue
+    if (billBack && !billBack.has(seg)) continue
     groups.push({
       deptLabel: PAYROLL_SEGMENT_LABEL[seg as PayrollSegment],
       segment: seg as PayrollSegment,
@@ -1898,13 +1918,18 @@ function groupOwnShareAllocation(rows: OwnShareRpcRow[]): DeptComponentGroup[] {
       },
     })
   }
-  groups.sort((a, b) => OWN_SHARE_ORDER.indexOf(a.segment) - OWN_SHARE_ORDER.indexOf(b.segment))
+  // Biggest first: the one worth a second look before it is billed.
+  groups.sort((a, b) => componentsTotal(b.components) - componentsTotal(a.components))
   return groups
 }
 
 export interface OwnShareInvoicePreview {
+  /** EVERY department with a residual, ticked or not. */
   groups: DeptComponentGroup[]
+  /** Total of the ticked ones only. */
   total: number
+  /** Segments the registry bills back — the dialog's initial ticks. */
+  billBack: string[]
 }
 
 /** Preview for the own-share review modal: the single Venture (Office) invoice's
@@ -1915,14 +1940,14 @@ export async function fetchOwnShareInvoicePreview(periodMonth: string): Promise<
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   const { data, error } = await supabase.rpc('get_staff_own_share_allocation' as never, { p_period_month: period } as never)
   if (error) throw new Error(`Failed to load own-share allocation: ${error.message}`)
-  const groups = groupOwnShareAllocation((data ?? []) as unknown as OwnShareRpcRow[])
+  const billBack = await ownShareBillbackSegments(supabase)
+  const groups = groupOwnShareAllocation((data ?? []) as unknown as OwnShareRpcRow[], null)
   const total = Math.round(
-    groups.reduce((s, g) => {
-      const k = g.components
-      return s + k.salary + k.allowance + k.epf + k.socso + k.eis
-    }, 0) * 100,
+    groups
+      .filter((g) => billBack.has(g.segment))
+      .reduce((s, g) => s + componentsTotal(g.components), 0) * 100,
   ) / 100
-  return { groups, total }
+  return { groups, total, billBack: [...billBack] }
 }
 
 /** Generate ONE draft own-share invoice for the period, billed to Venture
@@ -1932,6 +1957,8 @@ export async function fetchOwnShareInvoicePreview(periodMonth: string): Promise<
 export async function generateOwnShareInvoice(
   periodMonth: string,
   categoryCode: string | null,
+  /** This run only. Omit to bill back exactly what the registry says. */
+  segments?: string[] | null,
 ): Promise<{ generated: number; total: number }> {
   const user = await requirePermission('billing')
   const supabase = await createClient()
@@ -1940,7 +1967,11 @@ export async function generateOwnShareInvoice(
 
   const { data, error } = await supabase.rpc('get_staff_own_share_allocation' as never, { p_period_month: period } as never)
   if (error) throw new Error(`Failed to load own-share allocation: ${error.message}`)
-  const groups = groupOwnShareAllocation((data ?? []) as unknown as OwnShareRpcRow[])
+  // A run may tick a department the registry leaves off (and untick one it
+  // leaves on) without changing the setting — e.g. one month where HR's
+  // leftover should go back to Venture Office after all.
+  const billBack = segments ? new Set(segments) : await ownShareBillbackSegments(supabase)
+  const groups = groupOwnShareAllocation((data ?? []) as unknown as OwnShareRpcRow[], billBack)
 
   const { data: ventureOffice, error: voErr } = await supabase
     .from('departments')
