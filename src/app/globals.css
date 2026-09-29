@@ -1046,6 +1046,47 @@ table.ledger-table.cf-report tbody tr.search-row-active:hover { background: rgb(
 .cf-matrix tr.search-row-hit > td, .cf-matrix tr.search-row-active > td { background: rgb(var(--cf-now)); }
 .cf-pill-on { background: rgb(var(--cf-navy)); color: rgb(var(--cf-navy-ink)); border-color: rgb(var(--cf-navy)); }
 
+/* ── The rules under the label column (2026-09-29, user: "这个线条不见了") ──
+   The first column is `position: sticky`, which makes it a positioned element
+   painted ABOVE the table's collapsed borders — so every row rule and the
+   column's own right edge disappeared under it while showing fine across the
+   figures. Redraw both on the cell itself, where the sticky paint can't cover
+   them. The cf skin keeps its gold category edge by stacking the shadows. */
+.mx-matrix tbody tr > td:first-child,
+.mx-matrix thead th:first-child {
+  box-shadow: inset -1px 0 0 rgb(var(--hairline));
+}
+.mx-matrix tbody tr:not(:last-child) > td:first-child {
+  box-shadow: inset -1px 0 0 rgb(var(--hairline)), inset 0 -1px 0 rgb(var(--hairline));
+}
+.cf-matrix tbody tr > td:first-child,
+.cf-matrix thead th:first-child {
+  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline));
+}
+.cf-matrix tbody tr:not(:last-child) > td:first-child {
+  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline)), inset 0 -1px 0 rgb(var(--cf-hairline));
+}
+.cf-matrix tbody tr > td.cf-cat-label {
+  box-shadow: inset 3px 0 0 rgb(var(--cf-gold)), inset -1px 0 0 rgb(var(--cf-hairline));
+}
+.cf-matrix tbody tr:not(:last-child) > td.cf-cat-label {
+  box-shadow: inset 3px 0 0 rgb(var(--cf-gold)), inset -1px 0 0 rgb(var(--cf-hairline)),
+    inset 0 -1px 0 rgb(var(--cf-hairline));
+}
+/* Headline rows (流入合计 / net change) carry a 2px gold rule top and bottom. */
+.cf-matrix tbody tr.cf-strong-row > td:first-child {
+  box-shadow: inset -1px 0 0 rgb(var(--cf-hairline)), inset 0 2px 0 rgb(var(--cf-gold-deep)),
+    inset 0 -2px 0 rgb(var(--cf-gold-deep));
+}
+
+/* Row labels stay on one line — wrapped names made the reports hard to scan
+   (user 2026-09-29: "可以不要给他 wrap text 吗？其他的 report 也是一样"). The
+   column grows to the longest label and the figures scroll beside it. */
+.gl-report td:first-child,
+.gl-report th:first-child {
+  white-space: nowrap;
+}
+
 /* ── Deal form preview (2026-09-22, New loan / New fund source): the right-hand
    panel borrows the Cash Flow navy + gold so the live figures read as "the
    record this will become". Put cf-scope on the same element for the tokens. */

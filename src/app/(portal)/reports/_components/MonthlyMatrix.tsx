@@ -176,11 +176,11 @@ export default function MonthlyMatrix({
         ))}
       </div>
 
-      <div className={`overflow-x-auto table-scroll border rounded-md ${cf ? 'cf-matrix' : 'border-hairline'}`}>
+      <div className={`overflow-x-auto table-scroll border rounded-md mx-matrix ${cf ? 'cf-matrix' : 'border-hairline'}`}>
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className={cf ? '' : 'border-b border-hairline'}>
-              <th className={`sticky left-0 z-10 text-left font-sans text-xs uppercase tracking-wide px-4 py-3 min-w-[130px] sm:min-w-[220px] ${cf ? 'cf-th' : 'bg-surface text-muted'}`}>
+              <th className={`sticky left-0 z-10 whitespace-nowrap text-left font-sans text-xs uppercase tracking-wide px-4 py-3 min-w-[130px] sm:min-w-[220px] ${cf ? 'cf-th' : 'bg-surface text-muted'}`}>
                 {cf ? '' : 'Item'}
               </th>
               {columns.map((c) => (
@@ -287,7 +287,7 @@ export default function MonthlyMatrix({
                   }`}
                 >
                   <td
-                    className={`sticky left-0 z-10 ${stickyBg} ${isCat && cf ? 'cf-cat-label' : ''} px-4 font-sans ${labelTone} ${labelWeight} ${
+                    className={`sticky left-0 z-10 whitespace-nowrap ${stickyBg} ${isCat && cf ? 'cf-cat-label' : ''} px-4 font-sans ${labelTone} ${labelWeight} ${
                       isStrong ? 'py-4 text-[15px]' : 'py-2.5'
                     }`}
                     style={{ paddingLeft: `${16 + row.depth * 18}px` }}
