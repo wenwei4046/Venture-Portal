@@ -327,7 +327,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
         // Fund Summary + Claims Report dropped from the menu (user 2026-09-15
         // "remove 掉"); routes still exist for direct links.
         { href: '/reports/debtor-aging', label: 'Debtor Aging', visible: canAccessDeptReports },
-        { href: '/reports/loan-aging', label: 'Loan Monitor', visible: canAccessReports },
+        { href: '/reports/loan-aging', label: 'Loan Aging', visible: canAccessReports },
         { href: '/reports/company-statement', label: 'Company Statement', visible: canAccessReports },
       ],
     },

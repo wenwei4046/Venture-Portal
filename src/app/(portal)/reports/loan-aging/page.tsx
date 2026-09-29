@@ -178,9 +178,9 @@ export default async function LoanMonitorPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>III.</em> REPORTS · LOAN MONITOR · {monthLabel.toUpperCase()}
+            <em>III.</em> REPORTS · LOAN AGING · {monthLabel.toUpperCase()}
           </div>
-          <h1 className="page-title">Loan Monitor</h1>
+          <h1 className="page-title">Loan Aging</h1>
           <p className="font-serif italic text-graphite text-base mt-2">
             Scheduled by the agreed start month: unpaid installments bucket by
             months late (settled months drop off) · Outstanding overview below ·

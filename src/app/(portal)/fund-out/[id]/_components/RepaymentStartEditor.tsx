@@ -51,7 +51,7 @@ export default function RepaymentStartEditor({
       </div>
       <p className="font-serif italic text-muted text-xs mt-1.5">
         第一期落在哪个月(比如谈好 5 月起还就选 5 月)。没设的话默认 {defaultHint} 起。
-        Loan Monitor 的「本月应收」按这个算。
+        Loan Aging 的「本月应收」按这个算。
       </p>
       {error ? <p className="text-xs font-sans text-danger mt-1.5">{error}</p> : null}
     </div>

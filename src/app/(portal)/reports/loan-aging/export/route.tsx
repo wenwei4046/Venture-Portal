@@ -91,7 +91,7 @@ export async function GET(req: Request) {
       filename,
       element: (
         <PdfDocument
-          title="Loan Monitor — Aging"
+          title="Loan Aging — Aging"
           subtitle="Unpaid installments from each agreed start · payments FIFO oldest-first · all amounts RM (principal + interest)"
           periodLabel={`As of ${monthLabel}`}
           orientation="landscape"
@@ -155,7 +155,7 @@ export async function GET(req: Request) {
     filename,
     element: (
       <PdfDocument
-        title="Loan Monitor — Outstanding"
+        title="Loan Aging — Outstanding"
         subtitle="Principal balances · scheduled vs undecided · all amounts RM"
         periodLabel={`As of ${monthLabel}`}
       >

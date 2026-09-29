@@ -41,7 +41,7 @@ const reports = [
   },
   {
     href: '/reports/loan-aging',
-    title: 'Loan Monitor',
+    title: 'Loan Aging',
     description: 'This-month dues not yet settled (both ways) + outstanding balances, scheduled vs undecided.',
   },
   {
