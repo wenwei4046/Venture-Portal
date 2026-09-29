@@ -24,6 +24,7 @@ function person(name: string, lock: Partial<SplitLockInput>): StaffAllocationDat
       status: 'draft', revenue: false, completedAt: null, topupOpenedAt: null, topupKind: null, monthClosed: false,
       ...lock,
     }),
+    centralized: false,
   }
 }
 
@@ -129,6 +130,28 @@ describe('AllocationEditor — the split follows the payroll row', () => {
     )
     expect(within(card('TAN YONG HONG')).getAllByRole('spinbutton').map((i) => (i as HTMLInputElement).value)).toEqual(['50', '25'])
     expect(within(card('CHEW WEE HO')).getAllByRole('spinbutton').map((i) => (i as HTMLInputElement).value)).toEqual(['15'])
+  })
+
+  // 2026-09-30: a centralized department bills by invoice. Somebody of theirs
+  // is only listed while a split is left over from before — it can be
+  // cleared, never edited.
+  it('offers only to clear a split left over in a centralized department', async () => {
+    actions.saveStaffAllocation.mockResolvedValue({ ok: true })
+    render(
+      <AllocationEditor
+        period="2026-09-01"
+        companies={companies}
+        readOnly={false}
+        staff={[{ ...person('WONG JOEY', {}), dept: 'Marketing', centralized: true }]}
+      />,
+    )
+    const c = within(card('WONG JOEY'))
+    expect(c.getByText('Marketing is centralized — billed by invoice, not split. This split is left from before.')).toBeInTheDocument()
+    expect(c.getByRole('combobox')).toBeDisabled()
+    expect(c.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(c.queryByRole('button', { name: '+ Company' })).toBeNull()
+    fireEvent.click(c.getByRole('button', { name: 'Clear split' }))
+    await waitFor(() => expect(actions.saveStaffAllocation).toHaveBeenCalledWith('WONG JOEY', '2026-09-01', []))
   })
 
   it('opens again while a Resubmit has the row back in draft', () => {

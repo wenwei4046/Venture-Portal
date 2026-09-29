@@ -165,6 +165,13 @@ export function splitLockMessage(name: string, monthLabel: string, lock: SplitLo
   return `${name}'s ${monthLabel} pay is ${lock.state} — its billing split is locked with it. ${lock.wayBack} to change it`
 }
 
+/**
+ * Where somebody on this month's payroll stands for a split: `open` may take
+ * one; `locked` is past draft (their split stays as it left); `centralized`
+ * belongs to a department that bills by invoice and is never split.
+ */
+export type SplitStanding = 'open' | 'locked' | 'centralized'
+
 export interface SplitCopyPlan<T> {
   /** Last month's rows to write into this month. */
   rows: T[]
@@ -172,57 +179,93 @@ export interface SplitCopyPlan<T> {
   copied: number
   /** On this month's payroll but past draft — their split is left alone. */
   locked: number
+  /** In a centralized department now — billed by invoice, not split. */
+  centralized: number
   /** Split last month, not on this month's payroll — nothing to split. */
   notOnPayroll: number
 }
 
 /**
  * Copy from last month, person by person: only somebody on this month's
- * payroll, still editable, with no split of their own yet. Anybody already
- * split this month is left alone and not counted — the copy never overwrites.
+ * payroll, still open, with no split of their own yet. Anybody already split
+ * this month is left alone and not counted — the copy never overwrites.
  *
- * `payroll` maps this month's staff_id → whether their split can change.
+ * `payroll` maps this month's staff_id → where they stand.
  */
 export function planSplitCopy<T extends { staff_id: string }>(
   lastMonth: readonly T[],
-  payroll: ReadonlyMap<string, boolean>,
+  payroll: ReadonlyMap<string, SplitStanding>,
   alreadySplit: ReadonlySet<string>,
 ): SplitCopyPlan<T> {
   const rows: T[] = []
   const copied = new Set<string>()
   const locked = new Set<string>()
+  const centralized = new Set<string>()
   const notOnPayroll = new Set<string>()
   for (const r of lastMonth) {
     if (alreadySplit.has(r.staff_id)) continue
-    const editable = payroll.get(r.staff_id)
-    if (editable === undefined) notOnPayroll.add(r.staff_id)
-    else if (!editable) locked.add(r.staff_id)
+    const standing = payroll.get(r.staff_id)
+    if (standing === undefined) notOnPayroll.add(r.staff_id)
+    else if (standing === 'centralized') centralized.add(r.staff_id)
+    else if (standing === 'locked') locked.add(r.staff_id)
     else {
       rows.push(r)
       copied.add(r.staff_id)
     }
   }
-  return { rows, copied: copied.size, locked: locked.size, notOnPayroll: notOnPayroll.size }
+  return {
+    rows,
+    copied: copied.size,
+    locked: locked.size,
+    centralized: centralized.size,
+    notOnPayroll: notOnPayroll.size,
+  }
 }
 
 /** What a copy did, including who it left alone and why. */
 export function splitCopyNote(
-  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'>,
+  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'> & { centralized?: number },
 ): string {
   const { copied, locked, notOnPayroll } = counts
+  const centralized = counts.centralized ?? 0
+  const were = (n: number) => (n === 1 ? 'was' : 'were')
   const parts: string[] = []
   if (copied > 0) parts.push(`Copied splits for ${copied} staff.`)
-  if (locked > 0) {
-    parts.push(`${locked} locked with their payroll ${locked === 1 ? 'was' : 'were'} left alone.`)
+  if (locked > 0) parts.push(`${locked} locked with their payroll ${were(locked)} left alone.`)
+  if (centralized > 0) {
+    parts.push(`${centralized} in a centralized department ${were(centralized)} skipped.`)
   }
   if (notOnPayroll > 0) {
-    parts.push(
-      `${notOnPayroll} not on this month's payroll ${notOnPayroll === 1 ? 'was' : 'were'} skipped.`,
-    )
+    parts.push(`${notOnPayroll} not on this month's payroll ${were(notOnPayroll)} skipped.`)
   }
   return parts.length > 0
     ? parts.join(' ')
     : 'Nothing to copy — no last-month splits, or everyone already set.'
+}
+
+/**
+ * Who Billing Allocation lists (2026-09-30): everybody on the month's payroll
+ * in a cost-center department — and anybody else who still HAS a split (a
+ * department switched to centralized after their pay was Completed keeps the
+ * split it left with, and the page must never hide money that will be billed).
+ * The rest — centralized departments, billed by invoice — are counted per
+ * department so the page can say why they are not there.
+ */
+export function allocationRoster<T extends { dept: string; centralized: boolean; hasSplit: boolean }>(
+  rows: readonly T[],
+): { listed: T[]; notListed: Array<{ dept: string; people: number }> } {
+  const listed: T[] = []
+  const notListed = new Map<string, number>()
+  for (const r of rows) {
+    if (!r.centralized || r.hasSplit) listed.push(r)
+    else notListed.set(r.dept, (notListed.get(r.dept) ?? 0) + 1)
+  }
+  return {
+    listed,
+    notListed: [...notListed.entries()]
+      .map(([dept, people]) => ({ dept, people }))
+      .sort((a, b) => a.dept.localeCompare(b.dept)),
+  }
 }
 
 // ─── Invoice line breakdown (user sample 2026-07-03) ─────────────────────────

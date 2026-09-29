@@ -839,8 +839,21 @@ read-only, the name a link to Director Salary). The page's rules:
   which (*Second payroll · editing* / *Second payroll ready*). A row that can
   take neither shows one disabled *Resubmit · Second payroll* item with the
   reason.
-- **Billing Allocation follows the grid** (2026-09-30): one card per payroll row,
-  in the grid's order, with the status chip beside the name in the grid's words
+- **Department mode** (2026-09-30): a department is a *Cost center* or
+  *Centralized*. Its switch is `.dept-mode-switch` — a 30px pill holding a
+  34×20 track and the current mode's name, on (accent track, accent wash) =
+  Centralized. On a department's own page it sits in a `.dept-mode` strip right
+  under the page head: `HR · DEPARTMENT MODE` eyebrow, the switch, then one line
+  on what the mode means; in Settings › Departments it is the *Mode* column's
+  cell. Flipping it never acts at once — an inline `.dept-mode-ask` panel (accent
+  wash) says what will happen (*HR leaves Billing Allocation … 3 splits on
+  payroll still in draft will be cleared*) with *Switch to Centralized* and
+  *Cancel*. Somebody who may not switch sees it disabled and *Switched by the
+  Principal.*
+- **Billing Allocation follows the grid** (2026-09-30): one card per payroll row
+  of a cost-center department, in the grid's order (centralized departments are
+  named under the title instead — *Not listed: Marketing (12) and Revenue
+  Department (32) — centralized …*), with the status chip beside the name in the grid's words
   (`Draft` plain · `Completed 30 Sep` ledger · `With Finance` alert · `Paid`
   ledger · `Resubmit · editing` / `Resubmit ready` accent · `Closed for good`).
   Past draft a card is frozen — company selects and % inputs disabled, no
@@ -2378,6 +2391,7 @@ If adding a new component to vocabulary, update this doc first.
 ## Change Log
 
 - **2026-09-30 (the split follows the payroll)** — HR › Billing Allocation reads like the Payroll grid it belongs to: its cards come in the grid's order, each carries the person's payroll status chip, and a card past draft freezes with a one-line way back at its foot instead of *+ Company* / *Save*. See "Payroll batches".
+- **2026-09-30 (department mode)** — A department is a cost center or centralized, and says so: the `.dept-mode` strip under the page head of HR Costing, Service Billing, Director Pool and the new Revenue › Department page, and a *Mode* column in Settings › Departments — the same pill switch everywhere, asking inline before it acts. Billing Allocation lists cost-center people only and names the centralized departments it leaves out. See "Payroll batches".
 - **2026-09-28 (quiet until asked)** — Comm Cal's month folds what it explains. The payroll bar is one line (chevron · `PAYROLL · SEPTEMBER 2026` · dot + state · one tag: *N to settle* / *Moved since* / *Payroll closed*) and opens on a click; *Bills priced RM 0* folds to its headline the same way (`.fold` / `.foldMark`). The month's real switches (*This month pays*) leave the bar's foot for the top of **Review settings** (`.monthPays`), whose *Calculation setup* fold and preview-only KPI / Open Bill / Margin checkboxes are removed — one set of switches on the page; the current-team preview stays, and the summary shows a *Draft* tag while a draft is open. See "The payroll bar" under Tabbed pages.
 - **2026-09-27 (director pay)** — Revenue Directors are paid. Rules gains a tenth tab, **Directors** (section X, shown while the sub-department has a director): one `.ledger-table` row per director — name with title · code under it, *Fixed amount · RM*, *Incentive when Commissionable value reaches · RM*, *Incentive · RM*, the row's Save — and a foot line naming the Revenue Director rung's rate (or a `sheet-warning` when the ladder has none). The Title ladder's title picker offers only titles without a rung, the head as *Revenue Director · heads the department*; its row reads *Always* under Can recruit and *Own bills only · no override · no gate* across the two gate columns. Comm Cal: a director with a rung reads *Revenue Director* / *Rank SS · 12% · own bills only · no override* in the Title / rank cell and the hero, the total adds *Includes RM X director pay*, and a `.notice` above their ledger (`DirectorPayNote`) names the fixed amount and whether the month's Commissionable value has reached the incentive threshold, and by how much it is short.
 - **2026-09-27 (brand)** — A bill with no brand gets one by hand. The bill menu on Sales orders and on a salesperson’s ledger gains *Brand for the margin…*, shown only on a live bill that nothing names a brand for (or one given its brand there): an adjacent panel with one plain button per margin-ladder brand, *Take the pick off*, and Cancel, the same paper as the *Don’t count* confirmation. The result is one status line above the table. See “Bill context menu”.

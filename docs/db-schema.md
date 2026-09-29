@@ -38,7 +38,14 @@ departments (
     id              uuid PK DEFAULT gen_random_uuid()
     name            text NOT NULL                   -- Marketing, Finance, HR
     created_at      timestamptz DEFAULT now()
+    cost_model      text NOT NULL DEFAULT 'cost_center'   -- 2026-09-30
+                    CHECK (cost_model IN ('cost_center','centralized'))
 )
+-- cost_center：薪水在 Billing Allocation 分给子公司，pool 应该归零（HR / Finance / IT / Director Office）
+-- centralized：自己开 invoice 给子公司、钱进自己的 pool、自己付；不进 Billing Allocation（Director / Marketing / Revenue）
+-- 只有 permission department_mode（默认 Principal）能切：department_set_cost_model(uuid, text)；
+--   切成 centralized 会清掉该部门还在 draft 的 split。读：department_modes()。
+-- 没 bill 回去的差额要不要给 Venture Office 吸收，仍是 own_share_billback（Finance 每次开单决定），不跟 mode 走。
 ```
 1.4 approval_requests
 ```sql

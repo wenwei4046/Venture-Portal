@@ -154,10 +154,13 @@ src/
 │   │   │                              `20260927061000`, DESIGN.md › Payroll batches.
 │   │   │                              **BILLING ALLOCATION FOLLOWS THE PAYROLL
 │   │   │                              (2026-09-30):** allocation/[period] is one card
-│   │   │                              per payroll row of the month, in the grid's
-│   │   │                              order (`comparePayrollOrder`) — the same people,
-│   │   │                              directors aside (billed through Director
-│   │   │                              Salary). A person's split LOCKS with their row:
+│   │   │                              per payroll row of the month in a COST-CENTER
+│   │   │                              department, in the grid's order
+│   │   │                              (`comparePayrollOrder`); centralized
+│   │   │                              departments are named in the header, not
+│   │   │                              listed (`allocationRoster` — anybody who still
+│   │   │                              HAS a split stays listed, so nothing billed is
+│   │   │                              hidden). A person's split LOCKS with their row:
 │   │   │                              Completed, with Finance, paid, or the month
 │   │   │                              Closed for good. The way back is the payroll's
 │   │   │                              own — Unlock, reopen on Comm Cal, or Resubmit /
@@ -171,6 +174,33 @@ src/
 │   │   │                              on this month's payroll and still a draft.
 │   │   │                              `splitLock` in lib/staff-allocation.ts, mig
 │   │   │                              `20260930040000`.
+│   │   │                              **DEPARTMENT MODE (2026-09-30):**
+│   │   │                              `departments.cost_model` = `cost_center` (only
+│   │   │                              passes its cost through: split on Billing
+│   │   │                              Allocation, pool should net to zero — HR,
+│   │   │                              Finance, IT, Director Office) or `centralized`
+│   │   │                              (bills the subsidiaries by INVOICE, runs its
+│   │   │                              own pool, not on Billing Allocation — Director,
+│   │   │                              Marketing, Revenue). An on/off switch
+│   │   │                              (`components/department/DepartmentModeSwitch`,
+│   │   │                              on = centralized) in Settings › Departments'
+│   │   │                              Mode column and on each department's own page
+│   │   │                              (HR Costing, Service Billing, Director Pool,
+│   │   │                              Revenue › Department; Marketing once it has a
+│   │   │                              view). Only permission `department_mode`
+│   │   │                              (Principal by default) switches it, and it
+│   │   │                              asks about the person SIGNED IN — the Principal
+│   │   │                              flips it from HR's or Finance's view too — so
+│   │   │                              the gate is `department_set_cost_model`'s
+│   │   │                              `has_perm`, not `requirePermission`. Going
+│   │   │                              centralized clears that department's splits on
+│   │   │                              DRAFT payroll; the guard refuses a new split on
+│   │   │                              a centralized department's person. NOT tied to
+│   │   │                              `own_share_billback`: a cost center that did
+│   │   │                              not net to zero must stay VISIBLE, never be
+│   │   │                              absorbed by Venture automatically (user
+│   │   │                              2026-09-30). `lib/department-mode.ts`, mig
+│   │   │                              `20260930050000`.
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission

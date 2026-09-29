@@ -7,6 +7,7 @@ import {
   buildAllocationInvoiceLines,
   buildConsolidatedInvoiceLines,
   PAYROLL_SEGMENT_LABEL,
+  allocationRoster,
   planSplitCopy,
   splitCopyNote,
   splitLock,
@@ -14,6 +15,7 @@ import {
   type AllocationRow,
   type DeptComponentGroup,
   type SplitLockInput,
+  type SplitStanding,
 } from './staff-allocation'
 
 describe('validateAllocationRows', () => {
@@ -334,17 +336,56 @@ describe('planSplitCopy', () => {
     { staff_id: 'cwh', company_id: 'hc', allocation_pct: 1 },
     { staff_id: 'gone', company_id: 'hc', allocation_pct: 0.4 },
     { staff_id: 'set', company_id: 'car', allocation_pct: 0.3 },
+    { staff_id: 'mkt', company_id: 'hc', allocation_pct: 0.2 },
   ]
 
-  it('copies only people on this month’s payroll, still editable, not split yet', () => {
-    const payroll = new Map([['tyh', true], ['cwh', false], ['set', true]])
+  it('copies only people on this month’s payroll, still open, not split yet', () => {
+    const payroll = new Map<string, SplitStanding>([
+      ['tyh', 'open'],
+      ['cwh', 'locked'],
+      ['set', 'open'],
+      ['mkt', 'centralized'],
+    ])
     const plan = planSplitCopy(last, payroll, new Set(['set']))
     expect(plan.rows.map((r) => `${r.staff_id}:${r.company_id}`)).toEqual(['tyh:hc', 'tyh:car'])
-    expect(plan).toMatchObject({ copied: 1, locked: 1, notOnPayroll: 1 })
+    expect(plan).toMatchObject({ copied: 1, locked: 1, centralized: 1, notOnPayroll: 1 })
   })
 
   it('copies nothing when last month had no splits', () => {
-    expect(planSplitCopy([], new Map([['tyh', true]]), new Set())).toEqual({ rows: [], copied: 0, locked: 0, notOnPayroll: 0 })
+    expect(planSplitCopy([], new Map<string, SplitStanding>([['tyh', 'open']]), new Set())).toEqual({
+      rows: [],
+      copied: 0,
+      locked: 0,
+      centralized: 0,
+      notOnPayroll: 0,
+    })
+  })
+})
+
+describe('allocationRoster', () => {
+  // User 2026-09-30: a centralized department bills by invoice, so it is not
+  // on Billing Allocation's name list.
+  const row = (name: string, dept: string, centralized: boolean, hasSplit = false) => ({ name, dept, centralized, hasSplit })
+
+  it('lists cost-center people and names the centralized departments it leaves out', () => {
+    const { listed, notListed } = allocationRoster([
+      row('TAN YONG HONG', 'IT', false),
+      row('STANLEY', 'Revenue Department', true),
+      row('WONG JOEY', 'Marketing', true),
+      row('CHEW WEE HO', 'Finance', false),
+      row('ANTHONY', 'Revenue Department', true),
+    ])
+    expect(listed.map((r) => r.name)).toEqual(['TAN YONG HONG', 'CHEW WEE HO'])
+    expect(notListed).toEqual([
+      { dept: 'Marketing', people: 1 },
+      { dept: 'Revenue Department', people: 2 },
+    ])
+  })
+
+  it('never hides somebody who still has a split, whatever their department is now', () => {
+    const { listed, notListed } = allocationRoster([row('LI SEAN', 'HR', true, true), row('NURAZIRA', 'HR', true)])
+    expect(listed.map((r) => r.name)).toEqual(['LI SEAN'])
+    expect(notListed).toEqual([{ dept: 'HR', people: 1 }])
   })
 })
 
@@ -354,6 +395,12 @@ describe('splitCopyNote', () => {
       "Copied splits for 5 staff. 2 locked with their payroll were left alone. 1 not on this month's payroll was skipped.",
     )
     expect(splitCopyNote({ copied: 0, locked: 1, notOnPayroll: 0 })).toBe('1 locked with their payroll was left alone.')
+  })
+
+  it('says who a centralized department kept out', () => {
+    expect(splitCopyNote({ copied: 2, locked: 0, centralized: 3, notOnPayroll: 0 })).toBe(
+      'Copied splits for 2 staff. 3 in a centralized department were skipped.',
+    )
   })
 
   it('keeps the old line when there was nothing to do', () => {

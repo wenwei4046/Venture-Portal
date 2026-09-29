@@ -21,6 +21,11 @@ export interface StaffAllocationData {
   rows: Array<{ companyId: string; pct: number }>
   /** Where their pay stands; past draft the split is locked with it. */
   lock: SplitLock
+  /**
+   * Their department bills by invoice (2026-09-30). Only listed while a split
+   * is left over from before — frozen, and clearable while their pay is a draft.
+   */
+  centralized: boolean
 }
 
 interface Company {
@@ -109,9 +114,11 @@ function StaffCard({
     setShownKey(savedKey)
     if (!dirty) setRows(toEditRows(staff.rows))
   }
-  // The split follows the payroll row: past draft it stays as it left.
+  // The split follows the payroll row: past draft it stays as it left. A
+  // centralized department's person is only here for a split left over from
+  // before — never edited, only cleared.
   const locked = staff.lock.locked
-  const frozen = readOnly || locked
+  const frozen = readOnly || locked || staff.centralized
 
   const parsed = toAllocationRows(rows)
   const parseable = parsed.every((r) => r.companyId && Number.isFinite(r.pct))
@@ -146,9 +153,14 @@ function StaffCard({
       setError(v.error)
       return
     }
+    persist(parsed)
+  }
+
+  function persist(next: AllocationRow[]) {
+    setError(null)
     startTransition(async () => {
       try {
-        const result = await saveStaffAllocation(staff.staffId, period, parsed)
+        const result = await saveStaffAllocation(staff.staffId, period, next)
         if (!result.ok) {
           // Locked since this page was opened: say why, then show the card
           // as it now stands.
@@ -287,6 +299,23 @@ function StaffCard({
               ? `Locked with their pay · ${staff.lock.wayBack} to change it`
               : 'Payroll for this month is closed for good'}
           </p>
+        )}
+        {staff.centralized && !locked && (
+          <div className="flex items-center gap-3 flex-wrap sm:justify-end">
+            <p className="text-xs sm:text-right m-0">
+              {staff.dept} is centralized — billed by invoice, not split. This split is left from before.
+            </p>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => persist([])}
+                disabled={isPending}
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-1.5 rounded-control transition-colors disabled:opacity-40"
+              >
+                {isPending ? 'Clearing…' : 'Clear split'}
+              </button>
+            )}
+          </div>
         )}
         {!frozen && (
           <div className="flex items-center gap-2">

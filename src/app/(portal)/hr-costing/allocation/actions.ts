@@ -6,12 +6,14 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { isTopupKind, type RowStatus } from '@/lib/payroll-lifecycle'
+import { centralizedSplitMessage, costModelOf } from '@/lib/department-mode'
 import {
   planSplitCopy,
   splitLock,
   splitLockMessage,
   validateAllocationRows,
   type AllocationRow,
+  type SplitStanding,
 } from '@/lib/staff-allocation'
 
 // ─── Save one staff member's billing allocation for a period (HR) ────────────
@@ -53,7 +55,7 @@ export async function saveStaffAllocation(
       supabase
         .from('hr_monthly_payroll')
         .select(
-          'status, source, completed_at, topup_opened_at, topup_kind, hr_staff_costs (employee_name, departments (payroll_source))',
+          'status, source, completed_at, topup_opened_at, topup_kind, hr_staff_costs (employee_name, departments (name, payroll_source, cost_model))',
         )
         .eq('staff_id', staffId)
         .eq('period_month', period)
@@ -78,6 +80,14 @@ export async function saveStaffAllocation(
   })
   if (lock.locked) {
     return { ok: false, reason: splitLockMessage(sc?.employee_name ?? 'This person', monthLabel, lock) }
+  }
+  // A centralized department bills by invoice (2026-09-30): a split left over
+  // from before may be cleared, never written.
+  if (rows.length > 0 && costModelOf(sc?.departments?.cost_model) === 'centralized') {
+    return {
+      ok: false,
+      reason: centralizedSplitMessage(sc?.departments?.name ?? 'Their department', sc?.employee_name ?? 'this person'),
+    }
   }
 
   const { error: delErr } = await supabase
@@ -110,12 +120,14 @@ export async function saveStaffAllocation(
 // Only fills staff who have NO rows in the target period yet — never
 // overwrites what's already entered this month — and, since 2026-09-30, only
 // people on this month's payroll whose split can still change: somebody
-// Completed / with Finance / paid keeps the split they left with, and
-// somebody who left has no payroll row to split.
+// Completed / with Finance / paid keeps the split they left with, somebody in
+// a centralized department is billed by invoice instead, and somebody who
+// left has no payroll row to split.
 
 export async function copyAllocationsFromLastMonth(periodMonth: string): Promise<{
   copiedStaff: number
   lockedStaff: number
+  centralizedStaff: number
   notOnPayrollStaff: number
 }> {
   const user = await requirePermission('hr_costing')
@@ -143,7 +155,7 @@ export async function copyAllocationsFromLastMonth(periodMonth: string): Promise
       .eq('period_month', period),
     supabase
       .from('hr_monthly_payroll')
-      .select('staff_id, status')
+      .select('staff_id, status, hr_staff_costs (departments (cost_model))')
       .eq('period_month', period),
     supabase.rpc('payroll_month_closed', { p_period: period }),
   ])
@@ -152,12 +164,18 @@ export async function copyAllocationsFromLastMonth(periodMonth: string): Promise
   if (payErr) throw new Error(`Failed to read this month's payroll: ${payErr.message}`)
   if (closedErr) throw new Error(`Failed to read whether the month is closed: ${closedErr.message}`)
 
-  const editable = new Map(
-    (payrollRows ?? []).map((r) => [r.staff_id, monthClosed !== true && r.status === 'draft']),
+  const standing = new Map<string, SplitStanding>(
+    (payrollRows ?? []).map((r) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const model = costModelOf((r as any).hr_staff_costs?.departments?.cost_model)
+      const where: SplitStanding =
+        model === 'centralized' ? 'centralized' : monthClosed !== true && r.status === 'draft' ? 'open' : 'locked'
+      return [r.staff_id, where]
+    }),
   )
   const plan = planSplitCopy(
     prevRows ?? [],
-    editable,
+    standing,
     new Set((currentRows ?? []).map((r) => r.staff_id)),
   )
 
@@ -180,6 +198,7 @@ export async function copyAllocationsFromLastMonth(periodMonth: string): Promise
   return {
     copiedStaff: plan.copied,
     lockedStaff: plan.locked,
+    centralizedStaff: plan.centralized,
     notOnPayrollStaff: plan.notOnPayroll,
   }
 }

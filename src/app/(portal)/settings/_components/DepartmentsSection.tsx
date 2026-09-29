@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { hasMode, type DepartmentMode } from '@/lib/department-mode'
+import DepartmentModeSwitch from '@/components/department/DepartmentModeSwitch'
 import { addDepartment, provisionDepartment, setDepartmentBillback } from '../actions'
 
 // Departments management (2026-08-24, dynamic departments). ADD + 转正
@@ -30,7 +32,15 @@ function slugOf(name: string): string {
     .slice(0, 31)
 }
 
-export default function DepartmentsSection({ departments }: { departments: DeptRow[] }) {
+export default function DepartmentsSection({
+  departments,
+  modes = [],
+}: {
+  departments: DeptRow[]
+  /** Cost center / centralized per department (2026-09-30) — empty when it could not be read. */
+  modes?: DepartmentMode[]
+}) {
+  const modeById = new Map(modes.map((m) => [m.id, m]))
   const [isPending, startTransition] = useTransition()
   const [showAdd, setShowAdd] = useState(false)
   const [provisionId, setProvisionId] = useState<string | null>(null)
@@ -108,6 +118,11 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
         <em>Bill back 薪水</em>:这个部门没 bill 给子公司的那部分薪水,勾了就转给 Venture Office
         承担(部门自己收回来),不勾就留在自己的 pool。开 own-share 单的时候照这里带出来,那一次可以临时改。
       </p>
+      <p className="font-serif italic text-muted text-sm mb-4 max-w-2xl">
+        <em>Mode</em>:<em>Cost center</em> 只是过一手 — 薪水在 Billing Allocation 分给子公司,pool
+        应该归零。<em>Centralized</em> 自己开 invoice 给子公司、钱进自己的 pool、自己付 — 不进 Billing
+        Allocation。只有 Principal 能切;切成 Centralized 会清掉它还在 draft 的 split。
+      </p>
 
       {error ? (
         <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-4 text-sm font-sans">
@@ -153,6 +168,7 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
               <th className="text-left py-3 px-4 font-medium">Segment</th>
               <th className="text-left py-3 px-4 font-medium">Pool GL</th>
               <th className="text-left py-3 px-4 font-medium">Billing mode</th>
+              <th className="text-left py-3 px-4 font-medium">Mode</th>
               <th className="text-center py-3 px-4 font-medium">Bill back 薪水</th>
               <th className="text-right py-3 px-4 font-medium">Actions</th>
             </tr>
@@ -177,6 +193,16 @@ export default function DepartmentsSection({ departments }: { departments: DeptR
                   </td>
                   <td className="py-3 px-4 font-mono text-xs text-graphite">{d.pool_gl_code ?? '—'}</td>
                   <td className="py-3 px-4 font-mono text-xs text-graphite">{d.billing_mode_key ?? '—'}</td>
+                  <td className="py-3 px-4">
+                    {(() => {
+                      const mode = modeById.get(d.id)
+                      return mode && hasMode(mode) ? (
+                        <DepartmentModeSwitch department={mode} variant="cell" />
+                      ) : (
+                        <span className="text-muted font-mono text-xs">—</span>
+                      )
+                    })()}
+                  </td>
                   <td className="py-3 px-4 text-center">
                     {full && !d.is_internal ? (
                       <input
