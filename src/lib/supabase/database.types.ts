@@ -2519,6 +2519,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          ar_account_code: string | null
           created_at: string
           director_heads: number
           id: string
@@ -2528,6 +2529,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ar_account_code?: string | null
           created_at?: string
           director_heads?: number
           id?: string
@@ -2537,6 +2539,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ar_account_code?: string | null
           created_at?: string
           director_heads?: number
           id?: string

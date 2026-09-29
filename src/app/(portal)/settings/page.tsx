@@ -176,7 +176,11 @@ export default async function SettingsPage({ searchParams }: Props) {
             name: c.name,
             short_code: c.short_code,
             is_active: c.is_active,
+            ar_account_code: (c as { ar_account_code?: string | null }).ar_account_code ?? null,
           }))}
+          arAccounts={(accountRows ?? [])
+            .filter((a) => (a as { parent_code: string | null }).parent_code === '3030' && a.is_active)
+            .map((a) => ({ code: a.code as string, name: a.name as string }))}
         />
       )}
 

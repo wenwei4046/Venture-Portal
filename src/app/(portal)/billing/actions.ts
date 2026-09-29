@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { resolveArGlCode } from '@/lib/ar-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
@@ -1257,6 +1258,8 @@ export async function settleInvoicesConsolidated(payload: {
   // Payee label
   const companyId = invoices[0].company_id
   let payeeName = invoices[0].billable_to_freetext_name ?? '—'
+  // Every invoice in a settlement belongs to one payer, so one AR account.
+  const arCode = await resolveArGlCode(supabase, { invoiceId: invoices[0].id })
   if (companyId) {
     const { data: company } = await supabase
       .from('companies')
@@ -1314,7 +1317,7 @@ export async function settleInvoicesConsolidated(payload: {
   // Primary source row (AR clearing account)
   const { error: srcErr } = await supabase
     .from('payment_voucher_sources')
-    .insert({ voucher_id: pv.id, pool: 'venture_pool', amount: total, account_code: '3030' })
+    .insert({ voucher_id: pv.id, pool: 'venture_pool', amount: total, account_code: arCode })
   if (srcErr) throw new Error(`source row insert failed: ${srcErr.message}`)
 
   // Bank cache — fail loud (2026-06-11 audit): a swallowed bump drifts the
@@ -1405,7 +1408,7 @@ export async function settleInvoicesConsolidated(payload: {
         segment: seg,
         lines: [
           { accountCode: bankGlCode, debit: segAmount, description: `Bank deposit — ${voucherNo}` },
-          { accountCode: '3030', credit: segAmount, description: `Payment received — ${payeeName}` },
+          { accountCode: arCode, credit: segAmount, description: `Payment received — ${payeeName}` },
         ],
         createdBy: user.id,
       })
@@ -2098,7 +2101,7 @@ export async function approveInvoice(formData: FormData) {
           const segLines = bySeg.get(seg)!
           const subtotal = Math.round(segLines.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100
           const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
-            { accountCode: '3030', debit: subtotal, description: `AR — invoice ${inv.invoice_no ?? ''} (${seg})`.trim() },
+              { accountCode: await resolveArGlCode(supabase, { invoiceId: inv.id }), debit: subtotal, description: `AR — invoice ${inv.invoice_no ?? ''} (${seg})`.trim() },
           ]
           for (const ln of segLines) {
             const code = await resolveRevenueGlCode(supabase, ln.category_code, inv.billing_mode)
@@ -2119,7 +2122,7 @@ export async function approveInvoice(formData: FormData) {
         // (mig 275), else a single Cr for the full amount. Segment is derived
         // downstream from the invoice's billing_mode.
         const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
-          { accountCode: '3030', debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+          { accountCode: await resolveArGlCode(supabase, { invoiceId: inv.id }), debit: amount, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
         ]
         if (invoiceLines && invoiceLines.length > 0) {
           for (const ln of invoiceLines) {
@@ -2196,7 +2199,7 @@ export async function approveInvoice(formData: FormData) {
           createdBy: user.id,
           lines: [
             ...natureSplits.map((s) => ({ accountCode: s.accountCode, debit: s.amount, description: `Inter-billing (${payingDept.name}) — by nature` })),
-            { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
+            { accountCode: await resolveArGlCode(supabase, { invoiceId: inv.id }), credit: amount, description: `AR cleared — inter-billing ${inv.invoice_no ?? ''}`.trim() },
           ],
         })
       } catch (jeErr) {
@@ -2275,7 +2278,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         const segLines = bySeg.get(seg)!
         const subtotal = Math.round(segLines.reduce((s, l) => s + Number(l.amount), 0) * 100) / 100
         const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
-          { accountCode: '3030', debit: subtotal, description: `AR — invoice ${row.invoice_no ?? ''} (${seg})`.trim() },
+          { accountCode: await resolveArGlCode(supabase, { invoiceId: row.id }), debit: subtotal, description: `AR — invoice ${row.invoice_no ?? ''} (${seg})`.trim() },
         ]
         for (const ln of segLines) {
           const code = await resolveRevenueGlCode(supabase, ln.category_code, row.billing_mode)
@@ -2308,7 +2311,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
         .eq('invoice_id', row.id)
         .order('line_no')
       const jeLines: Array<{ accountCode: string; debit?: number; credit?: number; description: string }> = [
-        { accountCode: '3030', debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
+        { accountCode: await resolveArGlCode(supabase, { invoiceId: row.id }), debit: amount, description: `AR — invoice ${row.invoice_no ?? ''}`.trim() },
       ]
       if (rowLines && rowLines.length > 0) {
         for (const ln of rowLines) {
@@ -2374,7 +2377,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
           createdBy: user.id,
           lines: [
             ...natureSplits.map((s) => ({ accountCode: s.accountCode, debit: s.amount, description: `Inter-billing (${payingDept.name}) — by nature` })),
-            { accountCode: '3030', credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
+            { accountCode: await resolveArGlCode(supabase, { invoiceId: row.id }), credit: amount, description: `AR cleared — inter-billing ${row.invoice_no ?? ''}`.trim() },
           ],
         })
       } catch (jeErr) {
@@ -2448,7 +2451,7 @@ export async function approveCreditNote(formData: FormData) {
       createdBy: user.id,
       lines: [
         { accountCode: debitCode, debit: amount, description: `Credit note — ${cn.reason}` },
-        { accountCode: '3030', credit: amount, description: `AR reduced — CN ${cn.credit_note_no ?? ''}`.trim() },
+        { accountCode: await resolveArGlCode(supabase, { invoiceId: inv.id }), credit: amount, description: `AR reduced — CN ${cn.credit_note_no ?? ''}`.trim() },
       ],
     })
   } catch (jeErr) {

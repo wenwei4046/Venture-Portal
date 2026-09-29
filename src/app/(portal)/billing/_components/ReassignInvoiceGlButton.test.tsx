@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import ReassignInvoiceGlButton from './ReassignInvoiceGlButton'
 
-const reassign = vi.fn(async () => ({ changed: 5 }))
+const reassign = vi.fn(async (_fd: FormData) => ({ changed: 5 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 vi.mock('../actions', () => ({ reassignInvoiceGlAccount: (fd: FormData) => reassign(fd) }))
 
@@ -47,7 +47,7 @@ describe('ReassignInvoiceGlButton', () => {
     fireEvent.click(screen.getByText('确认改'))
 
     expect(reassign).toHaveBeenCalledTimes(1)
-    const fd = reassign.mock.calls[0][0] as unknown as FormData
+    const fd = reassign.mock.calls[0]![0] as unknown as FormData
     expect(fd.get('old_account')).toBe('3051,3056')
     expect(fd.get('new_account')).toBe('5011')
   })

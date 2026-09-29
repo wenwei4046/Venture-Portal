@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { resolveArGlCode } from '@/lib/ar-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
@@ -73,8 +74,14 @@ async function createPaymentVoucherInner(formData: FormData) {
   // The user-facing form doesn't need to ask for an account — revenue was
   // already recognised at invoice issue. Auto-fill with AR — Subs (3030).
   const rawAccountCode = (formData.get('account_code') as string) || null
-  const accountCode = rawAccountCode
-    ?? (voucherType === 'billing_payment' ? '3030' : null)
+  // AR is per customer since 2026-09-29, so the receivable leg resolves from
+  // the invoice being settled (else the payee) instead of a fixed 3030.
+  const arCode = await resolveArGlCode(supabase, {
+    invoiceId,
+    companyId: payeeCompanyId,
+    freetext: payeeName || null,
+  })
+  const accountCode = rawAccountCode ?? (voucherType === 'billing_payment' ? arCode : null)
   const sourcePool = (formData.get('source_pool') as string) || null
   // Phase 7 Step 10: Credit vouchers default to Venture Pool when unspecified.
   const targetPoolRaw = (formData.get('target_pool') as string) || null
@@ -610,7 +617,7 @@ async function createPaymentVoucherInner(formData: FormData) {
               segment: g.segment,
               lines: [
                 { accountCode: glAccountCode, debit: r2(g.amount), description: `Bank deposit — ${voucherNo} (${g.segment})` },
-                { accountCode: accountCode ?? '3030', credit: r2(g.amount), description: `Payment received — ${payeeName} (${g.segment})` },
+                { accountCode: accountCode ?? arCode, credit: r2(g.amount), description: `Payment received — ${payeeName} (${g.segment})` },
               ],
               createdBy: user.id,
             })
@@ -630,7 +637,7 @@ async function createPaymentVoucherInner(formData: FormData) {
               // 2026-06-03 / fixed 2026-06-11): a receipt against a non-3030
               // receivable (e.g. 3071 Other Debtor) credits THAT account —
               // hardcoding 3030 made AR absorb every receipt.
-              { accountCode: accountCode ?? '3030', credit: r2(amount), description: `Payment received — ${payeeName}` },
+              { accountCode: accountCode ?? arCode, credit: r2(amount), description: `Payment received — ${payeeName}` },
             ],
             createdBy: user.id,
           })

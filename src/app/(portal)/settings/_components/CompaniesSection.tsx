@@ -3,18 +3,26 @@
 import { useState, useTransition } from 'react'
 import { addCompany, updateCompany, toggleCompanyActive } from '../actions'
 
+interface ArAccountOption {
+  code: string
+  name: string
+}
+
 interface CompanyRow {
   id: string
   name: string
   short_code: string
   is_active: boolean
+  ar_account_code?: string | null
 }
 
 interface Props {
   companies: CompanyRow[]
+  /** The receivable accounts a customer can be filed under (children of 3030). */
+  arAccounts?: ArAccountOption[]
 }
 
-export default function CompaniesSection({ companies }: Props) {
+export default function CompaniesSection({ companies, arAccounts = [] }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showAdd, setShowAdd] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -126,6 +134,7 @@ export default function CompaniesSection({ companies }: Props) {
             <tr className="border-b border-hairline text-xs uppercase tracking-wide text-muted font-sans bg-surface-2/30">
               <th className="text-left py-3 px-4 font-medium">Name</th>
               <th className="text-left py-3 px-4 font-medium">Code</th>
+              <th className="text-left py-3 px-4 font-medium">AR account</th>
               <th className="text-left py-3 px-4 font-medium">Status</th>
               <th className="text-right py-3 px-4 font-medium">Actions</th>
             </tr>
@@ -134,7 +143,7 @@ export default function CompaniesSection({ companies }: Props) {
             {companies.map((c) => (
               <tr key={c.id} className="border-b border-hairline last:border-0">
                 {editId === c.id ? (
-                  <td colSpan={4} className="p-4">
+                  <td colSpan={5} className="p-4">
                     <form action={handleUpdate} className="flex flex-wrap items-end gap-3">
                       <input type="hidden" name="id" value={c.id} />
                       <div>
@@ -158,6 +167,22 @@ export default function CompaniesSection({ companies }: Props) {
                           className="px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border uppercase w-24"
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-sans text-muted mb-1">AR account</label>
+                        <select
+                          name="ar_account_code"
+                          defaultValue={c.ar_account_code ?? ''}
+                          className="px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+                          title="这家客户的发票挂哪个应收账户 — 留空就归到「AR - 外部客户」"
+                        >
+                          <option value="">(AR - Other)</option>
+                          {arAccounts.map((a) => (
+                            <option key={a.code} value={a.code}>
+                              {a.code} · {a.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <button
                         type="submit"
                         disabled={isPending}
@@ -178,6 +203,9 @@ export default function CompaniesSection({ companies }: Props) {
                   <>
                     <td className="py-3 px-4 font-serif text-ink">{c.name}</td>
                     <td className="py-3 px-4 font-mono text-xs text-graphite">{c.short_code}</td>
+                    <td className="py-3 px-4 font-mono text-xs text-graphite">
+                      {c.ar_account_code ?? <span className="font-serif italic text-muted">AR - Other</span>}
+                    </td>
                     <td className="py-3 px-4">
                       <span className={`font-serif italic text-sm ${c.is_active ? 'text-ledger' : 'text-muted'}`}>
                         {c.is_active ? 'active' : 'inactive'}

@@ -28,6 +28,7 @@ import { primedModeToPool, primedSegmentToPool } from './dept-registry'
 import type { AccountType, CashFlowCategory } from './coa'
 import { CASH_FLOW_CATEGORIES } from './coa'
 import type { Database } from './supabase/database.types'
+import { accountFamily } from './ar-accounts'
 
 type GlSegment = Database['public']['Enums']['gl_segment']
 
@@ -1439,13 +1440,20 @@ export async function fetchBalanceSheet(
 
   // ── 4: Named asset line items (post-mig 238 codes):
   //    Accounts Receivable = 3030, Loans Receivable = 3020.
+  // Both are headers with a child per counterparty — 3020 always was, 3030
+  // since 2026-09-29 — and the postings live on the children, so the family
+  // has to be summed. Reading the bare parent returned zero.
+  const [arCodes, loanCodes] = await Promise.all([
+    accountFamily(supabase, AR_CODE),
+    accountFamily(supabase, LOANS_RECEIVABLE_CODE),
+  ])
   const invoiceReceivable = await sumGlNetAcrossCodes(
     supabase,
-    { asOf, codes: [AR_CODE], sign: 'dr-cr' },
+    { asOf, codes: arCodes, sign: 'dr-cr' },
   )
   const loanReceivable = await sumGlNetAcrossCodes(
     supabase,
-    { asOf, codes: [LOANS_RECEIVABLE_CODE], sign: 'dr-cr' },
+    { asOf, codes: loanCodes, sign: 'dr-cr' },
   )
 
   // ── 5: Fixed assets total (2xxx range, fixed_asset type).

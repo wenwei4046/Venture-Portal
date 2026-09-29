@@ -13,6 +13,7 @@ import AttachmentUploader from './_components/AttachmentUploader'
 import AttachmentList from '@/components/voucher/AttachmentList'
 import LedgerRow from '@/components/LedgerRow'
 import { recipientAccountLabel, salaryPaymentLabel } from '@/lib/payroll-voucher-display'
+import { AR_PARENT, accountFamily } from '@/lib/ar-accounts'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -194,12 +195,15 @@ export default async function PaymentDetailPage({ params }: Props) {
       supabase.rpc('bank_gl_codes' as never),
     ])
     const bankSet = new Set(((bankCodesData ?? []) as unknown as string[]))
+    // AR is per customer since 2026-09-29, so the leg to hide is the whole
+    // 3030 family, not just the old pooled code.
+    const arFamily = new Set(await accountFamily(supabase, AR_PARENT))
     const nameByCode = new Map(
       ((coaRows ?? []) as Array<{ code: string; name: string }>).map((c) => [c.code, c.name]),
     )
     const totals = new Map<string, number>()
     for (const l of (jlRows ?? []) as Array<{ account_code: string; debit: number | null; credit: number | null }>) {
-      if (bankSet.has(l.account_code) || l.account_code === '3000' || l.account_code === '3030') continue
+      if (bankSet.has(l.account_code) || l.account_code === '3000' || arFamily.has(l.account_code)) continue
       totals.set(l.account_code, (totals.get(l.account_code) ?? 0) + Number(l.debit ?? 0) + Number(l.credit ?? 0))
     }
     reassignFrom = [...totals.entries()].map(([code, total]) => ({

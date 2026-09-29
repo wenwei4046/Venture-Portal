@@ -374,14 +374,37 @@ export async function updateCompany(formData: FormData) {
   const id = formData.get('id') as string
   const name = (formData.get('name') as string)?.trim()
   const shortCode = (formData.get('short_code') as string)?.trim().toUpperCase()
+  // Which receivable account this customer's invoices post to (2026-09-29).
+  // Blank = fall through to AR - Other; anything else must be a child of 3030
+  // so the split stays a real hierarchy.
+  const arAccountRaw = (formData.get('ar_account_code') as string)?.trim() ?? ''
+  const arAccountCode = arAccountRaw === '' ? null : arAccountRaw
 
   if (!id) throw new Error('Company ID is required')
   if (!name) throw new Error('Company name is required')
   if (!shortCode || shortCode.length > 10) throw new Error('Short code is required (max 10 chars)')
+  if (arAccountCode) {
+    const { data: acct } = await supabase
+      .from('chart_of_accounts')
+      .select('code, parent_code, is_active')
+      .eq('code', arAccountCode)
+      .maybeSingle()
+    if (!acct?.is_active) {
+      throw new Error(`Account ${arAccountCode} does not exist or is inactive`)
+    }
+    if ((acct as { parent_code: string | null }).parent_code !== '3030') {
+      throw new Error(`Account ${arAccountCode} is not a receivable account under 3030`)
+    }
+  }
 
   const { error } = await supabase
     .from('companies')
-    .update({ name, short_code: shortCode, updated_at: new Date().toISOString() })
+    .update({
+      name,
+      short_code: shortCode,
+      ar_account_code: arAccountCode,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
 
   if (error) {
