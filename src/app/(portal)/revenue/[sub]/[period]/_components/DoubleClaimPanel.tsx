@@ -2,10 +2,13 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { formatMoney } from '@/lib/utils'
-import type { CarriedMonth, DoubleClaimGroup } from '@/lib/commission/double-claims'
+import type { CarriedMonth, DoubleClaimBill, DoubleClaimGroup } from '@/lib/commission/double-claims'
+import type { ClaimExplanation, ClaimVerdict, Sameness } from '@/lib/commission/double-claim-reasons'
 import { dismissDoubleClaim, restoreDoubleClaim } from '../../../double-claim-actions'
+import s from './commission-workbench.module.css'
+import d from './double-claims.module.css'
 
 interface Props {
   period: string
@@ -16,7 +19,26 @@ interface Props {
   carried: CarriedMonth[]
   /** Why the check could not run, when it could not. */
   unavailable: string | null
+  /** Why each group was flagged, by paper number (`lib/commission/double-claim-reasons.ts`). */
+  explanations?: Record<string, ClaimExplanation>
+  /** What of the evidence behind the reasons could not be read. */
+  evidenceUnavailable?: string | null
+  /** Where a bill opened from here leads back to — this tab, on this month. */
+  returnTo?: string
+  /**
+   * A tab of the month's workbench (2026-09-30): drawn whatever it holds, with
+   * an empty state. Alone on a page it says nothing when there is nothing.
+   */
+  inTab?: boolean
 }
+
+const TONE: Record<ClaimVerdict, 'danger' | 'alert' | 'quiet'> = {
+  paid_again: 'danger', copy: 'danger', second_sale: 'alert', number_only: 'alert', split: 'quiet', settled: 'quiet',
+}
+const CHIP: Record<ClaimVerdict, string> = {
+  paid_again: 'danger', copy: 'danger', second_sale: 'alert', number_only: 'alert', split: 'info', settled: 'ledger',
+}
+const MATCH: Record<Sameness, string> = { same: '✓ Same', differs: '≠ Differs', unknown: '? Can’t tell' }
 
 function monthName(period: string, style: 'long' | 'short' = 'long'): string {
   return new Date(`${period}T00:00:00Z`).toLocaleString('en-US', { month: style, year: 'numeric', timeZone: 'UTC' })
@@ -26,17 +48,27 @@ function list(words: string[]): string {
   return words.length <= 1 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
 }
 
+function Summary({ label, value, note }: { label: string; value: string; note?: string }) {
+  return <div className={s.summary}><span className={s.summaryLabel}>{label}</span><strong className={s.summaryValue}>{value}</strong>{note && <small>{note}</small>}</div>
+}
+
 /**
- * "Is anything here claimed twice?" (user 2026-09-26) — asked at the top of
- * the month, where the run is computed, rather than discovered in payroll.
+ * "Is anything here claimed twice — and why do you think so?" (user
+ * 2026-09-26, then 2026-09-30: 我要你全部都写原因 … 把过去的 history 拿出来).
  *
- * Two questions, because a bill is paid twice in two different ways: the same
- * paper number on two bills (a month worked out by hand, and the ERP keying
- * it again), and bills carried in from a month no run of the portal ever paid
- * (`lib/commission/double-claims.ts`). Only the first can be answered here —
- * the second is a decision about months, not bills.
+ * A tab of the month's workbench since 2026-09-30; it sat above the month's
+ * cards until then. Two ways a bill gets paid twice, both said here: the same
+ * paper number on two bills (a month worked out by hand, and the ERP keying it
+ * again), and bills carried in from a month no run of the portal ever paid
+ * (`lib/commission/double-claims.ts`). Every group of the first kind opens on
+ * WHY it is here — its verdict, its findings, what to do — then lays its bills
+ * side by side and tells each one's history
+ * (`lib/commission/double-claim-reasons.ts`). Only the first kind can be
+ * answered here; the second is a decision about months, not bills.
  */
-export default function DoubleClaimPanel({ period, subDepartmentId, basePath, groups, carried, unavailable }: Props) {
+export default function DoubleClaimPanel({
+  period, subDepartmentId, basePath, groups, carried, unavailable, explanations, evidenceUnavailable = null, returnTo, inTab = false,
+}: Props) {
   const router = useRouter()
   const [showChecked, setShowChecked] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +79,12 @@ export default function DoubleClaimPanel({ period, subDepartmentId, basePath, gr
   const carriedBills = carried.reduce((a, c) => a + c.bills, 0)
   const carriedValue = carried.reduce((a, c) => a + c.value, 0)
 
-  if (!unavailable && openGroups.length === 0 && checked.length === 0 && carried.length === 0) return null
+  if (!inTab && !unavailable && openGroups.length === 0 && checked.length === 0 && carried.length === 0) return null
+
+  const explained = openGroups.map(g => explanations?.[g.billRef]).filter((x): x is ClaimExplanation => Boolean(x))
+  const twice = explained.filter(x => x.verdict === 'paid_again' || x.verdict === 'copy')
+  const apart = explained.filter(x => x.verdict === 'split' || x.verdict === 'second_sale' || x.verdict === 'settled')
+  const atRisk = twice.reduce((a, x) => a + x.atRisk, 0)
 
   function answer(action: () => Promise<unknown>) {
     setError(null)
@@ -62,116 +99,205 @@ export default function DoubleClaimPanel({ period, subDepartmentId, basePath, gr
     })
   }
 
-  function group(g: DoubleClaimGroup) {
+  const billHref = (b: DoubleClaimBill) =>
+    `${basePath}/${b.periodMonth}/orders/${b.orderId}${returnTo ? `?from=${encodeURIComponent(returnTo)}` : ''}`
+
+  function answerButton(g: DoubleClaimGroup): ReactNode {
+    return g.dismissed ? (
+      <button type="button" className={s.ghostButton} disabled={pending}
+        onClick={() => answer(() => restoreDoubleClaim(subDepartmentId, g.billRef))}>
+        Ask again
+      </button>
+    ) : (
+      <button type="button" className={s.button} disabled={pending}
+        title="Say so once; a new bill under this number asks again"
+        onClick={() => {
+          if (window.confirm(`${g.billRef}: these ${g.bills.length} bills are separate sales, not one bill claimed twice?`)) {
+            answer(() => dismissDoubleClaim(subDepartmentId, g.billRef))
+          }
+        }}>
+        Checked — separate sales
+      </button>
+    )
+  }
+
+  /** A group with nothing read behind it: which bills, and where each came from. */
+  function plain(g: DoubleClaimGroup) {
     const across = g.months.length > 1
     return (
-      <div key={g.billRef} className="mb-4 last:mb-0">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-1.5">
-          <span className="font-mono text-[12px] text-ink font-semibold">{g.billRef}</span>
-          <span className="font-serif italic text-sm text-graphite">
-            {across
-              ? `on ${g.bills.length} bills in ${list(g.months.map(m => monthName(m)))}`
-              : `on ${g.bills.length} bills in ${monthName(g.months[0])}`}
-          </span>
+      <article key={g.billRef} className={d.card} aria-label={`${g.billRef} on ${g.bills.length} bills`}>
+        <div className={d.head}>
+          <div className={d.headTop}>
+            <span className={d.ref}>{g.billRef}</span>
+            <span className={d.meta}>
+              {across ? `on ${g.bills.length} bills in ${list(g.months.map(m => monthName(m)))}` : `on ${g.bills.length} bills in ${monthName(g.months[0])}`}
+            </span>
+          </div>
         </div>
-        <div className="border border-hairline rounded-card bg-surface overflow-x-auto">
-          <table className="ledger-table tight">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Bill</th>
-                <th className="m-hide">Salesperson</th>
-                <th className="right">Sales value</th>
-                <th className="m-hide">Came from</th>
-              </tr>
-            </thead>
-            <tbody>
-              {g.bills.map(b => (
-                <tr key={b.orderId} className={b.periodMonth === period ? 'font-semibold' : undefined}>
-                  <td>{monthName(b.periodMonth, 'short')}</td>
-                  <td className="font-mono text-xs">
-                    <Link href={`${basePath}/${b.periodMonth}/orders/${b.orderId}`} className="text-ink hover:text-accent">
-                      {b.orderNo}
-                    </Link>
-                  </td>
-                  <td className="m-hide" data-label="Salesperson">{b.employeeName ?? b.agentName}</td>
-                  <td className="num">{formatMoney(b.orderTotal)}</td>
-                  <td className="m-hide font-serif italic text-sm text-graphite" data-label="Came from">
-                    {b.source === 'erp_sync' ? 'ERP' : 'Imported'}
-                    {b.paidByRun ? <span className="text-alert"> · already paid by a run</span> : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className={d.compareWrap}>
+          <div className={s.tableFrame}><div className={s.tableScroll}>
+            <table className={s.table}>
+              <thead><tr><th>Month</th><th>Bill</th><th>Salesperson</th><th className={s.numeric}>Sales value</th><th>Came from</th></tr></thead>
+              <tbody>
+                {g.bills.map(b => (
+                  <tr key={b.orderId}>
+                    <td>{monthName(b.periodMonth, 'short')}</td>
+                    <td><Link href={billHref(b)}>{b.orderNo}</Link></td>
+                    <td>{b.employeeName ?? b.agentName}</td>
+                    <td className={s.numeric}>{formatMoney(b.orderTotal)}</td>
+                    <td>{b.source === 'erp_sync' ? 'ERP' : 'Imported'}{b.paidByRun ? ' · already paid by a run' : ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div></div>
         </div>
-        <div className="mt-1.5">
-          {g.dismissed ? (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => answer(() => restoreDoubleClaim(subDepartmentId, g.billRef))}
-              className="font-mono text-[10.5px] uppercase tracking-wide text-muted hover:text-accent disabled:opacity-40"
-            >
-              Ask again
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                if (window.confirm(`${g.billRef}: these ${g.bills.length} bills are separate sales, not one bill claimed twice?`)) {
-                  answer(() => dismissDoubleClaim(subDepartmentId, g.billRef))
-                }
-              }}
-              className="font-mono text-[10.5px] uppercase tracking-wide text-muted hover:text-accent disabled:opacity-40"
-              title="Say so once; a new bill under this number asks again"
-            >
-              Checked — separate sales
-            </button>
-          )}
+        <div className={d.foot}>{answerButton(g)}</div>
+      </article>
+    )
+  }
+
+  function card(g: DoubleClaimGroup) {
+    const x = explanations?.[g.billRef]
+    if (!x) return plain(g)
+    const people = [...new Set(g.bills.map(b => b.employeeName ?? b.agentName))]
+    return (
+      <article key={g.billRef} className={d.card} data-tone={g.dismissed ? 'quiet' : TONE[x.verdict]}
+        aria-labelledby={`claim-${g.billRef}`}>
+        <div className={d.head}>
+          <div className={d.headTop}>
+            <span className={d.ref}>{g.billRef}</span>
+            <span className={`chip ${CHIP[x.verdict]}`}><span className="dot" />{x.label}</span>
+            <span className={d.meta}>
+              {g.bills.length} bills · {list(g.months.map(m => monthName(m)))} · {list(people)}
+            </span>
+          </div>
+          <h3 id={`claim-${g.billRef}`} className={d.headline}>{x.headline}</h3>
         </div>
-      </div>
+
+        <div className={d.why}>
+          <h4>Why it is here</h4>
+          <ul className={d.reasons}>{x.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          <p className={d.action}><strong>What to do: </strong>{x.action}</p>
+        </div>
+
+        <div className={d.compareWrap}>
+          <div className={s.tableFrame}>
+            <div className={`${s.tableScroll} ${d.unbounded}`} role="region" tabIndex={0} aria-label={`${g.billRef}: the bills side by side, scroll horizontally`}>
+              <table className={`${s.table} ${d.compare}`} aria-label={`${g.billRef}: the bills side by side`}>
+                <thead>
+                  <tr>
+                    <th className={s.stickyFirst} scope="col">Bill</th>
+                    {g.bills.map(b => (
+                      <th key={b.orderId} scope="col">
+                        <Link href={billHref(b)}>{b.orderNo}</Link>
+                        <small>{monthName(b.periodMonth, 'short')}{b.periodMonth === period ? ' · this month' : ''}</small>
+                      </th>
+                    ))}
+                    <th scope="col" className={d.match}>Match</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {x.facts.map(f => (
+                    <tr key={f.label}>
+                      <th scope="row" className={s.stickyFirst}>{f.label}</th>
+                      {f.values.map((v, i) => (
+                        <td key={g.bills[i]?.orderId ?? i}>{v}{f.notes[i] ? <small>{f.notes[i]}</small> : null}</td>
+                      ))}
+                      <td className={d.match}>
+                        {f.same ? <span className={d[f.same]}>{MATCH[f.same]}</span> : null}
+                        {f.gap ? <small>{f.gap}</small> : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className={d.histories}>
+          {g.bills.map(b => (
+            <section key={b.orderId} className={d.history} aria-label={`History of ${b.orderNo}`}>
+              <h4>History of <Link href={billHref(b)}>{b.orderNo}</Link></h4>
+              <ol className={d.timeline}>
+                {(x.history[b.orderId] ?? []).map((e, i) => (
+                  <li key={i} data-tone={e.tone}>
+                    {e.when ? <span className={d.when}>{e.when}</span> : null}
+                    {e.text}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ))}
+        </div>
+
+        <div className={d.foot}>{answerButton(g)}</div>
+      </article>
     )
   }
 
   return (
-    <section aria-label="Possible double claims" className="mb-6 border border-alert rounded-card bg-alert-bg px-4 py-4">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-3">
-        <h2 className="font-serif text-[17px] text-ink">Possible double claims</h2>
-        <span className="font-mono text-[11px] uppercase tracking-[0.02em] text-alert">
-          {openGroups.length} to check{carriedBills > 0 ? ` · ${carriedBills} carried in` : ''}
-        </span>
+    <section aria-label="Possible double claims">
+      <div className={s.topLine}>
+        <div>
+          <h2 className={s.sectionHeading}>Possible double claims</h2>
+          <p className={s.subtitle}>
+            A bill is flagged when its paper number — the number on the customer&apos;s paper bill, which the
+            ERP keeps as its Customer SO no. — is on more than one bill a run could pay or already paid. Each
+            one says why it looks like one sale paid twice (or why it probably is not), what the bills share
+            and where they part, and what every bill has been through.
+          </p>
+        </div>
+        {atRisk > 0 ? (
+          <div className={s.overviewTotal}>
+            <span>Would be paid twice</span>
+            <strong>{formatMoney(atRisk)}</strong>
+            <small>Sales value of the copies below</small>
+          </div>
+        ) : null}
       </div>
 
+      {openGroups.length > 0 || checked.length > 0 ? (
+        <div className={s.summaryGrid}>
+          <Summary label="To check" value={String(openGroups.length)} note={`${list(openGroups.map(g => g.billRef).slice(0, 3))}${openGroups.length > 3 ? ' …' : ''}`} />
+          <Summary label="Would pay twice" value={String(twice.length)} note="Already claimed, or the same sale twice" />
+          <Summary label="Probably separate" value={String(apart.length)} note="One sale in parts, a later bill, a settled month" />
+          <Summary label="Checked — separate sales" value={String(checked.length)} />
+        </div>
+      ) : null}
+
       {unavailable ? (
-        <p className="font-serif italic text-sm text-danger mb-3">
-          The check for bills claimed twice could not run: {unavailable}
+        <p className={s.warning} role="alert">The check for bills claimed twice could not run: {unavailable}</p>
+      ) : null}
+      {evidenceUnavailable ? (
+        <p className={s.warning}>
+          Some of the history behind these bills could not be read — {evidenceUnavailable} The reasons below
+          use what could.
         </p>
       ) : null}
 
-      {openGroups.length > 0 ? (
-        <>
-          <p className="font-serif italic text-sm text-graphite mb-3 max-w-3xl">
-            The same paper number is on more than one bill a run could pay. Open each bill: if it is
-            one sale, correct the copy where it came from; if they are separate sales, mark them checked.
-          </p>
-          {openGroups.map(group)}
-        </>
+      {openGroups.map(card)}
+
+      {inTab && !unavailable && openGroups.length === 0 && carried.length === 0 ? (
+        <div className={`${s.tableFrame} ${s.empty}`}>
+          No bill of {monthName(period)} shares its paper number with another bill.
+          {checked.length ? ` ${checked.length} checked earlier ${checked.length === 1 ? 'is' : 'are'} below.` : ''}
+        </div>
       ) : null}
 
       {carried.length > 0 ? (
-        <div className={openGroups.length > 0 ? 'mt-5 pt-4 border-t border-hairline' : undefined}>
-          <h3 className="font-serif text-[15px] text-ink mb-1">
+        <div className={d.carried}>
+          <h3>
             {carriedBills} {carriedBills === 1 ? 'bill' : 'bills'} carried in from {list(carried.map(c => monthName(c.periodMonth)))} · {formatMoney(carriedValue)}
           </h3>
-          <p className="font-serif italic text-sm text-graphite max-w-3xl">
+          <p>
             The run pays every earlier bill that no run in the portal has paid, and no run has paid{' '}
             {list(carried.map(c => monthName(c.periodMonth)))}. If {carried.length === 1 ? 'that month was' : 'those months were'}{' '}
             paid by hand, computing {monthName(period)} would pay these bills again. They are counted in each
-            salesperson&apos;s orders below, marked &ldquo;Carried from&rdquo; on their bills.
+            salesperson&apos;s orders, marked &ldquo;Carried from&rdquo; on their bills.
           </p>
-          <ul className="mt-2 font-mono text-[11px] text-graphite">
+          <ul>
             {carried.map(c => (
               <li key={c.periodMonth}>
                 {monthName(c.periodMonth, 'short')} · {c.bills} {c.bills === 1 ? 'bill' : 'bills'} · {formatMoney(c.value)}
@@ -182,20 +308,15 @@ export default function DoubleClaimPanel({ period, subDepartmentId, basePath, gr
       ) : null}
 
       {checked.length > 0 ? (
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => setShowChecked(v => !v)}
-            aria-expanded={showChecked}
-            className="font-mono text-[10.5px] uppercase tracking-wide text-graphite hover:text-accent"
-          >
+        <div className={d.checked}>
+          <button type="button" className={s.ghostButton} onClick={() => setShowChecked(v => !v)} aria-expanded={showChecked}>
             {showChecked ? 'Hide' : 'Show'} {checked.length} checked — separate sales
           </button>
-          {showChecked ? <div className="mt-3">{checked.map(group)}</div> : null}
+          {showChecked ? <div className="mt-3">{checked.map(card)}</div> : null}
         </div>
       ) : null}
 
-      {error ? <p role="alert" className="font-serif italic text-sm text-danger mt-3">{error}</p> : null}
+      {error ? <p role="alert" className={s.warning}>{error}</p> : null}
     </section>
   )
 }
