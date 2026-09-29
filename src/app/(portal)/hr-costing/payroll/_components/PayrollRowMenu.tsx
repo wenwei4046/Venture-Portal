@@ -6,7 +6,14 @@ import { useRouter } from 'next/navigation'
 import { topupKindLabel, type RowActions, type StatusView, type TopupKind } from '@/lib/payroll-lifecycle'
 import MenuPanel, { beside, type MenuAnchor } from '../../../revenue/[sub]/hierarchy/_components/ContextMenuPanel'
 import styles from '../../../revenue/[sub]/hierarchy/_components/membership-controls.module.css'
-import { cancelPayrollResubmit, completePayrollRows, resubmitPayrollRow, unlockPayrollRows } from '../actions'
+import { PAYROLL_FIELD_LABELS } from '@/lib/payroll-grid'
+import {
+  cancelPayrollResubmit,
+  completePayrollRows,
+  resetStaffStatutoryToLookup,
+  resubmitPayrollRow,
+  unlockPayrollRows,
+} from '../actions'
 import type { PayrollRowData } from './PayrollGrid'
 
 export type RowMenuAnchor = MenuAnchor
@@ -113,6 +120,10 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
   }
 
   const sourceHref = row.origin === 'revenue' ? row.comm_cal_href ?? null : row.origin === 'director' ? row.director_href ?? null : null
+  // A draft whose statutory is not all JADUAL's: figures typed on the grid
+  // (2026-09-30), or the InfoTech file's. Reset gives all seven back to JADUAL.
+  const typedNames = (row.statutory_typed ?? []).map(f => PAYROLL_FIELD_LABELS[f]).join(', ')
+  const canReset = row.scope === 'staff' && row.status === 'draft' && (!!typedNames || !!row.statutory_overridden_at)
 
   // Portalled outside the sheet: `sheet-theme` brings its palette along.
   return createPortal(
@@ -154,6 +165,18 @@ export default function PayrollRowMenu({ row, period, anchor, byRightClick, acti
               return `${row.staff_name} unlocked — editable again`
             })}>
             <span className={styles.rowCopy}><span>Unlock</span><small>Back to an editable draft</small></span>
+          </button>
+        ) : null}
+        {canReset ? (
+          <button type="button" role="menuitem" tabIndex={-1} disabled={pending}
+            onClick={() => run(async () => {
+              await resetStaffStatutoryToLookup(row.id)
+              return `${row.staff_name}: EPF, SOCSO, EIS and PCB are JADUAL's again`
+            })}>
+            <span className={styles.rowCopy}>
+              <span>Reset statutory to JADUAL</span>
+              <small>{typedNames ? `Typed by hand: ${typedNames}` : 'From the InfoTech file'} — JADUAL works them out again</small>
+            </span>
           </button>
         ) : null}
 

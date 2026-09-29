@@ -4,8 +4,11 @@ import PaycheckWindow from './PaycheckWindow'
 import { editFromRow } from '@/lib/payroll-grid'
 import type { PayrollRowData } from './PayrollGrid'
 
-const { updateStaffStatutory, refresh } = vi.hoisted(() => ({ updateStaffStatutory: vi.fn().mockResolvedValue(undefined), refresh: vi.fn() }))
-vi.mock('../actions', () => ({ updateStaffStatutory, resetStaffStatutoryToLookup: vi.fn() }))
+const { resetStaffStatutoryToLookup, refresh } = vi.hoisted(() => ({
+  resetStaffStatutoryToLookup: vi.fn().mockResolvedValue(undefined),
+  refresh: vi.fn(),
+}))
+vi.mock('../actions', () => ({ resetStaffStatutoryToLookup }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 
 const row: PayrollRowData = {
@@ -69,14 +72,15 @@ function setup(over: Partial<React.ComponentProps<typeof PaycheckWindow>> = {}) 
 }
 
 describe('PaycheckWindow', () => {
-  it('reconciles net basic, statutory PVs and commission and lets HR edit PCB', async () => {
-    setup({ row: {
+  it('reconciles net basic, statutory PVs and commission and lets HR type PCB', () => {
+    const revenue: PayrollRowData = {
       ...row, source: 'commission', revenue_payroll: true, payout_split_version: 2,
       basic_salary: 5000, commission_amount: 10000, basic_pay_net: 4302.70, commission_balance: 4253.45,
       statutory_allowance: 0, non_statutory_allowance: 0, skbbk_amount: 0,
       epf_er: 650, epf_ee: 550, socso_er: 86.65, socso_ee: 24.75, eis_er: 9.9, eis_ee: 9.9,
       pcb: 112.65, gross: 9253.45, net: 8556.15,
-    } })
+    }
+    const { props } = setup({ row: revenue, edit: editFromRow(revenue) })
     const split = screen.getByRole('region', { name: 'Revenue payout split' })
     expect(within(split).getAllByText('4,302.70').length).toBeGreaterThan(0)
     expect(within(split).getAllByText('4,253.45').length).toBeGreaterThan(0)
@@ -85,11 +89,13 @@ describe('PaycheckWindow', () => {
     expect(allocation).toHaveTextContent('584.65')
     expect(allocation).toHaveTextContent('746.55')
     expect(allocation).toHaveTextContent('112.65')
-    fireEvent.click(screen.getByRole('button', { name: 'Edit PCB' }))
-    fireEvent.change(screen.getByRole('textbox', { name: 'Override PCB' }), { target: { value: '200' } })
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Override PCB' }), { key: 'Enter' })
-    await waitFor(() => expect(updateStaffStatutory).toHaveBeenCalledWith('r1', { pcb: 200 }))
-    await waitFor(() => expect(refresh).toHaveBeenCalled())
+    // PCB is a field like the rest (2026-09-30): typing it writes the row's
+    // own edit state and the row's Save sends it — no click-to-edit line.
+    const pcb = screen.getByLabelText('PCB')
+    expect(pcb).toHaveValue('112.65')
+    fireEvent.focus(pcb)
+    fireEvent.change(pcb, { target: { value: '200' } })
+    expect(props.onField).toHaveBeenLastCalledWith('pcb', 200)
   })
   it('names the person, the month and the place in the list', () => {
     setup()
@@ -100,13 +106,65 @@ describe('PaycheckWindow', () => {
     expect(dialog.textContent).toContain('PAYCHECK · AUGUST 2026 · FINANCE')
   })
 
-  it('shows the nine editable figures as fields on a draft row', () => {
+  it('shows every editable figure as a field on a draft row, statutory included', () => {
     const { container } = setup()
     expect(container.querySelectorAll).toBeDefined()
     const fields = document.querySelectorAll('.pg-win input.pg-in')
-    expect(fields.length).toBe(9)
+    // Nine inputs + EPF / SOCSO / EIS employee, PCB, EPF / SOCSO / EIS employer.
+    expect(fields.length).toBe(16)
     expect((screen.getByLabelText('Basic salary') as HTMLInputElement).value).toBe('3,000.00')
     expect((screen.getByLabelText('Unpaid leave days') as HTMLInputElement).value).toBe('0.0')
+    expect(screen.getByLabelText('EPF employee')).toHaveValue('330.00')
+    expect(screen.getByLabelText('SOCSO employee')).toHaveValue('15.00')
+    expect(screen.getByLabelText('EIS employee')).toHaveValue('6.00')
+    expect(screen.getByLabelText('PCB')).toHaveValue('0.00')
+    expect(screen.getByLabelText('EPF employer')).toHaveValue('390.00')
+    expect(screen.getByLabelText('SOCSO employer')).toHaveValue('52.65')
+    expect(screen.getByLabelText('EIS employer')).toHaveValue('6.00')
+  })
+
+  it('puts the employee statutory under Deductions and the employer’s in its own section', () => {
+    setup()
+    const deductions = screen.getByRole('heading', { name: /^Deductions/ }).closest('section')!
+    const employer = screen.getByRole('heading', { name: /^Employer/ }).closest('section')!
+    expect(within(deductions).getByLabelText('EPF employee')).toBeInTheDocument()
+    expect(within(deductions).getByLabelText('PCB')).toBeInTheDocument()
+    expect(within(employer).getByLabelText('EPF employer')).toBeInTheDocument()
+    expect(within(deductions).queryByLabelText('EPF employer')).toBeNull()
+  })
+
+  it('writes a typed statutory figure to the row state like any other', () => {
+    const { props } = setup()
+    fireEvent.focus(screen.getByLabelText('EPF employee'))
+    fireEvent.change(screen.getByLabelText('EPF employee'), { target: { value: '300' } })
+    expect(props.onField).toHaveBeenLastCalledWith('epf_ee', 300)
+    fireEvent.focus(screen.getByLabelText('SOCSO employer'))
+    fireEvent.change(screen.getByLabelText('SOCSO employer'), { target: { value: '60' } })
+    expect(props.onField).toHaveBeenLastCalledWith('socso_er', 60)
+  })
+
+  it('marks a typed figure and offers Reset to JADUAL while nothing is unsaved', async () => {
+    const typed: PayrollRowData = { ...row, statutory_typed: ['epf_ee', 'pcb'], statutory_overridden_at: '2026-09-30T01:00:00Z' }
+    const { props, rerender } = setup({ row: typed })
+    expect(screen.getByLabelText('EPF employee')).toHaveClass('manual')
+    expect(screen.getByLabelText('EPF employee')).toHaveAttribute('title', expect.stringContaining('Reset statutory to JADUAL'))
+    expect(screen.getByLabelText('SOCSO employee')).not.toHaveClass('manual')
+    expect(screen.getByText(/Manually overridden · EPF employee, PCB/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to JADUAL' }))
+    await waitFor(() => expect(resetStaffStatutoryToLookup).toHaveBeenCalledWith('r1'))
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
+
+    // With an edit pending, Reset would throw it away — only the note shows.
+    rerender(<PaycheckWindow {...props} row={typed} edit={{ ...props.edit, ot_amount: 5 }} dirtyList={['ot_amount']} />)
+    expect(screen.queryByRole('button', { name: 'Reset to JADUAL' })).toBeNull()
+    expect(screen.getByText('Typed by hand: EPF employee, PCB.')).toBeVisible()
+  })
+
+  it('shows PCB as nothing to type when their People record sets no tax', () => {
+    setup({ row: { ...row, tax_mode: 'none' } })
+    expect(screen.queryByLabelText('PCB')).toBeNull()
+    expect(screen.getByText('no tax — set on their People record')).toBeVisible()
+    expect(document.querySelectorAll('.pg-win input.pg-in').length).toBe(15)
   })
 
   it('writes a typed figure to the row state — the row is the one source of truth', () => {
@@ -157,7 +215,9 @@ describe('PaycheckWindow', () => {
   it('shows the computed side and the payslip link', () => {
     setup()
     const dialog = screen.getByRole('dialog')
-    expect(dialog.textContent).toContain('390.00 / 330.00')
+    const computed = screen.getByRole('heading', { name: /^Computed/ })
+    expect(computed).toBeVisible()
+    expect(dialog.textContent).toContain('31 / 31 days')
     expect(dialog.textContent).toContain('3,575.65') // cost to company: gross + ER
     expect(dialog.textContent).toContain('2,753.85')
     expect((screen.getByRole('link', { name: 'Payslip ↗' }) as HTMLAnchorElement).getAttribute('href')).toBe(
@@ -166,9 +226,12 @@ describe('PaycheckWindow', () => {
   })
 
   it('is read only once the month has been submitted', () => {
-    setup({ row: { ...row, status: 'submitted' }, locked: true })
+    setup({ row: { ...row, status: 'submitted', statutory_typed: ['socso_er'] }, locked: true })
     expect(document.querySelectorAll('.pg-win input.pg-in').length).toBe(0)
-    expect(document.querySelectorAll('.pg-win .ro').length).toBe(9)
+    expect(document.querySelectorAll('.pg-win .ro').length).toBe(16)
+    // A typed figure keeps its mark on the bare figure too.
+    expect(document.querySelectorAll('.pg-win .ro.manual').length).toBe(1)
+    expect(screen.queryByRole('button', { name: 'Reset to JADUAL' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(screen.getByText('submitted · read only')).toBeDefined()
   })
@@ -186,7 +249,7 @@ describe('PaycheckWindow', () => {
     expect(screen.queryByLabelText('Commission')).toBeNull()
     const link = screen.getByText('4,250.00') as HTMLAnchorElement
     expect(link.getAttribute('href')).toBe('/revenue/fair/2026-08-01/statement/s1')
-    expect(document.querySelectorAll('.pg-win input.pg-in').length).toBe(8)
+    expect(document.querySelectorAll('.pg-win input.pg-in').length).toBe(15)
   })
 
   it('names Withholding tax rather than PCB when that is what applies', () => {

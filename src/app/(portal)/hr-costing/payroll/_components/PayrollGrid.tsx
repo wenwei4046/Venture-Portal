@@ -9,6 +9,8 @@ import {
   formatAmount,
   groupByDepartment,
   neighbourId,
+  type PayrollStatutoryField,
+  type PayrollTaxMode,
 } from '@/lib/payroll-grid'
 import { round2 } from '@/lib/payroll-funding'
 import { isTopupKind, rowActions, rowStatusView, type LifecycleRow, type RowStatus } from '@/lib/payroll-lifecycle'
@@ -67,6 +69,12 @@ export interface PayrollRowData {
   eis_ee: number
   pcb: number
   withholding_tax: number
+  /** Statutory figures somebody typed — they stay until Reset to JADUAL (2026-09-30). */
+  statutory_typed?: PayrollStatutoryField[]
+  /** Set by a typed figure or the InfoTech import: the row's statutory is not all JADUAL's. */
+  statutory_overridden_at?: string | null
+  /** From their People record: PCB is typed only for somebody on PCB. */
+  tax_mode?: PayrollTaxMode
   gross: number
   net: number
   /**
@@ -109,9 +117,13 @@ const COLUMNS = [
   'unpaid',
   'ded',
   'skbbk',
-  'epf',
-  'socso',
-  'eis',
+  'epf-ee',
+  'socso-ee',
+  'eis-ee',
+  'pcb',
+  'epf-er',
+  'socso-er',
+  'eis-er',
 ] as const
 
 const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`
@@ -127,6 +139,10 @@ const TOTAL_KEYS = [
   'unpaid_leave_days',
   'deduction_amount',
   'skbbk_amount',
+  'epf_ee',
+  'socso_ee',
+  'eis_ee',
+  'pcb',
   'epf_er',
   'socso_er',
   'eis_er',
@@ -157,6 +173,9 @@ export function lifecycleOf(r: PayrollRowData): LifecycleRow {
  * carries the subtotal. Since the unified Payroll (2026-09-27) the Status
  * column says where each person's pay stands; tick people to Complete,
  * Unlock or Delete them, right-click somebody to Resubmit or add a Second payroll.
+ * Since 2026-09-30 every statutory figure is a field too — the employee's
+ * EPF / SOCSO / EIS and PCB under Deductions, the employer's under Employer —
+ * and one somebody typed keeps an accent dot until Reset to JADUAL.
  */
 export default function PayrollGrid({ rows, period, monthClosed = false }: Props) {
   const router = useRouter()
@@ -372,6 +391,7 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
         ) : (
           <span className="pg-legend">
             <span><i className="in" aria-hidden />editable</span>
+            <span><i className="mn" aria-hidden />typed over JADUAL</span>
             <span><i className="ro" aria-hidden />computed</span>
             <span><i className="dv" aria-hidden />from Comm Cal / Director Salary</span>
           </span>
@@ -403,7 +423,7 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
                 <th className="pg-st l3" colSpan={3}>Payout</th>
                 {showRevenueSplit && <th className="g1" colSpan={2}>Revenue payout</th>}
                 <th className="g1" colSpan={5}>Earnings</th>
-                <th className="g1" colSpan={3}>Deductions</th>
+                <th className="g1" colSpan={7}>Deductions</th>
                 <th className="g1" colSpan={3}>Employer</th>
               </tr>
               <tr className="pg-cols">
@@ -436,9 +456,13 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
                 <th className="num g1 col-unpaid">Unpaid <i>days</i></th>
                 <th className="num col-ded">Deduct</th>
                 <th className="num col-skbbk" title="Net-only employee deduction — gross and statutory are unaffected">SKBBK</th>
-                <th className="num g1 col-epf">EPF ER</th>
-                <th className="num col-socso">SOCSO ER</th>
-                <th className="num col-eis">EIS ER</th>
+                <th className="num col-epf-ee" title="EPF, employee's share — JADUAL until typed">EPF EE</th>
+                <th className="num col-socso-ee" title="SOCSO, employee's share — JADUAL until typed">SOCSO EE</th>
+                <th className="num col-eis-ee" title="EIS, employee's share — JADUAL until typed">EIS EE</th>
+                <th className="num col-pcb" title="Monthly tax deduction — JADUAL until typed">PCB</th>
+                <th className="num g1 col-epf-er" title="EPF, employer's share — JADUAL until typed">EPF ER</th>
+                <th className="num col-socso-er" title="SOCSO, employer's share — JADUAL until typed">SOCSO ER</th>
+                <th className="num col-eis-er" title="EIS, employer's share — JADUAL until typed">EIS ER</th>
               </tr>
             </thead>
             <tbody>
@@ -483,7 +507,7 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
                       )}
                       <td colSpan={4} />
                       <td className="num sub">{formatMoneyBare(groupDisplayedCommission)}</td>
-                      <td colSpan={6} />
+                      <td colSpan={10} />
                     </tr>
                     {g.rows.map((r, i) => {
                       const view = views.get(r.id)!
@@ -540,6 +564,10 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
                 <td className="num g1 sub">{formatAmount(totals.unpaid_leave_days, 1)}</td>
                 <td className="num sub">{formatMoneyBare(totals.deduction_amount)}</td>
                 <td className="num sub">{formatMoneyBare(totals.skbbk_amount)}</td>
+                <td className="num sub">{formatMoneyBare(totals.epf_ee)}</td>
+                <td className="num sub">{formatMoneyBare(totals.socso_ee)}</td>
+                <td className="num sub">{formatMoneyBare(totals.eis_ee)}</td>
+                <td className="num sub">{formatMoneyBare(totals.pcb)}</td>
                 <td className="num g1 sub">{formatMoneyBare(totals.epf_er)}</td>
                 <td className="num sub">{formatMoneyBare(totals.socso_er)}</td>
                 <td className="num sub">{formatMoneyBare(totals.eis_er)}</td>
@@ -551,7 +579,9 @@ export default function PayrollGrid({ rows, period, monthClosed = false }: Props
 
       <p className="text-xs mt-4">
         Edit a draft in the row and click Save, or open a name for the paycheck — same figures either way.
-        Tick people and <strong className="font-bold">Complete</strong> them when checked; <strong className="font-bold">Submit to Finance</strong>
+        EPF, SOCSO, EIS and PCB follow JADUAL until you type one; a typed figure keeps an accent dot and stays
+        {' '}when the pay changes, until <strong className="font-bold">Reset statutory to JADUAL</strong> in the row&apos;s ⋯ menu.
+        {' '}Tick people and <strong className="font-bold">Complete</strong> them when checked; <strong className="font-bold">Submit to Finance</strong>
         {' '}sends everybody Completed as one batch, and can be pressed again for the next group. Right-click somebody already sent to
         {' '}<strong className="font-bold">Resubmit</strong> them (a correction) or give them a <strong className="font-bold">Second payroll</strong>
         {' '}(a planned second payment) — either way the next batch sends only the difference.

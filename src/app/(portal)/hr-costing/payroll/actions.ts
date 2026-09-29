@@ -12,6 +12,15 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { postPayrollBatchAccrualJVs } from '@/lib/payroll-accrual'
 import { isTopupKind, type TopupKind } from '@/lib/payroll-lifecycle'
 import { seedPayrollRows } from '@/lib/payroll-period'
+import {
+  isStatutoryField,
+  payrollRowWrite,
+  STATUTORY_OVERRIDE_COLUMNS,
+  type PayrollEditField,
+  type PayrollStatutoryField,
+  type PayrollTaxMode,
+  type StatutoryOverrideColumn,
+} from '@/lib/payroll-grid'
 
 // ─── The unified Payroll (2026-09-27) ───────────────────────────────────────
 // A person's pay moves draft → completed → submitted → paid. HR completes
@@ -231,17 +240,11 @@ export async function refilePayrollBatchRequest(period: string, batchId: string)
   revalidatePayroll(period)
 }
 
-export interface PayrollRowUpdate {
-  basic_salary?: number
-  statutory_allowance?: number
-  non_statutory_allowance?: number
-  ot_hours?: number
-  ot_amount?: number
-  commission_amount?: number
-  unpaid_leave_days?: number
-  deduction_amount?: number
-  skbbk_amount?: number
-}
+/**
+ * One row's save: the inputs, and any statutory figure HR typed (2026-09-30)
+ * — `epf_ee`, `pcb`, `epf_er` and the rest, each going to its override column.
+ */
+export type PayrollRowUpdate = Partial<Record<PayrollEditField, number>>
 
 async function assertDraftRowsOpen(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -311,55 +314,67 @@ async function stripDerivedCommission(
 }
 
 /**
- * Update one payroll row. The DB trigger recomputes pro-rata + statutory + gross/net.
- * Only allowed while status='draft'.
+ * The tax mode of each row's person, for the saves that type a PCB: PCB is
+ * only somebody's on PCB — withholding tax and "none" compute it as 0.
  */
-export async function updatePayrollRow(
-  id: string,
-  fields: PayrollRowUpdate,
-): Promise<void> {
-  await requirePermission('hr_costing')
-  const supabase = await createClient()
-
-  await assertDraftRowsOpen(supabase, [id])
-  const [row] = await stripDerivedCommission(supabase, [{ id, fields }])
-
+async function taxModesOf(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ids: string[],
+): Promise<Map<string, PayrollTaxMode>> {
+  if (ids.length === 0) return new Map()
   const { data, error } = await supabase
     .from('hr_monthly_payroll')
-    .update(row.fields)
-    .eq('id', id)
-    .eq('status', 'draft')
-    .select('id')
-    .maybeSingle()
-
-  if (error) throw new Error(`Failed to update payroll row: ${error.message}`)
-  if (!data) throw new Error('Payroll changed while saving. Refresh before retrying.')
-
-  revalidatePath('/hr-costing/payroll', 'layout')
+    .select('id, hr_staff_costs!inner (tax_mode)')
+    .in('id', ids)
+  if (error) throw new Error(`Could not check who is on PCB: ${error.message}`)
+  return new Map(
+    ((data ?? []) as unknown as Array<{
+      id: string
+      hr_staff_costs: { tax_mode: PayrollTaxMode } | { tax_mode: PayrollTaxMode }[]
+    }>).map(r => {
+      const staff = Array.isArray(r.hr_staff_costs) ? r.hr_staff_costs[0] : r.hr_staff_costs
+      return [r.id, staff?.tax_mode ?? 'pcb']
+    }),
+  )
 }
 
 /**
- * Batch-save every row the page-level Save button collected. Same rules as
- * updatePayrollRow (draft-only, trigger recomputes statutory) but one
- * revalidate for the whole batch. Partial failure keeps going — the error
- * reports how many saved so HR knows which rows to re-check.
+ * Every save of a payroll row goes through here — the row's Save, the
+ * header's Save and the payslip's statutory editor — so they cannot disagree:
+ * draft rows only, a derived commission refused, and a typed statutory figure
+ * written to its override column (`payrollRowWrite`), stamped with who typed
+ * it. The compute trigger listens to those columns and settles the row.
+ * Partial failure keeps going and is reported back, row by row.
  */
-export async function updatePayrollRows(
+async function writePayrollRows(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
   updates: { id: string; fields: PayrollRowUpdate }[],
-): Promise<{ saved: number }> {
-  await requirePermission('hr_costing')
-  if (updates.length === 0) return { saved: 0 }
-
-  const supabase = await createClient()
+): Promise<{ saved: number; failures: string[] }> {
   await assertDraftRowsOpen(supabase, updates.map(row => row.id))
   const cleaned = await stripDerivedCommission(supabase, updates)
+  const taxModes = await taxModesOf(supabase, cleaned.filter(u => u.fields.pcb !== undefined).map(u => u.id))
 
   let saved = 0
   const failures: string[] = []
   for (const u of cleaned) {
+    let write: ReturnType<typeof payrollRowWrite>
+    try {
+      write = payrollRowWrite(u.fields, taxModes.get(u.id) ?? null)
+    } catch (err) {
+      failures.push(err instanceof Error ? err.message : 'That figure could not be saved')
+      continue
+    }
+    const columns = write.typed
+      ? { ...write.columns, statutory_overridden_at: new Date().toISOString(), statutory_overridden_by: userId }
+      : write.columns
+    if (Object.keys(columns).length === 0) {
+      saved++
+      continue
+    }
     const { data, error } = await supabase
       .from('hr_monthly_payroll')
-      .update(u.fields)
+      .update(columns)
       .eq('id', u.id)
       .eq('status', 'draft')
       .select('id')
@@ -368,6 +383,40 @@ export async function updatePayrollRows(
     else if (!data) failures.push('Payroll changed while saving. Refresh before retrying.')
     else saved++
   }
+  return { saved, failures }
+}
+
+/**
+ * Update one payroll row. The DB trigger recomputes pro-rata, every statutory
+ * figure nobody typed, gross and net. Only allowed while status='draft'.
+ */
+export async function updatePayrollRow(
+  id: string,
+  fields: PayrollRowUpdate,
+): Promise<void> {
+  const user = await requirePermission('hr_costing')
+  const supabase = await createClient()
+
+  const { failures } = await writePayrollRows(supabase, user.id, [{ id, fields }])
+  if (failures.length > 0) throw new Error(failures[0])
+
+  revalidatePath('/hr-costing/payroll', 'layout')
+}
+
+/**
+ * Batch-save every row the page-level Save button collected. Same rules as
+ * updatePayrollRow but one revalidate for the whole batch. Partial failure
+ * keeps going — the error reports how many saved so HR knows which rows to
+ * re-check.
+ */
+export async function updatePayrollRows(
+  updates: { id: string; fields: PayrollRowUpdate }[],
+): Promise<{ saved: number }> {
+  const user = await requirePermission('hr_costing')
+  if (updates.length === 0) return { saved: 0 }
+
+  const supabase = await createClient()
+  const { saved, failures } = await writePayrollRows(supabase, user.id, updates)
 
   revalidatePath('/hr-costing/payroll', 'layout')
 
@@ -379,116 +428,50 @@ export async function updatePayrollRows(
   return { saved }
 }
 
-// ─── Override / Reset Statutory (Phase 11.2 + PCB 2026-06-04) ──────────────
+// ─── Typed statutory, and Reset to JADUAL (2026-09-30) ──────────────────────
 //
-// The compute trigger on hr_monthly_payroll only fires when one of basic_salary,
-// statutory_allowance, non_statutory_allowance, ot_*, commission_amount,
-// unpaid_leave_days, period_month, or staff_id is in the UPDATE clause. So we
-// can update epf_*/socso_*/eis_*/pcb directly without the trigger overwriting
-// us. Reset fires a no-op update on basic_salary to force the trigger to
-// re-run the JADUAL lookups + recompute gross/net.
+// A typed EPF / SOCSO / EIS (either side) or PCB is kept in the row's own
+// *_override_amount column. The compute trigger listens to those columns and
+// applies them over the JADUAL lookup every time it runs, so a typed figure
+// survives later edits to Basic, OT or unpaid leave, and gross, net and the
+// Revenue split always follow it. Reset clears every override; the trigger
+// then takes all seven back from JADUAL. Until 2026-09-30 an override was
+// written onto the figure itself and lasted only until the next input edit.
 
-const STAFF_STAT_FIELDS = [
-  'epf_er',
-  'epf_ee',
-  'socso_er',
-  'socso_ee',
-  'eis_er',
-  'eis_ee',
-  'pcb',
-] as const
-type StaffStatutoryField = (typeof STAFF_STAT_FIELDS)[number]
-export type StaffStatutoryUpdate = Partial<Record<StaffStatutoryField, number>>
+export type StaffStatutoryUpdate = Partial<Record<PayrollStatutoryField, number>>
 
+/** The payslip's click-to-edit statutory line: the grid's write, one field at a time. */
 export async function updateStaffStatutory(
   id: string,
   fields: StaffStatutoryUpdate,
 ): Promise<void> {
   const user = await requirePermission('hr_costing')
+  const keys = Object.keys(fields ?? {})
+  if (keys.length === 0) throw new Error('No statutory fields provided')
+  const unknown = keys.find(k => !isStatutoryField(k))
+  if (unknown) throw new Error(`Unknown statutory field: ${unknown}`)
+
   const supabase = await createClient()
-
-  await assertDraftRowsOpen(supabase, [id])
-  const allowed = new Set<StaffStatutoryField>(STAFF_STAT_FIELDS)
-  const writes: Record<string, number> = {}
-  for (const [k, v] of Object.entries(fields)) {
-    if (!allowed.has(k as StaffStatutoryField)) {
-      throw new Error(`Unknown statutory field: ${k}`)
-    }
-    const n = Number(v)
-    if (!Number.isFinite(n) || n < 0) {
-      throw new Error(`${k} must be a non-negative number`)
-    }
-    writes[k] = Math.round(n * 100) / 100
-  }
-  if (Object.keys(writes).length === 0) throw new Error('No statutory fields provided')
-
-  const { data: row, error: fetchErr } = await supabase
-    .from('hr_monthly_payroll')
-    .select('id, source, status, gross, epf_er, epf_ee, socso_ee, eis_ee, pcb, withholding_tax, skbbk_amount')
-    .eq('id', id)
-    .single()
-  if (fetchErr || !row) throw new Error('Payroll row not found')
-  if (row.status !== 'draft') throw new Error('Cannot edit statutory on a non-draft payroll row')
-
-  // Net = gross - epf_ee - socso_ee - eis_ee - pcb - withholding tax. Apply the
-  // override values for whichever EE fields the caller passed; existing values
-  // stand for the rest. Withholding Tax is never one of them — it is not an
-  // overridable statutory field — but it must stay in the formula or overriding
-  // any statutory on a Revenue salesperson would quietly hand back their tax.
-  const merged = { ...row, ...writes }
-  const gross = Number(row.gross)
-  const net = Math.round(
-    (gross -
-      Number(merged.epf_ee ?? 0) -
-      Number(merged.socso_ee ?? 0) -
-      Number(merged.eis_ee ?? 0) -
-      Number(merged.pcb ?? 0) -
-      Number(row.withholding_tax ?? 0) -
-      Number(row.skbbk_amount ?? 0)) * 100
-  ) / 100
-
-  const { data: updatedRow, error: updErr } = await supabase
-    .from('hr_monthly_payroll')
-    .update({
-      ...writes,
-      // Revenue's trigger owns its net-basic/commission reconciliation.
-      ...(row.source === 'commission'
-        ? (writes.pcb !== undefined ? { pcb_override_amount: writes.pcb } : {})
-        : { gross, net }),
-      statutory_overridden_at: new Date().toISOString(),
-      statutory_overridden_by: user.id,
-    })
-    .eq('id', id)
-    .eq('status', 'draft')
-    .select('id')
-    .maybeSingle()
-  if (updErr) throw new Error(`Failed to update statutory: ${updErr.message}`)
-  if (!updatedRow) throw new Error('Payroll changed while saving. Refresh before retrying.')
+  const { failures } = await writePayrollRows(supabase, user.id, [{ id, fields }])
+  if (failures.length > 0) throw new Error(failures[0])
 
   revalidatePath('/hr-costing/payroll', 'layout')
 }
 
+/** Reset to JADUAL: every typed statutory figure on the row goes; the lookup takes them back. */
 export async function resetStaffStatutoryToLookup(id: string): Promise<void> {
   await requirePermission('hr_costing')
   const supabase = await createClient()
 
   await assertDraftRowsOpen(supabase, [id])
-  // Pull basic_salary so we can fire a no-op UPDATE that re-triggers the
-  // compute_hr_monthly_payroll function. The trigger watches basic_salary,
-  // so writing the same value back forces it to recompute statutory + net.
-  const { data: row, error: fetchErr } = await supabase
-    .from('hr_monthly_payroll')
-    .select('id, status, basic_salary')
-    .eq('id', id)
-    .single()
-  if (fetchErr || !row) throw new Error('Payroll row not found')
-  if (row.status !== 'draft') throw new Error('Cannot reset statutory on a non-draft payroll row')
-
+  const cleared = Object.fromEntries(STATUTORY_OVERRIDE_COLUMNS.map(column => [column, null])) as Record<
+    StatutoryOverrideColumn,
+    null
+  >
   const { data: resetRow, error: updErr } = await supabase
     .from('hr_monthly_payroll')
     .update({
-      basic_salary: row.basic_salary,
-      pcb_override_amount: null,
+      ...cleared,
       statutory_overridden_at: null,
       statutory_overridden_by: null,
     })

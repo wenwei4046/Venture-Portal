@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { PAYROLL_STATUTORY_FIELDS } from '@/lib/payroll-grid'
 import type { PayrollRowUpdate } from './actions'
 
 export interface RevenueCommissionAdjustmentInput {
@@ -27,9 +28,13 @@ export async function adjustRevenueCommission(
   if (!reason) throw new Error('Enter a reason for the commission adjustment.')
   if (reason.length > 1000) throw new Error('Keep the adjustment reason within 1,000 characters.')
 
-  const allowed = new Set([
+  // The row's other edits, saved in the adjustment's transaction — typed
+  // statutory figures included (2026-09-30): the RPC writes each to its
+  // override column, where the compute trigger picks it up.
+  const allowed = new Set<string>([
     'basic_salary', 'statutory_allowance', 'non_statutory_allowance',
     'ot_hours', 'ot_amount', 'unpaid_leave_days', 'deduction_amount', 'skbbk_amount',
+    ...PAYROLL_STATUTORY_FIELDS,
   ])
   const writes: Record<string, number> = {}
   if (rowUpdates !== undefined && (!rowUpdates || typeof rowUpdates !== 'object' || Array.isArray(rowUpdates))) {

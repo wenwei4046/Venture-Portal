@@ -6,6 +6,7 @@ import type { PayrollRowData } from './PayrollGrid'
 
 const actions = vi.hoisted(() => ({
   cancelPayrollResubmit: vi.fn(), completePayrollRows: vi.fn(), resubmitPayrollRow: vi.fn(), unlockPayrollRows: vi.fn(),
+  resetStaffStatutoryToLookup: vi.fn(),
 }))
 vi.mock('../actions', () => actions)
 const refresh = vi.hoisted(() => vi.fn())
@@ -82,5 +83,32 @@ describe('PayrollRowMenu — Resubmit and Second payroll', () => {
     open(row({ status: 'paid', batch_nos: [] }))
     expect(screen.queryByRole('menuitem', { name: /^Second payroll…/ })).toBeNull()
     expect(screen.getByRole('menuitem', { name: /Resubmit · Second payroll/ })).toBeDisabled()
+  })
+})
+
+describe('PayrollRowMenu — Reset statutory to JADUAL', () => {
+  const draft = { status: 'draft', batch_nos: [], completed_at: null, submitted_ctc: 0 }
+
+  it('hands a draft’s typed statutory back to JADUAL, naming what was typed', async () => {
+    actions.resetStaffStatutoryToLookup.mockResolvedValue(undefined)
+    const { onDone } = open(row({ ...draft, statutory_typed: ['epf_ee', 'pcb'] }))
+    const item = screen.getByRole('menuitem', { name: /^Reset statutory to JADUAL/ })
+    expect(item).toHaveTextContent('Typed by hand: EPF employee, PCB')
+    fireEvent.click(item)
+    await waitFor(() => expect(actions.resetStaffStatutoryToLookup).toHaveBeenCalledWith('row-1'))
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("CHEW WEE HO: EPF, SOCSO, EIS and PCB are JADUAL's again"))
+  })
+
+  it('offers it for the InfoTech file’s figures too', () => {
+    open(row({ ...draft, statutory_overridden_at: '2026-08-05T02:00:00Z' }))
+    expect(screen.getByRole('menuitem', { name: /^Reset statutory to JADUAL/ })).toHaveTextContent('From the InfoTech file')
+  })
+
+  it('offers nothing when every figure is JADUAL’s, or once the row has been sent', () => {
+    open(row({ ...draft }))
+    expect(screen.queryByRole('menuitem', { name: /Reset statutory/ })).toBeNull()
+    cleanup()
+    open(row({ statutory_typed: ['epf_ee'] }))
+    expect(screen.queryByRole('menuitem', { name: /Reset statutory/ })).toBeNull()
   })
 })

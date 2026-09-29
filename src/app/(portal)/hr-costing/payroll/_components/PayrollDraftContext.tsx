@@ -32,6 +32,13 @@ export function usePayrollDraft() {
   return useContext(PayrollDraftContext)
 }
 
+/** Same fields, same values — a row reporting what it already reported. */
+function sameEdit(a: PayrollRowUpdate | undefined, b: PayrollRowUpdate): boolean {
+  if (!a) return false
+  const keys = Object.keys(b) as (keyof PayrollRowUpdate)[]
+  return keys.length === Object.keys(a).length && keys.every(k => Object.is(a[k], b[k]))
+}
+
 export function PayrollDraftProvider({ children }: { children: ReactNode }) {
   const [edits, setEdits] = useState<Record<string, PayrollRowUpdate>>({})
   const [commissionReviews, setCommissionReviews] = useState<Record<string, () => Promise<boolean>>>({})
@@ -44,6 +51,12 @@ export function PayrollDraftProvider({ children }: { children: ReactNode }) {
         delete next[id]
         return next
       }
+      // The same figures reported again change nothing. Without this every
+      // report was a new object, re-rendering all 56 rows, and a row whose
+      // `edit` React was re-deriving (fast typing, 2026-09-30) reported again
+      // on every render — a loop that froze the grid and never let a Save's
+      // refresh land.
+      if (sameEdit(prev[id], edit)) return prev
       return { ...prev, [id]: edit }
     })
   }, [])

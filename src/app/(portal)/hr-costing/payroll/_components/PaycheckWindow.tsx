@@ -6,14 +6,15 @@ import { cn, formatMoneyBare } from '@/lib/utils'
 import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
 import {
   formatAmount,
+  isStatutoryField,
   periodLabel,
   PAYROLL_FIELD_LABELS,
+  TYPED_STATUTORY_HINT,
   type PayrollEdit,
   type PayrollEditField,
 } from '@/lib/payroll-grid'
 import AmountInput from './AmountInput'
 import RevenuePayoutBreakdown from './RevenuePayoutBreakdown'
-import EditableStatLine from '../[period]/[staffId]/payslip/_components/EditableStatLine'
 import ResetStaffStatutoryButton from '../[period]/[staffId]/payslip/_components/ResetStaffStatutoryButton'
 import type { PayrollRowData } from './PayrollGrid'
 
@@ -39,9 +40,12 @@ interface Props {
  * One person's paycheck as a floating window over the grid. It is a second
  * view of the row's figures, not a copy: the inputs here write the same
  * `edit` state the row's cells write, so a change in either place shows in
- * both and Save from either side saves the same thing. Computed figures
- * (ER / EE, PCB or WHT, cost to company) are the saved ones — the trigger
- * recomputes them when the row is saved.
+ * both and Save from either side saves the same thing. Since 2026-09-30 the
+ * statutory figures are fields too — the employee's EPF / SOCSO / EIS and PCB
+ * under Deductions, the employer's in their own section — and a typed one
+ * carries an accent dot until Reset to JADUAL. What is left computed
+ * (pro-rata, cost to company, gross, net) is the saved figure; the trigger
+ * works it out again when the row is saved.
  */
 export default function PaycheckWindow({
   row,
@@ -83,13 +87,18 @@ export default function PaycheckWindow({
   const statementHref = statements[0]?.href ?? row.commission_statement_href
   const ctc = row.gross + row.epf_er + row.socso_er + row.eis_er
   // PCB and Withholding Tax are mutually exclusive — whichever the staff
-  // record selects applies, the other is 0.
-  const tax: [string, number] =
-    row.withholding_tax > 0 ? ['Withholding tax', row.withholding_tax] : ['PCB', row.pcb]
+  // record selects applies, the other is 0. PCB is a field only on PCB.
+  const taxMode = row.tax_mode ?? (row.withholding_tax > 0 ? 'withholding' : 'pcb')
+  const typed = new Set(row.statutory_typed ?? [])
+  const typedNames = (row.statutory_typed ?? []).map(f => PAYROLL_FIELD_LABELS[f]).join(', ')
 
-  const amount = (f: PayrollEditField, decimals = 2, className?: string) =>
-    locked ? (
-      <span className={cn('ro num', row[f] === 0 && 'zero', className)}>
+  const amount = (f: PayrollEditField, decimals = 2, className?: string) => {
+    const manual = isStatutoryField(f) && typed.has(f)
+    return locked ? (
+      <span
+        className={cn('ro num', row[f] === 0 && 'zero', manual && 'manual', className)}
+        title={manual ? TYPED_STATUTORY_HINT : undefined}
+      >
         {formatAmount(row[f], decimals)}
       </span>
     ) : (
@@ -99,10 +108,13 @@ export default function PaycheckWindow({
         decimals={decimals}
         disabled={isPending}
         dirty={dirtyList.includes(f)}
+        manual={manual}
+        title={manual ? TYPED_STATUTORY_HINT : undefined}
         className={className}
         aria-label={PAYROLL_FIELD_LABELS[f]}
       />
     )
+  }
 
   const kv = (label: string, value: ReactNode, opts: { big?: boolean; sub?: string; zero?: boolean } = {}) => (
     <div className={cn('kv', opts.big && 'big')}>
@@ -276,29 +288,49 @@ export default function PaycheckWindow({
                 </span>
               </Field>
             )}
+            <Field label="EPF" sub="employee">{amount('epf_ee')}</Field>
+            <Field label="SOCSO" sub="employee">{amount('socso_ee')}</Field>
+            <Field label="EIS" sub="employee">{amount('eis_ee')}</Field>
+            {taxMode === 'pcb' ? (
+              <Field label="PCB">{amount('pcb')}</Field>
+            ) : taxMode === 'withholding' ? (
+              <Field label="Withholding tax" sub="their People record sets it">
+                <span className={cn('ro num', row.withholding_tax === 0 && 'zero')}>
+                  {formatMoneyBare(row.withholding_tax)}
+                </span>
+              </Field>
+            ) : (
+              <Field label="PCB" sub="no tax — set on their People record">
+                <span className="ro num zero">—</span>
+              </Field>
+            )}
           </section>
 
           <section className="c3">
             <h4>
-              Computed <span>ER / EE</span>
+              Employer <span>RM</span>
+            </h4>
+            <Field label="EPF">{amount('epf_er')}</Field>
+            <Field label="SOCSO">{amount('socso_er')}</Field>
+            <Field label="EIS">{amount('eis_er')}</Field>
+            {(typed.size > 0 || row.statutory_overridden_at) && (
+              locked || dirty || isPending ? (
+                <p className="text-xs mt-2">
+                  {typed.size > 0 ? `Typed by hand: ${typedNames}.` : 'Statutory figures from the InfoTech file.'}
+                </p>
+              ) : (
+                <ResetStaffStatutoryButton
+                  payrollId={row.id}
+                  overridden
+                  overriddenLabel={typed.size > 0 ? typedNames : 'from the InfoTech file'}
+                />
+              )
+            )}
+
+            <h4 className="mt-4">
+              Computed <span>RM</span>
             </h4>
             {kv('Pro-rata', `${row.prorata_days_worked} / ${row.prorata_days_in_month} days`)}
-            {kv('EPF', `${formatMoneyBare(row.epf_er)} / ${formatMoneyBare(row.epf_ee)}`, {
-              zero: row.epf_er === 0 && row.epf_ee === 0,
-            })}
-            {kv('SOCSO', `${formatMoneyBare(row.socso_er)} / ${formatMoneyBare(row.socso_ee)}`, {
-              zero: row.socso_er === 0 && row.socso_ee === 0,
-            })}
-            {kv('EIS', `${formatMoneyBare(row.eis_er)} / ${formatMoneyBare(row.eis_ee)}`, {
-              zero: row.eis_er === 0 && row.eis_ee === 0,
-            })}
-            {kv(tax[0], netBasicSplit && row.withholding_tax === 0
-              ? <EditableStatLine payrollId={row.id} field="pcb" value={row.pcb} readOnly={locked || dirty || isPending} />
-              : formatMoneyBare(tax[1]), { zero: tax[1] === 0 })}
-            {netBasicSplit && row.pcb_override_amount != null && <div className="text-xs mt-2">
-              Manual PCB amount
-              {!locked && !dirty && !isPending && <ResetStaffStatutoryButton payrollId={row.id} overridden />}
-            </div>}
             {kv('Cost to company', formatMoneyBare(ctc), { sub: 'gross + employer' })}
             {kv('Gross', formatMoneyBare(row.gross), { big: true })}
             {kv('Net to bank', formatMoneyBare(row.net), { big: true })}
