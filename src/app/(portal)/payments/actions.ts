@@ -734,6 +734,18 @@ async function createPaymentVoucherInner(formData: FormData) {
 
   revalidatePath('/payments')
   revalidatePath('/dashboard')
+
+  // Settling an invoice used to end on the voucher page, three screens away
+  // from the Billing list the work started on (user, 2026-09-29: "当我 settle
+  // invoice 后会自动跳去 payment"). A caller that sends return_to gets sent
+  // back there with the receipt number to show. Same-origin paths only — an
+  // absolute URL or a protocol-relative // would be an open redirect.
+  const rawReturn = ((formData.get('return_to') as string) ?? '').trim()
+  const returnTo = /^\/[A-Za-z0-9\-_/]*$/.test(rawReturn) ? rawReturn : null
+  if (returnTo) {
+    revalidatePath(returnTo)
+    redirect(`${returnTo}?receipt=${encodeURIComponent(voucherNo)}`)
+  }
   redirect(`/payments/${data.id}`)
 }
 

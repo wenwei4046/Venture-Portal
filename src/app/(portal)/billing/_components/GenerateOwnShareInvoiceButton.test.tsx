@@ -27,7 +27,10 @@ const preview = {
   billBack: ['director_office', 'finance'],
 }
 
-const generate = vi.fn(async () => ({ generated: 1, total: 0 }))
+const generate = vi.fn(async (_period: string, _category: string | null, _segments?: string[] | null) => ({
+  generated: 1,
+  total: 0,
+}))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 vi.mock('../actions', () => ({
   fetchOwnShareInvoicePreview: async () => preview,

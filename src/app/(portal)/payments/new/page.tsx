@@ -22,14 +22,17 @@ function poolForBillingMode(mode: string): string {
 }
 
 interface Props {
-  searchParams: Promise<{ invoice_id?: string; preset?: string; mode?: string }>
+  searchParams: Promise<{ invoice_id?: string; preset?: string; mode?: string; return_to?: string }>
 }
 
 export default async function NewPaymentPage({ searchParams }: Props) {
   await requirePermission('treasury')
   const supabase = await createClient()
 
-  const { invoice_id: invoiceId, preset, mode } = await searchParams
+  const { invoice_id: invoiceId, preset, mode, return_to: returnToRaw } = await searchParams
+  // Where to land after saving, when the caller wants the user back (Billing
+  // sends /billing). A path, never a URL — the action re-checks it too.
+  const returnTo = returnToRaw && /^\/[A-Za-z0-9\-_/]*$/.test(returnToRaw) ? returnToRaw : null
   const nonBillablePreset = preset === 'non_billable'
 
   // Dedicated flow: record a loan repayment RECEIVED (sub → HV).
@@ -264,6 +267,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       </div>
 
       <NewPaymentForm
+        returnTo={returnTo}
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}
         accounts={(accountRows ?? []).map((a) => ({

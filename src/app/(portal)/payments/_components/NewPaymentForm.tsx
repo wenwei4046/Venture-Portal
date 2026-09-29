@@ -72,6 +72,8 @@ interface Props {
    *  '?mode=receipt' = receive-only (credit). Locks the direction and hides
    *  the toggle; undefined keeps the legacy toggle (invoice preset path). */
   lockedDirection?: 'debit' | 'credit'
+  /** Path to return to after saving, when the caller wants the user back. */
+  returnTo?: string | null
 }
 
 const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
@@ -116,7 +118,7 @@ interface SourceRow {
   autoAccount?: boolean
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, refundPreset, payableFundSources = [], lockedDirection }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, refundPreset, payableFundSources = [], lockedDirection, returnTo = null }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
@@ -350,6 +352,9 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
 
   return (
     <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
+      {/* Set by a caller that wants the user back where they were — Billing
+          sends /billing so a settle does not strand them in Payments. */}
+      {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
       {/* Direction: locked per entry point (Create payment = debit, Receipt =
           credit, settle-invoice = credit). The toggle only survives on legacy
           paths with no lock. */}

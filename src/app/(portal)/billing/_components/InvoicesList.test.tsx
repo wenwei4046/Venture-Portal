@@ -31,16 +31,25 @@ function invoice(id: string, invoice_no: string, period_month: string) {
     billing_mode: 'hr_attribution',
     total_amount: 1000,
     status: 'issued',
-    billable_to_type: 'subsidiary' as const,
+    // Widened so a dept_pool variant can be spread from this helper.
+    billable_to_type: 'subsidiary' as 'subsidiary' | 'dept_pool',
   }
 }
 
 const companyMap = new Map([['co-hc', { name: 'HOUZS Century', code: 'HC' }]])
 const departmentMap = new Map<string, string>()
 
+const banks = [{ id: 'bank-hl', bank_name: 'Hong Leong', account_number: '1234' }]
+
 function list(period: string, rows: ReturnType<typeof invoice>[]) {
   return (
-    <InvoicesList invoices={rows} companyMap={companyMap} departmentMap={departmentMap} period={period} />
+    <InvoicesList
+      invoices={rows}
+      companyMap={companyMap}
+      departmentMap={departmentMap}
+      period={period}
+      bankAccounts={banks}
+    />
   )
 }
 
@@ -62,5 +71,25 @@ describe('InvoicesList selection across periods', () => {
     rerender(list('2026-10-01', [invoice('inv-oct', 'INV-OCT-1', '2026-10-01')]))
     expect(screen.queryByText(/^1 张/)).toBeNull()
     expect(screen.getByLabelText('Select INV-OCT-1')).not.toBeChecked()
+  })
+})
+
+// 2026-09-29: the per-invoice Settle used to be a link to /payments/new, which
+// left Billing entirely and ended on the voucher page. It now opens the same
+// dialog the batch settle uses, on the row you clicked.
+describe('settling one invoice', () => {
+  it('opens the dialog in place with that invoice selected', () => {
+    render(list('2026-09-01', [invoice('inv-1', 'INV-1', '2026-09-01')]))
+    fireEvent.click(screen.getByTitle('就地开收据,不用离开 Billing'))
+    expect(screen.getByText(/1 张发票/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Select INV-1')).toBeChecked()
+  })
+
+  it('sends a dept-pool invoice to the voucher page, with a way back', () => {
+    const interBilling = { ...invoice('inv-vo', 'INV-VO', '2026-09-01'), billable_to_type: 'dept_pool' as const }
+    render(list('2026-09-01', [interBilling]))
+    expect(screen.queryByTitle('就地开收据,不用离开 Billing')).toBeNull()
+    const link = screen.getByText('Settle →').closest('a')
+    expect(link).toHaveAttribute('href', '/payments/new?invoice_id=inv-vo&return_to=/billing')
   })
 })

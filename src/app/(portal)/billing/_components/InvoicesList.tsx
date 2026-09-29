@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -337,8 +337,47 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     if (inv.status === 'draft') draftCount++
   }
 
+  // One invoice settles in the SAME dialog the batch uses, so Billing never
+  // disappears under you (user, 2026-09-29). It cannot cover a dept_pool
+  // invoice — inter-billing and own-share settle by netting on the voucher
+  // page — so that one still leaves, and comes back here when it is saved.
+  function settleOne(inv: Invoice) {
+    setSettleError(null)
+    setSettleResult(null)
+    setSelectedIds(new Set([inv.id]))
+    if (!settleBank && bankAccounts.length > 0) setSettleBank(bankAccounts[0].id)
+    setSettleAmount(remainingOf(inv).toFixed(2))
+    setShowSettleModal(true)
+  }
+
+  // …and the receipt it made is announced here, not left behind on the
+  // voucher page. Read off the URL so no server plumbing is needed, then
+  // dropped from it so a refresh does not repeat the banner.
+  const [returnedReceipt, setReturnedReceipt] = useState<string | null>(null)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const receipt = params.get('receipt')
+    if (!receipt) return
+    setReturnedReceipt(receipt)
+    params.delete('receipt')
+    const query = params.toString()
+    window.history.replaceState(null, '', window.location.pathname + (query ? '?' + query : ''))
+  }, [])
+
   return (
     <section className="border-t border-hairline pt-8 mb-12">
+      {returnedReceipt ? (
+        <div className="mb-4 flex items-baseline justify-between gap-3 border border-ledger/40 bg-ledger/10 text-ledger rounded-md px-3 py-2">
+          <span className="font-sans text-sm">收据 {returnedReceipt} 已开 — 发票结清。</span>
+          <button
+            type="button"
+            onClick={() => setReturnedReceipt(null)}
+            className="font-sans text-xs opacity-70 hover:opacity-100"
+          >
+            知道了
+          </button>
+        </div>
+      ) : null}
       <div className="flex items-baseline justify-between mb-4 gap-4 flex-wrap">
         <h2 className="font-serif text-xl text-ink">Invoices</h2>
         <div className="flex items-baseline gap-4">
@@ -643,15 +682,27 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                             <ApproveInvoiceButton id={inv.id} />
                           </>
                         ) : inv.status === 'issued' ? (
-                          <Link
-                            href={`/payments/new?invoice_id=${inv.id}`}
-                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
-                          >
-                            Settle →
-                          </Link>
+                          isBatchSettleable(inv) ? (
+                            <button
+                              type="button"
+                              onClick={() => settleOne(inv)}
+                              className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                              title="就地开收据,不用离开 Billing"
+                            >
+                              Settle →
+                            </button>
+                          ) : (
+                            <Link
+                              href={`/payments/new?invoice_id=${inv.id}&return_to=/billing`}
+                              className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                              title="部门间结算走冲账凭单,开好会带你回来"
+                            >
+                              Settle →
+                            </Link>
+                          )
                         ) : inv.status === 'paid' ? (
                           <Link
-                            href={`/payments/new?mode=refund&invoice_id=${inv.id}`}
+                            href={`/payments/new?mode=refund&invoice_id=${inv.id}&return_to=/billing`}
                             className="text-xs text-muted hover:text-danger font-serif italic"
                             title="退款:开一张 debit PV 把已收的钱退回去(正常审批流程)"
                           >
