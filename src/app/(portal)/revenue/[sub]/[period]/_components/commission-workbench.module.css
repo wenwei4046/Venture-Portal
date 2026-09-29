@@ -289,6 +289,13 @@
 .table tbody tr:hover .rowMenuButton,
 .table tbody tr:focus-within .rowMenuButton,
 .rowMenuButton[aria-expanded='true'] { opacity: 1; }
+/* A shared bill (2026-09-30): under its number, whose bill the row's part is
+   of — a peach tag, the sheet's orange as a surface — and in Sales person
+   every holder on a line of their own, the ledger's own person in bold. */
+.table td small.shareNote { width: fit-content; padding: 1px 6px; border-radius: 4px; background: rgb(var(--accent-bg)); color: rgb(var(--ink)); font-weight: 500; }
+.holders { display: grid; gap: 2px; line-height: 1.35; }
+.holderSelf { font-weight: 600; }
+.holderPart { font-family: var(--font-mono, 'Chivo Mono'), monospace; font-size: 11px; }
 .rowMenuButton:hover,
 .rowMenuButton[aria-expanded='true'] { border-color: rgb(var(--hairline)); background: #fff; }
 .empty { padding: 44px 20px; text-align: center; font-size: 12px; line-height: 1.7; }

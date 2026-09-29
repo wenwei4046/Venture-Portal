@@ -443,6 +443,24 @@ src/
 │   │   │                              the SAME scheme columns as Rules. Member
 │   │   │                              Insight/Arena do not read shares yet. Mig
 │   │   │                              `20260924010000`.
+│   │   │                              **SHARE FROM THE RIGHT-CLICK (2026-09-30):**
+│   │   │                              a bill's menu — a salesperson's ledger on
+│   │   │                              Comm Cal, and Sales orders — has *Share this
+│   │   │                              bill…*: who with (the sub-department's team,
+│   │   │                              never the owner) + their % (50 to start),
+│   │   │                              Save; *Stop sharing with …* gives a part
+│   │   │                              back. Every PART carries `SalesOrder.share`
+│   │   │                              (owner + every holder's %, stamped by
+│   │   │                              `splitOrdersByShares`, display only — the
+│   │   │                              engine never reads it), so the other
+│   │   │                              holder's ledger says *From ADRIAN's bill*,
+│   │   │                              the owner's *Shared with ANTHONY*, and the
+│   │   │                              ledger's **Sales person** column names both
+│   │   │                              (`RowShare`). `shareOrder` also refuses a
+│   │   │                              new holder whose own month is closed
+│   │   │                              (`assertStaffNotClosed`) or who is off the
+│   │   │                              team, and answers with the holders
+│   │   │                              (`lib/commission/bill-share.ts`). No mig.
 │   │   │                              **THE CATALOGUE, MIRRORED — ITEMS ONLY
 │   │   │                              (2026-09-24):** `products/` (Product List)
 │   │   │                              is the Houzs ERP's Products page mirrored

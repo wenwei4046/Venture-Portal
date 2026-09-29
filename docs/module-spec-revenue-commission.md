@@ -1164,6 +1164,28 @@ A director of two sub-departments (PETER: Fair and IR) is paid by each
 sub-department's own row; their commission in payroll is the sum of their
 closes. Mig `20260927075000`.
 
+### 4.13 A shared bill — shared from its right-click (2026-09-30)
+
+Two people often close one customer together at a fair, and the ERP puts one
+name on the bill. `sales_order_shares` (2026-09-24, mig `20260924010000`) has
+always let HR say who else holds a part; since 2026-09-30 it is done where the
+bills are read (user 2026-09-30: 右 click 加多一个 option 是 share 单 — 选 share
+给哪一个 sales agent，然后多少 percent … 按 Anthony 进去的时候能看到这个 order，
+上面会写明这是谁的单).
+
+| | |
+|---|---|
+| Where | *Share this bill…* on a bill's right-click (or ⋯): a salesperson's ledger on Comm Cal — Personal, Overriding, Below deposit — the month's Below deposit tab, and Sales orders (beside *Share…* under the name) |
+| The form | **Share with** — the sub-department's team (`loadShareTeam`), never the owner; somebody closed this month cannot be picked. **Their part** — 50% to start, a holder's own part when they already hold one, else half of what the owner still keeps. Save; *Stop sharing with …* gives a part back |
+| The money | unchanged since 2026-09-24: the owner keeps 1 − Σ(shares); each part is the bill scaled down — lines, cost, total, paid — so it passes the deposit gate and lands in the margin band exactly as the whole bill does; it is paid at its holder's own rate and climbs its holder's own upline line; one release per bill, in the owner's name |
+| Both ledgers | every part carries `SalesOrder.share` (the owner and every holder's part, stamped by `splitOrdersByShares`; the engine never reads it). The other holder's ledger lists their part with *From ADRIAN's bill* under the number; the owner's says *Shared with ANTHONY*; the **Sales person** column names both with their parts, and Sales value reads *50% of RM X* |
+| Refused | a paid month (23RUN, trigger); shares leaving the owner nothing or naming the owner (23SHR, trigger); a bill anybody paid on it has closed (`assertBillsNotClosed`); a NEW holder whose own month is closed from the bill's month on (`assertStaffNotClosed` — their locked figure would silently stop matching their ledger); somebody off the sub-department's team (the run would pay nobody) |
+| Undo | the notice's *Undo* puts the part back as it was — no part, or the part it had |
+
+`shareOrder` / `unshareOrder` answer with the bill's holders as they now stand
+(`BillShareResult`, `lib/commission/bill-share.ts`); the menu's form, its
+checks and its words are that file's. No migration.
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total
