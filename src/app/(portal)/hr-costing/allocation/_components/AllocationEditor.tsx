@@ -8,6 +8,7 @@ import {
   hvRemainderPct,
   allocationPreview,
   type AllocationRow,
+  type SplitLock,
 } from '@/lib/staff-allocation'
 import { saveStaffAllocation } from '../actions'
 
@@ -18,6 +19,8 @@ export interface StaffAllocationData {
   /** gross + EPF/SOCSO/EIS ER for the period — the billing basis. */
   employerCost: number
   rows: Array<{ companyId: string; pct: number }>
+  /** Where their pay stands; past draft the split is locked with it. */
+  lock: SplitLock
 }
 
 interface Company {
@@ -66,7 +69,9 @@ export default function AllocationEditor({ period, staff, companies, readOnly }:
       <div className="space-y-3">
         {staff.map((s) => (
           <StaffCard
-            key={s.staffId}
+            // A card that locks (or opens) starts again from what is saved,
+            // so a refused edit never stays on screen as if it had landed.
+            key={`${s.staffId}:${s.lock.locked ? 'locked' : 'open'}`}
             period={period}
             staff={s}
             companies={companies}
@@ -95,6 +100,18 @@ function StaffCard({
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState(false)
+  // What is saved, in any order. When a refresh brings a different split —
+  // Copy from last month, a save in another tab — a card nobody is editing
+  // takes it; the form was only ever seeded on the first render.
+  const savedKey = staff.rows.map((r) => `${r.companyId}=${r.pct}`).sort().join('|')
+  const [shownKey, setShownKey] = useState(savedKey)
+  if (savedKey !== shownKey) {
+    setShownKey(savedKey)
+    if (!dirty) setRows(toEditRows(staff.rows))
+  }
+  // The split follows the payroll row: past draft it stays as it left.
+  const locked = staff.lock.locked
+  const frozen = readOnly || locked
 
   const parsed = toAllocationRows(rows)
   const parseable = parsed.every((r) => r.companyId && Number.isFinite(r.pct))
@@ -131,7 +148,14 @@ function StaffCard({
     }
     startTransition(async () => {
       try {
-        await saveStaffAllocation(staff.staffId, period, parsed)
+        const result = await saveStaffAllocation(staff.staffId, period, parsed)
+        if (!result.ok) {
+          // Locked since this page was opened: say why, then show the card
+          // as it now stands.
+          setError(result.reason)
+          router.refresh()
+          return
+        }
         setDirty(false)
         setSavedNote(true)
         router.refresh()
@@ -144,11 +168,18 @@ function StaffCard({
   const usedCompanyIds = new Set(rows.map((r) => r.companyId).filter(Boolean))
 
   return (
-    <div className="border border-hairline rounded-card bg-surface px-5 py-4">
+    <div
+      className="border border-hairline rounded-card bg-surface px-5 py-4"
+      data-locked={locked || undefined}
+    >
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
-        <div>
+        <div className="flex items-baseline gap-3 flex-wrap">
           <span className="text-sm font-bold">{staff.name}</span>
-          <span className="text-[11px] ml-3">{staff.dept}</span>
+          <span className="text-[11px]">{staff.dept}</span>
+          <span className={staff.lock.tone === 'muted' ? 'chip' : `chip ${staff.lock.tone}`}>
+            <span className="dot" />
+            {staff.lock.label}
+          </span>
         </div>
         <div className="text-xs">
           Employer cost <span className="num text-num-ink text-sm font-bold ml-1">{formatMoney(staff.employerCost)}</span>
@@ -172,7 +203,7 @@ function StaffCard({
                 <select
                   value={r.companyId}
                   onChange={(e) => patchRow(r.uid, { companyId: e.target.value })}
-                  disabled={readOnly}
+                  disabled={frozen}
                   className="px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent min-w-[180px]"
                 >
                   <option value="">Company…</option>
@@ -194,7 +225,7 @@ function StaffCard({
                     max="100"
                     value={r.pct}
                     onChange={(e) => patchRow(r.uid, { pct: e.target.value })}
-                    disabled={readOnly}
+                    disabled={frozen}
                     className="w-24 px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm font-mono text-ink text-right focus:outline-none focus:border-accent"
                     placeholder="0.00"
                   />
@@ -203,7 +234,7 @@ function StaffCard({
                 <span className="num text-sm min-w-[100px]">
                   {amt !== null ? formatMoney(amt) : '—'}
                 </span>
-                {!readOnly && (
+                {!frozen && (
                   <button
                     type="button"
                     onClick={() => removeRow(r.uid)}
@@ -250,7 +281,14 @@ function StaffCard({
           {error && <span className="text-danger ml-2">{error}</span>}
           {savedNote && !dirty && <span className="chip ledger ml-2"><span className="dot" />Saved.</span>}
         </div>
-        {!readOnly && (
+        {locked && (
+          <p className="text-xs sm:text-right">
+            {staff.lock.wayBack
+              ? `Locked with their pay · ${staff.lock.wayBack} to change it`
+              : 'Payroll for this month is closed for good'}
+          </p>
+        )}
+        {!frozen && (
           <div className="flex items-center gap-2">
             <button
               type="button"

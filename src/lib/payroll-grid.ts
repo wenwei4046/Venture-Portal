@@ -109,6 +109,25 @@ export function groupByDepartment<
     })
 }
 
+/**
+ * The grid's reading order as one comparator — department A→Z with the
+ * department-less last, then name A→Z — for a list of the same people that
+ * must read in the same order: Billing Allocation (2026-09-30).
+ */
+export function comparePayrollOrder(
+  a: { dept_name: string; staff_name: string },
+  b: { dept_name: string; staff_name: string },
+): number {
+  const da = deptKey(a.dept_name)
+  const db = deptKey(b.dept_name)
+  if (da !== db) {
+    if (da === NO_DEPARTMENT) return 1
+    if (db === NO_DEPARTMENT) return -1
+    return da.localeCompare(db)
+  }
+  return a.staff_name.localeCompare(b.staff_name)
+}
+
 /** Column sums for the totals row, rounded to cents. */
 export function columnTotals<T, K extends keyof T>(
   rows: readonly T[],

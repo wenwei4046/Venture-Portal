@@ -731,9 +731,13 @@ hr_staff_allocation (
     created_at      timestamptz DEFAULT now()
 
     UNIQUE (staff_id, company_id, period_month)
+    FOREIGN KEY (staff_id, period_month) → hr_monthly_payroll (staff_id, period_month)
+        ON UPDATE CASCADE ON DELETE CASCADE        -- 2026-09-30
 )
--- Constraint: 同 staff + period_month 的 allocation_pct 加总 = 1.0
--- 只有 Finance dept 员工用这张表（per person attribution）
+-- allocation_pct 是 0–1；同 staff + period_month 加总 ≤ 1.0，余数 = HV own share（不 bill）
+-- 2026-09-30：每一行都属于那个月的 payroll row（removed with it）；
+--   trigger trg_hr_staff_allocation_follows_payroll：payroll row 过了 draft
+--   （completed / submitted / paid）或月份 Total Close → 拒绝 INSERT/UPDATE/DELETE（23PAY）
 ```
 5.4 claims
 ```sql

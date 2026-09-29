@@ -152,6 +152,25 @@ src/
 │   │   │                              23PAY). June–August are batch #1 (legacy) of
 │   │   │                              their month. `lib/payroll-lifecycle.ts`, mig
 │   │   │                              `20260927061000`, DESIGN.md › Payroll batches.
+│   │   │                              **BILLING ALLOCATION FOLLOWS THE PAYROLL
+│   │   │                              (2026-09-30):** allocation/[period] is one card
+│   │   │                              per payroll row of the month, in the grid's
+│   │   │                              order (`comparePayrollOrder`) — the same people,
+│   │   │                              directors aside (billed through Director
+│   │   │                              Salary). A person's split LOCKS with their row:
+│   │   │                              Completed, with Finance, paid, or the month
+│   │   │                              Closed for good. The way back is the payroll's
+│   │   │                              own — Unlock, reopen on Comm Cal, or Resubmit /
+│   │   │                              Second payroll (a draft again while open).
+│   │   │                              Every split row belongs to its payroll row (FK
+│   │   │                              `hr_staff_allocation_payroll_row_fkey`, ON
+│   │   │                              DELETE CASCADE — removed with it) and trigger
+│   │   │                              `trg_hr_staff_allocation_follows_payroll`
+│   │   │                              refuses the rest (23PAY, same words as the
+│   │   │                              page). Copy from last month fills only people
+│   │   │                              on this month's payroll and still a draft.
+│   │   │                              `splitLock` in lib/staff-allocation.ts, mig
+│   │   │                              `20260930040000`.
 │   │   ├── revenue/                 ← Revenue Department: [sub]/ = one sub-department
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission

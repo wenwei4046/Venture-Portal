@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   columnTotals,
+  comparePayrollOrder,
   dirtyFields,
   editFromRow,
   formatAmount,
@@ -85,6 +86,24 @@ describe('groupByDepartment', () => {
     const copy = rows.map(r => r.id)
     groupByDepartment(rows)
     expect(rows.map(r => r.id)).toEqual(copy)
+  })
+})
+
+describe('comparePayrollOrder', () => {
+  // Billing Allocation lists the same people as the grid, and must read in
+  // the same order for the two to be checked against each other (2026-09-30).
+  it('sorts a flat list exactly as the grid reads its groups', () => {
+    const rows = [
+      { id: 'a', dept_name: 'Marketing', staff_name: 'THIEN YEE MUN', gross: 0, net: 0 },
+      { id: 'b', dept_name: 'Finance', staff_name: 'NUR AIN', gross: 0, net: 0 },
+      { id: 'c', dept_name: '—', staff_name: 'ZED', gross: 0, net: 0 },
+      { id: 'd', dept_name: 'Finance', staff_name: 'LOW CHENG AN', gross: 0, net: 0 },
+      { id: 'e', dept_name: '', staff_name: 'ANON', gross: 0, net: 0 },
+      { id: 'f', dept_name: 'Director Office', staff_name: 'CHOW WAI MAN', gross: 0, net: 0 },
+    ]
+    const grid = groupByDepartment(rows).flatMap(g => g.rows.map(r => r.id))
+    expect([...rows].sort(comparePayrollOrder).map(r => r.id)).toEqual(grid)
+    expect(grid).toEqual(['f', 'd', 'b', 'a', 'e', 'c'])
   })
 })
 

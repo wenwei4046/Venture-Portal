@@ -7,6 +7,7 @@
 // breakdown Finance bills (Salary / Allowance / EPF / SOCSO / EIS).
 
 import dayjs from 'dayjs'
+import { dayLabel, topupKindLabel, type RowStatus, type TopupKind } from '@/lib/payroll-lifecycle'
 
 export interface AllocationRow {
   companyId: string
@@ -89,6 +90,139 @@ export function allocationPreview(
     hvAmount = 0
   }
   return { lines, billedTotal, hvAmount }
+}
+
+// ─── The split follows the payroll row (2026-09-30) ──────────────────────────
+//
+// User 2026-09-30: once somebody's payroll is Completed their billing split
+// must not change. The split takes the payroll row's own lock — it changes
+// only while the row is a draft (a Resubmit or Second payroll makes it one
+// again while that is open), never in a month Closed for good — and every
+// split row belongs to a payroll row, so the editor lists exactly the payroll's
+// people. The database refuses the same, in the same words
+// (guard_staff_allocation_follows_payroll); these decide what the page offers.
+
+export interface SplitLockInput {
+  status: RowStatus
+  /** Paid through the Revenue team: completed by their close on Comm Cal. */
+  revenue: boolean
+  completedAt: string | null
+  /** Set while the row is unlocked for a Resubmit or a Second payroll. */
+  topupOpenedAt: string | null
+  topupKind: TopupKind | null
+  monthClosed: boolean
+}
+
+export interface SplitLock {
+  locked: boolean
+  /** The chip beside the name: where the person's pay stands. */
+  label: string
+  tone: 'muted' | 'accent' | 'alert' | 'ledger'
+  /** How a refusal names the state ('Completed', 'with Finance', 'paid'). */
+  state: string | null
+  /** What to do, and where, to change the split. Null while it can change. */
+  wayBack: string | null
+}
+
+/** Whether one person's split can change, and what the card says about it. */
+export function splitLock(input: SplitLockInput): SplitLock {
+  if (input.monthClosed) {
+    return { locked: true, label: 'Closed for good', tone: 'ledger', state: 'closed for good', wayBack: null }
+  }
+  const topup = input.topupOpenedAt != null
+  switch (input.status) {
+    case 'completed':
+      return {
+        locked: true,
+        label: topup
+          ? `${topupKindLabel(input.topupKind)} ready`
+          : `Completed ${dayLabel(input.completedAt)}`.trim(),
+        tone: topup ? 'accent' : 'ledger',
+        state: 'Completed',
+        wayBack: input.revenue ? 'Reopen them on Comm Cal' : 'Unlock them on HR › Payroll',
+      }
+    case 'submitted':
+      return { locked: true, label: 'With Finance', tone: 'alert', state: 'with Finance', wayBack: 'Resubmit them on HR › Payroll' }
+    case 'paid':
+      return { locked: true, label: 'Paid', tone: 'ledger', state: 'paid', wayBack: 'Resubmit them on HR › Payroll' }
+    case 'draft':
+    default:
+      return topup
+        ? { locked: false, label: `${topupKindLabel(input.topupKind)} · editing`, tone: 'accent', state: null, wayBack: null }
+        : { locked: false, label: 'Draft', tone: 'muted', state: null, wayBack: null }
+  }
+}
+
+/**
+ * The refusal, word for word what the database raises:
+ * "TAN YONG HONG's September 2026 pay is Completed — its billing split is
+ * locked with it. Unlock them on HR › Payroll to change it".
+ */
+export function splitLockMessage(name: string, monthLabel: string, lock: SplitLock): string {
+  if (lock.wayBack == null) {
+    return `Payroll for ${monthLabel} is closed for good — its billing splits cannot change`
+  }
+  return `${name}'s ${monthLabel} pay is ${lock.state} — its billing split is locked with it. ${lock.wayBack} to change it`
+}
+
+export interface SplitCopyPlan<T> {
+  /** Last month's rows to write into this month. */
+  rows: T[]
+  /** People whose split is copied. */
+  copied: number
+  /** On this month's payroll but past draft — their split is left alone. */
+  locked: number
+  /** Split last month, not on this month's payroll — nothing to split. */
+  notOnPayroll: number
+}
+
+/**
+ * Copy from last month, person by person: only somebody on this month's
+ * payroll, still editable, with no split of their own yet. Anybody already
+ * split this month is left alone and not counted — the copy never overwrites.
+ *
+ * `payroll` maps this month's staff_id → whether their split can change.
+ */
+export function planSplitCopy<T extends { staff_id: string }>(
+  lastMonth: readonly T[],
+  payroll: ReadonlyMap<string, boolean>,
+  alreadySplit: ReadonlySet<string>,
+): SplitCopyPlan<T> {
+  const rows: T[] = []
+  const copied = new Set<string>()
+  const locked = new Set<string>()
+  const notOnPayroll = new Set<string>()
+  for (const r of lastMonth) {
+    if (alreadySplit.has(r.staff_id)) continue
+    const editable = payroll.get(r.staff_id)
+    if (editable === undefined) notOnPayroll.add(r.staff_id)
+    else if (!editable) locked.add(r.staff_id)
+    else {
+      rows.push(r)
+      copied.add(r.staff_id)
+    }
+  }
+  return { rows, copied: copied.size, locked: locked.size, notOnPayroll: notOnPayroll.size }
+}
+
+/** What a copy did, including who it left alone and why. */
+export function splitCopyNote(
+  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'>,
+): string {
+  const { copied, locked, notOnPayroll } = counts
+  const parts: string[] = []
+  if (copied > 0) parts.push(`Copied splits for ${copied} staff.`)
+  if (locked > 0) {
+    parts.push(`${locked} locked with their payroll ${locked === 1 ? 'was' : 'were'} left alone.`)
+  }
+  if (notOnPayroll > 0) {
+    parts.push(
+      `${notOnPayroll} not on this month's payroll ${notOnPayroll === 1 ? 'was' : 'were'} skipped.`,
+    )
+  }
+  return parts.length > 0
+    ? parts.join(' ')
+    : 'Nothing to copy — no last-month splits, or everyone already set.'
 }
 
 // ─── Invoice line breakdown (user sample 2026-07-03) ─────────────────────────

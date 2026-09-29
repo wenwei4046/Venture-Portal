@@ -839,6 +839,16 @@ read-only, the name a link to Director Salary). The page's rules:
   which (*Second payroll · editing* / *Second payroll ready*). A row that can
   take neither shows one disabled *Resubmit · Second payroll* item with the
   reason.
+- **Billing Allocation follows the grid** (2026-09-30): one card per payroll row,
+  in the grid's order, with the status chip beside the name in the grid's words
+  (`Draft` plain · `Completed 30 Sep` ledger · `With Finance` alert · `Paid`
+  ledger · `Resubmit · editing` / `Resubmit ready` accent · `Closed for good`).
+  Past draft a card is frozen — company selects and % inputs disabled, no
+  *+ Company* / *Save* / ✕ — and its foot names the way back instead of the
+  buttons: *Locked with their pay · Unlock them on HR › Payroll to change it*
+  (or *Reopen them on Comm Cal* / *Resubmit them on HR › Payroll*). The status
+  line under the title counts them (`… · 3 locked with their payroll`), and
+  *Copy from last month* hides once nobody can take a split.
 
 ### Org chart canvas (v3.4, 2026-09-09 — Revenue › Staff Hierarchy)
 
@@ -2367,6 +2377,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-09-30 (the split follows the payroll)** — HR › Billing Allocation reads like the Payroll grid it belongs to: its cards come in the grid's order, each carries the person's payroll status chip, and a card past draft freezes with a one-line way back at its foot instead of *+ Company* / *Save*. See "Payroll batches".
 - **2026-09-28 (quiet until asked)** — Comm Cal's month folds what it explains. The payroll bar is one line (chevron · `PAYROLL · SEPTEMBER 2026` · dot + state · one tag: *N to settle* / *Moved since* / *Payroll closed*) and opens on a click; *Bills priced RM 0* folds to its headline the same way (`.fold` / `.foldMark`). The month's real switches (*This month pays*) leave the bar's foot for the top of **Review settings** (`.monthPays`), whose *Calculation setup* fold and preview-only KPI / Open Bill / Margin checkboxes are removed — one set of switches on the page; the current-team preview stays, and the summary shows a *Draft* tag while a draft is open. See "The payroll bar" under Tabbed pages.
 - **2026-09-27 (director pay)** — Revenue Directors are paid. Rules gains a tenth tab, **Directors** (section X, shown while the sub-department has a director): one `.ledger-table` row per director — name with title · code under it, *Fixed amount · RM*, *Incentive when Commissionable value reaches · RM*, *Incentive · RM*, the row's Save — and a foot line naming the Revenue Director rung's rate (or a `sheet-warning` when the ladder has none). The Title ladder's title picker offers only titles without a rung, the head as *Revenue Director · heads the department*; its row reads *Always* under Can recruit and *Own bills only · no override · no gate* across the two gate columns. Comm Cal: a director with a rung reads *Revenue Director* / *Rank SS · 12% · own bills only · no override* in the Title / rank cell and the hero, the total adds *Includes RM X director pay*, and a `.notice` above their ledger (`DirectorPayNote`) names the fixed amount and whether the month's Commissionable value has reached the incentive threshold, and by how much it is short.
 - **2026-09-27 (brand)** — A bill with no brand gets one by hand. The bill menu on Sales orders and on a salesperson’s ledger gains *Brand for the margin…*, shown only on a live bill that nothing names a brand for (or one given its brand there): an adjacent panel with one plain button per margin-ladder brand, *Take the pick off*, and Cancel, the same paper as the *Don’t count* confirmation. The result is one status line above the table. See “Bill context menu”.
