@@ -7,6 +7,7 @@ import SubmitHRCostButton from './_components/SubmitHRCostButton'
 import { executeHrCosting } from './actions'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import DepartmentModeCard from '@/components/department/DepartmentModeCard'
 
 interface DeptSummary {
   department_id: string
@@ -114,6 +115,9 @@ export default async function HRCostingPage() {
           ) : null}
         </div>
       </div>
+
+      {/* Cost center or centralized — HR's own switch (2026-09-30). */}
+      <DepartmentModeCard segmentKey="hr" />
 
       {/* ───────── The month in five figures ─────────
           Total CTC is the figure the page is opened for, so it is the sheet's

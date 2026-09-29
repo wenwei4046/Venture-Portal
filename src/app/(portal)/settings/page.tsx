@@ -13,6 +13,7 @@ import BaseRateSimulator from './_components/BaseRateSimulator'
 import BankAccountsSection from './_components/BankAccountsSection'
 import CompaniesSection from './_components/CompaniesSection'
 import DepartmentsSection from './_components/DepartmentsSection'
+import { loadDepartmentModes } from '@/lib/department-mode-server'
 import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
@@ -86,8 +87,17 @@ export default async function SettingsPage({ searchParams }: Props) {
       .order('type')
       .order('sort_order')
       .order('code'),
-    supabase.from('departments').select('id, name, is_internal, created_at, segment_key, pool_gl_code, billing_mode_key').order('created_at'),
+    // own_share_billback was read below but never selected (2026-09-29), so
+    // every Bill back box drew unticked whatever the registry held.
+    supabase
+      .from('departments')
+      .select('id, name, is_internal, created_at, segment_key, pool_gl_code, billing_mode_key, own_share_billback')
+      .order('created_at'),
   ])
+  // Cost center / centralized (2026-09-30). The rest of Settings must not fail
+  // because of it, so a failed read leaves the Mode column blank.
+  const departmentModes =
+    activeTabResolved === 'departments' ? await loadDepartmentModes().catch(() => []) : []
 
   const treasury = (treasuryRows ?? []) as TreasuryConfig[]
   const overdueStages = (overdueRows ?? []) as OverdueConfig[]
@@ -196,6 +206,7 @@ export default async function SettingsPage({ searchParams }: Props) {
             billing_mode_key: ((d as { billing_mode_key?: string | null }).billing_mode_key as string | null) ?? null,
             own_share_billback: Boolean((d as { own_share_billback?: boolean }).own_share_billback),
           }))}
+          modes={departmentModes}
         />
       )}
 

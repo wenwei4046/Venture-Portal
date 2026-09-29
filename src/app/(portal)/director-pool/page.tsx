@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
 import DirectorPoolClient from './_components/DirectorPoolClient'
+import DepartmentModeCard from '@/components/department/DepartmentModeCard'
 
 export default async function DirectorPoolPage() {
   await requirePermission('director_pool')
@@ -31,6 +32,8 @@ export default async function DirectorPoolPage() {
           📂 Import JSON
         </Link>
       </div>
+      {/* Cost center or centralized — the Director department's switch (2026-09-30). */}
+      <DepartmentModeCard segmentKey="director" />
       <DirectorPoolClient data={data} />
     </div>
   )
