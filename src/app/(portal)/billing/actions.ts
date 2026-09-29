@@ -18,14 +18,13 @@ import {
   buildConsolidatedInvoiceLines,
   periodShortLabel,
   PAYROLL_SEGMENT_LABEL,
-  PAYROLL_COMPONENTS,
   componentsTotal,
   type DeptComponentGroup,
   type PayrollSegment,
 } from '@/lib/staff-allocation'
 import {
+  componentOfLine,
   computeBillingDeltas,
-  type ComponentKey,
   type CompanyBillingDelta,
   type ShouldBillRow,
   type BilledRow,
@@ -1646,19 +1645,6 @@ export async function generateConsolidatedPayrollInvoices(
 // the gap with ONE adjustment invoice per company in the SAME consolidated
 // format (per-segment lines → identical issue/settle/P&L routing). Over-billed
 // segments are report-only: consolidated invoices take no credit notes.
-
-/** Which itemised component a billed line was, read off its description.
- *  Both line builders write "<Label> - <period>…", so the label is the
- *  prefix. Anything else (a lump adjustment line from before 2026-09-29,
- *  a hand-typed line) returns null, and its segment is then topped up as a
- *  single line rather than a split that would not be a reading. */
-function componentOfLine(description: string | null): ComponentKey | null {
-  const text = (description ?? '').trim()
-  for (const [key, label] of PAYROLL_COMPONENTS) {
-    if (text.startsWith(`${label} - `)) return key
-  }
-  return null
-}
 
 const ADJUSTMENT_MARKER = '· adjustment'
 const BILLED_STATUSES = ['issued', 'paid', 'paid_via_netting'] as const

@@ -113,6 +113,21 @@ function splitDelta(c: Cell, delta: number): ComponentDelta[] | null {
   return positives
 }
 
+/** Which itemised component a billed line was, read off its description.
+ *  Both line builders write "<Label> - <period>…", and an adjustment writes
+ *  "<Dept> <Label> adjustment - <period>", so a second 对数补差 run on the
+ *  same period can read back what the first one billed. Anything else — a
+ *  lump adjustment from before 2026-09-29, a hand-typed line — returns null,
+ *  and that segment is topped up as one line instead of a split that would
+ *  not be a reading. */
+export function componentOfLine(description: string | null): ComponentKey | null {
+  const text = (description ?? '').trim()
+  for (const [key, label] of PAYROLL_COMPONENTS) {
+    if (text.startsWith(`${label} - `) || text.includes(`${label} adjustment - `)) return key
+  }
+  return null
+}
+
 export function computeBillingDeltas(
   should: ShouldBillRow[],
   billed: BilledRow[],

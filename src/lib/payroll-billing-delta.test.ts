@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBillingDeltas, type ShouldBillRow, type BilledRow } from './payroll-billing-delta'
+import { componentOfLine, computeBillingDeltas, type ShouldBillRow, type BilledRow } from './payroll-billing-delta'
 
 const LABELS = { finance: 'Finance', director_office: 'Director Office', it: 'IT' }
 
@@ -188,5 +188,24 @@ describe('splitting the gap per component', () => {
     const hr = rows[0].segments.find((s) => s.segment === 'hr')!
     const sum = hr.componentDeltas!.reduce((t, c) => t + c.amount, 0)
     expect(Math.round(sum * 100) / 100).toBe(hr.delta)
+  })
+})
+
+describe('componentOfLine', () => {
+  it('reads an original invoice line', () => {
+    expect(componentOfLine("Salary - Aug'26")).toBe('salary')
+    expect(componentOfLine("EPF - Aug'26")).toBe('epf')
+    expect(componentOfLine("Salary - Aug'26 (HR)")).toBe('salary')
+  })
+
+  it('reads an adjustment line back, so a second run can still split', () => {
+    expect(componentOfLine("HR Salary adjustment - Aug'26")).toBe('salary')
+    expect(componentOfLine("Director Office SOCSO adjustment - Aug'26")).toBe('socso')
+  })
+
+  it('returns null for a lump line or anything hand-typed', () => {
+    expect(componentOfLine("Finance payroll adjustment - Aug'26")).toBeNull()
+    expect(componentOfLine('Website & software tools')).toBeNull()
+    expect(componentOfLine(null)).toBeNull()
   })
 })
