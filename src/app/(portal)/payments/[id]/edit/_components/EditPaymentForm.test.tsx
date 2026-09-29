@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ updatePaymentVoucher: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('../../../actions', () => ({ updatePaymentVoucher: mocks.updatePaymentVoucher }))
 import EditPaymentForm from './EditPaymentForm'
+import { officeDate } from '@/lib/office-clock'
 beforeEach(() => vi.clearAllMocks())
 
 describe('statutory voucher editor', () => {
@@ -67,5 +68,18 @@ describe('fund-source repayment draft editor', () => {
     fireEvent.click(screen.getByRole('button', { name: '按拆分重带账户' }))
     expect(screen.queryAllByDisplayValue(/5027/)).toHaveLength(0)
     expect(screen.getAllByDisplayValue(/6000/).length).toBeGreaterThan(0)
+  })
+})
+
+// 2026-09-29: HV-PV-202609-0437 was created by the copy path, which omitted
+// payment_date, so the editor opened with a blank date and saving kept the hole.
+describe('a voucher saved without a payment date', () => {
+  const voucher = { id: 'no-date', voucher_no: 'HV-PV-202609-0437', voucher_type: 'expense', direction: 'debit' as const, amount: 899.74, payee_name: 'Claimant', payee_company_id: null, bank_account_id: 'bank', description: "Claude Ai Claim - Sep'26", notes: null, payment_method: 'bank_transfer', payment_date: null, target_pool: null, fund_source_id: null, loan_id: null, repayment_breakdown: null }
+
+  it('opens on the office date and refuses to be cleared', () => {
+    render(<EditPaymentForm voucher={voucher} initialSources={[{ pool: 'venture_pool', amount: '899.74', account_code: '9000' }]} initialCreditAccountCode={null} companies={[]} bankAccounts={[{ id: 'bank', bank_name: 'HLB', account_number: '1', current_balance: 0 }]} glAccounts={[{ code: '9000', name: 'G&A Expenses', type: 'cost' as const, parent_code: null }]} />)
+    const date = screen.getByLabelText('Payment date') as HTMLInputElement
+    expect(date.value).toBe(officeDate())
+    expect(date.required).toBe(true)
   })
 })

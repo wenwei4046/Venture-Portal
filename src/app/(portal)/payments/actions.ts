@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { resolveArGlCode } from '@/lib/ar-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeDate } from '@/lib/office-clock'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { postJournalEntry, r2 } from '@/lib/journal'
@@ -219,9 +220,11 @@ async function createPaymentVoucherInner(formData: FormData) {
   // Money flows in immediately on creation.
   const isAutoComplete = direction === 'credit'
   const nowIso = new Date().toISOString()
-  const todayStr = dayjs().format('YYYY-MM-DD')
+  const todayStr = officeDate()
   // mig 276 / single-settle date: honor a user-chosen payment date when valid,
   // else fall back to today. Drives both payment_date and the settlement JE date.
+  // Today means the OFFICE's today: Vercel runs in UTC, so for the eight hours
+  // after midnight in KL a UTC date would book the voucher a day early.
   const rawPaymentDate = (formData.get('payment_date') as string)?.trim()
   const paymentDateStr = rawPaymentDate && /^\d{4}-\d{2}-\d{2}$/.test(rawPaymentDate)
     ? rawPaymentDate
@@ -923,6 +926,11 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
       payment_method: src.payment_method,
       target_pool: src.target_pool,
       source_pool: null,
+      // A copy is a NEW payment, so it gets today rather than the original's
+      // date - and never NULL: omitting the column here is how
+      // HV-PV-202609-0437 reached pending_approval with no payment date
+      // (2026-09-29), leaving the approval no GL date to post on.
+      payment_date: officeDate(),
       created_by: user.id,
     })
     .select('id')
@@ -1029,6 +1037,12 @@ export async function updatePaymentVoucher(formData: FormData) {
   const editPaymentDate = rawEditPaymentDate && /^\d{4}-\d{2}-\d{2}$/.test(rawEditPaymentDate)
     ? rawEditPaymentDate
     : null
+  // Clearing the field used to save silently (the old date stayed), which
+  // reads as accepted. If the form sent the field at all it has to be a real
+  // date - the approval posts the GL on it.
+  if (formData.has('payment_date') && !editPaymentDate) {
+    throw new Error('Choose a valid payment date')
+  }
 
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!description) throw new Error('Description is required')

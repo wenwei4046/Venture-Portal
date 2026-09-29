@@ -571,12 +571,13 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
           id="payment_date"
           name="payment_date"
           type="date"
+          required
           value={paymentDate}
           onChange={(e) => setPaymentDate(e.target.value)}
           className="w-full max-w-xs px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
         />
         <p className="font-serif italic text-muted text-xs mt-1.5">
-          Defaults to today. Set the actual date the money moved if backdating.
+          Defaults to today and cannot be left blank. Set the actual date the money moved if backdating.
         </p>
       </div>
 

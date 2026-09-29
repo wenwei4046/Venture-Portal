@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeDate } from '@/lib/office-clock'
 
 export async function submitClaim(formData: FormData) {
   const user = await requirePermission('claims')
@@ -109,6 +110,9 @@ export async function approveClaim(claimId: string) {
         source_pool: sourcePool,
         reference_type: 'claim',
         reference_id: claimId,
+        // Approval posts the GL on this date, so it is never left NULL;
+        // Finance can move it on the PV edit page before approving.
+        payment_date: officeDate(),
         created_by: user.id,
       })
       .select('id')

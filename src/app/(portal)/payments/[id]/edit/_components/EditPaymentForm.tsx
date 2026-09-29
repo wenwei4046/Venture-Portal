@@ -6,6 +6,7 @@ import { updatePaymentVoucher } from '../../../actions'
 import type { AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, seedRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import AccountPicker from '@/components/AccountPicker'
+import { officeDate } from '@/lib/office-clock'
 
 interface GlAccount {
   code: string
@@ -128,7 +129,9 @@ export default function EditPaymentForm({
   const [bankAccountId, setBankAccountId] = useState(voucher.bank_account_id ?? '')
   const [description, setDescription] = useState(voucher.description)
   const [paymentMethod, setPaymentMethod] = useState(voucher.payment_method ?? 'bank_transfer')
-  const [paymentDate, setPaymentDate] = useState(voucher.payment_date ?? '')
+  // A voucher saved without a date (the old copy path did that) opens on
+  // today rather than blank, so the editor cannot save the hole back.
+  const [paymentDate, setPaymentDate] = useState(voucher.payment_date ?? officeDate())
   const [notes, setNotes] = useState(voucher.notes ?? '')
   const [targetPool, setTargetPool] = useState(voucher.target_pool ?? '')
   const [accountCode, setAccountCode] = useState(initialCreditAccountCode ?? '')
@@ -381,6 +384,7 @@ export default function EditPaymentForm({
           <input
             id="edit_payment_date"
             type="date"
+            required
             value={paymentDate}
             onChange={(e) => setPaymentDate(e.target.value)}
             className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
