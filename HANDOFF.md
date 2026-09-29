@@ -1,5 +1,103 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-09-29 (SHIPPED) — AR per customer, the bill-back switch, settle in place, and an itemised 对数补差
+
+All merged and live on Vercel prod. Migrations applied in this order, each one
+backward-compatible with the code that was live when it ran.
+
+| commit | what |
+|---|---|
+| `81eec8e4` | Accounts Receivable split per customer (3031–3039 + 3073 under 3030) |
+| `59364627` | Loan Monitor → Loan Aging |
+| `57dc0fd5` | Issuing an invoice is all-or-nothing: a failed AR JE rolls it back to draft and logs why |
+| `fff81b47` | A payment voucher always carries the date its money moves on |
+| `570ddbf9` | A modal closes on a click, not on a selection that ended outside it |
+| `6b15b163` | Finance decides which departments bill their payroll back, not the program |
+| `74d33192` | Settling an invoice no longer walks you out of Billing |
+| `7dbd48fe` | An adjustment invoice itemises like the invoice it adjusts |
+| `2db60d99` | An adjustment line can be read back by the next reconciliation |
+
+Migrations live: `20260929010000_ar_by_customer_resolver`,
+`20260929020000_ar_by_customer_split`, `20260929030000_pv_payment_date_default_today`,
+`20260929040000_dept_own_share_billback`.
+
+### The HR August question — OPEN, waiting on HR
+
+The user asked to bill HR's August payroll back. Reading the records first
+changed the answer, so this is the state to resume from:
+
+- **July**: HR's 3 staff were each allocated **HOUZS Century 50% / The Cont 35% /
+  Carres 15%**, totalling 100%, so its whole 21,803.06 was billed to subsidiaries
+  and there was no own share left.
+- **August**: `hr_staff_allocation` has **no HR rows at all**, so the whole
+  **16,164.65** (4 staff, employer cost: basic 12,377.42 + allowance 1,923.08 +
+  EPF 1,637.00 + SOCSO 203.85 + EIS 23.30) sat in HR's own pool.
+- The user's decision: **bill it to the subsidiaries the way July did**, NOT back
+  to Venture Office. Projected: HC 8,082.33 / The Cont 5,657.63 / Carres 2,424.70.
+- **HR fills the allocation, not Finance** (HR Costing → Allocation, permission
+  `hr_costing`; Finance's Billing Allocator can only import a filled month).
+  User: "那就让 hr 自己去填, 我是 finance 的工作, 只负责开 bill 收钱".
+- Once filled: Billing → **对数补差** → preview → one draft adjustment invoice per
+  under-billed company → review → Approve & issue. Everything it needs is
+  verified: HR is in PAYROLL_DEPT_TO_SEGMENT, August payroll rows are
+  `submitted`, the period is open, all three companies have an August invoice,
+  and the original lines carry a single category (5050), which the generator
+  requires.
+- The own-share invoice for August (`HV-INV-202608-0050`, 1,729.88, Director
+  Office + Finance) is already paid and is NOT touched by any of this.
+
+### Decisions the user made — do not undo them
+
+- **The double-prorata split in `get_staff_billing_allocation` /
+  `get_staff_own_share_allocation` stays unfixed.** They re-prorate an already
+  prorated `basic_salary`, so for anyone who did not work a full month part of
+  Salary is labelled Allowance (Aug-2026 IT TAN YONG HONG 29/31: 271.59, i.e.
+  135.80 on each of HV-INV-202608-0035 / -0036). Totals, account (all lines Cr
+  5050), segment, AR, pools and 对数补差 are unaffected. User: "rpc 不修, 那个是
+  hr 决定不是我决定的".
+- **Those two issued invoices stay as they are** — the user said 改 and then
+  "等一下, invoice remain" before anything was touched.
+- HR's August own share going to subsidiaries rather than Venture Office means
+  the new bill-back switch stays OFF for HR.
+
+### What the switch is (and is not)
+
+`departments.own_share_billback` decides only what happens to the payroll a
+department did NOT bill to a subsidiary: back to Venture Office, or stays in its
+own pool. HR's allocation decides the other, larger half. Seeded exactly as the
+old literal held (Finance / Director Office / Director / IT on; HR / Marketing /
+Revenue Department off), so nothing moved when it shipped. Set in Settings →
+Departments; the own-share dialog lists every department with a residual, ticks
+the registry's answer, and a tick changed there applies to that run only.
+`OWN_SHARE_SEGMENTS` is gone from `lib/staff-allocation.ts`.
+
+### Still open
+
+- **9月 consolidated payroll invoice**: cannot be generated yet — all 56 September
+  payroll rows are `draft` (24 carried forward + **32 Revenue Department rows,
+  `source = commission`**, the first month that department appears). The
+  allocation RPC only reads `submitted`/`paid`.
+- 5 PVs pending approval, 2 draft invoices from 9/17 the user deliberately left.
+- Liang / Cont terms change still NOT applied (user: 记起来先、别做先).
+- External customers still share 3039 "AR - Other customers".
+
+### Traps this session hit
+
+- **Deploy order matters when the DB change breaks the OLD code.** The AR split
+  ran 24 minutes before the new code was live; every settlement in that window
+  created a voucher then failed at the source-row insert, leaving 8 ghost
+  vouchers and 3 invoices wrongly marked paid (cleaned up, invoices reset to
+  issued). An additive column (own_share_billback, a DEFAULT) is safe either way
+  and went in before the code; anything the old code would choke on does not.
+- A backdrop that closes on `click` closes when a text selection merely ENDS on
+  it — the click fires on the common ancestor of mousedown and mouseup.
+  `backdropDismiss()` in `src/components/modal-dismiss.tsx` requires the press to
+  start there too, and its ref binds Esc while mounted. 22 backdrops, 19 files.
+- A `use server` file cannot export a plain function, so a pure helper written
+  there cannot be unit-tested; `componentOfLine` moved to `lib/` for that reason.
+- `vitest run` has ONE pre-existing failure, `src/lib/erp-sync/catalogue.test.ts`
+  (the other session's ERP catalogue work). It fails on a clean HEAD too.
+
 ## CHECKPOINT 2026-09-24 (SHIPPED) — ERP catalogue mirror, items only; every margin at the portal's own prices; the catalogue syncs live
 
 **All merged and deployed.** VP **#147** (`f0f6463`, Vercel prod); ERP
