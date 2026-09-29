@@ -2144,7 +2144,25 @@ export async function approveInvoice(formData: FormData) {
       }
     } catch (jeErr) {
       const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
-      throw new Error(`Invoice issued but AR accrual JE failed: ${msg}`)
+      // The JE is what makes an issue real. Leaving the invoice "issued"
+      // with nothing in the ledger is worse than not issuing it at all
+      // (2026-09-29: HV-INV-202609-0044 sat issued and unposted), so put it
+      // back to draft and let Finance retry. Production masks the message a
+      // server action throws, so the cause goes to the server log too.
+      console.error('approveInvoice: AR accrual JE failed', {
+        invoice: inv.invoice_no ?? inv.id,
+        billingMode: inv.billing_mode,
+        amount,
+        message: msg,
+      })
+      await supabase
+        .from('invoices')
+        .update({ status: 'draft' })
+        .eq('id', inv.id)
+        .eq('status', 'issued')
+      throw new Error(
+        `Could not issue ${inv.invoice_no ?? inv.id}: the AR journal entry failed (${msg}). The invoice is back to draft.`,
+      )
     }
 
     // Inter-billing: post expense JE at invoice issue so that the paying
@@ -2204,6 +2222,12 @@ export async function approveInvoice(formData: FormData) {
         })
       } catch (jeErr) {
         const msg = jeErr instanceof Error ? jeErr.message : 'unknown'
+        console.error('approveInvoice: inter-billing expense JE failed', {
+          invoice: inv.invoice_no ?? inv.id,
+          payingDept: payingDept.name,
+          amount,
+          message: msg,
+        })
         throw new Error(`Invoice issued but inter-billing expense JE failed: ${msg}`)
       }
     }
