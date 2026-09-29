@@ -168,6 +168,26 @@ describe('commission workbench ledger', () => {
     reconcile(withKpi)
   })
 
+  it('names every holder of a shared bill on each part, the owner first (2026-09-30)', () => {
+    const source = input()
+    source.orders = [...splitOrdersByShares([sale('one')], [{ orderId: 'one', staffId: 'leader', pct: 0.5 }]), sale('two')]
+    const board = buildCommissionWorkbench(source, { people: [{ staffId: 'agent', name: 'ADRIAN' }, { staffId: 'leader', name: 'ANTHONY' }] })
+    const parts = board.personalRows.filter(row => row.orderId === 'one')
+    expect(parts.map(row => row.staffId)).toEqual(['agent', 'leader'])
+    for (const row of parts) {
+      expect(row.share).toEqual({
+        ownerStaffId: 'agent', ownerName: 'ADRIAN',
+        parts: [{ staffId: 'agent', name: 'ADRIAN', pct: 0.5 }, { staffId: 'leader', name: 'ANTHONY', pct: 0.5 }],
+        wholeTotal: 1_000,
+      })
+    }
+    // The upline's override row is the downline's part, and says so too.
+    const overrides = board.overridingRows.filter(row => row.orderId === 'one')
+    expect(overrides).toHaveLength(1)
+    expect(overrides[0].share?.ownerName).toBe('ADRIAN')
+    expect(board.personalRows.find(row => row.orderId === 'two')?.share).toBeNull()
+  })
+
   it('preserves shared-bill original IDs and excludes/restores every holder and upline together', () => {
     const source = input()
     source.orders = splitOrdersByShares([sale('one')], [{ orderId: 'one', staffId: 'leader', pct: 0.5 }])
