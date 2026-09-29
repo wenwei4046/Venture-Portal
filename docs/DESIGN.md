@@ -848,6 +848,29 @@ read-only, the name a link to Director Salary). The page's rules:
   which (*Second payroll · editing* / *Second payroll ready*). A row that can
   take neither shows one disabled *Resubmit · Second payroll* item with the
   reason.
+- **Department mode** (2026-09-30): a department is a *Cost center* or
+  *Centralized*. Its switch is `.dept-mode-switch` — a 30px pill holding a
+  34×20 track and the current mode's name, on (accent track, accent wash) =
+  Centralized. On a department's own page it sits in a `.dept-mode` strip right
+  under the page head: `HR · DEPARTMENT MODE` eyebrow, the switch, then one line
+  on what the mode means; in Settings › Departments it is the *Mode* column's
+  cell. Flipping it never acts at once — an inline `.dept-mode-ask` panel (accent
+  wash) says what will happen (*HR leaves Billing Allocation … 3 splits on
+  payroll still in draft will be cleared*) with *Switch to Centralized* and
+  *Cancel*. Somebody who may not switch sees it disabled and *Switched by the
+  Principal.*
+- **Billing Allocation follows the grid** (2026-09-30): one card per payroll row
+  of a cost-center department, in the grid's order (centralized departments are
+  named under the title instead — *Not listed: Marketing (12) and Revenue
+  Department (32) — centralized …*), with the status chip beside the name in the grid's words
+  (`Draft` plain · `Completed 30 Sep` ledger · `With Finance` alert · `Paid`
+  ledger · `Resubmit · editing` / `Resubmit ready` accent · `Closed for good`).
+  Past draft a card is frozen — company selects and % inputs disabled, no
+  *+ Company* / *Save* / ✕ — and its foot names the way back instead of the
+  buttons: *Locked with their pay · Unlock them on HR › Payroll to change it*
+  (or *Reopen them on Comm Cal* / *Resubmit them on HR › Payroll*). The status
+  line under the title counts them (`… · 3 locked with their payroll`), and
+  *Copy from last month* hides once nobody can take a split.
 
 ### Org chart canvas (v3.4, 2026-09-09 — Revenue › Staff Hierarchy)
 
@@ -2381,6 +2404,8 @@ If adding a new component to vocabulary, update this doc first.
 ## Change Log
 
 - **2026-09-30 (payroll: every figure a field)** — HR › Payroll's Deductions group gains EPF EE · SOCSO EE · EIS EE · PCB as `.pg-in` fields beside Unpaid · Deduct · SKBBK, and the Employer group's EPF · SOCSO · EIS become fields too (user: 在这个 payroll tab 那边，所有的东西基本上都应该是可以被 editable 的). A figure somebody typed keeps an accent dot (`.pg-in.manual`, legend *typed over JADUAL*) and stays through later edits until *Reset statutory to JADUAL* (⋯ menu, paycheck). The paycheck window's read-only *Computed · ER / EE* column becomes an Employer section of fields over a Computed block of pro-rata, cost to company, gross and net. The row's ▾ is gone — the name and the ⋯ menu's *Open paycheck* already opened the same window. See "Payroll grid".
+- **2026-09-30 (the split follows the payroll)** — HR › Billing Allocation reads like the Payroll grid it belongs to: its cards come in the grid's order, each carries the person's payroll status chip, and a card past draft freezes with a one-line way back at its foot instead of *+ Company* / *Save*. See "Payroll batches".
+- **2026-09-30 (department mode)** — A department is a cost center or centralized, and says so: the `.dept-mode` strip under the page head of HR Costing, Service Billing, Director Pool and the new Revenue › Department page, and a *Mode* column in Settings › Departments — the same pill switch everywhere, asking inline before it acts. Billing Allocation lists cost-center people only and names the centralized departments it leaves out. See "Payroll batches".
 - **2026-09-30 (review tabs)** — Comm Cal's month: *Drops and upsells the ERP found* and *Possible double claims* leave the top of the page for the end of the workbench rail — **Drops & upsells** (`?view=changes`, with *Bills of another month's fair* under it) and **Double claims** (`?view=claims`), both in the workbench's table design, each tab's count in an alert-tone badge while something waits. Every double claim is now a card that says why it is there — verdict chip, headline, findings, *What to do*, the bills side by side with a Match column, and each bill's history as a timeline (`double-claims.module.css`). The months list links its double-claim count to the tab; a bill opened from it leads back with *← Double claims*. See "Tabbed pages".
 - **2026-09-30 (share)** — A bill is shared from its right-click. The bill menu on a salesperson's ledger and on Sales orders gains *Share this bill…* above *Don't count*: an adjacent form panel — **Share with** (the team, the owner never offered, somebody closed greyed with why), **Their part** (a % field, 50 to start), a line saying what Save leaves, Cancel / **Save** (a new peach primary row, `.menu button.primary`) and *Stop sharing with …* rows once shared. The notice above the table names the holders, with **Open NAME** and *Undo*. On the ledger a shared row carries a peach `From ADRIAN's bill` / `Shared with ANTHONY` tag under its number, a new first optional column **Sales person** names every holder with their part, and Sales value says *50% of RM X*. See "Bill context menu".
 - **2026-09-28 (quiet until asked)** — Comm Cal's month folds what it explains. The payroll bar is one line (chevron · `PAYROLL · SEPTEMBER 2026` · dot + state · one tag: *N to settle* / *Moved since* / *Payroll closed*) and opens on a click; *Bills priced RM 0* folds to its headline the same way (`.fold` / `.foldMark`). The month's real switches (*This month pays*) leave the bar's foot for the top of **Review settings** (`.monthPays`), whose *Calculation setup* fold and preview-only KPI / Open Bill / Margin checkboxes are removed — one set of switches on the page; the current-team preview stays, and the summary shows a *Draft* tag while a draft is open. See "The payroll bar" under Tabbed pages.

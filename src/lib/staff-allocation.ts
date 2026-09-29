@@ -7,6 +7,7 @@
 // breakdown Finance bills (Salary / Allowance / EPF / SOCSO / EIS).
 
 import dayjs from 'dayjs'
+import { dayLabel, topupKindLabel, type RowStatus, type TopupKind } from '@/lib/payroll-lifecycle'
 
 export interface AllocationRow {
   companyId: string
@@ -89,6 +90,182 @@ export function allocationPreview(
     hvAmount = 0
   }
   return { lines, billedTotal, hvAmount }
+}
+
+// ─── The split follows the payroll row (2026-09-30) ──────────────────────────
+//
+// User 2026-09-30: once somebody's payroll is Completed their billing split
+// must not change. The split takes the payroll row's own lock — it changes
+// only while the row is a draft (a Resubmit or Second payroll makes it one
+// again while that is open), never in a month Closed for good — and every
+// split row belongs to a payroll row, so the editor lists exactly the payroll's
+// people. The database refuses the same, in the same words
+// (guard_staff_allocation_follows_payroll); these decide what the page offers.
+
+export interface SplitLockInput {
+  status: RowStatus
+  /** Paid through the Revenue team: completed by their close on Comm Cal. */
+  revenue: boolean
+  completedAt: string | null
+  /** Set while the row is unlocked for a Resubmit or a Second payroll. */
+  topupOpenedAt: string | null
+  topupKind: TopupKind | null
+  monthClosed: boolean
+}
+
+export interface SplitLock {
+  locked: boolean
+  /** The chip beside the name: where the person's pay stands. */
+  label: string
+  tone: 'muted' | 'accent' | 'alert' | 'ledger'
+  /** How a refusal names the state ('Completed', 'with Finance', 'paid'). */
+  state: string | null
+  /** What to do, and where, to change the split. Null while it can change. */
+  wayBack: string | null
+}
+
+/** Whether one person's split can change, and what the card says about it. */
+export function splitLock(input: SplitLockInput): SplitLock {
+  if (input.monthClosed) {
+    return { locked: true, label: 'Closed for good', tone: 'ledger', state: 'closed for good', wayBack: null }
+  }
+  const topup = input.topupOpenedAt != null
+  switch (input.status) {
+    case 'completed':
+      return {
+        locked: true,
+        label: topup
+          ? `${topupKindLabel(input.topupKind)} ready`
+          : `Completed ${dayLabel(input.completedAt)}`.trim(),
+        tone: topup ? 'accent' : 'ledger',
+        state: 'Completed',
+        wayBack: input.revenue ? 'Reopen them on Comm Cal' : 'Unlock them on HR › Payroll',
+      }
+    case 'submitted':
+      return { locked: true, label: 'With Finance', tone: 'alert', state: 'with Finance', wayBack: 'Resubmit them on HR › Payroll' }
+    case 'paid':
+      return { locked: true, label: 'Paid', tone: 'ledger', state: 'paid', wayBack: 'Resubmit them on HR › Payroll' }
+    case 'draft':
+    default:
+      return topup
+        ? { locked: false, label: `${topupKindLabel(input.topupKind)} · editing`, tone: 'accent', state: null, wayBack: null }
+        : { locked: false, label: 'Draft', tone: 'muted', state: null, wayBack: null }
+  }
+}
+
+/**
+ * The refusal, word for word what the database raises:
+ * "TAN YONG HONG's September 2026 pay is Completed — its billing split is
+ * locked with it. Unlock them on HR › Payroll to change it".
+ */
+export function splitLockMessage(name: string, monthLabel: string, lock: SplitLock): string {
+  if (lock.wayBack == null) {
+    return `Payroll for ${monthLabel} is closed for good — its billing splits cannot change`
+  }
+  return `${name}'s ${monthLabel} pay is ${lock.state} — its billing split is locked with it. ${lock.wayBack} to change it`
+}
+
+/**
+ * Where somebody on this month's payroll stands for a split: `open` may take
+ * one; `locked` is past draft (their split stays as it left); `centralized`
+ * belongs to a department that bills by invoice and is never split.
+ */
+export type SplitStanding = 'open' | 'locked' | 'centralized'
+
+export interface SplitCopyPlan<T> {
+  /** Last month's rows to write into this month. */
+  rows: T[]
+  /** People whose split is copied. */
+  copied: number
+  /** On this month's payroll but past draft — their split is left alone. */
+  locked: number
+  /** In a centralized department now — billed by invoice, not split. */
+  centralized: number
+  /** Split last month, not on this month's payroll — nothing to split. */
+  notOnPayroll: number
+}
+
+/**
+ * Copy from last month, person by person: only somebody on this month's
+ * payroll, still open, with no split of their own yet. Anybody already split
+ * this month is left alone and not counted — the copy never overwrites.
+ *
+ * `payroll` maps this month's staff_id → where they stand.
+ */
+export function planSplitCopy<T extends { staff_id: string }>(
+  lastMonth: readonly T[],
+  payroll: ReadonlyMap<string, SplitStanding>,
+  alreadySplit: ReadonlySet<string>,
+): SplitCopyPlan<T> {
+  const rows: T[] = []
+  const copied = new Set<string>()
+  const locked = new Set<string>()
+  const centralized = new Set<string>()
+  const notOnPayroll = new Set<string>()
+  for (const r of lastMonth) {
+    if (alreadySplit.has(r.staff_id)) continue
+    const standing = payroll.get(r.staff_id)
+    if (standing === undefined) notOnPayroll.add(r.staff_id)
+    else if (standing === 'centralized') centralized.add(r.staff_id)
+    else if (standing === 'locked') locked.add(r.staff_id)
+    else {
+      rows.push(r)
+      copied.add(r.staff_id)
+    }
+  }
+  return {
+    rows,
+    copied: copied.size,
+    locked: locked.size,
+    centralized: centralized.size,
+    notOnPayroll: notOnPayroll.size,
+  }
+}
+
+/** What a copy did, including who it left alone and why. */
+export function splitCopyNote(
+  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'> & { centralized?: number },
+): string {
+  const { copied, locked, notOnPayroll } = counts
+  const centralized = counts.centralized ?? 0
+  const were = (n: number) => (n === 1 ? 'was' : 'were')
+  const parts: string[] = []
+  if (copied > 0) parts.push(`Copied splits for ${copied} staff.`)
+  if (locked > 0) parts.push(`${locked} locked with their payroll ${were(locked)} left alone.`)
+  if (centralized > 0) {
+    parts.push(`${centralized} in a centralized department ${were(centralized)} skipped.`)
+  }
+  if (notOnPayroll > 0) {
+    parts.push(`${notOnPayroll} not on this month's payroll ${were(notOnPayroll)} skipped.`)
+  }
+  return parts.length > 0
+    ? parts.join(' ')
+    : 'Nothing to copy — no last-month splits, or everyone already set.'
+}
+
+/**
+ * Who Billing Allocation lists (2026-09-30): everybody on the month's payroll
+ * in a cost-center department — and anybody else who still HAS a split (a
+ * department switched to centralized after their pay was Completed keeps the
+ * split it left with, and the page must never hide money that will be billed).
+ * The rest — centralized departments, billed by invoice — are counted per
+ * department so the page can say why they are not there.
+ */
+export function allocationRoster<T extends { dept: string; centralized: boolean; hasSplit: boolean }>(
+  rows: readonly T[],
+): { listed: T[]; notListed: Array<{ dept: string; people: number }> } {
+  const listed: T[] = []
+  const notListed = new Map<string, number>()
+  for (const r of rows) {
+    if (!r.centralized || r.hasSplit) listed.push(r)
+    else notListed.set(r.dept, (notListed.get(r.dept) ?? 0) + 1)
+  }
+  return {
+    listed,
+    notListed: [...notListed.entries()]
+      .map(([dept, people]) => ({ dept, people }))
+      .sort((a, b) => a.dept.localeCompare(b.dept)),
+  }
 }
 
 // ─── Invoice line breakdown (user sample 2026-07-03) ─────────────────────────

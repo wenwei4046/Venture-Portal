@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { splitCopyNote } from '@/lib/staff-allocation'
 import { copyAllocationsFromLastMonth } from '../actions'
 
 export default function CopyAllocationsButton({ period }: { period: string }) {
@@ -13,11 +14,15 @@ export default function CopyAllocationsButton({ period }: { period: string }) {
     setNote(null)
     startTransition(async () => {
       try {
-        const { copiedStaff } = await copyAllocationsFromLastMonth(period)
+        const { copiedStaff, lockedStaff, centralizedStaff, notOnPayrollStaff } =
+          await copyAllocationsFromLastMonth(period)
         setNote(
-          copiedStaff === 0
-            ? 'Nothing to copy — no last-month splits, or everyone already set.'
-            : `Copied splits for ${copiedStaff} staff.`,
+          splitCopyNote({
+            copied: copiedStaff,
+            locked: lockedStaff,
+            centralized: centralizedStaff,
+            notOnPayroll: notOnPayrollStaff,
+          }),
         )
         router.refresh()
       } catch (e) {

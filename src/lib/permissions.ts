@@ -33,6 +33,7 @@ export const PERMISSIONS = [
   'reconciliation',
   'audit_log',
   'settings',
+  'department_mode',
   'override',
   'permissions_manage',
   'member_portal',

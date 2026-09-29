@@ -22,6 +22,7 @@ import GenerateConsolidatedInvoicesButton from './GenerateConsolidatedInvoicesBu
 import ReconcilePayrollBillingButton from './ReconcilePayrollBillingButton'
 import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
 import LedgerRow from '@/components/LedgerRow'
+import DepartmentModeCard from '@/components/department/DepartmentModeCard'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -508,6 +509,9 @@ export default async function BillingView({ searchParams }: Props) {
           )}
         </div>
       </div>
+
+      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}
+      <DepartmentModeCard segmentKey="finance" />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
         <div className="lg:col-span-7">

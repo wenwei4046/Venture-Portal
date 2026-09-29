@@ -2697,6 +2697,7 @@ export type Database = {
       departments: {
         Row: {
           billing_mode_key: string | null
+          cost_model: string
           created_at: string
           id: string
           is_internal: boolean
@@ -2708,6 +2709,7 @@ export type Database = {
         }
         Insert: {
           billing_mode_key?: string | null
+          cost_model?: string
           created_at?: string
           id?: string
           is_internal?: boolean
@@ -2719,6 +2721,7 @@ export type Database = {
         }
         Update: {
           billing_mode_key?: string | null
+          cost_model?: string
           created_at?: string
           id?: string
           is_internal?: boolean
@@ -7720,6 +7723,22 @@ export type Database = {
       delete_manual_journal_voucher: {
         Args: { p_entry_id: string }
         Returns: undefined
+      }
+      department_modes: {
+        Args: never
+        Returns: {
+          can_switch: boolean
+          cost_model: string
+          id: string
+          is_internal: boolean
+          name: string
+          open_split_people: number
+          segment_key: string | null
+        }[]
+      }
+      department_set_cost_model: {
+        Args: { p_cost_model: string; p_department_id: string }
+        Returns: Json
       }
       dept_invoice_settlements: {
         Args: { p_segment?: Database["public"]["Enums"]["gl_segment"] }

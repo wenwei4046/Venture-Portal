@@ -8,7 +8,7 @@
 
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
-import { PRODUCT_LIST_PATH, revenuePath } from '@/lib/revenue'
+import { PRODUCT_LIST_PATH, REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
 import {
   canAccessAuditLog,
   canAccessCategories,
@@ -279,6 +279,9 @@ export function buildNavEntries(data: NavData): NavEntry[] {
         { href: PRODUCT_LIST_PATH, label: 'Product List', visible: canAccessProductList },
         // Venues went on 2026-09-27: the ERP names every bill's fair — venue,
         // organiser and days — so nothing about a fair is typed here any more.
+        // The department as a whole (2026-09-30): its mode, cost center or
+        // centralized — later its pool.
+        { href: REVENUE_DEPARTMENT_PATH, label: 'Department', visible: canAccessRevenue },
       ],
     },
     { href: '/claims', label: 'Claims', section: 'Departments', visible: canAccessClaims },

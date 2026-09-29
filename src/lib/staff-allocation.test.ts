@@ -7,8 +7,15 @@ import {
   buildAllocationInvoiceLines,
   buildConsolidatedInvoiceLines,
   PAYROLL_SEGMENT_LABEL,
+  allocationRoster,
+  planSplitCopy,
+  splitCopyNote,
+  splitLock,
+  splitLockMessage,
   type AllocationRow,
   type DeptComponentGroup,
+  type SplitLockInput,
+  type SplitStanding,
 } from './staff-allocation'
 
 describe('validateAllocationRows', () => {
@@ -234,5 +241,171 @@ describe('buildConsolidatedInvoiceLines', () => {
     expect(PAYROLL_SEGMENT_LABEL.hr).toBe('HR')
     expect(PAYROLL_SEGMENT_LABEL.finance).toBe('Finance')
     expect(PAYROLL_SEGMENT_LABEL.director_office).toBe('Director Office')
+  })
+})
+
+// ─── The split follows the payroll row (2026-09-30) ──────────────────────────
+// User 2026-09-30: once somebody's payroll is Completed, their billing split
+// must not be editable any more.
+
+describe('splitLock', () => {
+  const base: SplitLockInput = {
+    status: 'draft',
+    revenue: false,
+    completedAt: null,
+    topupOpenedAt: null,
+    topupKind: null,
+    monthClosed: false,
+  }
+
+  it('leaves a draft editable', () => {
+    expect(splitLock(base)).toEqual({ locked: false, label: 'Draft', tone: 'muted', state: null, wayBack: null })
+  })
+
+  it('locks somebody Completed on Payroll, and says Unlock is the way back', () => {
+    const lock = splitLock({ ...base, status: 'completed', completedAt: '2026-09-30T02:00:00Z' })
+    expect(lock).toMatchObject({ locked: true, label: 'Completed 30 Sep', tone: 'ledger', wayBack: 'Unlock them on HR › Payroll' })
+  })
+
+  it('sends a salesperson back to Comm Cal, where their close is their Complete', () => {
+    const lock = splitLock({ ...base, status: 'completed', revenue: true, completedAt: '2026-09-30T02:00:00Z' })
+    expect(lock).toMatchObject({ locked: true, wayBack: 'Reopen them on Comm Cal' })
+  })
+
+  it('locks somebody with Finance or paid, and says Resubmit is the way back', () => {
+    expect(splitLock({ ...base, status: 'submitted' })).toMatchObject({
+      locked: true, label: 'With Finance', tone: 'alert', wayBack: 'Resubmit them on HR › Payroll',
+    })
+    expect(splitLock({ ...base, status: 'paid' })).toMatchObject({
+      locked: true, label: 'Paid', tone: 'ledger', wayBack: 'Resubmit them on HR › Payroll',
+    })
+  })
+
+  it('opens again while a Resubmit or Second payroll has the row back in draft', () => {
+    const at = '2026-10-02T02:00:00Z'
+    expect(splitLock({ ...base, topupOpenedAt: at, topupKind: 'resubmit' })).toMatchObject({
+      locked: false, label: 'Resubmit · editing', tone: 'accent',
+    })
+    expect(splitLock({ ...base, topupOpenedAt: at, topupKind: 'second_payroll' })).toMatchObject({
+      locked: false, label: 'Second payroll · editing',
+    })
+    // …and locks again once that is Completed.
+    expect(splitLock({ ...base, status: 'completed', topupOpenedAt: at, topupKind: 'resubmit' })).toMatchObject({
+      locked: true, label: 'Resubmit ready', tone: 'accent', wayBack: 'Unlock them on HR › Payroll',
+    })
+  })
+
+  it('locks everybody in a month Closed for good, drafts included', () => {
+    expect(splitLock({ ...base, monthClosed: true })).toMatchObject({ locked: true, label: 'Closed for good', wayBack: null })
+  })
+})
+
+describe('splitLockMessage', () => {
+  // Word for word what guard_staff_allocation_follows_payroll raised in the
+  // 2026-09-30 dry run against the live schema.
+  const month = 'September 2026'
+  const lockOf = (input: Partial<SplitLockInput>) =>
+    splitLock({ status: 'draft', revenue: false, completedAt: null, topupOpenedAt: null, topupKind: null, monthClosed: false, ...input })
+
+  it('names the person, the month, the state and the way back', () => {
+    expect(splitLockMessage('TAN YONG HONG', month, lockOf({ status: 'completed' }))).toBe(
+      "TAN YONG HONG's September 2026 pay is Completed — its billing split is locked with it. Unlock them on HR › Payroll to change it",
+    )
+    expect(splitLockMessage('TAN YONG HONG', month, lockOf({ status: 'submitted' }))).toBe(
+      "TAN YONG HONG's September 2026 pay is with Finance — its billing split is locked with it. Resubmit them on HR › Payroll to change it",
+    )
+    expect(splitLockMessage('TAN YONG HONG', month, lockOf({ status: 'paid' }))).toBe(
+      "TAN YONG HONG's September 2026 pay is paid — its billing split is locked with it. Resubmit them on HR › Payroll to change it",
+    )
+    expect(splitLockMessage('STANLEY', month, lockOf({ status: 'completed', revenue: true }))).toBe(
+      "STANLEY's September 2026 pay is Completed — its billing split is locked with it. Reopen them on Comm Cal to change it",
+    )
+  })
+
+  it('says a closed month cannot change at all', () => {
+    expect(splitLockMessage('TAN YONG HONG', month, lockOf({ monthClosed: true }))).toBe(
+      'Payroll for September 2026 is closed for good — its billing splits cannot change',
+    )
+  })
+})
+
+describe('planSplitCopy', () => {
+  const last = [
+    { staff_id: 'tyh', company_id: 'hc', allocation_pct: 0.5 },
+    { staff_id: 'tyh', company_id: 'car', allocation_pct: 0.25 },
+    { staff_id: 'cwh', company_id: 'hc', allocation_pct: 1 },
+    { staff_id: 'gone', company_id: 'hc', allocation_pct: 0.4 },
+    { staff_id: 'set', company_id: 'car', allocation_pct: 0.3 },
+    { staff_id: 'mkt', company_id: 'hc', allocation_pct: 0.2 },
+  ]
+
+  it('copies only people on this month’s payroll, still open, not split yet', () => {
+    const payroll = new Map<string, SplitStanding>([
+      ['tyh', 'open'],
+      ['cwh', 'locked'],
+      ['set', 'open'],
+      ['mkt', 'centralized'],
+    ])
+    const plan = planSplitCopy(last, payroll, new Set(['set']))
+    expect(plan.rows.map((r) => `${r.staff_id}:${r.company_id}`)).toEqual(['tyh:hc', 'tyh:car'])
+    expect(plan).toMatchObject({ copied: 1, locked: 1, centralized: 1, notOnPayroll: 1 })
+  })
+
+  it('copies nothing when last month had no splits', () => {
+    expect(planSplitCopy([], new Map<string, SplitStanding>([['tyh', 'open']]), new Set())).toEqual({
+      rows: [],
+      copied: 0,
+      locked: 0,
+      centralized: 0,
+      notOnPayroll: 0,
+    })
+  })
+})
+
+describe('allocationRoster', () => {
+  // User 2026-09-30: a centralized department bills by invoice, so it is not
+  // on Billing Allocation's name list.
+  const row = (name: string, dept: string, centralized: boolean, hasSplit = false) => ({ name, dept, centralized, hasSplit })
+
+  it('lists cost-center people and names the centralized departments it leaves out', () => {
+    const { listed, notListed } = allocationRoster([
+      row('TAN YONG HONG', 'IT', false),
+      row('STANLEY', 'Revenue Department', true),
+      row('WONG JOEY', 'Marketing', true),
+      row('CHEW WEE HO', 'Finance', false),
+      row('ANTHONY', 'Revenue Department', true),
+    ])
+    expect(listed.map((r) => r.name)).toEqual(['TAN YONG HONG', 'CHEW WEE HO'])
+    expect(notListed).toEqual([
+      { dept: 'Marketing', people: 1 },
+      { dept: 'Revenue Department', people: 2 },
+    ])
+  })
+
+  it('never hides somebody who still has a split, whatever their department is now', () => {
+    const { listed, notListed } = allocationRoster([row('LI SEAN', 'HR', true, true), row('NURAZIRA', 'HR', true)])
+    expect(listed.map((r) => r.name)).toEqual(['LI SEAN'])
+    expect(notListed).toEqual([{ dept: 'HR', people: 1 }])
+  })
+})
+
+describe('splitCopyNote', () => {
+  it('says what was copied and who was left alone', () => {
+    expect(splitCopyNote({ copied: 5, locked: 2, notOnPayroll: 1 })).toBe(
+      "Copied splits for 5 staff. 2 locked with their payroll were left alone. 1 not on this month's payroll was skipped.",
+    )
+    expect(splitCopyNote({ copied: 0, locked: 1, notOnPayroll: 0 })).toBe('1 locked with their payroll was left alone.')
+  })
+
+  it('says who a centralized department kept out', () => {
+    expect(splitCopyNote({ copied: 2, locked: 0, centralized: 3, notOnPayroll: 0 })).toBe(
+      'Copied splits for 2 staff. 3 in a centralized department were skipped.',
+    )
+  })
+
+  it('keeps the old line when there was nothing to do', () => {
+    expect(splitCopyNote({ copied: 0, locked: 0, notOnPayroll: 0 })).toBe(
+      'Nothing to copy — no last-month splits, or everyone already set.',
+    )
   })
 })

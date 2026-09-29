@@ -20,7 +20,7 @@
  * named "Products" would be unreachable rather than broken — silent, and
  * discovered only by whoever created it. `createSubDepartment` rejects these.
  */
-export const RESERVED_SUB_DEPT_SLUGS: readonly string[] = ['products']
+export const RESERVED_SUB_DEPT_SLUGS: readonly string[] = ['products', 'department']
 
 export function subDeptSlug(name: string): string {
   return name
@@ -37,6 +37,9 @@ export function revenuePath(slug: string, ...segments: Array<string | number>): 
 
 /** Item code → unit cost + brand. Department-wide, so it sits outside a slug. */
 export const PRODUCT_LIST_PATH = '/revenue/products'
+
+/** The Revenue Department as a whole: its mode (2026-09-30), later its pool. */
+export const REVENUE_DEPARTMENT_PATH = '/revenue/department'
 
 /** What `pickHomeSubDepartments` needs to know about a sub-department. */
 export interface HomeCandidate {
