@@ -4,26 +4,28 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import type { EngineInput, Rank, SalesOrder } from '@/lib/commission/types'
 import { buildPayRow } from '@/lib/revenue-pay'
 import { upsalesToOrders } from '@/lib/commission/upsales'
+import { splitOrdersByShares } from '@/lib/commission/shares'
+import { parseCloseSummary } from '@/lib/commission/closes'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import CommissionWorkbench, { type PayrollBarFacts } from './CommissionWorkbench'
 
 // The salary preview's pay-line editor saves through a server action (its own tests are SalaryCalculation.test).
 vi.mock('../../../pay-line-actions', () => ({ savePayLines: vi.fn() }))
 
-const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, setOrderBrand, url } = vi.hoisted(() => {
+const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, url } = vi.hoisted(() => {
   // Next re-renders `useSearchParams` from the browser's own pushState and
   // replaceState; the stand-in does the same through this subscription.
   const listeners = new Set<() => void>()
   return {
     saveOpenPicks: vi.fn(), refresh: vi.fn(), push: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn(),
-    setOrderBrand: vi.fn(),
+    setOrderBrand: vi.fn(), shareOrder: vi.fn(), unshareOrder: vi.fn(),
     url: {
       subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
       changed() { for (const listener of listeners) listener() },
     },
   }
 })
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, setOrderBrand }))
+vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder }))
 vi.mock('../../../close-actions', () => ({ closeSalespeople: vi.fn(), reopenSalespeople: vi.fn() }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
@@ -359,6 +361,46 @@ describe('CommissionWorkbench', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search venues' }), { target: { value: 'fair co' } })
     expect(within(table).queryByText('Hall')).toBeNull()
     expect(salesRow(table, 'Visible venues')).toHaveTextContent('RM 3,000.00')
+  })
+
+  // The two panels that sat above the month's cards became the rail's last
+  // two tabs (user 2026-09-30: 把这两个 move 去 … 让它们形成两个 tab).
+  it('carries the month’s review panels as the last two tabs, counting what waits in each', () => {
+    const reviews = {
+      changes: { panel: <section aria-label="Drops and upsells the ERP found">HC13254 upsell</section>, count: 2 },
+      claims: { panel: <section aria-label="Possible double claims">HC11357 — already claimed</section>, count: 8 },
+    }
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
+      monthOverview={<h1>August 2026</h1>} reviews={reviews} />)
+    const tabs = within(screen.getByRole('tablist', { name: 'Commission views' })).getAllByRole('tab')
+    expect(tabs.slice(-2).map(t => t.textContent)).toEqual(['Drops & upsells2', 'Double claims8'])
+    // Not stacked above the cards any more: only in their tabs.
+    expect(screen.queryByRole('region', { name: 'Possible double claims' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Drops and upsells the ERP found' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: /^Double claims/ }))
+    expect(window.location.search).toBe('?view=claims')
+    expect(screen.getByRole('tab', { name: /^Double claims/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('region', { name: 'Possible double claims' })).toHaveTextContent('HC11357 — already claimed')
+    expect(screen.queryByRole('table', { name: 'Salesperson commission summary' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: /^Drops & upsells/ }))
+    expect(window.location.search).toBe('?view=changes')
+    expect(screen.getByRole('region', { name: 'Drops and upsells the ERP found' })).toBeVisible()
+    expect(screen.queryByRole('region', { name: 'Possible double claims' })).toBeNull()
+  })
+
+  it('opens straight on Double claims from a link, and on the first view when the page has no such panel', () => {
+    visit('?view=claims')
+    const { unmount } = render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
+      reviews={{ claims: { panel: <section aria-label="Possible double claims">nothing to check</section>, count: 0 } }} />)
+    expect(screen.getByRole('tab', { name: /^Double claims/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: /^Drops & upsells/ })).toBeNull()
+    unmount()
+
+    renderBoard()
+    expect(screen.queryByRole('tab', { name: /^Double claims/ })).toBeNull()
+    expect(screen.getByRole('tab', { name: /^Total Sales Orders/ })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('opens on salesperson selection, then shows one personal row per order with a reconcilable total', () => {
@@ -1008,5 +1050,101 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     const row = screen.getByRole('menuitem', { name: /Brand for the margin/ })
     expect(row).toBeDisabled()
     expect(row).toHaveTextContent('The run for August 2026 has paid')
+  })
+})
+
+// User 2026-09-30: right-click a bill on a salesperson's ledger → Share, pick
+// the salesperson and the percent, Save — and the bill is on BOTH ledgers:
+// the other person's says whose bill it is, and both name the two holders.
+describe('CommissionWorkbench — a shared bill (user 2026-09-30)', () => {
+  const TEAM = [{ staffId: 'agent', name: 'Anthony' }, { staffId: 'leader', name: 'Alex' }]
+  function sharedFixture() {
+    const data = fixture()
+    data.input.orders = [...splitOrdersByShares([sale('one')], [{ orderId: 'one', staffId: 'leader', pct: 0.5 }]), sale('two', 2_000)]
+    return data
+  }
+
+  it("sits on both holders' ledgers, each saying whose bill it is and naming both", () => {
+    renderBoard(sharedFixture())
+    choose('Alex')
+    const alexRow = salesRow(personalTable(), 'SO-one')
+    expect(alexRow).toHaveTextContent('From Anthony’s bill')
+    expect(within(personalTable()).getByRole('columnheader', { name: 'Sales person' })).toBeVisible()
+    expect(alexRow).toHaveTextContent('Anthony 50%')
+    expect(alexRow).toHaveTextContent('Alex 50%')
+    // Their part of the sales, and of how much.
+    expect(alexRow).toHaveTextContent('RM 500.0050% of RM 1,000.00')
+
+    fireEvent.click(screen.getByRole('button', { name: '← Sales people' }))
+    choose('Anthony')
+    const anthonyRow = salesRow(personalTable(), 'SO-one')
+    expect(anthonyRow).toHaveTextContent('Shared with Alex')
+    expect(anthonyRow).toHaveTextContent('Anthony 50%')
+    expect(anthonyRow).toHaveTextContent('Alex 50%')
+    // A bill with one salesperson names just them.
+    const single = salesRow(personalTable(), 'SO-two')
+    expect(single).not.toHaveTextContent('Shared')
+    expect(single).not.toHaveTextContent('50%')
+
+    // Searching for the other holder finds the shared bill.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search sales orders' }), { target: { value: 'Alex' } })
+    expect(within(personalTable()).getByRole('link', { name: 'SO-one' })).toBeVisible()
+    expect(within(personalTable()).queryByRole('link', { name: 'SO-two' })).toBeNull()
+  })
+
+  it('shares a bill from its right-click, then opens the other holder where the part now is', async () => {
+    shareOrder.mockResolvedValue({ ok: true, result: {
+      orderId: 'one', orderNo: 'SO-one', changed: true, staffId: 'leader', name: 'Alex', before: null, after: 0.5,
+      parts: [{ staffId: 'agent', name: 'Anthony', pct: 0.5 }, { staffId: 'leader', name: 'Alex', pct: 0.5 }],
+    } })
+    unshareOrder.mockResolvedValue({ ok: true, result: {
+      orderId: 'one', orderNo: 'SO-one', changed: true, staffId: 'leader', name: 'Alex', before: 0.5, after: null,
+      parts: [{ staffId: 'agent', name: 'Anthony', pct: 1 }],
+    } })
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}
+      monthStats={monthStats} shareTeam={TEAM} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    fireEvent.click(screen.getByRole('menuitem', { name: /Share this bill/ }))
+    const panel = screen.getByRole('dialog', { name: 'Share SO-one' })
+    fireEvent.change(within(panel).getByLabelText(/Share with/), { target: { value: 'leader' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(shareOrder).toHaveBeenCalledWith('one', 'leader', 0.5))
+    const notice = await screen.findByText(/SO-one is shared: Anthony 50% · Alex 50%/)
+    expect(screen.queryByRole('menu')).toBeNull()
+
+    fireEvent.click(within(notice).getByRole('button', { name: 'Open Alex' }))
+    expect(screen.getByRole('heading', { name: 'Alex' })).toBeVisible()
+    expect(window.location.search).toBe('?person=leader')
+    // The line stays, and there is no button to the ledger already open.
+    const still = screen.getByText(/SO-one is shared: Anthony 50% · Alex 50%/)
+    expect(within(still).queryByRole('button', { name: 'Open Alex' })).toBeNull()
+
+    fireEvent.click(within(still).getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(unshareOrder).toHaveBeenCalledWith('one', 'leader'))
+    expect(await screen.findByText(/SO-one is no longer shared with Alex — Anthony holds all of it again\./)).toBeVisible()
+  })
+
+  it('will not share a bill whose holder is closed, and never with somebody closed', () => {
+    const data = sharedFixture()
+    render(<CommissionWorkbench data={data} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]}
+      monthStats={monthStats} shareTeam={TEAM} closes={{
+        subDepartmentId: 'sub', unavailable: null,
+        closes: [{ staffId: 'leader', closedAt: '2026-09-15T00:00:00Z', closedByName: 'HR', total: 0,
+          summary: parseCloseSummary({ name: 'Alex', total: 0, bills: [], overrides: [] }, 'Alex') }],
+      }} />)
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    const row = screen.getByRole('menuitem', { name: /Share this bill/ })
+    expect(row).toBeDisabled()
+    expect(row).toHaveTextContent('Alex’s August 2026 is closed — reopen it before changing who shares this bill')
+    fireEvent.pointerDown(document.body)
+
+    // SO-two is Anthony's alone: it can be shared — but not with Alex, who is closed.
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-two')).getByText('Convention Centre'), { clientX: 400, clientY: 300 })
+    fireEvent.click(screen.getByRole('menuitem', { name: /Share this bill/ }))
+    const panel = screen.getByRole('dialog', { name: 'Share SO-two' })
+    expect(within(within(panel).getByLabelText(/Share with/)).getByRole('option', { name: 'Alex — closed for August 2026' })).toBeDisabled()
   })
 })

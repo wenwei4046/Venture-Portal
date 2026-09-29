@@ -1021,7 +1021,9 @@ what was settled — the run's release, else the hand-worked row under the same
 paper number, else the bill as its closed month froze it, plus every answered
 drop or upsell on it — and keeps **one pending row per document**, updated as
 the ERP keeps saving and removed if the ERP returns to the settled figure. The
-month page lists them (*Drops and upsells the ERP found*): **Pay in {month}**
+month page lists them (*Drops and upsells the ERP found* — the workbench's
+*Drops & upsells* tab since 2026-09-30, a panel above the month's cards
+before): **Pay in {month}**
 confirms it into that month; **Not a change** lets the ERP's figure stand so
 the next change is measured from it; **Undo** puts back only the latest answer
 on a bill — listed under the panel's *Paid in {month}* since 2026-09-27, when
@@ -1163,6 +1165,76 @@ per director.
 A director of two sub-departments (PETER: Fair and IR) is paid by each
 sub-department's own row; their commission in payroll is the sum of their
 closes. Mig `20260927075000`.
+
+### 4.13 A shared bill — shared from its right-click (2026-09-30)
+
+Two people often close one customer together at a fair, and the ERP puts one
+name on the bill. `sales_order_shares` (2026-09-24, mig `20260924010000`) has
+always let HR say who else holds a part; since 2026-09-30 it is done where the
+bills are read (user 2026-09-30: 右 click 加多一个 option 是 share 单 — 选 share
+给哪一个 sales agent，然后多少 percent … 按 Anthony 进去的时候能看到这个 order，
+上面会写明这是谁的单).
+
+| | |
+|---|---|
+| Where | *Share this bill…* on a bill's right-click (or ⋯): a salesperson's ledger on Comm Cal — Personal, Overriding, Below deposit — the month's Below deposit tab, and Sales orders (beside *Share…* under the name) |
+| The form | **Share with** — the sub-department's team (`loadShareTeam`), never the owner; somebody closed this month cannot be picked. **Their part** — 50% to start, a holder's own part when they already hold one, else half of what the owner still keeps. Save; *Stop sharing with …* gives a part back |
+| The money | unchanged since 2026-09-24: the owner keeps 1 − Σ(shares); each part is the bill scaled down — lines, cost, total, paid — so it passes the deposit gate and lands in the margin band exactly as the whole bill does; it is paid at its holder's own rate and climbs its holder's own upline line; one release per bill, in the owner's name |
+| Both ledgers | every part carries `SalesOrder.share` (the owner and every holder's part, stamped by `splitOrdersByShares`; the engine never reads it). The other holder's ledger lists their part with *From ADRIAN's bill* under the number; the owner's says *Shared with ANTHONY*; the **Sales person** column names both with their parts, and Sales value reads *50% of RM X* |
+| Refused | a paid month (23RUN, trigger); shares leaving the owner nothing or naming the owner (23SHR, trigger); a bill anybody paid on it has closed (`assertBillsNotClosed`); a NEW holder whose own month is closed from the bill's month on (`assertStaffNotClosed` — their locked figure would silently stop matching their ledger); somebody off the sub-department's team (the run would pay nobody) |
+| Undo | the notice's *Undo* puts the part back as it was — no part, or the part it had |
+
+`shareOrder` / `unshareOrder` answer with the bill's holders as they now stand
+(`BillShareResult`, `lib/commission/bill-share.ts`); the menu's form, its
+checks and its words are that file's. No migration.
+
+### 4.14 Possible double claims — and why each one is there (2026-09-30)
+
+**The check** (2026-09-26, `revenue_possible_double_claims`): a paper number
+(`sales_orders.bill_ref` — the first number in the ERP's `customer_so_no`, else
+the order's own) on more than one bill a run could pay or already paid. A
+"Checked — separate sales" answer covers exactly the bills it was given for; a
+new bill under the number asks again.
+
+**The reasons** (user 2026-09-30: 我要你全部都写原因 … 比如它像哪一张单，你就要
+写清楚那张单曾经出过什么，把过去的 history 拿出来). The paper number alone
+decides nothing, so every group is read against what the portal knows of its
+bills (`loadDoubleClaimEvidence`: the ERP document, its lines, every delivery
+of it, the drops and upsells found on its paper, run releases, salespeople's
+closes, the cutover — existing tables, the viewer's own session) and
+`lib/commission/double-claim-reasons.ts` words it:
+
+| Verdict | When | What to do |
+|---|---|---|
+| **Would pay twice** (`paid_again`) | one bill is already claimed — on a claim form, in a month before the cutover, by an applied run, or inside a salesperson's close — and another is still payable | same sale → *Don't count this bill* on the payable copy; different sale → its paper number is wrong in the ERP |
+| **Same sale twice** (`copy`) | both payable; identical goods and value, or, under one salesperson, two or more of customer / fair / what earns / deposit / items alike and nothing against | take the copy out, unless the customer bought twice |
+| **One sale, two documents** (`split`) | opened in the ERP within the hour or numbered one after the other, no goods in common | mark checked — each document earns only on its own lines |
+| **Second bill on the paper** (`second_sale`) | the same customer (or none to tell), days apart | an add-on should earn only what was added; a separate purchase → mark checked |
+| **Settled — nothing to pay** (`settled`) | every bill in a month already claimed | nothing to pay or take back |
+| **Same number only** (`number_only`) | nothing else to go on | open both |
+
+Every group says, in words: which bill is claimed and how; how the payable
+one arrived (an ERP document opened N days after its fair closed, say); what
+the bills share and where they part — salesperson, customer, fair, the venue
+written on the bill, items, sales value, the part that earns (transport never
+does, and a difference made only of it is named), the deposit, when the ERP
+opened each; then the bills side by side with a Match column, and each bill's
+history — opened in the ERP, drafts, became a sale, saved again, held, moved
+between months and why, drops and upsells found, where it stands. A claim-form
+row carries neither customer nor items; the reasons say so rather than guess.
+
+**Where.** The month's *Double claims* tab (`?view=claims`), with *Drops &
+upsells* beside it (`?view=changes`) — both panels sat above the month's cards
+until 2026-09-30. The months list links its *N possible double claims* to the
+tab; a bill opened from it leads back with *← Double claims*. No migration.
+
+On 2026-09-30 September's eight read: HC11025 — SHAWN's July bill (placed in
+July by hand) keyed again on 28 Sep, same customer, same four items, RM 2,500
+paid in full; HC11357 / HC11568 / HC13927 / HC8971 / HC8977 — ETHAN's August
+claim-form bills keyed into the ERP on 28 Sep with the same deposits (HC11568's
+extra RM 1,056 is transport); HC13241 — MELVIN's two documents three minutes
+apart with nothing in common; PG10457 — SHAWN's customer ROY again twenty days
+later at another fair, nothing paid yet.
 
 ## 5. Tax — Withholding instead of PCB
 

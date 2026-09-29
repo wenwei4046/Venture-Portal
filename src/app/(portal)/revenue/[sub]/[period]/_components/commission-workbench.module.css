@@ -208,6 +208,8 @@
 .badge,
 .warningBadge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid rgb(var(--hairline)); border-radius: 5px; background: rgb(var(--surface-2)); font-size: 10px; font-weight: 500; white-space: nowrap; }
 .warningBadge { background: #fff4df; border-color: #e8c883; }
+/* A review tab's count while something in it waits on a person (2026-09-30). */
+.tabs .alertBadge { border-color: rgb(var(--alert) / 0.45); background: rgb(var(--alert-bg)); color: rgb(var(--alert)); font-weight: 600; }
 .notice,
 .warning { margin: 14px 0; padding: 11px 14px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--accent-bg)); font-size: 12px; line-height: 1.65; }
 .warning { border-color: #e8c883; background: #fff9ed; }
@@ -289,6 +291,13 @@
 .table tbody tr:hover .rowMenuButton,
 .table tbody tr:focus-within .rowMenuButton,
 .rowMenuButton[aria-expanded='true'] { opacity: 1; }
+/* A shared bill (2026-09-30): under its number, whose bill the row's part is
+   of — a peach tag, the sheet's orange as a surface — and in Sales person
+   every holder on a line of their own, the ledger's own person in bold. */
+.table td small.shareNote { width: fit-content; padding: 1px 6px; border-radius: 4px; background: rgb(var(--accent-bg)); color: rgb(var(--ink)); font-weight: 500; }
+.holders { display: grid; gap: 2px; line-height: 1.35; }
+.holderSelf { font-weight: 600; }
+.holderPart { font-family: var(--font-mono, 'Chivo Mono'), monospace; font-size: 11px; }
 .rowMenuButton:hover,
 .rowMenuButton[aria-expanded='true'] { border-color: rgb(var(--hairline)); background: #fff; }
 .empty { padding: 44px 20px; text-align: center; font-size: 12px; line-height: 1.7; }

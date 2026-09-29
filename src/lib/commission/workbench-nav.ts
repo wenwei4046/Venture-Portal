@@ -11,6 +11,8 @@
  * and a ledger is a link somebody can send.
  *
  *   ?view=kpi|open|deposit|venue   the cut of the month (absent: Total Sales Orders)
+ *   ?view=changes|claims           the month's review panels (2026-09-30): Drops &
+ *                                  upsells, Possible double claims
  *   ?person=<staff id>             whose ledger is open (the cut is then theirs)
  *   ?orders=overriding|deposit     which of their tables (absent: Personal)
  *   ?q= ?brand= ?sort=             the table's search, brand and order
@@ -20,7 +22,7 @@
  * alone.
  */
 
-export type WorkbenchTab = 'sales' | 'kpi' | 'open' | 'deposit' | 'venue'
+export type WorkbenchTab = 'sales' | 'kpi' | 'open' | 'deposit' | 'venue' | 'changes' | 'claims'
 export type LedgerView = 'personal' | 'overriding' | 'deposit'
 export type LedgerSort = 'date_asc' | 'date_desc' | 'commission_desc'
 
@@ -33,7 +35,7 @@ export interface WorkbenchLocation {
   sort: LedgerSort
 }
 
-const TABS: readonly WorkbenchTab[] = ['sales', 'kpi', 'open', 'deposit', 'venue']
+const TABS: readonly WorkbenchTab[] = ['sales', 'kpi', 'open', 'deposit', 'venue', 'changes', 'claims']
 const VIEWS: readonly LedgerView[] = ['personal', 'overriding', 'deposit']
 const SORTS: readonly LedgerSort[] = ['date_asc', 'date_desc', 'commission_desc']
 

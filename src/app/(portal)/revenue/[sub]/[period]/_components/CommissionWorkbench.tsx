@@ -10,7 +10,7 @@ import { depositRequired } from '@/lib/commission/engine'
 import { billCountAction, type BillCountAction } from '@/lib/commission/bill-exclusion'
 import {
   billHref, readWorkbenchLocation, sameWorkbenchView, workbenchSearch,
-  type LedgerSort, type LedgerView, type WorkbenchLocation,
+  type LedgerSort, type LedgerView, type WorkbenchLocation, type WorkbenchTab,
 } from '@/lib/commission/workbench-nav'
 import { formatMoney } from '@/lib/utils'
 import { computeRevenuePay } from '@/lib/revenue-pay'
@@ -21,9 +21,11 @@ import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench
 import { excludeOrder, includeOrder, saveOpenBillPicks } from '../../../run-actions'
 import { nameWarnings, payrollState, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
 import { useEntryScroll } from '@/components/layout/useEntryScroll'
-import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome } from '../orders/_components/BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
 import BillCountNotice from '../orders/_components/BillCountNotice'
+import BillShareNotice from '../orders/_components/BillShareNotice'
 import { billBrandAction, brandOutcomeMessage, type BrandOption } from '@/lib/commission/bill-brand'
+import { billShareAction, sharePct, type BillShareAction, type ShareCandidate, type ShareHolder } from '@/lib/commission/bill-share'
 import { useBillMenu } from '../orders/_components/useBillMenu'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
 import SalaryCalculation from './SalaryCalculation'
@@ -38,14 +40,21 @@ import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
 import c from './close-controls.module.css'
 
-type Tab = 'sales' | 'kpi' | 'open' | 'deposit' | 'venue'
+type Tab = WorkbenchTab
 const TABS: [Tab, string][] = [
   ['sales', 'Total Sales Orders'], ['kpi', 'KPI Items'], ['open', 'Open Bill'],
   ['deposit', 'Below deposit'], ['venue', 'Sales by venue'],
+  // The month's two review panels, above the cards until 2026-09-30 (user:
+  // 把这两个 move 去 … 让它们形成两个 tab). Drawn only when the page hands them over.
+  ['changes', 'Drops & upsells'], ['claims', 'Double claims'],
 ]
-type Column = 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+/** The tabs that are the page's panels rather than cuts of the workbench's own board. */
+const REVIEW_TABS: readonly Tab[] = ['changes', 'claims']
+type Column = 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+// Sales person (2026-09-30): the one column a person's own ledger rarely
+// needs — until a bill is shared, and then it names both holders.
 const COLUMNS: [Column, string][] = [
-  ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
+  ['salesperson', 'Sales person'], ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
   ['location', 'Sales location'], ['brand', 'Brand'], ['category', 'Category'], ['sales', 'Sales value'],
   ['commissionable', 'Commissionable value'],
   ['margin', 'Margin'], ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
@@ -77,6 +86,16 @@ export interface PayrollBarFacts {
   settledBefore: string | null
   /** Why the month's payroll can take no more commission (`commission_payroll_closed`), or null. */
   payrollClosed: string | null
+}
+
+/**
+ * A panel the month page builds on the server and hands over as a tab of its
+ * own (2026-09-30): what it shows, and how many things in it wait on a person
+ * — the count on the tab.
+ */
+export interface ReviewTab {
+  panel: ReactNode
+  count: number
 }
 
 /** A bill of the month taken out by hand (`excluded_reason = 'manual'`). */
@@ -131,6 +150,19 @@ interface Props {
    * month can be closed at all. Absent: no ticks, bar or Close button.
    */
   closes?: CloseFacts
+  /**
+   * *Share this bill…* on a bill's right-click (2026-09-30): the
+   * sub-department's team, whom a bill may be shared with. Absent: no row.
+   */
+  shareTeam?: readonly { staffId: string; name: string }[]
+  /**
+   * The month's review panels as tabs at the end of the rail (2026-09-30):
+   * *Drops & upsells* — what the ERP changed on settled bills, and bills of
+   * another month's fair — and *Double claims*, each group with the reasons
+   * it was flagged and its bills' history. They sat stacked above the month's
+   * cards until then. A tab whose panel is absent is not drawn.
+   */
+  reviews?: { changes?: ReviewTab; claims?: ReviewTab }
 }
 
 /** What the month page hands over for closing salespeople. */
@@ -153,7 +185,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -161,7 +193,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   // ledger lands on that ledger — it used to land on the list of people.
   const searchParams = useSearchParams()
   const here = useMemo(() => readWorkbenchLocation(searchParams), [searchParams])
-  const { tab, personId, view } = here
+  const reviewOf = (key: Tab): ReviewTab | undefined => key === 'changes' ? reviews?.changes : key === 'claims' ? reviews?.claims : undefined
+  const drawn = (key: Tab) => !REVIEW_TABS.includes(key) || reviewOf(key) !== undefined
+  // A link to a review tab this page does not draw opens on the month's first view.
+  const tab: Tab = drawn(here.tab) ? here.tab : 'sales'
+  const { personId, view } = here
   // The search box, brand and order are typed here and written into the URL
   // as they change (a replace, not a new entry), so the entry Back returns to
   // carries them too. A step through history onto another table picks up
@@ -186,6 +222,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const [error, setError] = useState('')
   const [billDone, setBillDone] = useState<BillMenuOutcome | null>(null)
   const [brandDone, setBrandDone] = useState<string | null>(null)
+  const [shareDone, setShareDone] = useState<BillShareOutcome | null>(null)
   // The ledger's own button is the real Don't count too (user 2026-09-27): it
   // answers on the same notice, with the same Undo, as the right-click menu.
   const [billPending, startBill] = useTransition()
@@ -380,7 +417,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     open: new Set(tags.map(t => t.orderId)).size,
     deposit: heldTotals.bills,
     venue: venues.length,
+    changes: reviews?.changes?.count ?? 0,
+    claims: reviews?.claims?.count ?? 0,
   }
+  // A review tab's count is what waits on somebody: it stands out while it is not zero.
+  const waiting = (key: Tab) => (reviewOf(key)?.count ?? 0) > 0
   // The run's promotion preview rides on the title it would change (it lived
   // on the saved-run table until that table went, 2026-09-26).
   const rankName = (key: string) => data.input.ranks.find(r => r.rankKey === key)?.label ?? key
@@ -401,6 +442,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     if (new URL(url, window.location.href).href === window.location.href) return false
     if (how === 'push') {
       setBillDone(null)
+      setShareDone(null)
       window.history.pushState(null, '', url)
     } else {
       window.history.replaceState(null, '', url)
@@ -439,12 +481,28 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   // somebody counts it again) — the same as the ledger's own button beside it.
   const billMenu = useBillMenu<CommissionOrderRow | OverrideOrderRow>(row => row.key, orderHref)
   const lockedMonths = new Set(lockedPeriods)
+  // A shared bill (2026-09-30): the row is ONE holder's part, and a change to
+  // the bill reaches every holder — so every holder's close stands in its way.
+  const holdersOf = (row: CommissionOrderRow | OverrideOrderRow): ShareHolder[] =>
+    row.share ? row.share.parts : [{ staffId: row.staffId, name: row.staffName, pct: 1 }]
+  const partOf = (row: CommissionOrderRow | OverrideOrderRow) => row.share?.parts.find(p => p.staffId === row.staffId)?.pct ?? 1
+  function closedHolder(row: CommissionOrderRow | OverrideOrderRow, doing: string): string | null {
+    const closed = holdersOf(row).find(holder => closer.closedById.has(holder.staffId))
+    return closed ? `${closed.name}’s ${monthLabel} is closed — reopen it before ${doing}` : null
+  }
+  /** Whose bill a shared row is, said from the row's own holder. */
+  function shareNote(row: CommissionOrderRow | OverrideOrderRow): string | null {
+    const share = row.share
+    if (!share) return null
+    return row.staffId === share.ownerStaffId
+      ? `Shared with ${share.parts.filter(p => p.staffId !== share.ownerStaffId).map(p => p.name).join(', ')}`
+      : `From ${share.ownerName}’s bill`
+  }
   function countActionFor(row: CommissionOrderRow): BillCountAction {
     // A closed salesperson's bills stay as they were closed (2026-09-27) —
     // the action refuses them too; the menu says so before anybody tries.
-    if (closer.closedById.has(row.staffId)) {
-      return { kind: 'locked', excludedByHand: false, reason: `${row.staffName}’s ${monthLabel} is closed — reopen it before changing which bills count` }
-    }
+    const closed = closedHolder(row, 'changing which bills count')
+    if (closed) return { kind: 'locked', excludedByHand: false, reason: closed }
     // Every bill on a ledger is live: an excluded one is not in the engine's input.
     return billCountAction(
       { cancelled: false, excludedReason: null, erpStatus: null, erpOnHold: false, excludedByHand: false },
@@ -454,7 +512,34 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function billMenuDone(outcome: BillMenuOutcome) {
     billMenu.closeMenu()
     setBrandDone(null)
+    setShareDone(null)
     setBillDone(outcome.result.changed ? outcome : null)
+  }
+  // Share this bill (2026-09-30): anybody on the team, bar the owner; somebody
+  // closed this month cannot take a part — their locked figure would stop
+  // matching their ledger.
+  const shareCandidates = useMemo<ShareCandidate[]>(() => (shareTeam ?? []).map(member => ({
+    ...member, closed: closer.closedById.has(member.staffId) ? `closed for ${monthLabel}` : null,
+  })), [shareTeam, closer.closedById, monthLabel])
+  function shareActionFor(row: CommissionOrderRow | OverrideOrderRow): BillShareAction | null {
+    if (row.upsale || !shareTeam) return null
+    return billShareAction(
+      { ownerStaffId: row.share?.ownerStaffId ?? row.staffId, ownerName: row.share?.ownerName ?? row.staffName, parts: holdersOf(row) },
+      { runLocked: lockedMonths.has(row.periodMonth), closedReason: closedHolder(row, 'changing who shares this bill'), monthLabel: monthName(row.periodMonth) },
+    )
+  }
+  function shareMenuDone(outcome: BillShareOutcome) {
+    billMenu.closeMenu()
+    setBillDone(null)
+    setBrandDone(null)
+    setShareDone(outcome)
+  }
+  // The notice's *Open NAME*: the ledger where the new part now sits, with
+  // the notice still saying what happened.
+  function openHolder(staffId: string) {
+    const outcome = shareDone
+    choosePerson(staffId)
+    setShareDone(outcome)
   }
   // Brand for the margin: only a bill nothing names a brand for, or one given
   // its brand here — the same row All bills offers (2026-09-27).
@@ -465,9 +550,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       { brandCode: brandOf.get(row.orderId) ?? null, picked: brandMenu?.picked[row.orderId] ?? null, cancelled: false },
       {
         runLocked: lockedMonths.has(row.periodMonth),
-        closedReason: closer.closedById.has(row.staffId)
-          ? `${row.staffName}’s ${monthLabel} is closed — reopen it before changing a bill’s brand`
-          : null,
+        closedReason: closedHolder(row, 'changing a bill’s brand'),
         monthLabel: monthName(row.periodMonth),
         hasOptions: brandOptions.length > 0,
       },
@@ -476,6 +559,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function brandMenuDone(outcome: BillBrandOutcome) {
     billMenu.closeMenu()
     setBillDone(null)
+    setShareDone(null)
     const nameOf = (code: string) => brandOptions.find(o => o.code === code)?.name ?? code
     setBrandDone(outcome.result.changed ? brandOutcomeMessage(outcome.result, nameOf) : null)
   }
@@ -493,7 +577,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </div>
   }
   function dontCount(row: CommissionOrderRow | OverrideOrderRow) {
-    setError(''); setNotice(''); setBillDone(null); setBillBusy(row.orderId)
+    setError(''); setNotice(''); setBillDone(null); setShareDone(null); setBillBusy(row.orderId)
     startBill(async () => {
       try {
         const result = await excludeOrder(row.orderId, null)
@@ -506,7 +590,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     })
   }
   function countAgain(bill: NotCountedBill) {
-    setError(''); setNotice(''); setBillDone(null); setBillBusy(bill.orderId)
+    setError(''); setNotice(''); setBillDone(null); setShareDone(null); setBillBusy(bill.orderId)
     startBill(async () => {
       try {
         const result = await includeOrder(bill.orderId)
@@ -550,17 +634,19 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function reset() { setPicks(null); setPicksSource(null); setCurrentTeam(false); setNotice('Draft reset to the current source orders.'); setError('') }
   function matches(row: CommissionOrderRow | OverrideOrderRow) {
     const q = query.trim().toLowerCase()
-    return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories].some(v => v?.toLowerCase().includes(q)))
+    // A shared bill answers to every holder's name — ADRIAN finds the part on ANTHONY's ledger.
+    return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories, ...(row.share?.parts.map(p => p.name) ?? [])].some(v => v?.toLowerCase().includes(q)))
   }
   function pickControl(row: CommissionOrderRow) {
     const order = data.input.orders.find(o => o.id === row.orderId)
+    const closed = closedHolder(row, 'changing this pick')
     return <div className="flex items-center gap-2">
       <input type="checkbox" aria-label={`Open Bill ${row.orderNo}`} checked={row.openBillRank != null}
-        disabled={!openEnabled || locked || saving || !!order?.upsale || closer.closedById.has(row.staffId)}
-        title={closer.closedById.has(row.staffId) ? `${row.staffName} is closed — reopen to change this pick` : undefined}
+        disabled={!openEnabled || locked || saving || !!order?.upsale || !!closed}
+        title={closed ?? undefined}
         onChange={e => changePick(row.orderId, e.target.checked ? 1 : null)} />
       {row.openBillRank != null && <select aria-label={`Open Bill rank ${row.orderNo}`} value={row.openBillRank}
-        disabled={!openEnabled || locked || saving || closer.closedById.has(row.staffId)} onChange={e => changePick(row.orderId, Number(e.target.value) as 1 | 2 | 3)}>
+        disabled={!openEnabled || locked || saving || !!closed} onChange={e => changePick(row.orderId, Number(e.target.value) as 1 | 2 | 3)}>
         <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option>
       </select>}
       <span>{money(row.openBillBonus)}</span>
@@ -569,6 +655,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function cell(row: CommissionOrderRow | OverrideOrderRow, key: Column, overriding: boolean) {
     const own = row as CommissionOrderRow
     switch (key) {
+      // A shared bill names every holder, the owner first; the ledger's own person in bold.
+      case 'salesperson': return row.share
+        ? <span className={s.holders}>{row.share.parts.map(p => <span key={p.staffId} className={p.staffId === row.staffId ? s.holderSelf : undefined}>
+          {p.name} <span className={s.holderPart}>{sharePct(p.pct)}</span></span>)}</span>
+        : row.staffName
       case 'date': return row.orderDate
       case 'venue': return row.venue || <span className={s.muted}>Not linked</span>
       case 'event': return <>{row.eventName || row.eventDate}</>
@@ -576,7 +667,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       case 'location': return row.location || '—'
       case 'brand': return row.brands.join(', ') || 'Unclassified'
       case 'category': return row.categories.join(', ') || '—'
-      case 'sales': return money(row.orderTotal)
+      // A holder's part of a shared bill is a part of its sales — say of how much.
+      case 'sales': return row.share
+        ? <>{money(row.orderTotal)}<small className={s.muted}>{sharePct(partOf(row))} of {money(row.share.wholeTotal)}</small></>
+        : money(row.orderTotal)
       case 'commissionable': return <>{money(row.commissionableValue)}<NoCommission amount={row.orderTotal - row.commissionableValue} /></>
       case 'margin': return row.upsale ? 'Not applicable' : <>{pct(row.marginPct)}<small className={s.muted}>{row.marginCost == null ? 'Cost incomplete' : money(row.marginRevenue - row.marginCost)}</small></>
       case 'rank': return overriding ? <>{(row as OverrideOrderRow).downlineTitle}<small>{(row as OverrideOrderRow).downlineRank}</small></>
@@ -590,7 +684,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function orderTable(rows: (CommissionOrderRow | OverrideOrderRow)[], overriding: boolean) {
     const filtered = rows.filter(matches)
       .sort((a, b) => (sort === 'commission_desc' ? b.totalCommission - a.totalCommission : sort === 'date_desc' ? b.orderDate.localeCompare(a.orderDate) : a.orderDate.localeCompare(b.orderDate)) || a.orderNo.localeCompare(b.orderNo))
-    const visibleColumns = columns.filter(([key]) => !overriding || !['kpi', 'incentive', 'open'].includes(key))
+    // Overriding names the downline in a column of its own.
+    const visibleColumns = columns.filter(([key]) => !overriding || !['salesperson', 'kpi', 'incentive', 'open'].includes(key))
     return <div className={s.tableFrame} key={overriding ? 'overriding' : 'personal'}>
       <div className={s.tableScroll} role="region" aria-label={`${overriding ? 'Overriding' : 'Personal'} commission table, scroll horizontally`} tabIndex={0}>
         <table className={s.table} aria-label={overriding ? 'Overriding commission by downline order' : 'Personal commission by sales order'}>
@@ -600,6 +695,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           <tbody>{filtered.map((row, i) => <tr key={`${row.orderId}:${overriding ? (row as OverrideOrderRow).downlineStaffId : row.staffId}:${i}`}
             onContextMenu={row.upsale ? undefined : event => billMenu.onRowContextMenu(event, row)}>
             <td className={s.stickyFirst}>{billCell(row, <>
+              {row.share && <small className={s.shareNote}>{shareNote(row)}</small>}
               {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}
               {!overriding && <small>{statusLabel[(row as CommissionOrderRow).status]}</small>}
               {!overriding && unpricedIds.has(row.orderId) && <small className={c.unpricedNote}>Priced RM 0 in the ERP</small>}</>)}</td>
@@ -632,7 +728,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           <tbody>{filtered.map(row => {
             const { required, short } = depositOf(row)
             return <tr key={row.key} onContextMenu={event => billMenu.onRowContextMenu(event, row)}>
-              <td className={s.stickyFirst}>{billCell(row, row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>)}</td>
+              <td className={s.stickyFirst}>{billCell(row, <>
+                {row.share && <small className={s.shareNote}>{shareNote(row)}</small>}
+                {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}</>)}</td>
               {withPerson && <td><button type="button" className={s.ghostButton} onClick={() => choosePerson(row.staffId, 'deposit')}>{row.staffName}</button></td>}
               <td>{row.orderDate}</td>
               <td>{row.venue || <span className={s.muted}>Not linked</span>}{row.eventName && <small>{row.eventName}</small>}</td>
@@ -656,6 +754,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {billDone && <BillCountNotice key={`${billDone.orderId}:${billDone.excluded}`} outcome={billDone} monthLabel={monthLabel}
       hasRun={runStatus !== null} className={s.notice} buttonClassName={s.ghostButton} onChange={setBillDone} />}
     {brandDone && <p className={s.notice} role="status">{brandDone}</p>}
+    {shareDone && <BillShareNotice key={`${shareDone.orderId}:${shareDone.result.staffId}:${shareDone.result.after}:${shareDone.undone ? 'undone' : 'done'}`}
+      outcome={shareDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setShareDone}
+      onOpenHolder={openHolder} currentStaffId={isPersonView ? personId : null} />}
     {error && <p className={s.warning} role="alert">{error}</p>}
     {stalePicks && <p className={s.warning} role="alert">Saved Open Bill picks changed while this draft was open. Reset draft to use the latest picks before saving.</p>}
     {picks && <div className={s.toolbar}><button className={s.primaryButton} disabled={saving || locked || stalePicks || !data.input.scheme.enableOpenBill} onClick={savePicks}>{saving ? 'Saving…' : 'Save Open Bill picks'}</button><span className={s.muted}>{data.input.scheme.enableOpenBill ? 'Unsaved until you save them — payroll is unchanged.' : 'Open Bill is switched off for this month, so these picks pay nothing and cannot be saved. Switch it on under Review settings › This month pays first.'}</span></div>}
@@ -668,9 +769,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks ? 'Draft calculation' : 'Live calculation'} />
     {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} period={period} state={payrollView} draft={drafting} />}
     <div className={s.tabs} role="tablist" aria-label="Commission views">
-      {TABS.map(([key, text]) =>
+      {TABS.filter(([key]) => drawn(key)).map(([key, text]) =>
         <button type="button" role="tab" aria-selected={tab === key} aria-controls={`commission-panel-${key}`} id={`commission-tab-${key}`} key={key}
-          onClick={() => navigate(key)} className={tab === key ? s.activeTab : undefined}>{text}<span className={s.badge}>{badges[key]}</span></button>)}
+          onClick={() => navigate(key)} className={tab === key ? s.activeTab : undefined}>{text}<span className={waiting(key) ? `${s.badge} ${s.alertBadge}` : s.badge}>{badges[key]}</span></button>)}
     </div>
     <div className={tab === 'sales' ? s.reviewToolbar : undefined}>
     {tab === 'sales' && <input className={s.search} placeholder="Search salesperson…" aria-label="Search salesperson" value={query} onChange={e => setQuery(e.target.value)} />}
@@ -888,6 +989,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       {!shownVenues.length && <div className={s.empty}>{venues.length ? 'No venues match this search.' : 'No bills this month.'}</div>}
       </div><div className={s.tableFooter}><span>{venueTotals.bills} bills · {money(venueTotals.commissionable)} of it earns commission</span><span>A venue opens every bill written there →</span></div></div>
     </>}
+
+    {/* The page's own panels, server-built (2026-09-30). */}
+    {tab === 'changes' && reviews?.changes?.panel}
+    {tab === 'claims' && reviews?.claims?.panel}
     </div>
 
     {billMenu.menu && <BillContextMenu
@@ -895,7 +1000,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         orderId: billMenu.menu.row.orderId,
         orderNo: billMenu.menu.row.orderNo,
         href: orderHref(billMenu.menu.row),
-        who: billMenu.menu.row.staffName,
+        // A shared bill is every holder's: the heading names them all.
+        who: holdersOf(billMenu.menu.row).map(holder => holder.name).join(' + '),
         action: countActionFor(billMenu.menu.row),
         exclusionDetail: null,
       }}
@@ -904,7 +1010,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         const action = brandActionFor(billMenu.menu.row)
         return action ? { action, options: brandOptions } : null
       })()}
-      onClose={billMenu.closeMenu} onDone={billMenuDone} onBrandDone={brandMenuDone} />}
+      share={(() => {
+        const action = shareActionFor(billMenu.menu.row)
+        return action ? { action, candidates: shareCandidates } : null
+      })()}
+      onClose={billMenu.closeMenu} onDone={billMenuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} />}
   </section>
 }
 

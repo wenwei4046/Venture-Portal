@@ -1,4 +1,4 @@
-import type { SalesLine, SalesOrder } from './types'
+import type { BillShare, SalesLine, SalesOrder } from './types'
 
 /**
  * A bill shared between salespeople (2026-09-24, `sales_order_shares`).
@@ -21,6 +21,10 @@ import type { SalesLine, SalesOrder } from './types'
  *
  * Money is split to the sen, and the OWNER takes the remainder, so the parts
  * always add back to the bill exactly.
+ *
+ * Every part — the owner's too — carries `share`: whose bill it is and who
+ * holds what (2026-09-30), so a ledger can say "From ADRIAN's bill" on the
+ * part it shows and name both holders. The engine never reads it.
  */
 export interface OrderShare {
   orderId: string
@@ -85,12 +89,18 @@ export function splitOrdersByShares(
       continue
     }
 
+    const share: BillShare = {
+      ownerStaffId: order.staffId,
+      parts: [{ staffId: order.staffId, pct: 1 - given }, ...mine.map(s => ({ staffId: s.staffId, pct: s.pct }))],
+      wholeTotal: order.orderTotal,
+    }
     const parts: SalesOrder[] = mine.map(s => ({
       ...order,
       staffId: s.staffId,
       orderTotal: round2(order.orderTotal * s.pct),
       paidAmount: round2(order.paidAmount * s.pct),
       lines: order.lines.map(l => scaleLine(l, s.pct)),
+      share,
     }))
 
     out.push({
@@ -98,6 +108,7 @@ export function splitOrdersByShares(
       orderTotal: round2(order.orderTotal - parts.reduce((a, p) => a + p.orderTotal, 0)),
       paidAmount: round2(order.paidAmount - parts.reduce((a, p) => a + p.paidAmount, 0)),
       lines: order.lines.map((l, i) => remainderLine(l, parts.map(p => p.lines[i]))),
+      share,
     })
     out.push(...parts)
   }

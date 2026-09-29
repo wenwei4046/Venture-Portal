@@ -348,6 +348,29 @@ src/
 │   │   │                              exactly those bills. The month page also
 │   │   │                              names bills carried in from months no run
 │   │   │                              paid (`lib/commission/double-claims.ts`).
+│   │   │                              **TWO TABS, AND THE REASONS (2026-09-30):**
+│   │   │                              *Drops and upsells the ERP found* and
+│   │   │                              *Possible double claims* left the top of
+│   │   │                              the month for the END of the workbench rail
+│   │   │                              (`?view=changes` / `?view=claims`; handed
+│   │   │                              over as `reviews`, counts = what waits),
+│   │   │                              and every group now says WHY it is there
+│   │   │                              (user: 我要你全部都写原因 … 把过去的
+│   │   │                              history 拿出来): which bill is already
+│   │   │                              claimed (claim form / month before the
+│   │   │                              cutover / a run / a close) and which a run
+│   │   │                              would still pay; what they share and where
+│   │   │                              they part (salesperson, customer, fair,
+│   │   │                              venue, items, value, what earns, deposit,
+│   │   │                              when the ERP opened each); the verdict
+│   │   │                              (paid_again · copy · split · second_sale ·
+│   │   │                              settled · number_only); what to do; the
+│   │   │                              bills side by side; each bill's history
+│   │   │                              (ERP saves, drafts, moves, adjustments).
+│   │   │                              Pure: `lib/commission/double-claim-reasons.ts`;
+│   │   │                              evidence: `loadDoubleClaimEvidence` in
+│   │   │                              `revenue/_lib/double-claims.ts` — existing
+│   │   │                              tables under the viewer's session, no mig.
 │   │   │                              **SALES VALUE vs COMMISSIONABLE VALUE:**
 │   │   │                              the ledger shows both — the whole bill
 │   │   │                              (transport included) and the lines that earn
@@ -377,7 +400,8 @@ src/
 │   │   │                              paper, else the frozen bill; answered rows
 │   │   │                              count as settled) = ONE pending
 │   │   │                              `comm_upsales` row per document. The month
-│   │   │                              page's *Drops and upsells the ERP found*
+│   │   │                              page's *Drops & upsells* tab (a panel above
+│   │   │                              the cards until 2026-09-30)
 │   │   │                              pays it into that month or lets the ERP's
 │   │   │                              figure stand; Undo takes back only the
 │   │   │                              latest answer. Runs read CONFIRMED rows
@@ -492,6 +516,24 @@ src/
 │   │   │                              the SAME scheme columns as Rules. Member
 │   │   │                              Insight/Arena do not read shares yet. Mig
 │   │   │                              `20260924010000`.
+│   │   │                              **SHARE FROM THE RIGHT-CLICK (2026-09-30):**
+│   │   │                              a bill's menu — a salesperson's ledger on
+│   │   │                              Comm Cal, and Sales orders — has *Share this
+│   │   │                              bill…*: who with (the sub-department's team,
+│   │   │                              never the owner) + their % (50 to start),
+│   │   │                              Save; *Stop sharing with …* gives a part
+│   │   │                              back. Every PART carries `SalesOrder.share`
+│   │   │                              (owner + every holder's %, stamped by
+│   │   │                              `splitOrdersByShares`, display only — the
+│   │   │                              engine never reads it), so the other
+│   │   │                              holder's ledger says *From ADRIAN's bill*,
+│   │   │                              the owner's *Shared with ANTHONY*, and the
+│   │   │                              ledger's **Sales person** column names both
+│   │   │                              (`RowShare`). `shareOrder` also refuses a
+│   │   │                              new holder whose own month is closed
+│   │   │                              (`assertStaffNotClosed`) or who is off the
+│   │   │                              team, and answers with the holders
+│   │   │                              (`lib/commission/bill-share.ts`). No mig.
 │   │   │                              **THE CATALOGUE, MIRRORED — ITEMS ONLY
 │   │   │                              (2026-09-24):** `products/` (Product List)
 │   │   │                              is the Houzs ERP's Products page mirrored

@@ -27,6 +27,15 @@ describe('readWorkbenchLocation', () => {
     expect(at('view=venue').tab).toBe('venue')
   })
 
+  // The month's review panels became tabs of the rail (2026-09-30); the months
+  // list links straight to Double claims.
+  it('reads the review tabs, and writes them back', () => {
+    expect(at('view=changes').tab).toBe('changes')
+    expect(at('view=claims').tab).toBe('claims')
+    expect(workbenchSearch('', { ...HOME, tab: 'claims' })).toBe('?view=claims')
+    expect(parseWorkbenchReturn('/revenue/fair/2026-09-01?view=claims', 'fair')).toMatchObject({ tab: 'claims', href: '/revenue/fair/2026-09-01?view=claims' })
+  })
+
   it('falls back to the defaults for values it does not know', () => {
     expect(at('view=payroll&sort=random')).toEqual(HOME)
     expect(at('person=agent&orders=everything').view).toBe('personal')

@@ -5,7 +5,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { openBillOnFor } from './_lib/open-bill-month'
-import { assertBillsNotClosed } from './_lib/salesperson-closes'
+import { assertBillsNotClosed, billsClosedReason, staffClosedReason } from './_lib/salesperson-closes'
+import { loadOrderShares, loadShareTeam } from './_lib/month-orders'
+import { holdersOf, type BillShareAnswer, type BillShareResult, type ShareHolder } from '@/lib/commission/bill-share'
 import { fetchByKeys } from '@/lib/paginate'
 
 /**
@@ -247,53 +249,164 @@ async function writeOpenBillRank(orderId: string, rank: BillRank | null, allowMo
   revalidatePath('/revenue', 'layout')
 }
 
-/**
- * Share a bill with another team member (2026-09-24). Default 50/50: the owner
- * keeps 1 − Σ(shares). Each part is paid at its holder's own rate and climbs
- * its holder's own upline line — `lib/commission/shares.ts`. Sharing again with
- * the same person changes their part. The table refuses a share with the owner,
- * shares that leave the owner nothing (23SHR) and a paid month (23RUN).
- */
-export async function shareOrder(orderId: string, staffId: string, pct = 0.5): Promise<void> {
-  await requirePermission('revenue')
-  if (!(pct > 0 && pct < 1)) throw new Error('A share is more than 0% and less than 100% of the bill')
-  const supabase = await client()
-
-  const { data: orderRow } = await supabase
-    .from('sales_orders')
-    .select('id, staff_id, period_month, sales_import_batches!inner (sub_department_id)')
-    .eq('id', orderId)
-    .maybeSingle()
-  const order = orderRow as {
-    staff_id: string | null
-    period_month: string
-    sales_import_batches: { sub_department_id: string }
-  } | null
-  if (!order) throw new Error('Order not found')
-  if (!order.staff_id) throw new Error('Match this bill to a salesperson before sharing it.')
-  if (order.staff_id === staffId) throw new Error('That is who the bill already belongs to.')
-
-  await Promise.all([
-    assertRunOpen(supabase, order.period_month, order.sales_import_batches.sub_department_id),
-    assertBillsNotClosed(supabase, [orderId]),
-  ])
-
-  const { error } = await supabase
-    .from('sales_order_shares')
-    .upsert({ order_id: orderId, staff_id: staffId, share_pct: Math.round(pct * 10_000) / 10_000 }, { onConflict: 'order_id,staff_id' })
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/revenue', 'layout')
+/** A bill as sharing needs it: whose it is, its month, and who holds a part now. */
+interface SharedBill {
+  orderNo: string
+  ownerStaffId: string | null
+  ownerName: string
+  periodMonth: string
+  subDepartmentId: string
+  cancelled: boolean
+  /** The owner first, with what nobody else holds. */
+  parts: ShareHolder[]
 }
 
-/** Take a share back: the owner holds that part again. */
-export async function unshareOrder(orderId: string, staffId: string): Promise<void> {
+async function readSharedBill(supabase: SupabaseClient, orderId: string): Promise<SharedBill> {
+  const { data, error } = await supabase
+    .from('sales_orders')
+    // The FK is named: sales_order_shares joins sales_orders to hr_staff_costs too (PGRST201).
+    .select('id, order_no, staff_id, period_month, cancelled, sales_import_batches!inner (sub_department_id), hr_staff_costs!sales_orders_staff_id_fkey (employee_name)')
+    .eq('id', orderId)
+    .maybeSingle()
+  if (error) throw new Error(`Could not read the bill: ${error.message}`)
+  const order = data as {
+    order_no: string
+    staff_id: string | null
+    period_month: string
+    cancelled: boolean
+    sales_import_batches: { sub_department_id: string } | { sub_department_id: string }[]
+    hr_staff_costs: { employee_name: string } | { employee_name: string }[] | null
+  } | null
+  if (!order) throw new Error('Order not found')
+  const batch = Array.isArray(order.sales_import_batches) ? order.sales_import_batches[0] : order.sales_import_batches
+  const staff = Array.isArray(order.hr_staff_costs) ? order.hr_staff_costs[0] : order.hr_staff_costs
+  const ownerName = staff?.employee_name ?? '—'
+  const shares = await loadOrderShares(supabase, [orderId])
+  return {
+    orderNo: order.order_no,
+    ownerStaffId: order.staff_id,
+    ownerName,
+    periodMonth: order.period_month,
+    subDepartmentId: batch.sub_department_id,
+    cancelled: order.cancelled,
+    parts: order.staff_id
+      ? holdersOf({ staffId: order.staff_id, name: ownerName }, shares.map(s => ({ staffId: s.staffId, name: s.name, pct: s.pct })))
+      : [],
+  }
+}
+
+/**
+ * Only somebody on the bill's sub-department's team can hold a part: the run
+ * ranks the scheme's own members, so a part given to anybody else would pay
+ * nobody. The same people the menu offers (`loadShareTeam`). Null when they are.
+ */
+async function offTeamReason(supabase: SupabaseClient, subDepartmentId: string, staffId: string): Promise<string | null> {
+  const { data: schemeRow, error: schemeError } = await supabase
+    .from('comm_schemes')
+    .select('id')
+    .eq('sub_department_id', subDepartmentId)
+    .eq('is_active', true)
+    .is('effective_to', null)
+    .maybeSingle()
+  if (schemeError) throw new Error(`Could not read the commission scheme: ${schemeError.message}`)
+  const schemeId = (schemeRow as { id: string } | null)?.id
+  if (!schemeId) return 'This bill’s sub-department has no commission scheme, so no part of it would be paid.'
+  const team = await loadShareTeam(supabase, schemeId)
+  return team.some(member => member.staffId === staffId)
+    ? null
+    : 'Only a member of this sub-department’s team can hold a part of its bills.'
+}
+
+function shareResult(orderId: string, bill: SharedBill, who: { staffId: string; name: string }, before: number | null, changed: boolean): BillShareResult {
+  const now = bill.parts.find(p => p.staffId === who.staffId && p.staffId !== bill.ownerStaffId)
+  return {
+    orderId, orderNo: bill.orderNo, changed,
+    staffId: who.staffId, name: now?.name ?? who.name,
+    before, after: now?.pct ?? null, parts: bill.parts,
+  }
+}
+
+/** The share table's own refusals (a paid month, a part that leaves the owner nothing), as words. */
+const SHARE_REFUSALS = new Set(['23RUN', '23SHR'])
+
+/**
+ * Share a bill with another team member (2026-09-24), or change their part.
+ * Default 50/50: the owner keeps 1 − Σ(shares). Each part is paid at its
+ * holder's own rate and climbs its holder's own upline line —
+ * `lib/commission/shares.ts`. The table refuses a share with the owner, shares
+ * that leave the owner nothing (23SHR) and a paid month (23RUN); this refuses
+ * a bill somebody paid on it has closed, a new holder whose own month is
+ * closed, and anybody off the sub-department's team (2026-09-30).
+ *
+ * Answers with the bill's holders as they now stand — the right-click menu's
+ * notice — or with why not (`BillShareAnswer`): a refusal is RETURNED, since
+ * production hands the browser only a digest of what an action throws.
+ */
+export async function shareOrder(orderId: string, staffId: string, pct = 0.5): Promise<BillShareAnswer> {
   await requirePermission('revenue')
+  if (typeof orderId !== 'string' || !orderId || typeof staffId !== 'string' || !staffId) {
+    return { ok: false, reason: 'Which bill, and who with?' }
+  }
+  const part = Math.round(pct * 10_000) / 10_000
+  if (!(part > 0 && part < 1)) return { ok: false, reason: 'A share is more than 0% and less than 100% of the bill.' }
   const supabase = await client()
-  await assertBillsNotClosed(supabase, [orderId])
-  const { error } = await supabase.from('sales_order_shares').delete().eq('order_id', orderId).eq('staff_id', staffId)
-  if (error) throw new Error(error.message)
-  revalidatePath('/revenue', 'layout')
+
+  const bill = await readSharedBill(supabase, orderId)
+  if (!bill.ownerStaffId) return { ok: false, reason: 'Match this bill to a salesperson before sharing it.' }
+  if (bill.ownerStaffId === staffId) return { ok: false, reason: `It is ${bill.ownerName}’s bill already.` }
+  if (bill.cancelled) return { ok: false, reason: `${bill.orderNo} does not count this month, so there is nothing to share.` }
+
+  const refused = (await Promise.all([
+    runLockReason(supabase, bill.periodMonth, bill.subDepartmentId),
+    billsClosedReason(supabase, [orderId]),
+    offTeamReason(supabase, bill.subDepartmentId, staffId),
+    staffClosedReason(supabase, staffId, bill.subDepartmentId, bill.periodMonth),
+  ])).find(reason => reason !== null)
+  if (refused) return { ok: false, reason: refused }
+
+  const before = bill.parts.find(p => p.staffId === staffId)?.pct ?? null
+  const changed = before === null || Math.abs(before - part) >= 0.00005
+  if (changed) {
+    const { error } = await supabase
+      .from('sales_order_shares')
+      .upsert({ order_id: orderId, staff_id: staffId, share_pct: part }, { onConflict: 'order_id,staff_id' })
+    if (error) {
+      if (SHARE_REFUSALS.has(error.code ?? '')) return { ok: false, reason: error.message }
+      throw new Error(error.message)
+    }
+    revalidatePath('/revenue', 'layout')
+  }
+  return { ok: true, result: shareResult(orderId, changed ? await readSharedBill(supabase, orderId) : bill, { staffId, name: '—' }, before, changed) }
+}
+
+/** Take a share back: the owner holds that part again. Refusals answered, like `shareOrder`. */
+export async function unshareOrder(orderId: string, staffId: string): Promise<BillShareAnswer> {
+  await requirePermission('revenue')
+  if (typeof orderId !== 'string' || !orderId || typeof staffId !== 'string' || !staffId) {
+    return { ok: false, reason: 'Which bill, and who?' }
+  }
+  const supabase = await client()
+  const closed = await billsClosedReason(supabase, [orderId])
+  if (closed) return { ok: false, reason: closed }
+  const bill = await readSharedBill(supabase, orderId)
+  const held = bill.parts.find(p => p.staffId === staffId && p.staffId !== bill.ownerStaffId)
+  const { data: removed, error } = await supabase
+    .from('sales_order_shares')
+    .delete()
+    .eq('order_id', orderId)
+    .eq('staff_id', staffId)
+    .select('staff_id')
+  if (error) {
+    if (SHARE_REFUSALS.has(error.code ?? '')) return { ok: false, reason: error.message }
+    throw new Error(error.message)
+  }
+  const changed = (removed ?? []).length > 0
+  if (changed) revalidatePath('/revenue', 'layout')
+  return {
+    ok: true,
+    result: shareResult(orderId, changed ? await readSharedBill(supabase, orderId) : bill,
+      { staffId, name: held?.name ?? '—' }, held?.pct ?? null, changed),
+  }
 }
 
 /** What taking a bill out, or counting it again, did. */
@@ -421,16 +534,20 @@ export async function setManualMargin(orderId: string, marginPct: number | null)
  * first — which puts the money back before the inputs move.
  */
 async function assertRunOpen(supabase: SupabaseClient, periodMonth: string, subDepartmentId: string): Promise<void> {
+  const reason = await runLockReason(supabase, periodMonth, subDepartmentId)
+  if (reason) throw new Error(reason)
+}
+
+/** `assertRunOpen`'s refusal as words, or null — for an action that returns its refusals. */
+async function runLockReason(supabase: SupabaseClient, periodMonth: string, subDepartmentId: string): Promise<string | null> {
   const { data: locked, error } = await supabase.rpc('commission_order_period_locked', {
     p_sub_department_id: subDepartmentId,
     p_period: periodMonth,
   })
   if (error) throw new Error(`Could not check the commission run: ${error.message}`)
-  if (locked) {
-    throw new Error(
-      `These ${periodMonth.slice(0, 7)} sales are in payroll, so they cannot change until the month comes out of payroll.`,
-    )
-  }
+  return locked
+    ? `These ${periodMonth.slice(0, 7)} sales are in payroll, so they cannot change until the month comes out of payroll.`
+    : null
 }
 
 // ─── Costs ──────────────────────────────────────────────────────────────────
