@@ -12,7 +12,10 @@ interface Props {
   disabled?: boolean
   /** Differs from what is saved — tinted so the eye finds it before Save. */
   dirty?: boolean
+  /** A statutory figure somebody typed over JADUAL — the accent dot. */
+  manual?: boolean
   className?: string
+  title?: string
   'aria-label': string
   'aria-invalid'?: boolean
 }
@@ -30,6 +33,7 @@ export default function AmountInput({
   decimals = 2,
   disabled,
   dirty,
+  manual,
   className,
   ...rest
 }: Props) {
@@ -46,7 +50,7 @@ export default function AmountInput({
       inputMode="decimal"
       value={text}
       disabled={disabled}
-      className={cn('pg-in', dirty && 'dirty', !dirty && value === 0 && 'zero', className)}
+      className={cn('pg-in', dirty && 'dirty', !dirty && value === 0 && 'zero', manual && 'manual', className)}
       onFocus={e => {
         setFocused(true)
         e.currentTarget.select()

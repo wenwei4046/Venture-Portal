@@ -8,13 +8,16 @@ import {
   dirtyFields,
   editFromRow,
   formatAmount,
+  isStatutoryField,
   parseAmount,
   PAYROLL_FIELD_LABELS,
   PAYROLL_EDIT_FIELDS,
+  rowUpdateFromEdit,
+  TYPED_STATUTORY_HINT,
   type PayrollEdit,
   type PayrollEditField,
 } from '@/lib/payroll-grid'
-import { updatePayrollRow } from '../actions'
+import { updatePayrollRow, type PayrollRowUpdate } from '../actions'
 import { usePayrollDraft } from './PayrollDraftContext'
 import AmountInput from './AmountInput'
 import PaycheckWindow from './PaycheckWindow'
@@ -52,9 +55,11 @@ interface Props {
 }
 
 /**
- * One person, one line. The row owns the working copy of the nine editable
- * figures; the paycheck window renders from — and writes to — that same
- * state, so it is a second view of the row rather than a copy of it.
+ * One person, one line. The row owns the working copy of the sixteen editable
+ * figures — nine inputs and, since 2026-09-30, the seven statutory ones; the
+ * paycheck window renders from — and writes to — that same state, so it is a
+ * second view of the row rather than a copy of it. The name or the ⋯ menu
+ * opens it (the row's own ▾ went 2026-09-30: it did what those two do).
  */
 export default function PayrollRow({
   row,
@@ -86,7 +91,7 @@ export default function PayrollRow({
   const reviewResultRef = useRef<((saved: boolean) => void) | null>(null)
   const requestReviewRef = useRef<() => Promise<boolean>>(null)
   const trRef = useRef<HTMLTableRowElement>(null)
-  const chevRef = useRef<HTMLButtonElement>(null)
+  const nameRef = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(false)
   const savedEditRef = useRef(editFromRow(row))
 
@@ -103,17 +108,26 @@ export default function PayrollRow({
   const regularDirty = dirtyList.some(field => field !== 'commission_amount' || !row.commission_is_derived)
   const dirty = dirtyList.length > 0 || commissionDirty
   const statementHref = row.commission_statements?.[0]?.href ?? row.commission_statement_href
+  const typed = new Set(row.statutory_typed ?? [])
+  // PCB is somebody's only on PCB; withholding tax and "none" compute it as 0.
+  const taxMode = row.tax_mode ?? (row.withholding_tax > 0 ? 'withholding' : 'pcb')
 
   // Sync clean fields after a server refresh while retaining the user's
   // unsaved work, including a Gross Commission amount awaiting review.
+  // Nothing saved moved (the first run, or a refresh that left this row
+  // alone) → no setState at all: a no-op update queued while the page
+  // hydrates can sit unprocessed in a low lane, and every later render then
+  // re-derives `edit` as a new object (2026-09-30, the grid froze in a loop).
   useEffect(() => {
     const previous = savedEditRef.current
     const next = editFromRow(row)
     savedEditRef.current = next
+    const derivedCommission = row.commission_is_derived && !commissionEditable
+    if (!derivedCommission && PAYROLL_EDIT_FIELDS.every(field => previous[field] === next[field])) return
     setEdit(current => {
       const merged = { ...current }
       for (const field of PAYROLL_EDIT_FIELDS) {
-        if ((field === 'commission_amount' && row.commission_is_derived && !commissionEditable) || current[field] === previous[field]) {
+        if ((field === 'commission_amount' && derivedCommission) || current[field] === previous[field]) {
           merged[field] = next[field]
         }
       }
@@ -122,13 +136,16 @@ export default function PayrollRow({
   }, [row, commissionEditable])
 
   // Report pending edits to the page-level draft context — powers the
-  // header Save button and blocks Submit to Finance while unsaved.
+  // header Save button and blocks Submit to Finance while unsaved. Keyed on
+  // the figures, not on `edit`'s identity, so a re-derived but equal `edit`
+  // reports nothing — reporting re-renders every row on the page.
   const { setRowEdit, setCommissionReview } = usePayrollDraft()
+  const draftKey = regularDirty && !locked
+    ? JSON.stringify(rowUpdateFromEdit(edit, row, { commissionDerived: row.commission_is_derived }))
+    : null
   useEffect(() => {
-    const update: Partial<PayrollEdit> = { ...edit }
-    if (row.commission_is_derived) delete update.commission_amount
-    setRowEdit(row.id, regularDirty && !locked ? update : null)
-  }, [row.id, row.commission_is_derived, regularDirty, locked, edit, setRowEdit])
+    setRowEdit(row.id, draftKey ? (JSON.parse(draftKey) as PayrollRowUpdate) : null)
+  }, [row.id, draftKey, setRowEdit])
   useEffect(() => () => setRowEdit(row.id, null), [row.id, setRowEdit])
   useEffect(() => {
     setCommissionReview(row.id, commissionDirty && !locked ? () => requestReviewRef.current!() : null)
@@ -137,14 +154,14 @@ export default function PayrollRow({
   useEffect(() => () => { reviewResultRef.current?.(false) }, [])
 
   // Opening scrolls the row into view (‹ › in the window can land anywhere
-  // in the list); closing hands focus back to the chevron that opened it.
+  // in the list); closing hands focus back to the row's name.
   useEffect(() => {
     if (open) {
       trRef.current?.scrollIntoView({ block: 'nearest' })
       wasOpen.current = true
     } else if (wasOpen.current) {
       wasOpen.current = false
-      chevRef.current?.focus({ preventScroll: true })
+      nameRef.current?.focus({ preventScroll: true })
     }
   }, [open])
 
@@ -163,9 +180,7 @@ export default function PayrollRow({
     }
     startTransition(async () => {
       try {
-        const update: Partial<PayrollEdit> = { ...edit }
-        if (row.commission_is_derived) delete update.commission_amount
-        await updatePayrollRow(row.id, update)
+        await updatePayrollRow(row.id, rowUpdateFromEdit(edit, row, { commissionDerived: row.commission_is_derived }))
         setSaved(true)
         router.refresh()
         setTimeout(() => setSaved(false), 1500)
@@ -211,10 +226,15 @@ export default function PayrollRow({
   }
 
   // An editable figure — a field on a draft row, a bare figure once the
-  // month has been submitted.
-  const cell = (field: PayrollEditField, decimals = 2) =>
-    locked ? (
-      <span className={cn('num', row[field] === 0 && 'zero')}>
+  // month has been submitted. A statutory figure somebody typed carries its
+  // accent dot either way.
+  const cell = (field: PayrollEditField, decimals = 2) => {
+    const manual = isStatutoryField(field) && typed.has(field)
+    return locked ? (
+      <span
+        className={cn('num', row[field] === 0 && 'zero', manual && 'manual')}
+        title={manual ? TYPED_STATUTORY_HINT : undefined}
+      >
         {formatAmount(row[field], decimals)}
       </span>
     ) : (
@@ -224,9 +244,25 @@ export default function PayrollRow({
         decimals={decimals}
         disabled={isPending}
         dirty={dirtyList.includes(field)}
+        manual={manual}
+        title={manual ? TYPED_STATUTORY_HINT : undefined}
         aria-label={`${PAYROLL_FIELD_LABELS[field]} — ${row.staff_name}`}
       />
     )
+  }
+
+  // PCB is typed only for somebody on PCB. The others have none to type:
+  // their People record sets withholding tax (it sits in net) or no tax.
+  const pcbCell = taxMode === 'pcb' ? cell('pcb') : (
+    <span
+      className="num zero"
+      title={taxMode === 'withholding'
+        ? `No PCB — withholding tax RM ${formatMoneyBare(row.withholding_tax)} applies instead (their People record)`
+        : 'No PCB — their People record sets no tax'}
+    >
+      —
+    </span>
+  )
 
   const num = (value: number, extra?: string) => (
     <td className={cn('num', value === 0 && 'zero', extra)}>{formatMoneyBare(value)}</td>
@@ -281,8 +317,11 @@ export default function PayrollRow({
             </a>
           ) : (
             <button
+              ref={nameRef}
               type="button"
               className="pg-name-btn"
+              aria-haspopup="dialog"
+              aria-expanded={open}
               onClick={open ? onClose : onOpen}
               title={`${row.staff_name} — open paycheck`}
             >
@@ -315,18 +354,6 @@ export default function PayrollRow({
             <span className="text-xs font-bold text-danger mr-1" title={error}>
               !
             </span>
-          )}
-          {!director && (
-            <button
-              ref={chevRef}
-              type="button"
-              className="icon-btn chev"
-              aria-expanded={open}
-              aria-label={open ? 'Close paycheck' : 'Open paycheck'}
-              onClick={open ? onClose : onOpen}
-            >
-              ▾
-            </button>
           )}
           <button
             type="button"
@@ -406,10 +433,14 @@ export default function PayrollRow({
         <td className="pg-ed g1">{cell('unpaid_leave_days', 1)}</td>
         <td className="pg-ed">{cell('deduction_amount')}</td>
         <td className="pg-ed">{cell('skbbk_amount')}</td>
+        <td className="pg-ed">{cell('epf_ee')}</td>
+        <td className="pg-ed">{cell('socso_ee')}</td>
+        <td className="pg-ed">{cell('eis_ee')}</td>
+        <td className={taxMode === 'pcb' ? 'pg-ed' : 'num'}>{pcbCell}</td>
 
-        {num(row.epf_er, 'g1')}
-        {num(row.socso_er)}
-        {num(row.eis_er)}
+        <td className="pg-ed g1">{cell('epf_er')}</td>
+        <td className="pg-ed">{cell('socso_er')}</td>
+        <td className="pg-ed">{cell('eis_er')}</td>
       </tr>
 
       {commissionEditable && <RevenueCommissionEditor

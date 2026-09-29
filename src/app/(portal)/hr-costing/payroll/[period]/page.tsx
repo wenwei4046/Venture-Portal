@@ -6,6 +6,7 @@ import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { round2 } from '@/lib/payroll-funding'
+import { typedStatutory } from '@/lib/payroll-grid'
 import {
   batchesHeadline,
   closeReadiness,
@@ -81,8 +82,11 @@ export default async function PayrollGridPage({ params }: PageProps) {
         deduction_amount, skbbk_amount, pay_line_earnings, pay_line_deductions,
         prorata_days_worked, prorata_days_in_month,
         epf_er, epf_ee, socso_er, socso_ee, eis_er, eis_ee, pcb, withholding_tax,
+        epf_er_override_amount, epf_ee_override_amount, socso_er_override_amount,
+        socso_ee_override_amount, eis_er_override_amount, eis_ee_override_amount,
+        statutory_overridden_at,
         gross, net,
-        hr_staff_costs (employee_name, departments (name, payroll_source))
+        hr_staff_costs (employee_name, tax_mode, departments (name, payroll_source))
       `)
       .eq('period_month', period)
       .order('id'),
@@ -215,6 +219,9 @@ export default async function PayrollGridPage({ params }: PageProps) {
       eis_ee: Number(r.eis_ee),
       pcb: Number(r.pcb),
       withholding_tax: Number(r.withholding_tax ?? 0),
+      statutory_typed: typedStatutory(r),
+      statutory_overridden_at: r.statutory_overridden_at,
+      tax_mode: staff?.tax_mode ?? 'pcb',
       gross: Number(r.gross),
       net: Number(r.net),
       revenue_payroll: r.source === 'commission' && r.commission_balance != null,

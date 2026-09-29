@@ -294,3 +294,96 @@ describe('PayrollGrid Revenue integration', () => {
     expect(updatePayrollRow.mock.calls[0][1]).not.toHaveProperty('commission_amount')
   })
 })
+
+// User 2026-09-30: deduction 本身并没有出现 EPF、Socso、EIS 还有 PCB … 在这个
+// payroll tab 那边，所有的东西基本上都应该是可以被 editable 的 — and the row's
+// ▾ goes: the ⋯ menu's Open paycheck already pops the same window.
+describe('PayrollGrid statutory fields and the paycheck', () => {
+  it('has no ▾ of its own — the name and the ⋯ menu open the paycheck', async () => {
+    render(grid([makeRow({})]))
+    const row = personRow('Finance employee')
+    expect(row.querySelector('.icon-btn.chev')).toBeNull()
+    expect(within(row).queryByRole('button', { name: /paycheck/i })).toBeNull()
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Actions for Finance employee' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Open paycheck' }))
+    expect(screen.getByRole('dialog', { name: 'Finance employee — paycheck' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // Focus goes back to the row, on its name.
+    expect(screen.getByRole('button', { name: 'Finance employee' })).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finance employee' }))
+    expect(screen.getByRole('dialog', { name: 'Finance employee — paycheck' })).toBeVisible()
+  })
+
+  it('puts EPF, SOCSO, EIS and PCB under Deductions, employee side, as fields', () => {
+    render(grid([makeRow({})]))
+    expect(screen.getByRole('columnheader', { name: 'Deductions' })).toHaveAttribute('colspan', '7')
+    for (const name of ['EPF EE', 'SOCSO EE', 'EIS EE', 'PCB', 'EPF ER', 'SOCSO ER', 'EIS ER']) {
+      expect(screen.getByRole('columnheader', { name })).toBeVisible()
+    }
+    expect(screen.getByLabelText('EPF employee — Finance employee')).toHaveValue('330.00')
+    expect(screen.getByLabelText('PCB — Finance employee')).toHaveValue('0.00')
+    expect(screen.getByLabelText('EPF employer — Finance employee')).toHaveValue('390.00')
+  })
+
+  it('saves a typed statutory figure with the row, and never one nobody typed', async () => {
+    render(grid([makeRow({})]))
+    enterAmount('EPF employee — Finance employee', '300')
+    enterAmount('PCB — Finance employee', '25')
+    enterAmount('SOCSO employer — Finance employee', '12')
+    expect(screen.getByLabelText('Pending edits').textContent).toContain('"epf_ee":300')
+    fireEvent.click(within(personRow('Finance employee')).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(updatePayrollRow).toHaveBeenCalledTimes(1))
+    const sent = updatePayrollRow.mock.calls[0][1]
+    expect(sent).toMatchObject({ basic_salary: 3000, epf_ee: 300, pcb: 25, socso_er: 12 })
+    expect(sent).not.toHaveProperty('socso_ee')
+    expect(sent).not.toHaveProperty('epf_er')
+  })
+
+  it('sends typed statutory through the header Save too', async () => {
+    render(<PayrollDraftProvider><SaveAllButton /><PayrollGrid rows={[makeRow({})]} period="2026-09-01" /></PayrollDraftProvider>)
+    enterAmount('EIS employee — Finance employee', '7.5')
+    fireEvent.click(screen.getByRole('button', { name: 'Save 1 row' }))
+    await waitFor(() => expect(updatePayrollRows).toHaveBeenCalledTimes(1))
+    const [[{ id, fields }]] = updatePayrollRows.mock.calls[0]
+    expect(id).toBe('finance')
+    expect(fields).toMatchObject({ eis_ee: 7.5 })
+    expect(fields).not.toHaveProperty('epf_ee')
+  })
+
+  it('marks a typed figure, and has no PCB to type for somebody with no tax', () => {
+    render(grid([
+      makeRow({ statutory_typed: ['epf_ee'] }),
+      makeRow({ id: 'none', staff_id: 's-none', staff_name: 'No tax person', tax_mode: 'none' }),
+    ]))
+    expect(screen.getByLabelText('EPF employee — Finance employee')).toHaveClass('manual')
+    expect(screen.getByLabelText('EPF employee — Finance employee')).toHaveAttribute('title', expect.stringContaining('Reset statutory to JADUAL'))
+    expect(screen.getByLabelText('SOCSO employee — Finance employee')).not.toHaveClass('manual')
+    expect(screen.queryByLabelText('PCB — No tax person')).toBeNull()
+    expect(within(personRow('No tax person')).getByTitle('No PCB — their People record sets no tax')).toHaveTextContent('—')
+    expect(screen.getByLabelText('EPF employee — No tax person')).toBeEnabled()
+  })
+
+  it('keeps the mark on the bare figure once the row is sent', () => {
+    render(grid([makeRow({ status: 'submitted', statutory_typed: ['pcb'], pcb: 88 })]))
+    expect(screen.queryByLabelText('PCB — Finance employee')).toBeNull()
+    const pcb = within(personRow('Finance employee')).getByText('88.00')
+    expect(pcb).toHaveClass('manual')
+  })
+
+  it('totals the statutory columns in the footer', () => {
+    render(grid([
+      makeRow({ epf_ee: 330, socso_ee: 15, eis_ee: 6, pcb: 10 }),
+      makeRow({ id: 'b', staff_id: 's-b', staff_name: 'Second', epf_ee: 100, socso_ee: 5, eis_ee: 2, pcb: 5 }),
+    ]))
+    const footer = screen.getByText('Total · 2 people').closest('tr')!
+    // Total · Gross · Net · ⋯ · five Earnings · Unpaid · Deduct · SKBBK, then the statutory.
+    expect(footer.cells[12]).toHaveTextContent('430.00')
+    expect(footer.cells[13]).toHaveTextContent('20.00')
+    expect(footer.cells[14]).toHaveTextContent('8.00')
+    expect(footer.cells[15]).toHaveTextContent('15.00')
+    expect(footer.cells[16]).toHaveTextContent('780.00')
+  })
+})

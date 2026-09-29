@@ -9,8 +9,12 @@ import {
   neighbourId,
   NO_DEPARTMENT,
   parseAmount,
+  payrollRowWrite,
   periodLabel,
   PAYROLL_EDIT_FIELDS,
+  rowUpdateFromEdit,
+  STATUTORY_OVERRIDE_COLUMNS,
+  typedStatutory,
 } from './payroll-grid'
 
 const saved = {
@@ -25,8 +29,95 @@ const saved = {
   skbbk_amount: 22.15,
 }
 
+const statutory = {
+  epf_ee: 330,
+  socso_ee: 15,
+  eis_ee: 6,
+  pcb: 0,
+  epf_er: 390,
+  socso_er: 52.65,
+  eis_er: 6,
+}
+
+describe('rowUpdateFromEdit', () => {
+  const row = { ...saved, ...statutory }
+
+  it('sends every input but no statutory figure nobody typed', () => {
+    const edit = editFromRow({ ...row, ot_amount: 120 })
+    const update = rowUpdateFromEdit(edit, row, { commissionDerived: false })
+    expect(update).toEqual({ ...saved, ot_amount: 120 })
+    // Sending JADUAL's EPF back would pin it: it must stay free to follow the pay.
+    expect(update).not.toHaveProperty('epf_ee')
+  })
+
+  it('sends a typed statutory figure, and only that one', () => {
+    const edit = editFromRow({ ...row, epf_ee: 300, pcb: 45.5 })
+    const update = rowUpdateFromEdit(edit, row, { commissionDerived: false })
+    expect(update).toMatchObject({ epf_ee: 300, pcb: 45.5 })
+    expect(Object.keys(update).filter(k => k in statutory).sort()).toEqual(['epf_ee', 'pcb'])
+  })
+
+  it('leaves a derived commission out — the run owns it', () => {
+    const edit = editFromRow({ ...row, socso_er: 60 })
+    const update = rowUpdateFromEdit(edit, row, { commissionDerived: true })
+    expect(update).not.toHaveProperty('commission_amount')
+    expect(update).toMatchObject({ socso_er: 60, basic_salary: 3000 })
+  })
+})
+
+describe('payrollRowWrite', () => {
+  it('passes inputs through and puts a typed figure in its override column', () => {
+    const { columns, typed } = payrollRowWrite({ basic_salary: 3200, epf_ee: 300, pcb: 12.35, socso_er: 0 })
+    expect(columns).toEqual({
+      basic_salary: 3200,
+      epf_ee_override_amount: 300,
+      pcb_override_amount: 12.35,
+      socso_er_override_amount: 0,
+    })
+    expect(typed).toBe(true)
+    // Never onto the figure itself: the trigger derives it, and would write JADUAL over it.
+    expect(columns).not.toHaveProperty('epf_ee')
+  })
+
+  it('is not a typed save when only inputs moved', () => {
+    expect(payrollRowWrite({ ot_amount: 50, skbbk_amount: 10 })).toEqual({
+      columns: { ot_amount: 50, skbbk_amount: 10 },
+      typed: false,
+    })
+  })
+
+  it('refuses a negative or non-numeric statutory figure', () => {
+    expect(() => payrollRowWrite({ eis_ee: -1 })).toThrow('EIS employee must be zero or more.')
+    expect(() => payrollRowWrite({ epf_er: Number.NaN })).toThrow('EPF employer must be zero or more.')
+  })
+
+  it('refuses PCB for somebody on withholding tax or no tax', () => {
+    expect(() => payrollRowWrite({ pcb: 10 }, 'withholding')).toThrow(/withholding tax/)
+    expect(() => payrollRowWrite({ pcb: 10 }, 'none')).toThrow(/no tax/)
+    expect(payrollRowWrite({ pcb: 10 }, 'pcb').columns).toEqual({ pcb_override_amount: 10 })
+    // The rest of their statutory is still theirs to type.
+    expect(payrollRowWrite({ epf_ee: 10 }, 'none').columns).toEqual({ epf_ee_override_amount: 10 })
+  })
+
+  it('refuses a column the grid never sends — net, gross, status', () => {
+    expect(() => payrollRowWrite({ net: 999999 } as Record<string, number>)).toThrow('Unknown payroll field: net')
+    expect(() => payrollRowWrite({ epf_ee_override_amount: 1 } as Record<string, number>)).toThrow(/Unknown payroll field/)
+  })
+})
+
+describe('typedStatutory', () => {
+  it('reads the typed figures off the override columns', () => {
+    expect(typedStatutory({ epf_ee_override_amount: 300, pcb_override_amount: 0, socso_er_override_amount: null })).toEqual([
+      'epf_ee',
+      'pcb',
+    ])
+    expect(typedStatutory({})).toEqual([])
+    expect(STATUTORY_OVERRIDE_COLUMNS).toHaveLength(7)
+  })
+})
+
 describe('editFromRow', () => {
-  it('copies the nine editable figures as numbers', () => {
+  it('copies the sixteen editable figures as numbers', () => {
     const edit = editFromRow({ ...saved, basic_salary: '3000' as unknown as number })
     expect(edit.basic_salary).toBe(3000)
     expect(Object.keys(edit).sort()).toEqual([...PAYROLL_EDIT_FIELDS].sort())

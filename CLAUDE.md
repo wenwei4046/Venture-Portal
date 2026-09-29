@@ -100,6 +100,17 @@ src/
 │   │   │                              includes exact coverage and completion;
 │   │   │                              lib/payment-cycle.ts drives reporting.
 │   │   │                              DESIGN.md: Payment statement (v3.7).
+│   │   │                              payroll/ grid (2026-09-30): EVERY statutory
+│   │   │                              figure is a field — EPF/SOCSO/EIS EE + PCB
+│   │   │                              under Deductions, ER under Employer. A typed
+│   │   │                              one lives in `*_override_amount` (the value
+│   │   │                              column is never written by hand) and the
+│   │   │                              compute trigger applies it over JADUAL on
+│   │   │                              every recompute until Reset to JADUAL; the
+│   │   │                              InfoTech import still writes its file's
+│   │   │                              figures verbatim. The row's ▾ is gone (the
+│   │   │                              name / ⋯ open the paycheck). `lib/payroll-
+│   │   │                              grid.ts` payrollRowWrite, mig `20260930010000`.
 │   │   │                              **THE UNIFIED PAYROLL (2026-09-27):** payroll/
 │   │   │                              [period] is everybody's pay on one grid —
 │   │   │                              staff keyed here, the Revenue team closed on

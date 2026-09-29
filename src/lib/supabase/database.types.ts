@@ -4112,6 +4112,12 @@ export type Database = {
           pay_line_earnings: number
           basic_pay_net: number | null
           pcb_override_amount: number | null
+          epf_er_override_amount: number | null
+          epf_ee_override_amount: number | null
+          socso_er_override_amount: number | null
+          socso_ee_override_amount: number | null
+          eis_er_override_amount: number | null
+          eis_ee_override_amount: number | null
           created_at: string
           created_by: string | null
           deduction_amount: number
@@ -4161,6 +4167,12 @@ export type Database = {
           pay_line_earnings?: number
           basic_pay_net?: number | null
           pcb_override_amount?: number | null
+          epf_er_override_amount?: number | null
+          epf_ee_override_amount?: number | null
+          socso_er_override_amount?: number | null
+          socso_ee_override_amount?: number | null
+          eis_er_override_amount?: number | null
+          eis_ee_override_amount?: number | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number
@@ -4210,6 +4222,12 @@ export type Database = {
           pay_line_earnings?: number
           basic_pay_net?: number | null
           pcb_override_amount?: number | null
+          epf_er_override_amount?: number | null
+          epf_ee_override_amount?: number | null
+          socso_er_override_amount?: number | null
+          socso_ee_override_amount?: number | null
+          eis_er_override_amount?: number | null
+          eis_ee_override_amount?: number | null
           created_at?: string
           created_by?: string | null
           deduction_amount?: number

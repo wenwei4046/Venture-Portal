@@ -1687,8 +1687,9 @@ table.ledger-table tr.lt-detail {
    person — so it can neither fold for a phone nor shed columns. Picked as
    "C · Window" out of three mockups (DESIGN.md → Payroll grid):
 
-   · Frozen panes on a .ledger-table. ✓ · Name · Gross · Net · ▾ stay put on
-     the left while the eleven working columns scroll under them; the two
+   · Frozen panes on a .ledger-table. ✓ · Name · Status · Gross · Net · ⋯
+     stay put on the left while the working columns (fifteen since the
+     statutory figures became fields, 2026-09-30) scroll under them; the two
      header rows pin to the top and the totals row to the bottom. A sticky
      edge only holds inside the element that scrolls, so the well is its own
      scroll box in both directions (spreadsheet style) rather than letting
@@ -1752,9 +1753,13 @@ table.payroll-grid col.col-comm { width: 88px; }
 table.payroll-grid col.col-unpaid { width: 84px; }
 table.payroll-grid col.col-ded { width: 84px; }
 table.payroll-grid col.col-skbbk { width: 76px; }
-table.payroll-grid col.col-epf { width: 92px; }
-table.payroll-grid col.col-socso { width: 84px; }
-table.payroll-grid col.col-eis { width: 76px; }
+table.payroll-grid col.col-epf-ee { width: 92px; }
+table.payroll-grid col.col-socso-ee { width: 88px; }
+table.payroll-grid col.col-eis-ee { width: 76px; }
+table.payroll-grid col.col-pcb { width: 92px; }
+table.payroll-grid col.col-epf-er { width: 92px; }
+table.payroll-grid col.col-socso-er { width: 88px; }
+table.payroll-grid col.col-eis-er { width: 76px; }
 
 table.payroll-grid thead th {
   position: sticky;
@@ -1910,10 +1915,6 @@ table.payroll-grid .icon-btn {
   vertical-align: middle;
   font-size: 12px;
 }
-table.payroll-grid .icon-btn.chev { transition: transform 0.18s ease, color 0.14s, opacity 0.14s; }
-table.payroll-grid tr.pg-row.open .icon-btn.chev { color: rgb(var(--accent)); opacity: 1; transform: rotate(180deg); }
-/* Save takes the chevron's place while the row has unsaved figures. */
-table.payroll-grid tr.pg-row.dirty .icon-btn.chev { display: none; }
 table.payroll-grid .icon-btn.more { opacity: 0.55; }
 table.payroll-grid tr.pg-row:hover .icon-btn.more,
 table.payroll-grid .icon-btn.more:focus-visible { opacity: 1; }
@@ -1966,6 +1967,23 @@ table.payroll-grid .icon-btn.more:focus-visible { opacity: 1; }
   font-weight: 500;
 }
 .pg-in:disabled { opacity: 0.6; cursor: not-allowed; }
+/* A statutory figure somebody typed over JADUAL (2026-09-30): an accent dot
+   in the field's top-left corner, where a spreadsheet marks a cell that
+   carries a note — clear of the right-aligned digits, inside the 6px radius.
+   The field keeps its box and its dirty tint; the title says how to undo it.
+   Declared after :focus and .dirty, whose `background` shorthand would
+   otherwise wipe it. A row past draft shows its bare figure with the dot on
+   the left, centred on the line. */
+.pg-in.manual {
+  background-image: radial-gradient(circle at 4px 4px, rgb(var(--accent)) 1.75px, transparent 2.25px);
+  background-repeat: no-repeat;
+}
+table.payroll-grid .num.manual,
+.pg-slip .f .ro.manual {
+  padding-left: 9px;
+  background-image: radial-gradient(circle at 3px 50%, rgb(var(--accent)) 1.75px, transparent 2.25px);
+  background-repeat: no-repeat;
+}
 
 /* Totals row, pinned to the bottom of the well */
 table.payroll-grid tfoot td {
@@ -1996,7 +2014,8 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 /* Caption legend above the well */
 .pg-legend {
   display: inline-flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 4px 14px;
   align-items: center;
   font-style: normal;
   font-family: var(--font-mono), 'Chivo Mono', monospace;
@@ -2005,6 +2024,9 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   text-transform: uppercase;
   color: rgb(var(--graphite));
 }
+/* Four keys since 2026-09-30: on a narrow screen they wrap between keys,
+   never inside one. */
+.pg-legend > span { white-space: nowrap; }
 .pg-legend i {
   display: inline-block;
   width: 22px;
@@ -2014,6 +2036,10 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   margin-right: 5px;
 }
 .pg-legend i.in { background: rgb(var(--paper)); border: 1px solid rgb(var(--hairline)); }
+.pg-legend i.mn {
+  background: radial-gradient(circle at 4px 4px, rgb(var(--accent)) 1.75px, transparent 2.25px) no-repeat, rgb(var(--paper));
+  border: 1px solid rgb(var(--hairline));
+}
 .pg-legend i.ro { border: 1px dashed rgb(var(--hairline)); }
 .pg-legend i.dv { height: 10px; border-radius: 0; border-bottom: 1px dotted rgb(var(--accent)); }
 
@@ -2186,7 +2212,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
 }
 @media (prefers-reduced-motion: reduce) {
   .pg-win, .pg-scrim { animation: none; }
-  table.payroll-grid .icon-btn.chev { transition: none; }
 }
 @media (max-width: 980px) {
   .pg-slip { grid-template-columns: 1fr 1fr; }
