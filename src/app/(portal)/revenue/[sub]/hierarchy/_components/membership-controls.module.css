@@ -33,6 +33,13 @@
 .dateField { display: grid; gap: 6px; padding: 7px 9px; font-size: 12px; }
 .dateField input { min-width: 0; width: 100%; border: 1px solid rgb(var(--hairline)); border-radius: 4px; padding: 7px; background: rgb(var(--paper)); color: rgb(var(--ink)); }
 .dateField input:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 1px; }
+/* A bill's *Share this bill…* panel (2026-09-30): who with, and their part. */
+.dateField select { min-width: 0; width: 100%; border: 1px solid rgb(var(--hairline)); border-radius: 4px; padding: 7px; background: rgb(var(--paper)); color: rgb(var(--ink)); font: inherit; }
+.dateField select:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 1px; }
+.partField { display: flex; align-items: center; gap: 6px; }
+.partField input { width: 72px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.menu button.primary { justify-content: center; background: rgb(var(--accent-bg)); color: rgb(var(--ink)); font-weight: 600; }
+.menu button.primary:hover:not(:disabled), .menu button.primary:focus-visible { background: rgb(var(--accent) / 0.35); }
 .menu button.danger { color: rgb(var(--danger)); }
 .menu button.danger:hover:not(:disabled), .menu button.danger:focus-visible { background: rgb(var(--danger-bg)); color: rgb(var(--danger)); }
 .menu button.danger:disabled { color: rgb(var(--muted)); }

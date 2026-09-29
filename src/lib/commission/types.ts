@@ -112,7 +112,24 @@ export interface SalesOrder {
    * override. It is never an Open Bill, never released, and never carried.
    */
   upsale?: boolean
+  /**
+   * Set on every part of a SHARED bill, the owner's included
+   * (`splitOrdersByShares`, 2026-09-30): whose bill it is and who holds which
+   * part. Display only — the engine pays each part as the ordinary bill it is,
+   * and never reads this.
+   */
+  share?: BillShare
   lines: SalesLine[]
+}
+
+/** Who holds a shared bill (`sales_order_shares`), as every one of its parts carries it. */
+export interface BillShare {
+  /** The bill's own salesperson — the name the ERP put on it. */
+  ownerStaffId: string
+  /** Every holder with their part, the owner first; the parts add up to 1. */
+  parts: { staffId: string; pct: number }[]
+  /** The whole bill's total, before it was split. */
+  wholeTotal: number
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────

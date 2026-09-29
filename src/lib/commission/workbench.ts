@@ -3,7 +3,7 @@ import {
   indexKpiItems, isDepositMet, marginBase, orderRevenueSplit, penaltyBandFor, round2,
 } from './engine'
 import { kpiItemLabel, kpiSourceOf } from './kpi'
-import type { EngineInput, EngineResult, MarginSource, OpenBillTag, SalesOrder, Statement } from './types'
+import type { BillShare, EngineInput, EngineResult, MarginSource, OpenBillTag, SalesOrder, Statement } from './types'
 
 /** Display metadata only; financial facts always come from EngineInput. */
 export interface WorkbenchPersonMeta {
@@ -81,6 +81,22 @@ export interface CommissionOrderRow {
   penaltyMultiplier: number
   penaltyWithheld: number
   totalCommission: number
+  /**
+   * Who holds a shared bill (2026-09-30), named: the row is ONE holder's part
+   * (`staffId`), and this says whose bill it is and who holds the rest.
+   * Absent or null: a bill with one salesperson.
+   */
+  share?: RowShare | null
+}
+
+/** A shared bill's holders, as a ledger names them. */
+export interface RowShare {
+  ownerStaffId: string
+  ownerName: string
+  /** Every holder with their part (0.5 = half), the owner first. */
+  parts: { staffId: string; name: string; pct: number }[]
+  /** The whole bill's total, before it was split. */
+  wholeTotal: number
 }
 
 /** The seller fields describe the downline; beneficiaryStaffId receives this amount. */
@@ -240,6 +256,25 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     ?? input.ranks.find(rank => rank.titleId === hierarchy.get(staffId)?.titleId)?.titleLabel
     ?? rankOf(staffId)?.titleLabel ?? null
   const overrideBases = new Map<string, number>()
+  // Every part of a shared bill carries the same `share`: named once per bill.
+  const named = new Map<BillShare, RowShare>()
+  const shareOf = (share: BillShare | undefined): RowShare | null => {
+    if (!share) return null
+    let row = named.get(share)
+    if (!row) {
+      const parts = share.parts.map(part => ({ staffId: part.staffId, name: nameOf(part.staffId), pct: part.pct }))
+      const owner = parts.filter(part => part.staffId === share.ownerStaffId)
+      const others = parts.filter(part => part.staffId !== share.ownerStaffId).sort((a, b) => a.name.localeCompare(b.name))
+      row = {
+        ownerStaffId: share.ownerStaffId, ownerName: nameOf(share.ownerStaffId),
+        // The owner first, then A→Z — the order every view names them in.
+        parts: [...owner, ...others],
+        wholeTotal: share.wholeTotal,
+      }
+      named.set(share, row)
+    }
+    return row
+  }
 
   const personalRows: CommissionOrderRow[] = input.orders.map(order => {
     const statement = statements.get(order.staffId)
@@ -287,6 +322,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       openBillBonus: component('open_bill'), penaltyMultiplier: multiplier,
       penaltyWithheld: eligible ? sum(result.penalised.filter(row => row.staffId === order.staffId && row.orderId === order.id).map(row => row.withheld)) : 0,
       totalCommission: 0,
+      share: shareOf(order.share),
     }
   })
 

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { shareOrder, unshareOrder } from '../../../../run-actions'
+import type { BillShareAnswer } from '@/lib/commission/bill-share'
 
 export interface ShareHolder {
   staffId: string
@@ -62,11 +63,14 @@ export default function ShareControl({
   const given = shares.reduce((a, s) => a + s.pct, 0)
   const offered = team.filter(m => m.staffId !== ownerStaffId)
 
-  function run(action: () => Promise<void>, after?: () => void) {
+  function run(action: () => Promise<BillShareAnswer>, after?: () => void) {
     setError(null)
     startTransition(async () => {
       try {
-        await action()
+        // A refusal comes back as words (a closed month, a paid run) — production
+        // would show only a digest of a thrown one.
+        const answer = await action()
+        if (!answer.ok) return setError(answer.reason)
         after?.()
         router.refresh()
       } catch (err) {

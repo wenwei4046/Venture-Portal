@@ -93,6 +93,19 @@ describe('splitOrdersByShares', () => {
     expect(parts[0].staffId).toBe('owner')
   })
 
+  it('tells every part whose bill it is and who holds the rest (2026-09-30)', () => {
+    const parts = splitOrdersByShares([bill()], [{ orderId: 'o1', staffId: 'member', pct: 0.5 }])
+    for (const part of parts) {
+      expect(part.share).toEqual({
+        ownerStaffId: 'owner',
+        parts: [{ staffId: 'owner', pct: 0.5 }, { staffId: 'member', pct: 0.5 }],
+        wholeTotal: 10_100,
+      })
+    }
+    // A bill nobody shares carries nothing of the kind.
+    expect(splitOrdersByShares([bill()], [])[0].share).toBeUndefined()
+  })
+
   it('ignores a share naming the owner and shares that would leave the owner nothing', () => {
     expect(splitOrdersByShares([bill()], [{ orderId: 'o1', staffId: 'owner', pct: 0.5 }])).toHaveLength(1)
     expect(

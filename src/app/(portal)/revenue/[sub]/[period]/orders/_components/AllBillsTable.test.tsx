@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   excludeOrder: vi.fn(),
   includeOrder: vi.fn(),
   setOrderBrand: vi.fn(),
+  shareOrder: vi.fn(),
   refresh: vi.fn(),
   push: vi.fn(),
 }))
@@ -12,7 +13,7 @@ vi.mock('../../../../run-actions', () => ({
   excludeOrder: mocks.excludeOrder,
   includeOrder: mocks.includeOrder,
   setOrderBrand: mocks.setOrderBrand,
-  shareOrder: vi.fn(),
+  shareOrder: mocks.shareOrder,
   unshareOrder: vi.fn(),
   setOpenBillRank: vi.fn(),
 }))
@@ -188,5 +189,48 @@ describe('AllBillsTable — brand for the margin', () => {
     const row = screen.getByRole('menuitem', { name: /Brand for the margin/ })
     expect(row).toBeDisabled()
     expect(row).toHaveTextContent('has paid')
+  })
+})
+
+// 2026-09-30: the right-click's *Share this bill…* is on Sales orders too —
+// the same write as *Share…* under the name.
+describe('AllBillsTable — Share this bill…', () => {
+  const TEAM = [{ staffId: 's-1', name: 'ANTHONY' }, { staffId: 's-2', name: 'ADRIAN' }]
+  function shared() {
+    return bill({ shares: [{ staffId: 's-2', name: 'ADRIAN', pct: 0.5 }] })
+  }
+
+  it('names every holder in the menu, and shares from it', async () => {
+    mocks.shareOrder.mockResolvedValue({ ok: true, result: {
+      orderId: 'order-1', orderNo: 'HC-SO-013493', changed: true, staffId: 's-2', name: 'ADRIAN', before: 0.5, after: 0.4,
+      parts: [{ staffId: 's-1', name: 'ANTHONY', pct: 0.6 }, { staffId: 's-2', name: 'ADRIAN', pct: 0.4 }],
+    } })
+    render(
+      <AllBillsTable rows={[shared()]} team={TEAM} openBillPaid={false} commissionNote={null}
+        initialShowExcluded={false} monthLabel="September 2026" hasRun brandOptions={BRANDS} />,
+    )
+    fireEvent.contextMenu(screen.getByText('Sarida'), { clientX: 400, clientY: 260 })
+    const root = screen.getByRole('menu', { name: 'Actions for HC-SO-013493' })
+    expect(root).toHaveTextContent('HC-SO-013493 · ANTHONY + ADRIAN')
+    const row = within(root).getByRole('menuitem', { name: /Share this bill/ })
+    expect(row).toHaveTextContent('ANTHONY 50% · ADRIAN 50%')
+    fireEvent.click(row)
+    const panel = screen.getByRole('dialog', { name: 'Share HC-SO-013493' })
+    fireEvent.change(within(panel).getByLabelText(/Share with/), { target: { value: 's-2' } })
+    fireEvent.change(within(panel).getByLabelText(/Their part/), { target: { value: '40' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(mocks.shareOrder).toHaveBeenCalledWith('order-1', 's-2', 0.4))
+    expect(await screen.findByText(/HC-SO-013493 is shared: ANTHONY 60% · ADRIAN 40%/)).toBeInTheDocument()
+  })
+
+  it('locks the share in a month whose run has paid, and says why', () => {
+    render(
+      <AllBillsTable rows={[bill({ shareDisabled: true, shareDisabledReason: 'x' })]} team={TEAM} openBillPaid={false}
+        commissionNote={null} initialShowExcluded={false} monthLabel="September 2026" hasRun brandOptions={BRANDS} />,
+    )
+    fireEvent.contextMenu(screen.getByText('Sarida'), { clientX: 400, clientY: 260 })
+    const row = screen.getByRole('menuitem', { name: /Share this bill/ })
+    expect(row).toBeDisabled()
+    expect(row).toHaveTextContent('The run for September 2026 has paid')
   })
 })
