@@ -170,6 +170,12 @@ function ReconcilePayrollBillingButtonBody({ currentPeriod }: Props) {
                             .map((s) => (
                               <div key={s.segment} className="font-mono text-xs text-muted">
                                 {s.deptLabel}: 已开 {fmt(s.billed)} → 应开 {fmt(s.should)} ({s.delta > 0 ? '+' : ''}{fmt(s.delta)})
+                                {s.componentDeltas ? (
+                                  <span className="text-muted">
+                                    {' · '}
+                                    {s.componentDeltas.map((c) => `${c.label} ${fmt(c.amount)}`).join(' / ')}
+                                  </span>
+                                ) : null}
                               </div>
                             ))}
                         </td>

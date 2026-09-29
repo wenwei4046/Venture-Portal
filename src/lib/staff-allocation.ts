@@ -187,7 +187,10 @@ export interface ConsolidatedInvoiceLine {
   deptLabel: string
 }
 
-const PAYROLL_COMPONENTS: Array<[keyof AllocationComponents, string]> = [
+/** The itemised lines of a consolidated invoice, in the order they appear.
+ *  Exported since 2026-09-29: the adjustment invoice splits its gap the same
+ *  way, and reads a billed line back by matching these labels. */
+export const PAYROLL_COMPONENTS: Array<[keyof AllocationComponents, string]> = [
   ['salary', 'Salary'],
   ['allowance', 'Allowance'],
   ['epf', 'EPF'],

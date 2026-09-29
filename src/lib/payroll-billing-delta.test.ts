@@ -98,3 +98,95 @@ describe('computeBillingDeltas (对数补差)', () => {
     expect(rows[0].positiveTotal).toBe(0)
   })
 })
+
+// 2026-09-29: an adjustment reads like the original invoice — Salary, EPF,
+// SOCSO and the rest on their own lines (user: "补回的我要明细拆成 salary,
+// epf, socso, eis"). The split is a reading of both sides, never a guess.
+describe('splitting the gap per component', () => {
+  const hrComponents = { salary: 11553.28, allowance: 2747.22, epf: 1637, socso: 203.85, eis: 23.3 }
+
+  it('a segment never billed splits into exactly its own components', () => {
+    const rows = computeBillingDeltas(
+      [{ ...co('hc', 'HC'), segment: 'hr', deptLabel: 'HR', amount: 8082.33, components: {
+        salary: 5776.64, allowance: 1373.61, epf: 818.5, socso: 101.93, eis: 11.65,
+      } }],
+      [{ companyId: 'hc', segment: 'finance', amount: 9805.33, component: 'salary' }],
+      LABELS,
+      new Map(),
+    )
+    const hr = rows[0].segments.find((s) => s.segment === 'hr')!
+    expect(hr.delta).toBe(8082.33)
+    expect(hr.componentDeltas?.map((c) => [c.label, c.amount])).toEqual([
+      ['Salary', 5776.64],
+      ['Allowance', 1373.61],
+      ['EPF', 818.5],
+      ['SOCSO', 101.93],
+      ['EIS', 11.65],
+    ])
+    // What matters most: the lines add up to the gap, to the sen.
+    expect(hr.componentDeltas!.reduce((t, c) => t + c.amount, 0)).toBeCloseTo(hr.delta, 2)
+  })
+
+  it('a top-up on a partly billed segment nets each component', () => {
+    const rows = computeBillingDeltas(
+      [{ ...co('hc', 'HC'), segment: 'finance', deptLabel: 'Finance', amount: 1200, components: {
+        salary: 1000, allowance: 0, epf: 150, socso: 40, eis: 10,
+      } }],
+      [
+        { companyId: 'hc', segment: 'finance', amount: 900, component: 'salary' },
+        { companyId: 'hc', segment: 'finance', amount: 150, component: 'epf' },
+      ],
+      LABELS,
+      new Map(),
+    )
+    const fin = rows[0].segments[0]
+    expect(fin.delta).toBe(150)
+    expect(fin.componentDeltas).toEqual([
+      { key: 'salary', label: 'Salary', amount: 100 },
+      { key: 'socso', label: 'SOCSO', amount: 40 },
+      { key: 'eis', label: 'EIS', amount: 10 },
+    ])
+  })
+
+  it('refuses to split when a component was over-billed inside the gap', () => {
+    const rows = computeBillingDeltas(
+      [{ ...co('hc', 'HC'), segment: 'finance', deptLabel: 'Finance', amount: 1200, components: {
+        salary: 1000, allowance: 0, epf: 150, socso: 40, eis: 10,
+      } }],
+      [
+        { companyId: 'hc', segment: 'finance', amount: 800, component: 'salary' },
+        { companyId: 'hc', segment: 'finance', amount: 200, component: 'epf' },
+      ],
+      LABELS,
+      new Map(),
+    )
+    expect(rows[0].segments[0].delta).toBe(200)
+    expect(rows[0].segments[0].componentDeltas).toBeNull()
+  })
+
+  it('refuses to split when a billed line names no component', () => {
+    const rows = computeBillingDeltas(
+      [{ ...co('hc', 'HC'), segment: 'finance', deptLabel: 'Finance', amount: 1200, components: {
+        salary: 1000, allowance: 0, epf: 150, socso: 40, eis: 10,
+      } }],
+      [{ companyId: 'hc', segment: 'finance', amount: 900, component: null }],
+      LABELS,
+      new Map(),
+    )
+    expect(rows[0].segments[0].componentDeltas).toBeNull()
+  })
+
+  it('hands the rounding remainder to the biggest component', () => {
+    const rows = computeBillingDeltas(
+      [{ ...co('hc', 'HC'), segment: 'hr', deptLabel: 'HR', amount: 100.01, components: {
+        salary: 33.333, allowance: 33.333, epf: 33.333, socso: 0, eis: 0,
+      } }],
+      [{ companyId: 'hc', segment: 'finance', amount: 1, component: 'salary' }],
+      LABELS,
+      new Map(),
+    )
+    const hr = rows[0].segments.find((s) => s.segment === 'hr')!
+    const sum = hr.componentDeltas!.reduce((t, c) => t + c.amount, 0)
+    expect(Math.round(sum * 100) / 100).toBe(hr.delta)
+  })
+})

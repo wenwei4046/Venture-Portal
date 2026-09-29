@@ -18,12 +18,14 @@ import {
   buildConsolidatedInvoiceLines,
   periodShortLabel,
   PAYROLL_SEGMENT_LABEL,
+  PAYROLL_COMPONENTS,
   componentsTotal,
   type DeptComponentGroup,
   type PayrollSegment,
 } from '@/lib/staff-allocation'
 import {
   computeBillingDeltas,
+  type ComponentKey,
   type CompanyBillingDelta,
   type ShouldBillRow,
   type BilledRow,
@@ -1645,6 +1647,19 @@ export async function generateConsolidatedPayrollInvoices(
 // format (per-segment lines → identical issue/settle/P&L routing). Over-billed
 // segments are report-only: consolidated invoices take no credit notes.
 
+/** Which itemised component a billed line was, read off its description.
+ *  Both line builders write "<Label> - <period>…", so the label is the
+ *  prefix. Anything else (a lump adjustment line from before 2026-09-29,
+ *  a hand-typed line) returns null, and its segment is then topped up as a
+ *  single line rather than a split that would not be a reading. */
+function componentOfLine(description: string | null): ComponentKey | null {
+  const text = (description ?? '').trim()
+  for (const [key, label] of PAYROLL_COMPONENTS) {
+    if (text.startsWith(`${label} - `)) return key
+  }
+  return null
+}
+
 const ADJUSTMENT_MARKER = '· adjustment'
 const BILLED_STATUSES = ['issued', 'paid', 'paid_via_netting'] as const
 
@@ -1684,6 +1699,13 @@ async function loadPayrollBillingDeltas(
         Number(r.epf_amount ?? 0) +
         Number(r.socso_amount ?? 0) +
         Number(r.eis_amount ?? 0),
+      components: {
+        salary: Number(r.salary_amount ?? 0),
+        allowance: Number(r.allowance_amount ?? 0),
+        epf: Number(r.epf_amount ?? 0),
+        socso: Number(r.socso_amount ?? 0),
+        eis: Number(r.eis_amount ?? 0),
+      },
     })
   }
 
@@ -1693,13 +1715,18 @@ async function loadPayrollBillingDeltas(
   if (invoiceIds.length > 0) {
     const { data: lines, error: linesErr } = await supabase
       .from('invoice_lines')
-      .select('invoice_id, segment, amount')
+      .select('invoice_id, segment, amount, description')
       .in('invoice_id', invoiceIds)
     if (linesErr) throw new Error(`Failed to load invoice lines: ${linesErr.message}`)
     for (const l of lines ?? []) {
       const companyId = companyByInvoice.get(l.invoice_id as string)
       if (!companyId || !l.segment) continue
-      billed.push({ companyId, segment: l.segment as string, amount: Number(l.amount) })
+      billed.push({
+        companyId,
+        segment: l.segment as string,
+        amount: Number(l.amount),
+        component: componentOfLine(l.description as string | null),
+      })
     }
   }
 
@@ -1786,13 +1813,27 @@ export async function generatePayrollAdjustmentInvoices(
   const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
   const generated: string[] = []
   for (const d of eligible) {
+    // Itemised like the original invoice (user 2026-09-29), so the
+    // subsidiary sees Salary / Allowance / EPF / SOCSO / EIS rather than one
+    // lump. componentDeltas already sums to the segment gap to the sen; when
+    // it is null the split could not be read, and one line is still right.
     const lines = d.segments
       .filter((s) => s.delta > 0.005)
-      .map((s) => ({
-        description: `${s.deptLabel} payroll adjustment - ${periodShort}`,
-        amount: Math.round(s.delta * 100) / 100,
-        segment: s.segment as PayrollSegment,
-      }))
+      .flatMap((s) =>
+        s.componentDeltas
+          ? s.componentDeltas.map((c) => ({
+              description: `${s.deptLabel} ${c.label} adjustment - ${periodShort}`,
+              amount: c.amount,
+              segment: s.segment as PayrollSegment,
+            }))
+          : [
+              {
+                description: `${s.deptLabel} payroll adjustment - ${periodShort}`,
+                amount: Math.round(s.delta * 100) / 100,
+                segment: s.segment as PayrollSegment,
+              },
+            ],
+      )
     const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
     if (lines.length === 0 || total <= 0) continue
 
