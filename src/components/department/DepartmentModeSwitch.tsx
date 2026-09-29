@@ -80,7 +80,9 @@ export default function DepartmentModeSwitch({
           type="button"
           onClick={confirm}
           disabled={isPending}
-          className="bg-accent hover:bg-accent-hover disabled:opacity-40 text-sm px-3 py-1.5 rounded-control transition-colors"
+          // White on the portal's blue; the sheet's own rule turns it back to
+          // black on its orange ("anything painted orange carries black lettering").
+          className="bg-accent hover:bg-accent-hover text-white disabled:opacity-40 text-sm px-3 py-1.5 rounded-control transition-colors"
         >
           {isPending ? 'Switching…' : `Switch to ${COST_MODEL_LABEL[target]}`}
         </button>
