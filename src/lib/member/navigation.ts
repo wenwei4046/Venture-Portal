@@ -3,7 +3,7 @@ export const MEMBER_ROUTE_CHANGE = "member-route-change";
 
 const stateKey = "__houzsMemberNavigationV1";
 const memberPages = new Set([
-  "today", "insight", "arena", "income", "quote", "team", "requests", "memos", "account",
+  "today", "insight", "arena", "income", "quote", "team", "requests", "memos", "crm", "account",
 ]);
 type RouteMarker = { id: number; current: string; previous: string };
 // A history entry is trusted only if this running workspace created its marker.

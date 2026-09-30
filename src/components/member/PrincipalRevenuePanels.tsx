@@ -175,6 +175,7 @@ export default function PrincipalRevenuePanels({ data, member, page, navigate, o
             ["team", "team", "Team", "Department map and the selected reporting tree"],
             ["requests", "receipt", "Requests", "Review claims, team changes and waiting lists"],
             ["memos", "bell", "Memos & notifications", "Read published team updates"],
+            ["crm", "chat", "CRM", "Meta ads leads, replies and appointments"],
           ] as const).map(([destination, icon, label, description]) => <button key={destination} className={`${s.listRow} ${s.listButton} ${p.actionRow}`} onClick={() => navigate(destination)}><span className={p.rowIcon}><Icon name={icon} size={24} /></span><span className={p.rowCopy}><h3>{label}</h3><span className={s.caption}>{description}</span></span><Icon name="chevron" size={18} /></button>)}
         </section>
       </div>

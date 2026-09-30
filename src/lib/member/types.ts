@@ -9,6 +9,7 @@ export type MemberPage =
   | "team"
   | "requests"
   | "memos"
+  | "crm"
   | "account";
 export type RequestKind = "claim" | "replacement" | "waiting";
 /** An explicit read-only Principal context; never replaces the signed-in profile. */

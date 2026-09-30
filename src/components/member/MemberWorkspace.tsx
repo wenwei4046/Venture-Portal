@@ -20,6 +20,7 @@ import MemberQuoteBuilder from "./MemberQuoteBuilder";
 import MemberSearch, { type MemberSearchItem } from "./MemberSearch";
 import PortalViewSwitcher from "@/components/layout/PortalViewSwitcher";
 import PrincipalRevenuePanels, { RevenueManagementButton } from "./PrincipalRevenuePanels";
+import MemberCrm from "./MemberCrm";
 import principalStyles from "./PrincipalRevenuePanels.module.css";
 import { categoryLabel } from "@/lib/member/catalog";
 import {
@@ -92,6 +93,7 @@ const labels: Record<MemberPage, string> = {
   team: "My team",
   requests: "Requests",
   memos: "Memos & notifications",
+  crm: "CRM",
   account: "Profile",
 };
 const statusLabels: Record<string, string> = {
@@ -2081,6 +2083,7 @@ export default function MemberWorkspace({
                     : ([["insight", "chart", "Insight · sales, ranking & downline"]] as const)),
                   ["requests", "receipt", "Requests"],
                   ["memos", "bell", "Memos & notifications"],
+                  ["crm", "chat", "CRM"],
                   ["team", "team", "Team & capacity"],
                 ] as const
               ).map(([p, i, l]) => (
@@ -2222,6 +2225,13 @@ export default function MemberWorkspace({
   }
   const activeMemo = data.memos.find((m) => m.id === selectedMemo),
     activeRequest = data.requests.find((r) => r.id === selectedRequest);
+  // CRM is an app of its own: its own top bar and Inbox / Calendar / Profile
+  // bar replace the workspace chrome. Back returns to Profile.
+  if (page === "crm" && member) {
+    return <div className={`${s.workspace} ${liveDesign ? liveStyles.workspace : ""}`} lang="en-MY">
+      <MemberCrm salesperson={data.profile.name} onExit={() => navigate("account")} />
+    </div>;
+  }
   return (
     <div className={`${s.workspace} ${design ? motion.shell : ""} ${liveDesign ? liveStyles.workspace : ""}`} lang="en-MY" data-arena-design={design} data-revenue-design={design} data-revenue-preview={isDesignPreview ? design : undefined}>
       <div id="member-shell">

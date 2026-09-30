@@ -1,3 +1,11 @@
+/* A sideways trackpad swipe made Chrome slide the whole app aside to show the
+   previous page behind it: two copies of the workspace on screen. The app
+   has its own Back button, so the browser's swipe-to-navigate is off here. */
+:global(html):has(.workspace),
+:global(body):has(.workspace) {
+  overscroll-behavior-x: none;
+}
+
 .workspace {
   --m-bg: rgb(var(--paper));
   --m-card: rgb(var(--surface));
