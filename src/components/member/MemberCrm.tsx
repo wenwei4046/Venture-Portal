@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CRM_LOST_REASONS, CRM_STATUSES, URGENCY_LABELS,
+  CRM_LOST_REASONS, CRM_STATUSES, messagePreview, clipLength, autoRepliesFor, DEFAULT_AUTO_REPLIES, URGENCY_LABELS,
   appointmentRate, appointmentSlots, showUpRate, applyAutoFollowUp, cancelAppointment, crmStatusLabel, daySlots,
   lostReasonComplete, lostReasonLabel, markAttended, previousLabel, receiveCustomerMessage, replyUrgency,
   rescheduleAppointment, setLeadStatus, slotClash, sortByUrgency, statusAfterCancel, statusAfterReply, waitingLabel,
   type CrmAppointment, type CrmBusySlot, type CrmLead, type CrmLost, type CrmLostReason,
-  type CrmMessage, type CrmStatus, type CrmUrgency,
+  type CrmAttachment, type CrmAutoReplySettings, type CrmMessage, type CrmStatus, type CrmUrgency,
 } from "@/lib/member/crm";
 import { detectRequestedTime } from "@/lib/member/crm-datetime";
 import { crmDemo, demoShowrooms } from "@/lib/member/crm-demo";
@@ -15,6 +15,9 @@ import s from "./member.module.css";
 import c from "./MemberCrm.module.css";
 import { Icon, initials } from "./MemberUI";
 import MemberCrmUpcoming from "./MemberCrmUpcoming";
+import MemberCrmComposer from "./MemberCrmComposer";
+import MemberCrmContacts from "./MemberCrmContacts";
+import MemberCrmAutoReplies from "./MemberCrmAutoReplies";
 import { apptLabel, dayLabel, roomName, time, whenLabel } from "./crm-format";
 
 const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
@@ -24,7 +27,7 @@ const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
 type BusyFor = (showroomId: string) => { room: CrmBusySlot[]; mine: CrmBusySlot[] };
 
 /** The CRM's own bottom bar: Inbox (leads and chats), Calendar (appointments), Profile (your numbers). */
-type Tab = "inbox" | "calendar" | "profile";
+type Tab = "inbox" | "contacts" | "calendar" | "profile" | "settings";
 type View = { kind: "tab" } | { kind: "chat"; leadId: string } | { kind: "appointment"; appointmentId: string };
 
 /**
@@ -42,6 +45,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   const [tab, setTab] = useState<Tab>("inbox");
   const [view, setView] = useState<View>({ kind: "tab" });
   const [filter, setFilter] = useState<CrmStatus | "all">("all");
+  const [autoReplies, setAutoReplies] = useState<CrmAutoReplySettings>(DEFAULT_AUTO_REPLIES);
   const [booking, setBooking] = useState(false);
 
   // The clock behind the colours: every minute the waits grow, and a New lead
@@ -76,7 +80,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
     setAppointments(list => [...list, appt]);
     updateLead(leadId, l => ({
       ...setLeadStatus(l, "appointment"),
-      messages: [...l.messages, systemNote(`Appointment booked: ${apptLabel(appt)}. Added to the showroom calendar and yours. Customer notified.`, "booking")],
+      messages: [...l.messages,
+        systemNote(`Appointment booked: ${apptLabel(appt)}. Added to the showroom calendar and yours.`, "booking"),
+        { id: crypto.randomUUID(), from: "me", text: "", at: new Date().toISOString(), card: { start, showroom: roomName(showroomId) } },
+      ],
     }));
     setBooking(false);
   }
@@ -84,7 +91,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   function reschedule(appt: CrmAppointment, start: string, showroomId: string) {
     const moved = rescheduleAppointment(appt, start, showroomId);
     setAppointments(list => list.map(a => (a.id === appt.id ? moved : a)));
-    note(appt.leadId, `Appointment changed to ${apptLabel(moved)}. Customer notified of the new time.`, "booking");
+    updateLead(appt.leadId, l => ({ ...l, messages: [...l.messages,
+      systemNote(`Appointment changed to ${apptLabel(moved)}.`, "booking"),
+      { id: crypto.randomUUID(), from: "me", text: "", at: new Date().toISOString(), card: { start, showroom: roomName(showroomId) } },
+    ] }));
   }
 
   function cancel(appt: CrmAppointment) {
@@ -133,15 +143,23 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
           const next = setLeadStatus(l, status, lost);
           return lost ? { ...next, messages: [...next.messages, systemNote(`Marked Lost: ${lostReasonLabel(lost)}.`)] } : next;
         })}
+        onAttachment={attachment => updateLead(lead.id, l => ({
+          ...l,
+          status: statusAfterReply(l.status),
+          messages: [...l.messages, { id: crypto.randomUUID(), from: "me", text: "", attachment, at: new Date().toISOString() }],
+        }))}
         onSend={text => updateLead(lead.id, l => ({
           ...l,
           status: statusAfterReply(l.status),
           messages: [...l.messages, { id: crypto.randomUUID(), from: "me", text, at: new Date().toISOString() }],
         }))}
-        onCustomerMessage={text => updateLead(lead.id, l => ({
-          ...receiveCustomerMessage(l, { id: crypto.randomUUID(), from: "lead", text, at: new Date().toISOString() }),
-          unread: 0, // they are looking at the chat
-        }))}
+        onCustomerMessage={text => updateLead(lead.id, l => {
+          const message: CrmMessage = { id: crypto.randomUUID(), from: "lead", text, at: new Date().toISOString() };
+          const received = receiveCustomerMessage(l, message);
+          const replies = autoRepliesFor(received, message, autoReplies)
+            .map((reply, i): CrmMessage => ({ id: crypto.randomUUID(), from: "me", auto: true, text: reply, at: new Date(Date.now() + 1000 * (i + 1)).toISOString() }));
+          return { ...received, unread: 0, messages: [...received.messages, ...replies] }; // they are looking at the chat
+        })}
         booking={booking}
         onBooking={setBooking}
         busy={busyFor}
@@ -189,7 +207,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
             <span className={c.leadBody}>
               <span className={c.leadTop}><strong>{lead.name}</strong><span className={s.caption}>{whenLabel(last?.at ?? lead.createdAt)}</span></span>
               <span className={c.leadAd}>{lead.adName}</span>
-              <span className={c.leadPreview}>{last?.from === "me" ? "You: " : ""}{last?.text}</span>
+              <span className={c.leadPreview}>{last?.from === "me" ? "You: " : ""}{last && messagePreview(last)}</span>
               <span className={c.leadMeta}>
                 <span className={c.status} data-status={lead.status}>{crmStatusLabel(lead.status)}{lead.lost && ` · ${lostReasonLabel(lead.lost)}`}</span>
                 {lead.previous && <span className={c.previous}>{previousLabel(lead.previous)}</span>}
@@ -200,6 +218,14 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
           </button>;
         })}
       </section>
+    </>;
+  }
+
+  // ── Contacts ──────────────────────────────────────────────────────────────
+  if (!inDetail && tab === "contacts") {
+    body = <>
+      <div className={c.tabTitle}><h1>Contacts</h1><p className={s.sub}>{leads.length} customers from both pages</p></div>
+      <MemberCrmContacts leads={leads} appointments={appointments} onOpen={id => { setTab("inbox"); openLead(id); }} />
     </>;
   }
 
@@ -280,10 +306,20 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
     </>;
   }
 
+  // ── Settings ──────────────────────────────────────────────────────────────
+  if (!inDetail && tab === "settings") {
+    body = <>
+      <div className={c.tabTitle}><h1>Settings</h1><p className={s.sub}>How your CRM works for you</p></div>
+      <MemberCrmAutoReplies settings={autoReplies} onChange={setAutoReplies} />
+    </>;
+  }
+
   const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = [
     { id: "inbox", icon: "chat", label: "Inbox", badge: needsReply },
+    { id: "contacts", icon: "team", label: "Contacts" },
     { id: "calendar", icon: "calendar", label: "Calendar", badge: upcomingCount },
     { id: "profile", icon: "user", label: "Profile" },
+    { id: "settings", icon: "gear", label: "Settings" },
   ];
 
   return (
@@ -305,7 +341,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   );
 }
 
-function Conversation({ lead, now, appointments, salesperson, onBack, onOpenAppointment, onStatus, onSend, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
+function Conversation({ lead, now, appointments, salesperson, onBack, onOpenAppointment, onStatus, onSend, onAttachment, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
   lead: CrmLead;
   now: Date;
   appointments: CrmAppointment[];
@@ -314,6 +350,7 @@ function Conversation({ lead, now, appointments, salesperson, onBack, onOpenAppo
   onOpenAppointment: (id: string) => void;
   onStatus: (status: CrmStatus, lost?: CrmLost) => void;
   onSend: (text: string) => void;
+  onAttachment: (attachment: CrmAttachment) => void;
   onCustomerMessage: (text: string) => void;
   booking: boolean;
   onBooking: (open: boolean) => void;
@@ -321,7 +358,6 @@ function Conversation({ lead, now, appointments, salesperson, onBack, onOpenAppo
   onBook: (showroomId: string, start: string) => void;
   onReschedule: (appt: CrmAppointment, start: string) => void;
 }) {
-  const [draft, setDraft] = useState("");
   const [demoDraft, setDemoDraft] = useState("");
   const [askingLost, setAskingLost] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -340,7 +376,6 @@ function Conversation({ lead, now, appointments, salesperson, onBack, onOpenAppo
 
   const urgency = replyUrgency(lead, now);
   const active = appointments.find(a => a.state === "booked") ?? null;
-  const send = () => { const text = draft.trim(); if (text) { onSend(text); setDraft(""); } };
 
   // The time the customer asked for in their latest message, if any and not yet answered.
   const lastCustomer = [...lead.messages].reverse().find(m => m.from === "lead");
@@ -398,8 +433,19 @@ function Conversation({ lead, now, appointments, salesperson, onBack, onOpenAppo
 
       <div className={c.messages}>
         {lead.messages.map(m => (
-          <div key={m.id} className={c.bubble} data-from={m.from}>
-            <p>{m.text}</p>
+          <div key={m.id} className={c.bubble} data-from={m.from} data-media={m.attachment?.kind} data-auto={m.auto || undefined} data-card={m.card ? true : undefined}>
+            {m.auto && <small className={c.autoTag}>Auto-reply</small>}
+            {m.card && <span className={c.apptCard}>
+              <small>APPOINTMENT CONFIRMED</small>
+              <strong>{dayLabel(m.card.start)}, {time(m.card.start)}</strong>
+              <span>{m.card.showroom}</span>
+              <em>Sent to the customer · they can pin it in Messenger</em>
+            </span>}
+            {/* eslint-disable-next-line @next/next/no-img-element -- a customer's photo (a blob or Meta CDN URL), not a site asset next/image can optimise */}
+            {m.attachment?.kind === "image" && <a href={m.attachment.url} target="_blank" rel="noreferrer"><img className={c.media} src={m.attachment.url} alt={m.attachment.name ?? "Photo"} /></a>}
+            {m.attachment?.kind === "video" && <video className={c.media} src={m.attachment.url} controls playsInline preload="metadata" />}
+            {m.attachment?.kind === "audio" && <span className={c.voice}><Icon name="mic" size={16} /><audio src={m.attachment.url} controls preload="metadata" />{m.attachment.seconds ? <small>{clipLength(m.attachment.seconds)}</small> : null}</span>}
+            {m.text && <p>{m.text}</p>}
             <span>{whenLabel(m.at)}</span>
           </div>
         ))}
@@ -431,11 +477,7 @@ function Conversation({ lead, now, appointments, salesperson, onBack, onOpenAppo
         ? <BookingSheet title="Book appointment" confirmLabel="Confirm" busy={busy()} onCancel={() => onBooking(false)} onConfirm={(r, start) => onBook(r, start)} />
         : <button className={`${s.button} ${s.primary} ${s.full}`} onClick={() => onBooking(true)}><Icon name="calendar" /> Book appointment</button>)}
 
-      <div className={c.composer}>
-        <input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") send(); }}
-          placeholder={`Reply to ${lead.name.split(" ")[0]}…`} aria-label="Reply" />
-        <button onClick={send} disabled={!draft.trim()} aria-label="Send"><Icon name="arrow" size={18} /></button>
-      </div>
+      <MemberCrmComposer placeholder={`Reply to ${lead.name.split(" ")[0]}…`} onText={onSend} onAttachment={onAttachment} />
 
       {/* Demo only: stands in for a message arriving from the customer. */}
       <details className={c.demoTool}>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  appointmentRate, appointmentSlots, relativeWhen, showUpRate, upcomingByDay, applyAutoFollowUp, cancelAppointment, markAttended, previousLabel, receiveCustomerMessage, rescheduleAppointment, statusAfterCancel, daySlots, isClosedStatus, statusAfterReply, lostReasonComplete, lostReasonLabel, openMinutesBetween, replyUrgency, setLeadStatus, slotClash, sortByUrgency, waitingLabel,
+  appointmentRate, appointmentSlots, autoRepliesFor, DEFAULT_AUTO_REPLIES, messagePreview, searchContacts, clipLength, relativeWhen, showUpRate, upcomingByDay, applyAutoFollowUp, cancelAppointment, markAttended, previousLabel, receiveCustomerMessage, rescheduleAppointment, statusAfterCancel, daySlots, isClosedStatus, statusAfterReply, lostReasonComplete, lostReasonLabel, openMinutesBetween, replyUrgency, setLeadStatus, slotClash, sortByUrgency, waitingLabel,
   type CrmAppointment, type CrmLead, type CrmMessage,
 } from "./crm";
 
@@ -276,3 +276,74 @@ describe("show-up rate", () => {
     expect(showUpRate([appt("a", future)], now).rate).toBeNull();
   });
 });
+
+describe("attachments", () => {
+  const m = (attachment?: CrmMessage["attachment"], text = ""): CrmMessage => ({ id: "x", from: "lead", text, at: "2026-10-01T04:00:00.000Z", attachment });
+
+  it("previews a message by what was sent", () => {
+    expect(messagePreview(m(undefined, "Hello"))).toBe("Hello");
+    expect(messagePreview(m({ kind: "image", url: "u" }))).toBe("📷 Photo");
+    expect(messagePreview(m({ kind: "video", url: "u" }, "Our kitchen"))).toBe("🎥 Video · Our kitchen");
+    expect(messagePreview(m({ kind: "audio", url: "u", seconds: 83 }))).toBe("🎤 Voice message (1:23)");
+  });
+
+  it("writes a clip length as minutes and seconds", () => {
+    expect([clipLength(7), clipLength(60), clipLength(125)]).toEqual(["0:07", "1:00", "2:05"]);
+  });
+});
+
+describe("contacts", () => {
+  const people: CrmLead[] = [
+    { ...lead("1"), name: "Tan Mei Ling", phone: "+60 12-345 6789", pageName: "Dream Crafter Design" },
+    { ...lead("2"), name: "Ahmad Faizal", phone: "+60 17-222 3344", pageName: "The Conts Property Management" },
+    { ...lead("3"), name: "Lim Wei Jie", phone: "+60 16-888 1200", pageName: "Dream Crafter Design" },
+  ];
+
+  it("lists everybody A–Z", () => {
+    expect(searchContacts(people, "").map(p => p.name)).toEqual(["Ahmad Faizal", "Lim Wei Jie", "Tan Mei Ling"]);
+  });
+
+  it("finds by name or by phone digits however they are typed", () => {
+    expect(searchContacts(people, "mei").map(p => p.id)).toEqual(["1"]);
+    expect(searchContacts(people, "012-345").map(p => p.id)).toEqual(["1"]);
+    expect(searchContacts(people, "12").map(p => p.id)).toEqual([]); // too few digits to mean a phone
+  });
+
+  it("narrows to one Page", () => {
+    expect(searchContacts(people, "", "Dream Crafter Design").map(p => p.id)).toEqual(["3", "1"]);
+  });
+});
+
+describe("auto-replies", () => {
+  const msg = (text: string, at: Date, id = "m"): CrmMessage => ({ id, from: "lead", text, at: at.toISOString() });
+  const day = (h: number) => new Date(2026, 9, 1, h, 0);
+
+  it("welcomes a new customer once", () => {
+    const first = msg("Hi", day(10));
+    expect(autoRepliesFor({ ...lead("a"), messages: [first] }, first, DEFAULT_AUTO_REPLIES)).toEqual([DEFAULT_AUTO_REPLIES.welcome.text]);
+    const second = msg("Hello again", day(11), "m2");
+    expect(autoRepliesFor({ ...lead("a"), messages: [first, second] }, second, DEFAULT_AUTO_REPLIES)).toEqual([]);
+  });
+
+  it("answers after hours and on keywords, in that order", () => {
+    const earlier = msg("Hi", day(10), "m0");
+    const late = msg("What is the 价钱?", day(22), "m1");
+    expect(autoRepliesFor({ ...lead("a"), messages: [earlier, late] }, late, DEFAULT_AUTO_REPLIES))
+      .toEqual([DEFAULT_AUTO_REPLIES.afterHours.text, DEFAULT_AUTO_REPLIES.keywords[0].text]);
+  });
+
+  it("skips rules that are switched off, and never answers its own messages", () => {
+    const off = { ...DEFAULT_AUTO_REPLIES, welcome: { ...DEFAULT_AUTO_REPLIES.welcome, on: false } };
+    const first = msg("hi", day(10));
+    expect(autoRepliesFor({ ...lead("a"), messages: [first] }, first, off)).toEqual([]);
+    expect(autoRepliesFor(lead("a"), { ...first, from: "me" }, DEFAULT_AUTO_REPLIES)).toEqual([]);
+  });
+
+  it("does not count as the salesperson's reply", () => {
+    const now = new Date(2026, 9, 1, 16, 0);
+    const asked = msg("hi", new Date(2026, 9, 1, 9, 0));
+    const auto: CrmMessage = { id: "a", from: "me", auto: true, text: "Thanks!", at: new Date(2026, 9, 1, 9, 0, 5).toISOString() };
+    expect(replyUrgency({ ...lead("x"), messages: [asked, auto] }, now).level).toBe("urgent");
+  });
+});
+

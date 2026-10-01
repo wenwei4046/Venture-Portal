@@ -46,7 +46,7 @@ export function crmDemo(): {
   const leads: CrmLead[] = [
     {
       id: "l1", name: "Tan Mei Ling", phone: "+60 12-345 6789",
-      adName: "Akemi Mattress · October Fair", campaign: "AKEMI OCT",
+      adName: "Akemi Mattress · October Fair", campaign: "AKEMI OCT", pageName: "Dream Crafter Design",
       status: "new", createdAt: ago(215), unread: 1,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: interested in a Queen mattress, prefers weekend visit.", at: ago(215) },
@@ -55,7 +55,7 @@ export function crmDemo(): {
     },
     {
       id: "l2", name: "Ahmad Faizal", phone: "+60 17-222 3344",
-      adName: "Sofa Clearance · Carousel", campaign: "SOFA CLEARANCE",
+      adName: "Sofa Clearance · Carousel", campaign: "SOFA CLEARANCE", pageName: "The Conts Property Management",
       status: "follow_up", createdAt: ago(10 * 60), unread: 1,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: 3-seater sofa, budget RM 3,000–4,000.", at: ago(10 * 60) },
@@ -65,7 +65,7 @@ export function crmDemo(): {
     },
     {
       id: "l3", name: "Lim Wei Jie", phone: "+60 16-888 1200",
-      adName: "Akemi Mattress · October Fair", campaign: "AKEMI OCT",
+      adName: "Akemi Mattress · October Fair", campaign: "AKEMI OCT", pageName: "Dream Crafter Design",
       status: "appointment", createdAt: at(-2, 11, 0), unread: 1,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: King size, back pain.", at: at(-2, 11, 0) },
@@ -77,7 +77,7 @@ export function crmDemo(): {
     },
     {
       id: "l6", name: "Siti Hajar", phone: "+60 13-456 7788",
-      adName: "Bedframe Bundle · Reels", campaign: "BEDFRAME BUNDLE",
+      adName: "Bedframe Bundle · Reels", campaign: "BEDFRAME BUNDLE", pageName: "Dream Crafter Design",
       status: "new", createdAt: ago(30 * 60), unread: 1,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: single bed frame for a child room.", at: ago(30 * 60) },
@@ -87,7 +87,7 @@ export function crmDemo(): {
     {
       // Won last month; wrote again, so the lead came back to Follow up by itself.
       id: "l7", name: "Chong Li Na", phone: "+60 12-909 1188",
-      adName: "Akemi Mattress · September", campaign: "AKEMI SEP",
+      adName: "Akemi Mattress · September", campaign: "AKEMI SEP", pageName: "Dream Crafter Design",
       status: "follow_up", previous: { status: "won" }, createdAt: at(-20, 14, 0), unread: 1,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: Queen mattress.", at: at(-20, 14, 0) },
@@ -97,7 +97,7 @@ export function crmDemo(): {
     },
     {
       id: "l8", name: "Rajesh Kumar", phone: "+60 12-771 4455",
-      adName: "Sofa Clearance · Carousel", campaign: "SOFA CLEARANCE",
+      adName: "Sofa Clearance · Carousel", campaign: "SOFA CLEARANCE", pageName: "The Conts Property Management",
       status: "appointment", createdAt: at(-3, 10, 0), unread: 0,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: recliner sofa.", at: at(-3, 10, 0) },
@@ -108,7 +108,7 @@ export function crmDemo(): {
     },
     {
       id: "l9", name: "Goh Siew Ling", phone: "+60 16-330 9087",
-      adName: "Akemi Mattress · October Fair", campaign: "AKEMI OCT",
+      adName: "Akemi Mattress · October Fair", campaign: "AKEMI OCT", pageName: "Dream Crafter Design",
       status: "appointment", createdAt: at(-1, 13, 0), unread: 0,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: 2 single mattresses for kids.", at: at(-1, 13, 0) },
@@ -119,7 +119,7 @@ export function crmDemo(): {
     },
     {
       id: "l4", name: "Nurul Aina", phone: "+60 19-765 4321",
-      adName: "Bedframe Bundle · Reels", campaign: "BEDFRAME BUNDLE",
+      adName: "Bedframe Bundle · Reels", campaign: "BEDFRAME BUNDLE", pageName: "Dream Crafter Design",
       status: "follow_up", createdAt: ago(36 * 60), unread: 2,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: bed frame + mattress bundle.", at: ago(36 * 60) },
@@ -130,7 +130,7 @@ export function crmDemo(): {
     },
     {
       id: "l5", name: "Wong Kah Hou", phone: "+60 11-1010 2020",
-      adName: "Sofa Clearance · Carousel", campaign: "SOFA CLEARANCE",
+      adName: "Sofa Clearance · Carousel", campaign: "SOFA CLEARANCE", pageName: "The Conts Property Management",
       status: "lost", lost: { reason: "bought_elsewhere" }, createdAt: at(-6, 13, 0), unread: 0,
       messages: [
         { id: "m1", from: "system", text: "Lead form submitted: L-shape sofa.", at: at(-6, 13, 0) },

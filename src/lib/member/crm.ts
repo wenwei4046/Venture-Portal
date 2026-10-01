@@ -92,8 +92,33 @@ export interface CrmMessage {
   from: "lead" | "me" | "system";
   /** A system note the salesperson caused. A booking answers the customer, so it stops the reply clock. */
   kind?: "booking";
+  /** Sent by an auto-reply rule, not typed by the salesperson — it does not stop the reply clock. */
+  auto?: boolean;
+  /** The appointment card the customer receives when one is booked or moved. */
+  card?: { start: string; showroom: string };
   text: string;
   at: string; // ISO timestamp
+  /** A photo, video or voice message sent with (or instead of) text. */
+  attachment?: CrmAttachment;
+}
+
+export interface CrmAttachment {
+  kind: "image" | "video" | "audio";
+  url: string;
+  name?: string;
+  /** Voice messages: length in seconds. */
+  seconds?: number;
+}
+
+/** "0:07", "1:23" — a voice message's length. */
+export const clipLength = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+
+/** One line for a lead list or notification: the text, or what was sent when there is none. */
+export function messagePreview(message: CrmMessage): string {
+  const a = message.attachment;
+  if (!a) return message.text;
+  const label = a.kind === "image" ? "📷 Photo" : a.kind === "video" ? "🎥 Video" : `🎤 Voice message${a.seconds ? ` (${clipLength(a.seconds)})` : ""}`;
+  return message.text ? `${label} · ${message.text}` : label;
 }
 
 export interface CrmAppointment {
@@ -151,6 +176,8 @@ export interface CrmLead {
   name: string;
   phone: string;
   adName: string; // the Meta ad the lead form came from
+  /** The Facebook Page the customer wrote to. */
+  pageName?: string;
   campaign: string;
   status: CrmStatus;
   lost?: CrmLost; // set exactly while status is Lost
@@ -233,7 +260,7 @@ export const URGENCY_LABELS: Record<Exclude<CrmUrgency, "none">, string> = {
 
 export function replyUrgency(lead: CrmLead, now: Date = new Date()): { level: CrmUrgency; waitingMinutes: number } {
   if (lead.status === "won" || lead.status === "lost") return { level: "none", waitingMinutes: 0 };
-  const last = [...lead.messages].reverse().find(m => m.from !== "system" || m.kind === "booking");
+  const last = [...lead.messages].reverse().find(m => (m.from !== "system" || m.kind === "booking") && !m.auto);
   if (!last || last.from !== "lead") return { level: "none", waitingMinutes: 0 };
   const waitingMinutes = openMinutesBetween(new Date(last.at), now);
   const t = URGENCY_THRESHOLDS;
@@ -330,3 +357,61 @@ export function showUpRate(appointments: CrmAppointment[], now: Date = new Date(
   const showed = due.filter(a => a.state === "attended").length;
   return { due: due.length, showed, rate: due.length ? showed / due.length : null };
 }
+
+/**
+ * The contact list: every customer, searchable by name or phone (digits only,
+ * and the Malaysian 012… and +60 12… are the same number), optionally one Page, A–Z.
+ */
+const localDigits = (phone: string) => phone.replace(/\D/g, "").replace(/^60/, "0");
+
+export function searchContacts(leads: CrmLead[], query: string, pageName?: string): CrmLead[] {
+  const q = query.trim().toLowerCase();
+  const digits = localDigits(q);
+  return leads
+    .filter(l => !pageName || l.pageName === pageName)
+    .filter(l => !q || l.name.toLowerCase().includes(q) || (digits.length >= 3 && localDigits(l.phone).includes(digits)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/* ── Auto-replies ───────────────────────────────────────────────────────── */
+
+export interface CrmAutoReplySettings {
+  /** The first message from a new customer. */
+  welcome: { on: boolean; text: string };
+  /** A message outside opening hours (8am–8pm). */
+  afterHours: { on: boolean; text: string };
+  /** A word in the customer's message → a canned answer. Case-insensitive. */
+  keywords: { id: string; on: boolean; words: string; text: string }[];
+}
+
+export const DEFAULT_AUTO_REPLIES: CrmAutoReplySettings = {
+  welcome: { on: true, text: "Hi! Thanks for contacting us 😊 A salesperson will reply shortly. May we have your name and phone number?" },
+  afterHours: { on: true, text: "Thanks for your message! We're open 8am–8pm daily and will reply first thing tomorrow." },
+  keywords: [
+    { id: "price", on: true, words: "price, harga, 价钱, 價錢, how much", text: "Our prices depend on size and design. Share your measurements and we'll send a quote." },
+    { id: "location", on: true, words: "address, location, alamat, 地址, where", text: "You can visit our showroom — ask your salesperson for the nearest one and the opening hours." },
+  ],
+};
+
+const isOpen = (at: Date, hours = OPENING_HOURS) => at.getHours() >= hours.open && at.getHours() < hours.close;
+
+/**
+ * The auto-replies a customer's message triggers, in the order they are sent:
+ * the welcome (first message only), the after-hours note, then every keyword
+ * rule whose word appears. Each rule fires once per message.
+ */
+export function autoRepliesFor(lead: CrmLead, message: CrmMessage, settings: CrmAutoReplySettings): string[] {
+  if (message.from !== "lead") return [];
+  const out: string[] = [];
+  const earlier = lead.messages.filter(m => m.from === "lead" && m.id !== message.id);
+  if (settings.welcome.on && earlier.length === 0 && settings.welcome.text.trim()) out.push(settings.welcome.text.trim());
+  if (settings.afterHours.on && !isOpen(new Date(message.at)) && settings.afterHours.text.trim()) out.push(settings.afterHours.text.trim());
+  const text = message.text.toLowerCase();
+  for (const rule of settings.keywords) {
+    if (!rule.on || !rule.text.trim()) continue;
+    const words = rule.words.split(",").map(w => w.trim().toLowerCase()).filter(Boolean);
+    if (words.some(w => text.includes(w))) out.push(rule.text.trim());
+  }
+  return out;
+}
+

@@ -252,3 +252,83 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .barLabel { font-size: 13px; }
 .bar { height: 8px; border-radius: 4px; background: var(--m-soft); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 4px; background: var(--m-brand); }
+
+/* Inbox: Chats | Contacts */
+.segment { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--m-soft); }
+.segment button { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--m-sub); font-weight: 700; cursor: pointer; }
+.segment [aria-selected="true"] { background: var(--m-card); color: var(--m-text); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+
+/* Contacts */
+.search { display: flex; align-items: center; gap: 8px; padding: 0 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-sub); }
+.search input { flex: 1; min-width: 0; min-height: 42px; border: 0; background: transparent; font: inherit; color: var(--m-text); outline: none; }
+.contactRow { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--m-border); }
+.contactMain { display: flex; gap: 12px; flex: 1; min-width: 0; padding: 12px 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.callButton { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--m-soft); color: var(--m-brand); }
+
+/* Photos, videos and voice messages in the chat */
+.media { display: block; max-width: 100%; max-height: 260px; border-radius: 10px; margin-bottom: 4px; }
+.bubble[data-media="image"], .bubble[data-media="video"] { padding: 4px; }
+.bubble[data-media="image"] span, .bubble[data-media="video"] span { padding: 0 6px 2px; }
+.voice { display: flex !important; align-items: center; gap: 6px; margin: 0 !important; }
+.voice audio { height: 34px; max-width: 200px; }
+.voice small { font-size: 11px; opacity: .8; }
+
+/* The input bar */
+.composerWrap { position: sticky; bottom: 76px; display: flex; flex-direction: column; gap: 6px; }
+.composerWrap .composer { position: static; }
+.composerGhost { background: transparent !important; color: var(--m-sub) !important; }
+.composerProblem { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgb(204 51 51 / .1); color: rgb(170 40 40); font-size: 13px; }
+.recording { align-items: center; }
+.recDot { width: 10px; height: 10px; border-radius: 50%; background: rgb(204 51 51); animation: recPulse 1s infinite; }
+.recTime { flex: 1; font-weight: 700; font-variant-numeric: tabular-nums; color: rgb(170 40 40); }
+@keyframes recPulse { 50% { opacity: .3; } }
+
+/* Auto-replies and the appointment card in the chat */
+.autoTag { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .75; margin-bottom: 2px; }
+.bubble[data-auto] { opacity: .85; border-style: dashed; }
+.apptCard { display: flex !important; flex-direction: column; gap: 2px; padding: 4px 2px; margin: 0 !important; }
+.apptCard small { font-size: 10px; letter-spacing: .08em; opacity: .8; }
+.apptCard strong { font-size: 16px; }
+.apptCard em { font-size: 11px; font-style: normal; opacity: .75; margin-top: 4px; }
+
+/* Auto-reply settings */
+.subHead { margin: 16px 0 6px; font-size: 14px; }
+.rule { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--m-border); }
+.rule textarea { width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); resize: vertical; }
+.rule textarea:disabled { opacity: .5; }
+.ruleTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--m-sub); cursor: pointer; }
+.switch input { width: 18px; height: 18px; accent-color: var(--m-brand); }
+.linkDanger { background: none; border: 0; color: rgb(190 50 50); font-weight: 600; font-size: 12px; cursor: pointer; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Four tabs on a phone */
+.appNav button { font-size: 10px; min-width: 0; }
+.appNavIcon { width: 46px; }
+
+/* The input bar, laid out like WhatsApp: ＋  [ text 😊 ]  📷  (🎤) */
+.waBar { display: flex; align-items: center; gap: 6px; padding: 6px 4px; background: var(--m-bg); }
+.waIcon { flex: none; width: 40px; height: 44px; display: grid; place-items: center; border: 0; background: transparent; color: var(--m-text); cursor: pointer; }
+.waField {
+  flex: 1; min-width: 0; display: flex; align-items: center; min-height: 46px; padding: 0 4px 0 16px;
+  border-radius: 24px; background: var(--m-card); border: 1px solid var(--m-border);
+}
+.waField input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 16px; color: var(--m-text); outline: none; padding: 10px 0; }
+.waInside { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 0; background: transparent; color: var(--m-sub); cursor: pointer; }
+.waRound {
+  flex: none; width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%;
+  background: var(--m-brand); color: var(--m-on-brand); cursor: pointer; box-shadow: 0 2px 6px rgb(0 0 0 / .15);
+}
+.waRecording { gap: 10px; padding-right: 16px; }
+.emojiTray {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 8px; border-radius: 16px;
+  background: var(--m-card); border: 1px solid var(--m-border); box-shadow: 0 6px 20px rgb(0 0 0 / .08);
+}
+.emojiTray button { aspect-ratio: 1; border: 0; border-radius: 8px; background: transparent; font-size: 22px; cursor: pointer; }
+.emojiTray button:hover { background: var(--m-soft); }
+/* The member workspace styles every input with a box; inside the rounded field it must have none. */
+.waField input, .waField input:focus { border: 0 !important; box-shadow: none !important; background: transparent !important; border-radius: 0 !important; min-height: 0 !important; }
+.waField:focus-within { border-color: var(--m-brand); }
+/* "On" never breaks onto two lines; a long rule title wraps instead. */
+.switch { white-space: nowrap; flex: none; }
+.ruleTop > span { min-width: 0; }
