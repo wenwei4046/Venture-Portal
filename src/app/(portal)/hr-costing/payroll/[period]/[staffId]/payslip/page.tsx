@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
@@ -242,7 +242,7 @@ export default async function PayslipPage({ params }: PageProps) {
               <ResetStaffStatutoryButton
                 payrollId={row.id}
                 overridden={true}
-                overriddenLabel={dayjs(row.statutory_overridden_at).format('D MMM YYYY HH:mm')}
+                overriddenLabel={officeTime(row.statutory_overridden_at).format('D MMM YYYY HH:mm')}
               />
             ) : null}
           </div>

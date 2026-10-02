@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -234,7 +235,7 @@ export default async function StatementDetailPage({ params }: Props) {
           </div>
           {statement.issued_at ? (
             <p className="font-mono text-xs text-muted mt-3">
-              Issued {dayjs(statement.issued_at).format('D MMM YYYY HH:mm')}
+              Issued {officeTime(statement.issued_at).format('D MMM YYYY HH:mm')}
             </p>
           ) : null}
         </section>

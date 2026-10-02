@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import LedgerRow from '@/components/LedgerRow'
@@ -108,7 +108,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
               {logs.map((log) => (
                 <LedgerRow key={log.id}>
                   <td className="font-mono text-[11px] text-graphite whitespace-nowrap">
-                    {dayjs(log.created_at).format('D MMM YY HH:mm')}
+                    {officeTime(log.created_at).format('D MMM YY HH:mm')}
                   </td>
                   <td className="font-serif text-[15px] text-ink m-hide" data-label="User">
                     {log.user_email ?? '—'}

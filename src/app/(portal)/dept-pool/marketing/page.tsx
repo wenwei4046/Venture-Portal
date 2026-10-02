@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -239,7 +240,7 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
                     <LedgerRow key={r.id}>
                       <td>
                         <div className="font-mono text-xs text-muted">
-                          {dayjs(r.requested_at).format('D MMM HH:mm')}
+                          {officeTime(r.requested_at).format('D MMM HH:mm')}
                         </div>
                       </td>
                       <td className="m-hide" data-label="Period">
@@ -359,7 +360,7 @@ async function RequestPaymentTabContent({
                   <LedgerRow key={r.id}>
                     <td>
                       <div className="font-mono text-xs text-muted">
-                        {dayjs(r.requested_at).format('D MMM HH:mm')}
+                        {officeTime(r.requested_at).format('D MMM HH:mm')}
                       </div>
                     </td>
                     <td className="m-hide" data-label="Payee">

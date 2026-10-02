@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 // Per-invoice document PDF. Each invoice = one A4 portrait page. Used for
 // both single-invoice download (one page) and batch (N pages, one per
@@ -155,7 +156,7 @@ function groupLinesBySegment(
 }
 
 function InvoicePage({ inv }: { inv: InvoiceDocData }) {
-  const generatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  const generatedAt = officeTime().format('YYYY-MM-DD HH:mm')
   const segmented = !!inv.lines && inv.lines.some((l) => l.segment)
   const lineGroups = segmented && inv.lines ? groupLinesBySegment(inv.lines) : null
   return (

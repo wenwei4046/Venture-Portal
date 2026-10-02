@@ -3,6 +3,7 @@
 // share one implementation. All internal component paths are preserved.
 
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
@@ -650,7 +651,7 @@ export default async function BillingView({ searchParams }: Props) {
             </span>
           </div>
           <div className="font-mono text-xs text-muted mb-4">
-            Submitted {directorSubmission?.submitted_at ? dayjs(directorSubmission.submitted_at).format('D MMM YYYY HH:mm') : ''} ·{' '}
+            Submitted {directorSubmission?.submitted_at ? officeTime(directorSubmission.submitted_at).format('D MMM YYYY HH:mm') : ''} ·{' '}
             {Number(directorSubmission?.director_count ?? 0)} director{Number(directorSubmission?.director_count ?? 0) === 1 ? '' : 's'} ·{' '}
             total {formatMoney(Number(directorSubmission?.total_gross ?? 0))}
           </div>

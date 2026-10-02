@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { recipientAccountLabel, salaryPaymentLabel } from '@/lib/payroll-voucher-display'
 
 // Per-voucher document PDF. Each voucher starts on an A4 portrait page. Mirrors the
@@ -103,7 +104,7 @@ function fmtMoney(v: number): string {
 }
 
 function VoucherPage({ v }: { v: VoucherDocData }) {
-  const generatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  const generatedAt = officeTime().format('YYYY-MM-DD HH:mm')
   const isCredit = v.direction === 'credit'
   const title = isCredit ? 'OFFICIAL RECEIPT' : 'PAYMENT VOUCHER'
   return (

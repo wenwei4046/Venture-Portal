@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
@@ -70,7 +70,7 @@ export default async function ActivityLog({
             <tbody>
               {rows.map((row, i) => {
                 const line = describeActivity(row, labels)
-                const at = dayjs(row.created_at)
+                const at = officeTime(row.created_at)
                 return (
                   <tr key={`${row.created_at}-${i}`}>
                     <td className="whitespace-nowrap">

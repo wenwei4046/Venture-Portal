@@ -15,6 +15,7 @@ import {
   type GapDirector,
 } from '@/lib/director-gap'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
 import CompleteDirectorSalaryButton from './_components/CompleteDirectorSalaryButton'
@@ -432,7 +433,7 @@ function SubmissionTab({
           </p>
           {submitted && submission ? (
             <p className="sheet-subtitle">
-              Billing snapshot {dayjs(submission.submitted_at).format('D MMM YYYY HH:mm')} · Finance sees these totals +
+              Billing snapshot {officeTime(submission.submitted_at).format('D MMM YYYY HH:mm')} · Finance sees these totals +
               the per-subsidiary split on Billing
             </p>
           ) : null}
@@ -809,7 +810,7 @@ function directorPayrollState(rows: Array<{ status: string; completed_at: string
   const paid = count('paid')
   const withFinance = submitted + paid
   const last = rows.map(r => r.completed_at).filter((x): x is string => !!x).sort().pop()
-  const when = last ? dayjs(last).format('D MMM YYYY HH:mm') : ''
+  const when = last ? officeTime(last).format('D MMM YYYY HH:mm') : ''
   if (rows.length === 0 || (draft === rows.length)) {
     return { draft, completed, submitted, paid, withFinance, heading: 'Not completed yet', detail: '', chip: null }
   }

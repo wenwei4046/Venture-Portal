@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -91,7 +92,7 @@ export default async function PastMonthSubmissionsPage() {
                       {dayjs(sub.period_month).format('MMMM YYYY')}
                     </div>
                     <div className="font-mono text-xs text-muted mt-1">
-                      Submitted {dayjs(sub.submitted_at).format('D MMM YYYY · HH:mm')}
+                      Submitted {officeTime(sub.submitted_at).format('D MMM YYYY · HH:mm')}
                       {sub.submitted_by_name && ` · ${sub.submitted_by_name}`}
                     </div>
                   </div>

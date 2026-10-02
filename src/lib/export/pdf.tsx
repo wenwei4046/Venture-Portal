@@ -2,7 +2,7 @@ import React from 'react'
 import {
   Document, Page, Text, View, StyleSheet, pdf,
 } from '@react-pdf/renderer'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 export type PdfOrientation = 'portrait' | 'landscape'
 
@@ -109,7 +109,7 @@ interface PdfDocumentProps {
 export function PdfDocument({
   title, subtitle, periodLabel, orientation = 'portrait', children,
 }: PdfDocumentProps): React.ReactElement {
-  const generatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  const generatedAt = officeTime().format('YYYY-MM-DD HH:mm')
   return (
     <Document>
       <Page size="A4" orientation={orientation} style={styles.page}>

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -120,7 +120,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
             {approval.description ?? 'Approval request'}
           </h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            Submitted by <em>{submitter?.name ?? 'Unknown'}</em> on {dayjs(approval.created_at).format('D MMMM YYYY HH:mm')}
+            Submitted by <em>{submitter?.name ?? 'Unknown'}</em> on {officeTime(approval.created_at).format('D MMMM YYYY HH:mm')}
           </p>
         </div>
         <ApprovalStatus status={approval.status} />
@@ -410,7 +410,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
             <em className={approval.status === 'approved' ? 'text-ledger' : 'text-danger'}>
               {approval.status}
             </em>{' '}
-            on {dayjs(approval.approved_at).format('D MMM YYYY HH:mm')}.
+            on {officeTime(approval.approved_at).format('D MMM YYYY HH:mm')}.
           </p>
         </div>
       )}

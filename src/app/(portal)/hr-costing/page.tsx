@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -133,7 +134,7 @@ export default async function HRCostingPage() {
           tone="primary"
           note={
             currentSubmission
-              ? `Snapshotted ${dayjs(currentSubmission.submitted_at).format('D MMM HH:mm')} by ${submitterName.get(currentSubmission.submitted_by) ?? '—'}`
+              ? `Snapshotted ${officeTime(currentSubmission.submitted_at).format('D MMM HH:mm')} by ${submitterName.get(currentSubmission.submitted_by) ?? '—'}`
               : `Live preview · ${monthLabel}`
           }
         />

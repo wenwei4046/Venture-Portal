@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
+import { OFFICE_TZ } from '@/lib/office-clock'
 import ApproveRejectButtons from './_components/ApproveRejectButtons'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -122,7 +123,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
             {statusBadge(run.status)}
             {run.submitted_at && (
               <span className="ml-3 text-muted">
-                submitted {new Date(run.submitted_at).toLocaleString('en-MY')}
+                submitted {new Date(run.submitted_at).toLocaleString('en-MY', { timeZone: OFFICE_TZ })}
               </span>
             )}
           </p>
@@ -143,7 +144,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
         <div className="mb-8 border-l-4 border-success bg-surface px-4 py-3">
           <div className="font-serif italic text-success text-sm uppercase tracking-wide">Paid</div>
           <div className="font-serif text-graphite mt-1">
-            Approved {new Date(run.approved_at!).toLocaleString('en-MY')} · payment date {new Date(run.paid_at).toLocaleDateString('en-MY')}
+            Approved {new Date(run.approved_at!).toLocaleString('en-MY', { timeZone: OFFICE_TZ })} · payment date {new Date(run.paid_at).toLocaleDateString('en-MY', { timeZone: OFFICE_TZ })}
           </div>
         </div>
       )}

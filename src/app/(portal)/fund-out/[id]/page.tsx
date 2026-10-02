@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -228,7 +229,7 @@ export default async function LoanDetailPage({ params }: Props) {
             <span className="text-ink font-serif italic">{creator?.name ?? '—'}</span>{' '}
             on{' '}
             <span className="font-mono text-muted">
-              {dayjs(loan.created_at).format('D MMM YYYY HH:mm')}
+              {officeTime(loan.created_at).format('D MMM YYYY HH:mm')}
             </span>
           </div>
           {loan.approved_at ? (
@@ -239,7 +240,7 @@ export default async function LoanDetailPage({ params }: Props) {
               </span>{' '}
               on{' '}
               <span className="font-mono text-muted">
-                {dayjs(loan.approved_at).format('D MMM YYYY HH:mm')}
+                {officeTime(loan.approved_at).format('D MMM YYYY HH:mm')}
               </span>
               {loan.disbursement_date ? (
                 <>
@@ -266,7 +267,7 @@ export default async function LoanDetailPage({ params }: Props) {
             </div>
             <p className="text-xs text-muted mt-1 italic font-serif">
               Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
-              {dayjs(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
+              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
               Approvals; the loan reverses (bank, Venture Pool, GL) and is marked cancelled.
             </p>
           </div>
