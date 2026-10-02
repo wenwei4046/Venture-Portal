@@ -18,6 +18,7 @@ import MemberCrmUpcoming from "./MemberCrmUpcoming";
 import MemberCrmComposer from "./MemberCrmComposer";
 import MemberCrmContacts from "./MemberCrmContacts";
 import MemberCrmAutoReplies from "./MemberCrmAutoReplies";
+import MemberCrmWhatsApp from "./MemberCrmWhatsApp";
 import { apptLabel, dayLabel, roomName, time, whenLabel } from "./crm-format";
 
 const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
@@ -310,6 +311,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   if (!inDetail && tab === "settings") {
     body = <>
       <div className={c.tabTitle}><h1>Settings</h1><p className={s.sub}>How your CRM works for you</p></div>
+      <MemberCrmWhatsApp />
       <MemberCrmAutoReplies settings={autoReplies} onChange={setAutoReplies} />
     </>;
   }

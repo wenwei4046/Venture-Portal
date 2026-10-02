@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs && node validate-pays-from.mjs && node validate-open-bill-months.mjs && node validate-kpi-add-ons.mjs",
+    "test": "node validate-member.mjs && node validate-director-reporting.mjs && node validate-ir-specialist-downlines.mjs && node validate-employee-chart-lifecycle.mjs && node validate-fair-calendar.mjs && node validate-catalogue.mjs && node validate-upsales.mjs && node validate-closed-month.mjs && node validate-pays-from.mjs && node validate-open-bill-months.mjs && node validate-kpi-add-ons.mjs && node validate-crm-whatsapp.mjs",
     "test:director-reporting": "node validate-director-reporting.mjs",
     "test:ir-specialist-downlines": "node validate-ir-specialist-downlines.mjs",
     "test:employee-chart-lifecycle": "node validate-employee-chart-lifecycle.mjs",
@@ -14,7 +14,8 @@
     "test:closed-month": "node validate-closed-month.mjs",
     "test:pays-from": "node validate-pays-from.mjs",
     "test:open-bill-months": "node validate-open-bill-months.mjs",
-    "test:kpi-add-ons": "node validate-kpi-add-ons.mjs"
+    "test:kpi-add-ons": "node validate-kpi-add-ons.mjs",
+    "test:crm-whatsapp": "node validate-crm-whatsapp.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"

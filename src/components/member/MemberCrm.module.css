@@ -332,3 +332,15 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 /* "On" never breaks onto two lines; a long rule title wraps instead. */
 .switch { white-space: nowrap; flex: none; }
 .ruleTop > span { min-width: 0; }
+
+/* Settings › WhatsApp */
+.copyRow { display: flex; gap: 6px; }
+.copyRow input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--m-border); background: var(--m-soft); color: var(--m-text); }
+.warnNote { display: flex; gap: 6px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: rgb(232 118 34 / .12); color: rgb(150 70 10); font-size: 12px; }
+.checkList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.checkList li { display: flex; gap: 10px; align-items: flex-start; }
+.checkList li > span { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: rgb(204 51 51 / .14); color: rgb(170 40 40); }
+.checkList li[data-ok="true"] > span { background: rgb(52 140 90 / .16); color: rgb(40 110 70); }
+.checkList em { font-style: normal; font-size: 12px; color: var(--m-sub); }
+.checkList small { display: block; font-size: 11px; color: var(--m-sub); margin-top: 2px; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }

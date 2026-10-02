@@ -75,9 +75,11 @@ export const config = {
     // /api/erp/* is the ERP live feed: a database calling in with a shared
     // secret, no session to refresh and nothing to redirect. It authenticates
     // itself (src/lib/erp-sync/auth.ts) and must never be bounced to /login.
+    // /api/whatsapp/* is Meta's WhatsApp webhook, the same kind of caller: it
+    // proves itself with Meta's signature (src/lib/whatsapp/webhook.ts).
     // The installable-app files are public too: the browser fetches the
     // manifest without cookies, and the service worker and its offline page
     // must load when nobody is signed in.
-    '/((?!api/erp/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api/erp/|api/whatsapp/|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
