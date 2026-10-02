@@ -9,6 +9,7 @@ vi.mock('./_components/VoucherActions', () => ({ default: (props: { reversePaidP
 vi.mock('./_components/CopyVoucherButton', () => ({ default: () => <div data-testid="copy-voucher" /> }))
 vi.mock('./_components/ReassignGlAccountButton', () => ({ default: () => <div data-testid="reassign-gl" /> }))
 vi.mock('./_components/AttachmentUploader', () => ({ default: () => <div data-testid="attachment-uploader" /> }))
+vi.mock('../_components/AmendDateButton', () => ({ default: (p: { id: string; currentDate: string }) => <div data-testid="amend-date">{p.id} {p.currentDate}</div> }))
 vi.mock('@/components/voucher/AttachmentList', () => ({ default: () => <div data-testid="attachment-list" /> }))
 import PaymentDetailPage from './page'
 
@@ -200,5 +201,39 @@ describe('the voucher page, laid out like the deal forms', () => {
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(stepLabels()).toEqual(['建立', '作废'])
     expect(document.querySelectorAll('.trail-step')[1]).toHaveClass('bad')
+  })
+})
+
+// 2026-10-02: a paid voucher's date is corrected in place, from the panel.
+describe('改日期 on the voucher page', () => {
+  const asFinance = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  const paid = { status: 'paid', payment_date: '2026-10-01', approved_at: '2026-10-01T03:00:00Z', executed_at: '2026-10-01T03:00:00Z' }
+
+  it('is offered beside the date of a paid voucher', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    Object.assign(voucher, paid)
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByTestId('amend-date')).toHaveTextContent('stat 2026-10-01')
+  })
+
+  it('not while it can still be edited, not on a payroll voucher, and not to HR', async () => {
+    asFinance()
+    database('ordinary_payment') // pending approval
+    const pending = render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.queryByTestId('amend-date')).toBeNull()
+    pending.unmount()
+
+    const payroll = database('payroll_disbursement')
+    Object.assign(payroll.voucher, paid)
+    const salary = render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.queryByTestId('amend-date')).toBeNull()
+    salary.unmount()
+
+    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    const statutory = database('payroll_statutory')
+    Object.assign(statutory.voucher, paid)
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.queryByTestId('amend-date')).toBeNull()
   })
 })

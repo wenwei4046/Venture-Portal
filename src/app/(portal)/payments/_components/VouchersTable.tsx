@@ -6,6 +6,7 @@ import { formatMoney } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
 import AmendRepaymentButton from './AmendRepaymentButton'
+import AmendDateButton from './AmendDateButton'
 
 /**
  * Row shape consumed by VouchersTable. The parent server page is
@@ -26,6 +27,10 @@ export interface VoucherRow {
   /** Override for the page a row opens — synthetic rows (loan repayments, fund-in
    *  receipts on /receipts) point at their own module instead of /payments. */
   href?: string
+  /** Set when this row's DATE can be corrected in place (2026-10-02): a paid
+   *  voucher that is not payroll's, or a loan repayment received directly.
+   *  `id` is the voucher's or the repayment's own id; `date` is YYYY-MM-DD. */
+  amendDate?: { kind: 'voucher' | 'repayment'; id: string; date: string }
   /** Rows sharing a batchKey collapse into one summary line (user 2026-09-15
    *  "hr 的 payroll voucher 我不想要显示这么多"): payroll disbursements are
    *  one voucher per person, 26 a month, and drowned the ledger. */
@@ -102,15 +107,20 @@ export default function VouchersTable({
   // 改金额 on the rows that have it. That dialog is mounted once, for the row
   // that asked — not in every row, as the link beside View was.
   const [amend, setAmend] = useState<{ row: VoucherRow; nonce: number } | null>(null)
+  const [redate, setRedate] = useState<{ row: VoucherRow; nonce: number } | null>(null)
   const links = useRowLinks<VoucherRow>({
     href: (v) => v.href ?? `/payments/${v.id}`,
     title: (v) => `${v.voucher_no ?? v.catLabel} · ${v.status.replace('_', ' ')}`,
     // Synthetic loan-repayment rows (id 'rpy-<repayment uuid>') get an
     // in-place amount fix (user 2026-09-03: "不能直接点开 receipt 的单去 edit?").
-    more: (v) =>
-      v.id.startsWith('rpy-')
+    more: (v) => [
+      ...(v.amendDate
+        ? [{ key: 'redate', label: '改日期', hint: '日期录错时用', onSelect: () => setRedate({ row: v, nonce: Date.now() }) }]
+        : []),
+      ...(v.id.startsWith('rpy-')
         ? [{ key: 'amend', label: '改金额', hint: '金额录错时用', onSelect: () => setAmend({ row: v, nonce: Date.now() }) }]
-        : [],
+        : []),
+    ],
   })
   const { plain, batches } = collapseBatches ? groupBatches(rows) : { plain: rows, batches: [] as Batch[] }
   const toggle = (key: string) =>
@@ -268,6 +278,17 @@ export default function VouchersTable({
           repaymentId={amend.row.id.slice(4)}
           currentAmount={amend.row.amount}
           label={amend.row.catLabel}
+        />
+      ) : null}
+      {redate?.row.amendDate ? (
+        <AmendDateButton
+          key={`${redate.row.id}:${redate.nonce}`}
+          autoOpen
+          hideTrigger
+          kind={redate.row.amendDate.kind}
+          id={redate.row.amendDate.id}
+          currentDate={redate.row.amendDate.date}
+          label={redate.row.voucher_no ?? `${redate.row.catLabel} · ${redate.row.payee_name}`}
         />
       ) : null}
     </div>

@@ -26,6 +26,9 @@ const POOL_LABELS: Record<string, string> = {
 }
 
 
+/** Vouchers HR Payment generates. Their dates are HR's to change. */
+const PAYROLL_REFERENCE_TYPES = new Set(['payroll_disbursement', 'payroll_statutory', 'payroll_payment_request'])
+
 export interface LedgerSearchParams {
   status?: string
   q?: string
@@ -373,6 +376,12 @@ export default async function VoucherLedger({
                     description: (v.description as string | null) ?? null,
                     paymentOrCreatedDate: (v.payment_date ?? v.created_at) as string,
                     batchKey,
+                    // A paid voucher's date is corrected in place (改日期) — a
+                    // draft or pending one with Edit, and payroll's from HR Payment.
+                    amendDate:
+                      v.status === 'paid' && v.payment_date && !PAYROLL_REFERENCE_TYPES.has(v.reference_type ?? '')
+                        ? { kind: 'voucher' as const, id: v.id, date: (v.payment_date as string).slice(0, 10) }
+                        : undefined,
                   }
                 }), ...extraFiltered]}
                 // A text search must be able to land on one person's salary

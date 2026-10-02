@@ -10,6 +10,7 @@ import VoucherActions from './_components/VoucherActions'
 import CopyVoucherButton from './_components/CopyVoucherButton'
 import ReassignGlAccountButton from './_components/ReassignGlAccountButton'
 import AttachmentUploader from './_components/AttachmentUploader'
+import AmendDateButton from '../_components/AmendDateButton'
 import AttachmentList from '@/components/voucher/AttachmentList'
 import LedgerRow from '@/components/LedgerRow'
 import { recipientAccountLabel, salaryPaymentLabel } from '@/lib/payroll-voucher-display'
@@ -242,6 +243,7 @@ export default async function PaymentDetailPage({ params }: Props) {
   }
 
   const isCredit = voucher.direction === 'credit'
+  const isPayrollVoucher = ['payroll_disbursement', 'payroll_statutory', 'payroll_payment_request'].includes(voucher.reference_type ?? '')
   const amount = Number(voucher.amount)
   const status = voucher.status as string
 
@@ -572,7 +574,25 @@ export default async function PaymentDetailPage({ params }: Props) {
             {isCredit ? '收自' : '付给'} {voucher.payee_name}
           </p>
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-[7px] text-[13px] m-0">
-            <PanelRow label={isCredit ? '收款日期' : '付款日期'} value={voucher.payment_date ? dayjs(voucher.payment_date).format('D MMM YYYY') : '还没定'} />
+            <PanelRow
+              label={isCredit ? '收款日期' : '付款日期'}
+              value={
+                <>
+                  {voucher.payment_date ? dayjs(voucher.payment_date).format('D MMM YYYY') : '还没定'}
+                  {/* A paid voucher's date is corrected in place; a draft or pending
+                      one with Edit; payroll's from HR Payment. */}
+                  {isFinance && status === 'paid' && voucher.payment_date && !isPayrollVoucher ? (
+                    <AmendDateButton
+                      kind="voucher"
+                      id={voucher.id}
+                      currentDate={String(voucher.payment_date).slice(0, 10)}
+                      label={voucher.voucher_no ?? 'voucher'}
+                      triggerClassName="deal-side-link ml-2 font-sans text-[11.5px] underline underline-offset-2"
+                    />
+                  ) : null}
+                </>
+              }
+            />
             {bankLabel ? <PanelRow label={isCredit ? '进银行' : '从银行'} value={bankLabel} title={bankName ?? undefined} /> : null}
             {poolLabel || categoryLabel ? <div role="separator" className="deal-side-sep col-span-2" /> : null}
             {poolLabel ? <PanelRow label={isCredit ? '进哪个池' : '扣哪个池'} value={poolLabel} /> : null}

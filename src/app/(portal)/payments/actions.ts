@@ -1232,6 +1232,44 @@ export async function updatePaymentVoucher(formData: FormData) {
   redirect(`/payments/${id}`)
 }
 
+// ─── Amend a PAID voucher's date (Finance) ──────────────────────────────────
+// User 2026-10-02: "这个日期我录错了怎么办？能自己改吗？". A draft or pending
+// voucher is re-dated with Edit; a paid one — and a receipt is paid the moment
+// it is made — had only void + record again. amend_voucher_date moves the
+// voucher, every journal entry it posted, and the repayment rows its approval
+// wrote, to the right day, and notes it on each. Amount, bank and pools stay.
+// The RPC guards roles, period locks (both months), bank reconciliation
+// matches, and payroll vouchers (those are HR Payment's to re-date).
+export async function amendVoucherDate(
+  formData: FormData,
+): Promise<{ error?: string; old?: string; newDate?: string }> {
+  await requirePermission('treasury')
+  const supabase = await createClient()
+
+  const id = ((formData.get('id') as string) ?? '').trim()
+  const newDate = ((formData.get('new_date') as string) ?? '').trim()
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+  if (!id) return { error: 'Voucher id is required' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: '选一个日期' }
+  if (!reason) return { error: '写一句原因(会留在记录里)' }
+
+  const { data, error } = await supabase.rpc('amend_voucher_date' as never, {
+    p_voucher_id: id,
+    p_new_date: newDate,
+    p_reason: reason,
+  } as never)
+  if (error) return { error: error.message }
+
+  const res = (data ?? {}) as { old?: string; new?: string }
+  revalidatePath(`/payments/${id}`)
+  revalidatePath('/payments')
+  revalidatePath('/receipts')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
+  return { old: res.old, newDate: res.new ?? newDate }
+}
+
 // ─── Reassign GL account on an approved/paid voucher (Finance) ──────────────
 // User 2026-08-24: "gl account 放错，我希望approve 了我还能改". Edits the
 // posted journal lines IN PLACE via the reassign_voucher_gl_account RPC —

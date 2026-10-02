@@ -548,6 +548,41 @@ export async function amendRepayment(
   return { old: Number(res.old ?? 0), newAmount: Number(res.new ?? newAmount) }
 }
 
+// ─── Amend a recorded repayment's DATE (2026-10-02) ──────────────────────────
+// User: "这个日期我录错了怎么办？能自己改吗？" — the same in-place fix as the
+// amount, for the day. One atomic RPC moves the repayments row and its one GL
+// entry (transaction date + period, audit note stamped); the amount, the bank
+// and the pool are not touched. It refuses a closed month, a future date and a
+// repayment already matched in a bank reconciliation.
+export async function amendRepaymentDate(
+  formData: FormData,
+): Promise<{ error?: string; old?: string; newDate?: string }> {
+  await requirePermission('treasury')
+  const supabase = await createClient()
+
+  const repaymentId = ((formData.get('id') as string) ?? '').trim()
+  const newDate = ((formData.get('new_date') as string) ?? '').trim()
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+  if (!repaymentId) return { error: 'Repayment id is required' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: '选一个日期' }
+  if (!reason) return { error: '写一句原因(会留在记录里)' }
+
+  const { data, error } = await supabase.rpc('amend_loan_repayment_date' as never, {
+    p_repayment_id: repaymentId,
+    p_new_date: newDate,
+    p_reason: reason,
+  } as never)
+  if (error) return { error: error.message }
+
+  const res = (data ?? {}) as { old?: string; new?: string }
+  revalidatePath('/receipts')
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
+  return { old: res.old, newDate: res.new ?? newDate }
+}
+
 // ─── Amend an active loan (Principal — self-service, direct apply) ────────────
 // Principal is the top approval authority, so edits apply immediately via the
 // amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the

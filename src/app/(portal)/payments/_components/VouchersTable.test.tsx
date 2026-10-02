@@ -19,6 +19,14 @@ vi.mock('./AmendRepaymentButton', () => ({
   ),
 }))
 
+vi.mock('./AmendDateButton', () => ({
+  default: (p: { kind: string; id: string; currentDate: string; label: string; autoOpen?: boolean; hideTrigger?: boolean }) => (
+    <div data-testid="redate" data-auto={String(!!p.autoOpen)} data-hide={String(!!p.hideTrigger)}>
+      {p.kind} · {p.id} · {p.currentDate} · {p.label}
+    </div>
+  ),
+}))
+
 import VouchersTable, { type VoucherRow } from './VouchersTable'
 
 const voucher: VoucherRow = {
@@ -46,6 +54,7 @@ const repayment: VoucherRow = {
   description: 'Loan principal repayment',
   paymentOrCreatedDate: '2026-09-19',
   href: '/fund-out/loan-9',
+  amendDate: { kind: 'repayment', id: 'abc', date: '2026-09-19' },
 }
 
 const rowOf = (text: string) => screen.getByText(text).closest('tr') as HTMLElement
@@ -101,7 +110,7 @@ describe('VouchersTable', () => {
     render(<VouchersTable rows={[voucher, repayment]} />)
     fireEvent.contextMenu(rowOf('The Cont'))
     expect(screen.getByRole('menu', { name: 'Actions for 还款 · principal · received' })).toBeInTheDocument()
-    expect(menuLabels()).toEqual(['打开', '在新分页打开', '改金额'])
+    expect(menuLabels()).toEqual(['打开', '在新分页打开', '改日期', '改金额'])
 
     fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /改金额/ }))
     const dialog = screen.getByTestId('amend')
@@ -122,5 +131,36 @@ describe('VouchersTable', () => {
     fireEvent.click(screen.getByRole('button', { name: /Payroll disbursement Sep 2026/ }))
     fireEvent.doubleClick(screen.getByText('Bala'))
     expect(push).toHaveBeenLastCalledWith('/payments/pv-8')
+  })
+})
+
+// 2026-10-02 (user: "这个日期我录错了怎么办？能自己改吗？" → "加").
+describe('改日期 from the row menu', () => {
+  const paid: VoucherRow = { ...voucher, id: 'pv-9', voucher_no: 'HV-OR-202610-0455', direction: 'credit', payee_name: 'Carres', amendDate: { kind: 'voucher', id: 'pv-9', date: '2026-10-01' } }
+
+  it('is offered only on a row whose date can be corrected', () => {
+    render(<VouchersTable rows={[voucher, paid]} />)
+    fireEvent.contextMenu(rowOf('TNB')) // not paid, or payroll's: nothing to re-date here
+    expect(menuLabels()).toEqual(['打开', '在新分页打开'])
+    fireEvent.contextMenu(rowOf('Carres'))
+    expect(menuLabels()).toEqual(['打开', '在新分页打开', '改日期'])
+  })
+
+  it('opens the dialog for that voucher, on its recorded date', () => {
+    render(<VouchersTable rows={[paid, repayment]} />)
+    expect(screen.queryByTestId('redate')).toBeNull()
+    fireEvent.contextMenu(rowOf('Carres'))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /改日期/ }))
+    const dialog = screen.getByTestId('redate')
+    expect(dialog).toHaveTextContent('voucher · pv-9 · 2026-10-01 · HV-OR-202610-0455')
+    expect(dialog.dataset.auto).toBe('true')
+    expect(dialog.dataset.hide).toBe('true')
+  })
+
+  it('…and for a loan repayment, which has no number: by what it is and who paid', () => {
+    render(<VouchersTable rows={[paid, repayment]} />)
+    fireEvent.contextMenu(rowOf('The Cont'))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /改日期/ }))
+    expect(screen.getByTestId('redate')).toHaveTextContent('repayment · abc · 2026-09-19 · 还款 · principal · The Cont')
   })
 })
