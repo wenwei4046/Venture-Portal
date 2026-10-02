@@ -125,7 +125,7 @@ grant is personal. It is the way to look at the executive's view.
 Not built, not asked: the General Ledger and the other reports made safe for
 such an account (the user: "暂时不需要").
 
-### Found, NOT fixed — needs the user's go-ahead ("先确定")
+### Found, NOT fixed — the user DECLINED the fix (2026-10-02: "不需要")
 
 **Role checks that let a caller with no role through.** `IF v_role NOT IN
 ('finance', 'principal') THEN RAISE …` passes when `v_role` is NULL (not logged
@@ -145,6 +145,34 @@ them — no function body changes, and no anon caller exists in the app (the API
 routes are `/api/erp/v1/*`, the `/api/member-queue` cron and `/api/wasm-health`;
 the admin client is service-role) — then add the NULL guard function by
 function. Many of them are HR's.
+
+**Told to the user in plain words and declined ("不需要").** Do not apply it and do
+not raise it again unasked.
+
+### Creating the finance executive's login (asked 2026-10-02, answered — nothing built)
+
+Only the Principal can: `team_invite` and `permissions_manage` are the Principal's, and the
+Finance Manager's account has neither (nor `team`). Finance has five people on the
+roster — ACCOUNTS ASSISTANT 1, ACCOUNTS EXECUTIVE 2, SENIOR ACCOUNT EXECUTIVE 1,
+ASSISTANT FINANCE MANAGER 1 — none with a login, no title with permissions of
+its own, no email on file.
+
+1. Team › People › open the person › **Invite** (`/team/people/invite?staff=…`, name /
+   department / title prefilled). NOT the "Invite user" button on the list — that
+   files a second roster row with basic_salary 0.
+2. Email, a password (6+, typed by the Principal, no email step — and the portal
+   has no change-password screen), Role **Finance**.
+3. On the person's page, Permissions: **Deny** Dept Pool, Reports, Department
+   reports, Reconciliation. Leave Payroll payouts alone (not inherited; do not
+   Grant). Do this before handing over the password.
+
+**Found on the way, NOT fixed:** the invite form's "Reports to" starts at
+"— Nobody" even for somebody already on the roster, and `inviteUser` writes
+`reports_to` unconditionally — so inviting an existing person without re-picking
+their manager CLEARS their reporting line (`team/people/invite-actions.ts`,
+`InviteUserForm.tsx`). All five Finance people have one today. Fix: prefill the
+select from the roster row, or leave `reports_to` out of the update when blank for
+an existing person. The user was told to re-pick the manager.
 
 ## CHECKPOINT 2026-10-02 c — the voucher page rebuilt (SHIPPED); two things asked and NOT built
 
