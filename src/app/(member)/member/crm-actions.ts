@@ -88,3 +88,30 @@ export async function sendCrmReply(contactId: string, text: string): Promise<{ o
     return { ok: false, error: /permission denied|42501/i.test(message) ? "You may not reply to this customer." : message.slice(0, 250) };
   }
 }
+
+/**
+ * The CRM's other writes. Each is a database function that asks, under the
+ * member's own session, whether they may do it (mig 20261003030000); this
+ * only passes the call through, from a fixed list — never a table write.
+ */
+const CRM_WRITES = [
+  "crm_mark_read", "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state",
+  "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time",
+] as const;
+export type CrmWrite = (typeof CRM_WRITES)[number];
+
+export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  try {
+    if (!CRM_WRITES.includes(name)) throw new Error("Unknown action.");
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    const db = (await createClient()) as unknown as SupabaseClient;
+    const { data, error } = await db.rpc(name, args);
+    if (error) throw new Error(error.message);
+    return { ok: true, data };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "That could not be saved. Please try again.";
+    // The database's own words are written for the member ("You may not …", "A Lost customer needs a reason.").
+    return { ok: false, error: /permission denied for/i.test(message) ? "You may not do that." : message.slice(0, 250) };
+  }
+}

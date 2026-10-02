@@ -13,7 +13,7 @@ import { detectRequestedTime } from "@/lib/member/crm-datetime";
 import { crmDemo, crmTeamDemo, demoShowrooms } from "@/lib/member/crm-demo";
 import {
   ROLE_LABELS, allTeams, assignsAds, canReassign, canReply, hasDownlines, leadsHeld, setsFullTime, takesEnquiries, pickInTeam, teamHandlers, teamOf, visibleLeads, visibleMembers,
-  type CrmAssignConfig, type CrmMember,
+  type CrmAssignConfig, type CrmAssignment, type CrmMember,
 } from "@/lib/member/crm-team";
 import s from "./member.module.css";
 import c from "./MemberCrm.module.css";
@@ -26,7 +26,7 @@ import MemberCrmLeadRow, { firstName } from "./MemberCrmLeadRow";
 import { MemberCrmMember, MemberCrmPerformance, MemberCrmTeam, roleTag } from "./MemberCrmTeam";
 import MemberCrmAssignment from "./MemberCrmAssignment";
 import { apptLabel, dayLabel, roomName, time, whenLabel } from "./crm-format";
-import { fetchCrm, sendCrmReply } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchCrm, sendCrmReply, type CrmWrite } from "@/app/(member)/member/crm-actions";
 import { windowOpen } from "@/lib/whatsapp/send";
 
 const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
@@ -56,9 +56,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   salesperson?: string;
   onExit?: () => void;
   /**
-   * The signed-in member's real CRM: read from the database under their own
-   * session (crm-actions.ts). Reads only for now — every write control is hidden
-   * until it saves for real. Without it, the demo (the preview page).
+   * The signed-in member's real CRM, read and written under their own session
+   * (crm-actions.ts). Every change is saved first and shown only once the
+   * database said yes. Not yet on live: photos/voice, templates, auto-replies,
+   * and telling the customer about an appointment. Without it, the demo (the preview page).
    */
   live?: boolean;
 }) {
@@ -69,8 +70,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   // Live replies: one at a time, and why the last one failed.
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
-  // Live data saves nothing yet, so nothing on screen may look as if it did.
-  const writable = !live;
+  // Live: why the last save failed (shown above the screen until the next one).
+  const [liveError, setLiveError] = useState("");
+  // Live settings save a moment after the last change, one save per thing changed.
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [now, setNow] = useState(() => new Date());
   const [tab, setTab] = useState<Tab>("inbox");
   const [view, setView] = useState<View>({ kind: "tab" });
@@ -113,9 +116,17 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
    * from another team. The team's own rules then pick who gets it: Fri–Sun a
    * full-time RS in turn, Mon–Thu the TL's % or the TL's "To assign" list.
    */
-  function sendToTeam(leadId: string, tlId: string) {
+  async function sendToTeam(leadId: string, tlId: string) {
     const tl = members.find(m => m.id === tlId);
-    const { memberId, memberBy } = pickInTeam(tlId, new Date(), config, leadsHeld(leads.filter(l => l.id !== leadId)), members);
+    let picked = pickInTeam(tlId, new Date(), config, leadsHeld(leads.filter(l => l.id !== leadId)), members);
+    // Live: the database deals it by the team's saved rules and says who it went to.
+    if (live) {
+      const saved = await persist("crm_send_to_team", { p_contact: leadId, p_tl: tlId });
+      if (!saved.ok) return;
+      const r = saved.data as { member: string | null; how: CrmAssignment["memberBy"] };
+      picked = { memberId: r.member, memberBy: r.how };
+    }
+    const { memberId, memberBy } = picked;
     const how = memberBy === "weekend" ? "Fri–Sun: full-time RS in turn" : memberBy === "ratio" ? `by ${firstName(tl?.name ?? "")}'s %`
       : memberBy === "no_full_time" ? "no full-time RS this weekend" : memberBy === "no_shares" ? "nobody has a %" : "Mon–Thu by hand";
     updateLead(leadId, l => ({
@@ -144,8 +155,58 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     return true;
   }
 
+  /**
+   * Live: save first, change the screen only once the database said yes; on
+   * no, say why above the screen and change nothing. The demo just changes.
+   */
+  async function persist(write: CrmWrite, args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false }> {
+    if (!live) return { ok: true, data: null };
+    setLiveError("");
+    const result = await crmWrite(write, args);
+    if (!result.ok) { setLiveError(result.error); return { ok: false }; }
+    return result;
+  }
+
+  /** The HOD sets who is full time (takes Fri–Sun enquiries). */
+  async function setFullTime(staffId: string, on: boolean) {
+    if (!(await persist("crm_set_full_time", { p_staff: staffId, p_full_time: on })).ok) return;
+    setMembers(list => list.map(m => (m.id === staffId ? { ...m, fullTime: on } : m)));
+  }
+
+  /**
+   * A settings change: on screen at once; live, saved a moment after the last
+   * keystroke — one save per thing that changed (a team's rules, the split, an ad).
+   */
+  function changeConfig(next: CrmAssignConfig) {
+    const prev = config;
+    setConfig(next);
+    if (!live) return;
+    const later = (key: string, write: CrmWrite, args: () => Record<string, unknown>) => {
+      clearTimeout(saveTimers.current[key]);
+      saveTimers.current[key] = setTimeout(() => { void persist(write, args()); }, 600);
+    };
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    for (const [tlId, st] of Object.entries(next.teams)) {
+      const was = prev.teams[tlId];
+      if (was && same({ ...was, editedBy: null }, { ...st, editedBy: null })) continue;
+      later(`team:${tlId}`, "crm_save_team_settings", () => ({ p_tl: tlId, p_percent_days: st.percentDays, p_weekend_full_time: st.weekendFullTime, p_ratios: st.ratios }));
+    }
+    if (!same(prev.teamRatios, next.teamRatios)) later("shares", "crm_save_team_shares", () => ({ p_shares: next.teamRatios }));
+    const ads = new Set([...prev.rules, ...next.rules].map(r => r.adName));
+    for (const ad of ads) {
+      const before = prev.rules.find(r => r.adName === ad)?.tlIds ?? [];
+      const after = next.rules.find(r => r.adName === ad)?.tlIds ?? [];
+      if (same(before, after)) continue;
+      // Rules are kept by the Meta ad id; the screen shows the ad's name.
+      const adId = leads.find(l => l.adName === ad)?.campaign;
+      if (!adId) { setLiveError(`Could not find the ad "${ad}".`); continue; }
+      later(`ad:${adId}`, "crm_save_ad_rule", () => ({ p_ad: adId, p_label: ad, p_tls: after }));
+    }
+  }
+
   /** A TL hands a lead to someone in their team (or takes it back from one). */
-  function assign(leadId: string, memberId: string) {
+  async function assign(leadId: string, memberId: string) {
+    if (!(await persist("crm_assign_member", { p_contact: leadId, p_member: memberId })).ok) return;
     updateLead(leadId, l => ({
       ...l, assignedTo: memberId, teamId: teamOf(memberId, members) ?? l.teamId,
       messages: [...l.messages, systemNote(`Assigned to ${nameOf(memberId)} by ${nameOf(viewer.id)}.`)],
@@ -206,9 +267,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
 
   // "mine" is the calendar of the salesperson who owns the lead — a leader
   // booking for Farah books into Farah's day, not their own.
+  // Live: only real appointments fill a calendar — never the demo's made-up bookings.
   const busyFor = (exceptId?: string, ownerId: string | undefined = viewerId): BusyFor => roomId => ({
-    room: [...(demo.showroomBusy[roomId] ?? []), ...appointmentSlots(appointments.filter(a => a.showroomId === roomId), "Showroom booked", exceptId)],
-    mine: [...(ownerId === "a1" ? demo.myBusy : []),
+    room: [...(live ? [] : demo.showroomBusy[roomId] ?? []), ...appointmentSlots(appointments.filter(a => a.showroomId === roomId), "Showroom booked", exceptId)],
+    mine: [...(!live && ownerId === "a1" ? demo.myBusy : []),
       ...appointmentSlots(appointments.filter(a => leads.find(l => l.id === a.leadId)?.assignedTo === ownerId), "Calendar: appointment", exceptId)],
   });
 
@@ -219,7 +281,11 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
 
   function openLead(id: string, fromMember?: string) {
     // Only the salesperson's own opening clears their unread count; a leader looking in leaves it.
-    if (leads.find(l => l.id === id)?.assignedTo === viewer.id) updateLead(id, l => ({ ...l, unread: 0 }));
+    const lead = leads.find(l => l.id === id);
+    if (lead?.assignedTo === viewer.id) {
+      updateLead(id, l => ({ ...l, unread: 0 }));
+      if (live && lead.unread > 0) void crmWrite("crm_mark_read", { p_contact: id }); // nothing to undo if it fails
+    }
     setBooking(false);
     setView({ kind: "chat", leadId: id, fromMember });
   }
@@ -230,35 +296,52 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     ...(lead.assignedTo !== viewer.id ? { by: viewer.id } : {}),
   });
 
-  function book(leadId: string, showroomId: string, start: string) {
-    const appt: CrmAppointment = { id: crypto.randomUUID(), leadId, showroomId, start, minutes: 60, state: "booked" };
+  // Live sends the customer nothing about appointments yet; the notes must not say it did.
+  const tellThem = live ? " Not sent to the customer — tell them in the chat." : "";
+
+  async function book(leadId: string, showroomId: string, start: string) {
+    let appt: CrmAppointment = { id: crypto.randomUUID(), leadId, showroomId, start, minutes: 60, state: "booked" };
+    if (live) {
+      const saved = await persist("crm_book", { p_contact: leadId, p_showroom: showroomId, p_start: start, p_minutes: 60 });
+      if (!saved.ok) return;
+      appt = { ...appt, id: (saved.data as { id: string }).id };
+    }
     setAppointments(list => [...list, appt]);
     updateLead(leadId, l => ({
       ...setLeadStatus(l, "appointment"),
       messages: [...l.messages,
-        systemNote(`Appointment booked: ${apptLabel(appt)}. Added to the showroom calendar and yours.`, "booking"),
-        { id: crypto.randomUUID(), from: "me", text: "", at: new Date().toISOString(), card: { start, showroom: roomName(showroomId) } },
+        systemNote(`Appointment booked: ${apptLabel(appt)}. Added to the showroom calendar and yours.${tellThem}`, "booking"),
+        // The demo shows the card the customer would receive; live does not send one yet.
+        ...(live ? [] : [{ id: crypto.randomUUID(), from: "me" as const, text: "", at: new Date().toISOString(), card: { start, showroom: roomName(showroomId) } }]),
       ],
     }));
     setBooking(false);
   }
 
-  function reschedule(appt: CrmAppointment, start: string, showroomId: string) {
+  async function reschedule(appt: CrmAppointment, start: string, showroomId: string) {
+    if (!(await persist("crm_move_appointment", { p_appointment: appt.id, p_start: start, p_showroom: showroomId })).ok) return;
     const moved = rescheduleAppointment(appt, start, showroomId);
     setAppointments(list => list.map(a => (a.id === appt.id ? moved : a)));
     updateLead(appt.leadId, l => ({ ...l, messages: [...l.messages,
-      systemNote(`Appointment changed to ${apptLabel(moved)}.`, "booking"),
-      { id: crypto.randomUUID(), from: "me", text: "", at: new Date().toISOString(), card: { start, showroom: roomName(showroomId) } },
+      systemNote(`Appointment changed to ${apptLabel(moved)}.${tellThem}`, "booking"),
+      ...(live ? [] : [{ id: crypto.randomUUID(), from: "me" as const, text: "", at: new Date().toISOString(), card: { start, showroom: roomName(showroomId) } }]),
     ] }));
   }
 
-  function cancel(appt: CrmAppointment) {
+  async function cancel(appt: CrmAppointment) {
+    if (!(await persist("crm_set_appointment_state", { p_appointment: appt.id, p_state: "cancelled" })).ok) return;
     const next = appointments.map(a => (a.id === appt.id ? cancelAppointment(a) : a));
     setAppointments(next);
     updateLead(appt.leadId, l => ({
       ...l, status: statusAfterCancel(l, next),
-      messages: [...l.messages, systemNote(`Appointment on ${dayLabel(appt.start)}, ${time(appt.start)} cancelled. Customer notified. Back to Follow up.`)],
+      messages: [...l.messages, systemNote(`Appointment on ${dayLabel(appt.start)}, ${time(appt.start)} cancelled.${live ? tellThem : " Customer notified."} Back to Follow up.`)],
     }));
+  }
+
+  async function showedUp(appt: CrmAppointment) {
+    if (!(await persist("crm_set_appointment_state", { p_appointment: appt.id, p_state: "attended" })).ok) return;
+    setAppointments(list => list.map(a => (a.id === appt.id ? markAttended(a) : a)));
+    note(appt.leadId, `Customer showed up on ${dayLabel(appt.start)}, ${time(appt.start)}.`);
   }
 
   const openAppointment = (id: string) => setView({ kind: "appointment", appointmentId: id });
@@ -273,12 +356,12 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     const lead = appt && leads.find(l => l.id === appt.leadId);
     if (appt && lead) {
       inDetail = true;
-      body = <AppointmentDetail appt={appt} lead={lead} busy={busyFor(appt.id, lead.assignedTo)} readOnly={!writable || !canReply(viewer, lead, members)}
+      body = <AppointmentDetail appt={appt} lead={lead} busy={busyFor(appt.id, lead.assignedTo)} readOnly={!canReply(viewer, lead, members)} live={live}
         onBack={() => setView({ kind: "tab" })}
         onOpenChat={() => { setTab("inbox"); openLead(lead.id); }}
-        onShowUp={() => { setAppointments(list => list.map(a => (a.id === appt.id ? markAttended(a) : a))); note(lead.id, `Customer showed up on ${dayLabel(appt.start)}, ${time(appt.start)}.`); }}
-        onChange={(start, room) => reschedule(appt, start, room)}
-        onCancel={() => cancel(appt)} />;
+        onShowUp={() => void showedUp(appt)}
+        onChange={(start, room) => void reschedule(appt, start, room)}
+        onCancel={() => void cancel(appt)} />;
     }
   }
 
@@ -288,12 +371,12 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     const fromMember = view.fromMember;
     if (lead) {
       inDetail = true;
-      // Live: replying on WhatsApp is the one write built so far — inside Meta's 24-hour window only.
+      // Live: free replies only inside Meta's 24-hour window; the rest (booking, Won/Lost) works any time.
       const mayReply = canReply(viewer, lead, members);
       const windowShut = live && !windowOpen(lead.lastCustomerAt, now);
-      const liveNote = !live || !mayReply ? undefined
-        : windowShut ? "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now (templates arrive later)."
-          : "Replies go to the customer on WhatsApp. Booking, Won/Lost and assigning arrive next.";
+      const windowNote = live && mayReply && windowShut
+        ? "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now (templates come later)."
+        : undefined;
       body = <Conversation
         lead={lead}
         now={now}
@@ -301,20 +384,24 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
         salesperson={lead.assignedTo ? nameOf(lead.assignedTo) : "Not assigned yet"}
         viewer={viewer}
         nameOf={nameOf}
-        readOnly={!writable || !mayReply}
-        readOnlyNote={liveNote}
-        canCompose={writable ? mayReply : mayReply && !windowShut}
+        readOnly={!mayReply}
+        demoTools={!live}
+        notice={windowNote}
+        canCompose={mayReply && !windowShut}
         composer={live ? { textOnly: true, sending, error: sendError } : undefined}
-        moveTo={writable && assignsAds(viewer) ? allTeams(members) : undefined}
-        onMoveTeam={tlId => sendToTeam(lead.id, tlId)}
-        reassignTo={writable && canReassign(viewer, lead, members) ? teamHandlers(lead.teamId ?? teamOf(lead.assignedTo ?? "", members) ?? "", members) : undefined}
-        onReassign={memberId => assign(lead.id, memberId)}
+        moveTo={assignsAds(viewer) ? allTeams(members) : undefined}
+        onMoveTeam={tlId => void sendToTeam(lead.id, tlId)}
+        reassignTo={canReassign(viewer, lead, members) ? teamHandlers(lead.teamId ?? teamOf(lead.assignedTo ?? "", members) ?? "", members) : undefined}
+        onReassign={memberId => void assign(lead.id, memberId)}
         onBack={() => { setView(fromMember ? { kind: "member", memberId: fromMember } : { kind: "tab" }); setBooking(false); }}
         onOpenAppointment={id => { setTab("calendar"); openAppointment(id); }}
-        onStatus={(status, lost) => updateLead(lead.id, l => {
-          const next = setLeadStatus(l, status, lost);
-          return lost ? { ...next, messages: [...next.messages, systemNote(`Marked Lost: ${lostReasonLabel(lost)}.`)] } : next;
-        })}
+        onStatus={async (status, lost) => {
+          if (!(await persist("crm_set_status", { p_contact: lead.id, p_status: status, p_reason: lost?.reason ?? null, p_note: lost?.note ?? null })).ok) return;
+          updateLead(lead.id, l => {
+            const next = setLeadStatus(l, status, lost);
+            return lost ? { ...next, messages: [...next.messages, systemNote(`Marked Lost: ${lostReasonLabel(lost)}.`)] } : next;
+          });
+        }}
         onAttachment={attachment => updateLead(lead.id, l => ({
           ...l,
           status: statusAfterReply(l.status),
@@ -335,8 +422,8 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
         booking={booking}
         onBooking={setBooking}
         busy={exceptId => busyFor(exceptId, lead.assignedTo)}
-        onBook={(room, start) => book(lead.id, room, start)}
-        onReschedule={(appt, start) => reschedule(appt, start, appt.showroomId)}
+        onBook={(room, start) => void book(lead.id, room, start)}
+        onReschedule={(appt, start) => void reschedule(appt, start, appt.showroomId)}
       />;
     }
   }
@@ -380,21 +467,21 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
           {teamHandlers(tl.id, members).filter(m => m.role === "rs").map(rs => <label key={rs.id} className={c.ruleTop}>
             <span>{rs.name}</span>
             <span className={c.switch}>
-              <input type="checkbox" checked={!!rs.fullTime} disabled={!writable} onChange={e => setMembers(list => list.map(m => (m.id === rs.id ? { ...m, fullTime: e.target.checked } : m)))} />
+              <input type="checkbox" checked={!!rs.fullTime} onChange={e => void setFullTime(rs.id, e.target.checked)} />
               {rs.fullTime ? "Full time" : "Part time"}
             </span>
           </label>)}
         </div>)}
       </section>}
-      {writable ? <MemberCrmAutoReplies settings={autoReplies} onChange={setAutoReplies} /> : <p className={c.demoNote}><Icon name="info" size={16} /> Auto-replies arrive together with sending from the CRM.</p>}
+      {!live ? <MemberCrmAutoReplies settings={autoReplies} onChange={setAutoReplies} /> : <p className={c.demoNote}><Icon name="info" size={16} /> Auto-replies are coming soon on live data.</p>}
     </div>;
   }
 
   // ── Assignment, from Settings ─────────────────────────────────────────────
   if (view.kind === "assignment" && seesAssignment) {
     inDetail = true;
-    body = <MemberCrmAssignment viewer={viewer} members={members} readOnly={!writable}
-      ads={[...new Set(leads.map(l => l.adName))].sort()} config={config} onConfig={setConfig}
+    body = <MemberCrmAssignment viewer={viewer} members={members} readOnly={false}
+      ads={[...new Set(leads.map(l => l.adName))].sort()} config={config} onConfig={changeConfig}
       onBack={() => setView({ kind: "settings" })} />;
   }
 
@@ -535,7 +622,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     body = <MemberCrmTeam viewer={viewer} members={members} leads={visible} appointments={visibleAppts} now={now}
       teamFilter={teamFilter} onTeamFilter={setTeamFilter}
       onOpenMember={id => setView({ kind: "member", memberId: id })} onOpenLead={id => openLead(id)}
-      onAssign={writable ? assign : undefined} onSendToTeam={writable ? sendToTeam : undefined} />;
+      onAssign={(id, m) => void assign(id, m)} onSendToTeam={(id, tl) => void sendToTeam(id, tl)} />;
   }
 
   // ── Profile ───────────────────────────────────────────────────────────────
@@ -606,7 +693,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
         </label>}
         <button className={live ? c.appGear : c.back} onClick={() => setView({ kind: "settings" })} aria-label="Settings"><Icon name="gear" size={20} /></button>
       </header>}
-      <main className={c.appMain}>{body}</main>
+      <main className={c.appMain}>
+        {liveError && <p className={c.composerProblem} role="alert">{liveError} <button className={c.linkButton} onClick={() => setLiveError("")}>Dismiss</button></p>}
+        {body}
+      </main>
       <nav className={c.appNav} aria-label="CRM" data-tabs={tabs.length}>
         {tabs.map(t => (
           <button key={t.id} aria-current={tab === t.id ? "page" : undefined} onClick={() => goTab(t.id)}>
@@ -619,7 +709,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   );
 }
 
-function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, readOnly, readOnlyNote, canCompose, composer, reassignTo, onReassign, moveTo, onMoveTeam, onBack, onOpenAppointment, onStatus, onSend, onAttachment, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
+function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, readOnly, notice, demoTools = true, canCompose, composer, reassignTo, onReassign, moveTo, onMoveTeam, onBack, onOpenAppointment, onStatus, onSend, onAttachment, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
   lead: CrmLead;
   now: Date;
   appointments: CrmAppointment[];
@@ -630,7 +720,10 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
   /** The Boss and HOD read chats but never reply, book or close a lead. */
   readOnly: boolean;
   /** Why it is read only when it is not the Boss/HOD rule (live data before sending is built). */
-  readOnlyNote?: string;
+  /** Something the person must know before writing (live: past the 24-hour window). */
+  notice?: string;
+  /** The demo's stand-in for a customer's message; never on live data. */
+  demoTools?: boolean;
   /** Whether the reply box shows, when that differs from readOnly (live: replying works, the rest does not yet). */
   canCompose?: boolean;
   /** Live: text only, the send in flight, and why the last one failed. */
@@ -711,10 +804,11 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
       </div>
       <p className={c.chatAd}><Icon name="target" size={14} /> {lead.adName}</p>
       {readOnly
-        ? <p className={c.stepIn}><Icon name="eye" size={16} /> {readOnlyNote ?? <>View only · {lead.assignedTo ? `${firstName(salesperson)}'s customer` : "not assigned yet"} — the {ROLE_LABELS[viewer.role]} reads chats but doesn&apos;t reply</>}</p>
+        ? <p className={c.stepIn}><Icon name="eye" size={16} /> View only · {lead.assignedTo ? `${firstName(salesperson)}'s customer` : "not assigned yet"} — the {ROLE_LABELS[viewer.role]} reads chats but doesn&apos;t reply</p>
         : lead.assignedTo !== viewer.id && <p className={c.stepIn}>
           <Icon name="eye" size={16} /> {lead.assignedTo ? `${firstName(salesperson)}'s customer` : "Not assigned yet"} · your replies show to the team as &ldquo;Replied by {firstName(viewer.name)}&rdquo;
         </p>}
+      {notice && <p className={c.waitBanner} data-urgency="soon" role="status">{notice}</p>}
       {moveTo && <label className={c.reassign}>
         <span>{lead.teamId ? "Team" : "Send to team"}</span>
         <select value={lead.teamId ?? ""} onChange={e => e.target.value && e.target.value !== lead.teamId && onMoveTeam(e.target.value)}>
@@ -796,7 +890,7 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
       {(canCompose ?? !readOnly) && <MemberCrmComposer placeholder={`Reply to ${lead.name.split(" ")[0]}…`} onText={onSend} onAttachment={onAttachment} {...composer} />}
 
       {/* Demo only: stands in for a message arriving from the customer. */}
-      {!readOnly && <details className={c.demoTool}>
+      {!readOnly && demoTools && <details className={c.demoTool}>
         <summary>Demo: send a message as {lead.name.split(" ")[0]}</summary>
         <div className={c.demoRow}>
           <input value={demoDraft} onChange={e => setDemoDraft(e.target.value)} placeholder="e.g. Can we change to Saturday 3pm?" aria-label="Customer message (demo)"
@@ -810,12 +904,14 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
 }
 
 /** The salesperson's view of one appointment: showed up, change, cancel. */
-function AppointmentDetail({ appt, lead, busy, readOnly, onBack, onOpenChat, onShowUp, onChange, onCancel }: {
+function AppointmentDetail({ appt, lead, busy, readOnly, live = false, onBack, onOpenChat, onShowUp, onChange, onCancel }: {
   appt: CrmAppointment;
   lead: CrmLead;
   busy: BusyFor;
   /** The Boss and HOD see an appointment but never change it. */
   readOnly: boolean;
+  /** Live: the customer is not told anything about appointments yet. */
+  live?: boolean;
   onBack: () => void;
   onOpenChat: () => void;
   onShowUp: () => void;
@@ -852,12 +948,12 @@ function AppointmentDetail({ appt, lead, busy, readOnly, onBack, onOpenChat, onS
       </div>}
 
       {booked && mode === "change" && <BookingSheet title="Change appointment" confirmLabel="Save new time" initialShowroom={appt.showroomId} busy={busy}
-        hint="The customer is notified of the new time."
+        hint={live ? "The customer is not told automatically yet — tell them in the chat." : "The customer is notified of the new time."}
         onCancel={() => setMode("idle")} onConfirm={(room, start) => { onChange(start, room); setMode("idle"); }} />}
 
       {booked && mode === "cancel" && <section className={c.sheet} aria-label="Cancel appointment">
         <h3>Cancel this appointment?</h3>
-        <p className={s.sub}>The slot is freed on the showroom calendar and yours, {lead.name.split(" ")[0]} is notified and goes back to Follow up.</p>
+        <p className={s.sub}>The slot is freed on the showroom calendar and yours, {lead.name.split(" ")[0]} {live ? "goes back to Follow up — tell them in the chat" : "is notified and goes back to Follow up"}.</p>
         <div className={c.sheetActions}>
           <button className={s.button} onClick={() => setMode("idle")}>Keep it</button>
           <button className={`${s.button} ${c.dangerSolid}`} onClick={() => { onCancel(); setMode("idle"); }}>Cancel appointment</button>

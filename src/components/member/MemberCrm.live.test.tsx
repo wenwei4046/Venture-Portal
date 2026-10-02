@@ -5,13 +5,15 @@ import type { CrmLiveData } from "@/lib/member/crm-live";
 // The live read and send are Server Actions; here they answer what the server would.
 const fetchCrm = vi.fn();
 const sendCrmReply = vi.fn();
+const crmWrite = vi.fn();
 vi.mock("@/app/(member)/member/crm-actions", () => ({
   fetchCrm: () => fetchCrm(),
   sendCrmReply: (id: string, text: string) => sendCrmReply(id, text),
+  crmWrite: (name: string, args: Record<string, unknown>) => crmWrite(name, args),
 }));
 const { default: MemberCrm } = await import("./MemberCrm");
 
-afterEach(() => { cleanup(); fetchCrm.mockReset(); sendCrmReply.mockReset(); });
+afterEach(() => { cleanup(); fetchCrm.mockReset(); sendCrmReply.mockReset(); crmWrite.mockReset(); });
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const data = (extra: Partial<CrmLiveData> = {}, lastCustomerAt = hoursAgo(2)): CrmLiveData => ({
@@ -37,15 +39,13 @@ describe("the CRM on live data", () => {
     expect(screen.queryByLabelText("Demo: view the CRM as")).toBeNull();
   });
 
-  it("replies on WhatsApp inside 24 hours — text only, and nothing else writes yet", async () => {
+  it("replies on WhatsApp inside 24 hours — text only", async () => {
     fetchCrm.mockResolvedValue({ ok: true, data: data() });
     sendCrmReply.mockResolvedValue({ ok: true, message: { id: "out1", from: "me", text: "Yes, until Sunday!", at: new Date().toISOString(), status: "sent" } });
     render(<MemberCrm live salesperson="Ann Tan" />);
     await openChat();
-    expect(screen.getByText(/Replies go to the customer on WhatsApp/)).toBeTruthy();
     expect(screen.queryByLabelText("Send a photo or video")).toBeNull();
-    expect(screen.queryByText("Book appointment")).toBeNull();
-    expect(screen.queryByLabelText("More actions")).toBeNull();
+    expect(screen.queryByText(/Demo: send a message/)).toBeNull();
     fireEvent.change(screen.getByLabelText("Reply"), { target: { value: "Yes, until Sunday!" } });
     fireEvent.click(screen.getByLabelText("Send"));
     expect(await screen.findByText("Yes, until Sunday!")).toBeTruthy();
@@ -63,6 +63,41 @@ describe("the CRM on live data", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.getByText(/could not deliver/)).toBeTruthy();
     await waitFor(() => expect((screen.getByLabelText("Reply") as HTMLInputElement).value).toBe("Hello?"));
+  });
+
+  it("saves Won to the database before showing it", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: data() });
+    crmWrite.mockResolvedValue({ ok: true, data: { status: "won" } });
+    render(<MemberCrm live salesperson="Ann Tan" />);
+    await openChat();
+    fireEvent.click(screen.getByLabelText("More actions"));
+    fireEvent.click(screen.getByText("Mark as Won"));
+    await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_set_status", { p_contact: "c1", p_status: "won", p_reason: null, p_note: null }));
+    expect(await screen.findByText(/moves back to Follow up if the customer writes again/)).toBeTruthy();
+  });
+
+  it("changes nothing and says why when the database says no", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: data() });
+    crmWrite.mockResolvedValue({ ok: false, error: "You may not change this customer." });
+    render(<MemberCrm live salesperson="Ann Tan" />);
+    await openChat();
+    fireEvent.click(screen.getByLabelText("More actions"));
+    fireEvent.click(screen.getByText("Mark as Won"));
+    expect(await screen.findByText(/You may not change this customer/)).toBeTruthy();
+    expect(screen.queryByText(/moves back to Follow up if the customer writes again/)).toBeNull();
+  });
+
+  it("books through the database and does not claim the customer was told", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: data() });
+    crmWrite.mockResolvedValue({ ok: true, data: { id: "appt-db-1" } });
+    render(<MemberCrm live salesperson="Ann Tan" />);
+    await openChat();
+    fireEvent.click(screen.getByText("Book appointment"));
+    fireEvent.click(screen.getAllByRole("button").find(b => /^[0-9]{1,2}:00/.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled)!);
+    fireEvent.click(screen.getByText("Confirm"));
+    await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_book", expect.objectContaining({ p_contact: "c1", p_minutes: 60 })));
+    expect(await screen.findByText(/Not sent to the customer — tell them in the chat/)).toBeTruthy();
+    expect(screen.queryByText("APPOINTMENT CONFIRMED")).toBeNull();
   });
 
   it("has no reply box after 24 hours, and says why", async () => {
