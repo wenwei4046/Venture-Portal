@@ -346,3 +346,96 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .checkList em { font-style: normal; font-size: 12px; color: var(--m-sub); }
 .checkList small { display: block; font-size: 11px; color: var(--m-sub); margin-top: 2px; }
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+
+/* Demo: whose eyes the CRM is seen through */
+.roleSwitch { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11px; font-weight: 700; color: var(--m-sub); white-space: nowrap; }
+.roleSwitch select { min-width: 0; max-width: 170px; min-height: 34px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font: inherit; font-size: 12px; }
+
+/* A lead seen by someone other than its salesperson */
+.leadMeta { flex-wrap: wrap; }
+.owner { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--m-border); color: var(--m-sub); }
+.stepIn { display: flex; align-items: center; gap: 6px; margin: 0; padding: 10px 12px; border-radius: 10px; background: rgb(52 120 150 / .12); color: rgb(36 92 118); font-size: 13px; font-weight: 600; }
+.byTag { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .8; margin-bottom: 2px; }
+
+/* Team */
+.teamHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
+.teamHead h2 { margin: 0; }
+.teamHead p { margin: 2px 0 0; }
+.teamTotal { flex: none; font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 8px; background: var(--m-soft); color: var(--m-sub); }
+.memberRow {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; text-align: left;
+  background: none; border: 0; border-top: 1px solid var(--m-border); color: inherit; cursor: pointer;
+}
+.memberNums { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--m-sub); }
+.memberNums b { color: var(--m-text); font-variant-numeric: tabular-nums; }
+
+/* Assignment */
+.shareRow { display: grid; grid-template-columns: 1fr 76px 44px; align-items: center; gap: 10px; padding: 6px 0; }
+.shareRow small { text-align: right; font-size: 12px; color: var(--m-sub); font-variant-numeric: tabular-nums; }
+.shareInput { width: 100%; min-height: 38px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font: inherit; text-align: right; }
+.shareInput:disabled { opacity: .6; background: var(--m-soft); }
+.pickTeam { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 8px 0 0; border: 0; }
+.pickTeam legend { width: 100%; padding: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--m-sub); }
+.pickTeam .switch { color: var(--m-text); font-weight: 600; font-size: 13px; }
+.preview { margin: 8px 0; padding: 0 0 0 22px; display: flex; flex-direction: column; gap: 2px; }
+.preview li { padding: 6px 0; border-bottom: 1px solid var(--m-border); }
+.preview li strong { margin-right: 8px; }
+.modeTag { float: right; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--m-soft); color: var(--m-sub); }
+
+/* Six tabs (a leader or the Boss has Team too): narrower icons, labels that never touch. */
+.appNav[data-tabs="6"] { padding-left: 4px; padding-right: 4px; }
+.appNav[data-tabs="6"] button { font-size: 9.5px; letter-spacing: -.01em; }
+.appNav[data-tabs="6"] button > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appNav[data-tabs="6"] .appNavIcon { width: 40px; }
+
+/* A tab title with one action on its right (Team › Assignment) */
+.titleRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.titleAction {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; margin-top: 4px; padding: 6px 12px;
+  border-radius: 19px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.shareHead { display: grid; grid-template-columns: 1fr 76px 44px; gap: 10px; font-size: 11px; font-weight: 700; color: var(--m-sub); text-transform: uppercase; letter-spacing: .04em; }
+.shareHead span:nth-child(2) { text-align: center; }
+.shareHead span:nth-child(3) { text-align: right; }
+
+/* Profile for a leader or the Boss: teams side by side */
+.compare { display: flex; flex-direction: column; font-size: 13px; }
+.compare > div { display: grid; grid-template-columns: 1.6fr repeat(5, 1fr); gap: 6px; padding: 9px 0; border-top: 1px solid var(--m-border); font-variant-numeric: tabular-nums; }
+.compare > div span:not(:first-child) { text-align: right; }
+.compare > .compareHead { border-top: 0; font-size: 11px; font-weight: 700; color: var(--m-sub); text-transform: uppercase; letter-spacing: .04em; }
+.stats > .stat:nth-child(n+5) small { white-space: normal; }
+
+/* The reporting line: role tags, the TL's "To assign" list, reassigning a lead */
+.roleTag { margin-left: 4px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--m-soft); color: var(--m-sub); vertical-align: middle; white-space: nowrap; }
+.roleTag[data-role="tl"] { background: rgb(90 62 43 / .14); color: var(--m-text); }
+.roleTag[data-role="ta"] { background: rgb(52 120 150 / .14); color: rgb(36 92 118); }
+.roleTag[data-full] { background: rgb(52 140 90 / .14); color: rgb(40 110 70); }
+.memberNums [data-over] b { color: rgb(190 50 50); }
+.queue { margin: 6px 0 4px; padding: 10px 12px; border-radius: 12px; border: 1.5px dashed var(--m-brand); }
+.queue h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 14px; }
+.queue p { margin: 0; }
+.queueRow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--m-border); }
+.queueLead { display: flex; flex-direction: column; flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.queueRow select, .reassign select { min-height: 36px; max-width: 170px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font: inherit; font-size: 13px; }
+.reassign { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--m-soft); font-size: 13px; font-weight: 700; }
+.flowSteps { margin: 0; padding: 10px 12px 10px 30px; border-radius: 10px; background: var(--m-soft); font-size: 13px; color: var(--m-sub); display: flex; flex-direction: column; gap: 4px; }
+.flowSteps strong { color: var(--m-text); }
+.segment button:disabled { cursor: default; }
+.segment [role="radio"][aria-checked="true"] { background: var(--m-card); color: var(--m-text); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+.memberRow .waitBadge { flex: none; white-space: nowrap; align-self: flex-start; }
+
+/* Shares typed as percentages: name · [ 40 ] % — and the group's total */
+.shareRow { grid-template-columns: 1fr 76px 16px; }
+.shareRow small { text-align: left; }
+.percentTotal { margin: 4px 0 0; text-align: right; font-size: 12px; font-weight: 700; color: rgb(40 110 70); font-variant-numeric: tabular-nums; }
+.percentTotal[data-off] { color: rgb(190 50 50); }
+
+/* The header: brand, demo role switch, then the settings gear at the far right */
+.appTop .roleSwitch select { max-width: 150px; }
+.editedBy { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; padding: 8px 10px; border-radius: 8px; background: rgb(224 172 30 / .16); color: rgb(140 100 10); font-size: 12px; font-weight: 600; }
+
+/* Inbox for a TL or TA: All · Mine · Members */
+.segment3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 12px; background: var(--m-soft); }
+.segment3 button { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--m-sub); font: inherit; font-weight: 700; cursor: pointer; }
+.segment3 button small { font-weight: 600; opacity: .7; }
+.segment3 [aria-checked="true"] { background: var(--m-card); color: var(--m-text); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }

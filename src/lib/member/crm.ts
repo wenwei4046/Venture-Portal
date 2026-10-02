@@ -100,6 +100,8 @@ export interface CrmMessage {
   at: string; // ISO timestamp
   /** A photo, video or voice message sent with (or instead of) text. */
   attachment?: CrmAttachment;
+  /** A team leader or the Boss who replied in a downline's chat (their member id) — shown as "Replied by …". */
+  by?: string;
 }
 
 export interface CrmAttachment {
@@ -178,6 +180,10 @@ export interface CrmLead {
   adName: string; // the Meta ad the lead form came from
   /** The Facebook Page the customer wrote to. */
   pageName?: string;
+  /** The person the enquiry was handed to (`crm-team.ts` decides who). Unset while it waits for its TL. */
+  assignedTo?: string;
+  /** The TL whose team took the enquiry. */
+  teamId?: string;
   campaign: string;
   status: CrmStatus;
   lost?: CrmLost; // set exactly while status is Lost
