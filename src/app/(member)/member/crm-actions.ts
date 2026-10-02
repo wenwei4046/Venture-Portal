@@ -28,7 +28,7 @@ export async function fetchCrm(): Promise<{ ok: true; data: CrmLiveData } | { ok
     const [people, contacts, messages, appointments, rules, teams] = await Promise.all([
       read<CrmPeopleRow>(db.rpc("crm_people")),
       read<CrmRows["contacts"]>(db.from("crm_contacts").select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at")),
-      read<CrmRows["messages"]>(db.from("crm_messages").select("id, contact_id, direction, kind, body, auto, sent_by, sent_at, status, error").order("sent_at")),
+      read<CrmRows["messages"]>(db.from("crm_messages").select("id, contact_id, direction, kind, body, media_id, auto, sent_by, sent_at, status, error").order("sent_at")),
       read<CrmRows["appointments"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state")),
       read<CrmRows["rules"]>(db.from("crm_assign_rules").select("ad_source_id, ad_label, tl_ids")),
       read<CrmRows["teams"]>(db.from("crm_team_settings").select("tl_id, team_share, percent_days, weekend_full_time, ratios, edited_by, edited_at")),

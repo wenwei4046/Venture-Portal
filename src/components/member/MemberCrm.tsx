@@ -854,6 +854,7 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
             {m.attachment?.kind === "image" && <a href={m.attachment.url} target="_blank" rel="noreferrer"><img className={c.media} src={m.attachment.url} alt={m.attachment.name ?? "Photo"} /></a>}
             {m.attachment?.kind === "video" && <video className={c.media} src={m.attachment.url} controls playsInline preload="metadata" />}
             {m.attachment?.kind === "audio" && <span className={c.voice}><Icon name="mic" size={16} /><audio src={m.attachment.url} controls preload="metadata" />{m.attachment.seconds ? <small>{clipLength(m.attachment.seconds)}</small> : null}</span>}
+            {m.attachment?.kind === "file" && <a className={c.fileLink} href={m.attachment.url} download><Icon name="file" size={16} /> {m.attachment.name ?? "Document"}</a>}
             {m.text && <p>{m.text}</p>}
             <span>{whenLabel(m.at)}{m.status && m.status !== "failed" && <> · {m.status === "sent" ? "✓" : m.status === "delivered" ? "✓✓" : "✓✓ Read"}</>}</span>
             {m.status === "failed" && <small className={c.failedTag} role="status">Not delivered{m.error ? ` — ${m.error}` : ""}</small>}

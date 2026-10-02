@@ -478,3 +478,5 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .dayRow > .dayChip { flex: 1 1 0; min-width: 0; padding: 6px 2px; }
 .dayRow > .dayChip { white-space: nowrap; font-size: 12px; min-height: 34px; border-radius: 17px; }
 .dayRow + label { margin-top: 10px; }
+/* A document the customer sent: a download, never shown in place */
+.fileLink { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: inherit; }

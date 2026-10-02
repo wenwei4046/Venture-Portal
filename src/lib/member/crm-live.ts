@@ -4,7 +4,7 @@
  * same CrmLead / CrmAppointment / CrmMember / CrmAssignConfig the demo uses.
  * Pure, so every rule is tested; the reads are crm-actions.ts.
  */
-import { CRM_LOST_REASONS, type CrmAppointment, type CrmLead, type CrmLostReason, type CrmMessage, type CrmStatus } from "./crm";
+import { CRM_LOST_REASONS, type CrmAppointment, type CrmAttachment, type CrmLead, type CrmLostReason, type CrmMessage, type CrmStatus } from "./crm";
 import type { CrmAssignConfig, CrmMember, CrmRole } from "./crm-team";
 
 /* ── The rows, as PostgREST returns them ───────────────────────────────── */
@@ -44,6 +44,8 @@ export interface CrmMessageRow {
   auto: boolean;
   sent_by: string | null;
   sent_at: string;
+  /** Meta's media id: the file is fetched by our route, never by the browser from Meta. */
+  media_id?: string | null;
   status?: "received" | "sent" | "delivered" | "read" | "failed" | null;
   error?: string | null;
 }
@@ -99,14 +101,20 @@ const MEDIA_LABEL: Record<string, string> = {
 const lostReasons = new Set<string>(CRM_LOST_REASONS.map(r => r.value));
 
 /** A message as the chat draws it. Media is named until it can be downloaded (it needs the token, server-side). */
+/** Media the chat can show, through our own route (crm-media/[messageId]) — never Meta's address. */
+const ATTACHMENT_KIND: Record<string, CrmAttachment["kind"]> = { image: "image", sticker: "image", video: "video", audio: "audio", document: "file" };
+
 export function messageFromRow(row: CrmMessageRow, owner: string | null): CrmMessage {
   const media = MEDIA_LABEL[row.kind];
-  const text = media ? (row.body ? `${media} · ${row.body}` : media) : row.body ?? "";
+  const shown = row.media_id ? ATTACHMENT_KIND[row.kind] : undefined;
+  // With the file shown, the caption is the text; without it, the label says what it was.
+  const text = shown ? row.body ?? "" : media ? (row.body ? `${media} · ${row.body}` : media) : row.body ?? "";
   return {
     id: row.id,
     from: row.direction === "in" ? "lead" : "me",
     text,
     at: row.sent_at,
+    ...(shown ? { attachment: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: row.body || "Document" } : {}) } } : {}),
     // Only our own messages have a delivery state worth showing.
     ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
     ...(row.error ? { error: row.error } : {}),

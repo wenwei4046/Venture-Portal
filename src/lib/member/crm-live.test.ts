@@ -57,6 +57,14 @@ describe("a message from the database", () => {
     expect(messageFromRow(message({ direction: "out", sent_by: null, auto: true }), "ann").by).toBeUndefined();
   });
 
+  it("shows a customer's photo, voice or document through our own route — never Meta's address", () => {
+    expect(messageFromRow(message({ kind: "image", body: "This colour?", media_id: "123456" }), null)).toMatchObject({
+      text: "This colour?", attachment: { kind: "image", url: "/member/crm-media/m1" },
+    });
+    expect(messageFromRow(message({ kind: "audio", body: null, media_id: "123456" }), null).attachment).toEqual({ kind: "audio", url: "/member/crm-media/m1" });
+    expect(messageFromRow(message({ kind: "document", body: "quote.pdf", media_id: "123456" }), null).attachment).toEqual({ kind: "file", url: "/member/crm-media/m1", name: "quote.pdf" });
+  });
+
   it("names media it cannot show yet, with the caption", () => {
     expect(messageFromRow(message({ kind: "image", body: null }), null).text).toBe("📷 Photo");
     expect(messageFromRow(message({ kind: "image", body: "This colour?" }), null).text).toBe("📷 Photo · This colour?");

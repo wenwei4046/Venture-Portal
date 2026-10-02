@@ -109,7 +109,8 @@ export interface CrmMessage {
 }
 
 export interface CrmAttachment {
-  kind: "image" | "video" | "audio";
+  /** "file": a document the customer sent — downloaded, never shown in place. */
+  kind: "image" | "video" | "audio" | "file";
   url: string;
   name?: string;
   /** Voice messages: length in seconds. */
@@ -123,7 +124,7 @@ export const clipLength = (seconds: number) => `${Math.floor(seconds / 60)}:${St
 export function messagePreview(message: CrmMessage): string {
   const a = message.attachment;
   if (!a) return message.text;
-  const label = a.kind === "image" ? "📷 Photo" : a.kind === "video" ? "🎥 Video" : `🎤 Voice message${a.seconds ? ` (${clipLength(a.seconds)})` : ""}`;
+  const label = a.kind === "image" ? "📷 Photo" : a.kind === "video" ? "🎥 Video" : a.kind === "file" ? `📄 ${a.name ?? "Document"}` : `🎤 Voice message${a.seconds ? ` (${clipLength(a.seconds)})` : ""}`;
   return message.text ? `${label} · ${message.text}` : label;
 }
 
