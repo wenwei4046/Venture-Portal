@@ -1053,6 +1053,7 @@ export default function BaView({
         <div className="overflow-x-auto">
           <SortableTable<BaRow>
             layoutId="ba.facilities"
+            layoutTitle="BA"
             rows={rows}
             getRowKey={r => r.id}
             defaultSort={{ key: 'period', dir: 'desc' }}
@@ -1061,6 +1062,7 @@ export default function BaView({
             columns={[
               {
                 key: 'baNo',
+                group: '基本',
                 label: 'Ref',
                 render: r => (
                   <div>
@@ -1073,6 +1075,7 @@ export default function BaView({
               },
               {
                 key: 'borrower',
+                group: '基本',
                 label: 'Borrower',
                 render: r => r.borrower,
                 sortValue: r => r.borrower,
@@ -1081,6 +1084,7 @@ export default function BaView({
               },
               {
                 key: 'face',
+                group: '金额',
                 label: 'Face',
                 align: 'right',
                 render: r => money(r.faceAmount),
@@ -1089,8 +1093,8 @@ export default function BaView({
               },
               {
                 key: 'period',
+                group: '日期',
                 label: 'Period',
-                align: 'right',
                 render: r => (
                   <span className="font-mono text-xs">
                     {dayjs(r.startDate).format('D MMM')} → {dayjs(r.maturityDate).format('D MMM YYYY')}
@@ -1101,6 +1105,7 @@ export default function BaView({
               },
               {
                 key: 'charge',
+                group: '金额',
                 label: 'Charge',
                 align: 'right',
                 render: r =>
@@ -1118,6 +1123,7 @@ export default function BaView({
               },
               {
                 key: 'owe',
+                group: '金额',
                 label: 'Owe HC',
                 align: 'right',
                 render: r =>
@@ -1135,6 +1141,7 @@ export default function BaView({
               },
               {
                 key: 'interest',
+                group: '金额',
                 label: 'Interest billing',
                 align: 'right',
                 sortable: false,
@@ -1144,6 +1151,7 @@ export default function BaView({
               },
               {
                 key: 'status',
+                group: '基本',
                 label: 'Status',
                 render: r => {
                   const daysLeft = dayjs(r.maturityDate).diff(dayjs(), 'day')

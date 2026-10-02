@@ -45,7 +45,16 @@ vi.mock('./InvoiceActions', () => ({
 }))
 vi.mock('./CreateCreditNoteButton', () => ({ default: dialog('dialog-cn') }))
 vi.mock('./ReassignInvoiceGlButton', () => ({ default: dialog('dialog-gl') }))
-vi.mock('./InvoiceDetailButton', () => ({ default: () => null }))
+// The detail popup: nothing in the cell, and — when the row opens it — a
+// stand-in that says which invoice it is showing.
+vi.mock('./InvoiceDetailButton', () => ({
+  default: (p: { invoice: { invoice_no: string | null; status: string }; autoOpen?: boolean; hideTrigger?: boolean }) =>
+    p.autoOpen ? (
+      <div data-testid="dialog-detail" data-hide={String(!!p.hideTrigger)}>
+        {p.invoice.invoice_no} · {p.invoice.status}
+      </div>
+    ) : null,
+}))
 
 function invoice(id: string, invoice_no: string, period_month: string) {
   return {
@@ -143,19 +152,19 @@ describe('the row menu', () => {
     render(list('2026-09-01', [issued]))
     fireEvent.contextMenu(row('INV-1'))
     expect(screen.getByRole('menu', { name: 'Actions for INV-1 · issued' })).toBeInTheDocument()
-    expect(menuLabels()).toEqual(['Settle', 'PDF', 'Copy', '+ Credit note', '改 account', '作废'])
+    expect(menuLabels()).toEqual(['打开', 'Settle', 'PDF', 'Copy', '+ Credit note', '改 account', '作废'])
   })
 
   it('…a draft', () => {
     render(list('2026-09-01', [draft]))
     fireEvent.contextMenu(firstRow())
-    expect(menuLabels()).toEqual(['Approve & issue', 'Edit', 'PDF', 'Copy', 'Delete'])
+    expect(menuLabels()).toEqual(['打开', 'Approve & issue', 'Edit', 'PDF', 'Copy', 'Delete'])
   })
 
   it('…and a paid one', () => {
     render(list('2026-09-01', [paid]))
     fireEvent.contextMenu(firstRow())
-    expect(menuLabels()).toEqual(['PDF', 'Copy', 'Refund', '+ Credit note', '改 account'])
+    expect(menuLabels()).toEqual(['打开', 'PDF', 'Copy', 'Refund', '+ Credit note', '改 account'])
   })
 
   it('the ⋯ opens the same menu', () => {
@@ -207,5 +216,46 @@ describe('the row menu', () => {
     fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Copy/ }))
     expect(await screen.findByText('INV-1: Period is locked')).toBeInTheDocument()
     vi.unstubAllGlobals()
+  })
+})
+
+// 2026-10-02: every finance table opens a row on a double-click. An invoice has
+// no page of its own, so what opens is its detail popup — the one its number
+// has always opened.
+describe('opening an invoice', () => {
+  const issued = invoice('inv-1', 'INV-1', '2026-09-01')
+  const other = invoice('inv-2', 'INV-2', '2026-09-01')
+  const row = (no: string) => screen.getByLabelText(`Select ${no}`).closest('tr') as HTMLElement
+
+  it('a double-click on the row opens its detail, for that row, with no trigger of its own', () => {
+    render(list('2026-09-01', [issued, other]))
+    expect(screen.queryByTestId('dialog-detail')).toBeNull()
+    fireEvent.doubleClick(within(row('INV-2')).getByText('HOUZS Century'))
+    const detail = screen.getByTestId('dialog-detail')
+    expect(detail).toHaveTextContent('INV-2 · issued')
+    expect(detail.dataset.hide).toBe('true')
+  })
+
+  it('…but not a double-click on its tick box or on its Settle button', () => {
+    render(list('2026-09-01', [issued]))
+    fireEvent.doubleClick(screen.getByLabelText('Select INV-1'))
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'Actions for INV-1' }))
+    expect(screen.queryByTestId('dialog-detail')).toBeNull()
+  })
+
+  it('打开 in the row menu opens the same thing', () => {
+    render(list('2026-09-01', [issued, other]))
+    fireEvent.contextMenu(row('INV-1'))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /^打开/ }))
+    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · issued')
+  })
+
+  it('shows the invoice as it is now, not as it was when the popup opened', () => {
+    const { rerender } = render(list('2026-09-01', [issued]))
+    fireEvent.doubleClick(within(row('INV-1')).getByText('HOUZS Century'))
+    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · issued')
+    // A settle lands and the page refreshes under the open popup.
+    rerender(list('2026-09-01', [{ ...issued, status: 'paid' }]))
+    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · paid')
   })
 })

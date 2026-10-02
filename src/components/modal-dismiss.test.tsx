@@ -49,6 +49,22 @@ describe('backdropDismiss', () => {
     expect(close).not.toHaveBeenCalled()
   })
 
+  // 2026-10-02: rows open on a double-click now, and so a trigger gets
+  // double-clicked too. The first click opens the modal; the second lands on
+  // the backdrop that has just appeared under the pointer.
+  it('does not close on the second click of the double-click that opened it', () => {
+    const close = vi.fn()
+    render(<Modal close={close} />)
+    const backdrop = screen.getByTestId('backdrop')
+    fireEvent.mouseDown(backdrop, { detail: 2 })
+    fireEvent.click(backdrop, { detail: 2 })
+    expect(close).not.toHaveBeenCalled()
+    // …and a click of its own, afterwards, still closes it.
+    fireEvent.mouseDown(backdrop, { detail: 1 })
+    fireEvent.click(backdrop, { detail: 1 })
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
   it('closes on Escape while mounted, and stops listening once unmounted', () => {
     const close = vi.fn()
     const view = render(<Modal close={close} />)

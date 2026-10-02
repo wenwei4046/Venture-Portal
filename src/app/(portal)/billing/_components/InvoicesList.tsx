@@ -167,6 +167,38 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   const catLabelByCode: Record<string, string> = Object.fromEntries(
     categories.map((c) => [c.code, c.label]),
   )
+  /** What the detail popup shows for an invoice. Its number in the Invoice #
+   *  cell and a double-click anywhere on its row open the same thing. */
+  const detailOf = (inv: Invoice) => {
+    const labels = resolvePartyLabel(inv, companyMap, departmentMap)
+    return {
+      invoice: {
+        id: inv.id,
+        invoice_no: inv.invoice_no,
+        period_month: inv.period_month,
+        billing_mode: inv.billing_mode,
+        total_amount: Number(inv.total_amount),
+        status: inv.status,
+        description: inv.description ?? null,
+        invoice_date: inv.invoice_date ?? null,
+        due_date: inv.due_date ?? null,
+        reference_no: inv.reference_no ?? null,
+        category_code: inv.category_code ?? null,
+        created_at: inv.created_at ?? null,
+        freetext_address: inv.billable_to_freetext_address ?? null,
+        freetext_phone: inv.billable_to_freetext_phone ?? null,
+        freetext_email: inv.billable_to_freetext_email ?? null,
+      },
+      partyPrimary: labels.primary,
+      partySub: labels.sub,
+      categoryLabel: inv.category_code ? categories.find((c) => c.code === inv.category_code)?.label : undefined,
+      billingModeLabel: formatBillingMode(inv.billing_mode),
+      lines: invoiceLines[inv.id] ?? [],
+      categoryLabels: catLabelByCode,
+      receipts: receiptsByInvoice[inv.id] ?? [],
+      creditNotes: cnDetailByInvoice[inv.id] ?? [],
+    }
+  }
   // 跨月: reveal other periods' unsettled invoices in the same list.
   const [showAllOpen, setShowAllOpen] = useState(false)
   const displayRows = showAllOpen ? [...invoices, ...extraOpenInvoices] : invoices
@@ -343,13 +375,14 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   // right click,然后我才选我要的 action"). The cell keeps the ONE action a row is
   // usually opened for; the rest are in the menu, on a right-click or the ⋯.
   const [menu, setMenu] = useState<{ invoice: Invoice; anchor: RowMenuAnchor } | null>(null)
-  // The three actions that are dialogs are mounted here, once, for the row
-  // that asked — not in every row as before. `nonce` remounts the component so
-  // choosing the same action on the same invoice opens it again.
-  const [dialog, setDialog] = useState<{ kind: 'edit' | 'credit_note' | 'reassign'; invoice: Invoice; nonce: number } | null>(null)
+  // The actions that are dialogs are mounted here, once, for the row that
+  // asked — not in every row as before. `nonce` remounts the component so
+  // choosing the same action on the same invoice opens it again. `detail` is
+  // the read-only popup, which a double-click on the row opens too.
+  type DialogKind = 'detail' | 'edit' | 'credit_note' | 'reassign'
+  const [dialog, setDialog] = useState<{ kind: DialogKind; invoice: Invoice; nonce: number } | null>(null)
   const [rowError, setRowError] = useState<string | null>(null)
-  const openDialog = (kind: 'edit' | 'credit_note' | 'reassign', invoice: Invoice) =>
-    setDialog({ kind, invoice, nonce: Date.now() })
+  const openDialog = (kind: DialogKind, invoice: Invoice) => setDialog({ kind, invoice, nonce: Date.now() })
 
   function copyOne(inv: Invoice) {
     if (!confirm(`复制 ${inv.invoice_no ?? '此发票'} 为本月新草稿?复制后可在草稿里改金额/描述再 issue。`)) return
@@ -380,7 +413,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   }
   /** Everything that can be done to this invoice in its present status. */
   function menuItems(inv: Invoice): RowMenuItem[] {
-    const items: RowMenuItem[] = []
+    const items: RowMenuItem[] = [
+      { key: 'open', label: '打开', hint: '看明细 · 双击也可以', onSelect: () => openDialog('detail', inv) },
+    ]
     if (inv.status === 'draft') {
       items.push({
         key: 'approve',
@@ -527,6 +562,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
               layoutId="billing.invoices"
+              layoutTitle="Invoices"
+              onRowOpen={(inv) => openDialog('detail', inv)}
               onRowContextMenu={(inv, e) => {
                 e.preventDefault()
                 setMenu({ invoice: inv, anchor: { x: e.clientX, y: e.clientY } })
@@ -631,46 +668,14 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                 },
                 {
                   key: 'invoice_no',
+                  group: '基本',
                   label: 'Invoice #',
-                  render: (inv) => {
-                    const labels = resolvePartyLabel(inv, companyMap, departmentMap)
-                    const categoryLabel = inv.category_code
-                      ? categories.find((c) => c.code === inv.category_code)?.label
-                      : undefined
-                    return (
-                      <InvoiceDetailButton
-                        invoice={{
-                          id: inv.id,
-                          invoice_no: inv.invoice_no,
-                          period_month: inv.period_month,
-                          billing_mode: inv.billing_mode,
-                          total_amount: Number(inv.total_amount),
-                          status: inv.status,
-                          description: inv.description ?? null,
-                          invoice_date: inv.invoice_date ?? null,
-                          due_date: inv.due_date ?? null,
-                          reference_no: inv.reference_no ?? null,
-                          category_code: inv.category_code ?? null,
-                          created_at: inv.created_at ?? null,
-                          freetext_address: inv.billable_to_freetext_address ?? null,
-                          freetext_phone: inv.billable_to_freetext_phone ?? null,
-                          freetext_email: inv.billable_to_freetext_email ?? null,
-                        }}
-                        partyPrimary={labels.primary}
-                        partySub={labels.sub}
-                        categoryLabel={categoryLabel}
-                        billingModeLabel={formatBillingMode(inv.billing_mode)}
-                        lines={invoiceLines[inv.id] ?? []}
-                        categoryLabels={catLabelByCode}
-                        receipts={receiptsByInvoice[inv.id] ?? []}
-                        creditNotes={cnDetailByInvoice[inv.id] ?? []}
-                      />
-                    )
-                  },
+                  render: (inv) => <InvoiceDetailButton {...detailOf(inv)} />,
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
                 },
                 {
                   key: 'company',
+                  group: '基本',
                   label: 'Company',
                   render: (inv) => {
                     const labels = resolvePartyLabel(inv, companyMap, departmentMap)
@@ -687,6 +692,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                 },
                 {
                   key: 'description',
+                  group: '基本',
                   label: 'Description',
                   render: (inv) => {
                     const d = inv.description?.trim()
@@ -702,6 +708,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                 },
                 {
                   key: 'billing_mode',
+                  group: '入账',
                   label: 'Mode',
                   render: (inv) => formatBillingMode(inv.billing_mode),
                   sortValue: (inv) => formatBillingMode(inv.billing_mode),
@@ -710,6 +717,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                 },
                 {
                   key: 'total_amount',
+                  group: '金额',
                   label: 'Amount',
                   align: 'right',
                   render: (inv) => {
@@ -734,6 +742,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                 },
                 {
                   key: 'status',
+                  group: '基本',
                   label: 'Status',
                   render: (inv) => <InvoiceStatus status={inv.status} />,
                   sortValue: (inv) => inv.status,
@@ -804,6 +813,15 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
       ) : null}
 
       {/* The dialogs the menu opens — one instance, for the row that asked. */}
+      {dialog?.kind === 'detail' ? (
+        <InvoiceDetailButton
+          key={`detail:${dialog.invoice.id}:${dialog.nonce}`}
+          autoOpen
+          hideTrigger
+          // The row as it is NOW: a settle or a credit note may have landed since.
+          {...detailOf(displayRows.find((i) => i.id === dialog.invoice.id) ?? dialog.invoice)}
+        />
+      ) : null}
       {dialog?.kind === 'edit' ? (
         <EditInvoiceButton
           key={`edit:${dialog.invoice.id}:${dialog.nonce}`}

@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/client', () => ({ createClient: vi.fn() }))
 import {
+  announceLayout,
   applyOrder,
   clampWidth,
+  COLUMN_GROUPS,
+  groupColumns,
+  onLayoutAnnounced,
   isCustomised,
   moveColumn,
   sameLayout,
@@ -13,6 +17,8 @@ import {
   MIN_COLUMN_WIDTH,
   MIN_STORED_WIDTH,
   storedWidth,
+  toggleHidden,
+  visibleColumns,
 } from './table-layout'
 
 const cols = (...keys: string[]) => keys.map((key) => ({ key }))
@@ -68,7 +74,9 @@ describe('moveColumn', () => {
 
 describe('sanitizeLayout', () => {
   it('accepts a well-formed layout', () => {
-    expect(sanitizeLayout({ order: ['a', 'b'], widths: { a: 180 } })).toEqual({ order: ['a', 'b'], widths: { a: 180 } })
+    expect(sanitizeLayout({ order: ['a', 'b'], widths: { a: 180 } })).toEqual({ order: ['a', 'b'], widths: { a: 180 }, hidden: [] })
+    // A row saved before the Columns panel has no `hidden` at all.
+    expect(sanitizeLayout({ order: [], widths: {}, hidden: ['pool', 7, 'pool', ''] }).hidden).toEqual(['pool'])
   })
   it('clamps widths and drops what is not a width', () => {
     const got = sanitizeLayout({ order: ['a'], widths: { a: 5, b: 99999, c: 'wide', d: -3, e: '240' } })
@@ -96,12 +104,114 @@ describe('the small ones', () => {
   })
   it('isCustomised is false only for the default', () => {
     expect(isCustomised(EMPTY_LAYOUT)).toBe(false)
-    expect(isCustomised({ order: [], widths: { a: 100 } })).toBe(true)
-    expect(isCustomised({ order: ['a'], widths: {} })).toBe(true)
+    expect(isCustomised({ order: [], widths: { a: 100 }, hidden: [] })).toBe(true)
+    expect(isCustomised({ order: ['a'], widths: {}, hidden: [] })).toBe(true)
+    expect(isCustomised({ order: [], widths: {}, hidden: ['pool'] })).toBe(true)
   })
   it('sameLayout compares order and widths', () => {
-    expect(sameLayout({ order: ['a', 'b'], widths: { a: 1 } }, { order: ['a', 'b'], widths: { a: 1 } })).toBe(true)
-    expect(sameLayout({ order: ['a', 'b'], widths: {} }, { order: ['b', 'a'], widths: {} })).toBe(false)
-    expect(sameLayout({ order: [], widths: { a: 1 } }, { order: [], widths: { a: 2 } })).toBe(false)
+    const l = (order: string[], widths: Record<string, number>, hidden: string[] = []) => ({ order, widths, hidden })
+    expect(sameLayout(l(['a', 'b'], { a: 1 }), l(['a', 'b'], { a: 1 }))).toBe(true)
+    expect(sameLayout(l(['a', 'b'], {}), l(['b', 'a'], {}))).toBe(false)
+    expect(sameLayout(l([], { a: 1 }), l([], { a: 2 }))).toBe(false)
+    expect(sameLayout(l([], {}, ['x', 'y']), l([], {}, ['y', 'x']))).toBe(true) // which are hidden, not in what order
+    expect(sameLayout(l([], {}, ['x']), l([], {}, []))).toBe(false)
+  })
+})
+
+describe('visibleColumns', () => {
+  const table = [
+    { key: '_select', pinned: 'start' as const },
+    { key: 'no' },
+    { key: 'pool' },
+    { key: 'amount' },
+    { key: 'action', pinned: 'end' as const },
+  ]
+  it('drops what was unticked', () => {
+    expect(keys(visibleColumns(table, ['pool']))).toEqual(['_select', 'no', 'amount', 'action'])
+  })
+  it('never hides a pinned column, or one that opts out', () => {
+    expect(keys(visibleColumns(table, ['_select', 'action', 'pool']))).toEqual(['_select', 'no', 'amount', 'action'])
+    const fixed = [{ key: 'no', hideable: false }, { key: 'pool' }, { key: 'amount' }]
+    expect(keys(visibleColumns(fixed, ['no', 'pool']))).toEqual(['no', 'amount'])
+  })
+  it('shows everything rather than a table of nothing', () => {
+    expect(keys(visibleColumns(table, ['no', 'pool', 'amount']))).toEqual(['_select', 'no', 'pool', 'amount', 'action'])
+  })
+  it('ignores a hidden key the table no longer has', () => {
+    expect(keys(visibleColumns(table, ['gone']))).toEqual(['_select', 'no', 'pool', 'amount', 'action'])
+  })
+})
+
+describe('toggleHidden', () => {
+  const hideable = ['no', 'pool', 'amount']
+  it('unticks and ticks a column', () => {
+    expect(toggleHidden([], 'pool', false, hideable)).toEqual(['pool'])
+    expect(toggleHidden(['pool', 'no'], 'pool', true, hideable)).toEqual(['no'])
+  })
+  it('refuses to untick the last column on show', () => {
+    const hidden = ['no', 'pool']
+    expect(toggleHidden(hidden, 'amount', false, hideable)).toBe(hidden)
+  })
+  it('unticking twice changes nothing', () => {
+    const hidden = ['pool']
+    expect(toggleHidden(hidden, 'pool', false, hideable)).toBe(hidden)
+  })
+})
+
+describe('groupColumns', () => {
+  const names = (cs: Array<{ key: string; group?: string }>) => groupColumns(cs).map((g) => [g.name, g.columns.map((c) => c.key)])
+
+  it('lists the headings in the one order every table uses, whatever order the table declares its columns in', () => {
+    // Payments: Voucher #, Category, Pool, Payee, Amount, Date.
+    const payments = [
+      { key: 'no', group: '基本' },
+      { key: 'category', group: '入账' },
+      { key: 'pool', group: '入账' },
+      { key: 'payee', group: '基本' },
+      { key: 'amount', group: '金额' },
+      { key: 'maturity', group: '日期' },
+    ]
+    expect(names(payments)).toEqual([
+      ['基本', ['no', 'payee']],
+      ['金额', ['amount']],
+      ['日期', ['maturity']],
+      ['入账', ['category', 'pool']],
+    ])
+    expect(COLUMN_GROUPS).toEqual(['基本', '金额', '日期', '入账'])
+  })
+
+  it('puts a heading only this table has after those, and the columns with none last', () => {
+    expect(names([{ key: 'added' }, { key: 'splits', group: '分摊' }, { key: 'name', group: '基本' }, { key: 'note' }])).toEqual([
+      ['基本', ['name']],
+      ['分摊', ['splits']],
+      ['', ['added', 'note']],
+    ])
+  })
+
+  it('is one unnamed group when no column has a heading', () => {
+    expect(names([{ key: 'a' }, { key: 'b' }])).toEqual([['', ['a', 'b']]])
+  })
+})
+
+describe('announcing a layout', () => {
+  it('reaches the tables with the same id, sanitised, and no other', () => {
+    const mine = vi.fn()
+    const other = vi.fn()
+    const stopMine = onLayoutAnnounced('payments.vouchers', mine)
+    const stopOther = onLayoutAnnounced('receipts.vouchers', other)
+    announceLayout('payments.vouchers', { order: [], widths: {}, hidden: ['pool'] })
+    expect(mine).toHaveBeenCalledWith({ order: [], widths: {}, hidden: ['pool'] })
+    expect(other).not.toHaveBeenCalled()
+
+    // Anything else on that event name is reduced to what is safe to apply.
+    window.dispatchEvent(new CustomEvent('table-layout', { detail: { tableId: 'payments.vouchers', layout: { hidden: 'pool' } } }))
+    expect(mine).toHaveBeenLastCalledWith(EMPTY_LAYOUT)
+    window.dispatchEvent(new CustomEvent('table-layout'))
+    expect(mine).toHaveBeenCalledTimes(2)
+
+    stopMine()
+    stopOther()
+    announceLayout('payments.vouchers', EMPTY_LAYOUT)
+    expect(mine).toHaveBeenCalledTimes(2)
   })
 })

@@ -1,5 +1,74 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-02 b (SHIPPED) — Columns panel, rows open on a double-click, dates on the left
+
+Same day, second round on the finance tables. User, on three screenshots:
+"应该定在靠左，而不是右" · "view 变这样了，可以 remove，我希望双击点开" · "我希望有
+column categories. 有些我不用显示". Confirmed on a clickable sample ("对，照这个做").
+
+### What a table does now
+
+- **Columns** (toolbar, desktop): a drawer listing the columns under 基本 / 金额 /
+  日期 / 入账, a tick each, a search box, Show all, Reset, Done. Ticks apply at
+  once. Saved with widths and order in the same `user_table_layouts` row
+  (`layout.hidden`), per person per table — **no migration**; a row saved before
+  has no `hidden` and reads as none. Pinned columns (tick box, ⋯) are not
+  listed; the last column on show cannot be unticked; hiding a column drops
+  its value filter. A column names its heading with `group`; the four headings
+  and their order live in `COLUMN_GROUPS` (`lib/table-layout.ts`).
+- **No View column** on Payments, Receipts, Fund in, Fund out, Statements. A
+  double-click opens the row; Tab + Enter does too; a phone gets 打开 → in the
+  row's detail panel. A right-click offers 打开 / 在新分页打开 (what the link
+  could do that a double-click cannot), from `components/row-links.tsx`
+  (`useRowLinks`). **改金额** (received loan repayment, Receipts) moved into that
+  menu; its dialog is mounted once, via `autoOpen` + `hideTrigger`.
+- **Invoices**: a double-click opens the detail popup (the one the invoice
+  number opens), and 打开 is the first item of the row menu.
+- **Alignment**: date columns read from the left (Payments/Receipts Date, Fund
+  in Date + Maturity, Fund out Disbursed, BA Period). Figures stay right, and
+  their HEADINGS are right now too — the th carries `right`, because the
+  ledger-table header rule out-ranks `text-right`. (Not `num`: that also sets
+  the heading in the figures' typeface.)
+
+### Four things found on the way, all fixed in this commit
+
+- A dialog a cell opens is still INSIDE its row (DOM, and React bubbling). So
+  selecting a word in the invoice detail popup, or right-clicking there to
+  copy, counted as a press on the row: the row menu hijacked the right-click
+  (live since 30d95f8b). `pressOnRow` in SortableTable now ignores anything
+  under a `.fixed` / `role=dialog` element inside the row, and portals.
+- Double-clicking an invoice NUMBER flashed the popup open and shut: the first
+  click opens it, the second lands on the backdrop that just appeared under
+  the pointer. `backdropDismiss` ignores a click with `detail > 1` — a click
+  that means "close" always starts a count of its own. Applies to all modals.
+- Tables sharing a `layoutId` (Payments draws each payroll batch as its own
+  table) now change together: `announceLayout` / `onLayoutAnnounced`.
+- `SortableTable.tsx` held a literal NUL byte (the blank-filter sentinel, there
+  since 2026-06-08), so git treated the file as binary and showed no diff of
+  it — this commit included. It is the `\0` escape now, the same string; from
+  the next change on its diffs are readable, and plain grep works on it.
+
+### Left as it is, on purpose
+
+- Fund in on a phone still keeps Type + Date in the grid. That used to fall
+  out of the default (first column + first right-aligned) only because Date
+  was right-aligned; the two are now named with `mobile: 'keep'`.
+- The billing-allocator staff list has the Columns button but no headings
+  (flat list) — that file is the other session's to arrange.
+- A hidden column is still searched by the search box and still sorts if it
+  was the sort column.
+- No drag-to-reorder inside the panel, no named/saved layouts, no pinning —
+  the ERP reference had them; the user asked only for show/hide by category.
+
+### Checked
+
+tsc (only the known MemberWorkspace / Commission test errors) · vitest 3970
+passed, 1 known failure (`erp-sync/catalogue.test.ts`) · next build · and in a real
+browser through the esbuild harness (real VouchersTable, FundSourcesTable,
+InvoiceDetailButton; router, server action and Supabase client stubbed):
+double-click, right-click menu, 改金额, Columns hide/search/Done, two tables in
+step, persistence across a reload, and the popup-inside-a-row cases.
+
 ## CHECKPOINT 2026-10-02 (SHIPPED) — Finance forms in the deal shell, a two-step loan picker, per-person table layouts, the invoice row menu
 
 Both commits are on main and live on Vercel prod. This is the Finance user's

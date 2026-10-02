@@ -15,9 +15,12 @@ export interface TableLayout {
   order: string[]
   /** Column key → width in px. A key with no entry is as wide as the browser makes it. */
   widths: Record<string, number>
+  /** Columns the person has unticked in the Columns panel (2026-10-02, user:
+   *  "有些我不用显示"). Absent on rows saved before the panel existed. */
+  hidden: string[]
 }
 
-export const EMPTY_LAYOUT: TableLayout = { order: [], widths: {} }
+export const EMPTY_LAYOUT: TableLayout = { order: [], widths: {}, hidden: [] }
 
 export const MIN_COLUMN_WIDTH = 60
 export const MAX_COLUMN_WIDTH = 900
@@ -29,7 +32,7 @@ export interface LayoutColumn {
 }
 
 export function isCustomised(layout: TableLayout): boolean {
-  return layout.order.length > 0 || Object.keys(layout.widths).length > 0
+  return layout.order.length > 0 || Object.keys(layout.widths).length > 0 || layout.hidden.length > 0
 }
 
 /**
@@ -107,14 +110,83 @@ export function sanitizeLayout(raw: unknown): TableLayout {
       if (key && Number.isFinite(n) && n > 0) widths[key] = storedWidth(n)
     }
   }
-  return { order, widths }
+  const hidden = Array.isArray((r as { hidden?: unknown }).hidden)
+    ? [...new Set(((r as { hidden: unknown[] }).hidden).filter((k): k is string => typeof k === 'string' && k.length > 0))]
+    : []
+  return { order, widths, hidden }
+}
+
+/** The columns still on show. A pinned column, or one that opts out, cannot be
+ *  hidden whatever the saved row says — and the table is never left with
+ *  nothing but its tick box and its menu. */
+export function visibleColumns<C extends LayoutColumn & { hideable?: boolean }>(columns: C[], hidden: string[]): C[] {
+  const off = new Set(hidden)
+  const canHide = (c: C) => !c.pinned && c.hideable !== false
+  const kept = columns.filter((c) => !canHide(c) || !off.has(c.key))
+  return kept.some(canHide) ? kept : columns
+}
+
+/** Tick or untick one column. Unticking the last one on show is refused. */
+export function toggleHidden(hidden: string[], key: string, show: boolean, hideableKeys: string[]): string[] {
+  if (show) return hidden.filter((k) => k !== key)
+  if (hidden.includes(key)) return hidden
+  const stillShown = hideableKeys.filter((k) => k !== key && !hidden.includes(k))
+  return stillShown.length === 0 ? hidden : [...hidden, key]
+}
+
+/** The headings of the Columns panel, in the order every table lists them. */
+export const COLUMN_GROUPS: readonly string[] = ['基本', '金额', '日期', '入账']
+
+/** Columns under their headings. Within a heading they keep the order the
+ *  table declares them in; a heading that is not one of the four follows
+ *  them, and columns with no heading at all come last. */
+export function groupColumns<C extends { group?: string }>(columns: C[]): Array<{ name: string; columns: C[] }> {
+  const groups: Array<{ name: string; columns: C[] }> = []
+  for (const c of columns) {
+    const name = c.group ?? ''
+    const g = groups.find((x) => x.name === name)
+    if (g) g.columns.push(c)
+    else groups.push({ name, columns: [c] })
+  }
+  const rank = (name: string) => {
+    if (name === '') return COLUMN_GROUPS.length + 1
+    const at = COLUMN_GROUPS.indexOf(name)
+    return at >= 0 ? at : COLUMN_GROUPS.length
+  }
+  // sort() is stable: headings of the same rank stay in declaration order.
+  return groups.sort((a, b) => rank(a.name) - rank(b.name))
+}
+
+// More than one table on a page can share an id — Payments draws each payroll
+// batch as a table of its own — and they must not disagree about which
+// columns are on show. The table that changes a layout says so; the others
+// take it.
+const LAYOUT_EVENT = 'table-layout'
+
+export function announceLayout(tableId: string, layout: TableLayout): void {
+  try {
+    window.dispatchEvent(new CustomEvent(LAYOUT_EVENT, { detail: { tableId, layout } }))
+  } catch {
+    // No window, no CustomEvent: then nothing is listening either.
+  }
+}
+
+/** Returns the function that stops listening. */
+export function onLayoutAnnounced(tableId: string, take: (layout: TableLayout) => void): () => void {
+  const listener = (e: Event) => {
+    const detail = (e as CustomEvent<{ tableId?: string; layout?: unknown } | null>).detail
+    if (detail && detail.tableId === tableId) take(sanitizeLayout(detail.layout))
+  }
+  window.addEventListener(LAYOUT_EVENT, listener)
+  return () => window.removeEventListener(LAYOUT_EVENT, listener)
 }
 
 export function sameLayout(a: TableLayout, b: TableLayout): boolean {
   if (a.order.length !== b.order.length || a.order.some((k, i) => k !== b.order[i])) return false
   const ka = Object.keys(a.widths)
   const kb = Object.keys(b.widths)
-  return ka.length === kb.length && ka.every((k) => a.widths[k] === b.widths[k])
+  if (ka.length !== kb.length || !ka.every((k) => a.widths[k] === b.widths[k])) return false
+  return a.hidden.length === b.hidden.length && a.hidden.every((k) => b.hidden.includes(k))
 }
 
 // ─── Where it is kept ───────────────────────────────────────────────────────
