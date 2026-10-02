@@ -60,9 +60,29 @@ column categories. 有些我不用显示". Confirmed on a clickable sample ("对
 - No drag-to-reorder inside the panel, no named/saved layouts, no pinning —
   the ERP reference had them; the user asked only for show/hide by category.
 
+### Two follow-ups, the same afternoon
+
+- **Invoices have a Date column** (`4bf71492`; user: "invoice 没有日期"): the
+  invoice date, after Invoice #, with its year, under 日期. All 222 invoices
+  have one. Due date was NOT added — only 118 of 222 carry one.
+- **期数 / 还剩 on the fund-out loan picker** (收到 Loan 还款; user: "可以看到
+  installment 欠多少 total 多少期? 类似 03/06 期"), the same two columns the
+  fund-in picker has. `lib/installment-count.ts` → `loanInstallmentCount`, the
+  Loan Monitor's rule (so the two cannot disagree), counting from the segment
+  in force when terms changed. No fixed term (未定还款 / 无还款方式 / 利滚利) → "—".
+- **The fund-in count was wrong and is corrected**: `listPayableFundSources`
+  counted installments as "months that saw a principal payment". HC's 300k was
+  paid 22 installments in one payment, so it read "还剩 22 / 36" beside a
+  balance of exactly one installment. It is now principal repaid ÷ one
+  installment (`remainingPeriods`, as the Loan Monitor already did): 1 / 36.
+  Display and ordering only — monthly amounts are untouched. The repayment
+  schedule's "N left" follows, and a lock-in source with money still owed can
+  no longer fall out of the scheduled rows once it has had as many payment
+  MONTHS as it has periods.
+
 ### Checked
 
-tsc (only the known MemberWorkspace / Commission test errors) · vitest 3970
+tsc (only the known MemberWorkspace / Commission test errors) · vitest 3981
 passed, 1 known failure (`erp-sync/catalogue.test.ts`) · next build · and in a real
 browser through the esbuild harness (real VouchersTable, FundSourcesTable,
 InvoiceDetailButton; router, server action and Supabase client stubbed):

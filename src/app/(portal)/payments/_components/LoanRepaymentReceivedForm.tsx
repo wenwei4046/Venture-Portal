@@ -34,6 +34,10 @@ export interface LoanOption {
   date: string | null
   /** Funding-source remark — what tells two loans to one borrower apart. */
   source: string | null
+  /** Installments: how many the loan runs for and how many are still owed
+   *  (2026-10-02, user: "可以看到 installment 欠多少 total 多少期?"). Null or
+   *  absent for a loan with no fixed term. */
+  periods?: { total: number; remaining: number } | null
   /** Borrower's Interest-in-Suspense leaf (3060 family), when one exists. */
   suspenseCode?: string | null
   suspenseName?: string | null
@@ -129,7 +133,16 @@ export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props
             columns={[
               { label: '借出日期', width: '1.15fr', cell: (l) => dealDate(l.date) },
               { label: '本金', width: '1.1fr', align: 'right', cell: (l) => dealMoney(l.principal) },
-              { label: '月息', width: '0.7fr', align: 'right', cell: (l) => dealRate(l.ratePct), dim: (l) => l.ratePct <= 0 },
+              { label: '月息', width: '0.65fr', align: 'right', cell: (l) => dealRate(l.ratePct), dim: (l) => l.ratePct <= 0 },
+              // The same two columns, in the same words, as the fund-in picker.
+              { label: '期数', width: '0.7fr', align: 'right', cell: (l) => (l.periods ? `${l.periods.total} 期` : '—'), dim: (l) => !l.periods },
+              {
+                label: '还剩',
+                width: '0.8fr',
+                align: 'right',
+                cell: (l) => (l.periods ? `${l.periods.remaining} / ${l.periods.total}` : '—'),
+                dim: (l) => !l.periods,
+              },
               {
                 label: '尚欠',
                 width: '1.15fr',

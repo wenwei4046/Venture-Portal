@@ -11,6 +11,7 @@ import type { FundSourceType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
 import { buildTermsSegments, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, termsForFundSource } from '@/lib/treasury-terms-data'
+import { remainingPeriods } from '@/lib/loan-monitor'
 
 // ─── Amend an ACTIVE fund source (Principal — self-service, direct apply) ─────
 // Principal is the top approval authority, so edits apply immediately via the
@@ -767,8 +768,17 @@ export async function listPayableFundSources(
       let monthlyPayment = Number(o.monthly_payment)
       let monthlyInterest = months > 0 ? Number((amount * rate).toFixed(2)) : 0
       let monthlyPrincipal = Number((monthlyPayment - monthlyInterest).toFixed(2))
-      let periodsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
-      let remaining = Math.max(0, months - periodsPaid)
+      // Installments are counted in MONEY — principal repaid ÷ one installment —
+      // not in months that saw a payment: one payment can cover many. (HC's
+      // 300k was paid 22 at once and went on reading "22 of 36 left" beside a
+      // balance of one installment, 2026-10-02.) The Loan Monitor's rule. A
+      // source with no lock-in has no installments; it keeps the month count,
+      // which only orders the list.
+      const monthsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
+      let remaining = o.lock_in_months
+        ? remainingPeriods(amount, months, Number(o.total_principal_paid ?? 0))
+        : Math.max(0, months - monthsPaid)
+      let periodsPaid = o.lock_in_months ? months - remaining : monthsPaid
       let termsFrom: string | null = null
       const meta = sourceById.get(o.fund_source_id)
       if (meta) {

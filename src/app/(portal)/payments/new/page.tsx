@@ -10,6 +10,9 @@ import { listPayableFundSources } from '../../fund-in/actions'
 import { invoicePoolForBillingMode } from '@/lib/cfo-reports'
 import { fetchDeptRegistry } from '@/lib/dept-registry'
 import { registryPoolOptions } from '@/lib/payment-pools'
+import { fetchAllRows } from '@/lib/paginate'
+import { loanInstallmentCount } from '@/lib/installment-count'
+import { fetchTermsHistory, isLoanPrincipal, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 
 // Settlement routing: when a sub pays an invoice, the money logically lands
 // in the dept pool that generated the service. Delegates to the canonical
@@ -40,8 +43,8 @@ export default async function NewPaymentPage({ searchParams }: Props) {
   // Dedicated flow: record a loan repayment RECEIVED (sub → HV).
   if (mode === 'loan_repayment') {
     const [{ data: loans }, { data: loanOut }, { data: cos }, { data: banks }, { data: suspenseAccts }, { data: suspenseLines }] = await Promise.all([
-      supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months, repayment_terms, disbursement_date').eq('status', 'active'),
-      supabase.from('loan_outstanding').select('loan_id, outstanding'),
+      supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months, repayment_terms, disbursement_date, compound_interest, repayment_start_month, terms_effective_from').eq('status', 'active'),
+      supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
       supabase.from('companies').select('id, short_code, name'),
       supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
       // Interest-in-Suspense leaves + their live balances, so the form can
@@ -68,7 +71,37 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       }) ?? null
     }
     const outMap = new Map((loanOut ?? []).map((o) => [o.loan_id as string, Number(o.outstanding)]))
+    const principalPaidMap = new Map((loanOut ?? []).map((o) => [o.loan_id as string, Number(o.total_principal_paid ?? 0)]))
     const coMap = new Map((cos ?? []).map((c) => [c.id as string, c]))
+    // 期数 / 还剩 for the picker (2026-10-02). A loan whose terms changed
+    // mid-life counts from the segment in force now, which needs its principal
+    // repayments month by month — read only for those loans.
+    const loanIds = (loans ?? []).map((l) => l.id as string)
+    const termsHistory = await fetchTermsHistory(supabase, 'loan', loanIds)
+    const changedIds = (loans ?? [])
+      .filter((l) => termsHistory.has(l.id as string) || l.terms_effective_from != null)
+      .map((l) => l.id as string)
+    const changedRepayments =
+      changedIds.length === 0
+        ? []
+        : await fetchAllRows((lo, hi) =>
+            supabase
+              .from('repayments')
+              .select('loan_id, amount, payment_date, payment_type')
+              .in('loan_id', changedIds)
+              .order('id', { ascending: true })
+              .range(lo, hi),
+          )
+    const principalByMonth = principalPaidByMonth(
+      changedRepayments.map((rp) => ({
+        id: rp.loan_id as string,
+        amount: Number(rp.amount),
+        payment_date: rp.payment_date as string,
+        payment_type: (rp.payment_type as string | null) ?? 'principal',
+      })),
+      isLoanPrincipal,
+    )
+    const currentYM = dayjs().format('YYYY-MM')
     const loanOptions = (loans ?? [])
       .map((l) => {
         const co = l.company_id ? coMap.get(l.company_id as string) : null
@@ -90,6 +123,13 @@ export default async function NewPaymentPage({ searchParams }: Props) {
           ratePct: Math.round(Number(l.effective_rate) * 100 * 1000) / 1000,
           date: disb ?? null,
           source: src ?? null,
+          // null = no fixed term (unscheduled, compounding): nothing to count.
+          periods: loanInstallmentCount({
+            terms: termsForLoan(l, termsHistory.get(l.id as string) ?? []),
+            principalPaid: principalPaidMap.get(l.id as string) ?? 0,
+            principalByMonth: principalByMonth.get(l.id as string),
+            currentYM,
+          }),
           label: `${co?.short_code ?? co?.name ?? '—'} · RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 欠 ${outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}${idBits}`,
           // Offer the suspense route only when that leaf actually holds a balance.
           suspenseCode: susp && (suspenseBalance.get(susp.code as string) ?? 0) > 0.005 ? (susp.code as string) : null,

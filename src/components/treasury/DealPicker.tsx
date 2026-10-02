@@ -129,7 +129,9 @@ export default function DealPicker<T extends DealPickerItem>({
       <p className="font-sans text-[11px] uppercase tracking-[0.1em] text-muted mb-2">② {dealLabel}</p>
       {party ? (
         <div className="overflow-x-auto">
-          <div role="radiogroup" aria-label={dealLabel} className="min-w-[520px]">
+          {/* Never narrower than its columns can be read at: five fit in 520px,
+              and each one more needs its share, or the figures run together. */}
+          <div role="radiogroup" aria-label={dealLabel} style={{ minWidth: Math.max(520, columns.length * 96) }}>
             <div
               className="grid gap-x-4 px-3 pb-1.5 border-b border-hairline font-sans text-[11px] uppercase tracking-[0.06em] text-muted"
               style={{ gridTemplateColumns: template }}
