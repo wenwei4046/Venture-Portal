@@ -27,15 +27,18 @@ function nextDay(weekend: boolean): Date {
  *   Who in the team — Friday–Sunday full-time RS in turn; Monday–Thursday as the TL chooses: automatically by %, or by hand.
  * The Boss and HOD edit the first; each TL edits only their own team.
  */
-export default function MemberCrmAssignment({ viewer, members, ads, config, onConfig, onBack }: {
+export default function MemberCrmAssignment({ viewer, members, ads, config, onConfig, onBack, readOnly = false }: {
   viewer: CrmMember;
   members: CrmMember[];
   ads: string[];
   config: CrmAssignConfig;
   onConfig: (config: CrmAssignConfig) => void;
   onBack: () => void;
+  /** Live data, before saving settings is built: everything shows, nothing edits. */
+  readOnly?: boolean;
 }) {
   const top = assignsAds(viewer);
+  const topEdits = top && !readOnly; // the Boss and HOD edit the first step
   // The Boss and HOD (and a Senior TL) see both steps; a TL sees only who in their own team.
   const wholeFlow = viewer.role !== "tl";
   const teams = visibleTeams(viewer, members);
@@ -101,9 +104,9 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
             <span><strong>{ad}</strong><br /><span className={s.caption}>
               {ids.length === 0 ? "No TL · split by % (Mode 2)" : `${ids.filter(id => top || teams.some(t => t.id === id)).map(teamName).join(", ")}${!top && ids.length > 1 ? " + another team" : ""} · in turn`}
             </span></span>
-            {top && <button className={c.chip} aria-expanded={openAd === ad} onClick={() => setOpenAd(openAd === ad ? null : ad)}>{openAd === ad ? "Done" : "Choose"}</button>}
+            {topEdits && <button className={c.chip} aria-expanded={openAd === ad} onClick={() => setOpenAd(openAd === ad ? null : ad)}>{openAd === ad ? "Done" : "Choose"}</button>}
           </div>
-          {top && openAd === ad && <fieldset className={c.pickTeam}>
+          {topEdits && openAd === ad && <fieldset className={c.pickTeam}>
             <legend>TLs</legend>
             {tls.map(t => <label key={t.id} className={c.switch}>
               <input type="checkbox" checked={ids.includes(t.id)} onChange={() => toggle(ad, t.id)} /> {t.name} · {t.teamName}
@@ -116,15 +119,15 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
       <p className={s.caption}>For every ad not handed to a TL: the % of those enquiries each team gets.</p>
       {tls.filter(t => top || teams.some(x => x.id === t.id)).map(t => <div key={t.id} className={c.shareRow}>
         <span>{t.teamName} <small className={s.caption}>· {t.name}</small></span>
-        {percent(config.teamRatios[t.id] ?? 0, n => onConfig({ ...config, teamRatios: { ...config.teamRatios, [t.id]: n } }), `${t.teamName} share`, !top)}
+        {percent(config.teamRatios[t.id] ?? 0, n => onConfig({ ...config, teamRatios: { ...config.teamRatios, [t.id]: n } }), `${t.teamName} share`, !topEdits)}
       </div>)}
-      {top && totalLine(teamTotal)}
+      {topEdits && totalLine(teamTotal)}
     </section>}
 
     {/* Step 2: who in each team */}
     {teams.map(t => {
       const st = settingsOf(t.id);
-      const canEdit = canEditTeamRules(viewer, t.id); // the TL, the Boss and the HOD
+      const canEdit = !readOnly && canEditTeamRules(viewer, t.id); // the TL, the Boss and the HOD
       const edited = st.editedBy;
       const editor = edited && members.find(m => m.id === edited.memberId);
       const handlers = teamHandlers(t.id, members);

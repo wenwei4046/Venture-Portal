@@ -2229,7 +2229,7 @@ export default function MemberWorkspace({
   // bar replace the workspace chrome. Back returns to Profile.
   if (page === "crm" && member) {
     return <div className={`${s.workspace} ${liveDesign ? liveStyles.workspace : ""}`} lang="en-MY">
-      <MemberCrm salesperson={data.profile.name} onExit={() => navigate("account")} />
+      <MemberCrm salesperson={data.profile.name} onExit={() => navigate("account")} live={!data.demo} />
     </div>;
   }
   return (

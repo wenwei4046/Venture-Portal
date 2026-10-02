@@ -44,9 +44,10 @@ export function MemberCrmTeam({ viewer, members, leads, appointments, now, teamF
   onTeamFilter: (teamId: string | null) => void;
   onOpenMember: (memberId: string) => void;
   onOpenLead: (leadId: string) => void;
-  onAssign: (leadId: string, memberId: string) => void;
+  /** A TL hands a waiting enquiry to someone. Absent while the CRM cannot save it (live, read only). */
+  onAssign?: (leadId: string, memberId: string) => void;
   /** The Boss or HOD sends an enquiry no team took to a TL's team. */
-  onSendToTeam: (leadId: string, tlId: string) => void;
+  onSendToTeam?: (leadId: string, tlId: string) => void;
 }) {
   const seen = new Set(visibleMembers(viewer, members).map(m => m.id));
   const teams = visibleTeams(viewer, members);
@@ -74,10 +75,10 @@ export function MemberCrmTeam({ viewer, members, leads, appointments, now, teamF
         <p className={s.caption}>No team took these. Send each to a TL — their team&apos;s rules decide who gets it.</p>
         {unassigned.map(l => <div key={l.id} className={c.queueRow}>
           <button className={c.queueLead} onClick={() => onOpenLead(l.id)}><strong>{l.name}</strong><span className={s.caption}>{l.adName}</span></button>
-          <select value="" onChange={e => e.target.value && onSendToTeam(l.id, e.target.value)} aria-label={`Send ${l.name} to a team`}>
+          {onSendToTeam && <select value="" onChange={e => e.target.value && onSendToTeam(l.id, e.target.value)} aria-label={`Send ${l.name} to a team`}>
             <option value="">Send to TL…</option>
             {allTeams(members).map(tl => <option key={tl.id} value={tl.id}>{tl.teamName} · {tl.name}</option>)}
-          </select>
+          </select>}
         </div>)}
       </section>;
     })()}
@@ -101,7 +102,7 @@ export function MemberCrmTeam({ viewer, members, leads, appointments, now, teamF
 
         {waiting.length > 0 && <div className={c.queue} aria-label="To assign">
           <h3><Icon name="info" size={16} /> To assign · {waiting.length}</h3>
-          {canReassign(viewer, waiting[0], members)
+          {onAssign && canReassign(viewer, waiting[0], members)
             ? waiting.map(l => <div key={l.id} className={c.queueRow}>
               <button className={c.queueLead} onClick={() => onOpenLead(l.id)}><strong>{l.name}</strong><span className={s.caption}>{l.adName}</span></button>
               <select value="" onChange={e => e.target.value && onAssign(l.id, e.target.value)} aria-label={`Assign ${l.name}`}>

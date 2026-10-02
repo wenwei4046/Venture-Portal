@@ -31,7 +31,7 @@ await db.exec(`
     title_id uuid references public.titles(id), reports_to uuid references public.hr_staff_costs(id), status text not null default 'active');
   grant usage on schema public to anon, authenticated, service_role;
 `)
-for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql']) {
+for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql', '20261002100000_crm_people.sql']) {
   await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), 'utf8'))
 }
 
@@ -140,7 +140,20 @@ for (const sql of [`select public.crm_role_of('${id('s', 'tlb')}')`, `select * f
 check((await as('tla', `select public.crm_my_role() as r`))[0].r, 'tl', 'you may ask your own role')
 check((await as('taa', `select count(*)::int as n from public.crm_my_downline()`))[0].n, 3, 'and your own downline (the TA and two RS)')
 
-// 9. The WhatsApp ingest still works beside the new columns: a new customer arrives with no team.
+// 9. crm_people(): who you are and who you see — names, roles, the line; never a peer.
+const crmPeople = async who => (await as(who, `select public.crm_people() as p`))[0].p
+const ppl = async who => (await crmPeople(who)).people.map(p => p.name).sort()
+check(await ppl('ann'), ['ann'], 'an RS sees only themselves')
+check(await ppl('taa'), ['amir', 'ann', 'taa'], 'a TA sees themselves and their RS')
+check(await ppl('tla'), ['amir', 'ann', 'taa', 'tla'], 'a TL sees their team, not the other TL’s')
+check(await ppl('hod'), ['amir', 'ann', 'ben', 'boss', 'hod', 'taa', 'tla', 'tlb'], 'the HOD sees everybody with a CRM role (zed has none)')
+const annSeenByTa = (await crmPeople('taa')).people.find(p => p.name === 'ann')
+check({ role: annSeenByTa.role, fullTime: annSeenByTa.fullTime, upline: annSeenByTa.uplineId }, { role: 'rs', fullTime: true, upline: id('s', 'taa') }, 'role, full time and upline come along')
+check(await crmPeople('zed'), { me: id('s', 'zed'), role: null, people: [] }, 'no CRM role: you see nobody, not even yourself')
+check(await crmPeople(null), { me: null, role: null, people: [] }, 'not linked: nothing')
+check(Object.keys((await crmPeople('tla')).people[0]).sort(), ['fullTime', 'id', 'name', 'role', 'uplineId'], 'nothing else about a person — no salary, no contact details')
+
+// 10. The WhatsApp ingest still works beside the new columns: a new customer arrives with no team.
 await db.exec(`set role service_role`)
 await q(`select public.crm_ingest_whatsapp($1::jsonb, '[]'::jsonb, 0, '{}'::jsonb)`, [JSON.stringify([{
   externalId: 'wamid.x', phoneNumberId: 'PN1', waId: '60111', name: 'New', kind: 'text', body: 'Hi',
