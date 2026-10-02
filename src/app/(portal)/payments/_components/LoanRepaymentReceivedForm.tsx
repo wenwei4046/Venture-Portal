@@ -1,13 +1,39 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect } from 'react'
-import Link from 'next/link'
 import { recordLoanRepaymentReceived } from '../../fund-out/actions'
+import {
+  dealFormClass,
+  DealCards,
+  DealCard,
+  DealRow,
+  DealLabel,
+  DealMore,
+  DealPreview,
+  type DealPreviewRow,
+} from '@/components/treasury/DealFormShell'
+import DealPicker, { OwedCell, dealDate, dealMoney, dealRate } from '@/components/treasury/DealPicker'
+import { bankShort } from '@/lib/deal-preview'
 
-interface LoanOption {
+// 收到 Loan 还款 (2026-10-02): the same four-card shell as New loan / New fund
+// source, with the loan chosen in two steps instead of one 26-row <select>.
+// Everything this form submits is unchanged — loan_id, payment_date,
+// bank_account_id, the three amounts, interest_account_code, notes.
+
+export interface LoanOption {
   id: string
+  /** The one-line form, kept for anything that still wants a single string. */
   label: string
   outstanding: number
+  /** Borrower's full name — the party button, and the preview headline. */
+  borrower: string
+  principal: number
+  /** Monthly rate in percent (0.5 = 0.5%/mo). */
+  ratePct: number
+  /** Disbursement date, YYYY-MM-DD. */
+  date: string | null
+  /** Funding-source remark — what tells two loans to one borrower apart. */
+  source: string | null
   /** Borrower's Interest-in-Suspense leaf (3060 family), when one exists. */
   suspenseCode?: string | null
   suspenseName?: string | null
@@ -19,6 +45,9 @@ interface Props {
   bankAccounts: { id: string; bank_name: string; account_number: string; current_balance: number }[]
 }
 
+const inputCls =
+  'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border'
+
 export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -29,11 +58,15 @@ export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props
   const [interest, setInterest] = useState('0.00')
   const [penalty, setPenalty] = useState('0.00')
   const [paymentDate, setPaymentDate] = useState(todayIso)
+  const [bankId, setBankId] = useState(bankAccounts[0]?.id ?? '')
   const formRef = useRef<HTMLFormElement>(null)
 
-  const total =
-    (parseFloat(principal) || 0) + (parseFloat(interest) || 0) + (parseFloat(penalty) || 0)
+  const p = parseFloat(principal) || 0
+  const i = parseFloat(interest) || 0
+  const pen = parseFloat(penalty) || 0
+  const total = p + i + pen
   const selected = loans.find((l) => l.id === loanId) ?? null
+  const bank = bankAccounts.find((b) => b.id === bankId) ?? null
 
   useEffect(() => {
     if (error && formRef.current) {
@@ -47,7 +80,7 @@ export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props
     setError(null)
     if (!loanId) return setError('请选择要收款的贷款')
     if (total <= 0) return setError('请填本金 / 利息 / 罚息至少一项')
-    if (selected && parseFloat(principal) > selected.outstanding + 0.005) {
+    if (selected && p > selected.outstanding + 0.005) {
       return setError(`本金 ${principal} 超过该贷款尚欠 ${selected.outstanding.toFixed(2)}`)
     }
     formData.set('loan_id', loanId)
@@ -55,7 +88,7 @@ export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props
     formData.set('repayment_principal', principal)
     formData.set('repayment_interest', interest)
     formData.set('repayment_penalty', penalty)
-    // bank_account_id + notes come from the rendered fields
+    // bank_account_id + interest_account_code + notes come from the rendered fields
     startTransition(async () => {
       try {
         await recordLoanRepaymentReceived(formData)
@@ -66,124 +99,141 @@ export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props
     })
   }
 
+  const offersSuspense = i > 0 && !!selected?.suspenseCode
+  const rows: DealPreviewRow[] = [
+    { label: '本金', value: `RM ${dealMoney(p)}` },
+    { label: '利息', value: `RM ${dealMoney(i)}` },
+    ...(pen > 0 ? [{ label: '罚息', value: `RM ${dealMoney(pen)}` } as DealPreviewRow] : []),
+    'sep',
+    { label: '合计收款', value: `RM ${dealMoney(total)}`, big: true },
+    'sep',
+    {
+      label: '还后尚欠',
+      value: selected ? `RM ${dealMoney(Math.max(0, selected.outstanding - p))}` : '—',
+      sub: selected ? `现在欠 ${dealMoney(selected.outstanding)}` : undefined,
+    },
+    { label: '收款日期', value: paymentDate ? dealDate(paymentDate) : '还没定' },
+  ]
+
   return (
-    <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-2xl">
-      <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
-        <div className="font-serif italic text-accent text-sm">收到 Loan 还款 · Loan repayment received</div>
-        <p className="font-serif text-sm text-graphite mt-1">
-          记录 subsidiary 还回来的贷款。本金 / 利息 / 罚息可分开填(各按对应科目入账)。
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
-        <div className="sm:col-span-2">
-          <label htmlFor="loan" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            贷款 · Loan <span className="text-danger">*</span>
-          </label>
-          <select
-            id="loan"
+    <form ref={formRef} action={handleSubmit} className={dealFormClass}>
+      <DealCards>
+        <DealCard n={1} title="哪一笔贷款" en="Loan">
+          <DealPicker<LoanOption & { party: string }>
+            items={loans.map((l) => ({ ...l, party: l.borrower }))}
             value={loanId}
-            onChange={(e) => setLoanId(e.target.value)}
-            required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="">选择贷款…</option>
-            {loans.map((l) => (
-              <option key={l.id} value={l.id}>{l.label}</option>
-            ))}
-          </select>
-          {selected ? (
-            <p className="font-serif italic text-muted text-xs mt-1.5">尚欠本金 RM {selected.outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label htmlFor="payment_date" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            收款日期 · Payment date <span className="text-danger">*</span>
-          </label>
-          <input
-            id="payment_date" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+            onChange={setLoanId}
+            partyLabel="谁还钱"
+            dealLabel="还哪一笔"
+            emptyHint="先在上面点一家公司。"
+            columns={[
+              { label: '借出日期', width: '1.15fr', cell: (l) => dealDate(l.date) },
+              { label: '本金', width: '1.1fr', align: 'right', cell: (l) => dealMoney(l.principal) },
+              { label: '月息', width: '0.7fr', align: 'right', cell: (l) => dealRate(l.ratePct), dim: (l) => l.ratePct <= 0 },
+              {
+                label: '尚欠',
+                width: '1.15fr',
+                align: 'right',
+                cell: (l) => <OwedCell principal={l.principal} outstanding={l.outstanding} />,
+              },
+              { label: '资金来源', width: '1fr', cell: (l) => l.source || '—', dim: (l) => !l.source },
+            ]}
           />
-        </div>
-        <div>
-          <label htmlFor="bank_account_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            收进账户 · Into account
-          </label>
-          <select
-            id="bank_account_id" name="bank_account_id" defaultValue={bankAccounts.find((b) => true)?.id ?? ''}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            {bankAccounts.length === 0 ? <option value="">No active bank accounts</option> : null}
-            {bankAccounts.map((b) => (
-              <option key={b.id} value={b.id}>{b.bank_name} — {b.account_number}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+        </DealCard>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <AmountField id="principal" label="本金 · Principal" value={principal} onChange={setPrincipal} />
-        <AmountField id="interest" label="利息 · Interest" value={interest} onChange={setInterest} />
-        <AmountField id="penalty" label="罚息 · Penalty" value={penalty} onChange={setPenalty} />
-      </div>
+        <DealCard n={2} title="还了多少" en="Amounts">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <AmountField id="principal" label="本金 · Principal" value={principal} onChange={setPrincipal} />
+            <AmountField id="interest" label="利息 · Interest" value={interest} onChange={setInterest} />
+            <AmountField id="penalty" label="罚息 · Penalty" value={penalty} onChange={setPenalty} />
+          </div>
 
-      {/* Where the interest lands. Only shown when interest is being recorded
-          AND this borrower has an Interest-in-Suspense leaf — otherwise the
-          only sensible answer is income and the choice is noise. */}
-      {(parseFloat(interest) || 0) > 0 && selected?.suspenseCode ? (
-        <div className="mb-6">
-          <label htmlFor="interest_account_code" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            利息入账科目 · Interest credited to
-          </label>
-          <select
-            id="interest_account_code"
-            name="interest_account_code"
-            defaultValue={selected.suspenseCode}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value={selected.suspenseCode}>
-              {selected.suspenseCode} · {selected.suspenseName} — 冲利息挂账(余 RM{' '}
-              {(selected.suspenseBalance ?? 0).toLocaleString('en-MY', { minimumFractionDigits: 2 })})
-            </option>
-            <option value="5027">5027 · Interest Income - Loans — 直接确认为收入</option>
-          </select>
-          <p className="font-serif italic text-muted text-xs mt-1.5">
-            这笔贷款的全期利息已经预先拆到挂账科目里,所以默认冲挂账 —— 再记一次收入会重复。
-            只有当这笔利息不在挂账内(额外收的),才选利息收入。
-          </p>
-        </div>
-      ) : null}
+          {/* Where the interest lands. Only shown when interest is being recorded
+              AND this borrower has an Interest-in-Suspense leaf — otherwise the
+              only sensible answer is income and the choice is noise. */}
+          {offersSuspense ? (
+            <div className="mt-4">
+              <DealLabel
+                htmlFor="interest_account_code"
+                hint="这笔贷款的全期利息已经预先拆到挂账科目里,所以默认冲挂账 —— 再记一次收入会重复。只有当这笔利息不在挂账内(额外收的),才选利息收入。"
+              >
+                利息入账科目 · Interest credited to
+              </DealLabel>
+              <select
+                id="interest_account_code"
+                name="interest_account_code"
+                defaultValue={selected!.suspenseCode!}
+                className={inputCls}
+              >
+                <option value={selected!.suspenseCode!}>
+                  {selected!.suspenseCode} · {selected!.suspenseName} — 冲利息挂账(余 RM{' '}
+                  {dealMoney(selected!.suspenseBalance ?? 0)})
+                </option>
+                <option value="5027">5027 · Interest Income - Loans — 直接确认为收入</option>
+              </select>
+            </div>
+          ) : null}
+        </DealCard>
 
-      <div className="mb-6 flex items-baseline justify-between border-t border-hairline pt-3">
-        <span className="font-serif italic text-graphite text-sm">合计收款 · Total received</span>
-        <span className="font-mono tabular font-semibold text-ink text-lg">RM {total.toFixed(2)}</span>
-      </div>
+        <DealCard n={3} title="收到哪里" en="Receipt">
+          <DealRow>
+            <div>
+              <DealLabel htmlFor="payment_date" required>
+                收款日期 · Payment date
+              </DealLabel>
+              <input
+                id="payment_date"
+                type="date"
+                required
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className={`${inputCls} font-mono`}
+              />
+            </div>
+            <div>
+              <DealLabel htmlFor="bank_account_id">收进账户 · Into account</DealLabel>
+              <select
+                id="bank_account_id"
+                name="bank_account_id"
+                value={bankId}
+                onChange={(e) => setBankId(e.target.value)}
+                className={inputCls}
+              >
+                {bankAccounts.length === 0 ? <option value="">No active bank accounts</option> : null}
+                {bankAccounts.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.bank_name} — {b.account_number}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </DealRow>
+        </DealCard>
 
-      <div className="mb-6">
-        <label htmlFor="notes" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          备注 · Notes <span className="text-muted font-normal">(optional)</span>
-        </label>
-        <input
-          id="notes" name="notes" type="text"
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          placeholder="For Finance reference"
-        />
-      </div>
+        <DealCard n={4} title="备注" en="Notes">
+          <DealMore summary="加备注 · Notes (optional)">
+            <input id="notes" name="notes" type="text" className={inputCls} placeholder="For Finance reference" />
+          </DealMore>
+        </DealCard>
+      </DealCards>
 
-      {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-6 text-sm font-sans">{error}</div>
-      ) : null}
-
-      <div className="flex items-center gap-4 pt-4 border-t border-hairline">
-        <button
-          type="submit" disabled={isPending}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
-        >
-          {isPending ? '记录中…' : '记录还款 · Record repayment'}
-        </button>
-        <Link href="/payments" className="text-sm text-graphite hover:text-ink font-sans transition-colors">Cancel</Link>
-      </div>
+      <DealPreview
+        who={selected ? selected.borrower : '未选贷款'}
+        since={selected?.date ? dealDate(selected.date) : null}
+        rows={rows}
+        gl={
+          <>
+            入账 <strong>{bank ? bankShort(bank.bank_name, bank.account_number) : '—'}</strong>
+            <br />
+            本金冲这笔贷款 · 利息{offersSuspense ? '默认冲利息挂账' : '记利息收入'}
+          </>
+        }
+        note="收到的钱即时入账,不需要审批。"
+        error={error}
+        submitLabel="记录还款 · Record repayment"
+        pending={isPending}
+        cancelHref="/receipts"
+      />
     </form>
   )
 }

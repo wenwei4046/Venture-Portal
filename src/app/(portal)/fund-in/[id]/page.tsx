@@ -11,6 +11,10 @@ import WithdrawButton from './_components/WithdrawButton'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
 import MinPayInterestToggle from './_components/MinPayInterestToggle'
 import NotesEditor from './_components/NotesEditor'
+import RecordRepaymentForm from './_components/RecordRepaymentForm'
+import { fetchDeptRegistry } from '@/lib/dept-registry'
+import { paymentPoolOptions, registryPoolOptions } from '@/lib/payment-pools'
+import { INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT } from '@/lib/repayment-source-rows'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
 import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
@@ -167,6 +171,33 @@ export default async function FundSourceDetailPage({ params }: Props) {
     : Number(source.amount) * Number(source.cost_rate)
 
   const repaymentsList = repayments ?? []
+
+  // Record repayment (2026-10-02): the form below files the same voucher
+  // Create payment does in loan-repayment mode, so it needs the banks, the
+  // pools and which of the three default accounts actually exist.
+  const canRecordRepayment = canFinanceEdit && (isActive || isMatured) && outstanding > 0
+  const repaymentAccounts = [source.account_code, INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT].filter(
+    (c): c is string => Boolean(c),
+  )
+  const [{ data: repayBanks }, { data: repayAccounts }, repayRegistry] = canRecordRepayment
+    ? await Promise.all([
+        supabase
+          .from('bank_accounts')
+          .select('id, bank_name, account_number, current_balance')
+          .eq('status', 'active')
+          .order('is_primary', { ascending: false }),
+        supabase.from('chart_of_accounts').select('code').eq('is_active', true).in('code', repaymentAccounts),
+        fetchDeptRegistry(supabase).catch(() => []),
+      ])
+    : [{ data: null }, { data: null }, []]
+  // This month's instalment to start from: what is due less its interest,
+  // never more than what is still owed. An open-ended source (no lock-in) has
+  // no instalment — the view prices it as ONE period, i.e. the whole balance —
+  // so it starts at interest only and Finance types whatever principal is
+  // actually going back.
+  const monthlyPrincipal = source.lock_in_months
+    ? Math.max(0, Math.min(outstanding, Math.round((monthlyPayment - monthlyInterest) * 100) / 100))
+    : 0
 
   return (
     <div>
@@ -406,13 +437,36 @@ export default async function FundSourceDetailPage({ params }: Props) {
         )}
       </section>
 
-      {/* ───────── Repayment info (read-only — payments happen in /payments) ───────── */}
-      {(isActive || isMatured) ? (
+      {/* ───────── Record repayment — the same entry a loan has on Fund out ───────── */}
+      {canRecordRepayment ? (
+        <section className="mb-12 border-t border-hairline pt-8">
+          <div className="sect-head">
+            <h2>Record repayment</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">FINANCE · PRINCIPAL + INTEREST + PENALTY</span>
+          </div>
+          <RecordRepaymentForm
+            fundSourceId={source.id}
+            lender={fromLabel}
+            lenderCompanyId={source.from_company_id ?? null}
+            accountCode={source.account_code ?? null}
+            outstanding={outstanding}
+            monthlyPrincipal={monthlyPrincipal}
+            monthlyInterest={Math.round(monthlyInterest * 100) / 100}
+            bankAccounts={(repayBanks ?? []).map((b) => ({
+              id: b.id as string,
+              bank_name: b.bank_name as string,
+              account_number: (b.account_number as string | null) ?? '',
+              current_balance: Number(b.current_balance ?? 0),
+            }))}
+            pools={paymentPoolOptions(registryPoolOptions(repayRegistry))}
+            activeAccounts={(repayAccounts ?? []).map((a) => a.code as string)}
+          />
+        </section>
+      ) : (isActive || isMatured) ? (
         <section className="mb-12 bg-accent-bg border border-accent-border rounded-md p-4 max-w-3xl">
           <p className="font-serif italic text-accent text-sm">
-            To make a repayment on this fund source, go to{' '}
-            <Link href="/payments/new" className="underline hover:text-accent-hover">Payments → Create payment</Link>{' '}
-            and select &quot;Loan repayment&quot;. All payments require Principal approval.
+            Repayments on this fund source are recorded by Finance and need Principal approval.
           </p>
         </section>
       ) : null}

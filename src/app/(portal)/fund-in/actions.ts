@@ -665,6 +665,14 @@ export interface PayableFundSource {
   total_periods: number
   periods_paid: number
   remaining_periods: number
+  /** The lender's FULL name, for the two-step picker's party button — the
+   *  label above abbreviates a company to its short code. */
+  lender?: string
+  /** 子公司 / 董事 / 部门 / 外部 — a word beside the name on that button. */
+  lender_kind?: string
+  /** The day the money came in (YYYY-MM-DD) — the picker lists a lender's
+   *  deals oldest first. */
+  effective_date?: string | null
   /** GL account the source is owed on (fund_sources.account_code, e.g. 4054);
    *  null on legacy rows without one. */
   account_code?: string | null
@@ -785,17 +793,30 @@ export async function listPayableFundSources(
       // "Director" fallback that earlier versions showed for any row without
       // a from_company_id).
       let counterparty: string
+      // The same party, spelled out and classified, for the picker (2026-10-02).
+      let lender: string
+      let lenderKind: string
       if (o.source_type === 'department_pool' && o.from_department_id) {
         counterparty = departmentMap.get(o.from_department_id) ?? 'Department'
+        lender = counterparty
+        lenderKind = '部门'
       } else if (o.from_company_id) {
         const company = companyMap.get(o.from_company_id)
         counterparty = company ? `${company.short_code ?? company.name}` : 'Company'
+        lender = company?.name ?? counterparty
+        lenderKind = '子公司'
       } else if (o.from_director_id) {
         counterparty = directorMap.get(o.from_director_id) ?? 'Director'
+        lender = counterparty
+        lenderKind = '董事'
       } else if (freetextMap.get(o.fund_source_id)) {
         counterparty = freetextMap.get(o.fund_source_id) as string
+        lender = counterparty
+        lenderKind = '外部'
       } else {
         counterparty = 'Director'
+        lender = counterparty
+        lenderKind = '董事'
       }
       const label = `${counterparty} · RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · ${months}mo`
 
@@ -818,6 +839,9 @@ export async function listPayableFundSources(
         settled_in_month: !(statusMap.get(o.fund_source_id) === 'active' && Number(o.outstanding) > 0),
         account_code: accountMap.get(o.fund_source_id) ?? null,
         terms_from: termsFrom,
+        lender,
+        lender_kind: lenderKind,
+        effective_date: meta?.effective_date ?? null,
       }
     })
     .sort((a, b) => b.remaining_periods - a.remaining_periods)

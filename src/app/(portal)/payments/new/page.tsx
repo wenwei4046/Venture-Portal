@@ -8,6 +8,8 @@ import NewPaymentForm from '../_components/NewPaymentForm'
 import LoanRepaymentReceivedForm from '../_components/LoanRepaymentReceivedForm'
 import { listPayableFundSources } from '../../fund-in/actions'
 import { invoicePoolForBillingMode } from '@/lib/cfo-reports'
+import { fetchDeptRegistry } from '@/lib/dept-registry'
+import { registryPoolOptions } from '@/lib/payment-pools'
 
 // Settlement routing: when a sub pays an invoice, the money logically lands
 // in the dept pool that generated the service. Delegates to the canonical
@@ -81,6 +83,13 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         return {
           id: l.id as string,
           outstanding,
+          // The picker shows these as columns; the one-line label is kept for
+          // anything that still wants a single string.
+          borrower: (co?.name as string | undefined) ?? (co?.short_code as string | undefined) ?? '—',
+          principal: Number(l.principal),
+          ratePct: Math.round(Number(l.effective_rate) * 100 * 1000) / 1000,
+          date: disb ?? null,
+          source: src ?? null,
           label: `${co?.short_code ?? co?.name ?? '—'} · RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 欠 ${outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}${idBits}`,
           // Offer the suspense route only when that leaf actually holds a balance.
           suspenseCode: susp && (suspenseBalance.get(susp.code as string) ?? 0) > 0.005 ? (susp.code as string) : null,
@@ -110,6 +119,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     { data: bankAccounts },
     { data: accountRows },
     payableFundSources,
+    deptRegistry,
   ] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
@@ -120,7 +130,12 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       .order('type')
       .order('code'),
     listPayableFundSources().catch(() => []),
+    fetchDeptRegistry(supabase).catch(() => []),
   ])
+  // Departments provisioned after the core five (IT, Revenue Department) have a
+  // pool of their own, and the database resolves it — pool_key_to_segment —
+  // but the form's pool list was a literal, so neither could be picked.
+  const extraPools = registryPoolOptions(deptRegistry)
 
   let invoicePreset: {
     id: string
@@ -268,6 +283,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
 
       <NewPaymentForm
         returnTo={returnTo}
+        extraPools={extraPools}
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}
         accounts={(accountRows ?? []).map((a) => ({

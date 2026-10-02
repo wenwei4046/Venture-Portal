@@ -3,9 +3,35 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createPaymentVoucher } from '../actions'
-import { ACCOUNT_TYPES, typeLabel, type AccountType } from '@/lib/coa'
+import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import AccountPicker from '@/components/AccountPicker'
+import {
+  dealFormClass,
+  DealCards,
+  DealCard,
+  DealRow,
+  DealLabel,
+  DealToggle,
+  DealMore,
+  DealPreview,
+  type DealPreviewRow,
+} from '@/components/treasury/DealFormShell'
+import DealPicker, { OwedCell, dealDate, dealMoney, dealRate } from '@/components/treasury/DealPicker'
+import { bankShort } from '@/lib/deal-preview'
+import { PAYMENT_POOL_OPTIONS as POOL_OPTIONS, paymentPoolOptions } from '@/lib/payment-pools'
+
+// 2026-10-02 — Create payment / Create receipt in the deal-form shell.
+//
+// This was one 768px column of a dozen sections: the pool split sat below the
+// fold, and nothing said what the voucher would do until it was saved. It is
+// now the four cards New loan / New fund source use (who → amount & bank →
+// pools & accounts → description), with the navy panel on the right keeping
+// the total, the bank, each pool's share and the account in view while typing.
+//
+// Only the arrangement moved. Every field keeps its name, the hidden inputs
+// are the same ones, and handleSubmit serialises exactly what it did before —
+// so createPaymentVoucher receives an identical FormData.
 
 interface InvoicePreset {
   id: string
@@ -42,6 +68,11 @@ interface PayableFundSource {
   remaining_periods: number
   /** GL account the source is owed on (4054 / 4058 …) — the principal row's default. */
   account_code?: string | null
+  /** Full lender name + kind + the day the money came in — the picker's party
+   *  button and its date column. */
+  lender?: string
+  lender_kind?: string
+  effective_date?: string | null
 }
 
 interface Account {
@@ -74,6 +105,10 @@ interface Props {
   lockedDirection?: 'debit' | 'credit'
   /** Path to return to after saving, when the caller wants the user back. */
   returnTo?: string | null
+  /** Pools of departments added after the core five (IT, Revenue Department…),
+   *  from the dept registry. The list below is a literal, and a literal list
+   *  of pools silently leaves every later department out. */
+  extraPools?: { value: string; label: string }[]
 }
 
 const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
@@ -87,15 +122,6 @@ const TYPE_BADGE: Record<AccountType, { label: string; className: string }> = {
   expense:      { label: 'P&L · Expense',     className: 'text-danger' },
 }
 
-const POOL_OPTIONS = [
-  { value: 'venture_pool', label: 'Venture Pool' },
-  { value: 'dept_pool_hr', label: 'HR Dept Pool' },
-  { value: 'dept_pool_finance', label: 'Finance Dept Pool' },
-  { value: 'dept_pool_director_office', label: 'Director Office Dept Pool' },
-  { value: 'dept_pool_director', label: 'Director Pool' },
-  { value: 'dept_pool_marketing', label: 'Marketing Dept Pool' },
-  { value: 'invoice_payout_pool', label: 'Invoice Payout Pool' },
-]
 
 const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank transfer' },
@@ -118,7 +144,7 @@ interface SourceRow {
   autoAccount?: boolean
 }
 
-export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, refundPreset, payableFundSources = [], lockedDirection, returnTo = null }: Props) {
+export default function NewPaymentForm({ companies, bankAccounts, accounts, invoicePreset, nonBillablePreset, refundPreset, payableFundSources = [], lockedDirection, returnTo = null, extraPools = [] }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isInvoicePay = !!invoicePreset
@@ -183,6 +209,10 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
     isInvoicePay ? invoicePreset!.target_pool : direction === 'credit' ? 'venture_pool' : ''
   )
   const [files, setFiles] = useState<File[]>([])
+  // Controlled so the preview can name the bank; it still submits as
+  // bank_account_id from the same <select>.
+  const [bankAccountId, setBankAccountId] = useState(bankAccounts[0]?.id ?? '')
+  const poolOptions = paymentPoolOptions(extraPools)
   const accountList = accounts.filter((a) => a.is_active)
   const accountByCode = new Map(accountList.map((a) => [a.code, a]))
   const formRef = useRef<HTMLFormElement>(null)
@@ -220,7 +250,7 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       // loan-repayment mode, so an empty fallback made Create un-passable
       // ("Payee name is required", 2026-08-24). Take the lender's name off
       // the option label ("Kingsley · RM 100,000.00 @ …").
-      const name = selectedFundSource.label.split(' · ')[0]?.trim()
+      const name = (selectedFundSource.lender ?? selectedFundSource.label.split(' · ')[0])?.trim()
       if (name) {
         setPayeeName(name)
         setPayeeCompanyId('')
@@ -350,302 +380,342 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
     })
   }
 
+  const inputCls =
+    'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border'
+  const isDebit = direction === 'debit'
+  const bank = bankAccounts.find((b) => b.id === bankAccountId) ?? null
+  const bankLine =
+    paymentMethod === 'netting' ? '冲账 · 不动银行' : bank ? bankShort(bank.bank_name, bank.account_number) : '—'
+  const poolName = (key: string) => poolOptions.find((p) => p.value === key)?.label ?? (key || '未选')
+  const creditAccount = accountByCode.get(accountCode) ?? null
+  const isProfitAndLoss = (t: AccountType) => t === 'revenue' || t === 'cost' || t === 'other_income' || t === 'expense'
+
+  // What the navy panel says this voucher will do.
+  const previewRows: DealPreviewRow[] = [
+    { label: '金额', value: `RM ${dealMoney(totalAmount)}`, big: true },
+    { label: isDebit ? '从银行' : '进银行', value: bankLine },
+    { label: '日期', value: paymentDate ? dealDate(paymentDate) : '还没定' },
+    'sep',
+  ]
+  if (isDebit) {
+    for (const r of sourceRows) {
+      const acct = accountByCode.get(r.account_code)
+      previewRows.push({
+        label: poolName(r.pool),
+        value: `− ${dealMoney(parseFloat(r.amount) || 0)}`,
+        sub: acct ? `${acct.code} ${acct.name}` : '未选科目',
+      })
+    }
+    if (sourceRows.length > 1 || sourceSumMismatch) {
+      previewRows.push({
+        label: '各池合计',
+        value: dealMoney(sourceSum),
+        sub: sourceSumMismatch ? `跟总额差 ${dealMoney(totalAmount - sourceSum)}` : '✓ 跟总额对上',
+      })
+    }
+  } else {
+    previewRows.push({ label: '进池', value: poolName(targetPool) })
+    if (!isInvoicePay) {
+      previewRows.push({
+        label: '科目',
+        value: creditAccount ? creditAccount.code : '未选',
+        sub: creditAccount?.name,
+      })
+    }
+  }
+
+  const previewGl = isInvoicePay ? (
+    <>
+      {isInterBilling ? 'Dr 9050 Inter-billing Expense / Cr 应收' : 'Dr 银行 / Cr 应收'}
+      <br />
+      {isInterBilling ? '部门间冲账,不动银行。' : '收入在开票时已经确认,这里只冲应收。'}
+    </>
+  ) : isDebit ? (
+    isInternalTransfer ? (
+      <>内部转账 · 银行之间搬钱,<strong>不扣部门池</strong></>
+    ) : isLoanRepayment ? (
+      <>本金冲出借人的账 · 利息记 6000 · 罚息记 9096</>
+    ) : (
+      <>Dr 各行的科目 / Cr <strong>{bankLine}</strong></>
+    )
+  ) : creditAccount ? (
+    isProfitAndLoss(creditAccount.type) ? (
+      <>
+        这笔算<strong>损益</strong> · {TYPE_BADGE[creditAccount.type].label}
+        <br />会出现在 P&amp;L 上。
+      </>
+    ) : (
+      <>
+        这笔记在<strong>资产负债表</strong> · {TYPE_BADGE[creditAccount.type].label}
+        <br />不算收入。
+      </>
+    )
+  ) : (
+    <>选了科目才知道这笔算收入,还是记在资产负债表。</>
+  )
+
   return (
-    <form ref={formRef} action={handleSubmit} className="bg-surface border border-hairline rounded-md p-8 max-w-3xl">
-      {/* Set by a caller that wants the user back where they were — Billing
-          sends /billing so a settle does not strand them in Payments. */}
-      {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
-      {/* Direction: locked per entry point (Create payment = debit, Receipt =
-          credit, settle-invoice = credit). The toggle only survives on legacy
-          paths with no lock. */}
-      {isInvoicePay ? (
-        <input type="hidden" name="direction" value="credit" />
-      ) : lockedDirection ? (
-        <input type="hidden" name="direction" value={lockedDirection} />
-      ) : (
-        <div className="mb-6">
-          <label className="block text-sm font-sans font-medium text-graphite mb-2">
-            Direction
-          </label>
-          <div className="flex gap-0 border border-hairline rounded-md overflow-hidden w-fit">
-            <button
-              type="button"
-              onClick={() => { setDirection('debit'); setTargetPool('') }}
-              className={direction === 'debit'
-                ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm'
-                : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2'}
-            >
-              Debit (pay out)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDirection('credit')
-                if (!targetPool) setTargetPool('venture_pool')
-              }}
-              className={direction === 'credit'
-                ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
-                : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}
-            >
-              Credit (receive)
-            </button>
-          </div>
-          <input type="hidden" name="direction" value={direction} />
-        </div>
-      )}
-      {/* voucher_type: billing_payment when settling; internal_transfer when
-          this debit is a pure bank-to-bank move; else derived from direction */}
-      <input
-        type="hidden"
-        name="voucher_type"
-        value={
-          isInvoicePay
-            ? 'billing_payment'
-            : direction === 'debit'
-              ? (isInternalTransfer ? 'internal_transfer' : 'expense')
-              : 'receive_payment'
-        }
-      />
-      {isInvoicePay ? <input type="hidden" name="invoice_id" value={invoicePreset!.id} /> : null}
-
-      {/* Internal-transfer toggle (debit only, standalone vouchers) */}
-      {!isInvoicePay && direction === 'debit' ? (
-        <label className="flex items-start gap-2 mb-6 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isInternalTransfer}
-            onChange={(e) => setIsInternalTransfer(e.target.checked)}
-            className="h-4 w-4 mt-0.5 accent-[var(--accent)]"
-          />
-          <span className="text-sm font-sans text-graphite">
-            这是内部转账 · Internal transfer (bank → bank, no pool spent)
-            <span className="block text-xs text-muted font-serif italic mt-0.5">
-              用于「发薪转账到 Alliance」等银行间搬钱:<strong>不会扣部门池</strong>(钱还是各部门的,只是换了银行),按 segment 分开记账。来源科目选目标银行,每行 pool = 该笔归属的部门/Venture。等真正发出去再记花费。
-            </span>
-          </span>
-        </label>
-      ) : null}
-
-      {isInvoicePay ? (
-        <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
-          <div className="font-serif italic text-accent text-sm mb-1">Settling invoice</div>
-          <div className="font-mono text-sm text-ink mb-1">{invoicePreset!.invoice_no}</div>
-          <div className="font-serif text-sm text-graphite">
-            {invoicePreset!.company_name} paid RM {invoicePreset!.total_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-          </div>
-        </div>
-      ) : null}
-
-      {isRefund ? (
-        <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
-          <div className="font-serif italic text-accent text-sm mb-1">退款 · Refund against paid invoice</div>
-          <div className="font-mono text-sm text-ink mb-1">{refundPreset!.invoice_no ?? '—'}</div>
-          <div className="font-serif text-sm text-graphite">
-            {refundPreset!.company_name} · 已收 RM{' '}
-            {refundPreset!.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} — 金额可改成部分退款。
-            来源 pool 选当初收款进的部门池,GL 科目选原本入账的收入/3030,审批走正常 PV 流程。
-          </div>
-        </div>
-      ) : null}
-
-      {/* ── Payee ── (hidden in loan-repayment mode; auto-filled from selected loan) */}
-      {isLoanRepayment ? (
-        <>
-          <input type="hidden" name="payee_company_id" value={payeeCompanyId} />
-          <input type="hidden" name="payee_name" value={payeeName} />
-        </>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
-          <div>
-            <label htmlFor="payee_company_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-              Company
-            </label>
-            <select
-              id="payee_company_id"
-              name="payee_company_id"
-              value={payeeCompanyId}
-              onChange={(e) => {
-                setPayeeCompanyId(e.target.value)
-                const co = companies.find((c) => c.id === e.target.value)
-                if (co && !payeeName) setPayeeName(co.name)
-              }}
-              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-            >
-              <option value="">Select company…</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.short_code})</option>
-              ))}
-            </select>
-            <p className="font-serif italic text-muted text-xs mt-1">
-              Name auto-fills from company if left blank
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="payee_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-              {direction === 'debit' ? 'Pay to' : 'Received from'}
-              <span className="text-muted font-normal ml-1">(auto from company)</span>
-            </label>
-            <input
-              id="payee_name"
-              name="payee_name"
-              type="text"
-              value={payeeName}
-              onChange={(e) => setPayeeName(e.target.value)}
-              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-              placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Hidden reference fields (no longer type-driven) */}
-      <input type="hidden" name="reference_type" value="" />
-      <input type="hidden" name="reference_id" value="" />
-
-      {/* ── Amount + Bank account ── (Amount is auto-computed in loan-repayment mode) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
-        {isLoanRepayment ? (
-          <>
-            <input type="hidden" name="amount" value={amount} />
-            <div className="flex flex-col justify-center">
-              <div className="text-xs text-muted uppercase tracking-wide font-sans">Repayment total</div>
-              <div className="statement-amount text-ink">
-                RM {repaymentSum.toFixed(2)}
-              </div>
-              <div className="text-xs text-muted font-mono mt-1">auto from split below</div>
-            </div>
-          </>
-        ) : (
-          <div>
-            <label htmlFor="amount" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-              Amount
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">RM</span>
-              <input
-                id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                readOnly={isInvoicePay}
-                className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border read-only:bg-surface-2 read-only:cursor-not-allowed"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-        )}
-
-        <div>
-          <label htmlFor="bank_account_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            {direction === 'debit' ? 'Pay from account' : 'Receive into account'}
-            {paymentMethod !== 'netting' ? <span className="text-danger"> *</span> : null}
-          </label>
-          <select
-            id="bank_account_id"
-            name="bank_account_id"
-            required={paymentMethod !== 'netting'}
-            defaultValue={bankAccounts[0]?.id ?? ''}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            {bankAccounts.length === 0 ? <option value="">No active bank accounts</option> : null}
-            {bankAccounts.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.bank_name} — {b.account_number} (bal: RM {Number(b.current_balance).toLocaleString('en-MY', { minimumFractionDigits: 2 })})
-              </option>
-            ))}
-          </select>
-          {paymentMethod === 'netting' ? (
-            <p className="font-serif italic text-muted text-xs mt-1.5">
-              Netting voucher — no real money moves, so bank is optional.
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      {/* ── Payment date ── (backdate to the real settlement date) */}
-      <div className="mb-6">
-        <label htmlFor="payment_date" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          Payment date
-        </label>
+    <form ref={formRef} action={handleSubmit} className={dealFormClass}>
+      <DealCards>
+        {/* Set by a caller that wants the user back where they were — Billing
+            sends /billing so a settle does not strand them in Payments. */}
+        {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
+        {/* Direction: locked per entry point (Create payment = debit, Receipt =
+            credit, settle-invoice = credit). The toggle only survives on legacy
+            paths with no lock — it sits in card ①. */}
+        {isInvoicePay ? (
+          <input type="hidden" name="direction" value="credit" />
+        ) : lockedDirection ? (
+          <input type="hidden" name="direction" value={lockedDirection} />
+        ) : null}
+        {/* voucher_type: billing_payment when settling; internal_transfer when
+            this debit is a pure bank-to-bank move; else derived from direction */}
         <input
-          id="payment_date"
-          name="payment_date"
-          type="date"
-          required
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
-          className="w-full max-w-xs px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink font-mono focus:outline-none focus:border-accent-border"
+          type="hidden"
+          name="voucher_type"
+          value={
+            isInvoicePay
+              ? 'billing_payment'
+              : direction === 'debit'
+                ? (isInternalTransfer ? 'internal_transfer' : 'expense')
+                : 'receive_payment'
+          }
         />
-        <p className="font-serif italic text-muted text-xs mt-1.5">
-          Defaults to today and cannot be left blank. Set the actual date the money moved if backdating.
-        </p>
-      </div>
+        {isInvoicePay ? <input type="hidden" name="invoice_id" value={invoicePreset!.id} /> : null}
+        {/* Hidden reference fields (no longer type-driven) */}
+        <input type="hidden" name="reference_type" value="" />
+        <input type="hidden" name="reference_id" value="" />
 
-      {/* ── Payment method ── */}
-      <div className="mb-6">
-        <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          Payment method
-        </label>
-        <select
-          name="payment_method"
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border max-w-xs"
-        >
-          {PAYMENT_METHODS.map((m) => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
-        </select>
-      </div>
+        {isInvoicePay ? (
+          <div className="border border-accent-border rounded-md bg-accent-bg p-4">
+            <div className="font-serif italic text-accent text-sm mb-1">Settling invoice</div>
+            <div className="font-mono text-sm text-ink mb-1">{invoicePreset!.invoice_no}</div>
+            <div className="font-serif text-sm text-graphite">
+              {invoicePreset!.company_name} paid RM {invoicePreset!.total_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+        ) : null}
 
-      {/* ── Loan repayment toggle (debit only) — HV repaying fund source ── */}
-      {direction === 'debit' && !isInvoicePay && payableFundSources.length > 0 ? (
-        <div className="mb-6 p-4 bg-paper border border-hairline rounded-md">
-          <label className="flex items-center gap-2 text-sm font-sans font-medium text-graphite cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isLoanRepayment}
-              onChange={(e) => setIsLoanRepayment(e.target.checked)}
-              className="rounded border-hairline"
-            />
-            This voucher is a loan repayment
-          </label>
-          {isLoanRepayment ? (
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-sans text-graphite mb-1">Loan to repay</label>
-                <select
-                  value={fundSourceId}
-                  onChange={(e) => {
-                    setFundSourceId(e.target.value)
-                    // Reset split so useEffect repopulates from the new source
-                    setRepayPrincipal('0.00')
-                    setRepayInterest('0.00')
-                  }}
-                  required
-                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+        {isRefund ? (
+          <div className="border border-accent-border rounded-md bg-accent-bg p-4">
+            <div className="font-serif italic text-accent text-sm mb-1">退款 · Refund against paid invoice</div>
+            <div className="font-mono text-sm text-ink mb-1">{refundPreset!.invoice_no ?? '—'}</div>
+            <div className="font-serif text-sm text-graphite">
+              {refundPreset!.company_name} · 已收 RM{' '}
+              {refundPreset!.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} — 金额可改成部分退款。
+              来源 pool 选当初收款进的部门池,GL 科目选原本入账的收入/3030,审批走正常 PV 流程。
+            </div>
+          </div>
+        ) : null}
+
+        {/* ───────── ① who ───────── */}
+        <DealCard n={1} title={isDebit ? '付给谁' : '收谁的钱'} en={isDebit ? 'Payee' : 'Payer'}>
+          {!isInvoicePay && !lockedDirection ? (
+            <div className="mb-4">
+              <label className="block text-sm font-sans font-medium text-graphite mb-2">Direction</label>
+              <div className="flex gap-0 border border-hairline rounded-md overflow-hidden w-fit">
+                <button
+                  type="button"
+                  onClick={() => { setDirection('debit'); setTargetPool('') }}
+                  className={direction === 'debit'
+                    ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm'
+                    : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2'}
                 >
-                  <option value="">Select loan…</option>
-                  {payableFundSources.map((fs) => (
-                    <option key={fs.id} value={fs.id}>
-                      {fs.label} · {fs.remaining_periods} of {fs.total_periods} periods left
-                    </option>
+                  Debit (pay out)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDirection('credit')
+                    if (!targetPool) setTargetPool('venture_pool')
+                  }}
+                  className={direction === 'credit'
+                    ? 'px-5 py-2 bg-accent-bg text-accent font-serif italic text-sm border-l border-hairline'
+                    : 'px-5 py-2 text-graphite font-sans text-sm hover:bg-surface-2 border-l border-hairline'}
+                >
+                  Credit (receive)
+                </button>
+              </div>
+              <input type="hidden" name="direction" value={direction} />
+            </div>
+          ) : null}
+
+          {/* The two things a standalone payment can be instead of an expense.
+              Neither checkbox carries a name: they only steer voucher_type and
+              the repayment fields, exactly as before. */}
+          {!isInvoicePay && isDebit ? (
+            <DealRow className="mb-4">
+              <DealToggle
+                id="is_internal_transfer"
+                name=""
+                label="内部转账"
+                sub="Internal transfer · bank → bank"
+                hint="用于「发薪转账到 Alliance」等银行间搬钱:不会扣部门池(钱还是各部门的,只是换了银行),按 segment 分开记账。来源科目选目标银行,每行 pool = 该笔归属的部门/Venture。等真正发出去再记花费。"
+                checked={isInternalTransfer}
+                onChange={setIsInternalTransfer}
+              />
+              {payableFundSources.length > 0 ? (
+                <DealToggle
+                  id="is_loan_repayment"
+                  name=""
+                  label="这是还贷款"
+                  sub="This voucher is a loan repayment"
+                  hint="HV 把借来的钱还给出借人(子公司 / 董事)。选了贷款之后,收款人和每月本金、利息会自动带出;批准执行时系统会自动写入这笔贷款的还款记录。"
+                  checked={isLoanRepayment}
+                  onChange={setIsLoanRepayment}
+                />
+              ) : null}
+            </DealRow>
+          ) : null}
+
+          {/* ── Payee ── (in loan-repayment mode it is the lender, auto-filled) */}
+          {isLoanRepayment ? (
+            <>
+              <input type="hidden" name="payee_company_id" value={payeeCompanyId} />
+              <input type="hidden" name="payee_name" value={payeeName} />
+              <DealPicker
+                items={payableFundSources.map((fs) => ({
+                  ...fs,
+                  party: fs.lender ?? fs.label.split(' · ')[0] ?? '—',
+                  partyTag: fs.lender_kind ?? null,
+                  date: fs.effective_date ?? null,
+                  principal: fs.original_amount,
+                }))}
+                value={fundSourceId}
+                onChange={(id) => {
+                  setFundSourceId(id)
+                  // Reset split so useEffect repopulates from the new source
+                  setRepayPrincipal('0.00')
+                  setRepayInterest('0.00')
+                }}
+                partyLabel="还给谁"
+                dealLabel="还哪一笔"
+                emptyHint="先在上面点一个出借人。"
+                columns={[
+                  { label: '借入日期', width: '1.15fr', cell: (fs) => dealDate(fs.date) },
+                  { label: '本金', width: '1.1fr', align: 'right', cell: (fs) => dealMoney(fs.principal) },
+                  { label: '月息', width: '0.65fr', align: 'right', cell: (fs) => dealRate(fs.cost_rate * 100), dim: (fs) => fs.cost_rate <= 0 },
+                  { label: '期数', width: '0.7fr', align: 'right', cell: (fs) => (fs.lock_in_months ? `${fs.total_periods} 期` : '—'), dim: (fs) => !fs.lock_in_months },
+                  { label: '还剩', width: '0.8fr', align: 'right', cell: (fs) => (fs.lock_in_months ? `${fs.remaining_periods} / ${fs.total_periods}` : '—'), dim: (fs) => !fs.lock_in_months },
+                  { label: '尚欠', width: '1.15fr', align: 'right', cell: (fs) => <OwedCell principal={fs.principal} outstanding={fs.outstanding} /> },
+                ]}
+              />
+              {selectedFundSource ? (
+                <p className="font-serif italic text-muted text-xs mt-3">
+                  Monthly payment RM {selectedFundSource.monthly_payment.toFixed(2)} ·
+                  outstanding principal RM {selectedFundSource.outstanding.toFixed(2)} ·
+                  {selectedFundSource.remaining_periods} month
+                  {selectedFundSource.remaining_periods === 1 ? '' : 's'} remaining
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <DealRow>
+              <div>
+                <DealLabel htmlFor="payee_company_id" hint="Name auto-fills from company if left blank.">
+                  Company
+                </DealLabel>
+                <select
+                  id="payee_company_id"
+                  name="payee_company_id"
+                  value={payeeCompanyId}
+                  onChange={(e) => {
+                    setPayeeCompanyId(e.target.value)
+                    const co = companies.find((c) => c.id === e.target.value)
+                    if (co && !payeeName) setPayeeName(co.name)
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">Select company…</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.short_code})</option>
                   ))}
                 </select>
-                {selectedFundSource ? (
-                  <p className="font-serif italic text-muted text-xs mt-1.5">
-                    Monthly payment RM {selectedFundSource.monthly_payment.toFixed(2)} ·
-                    outstanding principal RM {selectedFundSource.outstanding.toFixed(2)} ·
-                    {selectedFundSource.remaining_periods} month
-                    {selectedFundSource.remaining_periods === 1 ? '' : 's'} remaining
-                  </p>
-                ) : null}
               </div>
+              <div>
+                <label htmlFor="payee_name" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                  {direction === 'debit' ? 'Pay to' : 'Received from'}
+                  <span className="text-muted font-normal ml-1">(auto from company)</span>
+                </label>
+                <input
+                  id="payee_name"
+                  name="payee_name"
+                  type="text"
+                  value={payeeName}
+                  onChange={(e) => setPayeeName(e.target.value)}
+                  className={inputCls}
+                  placeholder={direction === 'debit' ? 'Recipient name' : 'Payer name'}
+                />
+              </div>
+            </DealRow>
+          )}
+        </DealCard>
+
+        {/* ───────── ② amount & bank ───────── */}
+        <DealCard n={2} title="金额与银行" en="Amount & bank">
+          <DealRow>
+            {isLoanRepayment ? (
+              <div>
+                <input type="hidden" name="amount" value={amount} />
+                <div className="text-xs text-muted uppercase tracking-wide font-sans">Repayment total</div>
+                <div className="statement-amount text-ink">RM {repaymentSum.toFixed(2)}</div>
+                <div className="text-xs text-muted font-mono mt-1">auto from split below</div>
+              </div>
+            ) : (
+              <div>
+                <DealLabel htmlFor="amount" required>
+                  Amount
+                </DealLabel>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted font-mono">RM</span>
+                  <input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    readOnly={isInvoicePay}
+                    className="w-full pl-10 pr-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular font-medium text-ink focus:outline-none focus:border-accent-border read-only:bg-surface-2 read-only:cursor-not-allowed"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="bank_account_id" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                {direction === 'debit' ? 'Pay from account' : 'Receive into account'}
+                {paymentMethod !== 'netting' ? <span className="text-danger"> *</span> : null}
+              </label>
+              <select
+                id="bank_account_id"
+                name="bank_account_id"
+                required={paymentMethod !== 'netting'}
+                value={bankAccountId}
+                onChange={(e) => setBankAccountId(e.target.value)}
+                className={inputCls}
+              >
+                {bankAccounts.length === 0 ? <option value="">No active bank accounts</option> : null}
+                {bankAccounts.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.bank_name} — {b.account_number} (bal: RM {Number(b.current_balance).toLocaleString('en-MY', { minimumFractionDigits: 2 })})
+                  </option>
+                ))}
+              </select>
+              {paymentMethod === 'netting' ? (
+                <p className="font-serif italic text-muted text-xs mt-1.5">
+                  Netting voucher — no real money moves, so bank is optional.
+                </p>
+              ) : null}
+            </div>
+          </DealRow>
+
+          {/* ── The repayment split (loan-repayment mode) ── */}
+          {isLoanRepayment ? (
+            <div className="mt-4">
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-sans text-graphite mb-1">Principal</label>
@@ -655,7 +725,7 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
                     min="0"
                     value={repayPrincipal}
                     onChange={(e) => setRepayPrincipal(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                    className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
                   />
                 </div>
                 <div>
@@ -666,7 +736,7 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
                     min="0"
                     value={repayInterest}
                     onChange={(e) => setRepayInterest(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                    className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
                   />
                 </div>
                 <div>
@@ -677,42 +747,92 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
                     min="0"
                     value={repayPenalty}
                     onChange={(e) => setRepayPenalty(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
+                    className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
                   />
                 </div>
               </div>
               {totalAmount > 0 ? (
-                <p className={`font-mono italic text-xs ${repaymentSumMismatch ? 'text-danger' : 'text-ledger'}`}>
+                <p className={`font-mono italic text-xs mt-2 ${repaymentSumMismatch ? 'text-danger' : 'text-ledger'}`}>
                   {repaymentSumMismatch
                     ? `Split sum RM ${repaymentSum.toFixed(2)} ≠ voucher total RM ${totalAmount.toFixed(2)}`
                     : `Split sum RM ${repaymentSum.toFixed(2)} matches voucher total ✓`}
                 </p>
               ) : null}
-              <p className="font-serif italic text-muted text-xs">
-                On execute, the system auto-inserts fund_source_repayments rows for this subsidiary/director.
-                The source rows below follow this split — principal on the lender&apos;s own account,
-                interest on 6000, penalty on 9096 — change a row&apos;s account if a case differs.
-              </p>
             </div>
           ) : null}
-        </div>
-      ) : null}
 
-      {/* ── Source pools (Debit, multi-row) / Target pool (Credit, single) ── */}
-      {direction === 'debit' ? (
-        <div className="mb-6">
-          <div className="flex items-baseline justify-between mb-1.5">
-            <label className="block text-sm font-sans font-medium text-graphite">
-              Deduct from pools <span className="text-danger">*</span>
-            </label>
-            <button
-              type="button"
-              onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', account_code: '' }])}
-              className="text-xs text-accent hover:text-accent-hover font-serif italic"
-            >
-              + Add source
-            </button>
-          </div>
+          <DealRow className="mt-4">
+            <div>
+              <DealLabel
+                htmlFor="payment_date"
+                required
+                hint="Defaults to today and cannot be left blank. Set the actual date the money moved if backdating."
+              >
+                Payment date
+              </DealLabel>
+              <input
+                id="payment_date"
+                name="payment_date"
+                type="date"
+                required
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className={`${inputCls} font-mono`}
+              />
+            </div>
+            <div>
+              <DealLabel htmlFor="payment_method">Payment method</DealLabel>
+              <select
+                id="payment_method"
+                name="payment_method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className={inputCls}
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </DealRow>
+        </DealCard>
+
+        {/* ───────── ③ pools & accounts ───────── */}
+        <DealCard
+          n={3}
+          title={isDebit ? '哪个池出 · 记哪个科目' : '进哪个池 · 记哪个科目'}
+          en="Pools & accounts"
+        >
+          {/* ── Source pools (Debit, multi-row) / Target pool (Credit, single) ── */}
+          {direction === 'debit' ? (
+            <div>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <label className="block text-sm font-sans font-medium text-graphite">
+                  Deduct from pools <span className="text-danger">*</span>
+                </label>
+                <span className="flex items-baseline gap-4">
+                  <Link
+                    href="/settings?tab=accounts"
+                    target="_blank"
+                    className="text-xs text-muted hover:text-accent font-serif italic"
+                  >
+                    Manage accounts →
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setSourceRows([...sourceRows, { pool: '', amount: '', account_code: '' }])}
+                    className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                  >
+                    + Add source
+                  </button>
+                </span>
+              </div>
+              {isLoanRepayment ? (
+                <p className="font-serif italic text-muted text-xs mb-2">
+                  这几行跟着上面的本金 / 利息 / 罚息走 —— 本金记出借人自己的账,利息记 6000,罚息记 9096。
+                  哪一行不一样,直接改那一行的科目。
+                </p>
+              ) : null}
           {/* Column headers for ≥2 rows */}
           {sourceRows.length > 1 ? (
             <div className="flex gap-2 items-center text-xs uppercase tracking-wide text-muted font-sans mb-1.5 px-0.5">
@@ -748,7 +868,7 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
                   className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
                 >
                   <option value="">Select pool…</option>
-                  {POOL_OPTIONS.map((p) => (
+                  {poolOptions.map((p) => (
                     <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
                 </select>
@@ -895,144 +1015,111 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
               Each row: which pool pays, what category, and how much. Row amounts must sum to the voucher total.
             </p>
           )}
-          <input type="hidden" name="target_pool" value="" />
-        </div>
-      ) : isInvoicePay ? (
-        // Settling an invoice: pool is fixed by the invoice's billing_mode
-        // (poolForBillingMode in payments/new/page.tsx). Render as
-        // read-only so Finance can see it but can't accidentally divert
-        // the payment to the wrong pool. The hidden input still submits
-        // the correct value so the server action receives target_pool.
-        <div className="mb-6">
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Receive into pool
-          </label>
-          <div className="px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink font-serif italic flex items-center gap-2">
-            <span>{POOL_OPTIONS.find((p) => p.value === targetPool)?.label ?? targetPool}</span>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5 not-italic">
-              from invoice
-            </span>
-          </div>
-          <p className="font-serif italic text-muted text-xs mt-1.5">
-            Auto-set from the invoice&apos;s billing mode. To land the
-            payment in a different pool, void this voucher and re-issue the
-            invoice under the correct billing mode.
-          </p>
-          <input type="hidden" name="target_pool" value={targetPool} />
-          <input type="hidden" name="source_pool" value="" />
-        </div>
-      ) : (
-        <div className="mb-6">
-          <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-            Receive into pool <span className="text-danger">*</span>
-          </label>
-          <select
-            name="target_pool"
-            value={targetPool}
-            onChange={(e) => setTargetPool(e.target.value)}
-            required
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            <option value="">Select pool…</option>
-            {POOL_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-          <p className="font-serif italic text-muted text-xs mt-1.5">
-            Which pool should this incoming payment be recorded under?
-          </p>
-          <input type="hidden" name="source_pool" value="" />
-        </div>
-      )}
-
-      {/* ── Account ── (debit: per-source rows own it; credit: single voucher-level) */}
-      {/* Settling an invoice is purely Dr Bank / Cr AR — revenue was already
-          recognised at invoice issue. The server auto-fills account_code with
-          3030 (AR — Subs); the user doesn't need to pick. */}
-      {isLoanRepayment || isInvoicePay ? null : (
-      <div className="mb-6">
-        <div className="flex items-baseline justify-between mb-1.5">
-          <label className="block text-sm font-sans font-medium text-graphite">
-            {direction === 'credit' ? 'Account' : 'Manage accounts'}
-          </label>
-          <Link
-            href="/settings?tab=accounts"
-            target="_blank"
-            className="text-xs text-accent hover:text-accent-hover font-serif italic"
-          >
-            Manage in Settings →
-          </Link>
-        </div>
-
-        {direction === 'credit' ? (
-          accountList.length === 0 ? (
-            <p className="font-serif italic text-muted text-sm py-2 px-3 bg-surface border border-hairline rounded-md">
-              No accounts yet — create one in Settings to start.
-            </p>
+              <input type="hidden" name="target_pool" value="" />
+            </div>
+          ) : isInvoicePay ? (
+            // Settling an invoice: pool is fixed by the invoice's billing_mode
+            // (poolForBillingMode in payments/new/page.tsx). Render as
+            // read-only so Finance can see it but can't accidentally divert
+            // the payment to the wrong pool. The hidden input still submits
+            // the correct value so the server action receives target_pool.
+            <div>
+              <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
+                Receive into pool
+              </label>
+              <div className="px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink font-serif italic flex items-center gap-2">
+                <span>{poolOptions.find((p) => p.value === targetPool)?.label ?? targetPool}</span>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5 not-italic">
+                  from invoice
+                </span>
+              </div>
+              <p className="font-serif italic text-muted text-xs mt-1.5">
+                Auto-set from the invoice&apos;s billing mode. To land the
+                payment in a different pool, void this voucher and re-issue the
+                invoice under the correct billing mode.
+              </p>
+              <input type="hidden" name="target_pool" value={targetPool} />
+              <input type="hidden" name="source_pool" value="" />
+            </div>
           ) : (
-            <AccountPicker
-              accounts={accountList}
-              value={accountCode}
-              onChange={setAccountCode}
-              name="account_code"
-              placeholder="Select account…"
+            <DealRow>
+              <div>
+                <DealLabel htmlFor="target_pool" required hint="Which pool should this incoming payment be recorded under?">
+                  Receive into pool
+                </DealLabel>
+                <select
+                  id="target_pool"
+                  name="target_pool"
+                  value={targetPool}
+                  onChange={(e) => setTargetPool(e.target.value)}
+                  required
+                  className={inputCls}
+                >
+                  <option value="">Select pool…</option>
+                  {poolOptions.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                <input type="hidden" name="source_pool" value="" />
+              </div>
+              {/* Settling an invoice is purely Dr Bank / Cr AR — revenue was already
+                  recognised at invoice issue, so that path never reaches here. */}
+              <div>
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <label className="block text-sm font-sans font-medium text-graphite">
+                    Account <span className="text-danger">*</span>
+                  </label>
+                  <Link
+                    href="/settings?tab=accounts"
+                    target="_blank"
+                    className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                  >
+                    Manage in Settings →
+                  </Link>
+                </div>
+                {accountList.length === 0 ? (
+                  <p className="font-serif italic text-muted text-sm py-2 px-3 bg-surface border border-hairline rounded-md">
+                    No accounts yet — create one in Settings to start.
+                  </p>
+                ) : (
+                  <AccountPicker
+                    accounts={accountList}
+                    value={accountCode}
+                    onChange={setAccountCode}
+                    name="account_code"
+                    placeholder="Select account…"
+                    required
+                  />
+                )}
+              </div>
+            </DealRow>
+          )}
+        </DealCard>
+
+        {/* ───────── ④ description ───────── */}
+        <DealCard n={4} title="说明与附件" en="Description">
+          <div className="mb-4">
+            <DealLabel htmlFor="description" required>
+              Description
+            </DealLabel>
+            <textarea
+              id="description"
+              name="description"
+              rows={3}
               required
+              defaultValue={
+                isInvoicePay
+                  ? `Settle invoice ${invoicePreset!.invoice_no} — ${invoicePreset!.company_name}`
+                  : isRefund
+                    ? `Refund invoice ${refundPreset!.invoice_no ?? ''} — ${refundPreset!.company_name}`
+                    : ''
+              }
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+              placeholder="What is this payment for? Include reference numbers, invoice numbers, etc."
             />
-          )
-        ) : (
-          <p className="font-serif italic text-muted text-xs">
-            Pick the chart-of-accounts code per-row in the pool split above. New accounts appear in every row&apos;s dropdown.
-          </p>
-        )}
-        {direction === 'credit' ? (
-          <p className="font-serif italic text-muted text-xs mt-1.5">
-            Drives P&L vs Balance Sheet classification. Pick the account this incoming payment lands on.
-          </p>
-        ) : null}
-      </div>
-      )}
+          </div>
 
-      {/* Invoice-pay info banner — replaces the Account picker for billing_payment. */}
-      {isInvoicePay ? (
-        <div className="mb-6 px-3 py-2 bg-surface border border-hairline rounded-md">
-          <p className="font-serif italic text-muted text-xs">
-            Journal entry:{' '}
-            <span className="font-mono not-italic text-graphite">
-              {isInterBilling
-                ? 'Dr 9050 Inter-billing Expense / Cr 3030 Accounts Receivable'
-                : 'Dr Bank / Cr 3030 Accounts Receivable'}
-            </span>
-            .{' '}
-            {isInterBilling
-              ? 'Inter-billing settle — no bank movement. The paying dept’s P&L books the expense (mig 253); the receiving dept already accrued revenue at invoice issue.'
-              : 'Revenue was already recognised when the invoice was issued — no account to pick.'}
-          </p>
-        </div>
-      ) : null}
-
-      {/* ── Description ── */}
-      <div className="mb-6">
-        <label htmlFor="description" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          Description <span className="text-danger">*</span>
-        </label>
-        <textarea
-          id="description"
-          name="description"
-          rows={3}
-          required
-          defaultValue={
-            isInvoicePay
-              ? `Settle invoice ${invoicePreset!.invoice_no} — ${invoicePreset!.company_name}`
-              : isRefund
-                ? `Refund invoice ${refundPreset!.invoice_no ?? ''} — ${refundPreset!.company_name}`
-                : ''
-          }
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
-          placeholder="What is this payment for? Include reference numbers, invoice numbers, etc."
-        />
-      </div>
-
-      {/* ── Attachments ── */}
+          {/* ── Attachments ── */}
       <div className="mb-6">
         <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
           Attachments <span className="text-muted font-normal">(optional)</span>
@@ -1071,43 +1158,33 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
         </div>
       </div>
 
-      {/* ── Notes ── */}
-      <div className="mb-6">
-        <label htmlFor="notes" className="block text-sm font-sans font-medium text-graphite mb-1.5">
-          Internal notes <span className="text-muted font-normal">(optional)</span>
-        </label>
-        <input
-          id="notes"
-          name="notes"
-          type="text"
-          className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
-          placeholder="For Finance team reference only"
-        />
-      </div>
+          <DealMore summary="内部备注 · Internal notes (optional)">
+            <input
+              id="notes"
+              name="notes"
+              type="text"
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border"
+              placeholder="For Finance team reference only"
+            />
+          </DealMore>
+        </DealCard>
+      </DealCards>
 
-      {/* ── Error ── */}
-      {error ? (
-        <div className="bg-danger-bg border border-danger text-danger rounded-md p-3 mb-6 text-sm font-sans">
-          {error}
-        </div>
-      ) : null}
-
-      {/* ── Submit ── */}
-      <div className="flex items-center gap-4 pt-4 border-t border-hairline">
-        <button
-          type="submit"
-          disabled={isPending || sourceSumMismatch || repaymentSumMismatch}
-          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isPending ? 'Creating…' : 'Create voucher (draft)'}
-        </button>
-        <Link href="/payments" className="text-sm text-graphite hover:text-ink font-sans transition-colors">
-          Cancel
-        </Link>
-        <span className="text-xs text-muted italic font-serif ml-auto">
-          Saved as draft — submit for approval next
-        </span>
-      </div>
+      <DealPreview
+        who={payeeName ? `${isDebit ? '付给' : '收自'} ${payeeName}` : isDebit ? '未填收款人' : '未填付款人'}
+        rows={previewRows}
+        gl={previewGl}
+        note={
+          isDebit
+            ? '先存成 draft,下一步才送批;Principal 批准后钱才会动。'
+            : '收到的钱即时入账,不需要审批。'
+        }
+        error={error}
+        submitLabel={isDebit ? 'Create voucher (draft)' : 'Create receipt'}
+        pending={isPending}
+        disabled={sourceSumMismatch || repaymentSumMismatch}
+        cancelHref={returnTo ?? (isInvoicePay || isRefund ? '/billing' : isDebit ? '/payments' : '/receipts')}
+      />
     </form>
   )
 }
