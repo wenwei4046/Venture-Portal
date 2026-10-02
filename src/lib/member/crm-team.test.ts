@@ -1,92 +1,151 @@
 import { describe, expect, it } from "vitest";
 import type { CrmAppointment, CrmLead, CrmMessage } from "./crm";
 import {
-  assignEnquiry, durationLabel, emptyCounts, firstReplyMinutes, memberStats, pickByShare, previewAssignments,
-  visibleLeads, visibleMembers, visibleTeams,
-  type CrmAdRule, type CrmMember, type CrmRatios, type CrmTeam,
+  allDownlines, assignEnquiry, canEditTeamRules, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
+  memberStats, overLimit, pickByShare, previewAssignments, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
+  type CrmAssignConfig, type CrmMember,
 } from "./crm-team";
 
+// Boss → HOD → (Senior TL vacant) → TL A / TL B → TA → RS
 const members: CrmMember[] = [
   { id: "boss", name: "Boss", role: "boss" },
-  { id: "la", name: "Leader A", role: "leader", teamId: "A" },
-  { id: "a1", name: "Ann", role: "sales", teamId: "A" },
-  { id: "a2", name: "Amir", role: "sales", teamId: "A" },
-  { id: "lb", name: "Leader B", role: "leader", teamId: "B" },
-  { id: "b1", name: "Ben", role: "sales", teamId: "B" },
+  { id: "hod", name: "Peter", role: "hod", uplineId: "boss" },
+  { id: "tla", name: "TL A", role: "tl", uplineId: "hod" },
+  { id: "taa", name: "TA A", role: "ta", uplineId: "tla" },
+  { id: "a1", name: "Ann", role: "rs", uplineId: "taa", fullTime: true },
+  { id: "a2", name: "Amir", role: "rs", uplineId: "taa" },
+  { id: "a3", name: "Aida", role: "rs", uplineId: "taa", fullTime: true },
+  { id: "tlb", name: "TL B", role: "tl", uplineId: "hod" },
+  { id: "tab", name: "TA B", role: "ta", uplineId: "tlb" },
+  { id: "b1", name: "Ben", role: "rs", uplineId: "tab" },
 ];
-const teams: CrmTeam[] = [{ id: "A", name: "A Team", leaderId: "la" }, { id: "B", name: "B Team", leaderId: "lb" }];
 const who = (id: string) => members.find(m => m.id === id)!;
+const ids = (list: { id: string }[]) => list.map(m => m.id);
+const friday = new Date(2026, 9, 2, 11); // Fri 2 Oct 2026
+const tuesday = new Date(2026, 9, 6, 11);
 
-describe("who sees whom", () => {
-  it("lets the Boss see everyone and every team", () => {
-    expect(visibleMembers(who("boss"), members)).toHaveLength(6);
-    expect(visibleTeams(who("boss"), teams).map(t => t.id)).toEqual(["A", "B"]);
+describe("the line", () => {
+  it("finds every downline and each person's team", () => {
+    expect(ids(allDownlines("tla", members))).toEqual(["taa", "a1", "a2", "a3"]);
+    expect([teamOf("a2", members), teamOf("taa", members), teamOf("tla", members), teamOf("hod", members)]).toEqual(["tla", "tla", "tla", undefined]);
+    expect(ids(teamHandlers("tla", members))).toEqual(["tla", "taa", "a1", "a2", "a3"]);
   });
 
-  it("keeps a leader to their own team — never another leader's", () => {
-    expect(visibleMembers(who("la"), members).map(m => m.id)).toEqual(["la", "a1", "a2"]);
-    expect(visibleTeams(who("la"), teams).map(t => t.id)).toEqual(["A"]);
-    expect(visibleMembers(who("la"), members).some(m => m.id === "lb" || m.id === "b1")).toBe(false);
+  it("flags anyone with more than 3 direct downlines", () => {
+    expect(overLimit(members)).toEqual([]);
+    const crowded = [...members, { id: "a4", name: "Extra", role: "rs" as const, uplineId: "taa" }];
+    expect(ids(overLimit(crowded))).toEqual(["taa"]);
+  });
+});
+
+describe("who sees and does what", () => {
+  it("shows everyone their whole downline and nobody else — a TL never sees another TL's team", () => {
+    expect(visibleMembers(who("boss"), members)).toHaveLength(members.length);
+    expect(ids(visibleMembers(who("tla"), members))).toEqual(["tla", "taa", "a1", "a2", "a3"]);
+    expect(ids(visibleMembers(who("taa"), members))).toEqual(["taa", "a1", "a2", "a3"]);
+    expect(ids(visibleMembers(who("a1"), members))).toEqual(["a1"]);
+    expect(ids(visibleTeams(who("hod"), members))).toEqual(["tla", "tlb"]);
+    expect(ids(visibleTeams(who("taa"), members))).toEqual(["tla"]);
   });
 
-  it("shows a salesperson only themselves", () => {
-    expect(visibleMembers(who("a1"), members).map(m => m.id)).toEqual(["a1"]);
-    expect(visibleTeams(who("a1"), teams)).toEqual([]);
+  it("opens assigned leads of people the viewer sees, and unassigned ones to their TL and above", () => {
+    const leads = [{ id: "x", assignedTo: "a1" }, { id: "y", assignedTo: "b1" }, { id: "w", teamId: "tla" }];
+    expect(ids(visibleLeads(who("tla"), members, leads))).toEqual(["x", "w"]);
+    expect(ids(visibleLeads(who("taa"), members, leads))).toEqual(["x"]); // the TL assigns, not the TA
+    expect(ids(visibleLeads(who("boss"), members, leads))).toEqual(["x", "y", "w"]);
   });
 
-  it("opens only the leads of people the viewer can see", () => {
-    const leads = [{ id: "x", assignedTo: "a1" }, { id: "y", assignedTo: "b1" }, { id: "z" }];
-    expect(visibleLeads(who("la"), members, leads).map(l => l.id)).toEqual(["x"]);
-    expect(visibleLeads(who("boss"), members, leads).map(l => l.id)).toEqual(["x", "y"]);
+  it("shows enquiries no team has taken to the Boss and HOD only", () => {
+    const leads = [{ id: "u" }, { id: "x", assignedTo: "a1" }];
+    expect(ids(visibleLeads(who("hod"), members, leads))).toEqual(["u", "x"]);
+    expect(ids(visibleLeads(who("boss"), members, leads))).toEqual(["u", "x"]);
+    expect(ids(visibleLeads(who("tla"), members, leads))).toEqual(["x"]);
+    expect([isUnassigned(leads[0]), isUnassigned(leads[1]), isUnassigned({ teamId: "tla" })]).toEqual([true, false, false]);
+  });
+
+  it("lets uplines who take enquiries reply, never the Boss or HOD", () => {
+    const lead = { assignedTo: "a2" };
+    expect([canReply(who("a2"), lead, members), canReply(who("taa"), lead, members), canReply(who("tla"), lead, members)]).toEqual([true, true, true]);
+    expect([canReply(who("boss"), lead, members), canReply(who("hod"), lead, members), canReply(who("a1"), lead, members), canReply(who("tlb"), lead, members)])
+      .toEqual([false, false, false, false]);
+  });
+
+  it("lets a team's TL, the Boss and the HOD change its rules — not another TL or the TA", () => {
+    expect([canEditTeamRules(who("tla"), "tla"), canEditTeamRules(who("boss"), "tla"), canEditTeamRules(who("hod"), "tla")]).toEqual([true, true, true]);
+    expect([canEditTeamRules(who("tlb"), "tla"), canEditTeamRules(who("taa"), "tla")]).toEqual([false, false]);
+  });
+
+  it("lets only the team's TL reassign", () => {
+    expect([canReassign(who("tla"), { assignedTo: "a2" }, members), canReassign(who("tla"), { teamId: "tla" }, members)]).toEqual([true, true]);
+    expect([canReassign(who("taa"), { assignedTo: "a2" }, members), canReassign(who("tlb"), { assignedTo: "a2" }, members), canReassign(who("boss"), { assignedTo: "a2" }, members)])
+      .toEqual([false, false, false]);
   });
 });
 
 describe("assignment", () => {
-  const ratios: CrmRatios = { teams: { A: 10, B: 5 }, members: { A: { a1: 3, a2: 1 }, B: { b1: 1 } } };
+  const config: CrmAssignConfig = {
+    rules: [{ adName: "Sofa", tlIds: ["tla", "tlb"] }],
+    teamRatios: { tla: 2, tlb: 1 },
+    teams: {
+      tla: { weekday: "auto", ratios: { a1: 1, a2: 1 } },
+      tlb: { weekday: "manual", ratios: {} },
+    },
+  };
 
   it("spreads by share, not in runs", () => {
     const given: Record<string, number> = {};
     const order: string[] = [];
     for (let i = 0; i < 30; i++) { const id = pickByShare({ A: 10, B: 5 }, given)!; order.push(id); given[id] = (given[id] ?? 0) + 1; }
-    expect([given.A, given.B]).toEqual([20, 10]); // exactly 2 : 1
+    expect([given.A, given.B]).toEqual([20, 10]);
     let longestRun = 1, run = 1;
     for (let i = 1; i < order.length; i++) { run = order[i] === order[i - 1] ? run + 1 : 1; longestRun = Math.max(longestRun, run); }
-    expect(longestRun).toBeLessThanOrEqual(2); // never more than two in a row for a 2 : 1 split
+    expect(longestRun).toBeLessThanOrEqual(2);
   });
 
-  it("Mode 1: an ad with a rule rotates evenly among its salespeople", () => {
-    const rules: CrmAdRule[] = [{ adName: "Sofa Clearance", memberIds: ["a2", "b1"] }];
-    const picks = previewAssignments("Sofa Clearance", 4, rules, ratios, emptyCounts(), members);
-    expect(picks.map(p => p?.memberId)).toEqual(["a2", "b1", "a2", "b1"]);
-    expect(picks.every(p => p?.mode === 1)).toBe(true);
+  it("knows Friday to Sunday", () => {
+    expect([1, 2, 3, 4, 5].map(d => isWeekendEnquiry(new Date(2026, 9, d, 12)))).toEqual([false, true, true, true, false]); // Thu 1 → Mon 5
+    expect(isWeekendEnquiry(friday)).toBe(true);
   });
 
-  it("Mode 2: team by the Boss's ratio, then salesperson by the leader's", () => {
-    const picks = previewAssignments("Akemi Mattress", 15, [], ratios, emptyCounts(), members);
-    const byTeam = (t: string) => picks.filter(p => p?.teamId === t).length;
-    expect([byTeam("A"), byTeam("B")]).toEqual([10, 5]);
-    const inA = picks.filter(p => p?.teamId === "A").map(p => p!.memberId);
-    expect(inA.filter(m => m === "a1").length).toBeGreaterThan(inA.filter(m => m === "a2").length); // 3 : 1
-    expect(picks.every(p => p?.mode === 2)).toBe(true);
+  it("Mode 1: an ad handed to TLs rotates evenly among their teams", () => {
+    const picks = previewAssignments("Sofa", tuesday, 4, config, emptyCounts(), members);
+    expect(picks.map(p => [p.teamId, p.teamBy])).toEqual([["tla", 1], ["tlb", 1], ["tla", 1], ["tlb", 1]]);
   });
 
-  it("Mode 1 wins over Mode 2", () => {
-    const rules: CrmAdRule[] = [{ adName: "Akemi Mattress", memberIds: ["b1"] }];
-    expect(assignEnquiry("Akemi Mattress", rules, ratios, emptyCounts(), members).assignment).toEqual({ memberId: "b1", teamId: "B", mode: 1 });
+  it("Mode 2: any other ad goes by the ratio between teams", () => {
+    const picks = previewAssignments("Akemi", tuesday, 9, config, emptyCounts(), members);
+    expect(picks.filter(p => p.teamId === "tla")).toHaveLength(6);
+    expect(picks.every(p => p.teamBy === 2)).toBe(true);
   });
 
-  it("skips a team whose leader has given nobody a share, and waits for the Boss when nobody can take it", () => {
-    const noB: CrmRatios = { teams: { A: 1, B: 5 }, members: { A: { a1: 1 }, B: { b1: 0 } } };
-    expect(assignEnquiry("x", [], noB, emptyCounts(), members).assignment?.teamId).toBe("A");
-    expect(assignEnquiry("x", [], { teams: {}, members: {} }, emptyCounts(), members).assignment).toBeNull();
+  it("Friday to Sunday: only full-time RS, evenly in turn", () => {
+    const picks = previewAssignments("Akemi", friday, 6, { ...config, teamRatios: { tla: 1 } }, emptyCounts(), members);
+    expect(picks.map(p => p.memberId)).toEqual(["a1", "a3", "a1", "a3", "a1", "a3"]);
+    expect(picks.every(p => p.memberBy === "weekend")).toBe(true);
   });
 
-  it("keeps counting across enquiries", () => {
-    let counts = emptyCounts();
-    const out: string[] = [];
-    for (let i = 0; i < 3; i++) { const r = assignEnquiry("x", [], ratios, counts, members); out.push(r.assignment!.memberId); counts = r.counts; }
-    expect(counts.team.A + (counts.team.B ?? 0)).toBe(3);
-    expect(out).toHaveLength(3);
+  it("Friday to Sunday with no full-time RS: waits for the TL", () => {
+    const r = assignEnquiry("Akemi", friday, { ...config, teamRatios: { tlb: 1 } }, emptyCounts(), members);
+    expect(r.assignment).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "no_full_time" });
+  });
+
+  it("Monday to Thursday: the TL's ratio when automatic, the TL's list when by hand", () => {
+    const auto = previewAssignments("Akemi", tuesday, 4, { ...config, teamRatios: { tla: 1 } }, emptyCounts(), members);
+    expect(auto.map(p => p.memberId)).toEqual(["a1", "a2", "a1", "a2"]);
+    const manual = assignEnquiry("Akemi", tuesday, { ...config, teamRatios: { tlb: 1 } }, emptyCounts(), members);
+    expect(manual.assignment).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "manual" });
+  });
+
+  it("sending to a team by hand follows that team's own rules", () => {
+    const held = leadsHeld([{ assignedTo: "a1" }, { assignedTo: "a1" }, {}]);
+    expect(held).toEqual({ a1: 2 });
+    expect(pickInTeam("tla", friday, config, held, members)).toEqual({ memberId: "a3", memberBy: "weekend" }); // the full-time RS with fewer leads
+    expect(pickInTeam("tla", tuesday, config, held, members)).toEqual({ memberId: "a2", memberBy: "ratio" });
+    expect(pickInTeam("tlb", tuesday, config, held, members)).toEqual({ memberId: null, memberBy: "manual" });
+  });
+
+  it("waits for the Boss or HOD when no team can take it", () => {
+    expect(assignEnquiry("x", tuesday, { rules: [], teamRatios: {}, teams: {} }, emptyCounts(), members).assignment).toEqual({ teamId: null, memberId: null });
   });
 });
 

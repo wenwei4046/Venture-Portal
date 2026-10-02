@@ -1,84 +1,173 @@
 /**
- * The CRM's team layer: who may see whom, how a new enquiry is handed to a
- * salesperson, and each salesperson's numbers.
+ * The CRM's team layer: the reporting line, who may see and do what, how a
+ * new enquiry is handed to someone, and each person's numbers.
  *
- * Roles follow the reporting line (People › Hierarchy, `reports_to`):
- *   - the Boss sees every team, and may narrow to one;
- *   - a Team leader sees only the salespeople who report to them — never
- *     another leader's team;
- *   - a Salesperson sees only themselves.
- * Leaders and the Boss may open a downline's chat and reply in it.
+ * The line, agreed with the Boss 2026-10-02:
+ *   Boss → HOD → Senior TL (vacant for now) → TL → TA → RS
+ * Everyone has at most 3 direct downlines (an RS has none).
  *
- * Assignment, decided 2026-10-01:
- *   Mode 1 — an ad handed to chosen salespeople (one or several); its
- *            enquiries rotate evenly among them.
- *   Mode 2 — by ratio set in advance: the Boss splits between teams
- *            (A 10 : B 5 : C 15), each leader splits their team's share
- *            between their salespeople.
- *   Mode 1 wins when an ad has a rule.
+ *   - Boss and HOD hand ads to TLs and watch performance. They read chats
+ *     but never reply in them.
+ *   - A team is a TL and everyone below them. TL, TA and RS all take
+ *     enquiries and reply to customers.
+ *   - Everyone sees themselves and their whole downline, nobody else: a TL
+ *     never sees another TL's team. An upline who takes enquiries (Senior TL,
+ *     TL, TA) may step into a downline's chat and reply.
+ *
+ * Assignment:
+ *   1. Which team. An ad the Boss or HOD handed to TLs rotates evenly among
+ *      them (Mode 1). Any other ad is split by each team's % (Mode 2).
+ *   2. Who in the team.
+ *      Friday–Sunday: only full-time RS, evenly in turn.
+ *      Monday–Thursday: as the TL chooses — automatically by the % the TL sets,
+ *      or by hand (the enquiry waits in the TL's "To assign" list).
+ *      The TL may reassign any lead in their team at any time.
  */
 import type { CrmAppointment, CrmLead } from "./crm";
 
-export type CrmRole = "boss" | "leader" | "sales";
+export type CrmRole = "boss" | "hod" | "stl" | "tl" | "ta" | "rs";
+
+export const ROLE_LABELS: Record<CrmRole, string> = {
+  boss: "Boss", hod: "HOD", stl: "Senior TL", tl: "TL", ta: "TA", rs: "RS",
+};
+
+/** The most direct downlines anyone may have. */
+export const MAX_DOWNLINES = 3;
 
 export interface CrmMember {
   id: string;
   name: string;
   role: CrmRole;
-  /** The team a leader runs or a salesperson works in; the Boss has none. */
-  teamId?: string;
+  /** Who they report to (People › Hierarchy, `reports_to`). The Boss has none. */
+  uplineId?: string;
+  /** RS only: full-time RS take the Friday–Sunday enquiries. */
+  fullTime?: boolean;
+  /** A TL: their team's name. */
+  teamName?: string;
 }
 
-export interface CrmTeam {
-  id: string;
-  name: string;
-  leaderId: string;
+/* ── The line ───────────────────────────────────────────────────────────── */
+
+export const directDownlines = (memberId: string, members: CrmMember[]) => members.filter(m => m.uplineId === memberId);
+
+/** Everyone below a person, at any depth. */
+export function allDownlines(memberId: string, members: CrmMember[]): CrmMember[] {
+  const out: CrmMember[] = [];
+  const walk = (id: string) => { for (const d of directDownlines(id, members)) { out.push(d); walk(d.id); } };
+  walk(memberId);
+  return out;
 }
 
-/** Everyone the viewer may see, themselves included. */
-export function visibleMembers(viewer: CrmMember, members: CrmMember[]): CrmMember[] {
-  if (viewer.role === "boss") return members;
-  if (viewer.role === "leader") return members.filter(m => m.id === viewer.id || (m.teamId === viewer.teamId && m.role === "sales"));
-  return members.filter(m => m.id === viewer.id);
+/** People over the limit of direct downlines — the hierarchy should not allow it. */
+export const overLimit = (members: CrmMember[]) => members.filter(m => directDownlines(m.id, members).length > MAX_DOWNLINES);
+
+/** The TL whose team a person is in (a TL is in their own). Above TL: none. */
+export function teamOf(memberId: string, members: CrmMember[]): string | undefined {
+  let m = members.find(x => x.id === memberId);
+  for (let guard = 0; m && guard < 10; guard++) {
+    if (m.role === "tl") return m.id;
+    if (m.role !== "ta" && m.role !== "rs") return undefined;
+    m = members.find(x => x.id === m!.uplineId);
+  }
+  return undefined;
 }
 
-/** The teams the viewer may see: every one for the Boss, their own for a leader, none for a salesperson. */
-export function visibleTeams(viewer: CrmMember, teams: CrmTeam[]): CrmTeam[] {
-  if (viewer.role === "boss") return teams;
-  if (viewer.role === "leader") return teams.filter(t => t.id === viewer.teamId);
-  return [];
+/** Every TL — one team each. */
+export const allTeams = (members: CrmMember[]) => members.filter(m => m.role === "tl");
+
+/** The people in a TL's team who take enquiries: the TL, their TAs and RS. */
+export const teamHandlers = (tlId: string, members: CrmMember[]) =>
+  [members.find(m => m.id === tlId), ...allDownlines(tlId, members)].filter((m): m is CrmMember => !!m && takesEnquiries(m));
+
+/* ── Who may see and do what ────────────────────────────────────────────── */
+
+/** TL, TA and RS take enquiries and reply to customers; Boss, HOD and Senior TL do not take them. */
+export const takesEnquiries = (m: CrmMember) => m.role === "tl" || m.role === "ta" || m.role === "rs";
+
+/** Everyone the viewer may see: themselves and their whole downline. */
+export const visibleMembers = (viewer: CrmMember, members: CrmMember[]) => [viewer, ...allDownlines(viewer.id, members)];
+
+/** The teams (TLs) the viewer may see — their own if they are inside one. */
+export function visibleTeams(viewer: CrmMember, members: CrmMember[]): CrmMember[] {
+  const own = teamOf(viewer.id, members);
+  if (own) return members.filter(m => m.id === own);
+  return visibleMembers(viewer, members).filter(m => m.role === "tl");
 }
 
-/** Leads the viewer may open: those assigned to anyone they can see. */
-export function visibleLeads<L extends { assignedTo?: string }>(viewer: CrmMember, members: CrmMember[], leads: L[]): L[] {
+/**
+ * Leads the viewer may open: those assigned to anyone they can see; for the
+ * TL and anyone above, their teams' enquiries still waiting to be assigned;
+ * and for the Boss and HOD, enquiries no team has taken yet.
+ */
+export function visibleLeads<L extends Pick<CrmLead, "assignedTo" | "teamId">>(viewer: CrmMember, members: CrmMember[], leads: L[]): L[] {
   const ids = new Set(visibleMembers(viewer, members).map(m => m.id));
-  return leads.filter(l => l.assignedTo !== undefined && ids.has(l.assignedTo));
+  return leads.filter(l => (l.assignedTo ? ids.has(l.assignedTo) : l.teamId ? ids.has(l.teamId) : assignsAds(viewer)));
 }
 
-export const canManage = (viewer: CrmMember) => viewer.role !== "sales";
+/** An enquiry no team has taken: no ad rule and no team % claimed it, or the Boss or HOD took it back. */
+export const isUnassigned = (lead: Pick<CrmLead, "assignedTo" | "teamId">) => !lead.assignedTo && !lead.teamId;
+
+/** A leader of anyone: gets the Team tab and the team's performance. */
+export const hasDownlines = (viewer: CrmMember, members: CrmMember[]) => directDownlines(viewer.id, members).length > 0;
+
+/** Boss and HOD hand ads to TLs, set each team's %, and send any enquiry to a team by hand. */
+export function assignsAds(viewer: CrmMember) { return viewer.role === "boss" || viewer.role === "hod"; }
+
+/** Whether the viewer may reply in this lead's chat: its own person, or an upline who takes enquiries or is a Senior TL. */
+export function canReply(viewer: CrmMember, lead: Pick<CrmLead, "assignedTo" | "teamId">, members: CrmMember[]): boolean {
+  if (viewer.role === "boss" || viewer.role === "hod") return false;
+  const owner = lead.assignedTo ?? lead.teamId;
+  return !!owner && (owner === viewer.id || allDownlines(viewer.id, members).some(m => m.id === owner));
+}
+
+/** Whether the viewer may hand this lead to someone else in its team: its TL (or a Senior TL above). */
+export function canReassign(viewer: CrmMember, lead: Pick<CrmLead, "assignedTo" | "teamId">, members: CrmMember[]): boolean {
+  if (viewer.role !== "tl" && viewer.role !== "stl") return false;
+  const team = lead.teamId ?? (lead.assignedTo ? teamOf(lead.assignedTo, members) : undefined);
+  return !!team && (team === viewer.id || allDownlines(viewer.id, members).some(m => m.id === team));
+}
 
 /* ── Assignment ─────────────────────────────────────────────────────────── */
 
-/** Mode 1: an ad's enquiries go to these salespeople, in turn. */
+/** Mode 1: the Boss or HOD hands an ad to these TLs; its enquiries rotate evenly among their teams. */
 export interface CrmAdRule {
   adName: string;
-  memberIds: string[];
+  tlIds: string[];
 }
 
-/** Mode 2: shares set in advance. A share of 0 (or none) takes no enquiries. */
-export interface CrmRatios {
-  teams: Record<string, number>;
-  /** teamId → salesperson → share, set by that team's leader. */
-  members: Record<string, Record<string, number>>;
+/** How a TL deals Monday–Thursday enquiries inside their team. */
+export interface CrmTeamSettings {
+  weekday: "auto" | "manual";
+  /**
+   * Each handler's % for "auto" (kept at 100 in all). 0 (or none) takes none.
+   * Set by the TL; the Boss and HOD may change it too, over the TL's head.
+   */
+  ratios: Record<string, number>;
+  /** Who last changed the Mon–Thu mode or the %s, and when — so a TL sees when the Boss or HOD did. */
+  editedBy?: { memberId: string; at: string };
 }
 
-/** How many enquiries each has already been given — what the next pick balances against. */
+/** Who may change a team's Mon–Thu mode and %s: its TL, and the Boss and HOD. */
+export const canEditTeamRules = (viewer: CrmMember, tlId: string) => viewer.id === tlId || assignsAds(viewer);
+
+export interface CrmAssignConfig {
+  rules: CrmAdRule[];
+  /** Mode 2: TL → % of the enquiries no ad rule claims, set by the Boss or HOD (100 in all). */
+  teamRatios: Record<string, number>;
+  /** TL → their team's settings, set by that TL. */
+  teams: Record<string, CrmTeamSettings>;
+}
+
+/** How many enquiries each team and person has already been given — what the next pick balances against. */
 export interface CrmAssignCounts {
   team: Record<string, number>;
   member: Record<string, number>;
 }
 
 export const emptyCounts = (): CrmAssignCounts => ({ team: {}, member: {} });
+
+/** Friday, Saturday and Sunday (local time): full-time RS only. */
+export const isWeekendEnquiry = (at: Date) => [5, 6, 0].includes(at.getDay());
 
 /**
  * The next pick by share: whoever is furthest below their share gets it.
@@ -96,48 +185,72 @@ export function pickByShare(shares: Record<string, number>, given: Record<string
   return best;
 }
 
+const even = (ids: string[]) => Object.fromEntries(ids.map(id => [id, 1]));
+
 export interface CrmAssignment {
-  memberId: string;
-  teamId?: string;
-  mode: 1 | 2;
+  /** The TL whose team takes it; null when no team can — it waits for the Boss or HOD. */
+  teamId: string | null;
+  /** Who in the team; null when it waits in the TL's "To assign" list. */
+  memberId: string | null;
+  /** Why that team: an ad rule (1) or the split between teams (2). */
+  teamBy?: 1 | 2;
+  /** Why that person. */
+  memberBy?: "weekend" | "ratio" | "manual" | "no_full_time" | "no_shares";
+}
+
+/** Who gets a new enquiry from this ad arriving at `at`, and the counts after it. */
+export function assignEnquiry(adName: string, at: Date, config: CrmAssignConfig, counts: CrmAssignCounts, members: CrmMember[]):
+  { assignment: CrmAssignment; counts: CrmAssignCounts } {
+  const tls = new Set(allTeams(members).map(t => t.id));
+
+  // 1. Which team.
+  const rule = config.rules.find(r => r.adName === adName && r.tlIds.some(id => tls.has(id)));
+  const teamId = rule
+    ? pickByShare(even(rule.tlIds.filter(id => tls.has(id))), counts.team)
+    : pickByShare(Object.fromEntries(Object.entries(config.teamRatios).filter(([id]) => tls.has(id))), counts.team);
+  if (!teamId) return { assignment: { teamId: null, memberId: null }, counts };
+  const teamBy = rule ? 1 : 2;
+  const withTeam = { ...counts, team: { ...counts.team, [teamId]: (counts.team[teamId] ?? 0) + 1 } };
+
+  // 2. Who in the team.
+  const { memberId, memberBy } = pickInTeam(teamId, at, config, counts.member, members);
+  const after = memberId ? { ...withTeam, member: { ...withTeam.member, [memberId]: (withTeam.member[memberId] ?? 0) + 1 } } : withTeam;
+  return { assignment: { teamId, memberId, teamBy, memberBy }, counts: after };
 }
 
 /**
- * Who gets a new enquiry from this ad, and the counts after it. Mode 1 when
- * the ad has a rule (even rotation among its salespeople); otherwise Mode 2,
- * team by the Boss's ratio, then salesperson by that leader's ratio. Null when
- * nobody can take it (no rule, no shares) — it waits for the Boss.
+ * Who in a team gets an enquiry arriving at `at` — by the team's own rules:
+ * Friday–Sunday a full-time RS in turn; Monday–Thursday the TL's % or the
+ * TL's "To assign" list. Also used when the Boss or HOD sends one to a team by hand.
  */
-export function assignEnquiry(adName: string, rules: CrmAdRule[], ratios: CrmRatios, counts: CrmAssignCounts, members: CrmMember[]):
-  { assignment: CrmAssignment | null; counts: CrmAssignCounts } {
-  const teamOf = (id: string) => members.find(m => m.id === id)?.teamId;
-  const give = (memberId: string, teamId: string | undefined): CrmAssignCounts => ({
-    team: teamId ? { ...counts.team, [teamId]: (counts.team[teamId] ?? 0) + 1 } : counts.team,
-    member: { ...counts.member, [memberId]: (counts.member[memberId] ?? 0) + 1 },
-  });
-
-  const rule = rules.find(r => r.adName === adName && r.memberIds.length > 0);
-  if (rule) {
-    const even = Object.fromEntries(rule.memberIds.map(id => [id, 1]));
-    const memberId = pickByShare(even, counts.member)!;
-    return { assignment: { memberId, teamId: teamOf(memberId), mode: 1 }, counts: give(memberId, teamOf(memberId)) };
+export function pickInTeam(teamId: string, at: Date, config: CrmAssignConfig, given: Record<string, number>, members: CrmMember[]):
+  Pick<CrmAssignment, "memberId" | "memberBy"> {
+  const handlers = teamHandlers(teamId, members);
+  const settings = config.teams[teamId] ?? { weekday: "manual", ratios: {} };
+  if (isWeekendEnquiry(at)) {
+    const memberId = pickByShare(even(handlers.filter(m => m.role === "rs" && m.fullTime).map(m => m.id)), given);
+    return { memberId, memberBy: memberId ? "weekend" : "no_full_time" };
   }
-
-  // A team whose leader has given nobody a share cannot take enquiries.
-  const takingTeams = Object.fromEntries(Object.entries(ratios.teams).filter(([teamId]) =>
-    Object.values(ratios.members[teamId] ?? {}).some(share => share > 0)));
-  const teamId = pickByShare(takingTeams, counts.team);
-  if (!teamId) return { assignment: null, counts };
-  const memberId = pickByShare(ratios.members[teamId] ?? {}, counts.member)!;
-  return { assignment: { memberId, teamId, mode: 2 }, counts: give(memberId, teamId) };
+  if (settings.weekday === "auto") {
+    const memberId = pickByShare(Object.fromEntries(handlers.map(m => [m.id, settings.ratios[m.id] ?? 0])), given);
+    return { memberId, memberBy: memberId ? "ratio" : "no_shares" };
+  }
+  return { memberId: null, memberBy: "manual" };
 }
 
-/** The next n enquiries for an ad, without changing anything — the settings' preview. */
-export function previewAssignments(adName: string, n: number, rules: CrmAdRule[], ratios: CrmRatios, counts: CrmAssignCounts, members: CrmMember[]): (CrmAssignment | null)[] {
-  const out: (CrmAssignment | null)[] = [];
+/** How many leads each person holds — what a pick made outside the normal flow balances against. */
+export function leadsHeld(leads: Pick<CrmLead, "assignedTo">[]): Record<string, number> {
+  const given: Record<string, number> = {};
+  for (const l of leads) if (l.assignedTo) given[l.assignedTo] = (given[l.assignedTo] ?? 0) + 1;
+  return given;
+}
+
+/** The next n enquiries for an ad arriving at `at`, without changing anything — the settings' preview. */
+export function previewAssignments(adName: string, at: Date, n: number, config: CrmAssignConfig, counts: CrmAssignCounts, members: CrmMember[]): CrmAssignment[] {
+  const out: CrmAssignment[] = [];
   let c = counts;
   for (let i = 0; i < n; i++) {
-    const r = assignEnquiry(adName, rules, ratios, c, members);
+    const r = assignEnquiry(adName, at, config, c, members);
     out.push(r.assignment);
     c = r.counts;
   }
