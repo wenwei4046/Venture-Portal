@@ -18,7 +18,6 @@ import MemberCrmUpcoming from "./MemberCrmUpcoming";
 import MemberCrmComposer from "./MemberCrmComposer";
 import MemberCrmContacts from "./MemberCrmContacts";
 import MemberCrmAutoReplies from "./MemberCrmAutoReplies";
-import MemberCrmWhatsApp from "./MemberCrmWhatsApp";
 import { apptLabel, dayLabel, roomName, time, whenLabel } from "./crm-format";
 
 const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
@@ -311,17 +310,16 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   if (!inDetail && tab === "settings") {
     body = <>
       <div className={c.tabTitle}><h1>Settings</h1><p className={s.sub}>How your CRM works for you</p></div>
-      <MemberCrmWhatsApp />
       <MemberCrmAutoReplies settings={autoReplies} onChange={setAutoReplies} />
     </>;
   }
 
+  // Settings opens from the gear at the top right, not the bottom bar.
   const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = [
     { id: "inbox", icon: "chat", label: "Inbox", badge: needsReply },
     { id: "contacts", icon: "team", label: "Contacts" },
     { id: "calendar", icon: "calendar", label: "Calendar", badge: upcomingCount },
     { id: "profile", icon: "user", label: "Profile" },
-    { id: "settings", icon: "gear", label: "Settings" },
   ];
 
   return (
@@ -329,6 +327,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
       {!inDetail && <header className={c.appTop}>
         {onExit && <button className={c.back} onClick={onExit} aria-label="Back to the Revenue app"><Icon name="back" size={20} /></button>}
         <span className={c.appBrand}>HOUZS <strong>CRM</strong></span>
+        <button className={c.appGear} onClick={() => goTab("settings")} aria-label="Settings" aria-current={tab === "settings" ? "page" : undefined}><Icon name="gear" size={20} /></button>
       </header>}
       <main className={c.appMain}>{body}</main>
       <nav className={c.appNav} aria-label="CRM">

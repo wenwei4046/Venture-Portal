@@ -211,7 +211,7 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--room); }
 
-/* The CRM as its own app: top bar, content, and a bottom bar of three tabs. */
+/* The CRM as its own app: top bar, content, and a bottom bar of four tabs; Settings is the gear at the top right. */
 .app { min-height: 100vh; min-height: 100dvh; background: var(--m-bg); color: var(--m-text); }
 .appTop {
   position: sticky; top: 0; z-index: 25; display: flex; align-items: center; gap: 10px;
@@ -219,6 +219,8 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 }
 .appBrand { font-size: 13px; letter-spacing: .14em; color: var(--m-sub); }
 .appBrand strong { color: var(--m-text); letter-spacing: .08em; }
+.appGear { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.appGear[aria-current="page"] { background: var(--m-text); color: var(--m-card); border-color: var(--m-text); }
 .appMain { max-width: 760px; margin: 0 auto; padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
 .appMain > section { margin: 0; }
 .appNav {
