@@ -30,6 +30,7 @@ export interface CrmContactRow {
   previous_status: "won" | "lost" | null;
   assigned_to: string | null;
   team_id: string | null;
+  last_customer_at?: string | null;
   unread: number;
   created_at: string;
 }
@@ -43,6 +44,8 @@ export interface CrmMessageRow {
   auto: boolean;
   sent_by: string | null;
   sent_at: string;
+  status?: "received" | "sent" | "delivered" | "read" | "failed" | null;
+  error?: string | null;
 }
 
 export interface CrmAppointmentRow {
@@ -101,6 +104,9 @@ export function messageFromRow(row: CrmMessageRow, owner: string | null): CrmMes
     from: row.direction === "in" ? "lead" : "me",
     text,
     at: row.sent_at,
+    // Only our own messages have a delivery state worth showing.
+    ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
+    ...(row.error ? { error: row.error } : {}),
     ...(row.auto ? { auto: true } : {}),
     // Replied by someone other than the customer's own salesperson: the team sees who.
     ...(row.direction === "out" && !row.auto && row.sent_by && row.sent_by !== owner ? { by: row.sent_by } : {}),
@@ -122,6 +128,7 @@ export function leadFromRow(row: CrmContactRow, messages: CrmMessageRow[]): CrmL
     ...(row.previous_status ? { previous: { status: row.previous_status } } : {}),
     ...(row.assigned_to ? { assignedTo: row.assigned_to } : {}),
     ...(row.team_id ? { teamId: row.team_id } : {}),
+    ...(row.last_customer_at ? { lastCustomerAt: row.last_customer_at } : {}),
     createdAt: row.created_at,
     unread: row.unread,
     messages: messages

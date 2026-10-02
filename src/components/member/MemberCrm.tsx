@@ -26,7 +26,8 @@ import MemberCrmLeadRow, { firstName } from "./MemberCrmLeadRow";
 import { MemberCrmMember, MemberCrmPerformance, MemberCrmTeam, roleTag } from "./MemberCrmTeam";
 import MemberCrmAssignment from "./MemberCrmAssignment";
 import { apptLabel, dayLabel, roomName, time, whenLabel } from "./crm-format";
-import { fetchCrm } from "@/app/(member)/member/crm-actions";
+import { fetchCrm, sendCrmReply } from "@/app/(member)/member/crm-actions";
+import { windowOpen } from "@/lib/whatsapp/send";
 
 const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
   ({ id: crypto.randomUUID(), from: "system", kind, text, at: new Date().toISOString() });
@@ -65,6 +66,9 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   const [leads, setLeads] = useState<CrmLead[]>(() => (live ? [] : applyAutoFollowUp(demo.leads)));
   const [appointments, setAppointments] = useState<CrmAppointment[]>(live ? [] : demo.appointments);
   const [load, setLoad] = useState<{ state: "loading" | "ready" } | { state: "error"; error: string }>({ state: live ? "loading" : "ready" });
+  // Live replies: one at a time, and why the last one failed.
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
   // Live data saves nothing yet, so nothing on screen may look as if it did.
   const writable = !live;
   const [now, setNow] = useState(() => new Date());
@@ -119,6 +123,25 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       messages: [...l.messages, systemNote(`Sent to ${tl?.teamName ?? "a team"} by ${nameOf(viewer.id)}. ${memberId
         ? `Assigned to ${nameOf(memberId)} (${how}).` : `Waits in ${firstName(tl?.name ?? "the TL")}'s To assign list (${how}).`}`)],
     }));
+  }
+
+  /**
+   * Live: send a reply on WhatsApp. It shows only once the server says it went
+   * AND was kept — never before — and the draft stays if it did not.
+   */
+  async function sendLive(leadId: string, text: string): Promise<boolean> {
+    setSending(true);
+    setSendError("");
+    const result = await sendCrmReply(leadId, text);
+    setSending(false);
+    if (!result.ok) { setSendError(result.error); return false; }
+    updateLead(leadId, l => ({
+      ...l,
+      status: statusAfterReply(l.status),
+      unread: l.assignedTo === viewer.id ? 0 : l.unread,
+      messages: [...l.messages, result.message],
+    }));
+    return true;
   }
 
   /** A TL hands a lead to someone in their team (or takes it back from one). */
@@ -262,6 +285,12 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     const fromMember = view.fromMember;
     if (lead) {
       inDetail = true;
+      // Live: replying on WhatsApp is the one write built so far — inside Meta's 24-hour window only.
+      const mayReply = canReply(viewer, lead, members);
+      const windowShut = live && !windowOpen(lead.lastCustomerAt, now);
+      const liveNote = !live || !mayReply ? undefined
+        : windowShut ? "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now (templates arrive later)."
+          : "Replies go to the customer on WhatsApp. Booking, Won/Lost and assigning arrive next.";
       body = <Conversation
         lead={lead}
         now={now}
@@ -269,8 +298,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
         salesperson={lead.assignedTo ? nameOf(lead.assignedTo) : "Not assigned yet"}
         viewer={viewer}
         nameOf={nameOf}
-        readOnly={!writable || !canReply(viewer, lead, members)}
-        readOnlyNote={live ? "Read only for now — replying from the CRM arrives next" : undefined}
+        readOnly={!writable || !mayReply}
+        readOnlyNote={liveNote}
+        canCompose={writable ? mayReply : mayReply && !windowShut}
+        composer={live ? { textOnly: true, sending, error: sendError } : undefined}
         moveTo={writable && assignsAds(viewer) ? allTeams(members) : undefined}
         onMoveTeam={tlId => sendToTeam(lead.id, tlId)}
         reassignTo={writable && canReassign(viewer, lead, members) ? teamHandlers(lead.teamId ?? teamOf(lead.assignedTo ?? "", members) ?? "", members) : undefined}
@@ -286,11 +317,11 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
           status: statusAfterReply(l.status),
           messages: [...l.messages, reply(l, { text: "", attachment })],
         }))}
-        onSend={text => updateLead(lead.id, l => ({
+        onSend={text => (live ? sendLive(lead.id, text) : updateLead(lead.id, l => ({
           ...l,
           status: statusAfterReply(l.status),
           messages: [...l.messages, reply(l, { text })],
-        }))}
+        })))}
         onCustomerMessage={text => updateLead(lead.id, l => {
           const message: CrmMessage = { id: crypto.randomUUID(), from: "lead", text, at: new Date().toISOString() };
           const received = receiveCustomerMessage(l, message);
@@ -585,7 +616,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   );
 }
 
-function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, readOnly, readOnlyNote, reassignTo, onReassign, moveTo, onMoveTeam, onBack, onOpenAppointment, onStatus, onSend, onAttachment, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
+function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, readOnly, readOnlyNote, canCompose, composer, reassignTo, onReassign, moveTo, onMoveTeam, onBack, onOpenAppointment, onStatus, onSend, onAttachment, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
   lead: CrmLead;
   now: Date;
   appointments: CrmAppointment[];
@@ -597,6 +628,10 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
   readOnly: boolean;
   /** Why it is read only when it is not the Boss/HOD rule (live data before sending is built). */
   readOnlyNote?: string;
+  /** Whether the reply box shows, when that differs from readOnly (live: replying works, the rest does not yet). */
+  canCompose?: boolean;
+  /** Live: text only, the send in flight, and why the last one failed. */
+  composer?: { textOnly: boolean; sending: boolean; error: string };
   /** The team's people, when the viewer is its TL and may hand the lead to someone else. */
   reassignTo?: CrmMember[];
   onReassign: (memberId: string) => void;
@@ -606,7 +641,7 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
   onBack: () => void;
   onOpenAppointment: (id: string) => void;
   onStatus: (status: CrmStatus, lost?: CrmLost) => void;
-  onSend: (text: string) => void;
+  onSend: (text: string) => void | Promise<boolean>;
   onAttachment: (attachment: CrmAttachment) => void;
   onCustomerMessage: (text: string) => void;
   booking: boolean;
@@ -723,7 +758,8 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
             {m.attachment?.kind === "video" && <video className={c.media} src={m.attachment.url} controls playsInline preload="metadata" />}
             {m.attachment?.kind === "audio" && <span className={c.voice}><Icon name="mic" size={16} /><audio src={m.attachment.url} controls preload="metadata" />{m.attachment.seconds ? <small>{clipLength(m.attachment.seconds)}</small> : null}</span>}
             {m.text && <p>{m.text}</p>}
-            <span>{whenLabel(m.at)}</span>
+            <span>{whenLabel(m.at)}{m.status && m.status !== "failed" && <> · {m.status === "sent" ? "✓" : m.status === "delivered" ? "✓✓" : "✓✓ Read"}</>}</span>
+            {m.status === "failed" && <small className={c.failedTag} role="status">Not delivered{m.error ? ` — ${m.error}` : ""}</small>}
           </div>
         ))}
       </div>
@@ -754,7 +790,7 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
         ? <BookingSheet title="Book appointment" confirmLabel="Confirm" busy={busy()} onCancel={() => onBooking(false)} onConfirm={(r, start) => onBook(r, start)} />
         : <button className={`${s.button} ${s.primary} ${s.full}`} onClick={() => onBooking(true)}><Icon name="calendar" /> Book appointment</button>)}
 
-      {!readOnly && <MemberCrmComposer placeholder={`Reply to ${lead.name.split(" ")[0]}…`} onText={onSend} onAttachment={onAttachment} />}
+      {(canCompose ?? !readOnly) && <MemberCrmComposer placeholder={`Reply to ${lead.name.split(" ")[0]}…`} onText={onSend} onAttachment={onAttachment} {...composer} />}
 
       {/* Demo only: stands in for a message arriving from the customer. */}
       {!readOnly && <details className={c.demoTool}>

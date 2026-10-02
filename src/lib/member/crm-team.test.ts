@@ -55,6 +55,12 @@ describe("who sees and does what", () => {
     expect(ids(visibleLeads(who("boss"), members, leads))).toEqual(["x", "y", "w"]);
   });
 
+  it("shows the Boss and HOD every lead, even one whose line does not reach them (as the database does)", () => {
+    const orphan = [{ id: "o", assignedTo: "nobody-above" }];
+    expect(ids(visibleLeads(who("hod"), members, orphan))).toEqual(["o"]);
+    expect(ids(visibleLeads(who("tla"), members, orphan))).toEqual([]);
+  });
+
   it("shows enquiries no team has taken to the Boss and HOD only", () => {
     const leads = [{ id: "u" }, { id: "x", assignedTo: "a1" }];
     expect(ids(visibleLeads(who("hod"), members, leads))).toEqual(["u", "x"]);

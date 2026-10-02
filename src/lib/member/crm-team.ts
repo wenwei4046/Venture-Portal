@@ -96,10 +96,12 @@ export function visibleTeams(viewer: CrmMember, members: CrmMember[]): CrmMember
 
 /**
  * Leads the viewer may open: those assigned to anyone they can see; for the
- * TL and anyone above, their teams' enquiries still waiting to be assigned;
- * and for the Boss and HOD, enquiries no team has taken yet.
+ * TL and anyone above, their teams' enquiries still waiting to be assigned.
+ * The Boss and HOD see EVERY lead — whether or not each person's reporting
+ * line reaches them — exactly as the database's crm_contacts policy does.
  */
 export function visibleLeads<L extends Pick<CrmLead, "assignedTo" | "teamId">>(viewer: CrmMember, members: CrmMember[], leads: L[]): L[] {
+  if (assignsAds(viewer)) return leads;
   const ids = new Set(visibleMembers(viewer, members).map(m => m.id));
   return leads.filter(l => (l.assignedTo ? ids.has(l.assignedTo) : l.teamId ? ids.has(l.teamId) : assignsAds(viewer)));
 }

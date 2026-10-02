@@ -14,10 +14,17 @@ const EMOJIS = ["😊", "😄", "🙏", "👍", "👌", "🙌", "👏", "💪", 
  * and a round 🎤 for a voice message that turns into Send once you type.
  * Voice: tap to record, the arrow sends it, × throws it away.
  */
-export default function MemberCrmComposer({ placeholder, onText, onAttachment }: {
+export default function MemberCrmComposer({ placeholder, onText, onAttachment, textOnly = false, sending = false, error = "" }: {
   placeholder: string;
-  onText: (text: string) => void;
+  /** May return whether it went: the draft is kept when it did not, so nothing typed is lost. */
+  onText: (text: string) => void | Promise<boolean>;
   onAttachment: (attachment: CrmAttachment) => void;
+  /** Text only (live, until photos and voice can be sent through WhatsApp). */
+  textOnly?: boolean;
+  /** A send is on its way: the bar waits. */
+  sending?: boolean;
+  /** Why the last send failed, from the caller. */
+  error?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -41,7 +48,12 @@ export default function MemberCrmComposer({ placeholder, onText, onAttachment }:
   // Never leave the microphone on when the chat closes.
   useEffect(() => () => recorder.current?.stream.getTracks().forEach(t => t.stop()), []);
 
-  const send = () => { const text = draft.trim(); if (text) { onText(text); setDraft(""); setEmojiOpen(false); } };
+  const send = async () => {
+    const text = draft.trim();
+    if (!text || sending) return;
+    const went = await onText(text);
+    if (went !== false) { setDraft(""); setEmojiOpen(false); }
+  };
 
   /** Put the emoji where the cursor is, not always at the end. */
   function addEmoji(emoji: string) {
@@ -99,7 +111,7 @@ export default function MemberCrmComposer({ placeholder, onText, onAttachment }:
 
   return (
     <div className={c.composerWrap}>
-      {problem && <p className={c.composerProblem} role="alert">{problem}</p>}
+      {(error || problem) && <p className={c.composerProblem} role="alert">{error || problem}</p>}
       {emojiOpen && !recording && <div className={c.emojiTray} role="group" aria-label="Emoji">
         {EMOJIS.map(e => <button key={e} onClick={() => addEmoji(e)} aria-label={`Add ${e}`}>{e}</button>)}
       </div>}
@@ -118,15 +130,15 @@ export default function MemberCrmComposer({ placeholder, onText, onAttachment }:
           </>
         ) : (
           <>
-            <button className={c.waIcon} onClick={() => galleryRef.current?.click()} aria-label="Send a photo or video"><Icon name="plus" size={26} /></button>
+            {!textOnly && <button className={c.waIcon} onClick={() => galleryRef.current?.click()} aria-label="Send a photo or video"><Icon name="plus" size={26} /></button>}
             <div className={c.waField}>
-              <input ref={textRef} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") send(); }}
+              <input ref={textRef} value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void send(); }} disabled={sending}
                 placeholder={placeholder} aria-label="Reply" />
               <button className={c.waInside} onClick={() => setEmojiOpen(v => !v)} aria-label="Emoji" aria-expanded={emojiOpen}><Icon name={emojiOpen ? "close" : "smile"} size={22} /></button>
             </div>
-            <button className={c.waIcon} onClick={() => cameraRef.current?.click()} aria-label="Take a photo or video"><Icon name="camera" size={24} /></button>
-            {draft.trim()
-              ? <button className={c.waRound} onClick={send} aria-label="Send"><Icon name="arrow" size={22} /></button>
+            {!textOnly && <button className={c.waIcon} onClick={() => cameraRef.current?.click()} aria-label="Take a photo or video"><Icon name="camera" size={24} /></button>}
+            {draft.trim() || textOnly
+              ? <button className={c.waRound} onClick={() => void send()} disabled={!draft.trim() || sending} aria-label={sending ? "Sending" : "Send"}><Icon name="arrow" size={22} /></button>
               : <button className={c.waRound} onClick={startRecording} aria-label="Record a voice message"><Icon name="mic" size={22} /></button>}
           </>
         )}

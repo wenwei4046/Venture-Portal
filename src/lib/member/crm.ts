@@ -102,6 +102,10 @@ export interface CrmMessage {
   attachment?: CrmAttachment;
   /** A team leader or the Boss who replied in a downline's chat (their member id) — shown as "Replied by …". */
   by?: string;
+  /** Live: what WhatsApp says happened to a message we sent (the webhook moves it forward). */
+  status?: "sent" | "delivered" | "read" | "failed";
+  /** Live: why WhatsApp could not deliver it. */
+  error?: string;
 }
 
 export interface CrmAttachment {
@@ -184,6 +188,8 @@ export interface CrmLead {
   assignedTo?: string;
   /** The TL whose team took the enquiry. */
   teamId?: string;
+  /** Live: the customer's latest message — WhatsApp's 24-hour window for free replies runs from it. */
+  lastCustomerAt?: string;
   campaign: string;
   status: CrmStatus;
   lost?: CrmLost; // set exactly while status is Lost

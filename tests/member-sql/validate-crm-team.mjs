@@ -31,7 +31,7 @@ await db.exec(`
     title_id uuid references public.titles(id), reports_to uuid references public.hr_staff_costs(id), status text not null default 'active');
   grant usage on schema public to anon, authenticated, service_role;
 `)
-for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql', '20261002100000_crm_people.sql']) {
+for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql', '20261002100000_crm_people.sql', '20261002110000_crm_reply.sql']) {
   await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), 'utf8'))
 }
 
@@ -153,7 +153,36 @@ check(await crmPeople('zed'), { me: id('s', 'zed'), role: null, people: [] }, 'n
 check(await crmPeople(null), { me: null, role: null, people: [] }, 'not linked: nothing')
 check(Object.keys((await crmPeople('tla')).people[0]).sort(), ['fullTime', 'id', 'name', 'role', 'uplineId'], 'nothing else about a person — no salary, no contact details')
 
-// 10. The WhatsApp ingest still works beside the new columns: a new customer arrives with no team.
+// 10. Replying: the customer's own person and their uplines who reply — never the Boss or HOD, never a peer.
+const canReply = async (who, contact) => (await as(who, `select public.crm_can_reply('${contact}') as ok`))[0].ok
+check([await canReply('amir', c.amir), await canReply('taa', c.amir), await canReply('tla', c.amir)], [true, true, true], 'the RS, their TA and their TL may reply')
+check([await canReply('ann', c.amir), await canReply('tlb', c.amir)], [false, false], 'a peer or another TL may not')
+check([await canReply('hod', c.amir), await canReply('boss', c.amir)], [false, false], 'the Boss and HOD read, they do not reply')
+check([await canReply('tla', c.waitingA), await canReply('taa', c.waitingA)], [true, false], 'a waiting enquiry is its TL’s until assigned')
+check(await canReply('hod', c.noTeam), false, 'nobody replies to an enquiry no team took')
+check(await canReply('zed', c.ben), false, 'no CRM role, no reply')
+
+const record = async (who, contact, wamid, body = 'Hello!') => (await as(who, `select public.crm_record_reply('${contact}', '${wamid}', '${body}') as r`))[0].r
+const sent = await record('amir', c.amir, 'wamid.out.amir')
+check({ direction: sent.direction, status: sent.status, body: sent.body, sent_by: sent.sent_by }, { direction: 'out', status: 'sent', body: 'Hello!', sent_by: id('s', 'amir') }, 'a reply is kept as sent, by whom')
+check((await q(`select status, unread, last_reply_at is not null as replied from crm_contacts where id = $1`, [c.amir]))[0], { status: 'follow_up', unread: 0, replied: true }, 'a New customer moves to Follow up and is read')
+await q(`update crm_contacts set unread = 3 where id = $1`, [c.amir])
+await record('tla', c.amir, 'wamid.out.tla')
+check((await q(`select unread from crm_contacts where id = $1`, [c.amir]))[0].unread, 3, 'the TL replying for Amir leaves Amir’s unread as it was')
+check((await q(`select sent_by from crm_messages where external_id = 'wamid.out.tla'`))[0].sent_by, id('s', 'tla'), 'the TL’s reply is the TL’s')
+await record('amir', c.amir, 'wamid.out.amir')
+check(Number((await q(`select count(*) from crm_messages where external_id = 'wamid.out.amir'`))[0].count), 1, 'the same Meta id is kept once')
+for (const [who, contact, what] of [['hod', c.amir, 'the HOD'], ['ann', c.amir, 'a peer'], ['zed', c.ben, 'someone with no role']]) {
+  await assert.rejects(() => record(who, contact, `wamid.no.${who}`), /may not reply/, `${what} cannot record a reply`)
+  checks++
+}
+await assert.rejects(() => record('amir', c.amir, ''), /needs Meta/, 'a reply without Meta’s id is refused'); checks++
+// Writing still goes only through the function.
+await db.exec(`set test.uid = '${id('u', 'amir')}'; set role authenticated`)
+await assert.rejects(() => q(`insert into crm_messages (contact_id, direction, body) values ('${c.amir}', 'out', 'x')`), /permission denied/, 'no direct insert'); checks++
+await db.exec(`reset role`)
+
+// 11. The WhatsApp ingest still works beside the new columns: a new customer arrives with no team.
 await db.exec(`set role service_role`)
 await q(`select public.crm_ingest_whatsapp($1::jsonb, '[]'::jsonb, 0, '{}'::jsonb)`, [JSON.stringify([{
   externalId: 'wamid.x', phoneNumberId: 'PN1', waId: '60111', name: 'New', kind: 'text', body: 'Hi',

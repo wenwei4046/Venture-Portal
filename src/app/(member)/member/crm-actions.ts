@@ -3,7 +3,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getMemberUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { crmFromRows, type CrmLiveData, type CrmPeopleRow, type CrmRows } from "@/lib/member/crm-live";
+import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type CrmPeopleRow, type CrmRows } from "@/lib/member/crm-live";
+import type { CrmMessage } from "@/lib/member/crm";
+import { cleanText, sendWhatsAppText, windowOpen } from "@/lib/whatsapp/send";
 
 /**
  * The CRM's live read: everything the signed-in person may see, read under
@@ -25,8 +27,8 @@ export async function fetchCrm(): Promise<{ ok: true; data: CrmLiveData } | { ok
     // Independent reads start together.
     const [people, contacts, messages, appointments, rules, teams] = await Promise.all([
       read<CrmPeopleRow>(db.rpc("crm_people")),
-      read<CrmRows["contacts"]>(db.from("crm_contacts").select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, unread, created_at")),
-      read<CrmRows["messages"]>(db.from("crm_messages").select("id, contact_id, direction, kind, body, auto, sent_by, sent_at").order("sent_at")),
+      read<CrmRows["contacts"]>(db.from("crm_contacts").select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at")),
+      read<CrmRows["messages"]>(db.from("crm_messages").select("id, contact_id, direction, kind, body, auto, sent_by, sent_at, status, error").order("sent_at")),
       read<CrmRows["appointments"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state")),
       read<CrmRows["rules"]>(db.from("crm_assign_rules").select("ad_source_id, ad_label, tl_ids")),
       read<CrmRows["teams"]>(db.from("crm_team_settings").select("tl_id, team_share, weekday, ratios, edited_by, edited_at")),
@@ -40,5 +42,49 @@ export async function fetchCrm(): Promise<{ ok: true; data: CrmLiveData } | { ok
         ? "The CRM is not set up for this account yet. Ask your administrator."
         : message.slice(0, 250),
     };
+  }
+}
+
+/**
+ * Reply to a WhatsApp customer from the CRM. Under the member's own session:
+ * the database says whether they may reply (crm_can_reply) BEFORE anything
+ * leaves; the server sends it with the token (never the browser's); the
+ * database records it with Meta's id (crm_record_reply), asking again.
+ */
+export async function sendCrmReply(contactId: string, text: string): Promise<{ ok: true; message: CrmMessage } | { ok: false; error: string }> {
+  try {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    if (!/^[0-9a-f-]{36}$/i.test(contactId)) throw new Error("Choose a customer first.");
+    const clean = cleanText(text);
+    if (!clean.ok) throw new Error(clean.error);
+
+    const db = (await createClient()) as unknown as SupabaseClient;
+    // Read under row level security: a customer the member cannot see is "not found", never a hint it exists.
+    const { data: contact, error: readError } = await db.from("crm_contacts")
+      .select("id, channel, account_id, external_id, assigned_to, last_customer_at").eq("id", contactId).maybeSingle();
+    if (readError) throw new Error(readError.message);
+    if (!contact) throw new Error("That customer is not in your CRM.");
+    if (contact.channel !== "whatsapp") throw new Error("Replying on Messenger arrives later.");
+    if (!windowOpen(contact.last_customer_at)) throw new Error("More than 24 hours since the customer's last message — WhatsApp only allows an approved template now.");
+
+    const { data: allowed, error: checkError } = await db.rpc("crm_can_reply", { p_contact: contactId });
+    if (checkError) throw new Error(checkError.message);
+    if (allowed !== true) throw new Error("You may not reply to this customer.");
+
+    const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+    if (!token) throw new Error("WhatsApp is not connected on this server yet. Ask your administrator.");
+    const sent = await sendWhatsAppText({ phoneNumberId: contact.account_id, to: contact.external_id, body: clean.text, token });
+    if (!sent.ok) throw new Error(sent.error);
+
+    const { data: row, error: recordError } = await db.rpc("crm_record_reply", { p_contact: contactId, p_external_id: sent.wamid, p_body: clean.text });
+    if (recordError || !row) {
+      // It DID reach the customer; say so, so nobody sends it twice.
+      return { ok: false, error: "Sent to the customer on WhatsApp, but it could not be saved here. Reload before sending again." };
+    }
+    return { ok: true, message: messageFromRow(row as CrmMessageRow, contact.assigned_to) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The message could not be sent. Please try again.";
+    return { ok: false, error: /permission denied|42501/i.test(message) ? "You may not reply to this customer." : message.slice(0, 250) };
   }
 }
