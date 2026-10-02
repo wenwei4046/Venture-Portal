@@ -83,7 +83,11 @@ function groupBatches(rows: VoucherRow[]): { plain: VoucherRow[]; batches: Batch
 export default function VouchersTable({
   rows,
   collapseBatches = true,
+  layoutId = 'payments.vouchers',
 }: {
+  /** Names the table for the saved column layout — Payments and Receipts
+   *  are arranged separately. */
+  layoutId?: string
   rows: VoucherRow[]
   /** false = render every row flat (used for the expanded members and when a
    *  text search is active, so a searched-for person is not hidden). */
@@ -128,7 +132,7 @@ export default function VouchersTable({
                 </button>
                 {open ? (
                   <div className="px-3 pb-3 pt-1 bg-paper">
-                    <VouchersTable rows={b.members} collapseBatches={false} />
+                    <VouchersTable rows={b.members} collapseBatches={false} layoutId={layoutId} />
                   </div>
                 ) : null}
               </div>
@@ -138,6 +142,7 @@ export default function VouchersTable({
       ) : null}
       {plain.length === 0 && batches.length > 0 ? null : (
         <SortableTable<VoucherRow>
+      layoutId={layoutId}
       rows={plain}
       getRowKey={(v) => v.id}
       // Date (not voucher #) so unnumbered synthetic rows interleave
@@ -225,6 +230,7 @@ export default function VouchersTable({
         },
         {
           key: 'action',
+          pinned: 'end',
           label: '',
           sortable: false,
           align: 'right',

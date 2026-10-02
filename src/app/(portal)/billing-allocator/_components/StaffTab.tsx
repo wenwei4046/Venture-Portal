@@ -483,6 +483,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
       {/* List — SortableTable: search, click-to-sort headers, newest first.
           Active only by default; the toggle reveals inactive. */}
       <SortableTable
+        layoutId="billing-allocator.staff"
         rows={showInactive ? data.staff : data.staff.filter((s) => s.status === 'active')}
         getRowKey={(s) => s.id}
         defaultSort={{ key: 'added', dir: 'desc' }}
@@ -595,6 +596,7 @@ function staffColumns(
     },
     {
       key: 'actions',
+      pinned: 'end',
       label: '',
       sortable: false,
       align: 'right',

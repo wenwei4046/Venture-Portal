@@ -24,6 +24,7 @@ function StatementStatus({ status }: { status: string }) {
 export default function StatementsPeriodTable({ rows }: { rows: StatementRow[] }) {
   return (
     <SortableTable<StatementRow>
+      layoutId="statements.period"
       rows={rows}
       getRowKey={(s) => s.id}
       defaultSort={{ key: 'netAmount', dir: 'desc' }}
@@ -77,6 +78,7 @@ export default function StatementsPeriodTable({ rows }: { rows: StatementRow[] }
         },
         {
           key: 'action',
+          pinned: 'end',
           label: '',
           sortable: false,
           align: 'right',

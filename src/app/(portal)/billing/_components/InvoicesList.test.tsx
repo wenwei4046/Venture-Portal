@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import InvoicesList from './InvoicesList'
 
 /**
@@ -8,18 +8,43 @@ import InvoicesList from './InvoicesList'
  * in one month used to survive into the next — invisible in the checkboxes
  * (different rows) but still counted, and 打印所选 printed the old ids.
  */
-const { push, refresh } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }))
-vi.mock('../actions', () => ({ settleInvoicesConsolidated: vi.fn() }))
-vi.mock('./InvoiceActions', () => ({
-  ApproveInvoiceButton: () => null,
-  BulkIssueInvoicesButton: () => null,
-  DeleteInvoiceButton: () => null,
-  EditInvoiceButton: () => null,
+// The three dialogs are stand-ins that say which invoice they were opened for,
+// and whether they arrived open and without a trigger of their own.
+type DialogProps = { invoiceNo?: string | null; autoOpen?: boolean; hideTrigger?: boolean }
+const { push, refresh, copyInvoice, deleteDraftInvoice, dialog } = vi.hoisted(() => ({
+  push: vi.fn(),
+  refresh: vi.fn(),
+  copyInvoice: vi.fn(async (_fd: FormData) => undefined),
+  deleteDraftInvoice: vi.fn(async (_fd: FormData) => undefined),
+  dialog: (name: string) =>
+    function Dialog(p: DialogProps) {
+      return (
+        <div data-testid={name} data-auto={String(!!p.autoOpen)} data-hide={String(!!p.hideTrigger)}>
+          {p.invoiceNo}
+        </div>
+      )
+    },
 }))
-vi.mock('./CreateCreditNoteButton', () => ({ default: () => null }))
-vi.mock('./ReassignInvoiceGlButton', () => ({ default: () => null }))
-vi.mock('./CopyInvoiceButton', () => ({ default: () => null }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }))
+vi.mock('../actions', () => ({
+  settleInvoicesConsolidated: vi.fn(),
+  voidIssuedInvoices: vi.fn(),
+  copyInvoice,
+  deleteDraftInvoice,
+}))
+// The saved column layout is fetched from the browser client; here it has none.
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
+  }),
+}))
+vi.mock('./InvoiceActions', () => ({
+  ApproveInvoiceButton: ({ id }: { id: string }) => <button type="button">Approve {id}</button>,
+  BulkIssueInvoicesButton: () => null,
+  EditInvoiceButton: dialog('dialog-edit'),
+}))
+vi.mock('./CreateCreditNoteButton', () => ({ default: dialog('dialog-cn') }))
+vi.mock('./ReassignInvoiceGlButton', () => ({ default: dialog('dialog-gl') }))
 vi.mock('./InvoiceDetailButton', () => ({ default: () => null }))
 
 function invoice(id: string, invoice_no: string, period_month: string) {
@@ -91,5 +116,96 @@ describe('settling one invoice', () => {
     expect(screen.queryByTitle('就地开收据,不用离开 Billing')).toBeNull()
     const link = screen.getByText('Settle →').closest('a')
     expect(link).toHaveAttribute('href', '/payments/new?invoice_id=inv-vo&return_to=/billing')
+  })
+})
+
+// 2026-10-02: an issued invoice had six links in its Action cell. The row now
+// keeps one, and the rest are on a right-click or the ⋯.
+describe('the row menu', () => {
+  const issued = invoice('inv-1', 'INV-1', '2026-09-01')
+  const draft = { ...invoice('inv-d', 'INV-D', '2026-09-01'), status: 'draft' }
+  const paid = { ...invoice('inv-p', 'INV-P', '2026-09-01'), status: 'paid' }
+  const row = (no: string) => screen.getByLabelText(`Select ${no}`).closest('tr') as HTMLElement
+  const firstRow = () => document.querySelector('tbody tr') as HTMLElement
+  const menuLabels = () => within(screen.getByRole('menu')).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)
+
+  it('leaves one action and a ⋯ on the row', () => {
+    render(list('2026-09-01', [issued]))
+    const cells = within(row('INV-1'))
+    expect(cells.getByText('Settle →')).toBeInTheDocument()
+    expect(cells.getByRole('button', { name: 'Actions for INV-1' })).toBeInTheDocument()
+    for (const gone of ['PDF', 'Copy', '+ Credit note', '改 account', '作废']) {
+      expect(cells.queryByText(gone)).toBeNull()
+    }
+  })
+
+  it('a right-click offers what an issued invoice can do', () => {
+    render(list('2026-09-01', [issued]))
+    fireEvent.contextMenu(row('INV-1'))
+    expect(screen.getByRole('menu', { name: 'Actions for INV-1 · issued' })).toBeInTheDocument()
+    expect(menuLabels()).toEqual(['Settle', 'PDF', 'Copy', '+ Credit note', '改 account', '作废'])
+  })
+
+  it('…a draft', () => {
+    render(list('2026-09-01', [draft]))
+    fireEvent.contextMenu(firstRow())
+    expect(menuLabels()).toEqual(['Approve & issue', 'Edit', 'PDF', 'Copy', 'Delete'])
+  })
+
+  it('…and a paid one', () => {
+    render(list('2026-09-01', [paid]))
+    fireEvent.contextMenu(firstRow())
+    expect(menuLabels()).toEqual(['PDF', 'Copy', 'Refund', '+ Credit note', '改 account'])
+  })
+
+  it('the ⋯ opens the same menu', () => {
+    render(list('2026-09-01', [issued]))
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for INV-1' }))
+    expect(menuLabels()).toContain('+ Credit note')
+  })
+
+  it('opens a dialog for the row that asked, already open and with no trigger of its own', () => {
+    render(list('2026-09-01', [issued, { ...invoice('inv-2', 'INV-2', '2026-09-01') }]))
+    expect(screen.queryByTestId('dialog-cn')).toBeNull() // not mounted per row any more
+    fireEvent.contextMenu(row('INV-2'))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Credit note/ }))
+    const cn = screen.getByTestId('dialog-cn')
+    expect(cn).toHaveTextContent('INV-2')
+    expect(cn.dataset.auto).toBe('true')
+    expect(cn.dataset.hide).toBe('true')
+    expect(screen.queryByRole('menu')).toBeNull() // the menu closed
+
+    fireEvent.contextMenu(row('INV-1'))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /改 account/ }))
+    expect(screen.getByTestId('dialog-gl')).toHaveTextContent('INV-1')
+    expect(screen.queryByTestId('dialog-cn')).toBeNull()
+  })
+
+  it('Delete asks first and only then deletes', async () => {
+    const ask = vi.fn(() => false)
+    vi.stubGlobal('confirm', ask)
+    render(list('2026-09-01', [draft]))
+    fireEvent.contextMenu(firstRow())
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Delete/ }))
+    expect(ask).toHaveBeenCalledTimes(1)
+    expect(deleteDraftInvoice).not.toHaveBeenCalled()
+
+    ask.mockReturnValue(true)
+    fireEvent.contextMenu(firstRow())
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Delete/ }))
+    await waitFor(() => expect(deleteDraftInvoice).toHaveBeenCalledTimes(1))
+    expect(deleteDraftInvoice.mock.calls[0]![0].get('id')).toBe('inv-d')
+    vi.unstubAllGlobals()
+  })
+
+  it('says so on the page when an action from the menu fails', async () => {
+    const ask = vi.fn(() => true)
+    vi.stubGlobal('confirm', ask)
+    copyInvoice.mockRejectedValueOnce(new Error('Period is locked'))
+    render(list('2026-09-01', [issued]))
+    fireEvent.contextMenu(row('INV-1'))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Copy/ }))
+    expect(await screen.findByText('INV-1: Period is locked')).toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 })

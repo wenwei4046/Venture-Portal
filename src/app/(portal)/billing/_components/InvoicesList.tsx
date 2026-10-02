@@ -6,14 +6,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
-import { ApproveInvoiceButton, BulkIssueInvoicesButton, DeleteInvoiceButton, EditInvoiceButton } from './InvoiceActions'
+import { ApproveInvoiceButton, BulkIssueInvoicesButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
 import ReassignInvoiceGlButton from './ReassignInvoiceGlButton'
-import CopyInvoiceButton from './CopyInvoiceButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable from '@/components/SortableTable'
+import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
 import type { AccountType } from '@/lib/coa'
-import { settleInvoicesConsolidated, voidIssuedInvoices } from '../actions'
+import { copyInvoice, deleteDraftInvoice, settleInvoicesConsolidated, voidIssuedInvoices } from '../actions'
 import { payeeKey } from '@/lib/invoice-settlement'
 
 interface Invoice {
@@ -337,6 +337,98 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
     if (inv.status === 'draft') draftCount++
   }
 
+  // ─── The row menu (2026-10-02) ────────────────────────────────────────────
+  // An issued invoice had six links in its Action cell, wrapping onto two
+  // lines and doubling every row's height (user: "action 太多了,可以不可以
+  // right click,然后我才选我要的 action"). The cell keeps the ONE action a row is
+  // usually opened for; the rest are in the menu, on a right-click or the ⋯.
+  const [menu, setMenu] = useState<{ invoice: Invoice; anchor: RowMenuAnchor } | null>(null)
+  // The three actions that are dialogs are mounted here, once, for the row
+  // that asked — not in every row as before. `nonce` remounts the component so
+  // choosing the same action on the same invoice opens it again.
+  const [dialog, setDialog] = useState<{ kind: 'edit' | 'credit_note' | 'reassign'; invoice: Invoice; nonce: number } | null>(null)
+  const [rowError, setRowError] = useState<string | null>(null)
+  const openDialog = (kind: 'edit' | 'credit_note' | 'reassign', invoice: Invoice) =>
+    setDialog({ kind, invoice, nonce: Date.now() })
+
+  function copyOne(inv: Invoice) {
+    if (!confirm(`复制 ${inv.invoice_no ?? '此发票'} 为本月新草稿?复制后可在草稿里改金额/描述再 issue。`)) return
+    setRowError(null)
+    startTransition(async () => {
+      const fd = new FormData()
+      fd.set('invoice_id', inv.id)
+      try {
+        await copyInvoice(fd)
+      } catch (e) {
+        if (e instanceof Error && e.message.includes('NEXT_REDIRECT')) throw e
+        setRowError(`${inv.invoice_no ?? 'Invoice'}: ${e instanceof Error ? e.message : 'Copy failed'}`)
+      }
+    })
+  }
+  function deleteOne(inv: Invoice) {
+    if (!confirm(`Delete draft invoice ${inv.invoice_no ?? inv.id.slice(0, 8)}? This cannot be undone.`)) return
+    setRowError(null)
+    startTransition(async () => {
+      const fd = new FormData()
+      fd.set('id', inv.id)
+      try {
+        await deleteDraftInvoice(fd)
+      } catch (e) {
+        setRowError(`${inv.invoice_no ?? 'Invoice'}: ${e instanceof Error ? e.message : 'Delete failed'}`)
+      }
+    })
+  }
+  /** Everything that can be done to this invoice in its present status. */
+  function menuItems(inv: Invoice): RowMenuItem[] {
+    const items: RowMenuItem[] = []
+    if (inv.status === 'draft') {
+      items.push({
+        key: 'approve',
+        label: 'Approve & issue',
+        hint: '开出去',
+        // The row's own button does it, so its 'Issuing…' and any error show there.
+        onSelect: () => document.querySelector<HTMLButtonElement>(`[data-approve="${inv.id}"] button`)?.click(),
+      })
+      items.push({ key: 'edit', label: 'Edit', hint: '改内容', onSelect: () => openDialog('edit', inv) })
+    }
+    if (inv.status === 'issued') {
+      items.push({
+        key: 'settle',
+        label: 'Settle',
+        hint: '收钱、开收据',
+        onSelect: () =>
+          isBatchSettleable(inv) ? settleOne(inv) : router.push(`/payments/new?invoice_id=${inv.id}&return_to=/billing`),
+      })
+    }
+    items.push({
+      key: 'pdf',
+      label: 'PDF',
+      hint: '看发票',
+      onSelect: () => window.open(`/billing/invoice-doc?id=${inv.id}`, '_blank', 'noopener,noreferrer'),
+    })
+    items.push({ key: 'copy', label: 'Copy', hint: '复制成本月新草稿', onSelect: () => copyOne(inv) })
+    if (inv.status === 'paid') {
+      items.push({
+        key: 'refund',
+        label: 'Refund',
+        hint: '退款',
+        onSelect: () => router.push(`/payments/new?mode=refund&invoice_id=${inv.id}&return_to=/billing`),
+      })
+    }
+    if (inv.status !== 'draft' && inv.status !== 'voided') {
+      items.push({ key: 'credit_note', label: '+ Credit note', hint: '开 CN', onSelect: () => openDialog('credit_note', inv) })
+      items.push({ key: 'reassign', label: '改 account', hint: '换科目', onSelect: () => openDialog('reassign', inv) })
+    }
+    const last: RowMenuItem[] = []
+    if (isVoidable(inv)) {
+      last.push({ key: 'void', label: '作废', hint: '整张作废', danger: true, onSelect: () => openVoidModal([inv.id]) })
+    }
+    if (inv.status === 'draft') {
+      last.push({ key: 'delete', label: 'Delete', hint: '删掉这张 draft', danger: true, onSelect: () => deleteOne(inv) })
+    }
+    return last.length > 0 ? [...items, 'sep', ...last] : items
+  }
+
   // One invoice settles in the SAME dialog the batch uses, so Billing never
   // disappears under you (user, 2026-09-29). It cannot cover a dept_pool
   // invoice — inter-billing and own-share settle by netting on the voucher
@@ -366,6 +458,14 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 
   return (
     <section className="border-t border-hairline pt-8 mb-12">
+      {rowError ? (
+        <div className="mb-4 flex items-baseline justify-between gap-3 bg-danger-bg border border-danger text-danger rounded-md px-3 py-2">
+          <span className="font-sans text-sm">{rowError}</span>
+          <button type="button" onClick={() => setRowError(null)} className="font-sans text-xs opacity-70 hover:opacity-100">
+            知道了
+          </button>
+        </div>
+      ) : null}
       {returnedReceipt ? (
         <div className="mb-4 flex items-baseline justify-between gap-3 border border-ledger/40 bg-ledger/10 text-ledger rounded-md px-3 py-2">
           <span className="font-sans text-sm">收据 {returnedReceipt} 已开 — 发票结清。</span>
@@ -426,6 +526,11 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
+              layoutId="billing.invoices"
+              onRowContextMenu={(inv, e) => {
+                e.preventDefault()
+                setMenu({ invoice: inv, anchor: { x: e.clientX, y: e.clientY } })
+              }}
               rows={displayRows}
               getRowKey={(inv) => inv.id}
               defaultSort={{ key: 'invoice_no', dir: 'desc' }}
@@ -507,6 +612,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: '_select',
                   label: '',
                   sortable: false,
+                  pinned: 'start',
+                  resizable: false,
                   render: (inv) => {
                     const settleable = isBatchSettleable(inv)
                     const selectable = settleable || isVoidable(inv)
@@ -637,117 +744,121 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   label: 'Action',
                   sortable: false,
                   align: 'right',
-                  render: (inv) => {
-                    const labels = resolvePartyLabel(inv, companyMap, departmentMap)
-                    return (
-                      <div className="flex items-center justify-end gap-3">
-                        <Link
-                          href={`/billing/invoice-doc?id=${inv.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-graphite hover:text-accent font-serif italic"
-                          title="Download single-invoice PDF"
-                        >
-                          PDF
-                        </Link>
-                        <CopyInvoiceButton id={inv.id} invoiceNo={inv.invoice_no} />
-                        {inv.status === 'draft' ? (
-                          <>
-                            <EditInvoiceButton
-                              id={inv.id}
-                              invoiceNo={inv.invoice_no}
-                              initial={{
-                                total_amount: Number(inv.total_amount),
-                                category_code: inv.category_code ?? null,
-                                description: inv.description ?? null,
-                                invoice_date: inv.invoice_date ?? null,
-                                due_date: inv.due_date ?? null,
-                                reference_no: inv.reference_no ?? null,
-                                billing_mode: inv.billing_mode ?? null,
-                                billable_to_type: inv.billable_to_type ?? null,
-                                company_id: inv.company_id ?? null,
-                                billable_to_department_id: inv.billable_to_department_id ?? null,
-                                billable_to_freetext_name: inv.billable_to_freetext_name ?? null,
-                                billable_to_freetext_address: inv.billable_to_freetext_address ?? null,
-                                billable_to_freetext_phone: inv.billable_to_freetext_phone ?? null,
-                                billable_to_freetext_email: inv.billable_to_freetext_email ?? null,
-                                period_month: inv.period_month ?? null,
-                              }}
-                              initialLines={invoiceLines[inv.id] ?? []}
-                              categories={categories ?? []}
-                              companies={Array.from(companyMap, ([cid, c]) => ({ id: cid, name: c.name }))}
-                              departments={Array.from(departmentMap, ([did, dname]) => ({ id: did, name: dname }))}
-                            />
-                            <DeleteInvoiceButton id={inv.id} invoiceNo={inv.invoice_no} />
-                            <ApproveInvoiceButton id={inv.id} />
-                          </>
-                        ) : inv.status === 'issued' ? (
-                          isBatchSettleable(inv) ? (
-                            <button
-                              type="button"
-                              onClick={() => settleOne(inv)}
-                              className="text-xs text-accent hover:text-accent-hover font-serif italic"
-                              title="就地开收据,不用离开 Billing"
-                            >
-                              Settle →
-                            </button>
-                          ) : (
-                            <Link
-                              href={`/payments/new?invoice_id=${inv.id}&return_to=/billing`}
-                              className="text-xs text-accent hover:text-accent-hover font-serif italic"
-                              title="部门间结算走冲账凭单,开好会带你回来"
-                            >
-                              Settle →
-                            </Link>
-                          )
-                        ) : inv.status === 'paid' ? (
-                          <Link
-                            href={`/payments/new?mode=refund&invoice_id=${inv.id}&return_to=/billing`}
-                            className="text-xs text-muted hover:text-danger font-serif italic"
-                            title="退款:开一张 debit PV 把已收的钱退回去(正常审批流程)"
-                          >
-                            Refund →
-                          </Link>
-                        ) : null}
-                        {inv.status !== 'draft' && inv.status !== 'voided' ? (
-                          <>
-                            <CreateCreditNoteButton
-                              invoiceId={inv.id}
-                              invoiceNo={inv.invoice_no}
-                              invoiceTotal={Number(inv.total_amount)}
-                              payeeLabel={labels.primary}
-                              categories={categories}
-                              extraModes={extraModes}
-                            />
-                            <ReassignInvoiceGlButton
-                              invoiceId={inv.id}
-                              invoiceNo={inv.invoice_no}
-                              currentCategory={inv.category_code ?? null}
-                              categories={categories.map((c) => ({ code: c.code, label: c.label }))}
-                              postedAccounts={postedAccountsOf(inv.id)}
-                            />
-                          </>
-                        ) : null}
-                        {isVoidable(inv) ? (
+                  pinned: 'end',
+                  render: (inv) => (
+                    <div className="flex items-center justify-end gap-2">
+                      {/* The one action this row is usually opened for. */}
+                      {inv.status === 'draft' ? (
+                        <span data-approve={inv.id}>
+                          <ApproveInvoiceButton id={inv.id} />
+                        </span>
+                      ) : inv.status === 'issued' ? (
+                        isBatchSettleable(inv) ? (
                           <button
                             type="button"
-                            onClick={() => openVoidModal([inv.id])}
-                            disabled={isPending}
-                            className="text-xs text-muted hover:text-danger font-serif italic disabled:opacity-50"
-                            title="作废：冲掉开票的账，单号保留，状态变 voided"
+                            onClick={() => settleOne(inv)}
+                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                            title="就地开收据,不用离开 Billing"
                           >
-                            作废
+                            Settle →
                           </button>
-                        ) : null}
-                      </div>
-                    )
-                  },
+                        ) : (
+                          <Link
+                            href={`/payments/new?invoice_id=${inv.id}&return_to=/billing`}
+                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                            title="部门间结算走冲账凭单,开好会带你回来"
+                          >
+                            Settle →
+                          </Link>
+                        )
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-haspopup="menu"
+                        aria-label={`Actions for ${inv.invoice_no ?? 'invoice'}`}
+                        title="更多动作 — 也可以在这一行按右键"
+                        onClick={(e) => {
+                          const r = e.currentTarget.getBoundingClientRect()
+                          setMenu({ invoice: inv, anchor: { x: r.right - 220, y: r.bottom + 4 } })
+                        }}
+                        className="grid place-items-center h-7 w-7 rounded-md border border-transparent text-graphite text-base leading-none hover:border-hairline hover:bg-surface"
+                      >
+                        ⋯
+                      </button>
+                    </div>
+                  ),
                 },
               ]}
             />
           </div>
         </>
       )}
+
+      {menu ? (
+        <RowMenu
+          title={`${menu.invoice.invoice_no ?? 'Invoice'} · ${menu.invoice.status}`}
+          anchor={menu.anchor}
+          items={menuItems(menu.invoice)}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
+
+      {/* The dialogs the menu opens — one instance, for the row that asked. */}
+      {dialog?.kind === 'edit' ? (
+        <EditInvoiceButton
+          key={`edit:${dialog.invoice.id}:${dialog.nonce}`}
+          autoOpen
+          hideTrigger
+          id={dialog.invoice.id}
+          invoiceNo={dialog.invoice.invoice_no}
+          initial={{
+            total_amount: Number(dialog.invoice.total_amount),
+            category_code: dialog.invoice.category_code ?? null,
+            description: dialog.invoice.description ?? null,
+            invoice_date: dialog.invoice.invoice_date ?? null,
+            due_date: dialog.invoice.due_date ?? null,
+            reference_no: dialog.invoice.reference_no ?? null,
+            billing_mode: dialog.invoice.billing_mode ?? null,
+            billable_to_type: dialog.invoice.billable_to_type ?? null,
+            company_id: dialog.invoice.company_id ?? null,
+            billable_to_department_id: dialog.invoice.billable_to_department_id ?? null,
+            billable_to_freetext_name: dialog.invoice.billable_to_freetext_name ?? null,
+            billable_to_freetext_address: dialog.invoice.billable_to_freetext_address ?? null,
+            billable_to_freetext_phone: dialog.invoice.billable_to_freetext_phone ?? null,
+            billable_to_freetext_email: dialog.invoice.billable_to_freetext_email ?? null,
+            period_month: dialog.invoice.period_month ?? null,
+          }}
+          initialLines={invoiceLines[dialog.invoice.id] ?? []}
+          categories={categories ?? []}
+          companies={Array.from(companyMap, ([cid, c]) => ({ id: cid, name: c.name }))}
+          departments={Array.from(departmentMap, ([did, dname]) => ({ id: did, name: dname }))}
+        />
+      ) : null}
+      {dialog?.kind === 'credit_note' ? (
+        <CreateCreditNoteButton
+          key={`cn:${dialog.invoice.id}:${dialog.nonce}`}
+          autoOpen
+          hideTrigger
+          invoiceId={dialog.invoice.id}
+          invoiceNo={dialog.invoice.invoice_no}
+          invoiceTotal={Number(dialog.invoice.total_amount)}
+          payeeLabel={resolvePartyLabel(dialog.invoice, companyMap, departmentMap).primary}
+          categories={categories}
+          extraModes={extraModes}
+        />
+      ) : null}
+      {dialog?.kind === 'reassign' ? (
+        <ReassignInvoiceGlButton
+          key={`gl:${dialog.invoice.id}:${dialog.nonce}`}
+          autoOpen
+          hideTrigger
+          invoiceId={dialog.invoice.id}
+          invoiceNo={dialog.invoice.invoice_no}
+          currentCategory={dialog.invoice.category_code ?? null}
+          categories={categories.map((c) => ({ code: c.code, label: c.label }))}
+          postedAccounts={postedAccountsOf(dialog.invoice.id)}
+        />
+      ) : null}
 
       {/* Batch-settle modal */}
       {showSettleModal ? (

@@ -331,6 +331,7 @@ export default async function VoucherLedger({
           ) : (
             <div className="overflow-x-auto">
               <VouchersTable
+                layoutId={isReceipts ? 'receipts.vouchers' : 'payments.vouchers'}
                 rows={[...filtered.map<VoucherRow>((v) => {
                   const cats = categoriesByVoucher.get(v.id) ?? []
                   // 还款 · prefix keeps repayment PVs recognizable (and

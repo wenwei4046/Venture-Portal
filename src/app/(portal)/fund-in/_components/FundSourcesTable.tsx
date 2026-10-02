@@ -52,6 +52,7 @@ function StatusLabel({ status, maturityDate }: { status: FundSourceStatus; matur
 export default function FundSourcesTable({ rows }: { rows: FundSourceRow[] }) {
   return (
     <SortableTable<FundSourceRow>
+      layoutId="fund-in.sources"
       rows={rows}
       getRowKey={(s) => s.id}
       defaultSort={{ key: 'effectiveDate', dir: 'desc' }}
@@ -150,6 +151,7 @@ export default function FundSourcesTable({ rows }: { rows: FundSourceRow[] }) {
         },
         {
           key: 'action',
+          pinned: 'end',
           label: '',
           sortable: false,
           align: 'right',

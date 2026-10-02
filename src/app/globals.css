@@ -4733,3 +4733,45 @@ a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb
    its red — it is one class heavier. */
 :where(.sheet-theme) .icon-btn:hover,
 :where(.sheet-theme) .icon-btn:focus-visible { color: rgb(var(--ink)); }
+
+/* ─── SortableTable column layout (2026-10-02) ─────────────────────────────
+   A header with a layoutId can be dragged wider/narrower by its right edge
+   and dragged onto another header to change the order. The handle is a strip
+   on the edge that only shows its line on hover, so a table nobody has
+   touched looks exactly as it did. */
+table.ledger-table thead th.st-th { position: relative; }
+table.ledger-table thead th.st-th[draggable="true"] { cursor: grab; }
+table.ledger-table thead th.st-dragging { opacity: 0.4; }
+table.ledger-table thead th.st-drop-before { box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+table.ledger-table thead th.st-drop-after { box-shadow: inset -3px 0 0 rgb(var(--accent)); }
+.st-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.st-resize::after {
+  content: "";
+  position: absolute;
+  top: 22%;
+  right: 3px;
+  width: 2px;
+  height: 56%;
+  border-radius: 2px;
+  background: transparent;
+}
+th.st-th:hover .st-resize::after { background: rgb(var(--hairline)); }
+.st-resize:hover::after,
+.st-resize:active::after { background: rgb(var(--accent)); }
+/* Once a width has been dragged the table is fixed-layout: a cell keeps to
+   its column and what does not fit is cut with an ellipsis, like a sheet. */
+table.ledger-table.st-fixed th,
+table.ledger-table.st-fixed td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1052,6 +1052,7 @@ export default function BaView({
       ) : (
         <div className="overflow-x-auto">
           <SortableTable<BaRow>
+            layoutId="ba.facilities"
             rows={rows}
             getRowKey={r => r.id}
             defaultSort={{ key: 'period', dir: 'desc' }}
@@ -1176,6 +1177,7 @@ export default function BaView({
               },
               {
                 key: 'action',
+                pinned: 'end',
                 label: '',
                 sortable: false,
                 align: 'right',

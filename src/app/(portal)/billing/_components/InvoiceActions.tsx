@@ -132,7 +132,13 @@ export function EditInvoiceButton({
   categories,
   companies = [],
   departments = [],
+  autoOpen = false,
+  hideTrigger = false,
 }: {
+  /** Opened from the row menu (2026-10-02): the dialog starts open and the
+   *  component draws no trigger of its own. */
+  autoOpen?: boolean
+  hideTrigger?: boolean
   id: string
   invoiceNo: string | null
   initial: {
@@ -158,7 +164,7 @@ export function EditInvoiceButton({
   departments?: Array<{ id: string; name: string }>
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -597,13 +603,15 @@ export function EditInvoiceButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-xs text-graphite hover:text-ink font-serif italic"
-      >
-        Edit
-      </button>
+      {hideTrigger ? null : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-xs text-graphite hover:text-ink font-serif italic"
+        >
+          Edit
+        </button>
+      )}
       {modal && typeof document !== 'undefined' ? createPortal(modal, document.body) : null}
     </>
   )

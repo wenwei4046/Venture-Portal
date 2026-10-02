@@ -34,6 +34,7 @@ function StatusLabel({ status }: { status: LoanRow['status'] }) {
 export default function LoansTable({ rows }: { rows: LoanRow[] }) {
   return (
     <SortableTable<LoanRow>
+      layoutId="fund-out.loans"
       rows={rows}
       getRowKey={(l) => l.id}
       defaultSort={{ key: 'disbursedAt', dir: 'desc' }}
@@ -104,6 +105,7 @@ export default function LoansTable({ rows }: { rows: LoanRow[] }) {
         },
         {
           key: 'action',
+          pinned: 'end',
           label: '',
           sortable: false,
           align: 'right',

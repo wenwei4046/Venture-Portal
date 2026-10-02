@@ -59,10 +59,17 @@ export default function CreateCreditNoteButton({
   payeeLabel,
   categories = [],
   extraModes = [],
-}: Props) {
+  autoOpen = false,
+  hideTrigger = false,
+}: Props & {
+  /** Opened from the row menu (2026-10-02): the dialog starts open and the
+   *  component draws no trigger of its own. */
+  autoOpen?: boolean
+  hideTrigger?: boolean
+}) {
   const router = useRouter()
   const poolOptions = [...POOL_OPTIONS, ...(extraModes as unknown as typeof POOL_OPTIONS)]
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [reason, setReason] = useState('')
@@ -158,12 +165,14 @@ export default function CreateCreditNoteButton({
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="text-xs text-graphite hover:text-accent font-serif italic transition-colors"
-      >
-        + Credit note
-      </button>
+      {hideTrigger ? null : (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs text-graphite hover:text-accent font-serif italic transition-colors"
+        >
+          + Credit note
+        </button>
+      )}
 
       {open && (
         <div
