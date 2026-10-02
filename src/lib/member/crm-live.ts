@@ -133,6 +133,7 @@ export function leadFromRow(row: CrmContactRow, messages: CrmMessageRow[]): CrmL
     phone: row.phone ?? "",
     adName: row.ad_headline?.trim() || (row.ad_source_id ? `Ad ${row.ad_source_id}` : `${CHANNEL_LABEL[row.channel]} enquiry`),
     pageName: CHANNEL_LABEL[row.channel],
+    channel: row.channel,
     campaign: row.ad_source_id ?? "",
     status: row.status,
     ...(row.status === "lost" && lostReason ? { lost: { reason: lostReason, ...(row.lost_note ? { note: row.lost_note } : {}) } } : {}),

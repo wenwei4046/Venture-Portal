@@ -28,6 +28,7 @@ import MemberCrmAssignment from "./MemberCrmAssignment";
 import { apptLabel, dayLabel, roomName, time, whenLabel } from "./crm-format";
 import { crmWrite, fetchCrm, sendCrmReply, type CrmWrite } from "@/app/(member)/member/crm-actions";
 import { windowOpen } from "@/lib/whatsapp/send";
+import { messengerWindow } from "@/lib/messenger/send";
 
 const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
   ({ id: crypto.randomUUID(), from: "system", kind, text, at: new Date().toISOString() });
@@ -373,10 +374,15 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       inDetail = true;
       // Live: free replies only inside Meta's 24-hour window; the rest (booking, Won/Lost) works any time.
       const mayReply = canReply(viewer, lead, members);
-      const windowShut = live && !windowOpen(lead.lastCustomerAt, now);
-      const windowNote = live && mayReply && windowShut
-        ? "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now (templates come later)."
-        : undefined;
+      // WhatsApp: 24 hours. Messenger: 24 hours, then up to 7 days as a person (the Human Agent tag).
+      const onMessenger = lead.channel === "messenger";
+      const mWindow = messengerWindow(lead.lastCustomerAt, now);
+      const windowShut = live && (onMessenger ? mWindow === "shut" : !windowOpen(lead.lastCustomerAt, now));
+      const windowNote = !live || !mayReply ? undefined
+        : windowShut ? (onMessenger
+          ? "More than 7 days since the customer's last message — Messenger no longer allows a reply. Call them instead."
+          : "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now (templates come later).")
+          : onMessenger && mWindow === "human_agent" ? "Over 24 hours: Messenger allows a reply from a person (Human Agent) until 7 days." : undefined;
       body = <Conversation
         lead={lead}
         now={now}

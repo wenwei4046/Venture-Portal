@@ -100,6 +100,22 @@ describe("the CRM on live data", () => {
     expect(screen.queryByText("APPOINTMENT CONFIRMED")).toBeNull();
   });
 
+  it("on Messenger, still replies after 24 hours as a person — until 7 days", async () => {
+    const d = data({}, hoursAgo(30));
+    fetchCrm.mockResolvedValue({ ok: true, data: { ...d, leads: d.leads.map(l => ({ ...l, channel: "messenger" as const, pageName: "Messenger" })) } });
+    render(<MemberCrm live salesperson="Ann Tan" />);
+    await openChat();
+    expect(screen.getByText(/Human Agent/)).toBeTruthy();
+    expect(screen.getByLabelText("Reply")).toBeTruthy();
+    cleanup();
+    const old = data({}, hoursAgo(24 * 8));
+    fetchCrm.mockResolvedValue({ ok: true, data: { ...old, leads: old.leads.map(l => ({ ...l, channel: "messenger" as const })) } });
+    render(<MemberCrm live salesperson="Ann Tan" />);
+    await openChat();
+    expect(screen.getByText(/More than 7 days/)).toBeTruthy();
+    expect(screen.queryByLabelText("Reply")).toBeNull();
+  });
+
   it("has no reply box after 24 hours, and says why", async () => {
     fetchCrm.mockResolvedValue({ ok: true, data: data({}, hoursAgo(30)) });
     render(<MemberCrm live salesperson="Ann Tan" />);

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type CrmPeopleRow, type CrmRows } from "@/lib/member/crm-live";
 import type { CrmMessage } from "@/lib/member/crm";
 import { cleanText, sendWhatsAppText, windowOpen } from "@/lib/whatsapp/send";
+import { messengerWindow, pageToken, sendMessengerText } from "@/lib/messenger/send";
 
 /**
  * The CRM's live read: everything the signed-in person may see, read under
@@ -65,22 +66,38 @@ export async function sendCrmReply(contactId: string, text: string): Promise<{ o
       .select("id, channel, account_id, external_id, assigned_to, last_customer_at").eq("id", contactId).maybeSingle();
     if (readError) throw new Error(readError.message);
     if (!contact) throw new Error("That customer is not in your CRM.");
-    if (contact.channel !== "whatsapp") throw new Error("Replying on Messenger arrives later.");
-    if (!windowOpen(contact.last_customer_at)) throw new Error("More than 24 hours since the customer's last message — WhatsApp only allows an approved template now.");
+    // Meta's windows: WhatsApp 24 hours; Messenger 24 hours, then 7 days as a person (Human Agent).
+    const messenger = contact.channel === "messenger";
+    const mWindow = messengerWindow(contact.last_customer_at);
+    if (messenger ? mWindow === "shut" : !windowOpen(contact.last_customer_at)) {
+      throw new Error(messenger
+        ? "More than 7 days since the customer's last message — Messenger no longer allows a reply."
+        : "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now.");
+    }
 
     const { data: allowed, error: checkError } = await db.rpc("crm_can_reply", { p_contact: contactId });
     if (checkError) throw new Error(checkError.message);
     if (allowed !== true) throw new Error("You may not reply to this customer.");
 
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
-    if (!token) throw new Error("WhatsApp is not connected on this server yet. Ask your administrator.");
-    const sent = await sendWhatsAppText({ phoneNumberId: contact.account_id, to: contact.external_id, body: clean.text, token });
-    if (!sent.ok) throw new Error(sent.error);
+    if (!token) throw new Error(`${messenger ? "Messenger" : "WhatsApp"} is not connected on this server yet. Ask your administrator.`);
+    let externalId: string;
+    if (messenger) {
+      const pageAccess = await pageToken(contact.account_id, token);
+      if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
+      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: mWindow as "open" | "human_agent" });
+      if (!sent.ok) throw new Error(sent.error);
+      externalId = sent.mid;
+    } else {
+      const sent = await sendWhatsAppText({ phoneNumberId: contact.account_id, to: contact.external_id, body: clean.text, token });
+      if (!sent.ok) throw new Error(sent.error);
+      externalId = sent.wamid;
+    }
 
-    const { data: row, error: recordError } = await db.rpc("crm_record_reply", { p_contact: contactId, p_external_id: sent.wamid, p_body: clean.text });
+    const { data: row, error: recordError } = await db.rpc("crm_record_reply", { p_contact: contactId, p_external_id: externalId, p_body: clean.text });
     if (recordError || !row) {
       // It DID reach the customer; say so, so nobody sends it twice.
-      return { ok: false, error: "Sent to the customer on WhatsApp, but it could not be saved here. Reload before sending again." };
+      return { ok: false, error: `Sent to the customer on ${messenger ? "Messenger" : "WhatsApp"}, but it could not be saved here. Reload before sending again.` };
     }
     return { ok: true, message: messageFromRow(row as CrmMessageRow, contact.assigned_to) };
   } catch (error) {

@@ -185,6 +185,8 @@ export interface CrmLead {
   adName: string; // the Meta ad the lead form came from
   /** The Facebook Page the customer wrote to. */
   pageName?: string;
+  /** Live: where the customer wrote — WhatsApp (24-hour window) or Messenger (24 hours, then 7 days as a person). */
+  channel?: "whatsapp" | "messenger";
   /** The person the enquiry was handed to (`crm-team.ts` decides who). Unset while it waits for its TL. */
   assignedTo?: string;
   /** The TL whose team took the enquiry. */
