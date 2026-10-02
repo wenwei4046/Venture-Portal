@@ -259,3 +259,33 @@ describe('opening an invoice', () => {
     expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · paid')
   })
 })
+
+// 2026-10-02 (user, on the invoice list: "invoice 没有日期").
+describe('the invoice date', () => {
+  const early = { ...invoice('inv-1', 'INV-1', '2026-09-01'), invoice_date: '2026-09-30' }
+  const late = { ...invoice('inv-2', 'INV-2', '2026-10-01'), invoice_date: '2026-10-02' }
+  const firstInvoice = () => document.querySelector('tbody tr')!.querySelector('input[type="checkbox"]')!.getAttribute('aria-label')
+
+  it('has a column of its own, after the number, read from the left', () => {
+    render(list('2026-09-01', [early, late]))
+    const heads = Array.from(document.querySelectorAll('thead th[data-col]')).map((h) => (h as HTMLElement).dataset.col)
+    expect(heads.slice(0, 4)).toEqual(['_select', 'invoice_no', 'invoice_date', 'company'])
+    const cell = screen.getByText('30 Sep 2026').closest('td')!
+    expect(cell.classList.contains('text-right')).toBe(false)
+    expect(screen.getByText('2 Oct 2026')).toBeInTheDocument() // with its year
+  })
+
+  it('sorts by the date, not by how the date is written', () => {
+    render(list('2026-09-01', [late, early]))
+    fireEvent.click(screen.getByText('Date'))
+    expect(firstInvoice()).toBe('Select INV-2') // 2 Oct before 30 Sep, newest first
+    fireEvent.click(screen.getByText('Date'))
+    expect(firstInvoice()).toBe('Select INV-1')
+  })
+
+  it('shows a dash for an invoice that has none', () => {
+    render(list('2026-09-01', [invoice('inv-3', 'INV-3', '2026-09-01')]))
+    const row = screen.getByLabelText('Select INV-3').closest('tr')!
+    expect(row.querySelectorAll('td')[2].textContent).toBe('—')
+  })
+})

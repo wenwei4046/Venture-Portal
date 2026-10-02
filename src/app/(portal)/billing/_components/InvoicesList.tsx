@@ -674,6 +674,18 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
                 },
                 {
+                  // 2026-10-02 (user: "invoice 没有日期"). The date printed on the
+                  // invoice, with its year: 跨月 brings other months' invoices
+                  // into this list, and the number alone does not say which.
+                  key: 'invoice_date',
+                  group: '日期',
+                  label: 'Date',
+                  render: (inv) =>
+                    inv.invoice_date ? dayjs(inv.invoice_date).format('D MMM YYYY') : <span className="text-muted">—</span>,
+                  sortValue: (inv) => (inv.invoice_date ? new Date(inv.invoice_date) : null),
+                  cellClassName: 'text-graphite whitespace-nowrap',
+                },
+                {
                   key: 'company',
                   group: '基本',
                   label: 'Company',
