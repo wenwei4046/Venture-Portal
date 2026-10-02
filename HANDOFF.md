@@ -1,5 +1,88 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-02 (SHIPPED) — Finance forms in the deal shell, a two-step loan picker, per-person table layouts, the invoice row menu
+
+Both commits are on main and live on Vercel prod. This is the Finance user's
+session (assisting dev); another session works in the same repo on Revenue / HR.
+
+| commit | what |
+|---|---|
+| `81fcc54c` | Create payment / Create receipt / 收到 Loan 还款 in the deal-form shell; DealPicker; Record repayment on a fund source; registry pools |
+| `30d95f8b` | SortableTable column widths + order per person; RowMenu; the invoice Action cell reduced to one action + ⋯ |
+
+Migration live: `20261002010000_user_table_layouts` (own rows only, RLS on
+auth.uid(); verified as Finance and as Principal in a rolled-back transaction).
+
+### What changed, and what did not
+
+- **NewPaymentForm** is the old file's logic (imports → handleSubmit) with six
+  named edits; only the JSX is new, and its two intricate blocks (source rows,
+  attachments) were sliced out of the old file byte for byte. Every field name
+  and the serialised FormData are pinned by `NewPaymentForm.test.tsx`. The
+  rebuild script is not in the repo — if the form needs another restructure,
+  edit it directly.
+- **DealPicker** (`components/treasury/DealPicker.tsx`): party buttons of equal
+  width carrying the FULL name (user's choice), then that party's deals on one
+  grid template shared by header and rows. Used by 收到 Loan 还款 (fund out) and
+  by Create payment in loan-repayment mode (fund in).
+- **Record repayment on /fund-in/[id]** files the SAME voucher Create payment
+  does in loan-repayment mode (same action, `buildRepaymentSourceRows`), then
+  lands on the draft PV to send for approval — money going out needs the
+  Principal, so unlike Fund out it is not recorded on the spot. An open-ended
+  source (no lock-in) starts at interest only: `fund_source_outstanding.
+  monthly_payment` prices it as ONE period, i.e. the whole balance.
+- **Pools**: Create payment's pool list was a literal, so `dept_pool_it` and
+  `dept_pool_revenue_department` could not be picked although
+  `pool_key_to_segment` resolves both. `lib/payment-pools.ts` now holds the
+  core list and takes the rest from the dept registry. EditPaymentForm still has
+  its own literal copy.
+- **Table layouts** (`lib/table-layout.ts`, `SortableTable` + `layoutId`): on for
+  Invoices, Payments, Receipts, Fund in, Fund out, Statements, BA and the
+  billing-allocator staff list. **Not the General Ledger report** — it is a
+  hand-written table whose total rows use `colSpan={6}`, so reordering does not
+  fit it; width-dragging alone could be added there. The user was told.
+- **Invoice Action cell**: one action (Settle → / Approve & issue) + ⋯; the rest
+  in `components/RowMenu.tsx`, on the ⋯ or a right-click. Edit / Credit note /
+  Reassign are mounted ONCE for the row that asked, via new `autoOpen` +
+  `hideTrigger` props. `CopyInvoiceButton.tsx` and `DeleteInvoiceButton` are no
+  longer rendered anywhere — left in place (not this session's files to delete).
+
+### HR August payroll — DONE
+
+HR filled the August allocation (4 staff × HOUZS Century 50 / The Cont 35 /
+Carres 15; they had to Resubmit each payroll row first, since a split now
+changes only while its payroll row is a draft, then cancel the resubmit). 对数补差
+produced HV-INV-202608-0051 / -0052 / -0053 = 8,082.33 / 5,657.63 / 2,424.70,
+itemised per component, issued on 2026-08-31. August reconciles to zero on all
+13 company × department cells. **They are issued, not yet paid** — HR's pool
+recovers the 16,164.66 when they settle. Do not chase it.
+
+### How the UI was checked without a login
+
+The portal sits behind auth and this session may not sign in, so:
+- forms: a throwaway vitest file rendered each form with testing-library, wrote
+  `document.body.innerHTML` to an HTML file linking `.next/static/css/*.css`,
+  served it on 127.0.0.1 and looked at it in the Browser pane;
+- table: an esbuild bundle of a small harness (SortableTable + RowMenu, alias
+  `@` → src), driven with real PointerEvent / DragEvent / contextmenu from the
+  page. That is what caught the tick-box column jumping from 39px to 60px on the
+  first drag (measured widths were being clamped to the dragging minimum).
+Both are scratch files, not in the repo. The Browser pane's screenshot times out
+when the pane is hidden, and rAF never fires there — wait with setTimeout.
+
+### Still open
+
+- 9月 consolidated payroll invoice: waiting on HR to submit September payroll.
+- Liang / Cont terms change still NOT applied (user: 记起来先、别做先).
+- External customers still share 3039 "AR - Other customers".
+- Director has `own_share_billback = true` but is now `cost_model = centralized`
+  with no `hr_monthly_payroll` rows; if its payroll ever lands there, that tick
+  bills its WHOLE payroll to Venture Office. User was told; left as is.
+- The reference grid the user showed also hides/shows columns ("34 of 67 cols").
+  Not asked for, not built.
+- `vitest run` still has the one pre-existing failure,
+  `src/lib/erp-sync/catalogue.test.ts` (the other session's).
+
 ## CHECKPOINT 2026-09-29 (SHIPPED) — AR per customer, the bill-back switch, settle in place, and an itemised 对数补差
 
 All merged and live on Vercel prod. Migrations applied in this order, each one
