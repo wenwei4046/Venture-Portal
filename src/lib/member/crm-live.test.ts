@@ -79,12 +79,13 @@ describe("the people and the settings", () => {
   it("reads the team settings and the ad rules", () => {
     const config = configFromRows(
       [{ ad_source_id: "AD1", ad_label: "Sofa Clearance", tl_ids: ["tla"] }, { ad_source_id: "AD2", ad_label: null, tl_ids: [] }],
-      [{ tl_id: "tla", team_share: 60, weekday: "auto", ratios: { ann: 100 }, edited_by: "hod", edited_at: "2026-10-02T05:00:00Z" }],
+      [{ tl_id: "tla", team_share: 60, percent_days: [1, 2, 9], weekend_full_time: false, ratios: { ann: 100 }, edited_by: "hod", edited_at: "2026-10-02T05:00:00Z" }],
     );
     expect(config).toEqual({
       rules: [{ adName: "Sofa Clearance", tlIds: ["tla"] }],
       teamRatios: { tla: 60 },
-      teams: { tla: { weekday: "auto", ratios: { ann: 100 }, editedBy: { memberId: "hod", at: "2026-10-02T05:00:00Z" } } },
+      // A day that is not Mon–Thu is dropped.
+      teams: { tla: { percentDays: [1, 2], weekendFullTime: false, ratios: { ann: 100 }, editedBy: { memberId: "hod", at: "2026-10-02T05:00:00Z" } } },
     });
   });
 

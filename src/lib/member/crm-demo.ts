@@ -197,9 +197,11 @@ export function crmTeamDemo(you = "You"): { members: CrmMember[]; config: CrmAss
       rules: [{ adName: "Sofa Clearance · Carousel", tlIds: ["lkv", "lnt"] }],
       teamRatios: { lkv: 50, lnt: 25, lst: 25 }, // percentages, adding up to 100
       teams: {
-        lkv: { weekday: "auto", ratios: { lkv: 0, a2: 15, a1: 40, a3: 15, a4: 30 } },
-        lnt: { weekday: "manual", ratios: { lnt: 0, b1: 25, b2: 50, b3: 25 } },
-        lst: { weekday: "auto", ratios: { lst: 0, c1: 35, c2: 65 } },
+        // Klang Valley: every weekday by %, weekends to full time. Northern: by hand Mon–Thu.
+        // Southern: Mon–Wed by % (Thursday by hand), weekends by % too.
+        lkv: { percentDays: [1, 2, 3, 4], weekendFullTime: true, ratios: { lkv: 0, a2: 15, a1: 40, a3: 15, a4: 30 } },
+        lnt: { percentDays: [], weekendFullTime: true, ratios: { lnt: 0, b1: 25, b2: 50, b3: 25 } },
+        lst: { percentDays: [1, 2, 3], weekendFullTime: false, ratios: { lst: 0, c1: 35, c2: 65 } },
       },
     },
   };

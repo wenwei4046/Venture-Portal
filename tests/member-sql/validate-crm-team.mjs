@@ -31,7 +31,7 @@ await db.exec(`
     title_id uuid references public.titles(id), reports_to uuid references public.hr_staff_costs(id), status text not null default 'active');
   grant usage on schema public to anon, authenticated, service_role;
 `)
-for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql', '20261002100000_crm_people.sql', '20261002110000_crm_reply.sql']) {
+for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql', '20261002100000_crm_people.sql', '20261002110000_crm_reply.sql', '20261003010000_crm_team_days.sql']) {
   await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), 'utf8'))
 }
 

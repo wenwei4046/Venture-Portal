@@ -97,8 +97,9 @@ describe("assignment", () => {
     rules: [{ adName: "Sofa", tlIds: ["tla", "tlb"] }],
     teamRatios: { tla: 2, tlb: 1 },
     teams: {
-      tla: { weekday: "auto", ratios: { a1: 1, a2: 1 } },
-      tlb: { weekday: "manual", ratios: {} },
+      // TL A: every weekday by %, Fri–Sun full time only. TL B: nothing ticked yet.
+      tla: { percentDays: [1, 2, 3, 4], weekendFullTime: true, ratios: { a1: 1, a2: 1 } },
+      tlb: { percentDays: [], weekendFullTime: true, ratios: {} },
     },
   };
 
@@ -139,11 +140,33 @@ describe("assignment", () => {
     expect(r.assignment).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "no_full_time" });
   });
 
-  it("Monday to Thursday: the TL's ratio when automatic, the TL's list when by hand", () => {
+  it("Monday to Thursday: a ticked day goes by the TL's %s, an unticked one to the TL's list", () => {
     const auto = previewAssignments("Akemi", tuesday, 4, { ...config, teamRatios: { tla: 1 } }, emptyCounts(), members);
     expect(auto.map(p => p.memberId)).toEqual(["a1", "a2", "a1", "a2"]);
     const manual = assignEnquiry("Akemi", tuesday, { ...config, teamRatios: { tlb: 1 } }, emptyCounts(), members);
     expect(manual.assignment).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "manual" });
+    // TL A ticks Monday and Thursday only: Tuesday now waits for them.
+    const mondayThursday = { ...config, teams: { ...config.teams, tla: { ...config.teams.tla, percentDays: [1, 4] } } };
+    expect(pickInTeam("tla", tuesday, mondayThursday, {}, members)).toEqual({ memberId: null, memberBy: "manual" });
+    expect(pickInTeam("tla", new Date(2026, 9, 8, 11), mondayThursday, {}, members).memberBy).toBe("ratio"); // Thu 8 Oct
+  });
+
+  it("the %s include people who are not full time", () => {
+    // a2 (Amir) is part time: on a ticked weekday he takes his share.
+    const picks = previewAssignments("Akemi", tuesday, 2, { ...config, teamRatios: { tla: 1 } }, emptyCounts(), members);
+    expect(picks.some(p => p.memberId === "a2")).toBe(true);
+  });
+
+  it("Friday to Sunday with the switch off: the same %s, part time included", () => {
+    const off = { ...config, teamRatios: { tla: 1 }, teams: { ...config.teams, tla: { ...config.teams.tla, weekendFullTime: false } } };
+    const picks = previewAssignments("Akemi", friday, 4, off, emptyCounts(), members);
+    expect(picks.map(p => p.memberId)).toEqual(["a1", "a2", "a1", "a2"]);
+    expect(picks.every(p => p.memberBy === "ratio")).toBe(true);
+  });
+
+  it("a team nobody has set up: every weekday by hand, Fri–Sun to full-time RS", () => {
+    expect(pickInTeam("tla", tuesday, { rules: [], teamRatios: {}, teams: {} }, {}, members)).toEqual({ memberId: null, memberBy: "manual" });
+    expect(pickInTeam("tla", friday, { rules: [], teamRatios: {}, teams: {} }, {}, members).memberBy).toBe("weekend");
   });
 
   it("sending to a team by hand follows that team's own rules", () => {

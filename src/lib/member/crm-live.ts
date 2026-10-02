@@ -61,7 +61,8 @@ export interface CrmAssignRuleRow { ad_source_id: string; ad_label: string | nul
 export interface CrmTeamSettingsRow {
   tl_id: string;
   team_share: number;
-  weekday: "auto" | "manual";
+  percent_days: number[] | null;
+  weekend_full_time: boolean | null;
   ratios: Record<string, number> | null;
   edited_by: string | null;
   edited_at: string | null;
@@ -159,7 +160,8 @@ export function configFromRows(rules: CrmAssignRuleRow[], teams: CrmTeamSettings
     rules: rules.filter(r => r.tl_ids.length > 0).map(r => ({ adName: r.ad_label?.trim() || `Ad ${r.ad_source_id}`, tlIds: r.tl_ids })),
     teamRatios: Object.fromEntries(teams.map(t => [t.tl_id, t.team_share])),
     teams: Object.fromEntries(teams.map(t => [t.tl_id, {
-      weekday: t.weekday,
+      percentDays: (t.percent_days ?? []).filter(d => d >= 1 && d <= 4),
+      weekendFullTime: t.weekend_full_time ?? true,
       ratios: t.ratios ?? {},
       ...(t.edited_by && t.edited_at ? { editedBy: { memberId: t.edited_by, at: t.edited_at } } : {}),
     }])),

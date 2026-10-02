@@ -17,10 +17,12 @@
  * Assignment:
  *   1. Which team. An ad the Boss or HOD handed to TLs rotates evenly among
  *      them (Mode 1). Any other ad is split by each team's % (Mode 2).
- *   2. Who in the team.
- *      Friday–Sunday: only full-time RS, evenly in turn.
- *      Monday–Thursday: as the TL chooses — automatically by the % the TL sets,
- *      or by hand (the enquiry waits in the TL's "To assign" list).
+ *   2. Who in the team (revised by the user 2026-10-03).
+ *      Monday–Thursday: the TL ticks which days go by the %s they set
+ *      (everyone with a %, full time or not); an unticked day waits in the
+ *      TL's "To assign" list for them to hand out.
+ *      Friday–Sunday: a switch. On — full-time RS only, evenly in turn.
+ *      Off — the same %s as the ticked days.
  *      The TL may reassign any lead in their team at any time.
  */
 import type { CrmAppointment, CrmLead } from "./crm";
@@ -137,17 +139,26 @@ export interface CrmAdRule {
   tlIds: string[];
 }
 
-/** How a TL deals Monday–Thursday enquiries inside their team. */
+/** Monday–Thursday as JavaScript numbers them (Date.getDay): the days a TL may tick for %. */
+export const WEEKDAYS = [1, 2, 3, 4] as const;
+
+/** How a TL deals enquiries inside their team. */
 export interface CrmTeamSettings {
-  weekday: "auto" | "manual";
+  /** The Mon–Thu days (1–4) dealt by %; an unticked one waits for the TL to assign. */
+  percentDays: number[];
+  /** Fri–Sun: on = full-time RS only, in turn; off = by % like a ticked day. */
+  weekendFullTime: boolean;
   /**
-   * Each handler's % for "auto" (kept at 100 in all). 0 (or none) takes none.
+   * Each handler's % (kept at 100 in all). 0 (or none) takes none.
    * Set by the TL; the Boss and HOD may change it too, over the TL's head.
    */
   ratios: Record<string, number>;
-  /** Who last changed the Mon–Thu mode or the %s, and when — so a TL sees when the Boss or HOD did. */
+  /** Who last changed the days, the switch or the %s, and when — so a TL sees when the Boss or HOD did. */
   editedBy?: { memberId: string; at: string };
 }
+
+/** A team nobody has set up: every weekday by hand, Fri–Sun to full-time RS (the rule before the TL decides). */
+export const DEFAULT_TEAM_SETTINGS: CrmTeamSettings = { percentDays: [], weekendFullTime: true, ratios: {} };
 
 /** Whether an RS is full time (takes Friday–Sunday enquiries) is the HOD's call, decided 2026-10-02. */
 export const setsFullTime = (viewer: CrmMember) => viewer.role === "hod";
@@ -225,21 +236,24 @@ export function assignEnquiry(adName: string, at: Date, config: CrmAssignConfig,
 
 /**
  * Who in a team gets an enquiry arriving at `at` — by the team's own rules:
- * Friday–Sunday a full-time RS in turn; Monday–Thursday the TL's % or the
- * TL's "To assign" list. Also used when the Boss or HOD sends one to a team by hand.
+ * Friday–Sunday full-time RS in turn while the switch is on, else the TL's %s;
+ * Monday–Thursday the TL's %s on a ticked day, else the TL's "To assign" list.
+ * Also used when the Boss or HOD sends one to a team by hand.
  */
 export function pickInTeam(teamId: string, at: Date, config: CrmAssignConfig, given: Record<string, number>, members: CrmMember[]):
   Pick<CrmAssignment, "memberId" | "memberBy"> {
   const handlers = teamHandlers(teamId, members);
-  const settings = config.teams[teamId] ?? { weekday: "manual", ratios: {} };
+  const settings = config.teams[teamId] ?? DEFAULT_TEAM_SETTINGS;
+  const byPercent = (): Pick<CrmAssignment, "memberId" | "memberBy"> => {
+    const memberId = pickByShare(Object.fromEntries(handlers.map(m => [m.id, settings.ratios[m.id] ?? 0])), given);
+    return { memberId, memberBy: memberId ? "ratio" : "no_shares" };
+  };
   if (isWeekendEnquiry(at)) {
+    if (!settings.weekendFullTime) return byPercent();
     const memberId = pickByShare(even(handlers.filter(m => m.role === "rs" && m.fullTime).map(m => m.id)), given);
     return { memberId, memberBy: memberId ? "weekend" : "no_full_time" };
   }
-  if (settings.weekday === "auto") {
-    const memberId = pickByShare(Object.fromEntries(handlers.map(m => [m.id, settings.ratios[m.id] ?? 0])), given);
-    return { memberId, memberBy: memberId ? "ratio" : "no_shares" };
-  }
+  if (settings.percentDays.includes(at.getDay())) return byPercent();
   return { memberId: null, memberBy: "manual" };
 }
 
