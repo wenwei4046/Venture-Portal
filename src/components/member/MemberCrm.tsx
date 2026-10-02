@@ -12,7 +12,7 @@ import {
 import { detectRequestedTime } from "@/lib/member/crm-datetime";
 import { crmDemo, crmTeamDemo, demoShowrooms } from "@/lib/member/crm-demo";
 import {
-  ROLE_LABELS, allTeams, assignsAds, canReassign, canReply, hasDownlines, leadsHeld, takesEnquiries, pickInTeam, teamHandlers, teamOf, visibleLeads, visibleMembers,
+  ROLE_LABELS, allTeams, assignsAds, canReassign, canReply, hasDownlines, leadsHeld, setsFullTime, takesEnquiries, pickInTeam, teamHandlers, teamOf, visibleLeads, visibleMembers,
   type CrmAssignConfig, type CrmMember,
 } from "@/lib/member/crm-team";
 import s from "./member.module.css";
@@ -66,26 +66,28 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   const [booking, setBooking] = useState(false);
   // The team behind the CRM (demo): who is looking, and how new enquiries are dealt.
   const team = useMemo(() => crmTeamDemo(salesperson), [salesperson]);
+  // The people, as state: the HOD may switch an RS between full time and part time.
+  const [members, setMembers] = useState<CrmMember[]>(team.members);
   const [viewerId, setViewerId] = useState("a1");
   const [config, setConfig] = useState<CrmAssignConfig>(team.config);
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
-  const viewer: CrmMember = team.members.find(m => m.id === viewerId) ?? team.members[0];
-  const nameOf = (id: string) => team.members.find(m => m.id === id)?.name ?? "—";
+  const viewer: CrmMember = members.find(m => m.id === viewerId) ?? members[0];
+  const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? "—";
   // Everything below works on what the viewer may see: an RS their own leads,
   // anyone above their whole downline's, the Boss everyone's.
-  const visible = visibleLeads(viewer, team.members, leads);
+  const visible = visibleLeads(viewer, members, leads);
   const visibleIds = new Set(visible.map(l => l.id));
   const visibleAppts = appointments.filter(a => visibleIds.has(a.leadId));
 
   function viewAs(id: string) {
-    const next = team.members.find(m => m.id === id);
+    const next = members.find(m => m.id === id);
     setViewerId(id);
     setView({ kind: "tab" });
     setBooking(false);
     setTeamFilter(null);
     setInboxScope("all");
     setMemberPick([]);
-    if (next && !hasDownlines(next, team.members) && tab === "team") setTab("inbox");
+    if (next && !hasDownlines(next, members) && tab === "team") setTab("inbox");
   }
 
   /**
@@ -94,8 +96,8 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
    * full-time RS in turn, Mon–Thu the TL's % or the TL's "To assign" list.
    */
   function sendToTeam(leadId: string, tlId: string) {
-    const tl = team.members.find(m => m.id === tlId);
-    const { memberId, memberBy } = pickInTeam(tlId, new Date(), config, leadsHeld(leads.filter(l => l.id !== leadId)), team.members);
+    const tl = members.find(m => m.id === tlId);
+    const { memberId, memberBy } = pickInTeam(tlId, new Date(), config, leadsHeld(leads.filter(l => l.id !== leadId)), members);
     const how = memberBy === "weekend" ? "Fri–Sun: full-time RS in turn" : memberBy === "ratio" ? `by ${firstName(tl?.name ?? "")}'s %`
       : memberBy === "no_full_time" ? "no full-time RS this weekend" : memberBy === "no_shares" ? "nobody has a %" : "Mon–Thu by hand";
     updateLead(leadId, l => ({
@@ -108,7 +110,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   /** A TL hands a lead to someone in their team (or takes it back from one). */
   function assign(leadId: string, memberId: string) {
     updateLead(leadId, l => ({
-      ...l, assignedTo: memberId, teamId: teamOf(memberId, team.members) ?? l.teamId,
+      ...l, assignedTo: memberId, teamId: teamOf(memberId, members) ?? l.teamId,
       messages: [...l.messages, systemNote(`Assigned to ${nameOf(memberId)} by ${nameOf(viewer.id)}.`)],
     }));
   }
@@ -193,7 +195,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
     const lead = appt && leads.find(l => l.id === appt.leadId);
     if (appt && lead) {
       inDetail = true;
-      body = <AppointmentDetail appt={appt} lead={lead} busy={busyFor(appt.id, lead.assignedTo)} readOnly={!canReply(viewer, lead, team.members)}
+      body = <AppointmentDetail appt={appt} lead={lead} busy={busyFor(appt.id, lead.assignedTo)} readOnly={!canReply(viewer, lead, members)}
         onBack={() => setView({ kind: "tab" })}
         onOpenChat={() => { setTab("inbox"); openLead(lead.id); }}
         onShowUp={() => { setAppointments(list => list.map(a => (a.id === appt.id ? markAttended(a) : a))); note(lead.id, `Customer showed up on ${dayLabel(appt.start)}, ${time(appt.start)}.`); }}
@@ -215,10 +217,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
         salesperson={lead.assignedTo ? nameOf(lead.assignedTo) : "Not assigned yet"}
         viewer={viewer}
         nameOf={nameOf}
-        readOnly={!canReply(viewer, lead, team.members)}
-        moveTo={assignsAds(viewer) ? allTeams(team.members) : undefined}
+        readOnly={!canReply(viewer, lead, members)}
+        moveTo={assignsAds(viewer) ? allTeams(members) : undefined}
         onMoveTeam={tlId => sendToTeam(lead.id, tlId)}
-        reassignTo={canReassign(viewer, lead, team.members) ? teamHandlers(lead.teamId ?? teamOf(lead.assignedTo ?? "", team.members) ?? "", team.members) : undefined}
+        reassignTo={canReassign(viewer, lead, members) ? teamHandlers(lead.teamId ?? teamOf(lead.assignedTo ?? "", members) ?? "", members) : undefined}
         onReassign={memberId => assign(lead.id, memberId)}
         onBack={() => { setView(fromMember ? { kind: "member", memberId: fromMember } : { kind: "tab" }); setBooking(false); }}
         onOpenAppointment={id => { setTab("calendar"); openAppointment(id); }}
@@ -252,18 +254,18 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
     }
   }
 
-  const manager = hasDownlines(viewer, team.members);
+  const manager = hasDownlines(viewer, members);
   // Assignment is for those who set it: Boss, HOD (and a Senior TL, read only) and each TL.
   const seesAssignment = manager && viewer.role !== "ta";
 
   // ── One person, from Team ─────────────────────────────────────────────────
   if (view.kind === "member" && manager) {
-    const member = team.members.find(m => m.id === view.memberId);
+    const member = members.find(m => m.id === view.memberId);
     // Only someone in the viewer's own downline — a TL never opens another TL's team.
-    if (member && visibleMembers(viewer, team.members).some(m => m.id === member.id)) {
+    if (member && visibleMembers(viewer, members).some(m => m.id === member.id)) {
       inDetail = true;
-      body = <MemberCrmMember member={member} members={team.members} leads={visible} appointments={visibleAppts}
-        now={now} viewer={viewer} stepIn={canReply(viewer, { assignedTo: member.id }, team.members)} nameOf={nameOf}
+      body = <MemberCrmMember member={member} members={members} leads={visible} appointments={visibleAppts}
+        now={now} viewer={viewer} stepIn={canReply(viewer, { assignedTo: member.id }, members)} nameOf={nameOf}
         onBack={() => setView({ kind: "tab" })} onOpenLead={id => openLead(id, member.id)} />;
     }
   }
@@ -282,6 +284,21 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
           <Icon name="chevron" size={16} />
         </button>
       </section>}
+      {/* The HOD decides who is full time: only full-time RS take Friday–Sunday enquiries. */}
+      {setsFullTime(viewer) && <section className={s.card} aria-label="Full time or part time">
+        <h2>Full time / Part time</h2>
+        <p className={s.caption}>Only full-time RS take Friday–Sunday enquiries, in turn within their team.</p>
+        {allTeams(members).map(tl => <div key={tl.id} className={c.rule}>
+          <strong>{tl.teamName} <small className={s.caption}>· {tl.name}</small></strong>
+          {teamHandlers(tl.id, members).filter(m => m.role === "rs").map(rs => <label key={rs.id} className={c.ruleTop}>
+            <span>{rs.name}</span>
+            <span className={c.switch}>
+              <input type="checkbox" checked={!!rs.fullTime} onChange={e => setMembers(list => list.map(m => (m.id === rs.id ? { ...m, fullTime: e.target.checked } : m)))} />
+              {rs.fullTime ? "Full time" : "Part time"}
+            </span>
+          </label>)}
+        </div>)}
+      </section>}
       <MemberCrmAutoReplies settings={autoReplies} onChange={setAutoReplies} />
     </div>;
   }
@@ -289,7 +306,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   // ── Assignment, from Settings ─────────────────────────────────────────────
   if (view.kind === "assignment" && seesAssignment) {
     inDetail = true;
-    body = <MemberCrmAssignment viewer={viewer} members={team.members}
+    body = <MemberCrmAssignment viewer={viewer} members={members}
       ads={[...new Set(leads.map(l => l.adName))].sort()} config={config} onConfig={setConfig}
       onBack={() => setView({ kind: "settings" })} />;
   }
@@ -306,14 +323,14 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
   const membersOnly = visible.filter(l => l.assignedTo !== viewer.id);
   // The members to tick: everyone below who holds a lead, then "To assign" when the team has some waiting.
   const pickable = [
-    ...visibleMembers(viewer, team.members).filter(m => m.id !== viewer.id && membersOnly.some(l => l.assignedTo === m.id)).map(m => ({ id: m.id, label: firstName(m.name) })),
+    ...visibleMembers(viewer, members).filter(m => m.id !== viewer.id && membersOnly.some(l => l.assignedTo === m.id)).map(m => ({ id: m.id, label: firstName(m.name) })),
     ...(membersOnly.some(l => !l.assignedTo) ? [{ id: "", label: "To assign" }] : []),
   ];
   // The Boss, HOD (and a Senior TL) narrow by team instead — the same choice as on the Team tab. "" = no team yet.
   const byTeam = manager && !takesEnquiries(viewer);
-  const teamOfLead = (l: CrmLead) => l.teamId ?? (l.assignedTo ? teamOf(l.assignedTo, team.members) : undefined) ?? "";
+  const teamOfLead = (l: CrmLead) => l.teamId ?? (l.assignedTo ? teamOf(l.assignedTo, members) : undefined) ?? "";
   const teamChoices = byTeam ? [
-    ...allTeams(team.members).filter(t => visibleMembers(viewer, team.members).some(m => m.id === t.id)),
+    ...allTeams(members).filter(t => visibleMembers(viewer, members).some(m => m.id === t.id)),
     ...(visible.some(l => teamOfLead(l) === "") ? [{ id: "", teamName: "No team" }] : []),
   ] : [];
   const inScope = byTeam ? visible.filter(l => teamFilter === null || teamOfLead(l) === teamFilter)
@@ -428,7 +445,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
 
   // ── Team ──────────────────────────────────────────────────────────────────
   if (!inDetail && tab === "team" && manager) {
-    body = <MemberCrmTeam viewer={viewer} members={team.members} leads={visible} appointments={visibleAppts} now={now}
+    body = <MemberCrmTeam viewer={viewer} members={members} leads={visible} appointments={visibleAppts} now={now}
       teamFilter={teamFilter} onTeamFilter={setTeamFilter}
       onOpenMember={id => setView({ kind: "member", memberId: id })} onOpenLead={id => openLead(id)}
       onAssign={assign} onSendToTeam={sendToTeam} />;
@@ -443,7 +460,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
         <div><h1>{viewer.name}</h1><p className={s.sub}>{manager ? `${roleTag(viewer)}${viewer.teamName ? ` · ${viewer.teamName}` : ""} · your downline's numbers` : `${roleTag(viewer)} · your CRM`}</p></div>
       </div>
       {/* A leader or the Boss sees the team's performance; a salesperson their own four numbers. */}
-      {manager ? <MemberCrmPerformance viewer={viewer} members={team.members} leads={visible} appointments={visibleAppts} now={now} /> : <div className={c.stats}>
+      {manager ? <MemberCrmPerformance viewer={viewer} members={members} leads={visible} appointments={visibleAppts} now={now} /> : <div className={c.stats}>
         <div className={c.stat}><span>Leads</span><strong>{rate.leads}</strong></div>
         <div className={c.stat}><span>Appointments</span><strong>{rate.booked}</strong></div>
         <div className={c.stat}><span>Appt rate</span><strong>{rate.rate == null ? "—" : `${Math.round(rate.rate * 100)}%`}</strong><small>{rate.booked} of {rate.leads} leads</small></div>
@@ -485,7 +502,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit }: 
     { id: "profile", icon: "user", label: "Profile" },
   ];
   // Demo: one of each level, and two TLs to show they never see each other's team.
-  const demoViewers = ["boss", "hod", "lkv", "lnt", "a2", "a1"].map(id => team.members.find(m => m.id === id)).filter((m): m is CrmMember => !!m);
+  const demoViewers = ["boss", "hod", "lkv", "lnt", "a2", "a1"].map(id => members.find(m => m.id === id)).filter((m): m is CrmMember => !!m);
 
   return (
     <div className={c.app}>

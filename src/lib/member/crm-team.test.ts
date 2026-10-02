@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CrmAppointment, CrmLead, CrmMessage } from "./crm";
 import {
   allDownlines, assignEnquiry, canEditTeamRules, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
-  memberStats, overLimit, pickByShare, previewAssignments, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
+  memberStats, overLimit, pickByShare, previewAssignments, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
   type CrmAssignConfig, type CrmMember,
 } from "./crm-team";
 
@@ -73,6 +73,10 @@ describe("who sees and does what", () => {
   it("lets a team's TL, the Boss and the HOD change its rules — not another TL or the TA", () => {
     expect([canEditTeamRules(who("tla"), "tla"), canEditTeamRules(who("boss"), "tla"), canEditTeamRules(who("hod"), "tla")]).toEqual([true, true, true]);
     expect([canEditTeamRules(who("tlb"), "tla"), canEditTeamRules(who("taa"), "tla")]).toEqual([false, false]);
+  });
+
+  it("lets only the HOD set who is full time", () => {
+    expect(["boss", "hod", "tla", "taa", "a1"].map(id => setsFullTime(who(id)))).toEqual([false, true, false, false, false]);
   });
 
   it("lets only the team's TL reassign", () => {

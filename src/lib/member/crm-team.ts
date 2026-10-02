@@ -147,6 +147,9 @@ export interface CrmTeamSettings {
   editedBy?: { memberId: string; at: string };
 }
 
+/** Whether an RS is full time (takes Friday–Sunday enquiries) is the HOD's call, decided 2026-10-02. */
+export const setsFullTime = (viewer: CrmMember) => viewer.role === "hod";
+
 /** Who may change a team's Mon–Thu mode and %s: its TL, and the Boss and HOD. */
 export const canEditTeamRules = (viewer: CrmMember, tlId: string) => viewer.id === tlId || assignsAds(viewer);
 
