@@ -7,6 +7,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { can } from '@/lib/permissions'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { exportPdfResponse } from '@/lib/export/response'
 import { formatPoolLabel } from '@/lib/voucher-detail'
 import { VoucherDocPdf, type SalaryPaymentData, type StatutoryCoverageData, type VoucherDocData } from '../_format/voucher-doc-pdf'
@@ -37,7 +39,11 @@ export async function GET(req: Request) {
   }
   q = q.order('voucher_no', { ascending: true })
 
-  const { data: vouchers } = await q
+  const { data: found } = await q
+  // A payroll voucher prints who is paid what, and into which account: not
+  // without Payroll payouts. Dropped rather than refused, so a mixed selection
+  // still prints the vouchers the account may see.
+  const vouchers = canSeePayrollPayouts(user) ? found : (found ?? []).filter((v) => !isPayrollReference(v.reference_type))
   if (!vouchers || vouchers.length === 0) {
     return Response.json({ error: 'No matching vouchers' }, { status: 404 })
   }

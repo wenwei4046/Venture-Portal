@@ -66,8 +66,10 @@ describe('AmendDateButton', () => {
     expect(mocks.amendRepaymentDate).not.toHaveBeenCalled()
     expect(await screen.findByRole('status')).toHaveTextContent('1 Oct 2026 → 30 Sep 2026')
     expect(mocks.refresh).toHaveBeenCalledTimes(1)
-    // Done: nothing more to confirm, only to close.
+    // Done: nothing more to confirm, only to close. The result shows a moment
+    // before the save is counted as finished, and Close waits for that.
     expect(screen.queryByRole('button', { name: '确认改' })).toBeNull()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
@@ -89,7 +91,7 @@ describe('AmendDateButton', () => {
     fireEvent.change(reasonBox(), { target: { value: 'x' } })
     confirm()
     expect(await screen.findByRole('alert')).toHaveTextContent('Sep 2026 is closed')
-    expect(screen.getByRole('button', { name: '确认改' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: '确认改' })).toBeEnabled() // back from 改着…
     expect(mocks.refresh).not.toHaveBeenCalled()
   })
 })

@@ -153,6 +153,12 @@ interface Props<T> {
    * mouse: Tab to the row, then Enter — as the link could be reached.
    */
   onRowOpen?: (row: T) => void
+  /**
+   * false for a row that has nothing to open and no menu — a total standing in
+   * for rows the viewer may not see (2026-10-02, a locked payroll batch). Such
+   * a row takes no double-click, no right-click, no Tab stop and no 打开 →.
+   */
+  rowOpens?: (row: T) => boolean
 }
 
 const ROW_CONTROLS = 'a, button, input, select, textarea, label'
@@ -196,8 +202,9 @@ export default function SortableTable<T>({
   footer,
   layoutId,
   layoutTitle,
-  onRowContextMenu,
-  onRowOpen,
+  onRowContextMenu: onAnyRowContextMenu,
+  onRowOpen: onAnyRowOpen,
+  rowOpens,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState(defaultSort.key)
   const [sortDir, setSortDir] = useState<SortDir>(defaultSort.dir)
@@ -534,7 +541,7 @@ export default function SortableTable<T>({
 
   return (
     <div>
-      {(searchKeys && searchKeys.length > 0) || toolbarRight || layoutOn || onRowOpen ? (
+      {(searchKeys && searchKeys.length > 0) || toolbarRight || layoutOn || onAnyRowOpen ? (
         <div className="mb-3 flex items-center gap-3 flex-wrap">
           {searchKeys && searchKeys.length > 0 ? (
             <>
@@ -552,9 +559,9 @@ export default function SortableTable<T>({
               ) : null}
             </>
           ) : null}
-          {onRowOpen ? (
+          {onAnyRowOpen ? (
             <span className="hidden md:inline font-serif italic text-xs text-muted">
-              双击一行打开{onRowContextMenu ? ' · 右键更多' : ''}
+              双击一行打开{onAnyRowContextMenu ? ' · 右键更多' : ''}
             </span>
           ) : null}
           {toolbarRight ? <div className="ml-auto flex items-center gap-3 flex-wrap">{toolbarRight}</div> : null}
@@ -721,6 +728,9 @@ export default function SortableTable<T>({
             visible.map((row) => {
               const rowKey = getRowKey(row)
               const isOpen = expanded.has(rowKey)
+              const opens = rowOpens ? rowOpens(row) : true
+              const onRowOpen = opens ? onAnyRowOpen : undefined
+              const onRowContextMenu = opens ? onAnyRowContextMenu : undefined
               return (
                 <Fragment key={rowKey}>
                   <tr

@@ -12,6 +12,7 @@ export const PERMISSIONS = [
   'dashboard',
   'approvals',
   'treasury',
+  'payroll_payouts',
   'billing',
   'categories',
   'hr_costing',

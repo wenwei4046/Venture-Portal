@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import {
@@ -89,6 +91,15 @@ export default async function ApprovalDetailPage({ params }: Props) {
   let voucherContext: VoucherDetailContext | null = null
   if (approval.request_type === 'payment_voucher' && approval.reference_id) {
     voucherContext = await getVoucherDetailContext(supabase, approval.reference_id)
+  }
+  // The request for a payroll voucher is titled with who is paid what, and
+  // shows the voucher under it: not without Payroll payouts (2026-10-02).
+  if (
+    voucherContext &&
+    isPayrollReference(voucherContext.voucher.reference_type) &&
+    !canSeePayrollPayouts(user)
+  ) {
+    notFound()
   }
 
   // Issue #4 pre-check: Debit voucher with insufficient bank balance should not

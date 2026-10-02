@@ -468,6 +468,25 @@ describe('SortableTable opening a row', () => {
     expect(onRowOpen.mock.calls[0][0]).toMatchObject({ id: '1' })
   })
 
+  // 2026-10-02: a total standing in for rows the viewer may not see.
+  it('a row that opens nothing takes no double-click, no right-click and no Tab stop', () => {
+    const onRowOpen = vi.fn()
+    const onRowContextMenu = vi.fn()
+    table({ onRowOpen, onRowContextMenu, rowOpens: (r) => r.id !== '1' })
+    fireEvent.doubleClick(cell(0, 2))
+    fireEvent.contextMenu(bodyRows()[0])
+    fireEvent.keyDown(bodyRows()[0], { key: 'Enter' })
+    expect(onRowOpen).not.toHaveBeenCalled()
+    expect(onRowContextMenu).not.toHaveBeenCalled()
+    expect(bodyRows()[0].getAttribute('tabindex')).toBeNull()
+    // The row beside it is as it was.
+    expect(bodyRows()[1].getAttribute('tabindex')).toBe('0')
+    fireEvent.doubleClick(cell(1, 2))
+    fireEvent.contextMenu(bodyRows()[1])
+    expect(onRowOpen).toHaveBeenCalledTimes(1)
+    expect(onRowContextMenu).toHaveBeenCalledTimes(1)
+  })
+
   it('says how, in the toolbar — and that a right-click has more when it does', () => {
     const { unmount } = table({ onRowOpen: vi.fn() })
     expect(screen.getByText('双击一行打开')).toBeInTheDocument()

@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
+import { SheetIcon } from '@/components/sheet/SheetIcon'
 import AmendRepaymentButton from './AmendRepaymentButton'
 import AmendDateButton from './AmendDateButton'
 
@@ -35,6 +36,10 @@ export interface VoucherRow {
    *  "hr 的 payroll voucher 我不想要显示这么多"): payroll disbursements are
    *  one voucher per person, 26 a month, and drowned the ledger. */
   batchKey?: string
+  /** A payroll batch standing as its total, for an account that may not see
+   *  one person's pay (2026-10-02 — lib/payroll-vouchers.ts). The server sends
+   *  this row INSTEAD of the batch's vouchers; it opens nothing. */
+  locked?: boolean
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -174,6 +179,7 @@ export default function VouchersTable({
       layoutTitle={layoutTitle}
       onRowOpen={links.onRowOpen}
       onRowContextMenu={links.onRowContextMenu}
+      rowOpens={(v) => !v.locked}
       rows={plain}
       getRowKey={(v) => v.id}
       // Date (not voucher #) so unnumbered synthetic rows interleave
@@ -212,7 +218,19 @@ export default function VouchersTable({
           key: 'payee_name',
           group: '基本',
           label: 'Payee',
-          render: (v) => v.payee_name,
+          render: (v) =>
+            v.locked ? (
+              // The name is the whole of what this row says, month last: it wraps
+              // rather than being cut at the column's width.
+              <span className="whitespace-normal" title={`${v.payee_name} · 这个帐号看不到里面每个人的明细`}>
+                <span className="inline-block w-3 mr-1.5 align-[-1px] text-muted [&>svg]:w-3 [&>svg]:h-3">
+                  <SheetIcon name="lock" />
+                </span>
+                {v.payee_name}
+              </span>
+            ) : (
+              v.payee_name
+            ),
           sortValue: (v) => v.payee_name,
           filterable: true,
           cellClassName: 'font-serif text-[15px] text-ink truncate max-w-[200px]',

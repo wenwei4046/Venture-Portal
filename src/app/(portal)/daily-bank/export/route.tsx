@@ -6,13 +6,14 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
 import { sumAmounts } from '@/lib/daily-bank'
 import { PdfDocument, PdfTable, type PdfColumn, type PdfRowKind } from '@/lib/export/pdf'
 import { exportPdfResponse } from '@/lib/export/response'
 
 export async function GET(request: Request) {
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const url = new URL(request.url)
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
   const date =
     /^\d{4}-\d{2}-\d{2}$/.test(raw) && dayjs(raw).isValid() ? raw : dayjs().format('YYYY-MM-DD')
 
-  const data = await fetchDailyBank(supabase, date)
+  const data = await fetchDailyBank(supabase, date, { seesPayroll: canSeePayrollPayouts(user) })
   // Dynamic departments: the column set comes from the payload (cores + one
   // per provisioned full dept), so the PDF matches the screen.
   const colKeys = data.columns.map(c => c.key)

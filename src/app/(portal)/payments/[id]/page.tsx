@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
 import { can } from '@/lib/permissions'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { submitForApproval, approveVoucher, voidVoucher, voidPaidReceipt, reversePaidPayment, returnVoucherToDraft } from '../actions'
@@ -48,6 +50,10 @@ export default async function PaymentDetailPage({ params }: Props) {
   const { data: voucher, error } = await voucherQuery.single()
 
   if (error || !voucher) notFound()
+  // A payroll voucher says what one named person is paid. Without Payroll
+  // payouts it does not open (2026-10-02) — Payments shows such an account the
+  // batch's total instead, and offers no way here.
+  if (isPayrollReference(voucher.reference_type) && !canSeePayrollPayouts(user)) notFound()
 
   // Resolve names
   let payeeCompanyName: string | null = null

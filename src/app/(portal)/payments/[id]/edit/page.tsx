@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
 import EditPaymentForm from './_components/EditPaymentForm'
 
@@ -20,7 +22,7 @@ interface SourceRow {
 }
 
 export default async function EditPaymentPage({ params }: Props) {
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury')
   const { id } = await params
   const supabase = await createClient()
 
@@ -31,6 +33,8 @@ export default async function EditPaymentPage({ params }: Props) {
     .single()
 
   if (!voucher) notFound()
+  // As on the voucher's own page: payroll does not open without Payroll payouts.
+  if (isPayrollReference(voucher.reference_type) && !canSeePayrollPayouts(user)) notFound()
 
   // Only editable in draft / pending_approval — otherwise bounce back to detail
   if (voucher.status !== 'pending_approval' && voucher.status !== 'draft') {

@@ -1,0 +1,161 @@
+import { describe, expect, it } from 'vitest'
+import {
+  filterLockedBatches,
+  isPayrollReference,
+  lockPayrollBatches,
+  payrollBatchLabel,
+  type LedgerFilters,
+  type PayrollVoucherLike,
+} from './payroll-vouchers'
+
+const pv = (over: Partial<PayrollVoucherLike>): PayrollVoucherLike => ({
+  reference_type: 'payroll_disbursement',
+  description: 'Payroll disbursement Sep 2026 — Aina binti Example',
+  voucher_type: 'other',
+  status: 'paid',
+  amount: 1000,
+  payment_date: '2026-10-05',
+  created_at: '2026-10-01T03:00:00+00:00',
+  ...over,
+})
+
+const NO_FILTER: LedgerFilters = {
+  tab: 'all', typeFilter: '', poolFilter: '', fromFilter: '', toFilter: '', minFilter: null, maxFilter: null, qFilter: '',
+}
+
+describe('isPayrollReference', () => {
+  it('knows the three kinds of voucher payroll produces, and nothing else', () => {
+    expect(isPayrollReference('payroll_disbursement')).toBe(true)
+    expect(isPayrollReference('payroll_statutory')).toBe(true)
+    expect(isPayrollReference('payroll_payment_request')).toBe(true)
+    expect(isPayrollReference('loan')).toBe(false)
+    expect(isPayrollReference(null)).toBe(false)
+    expect(isPayrollReference(undefined)).toBe(false)
+  })
+})
+
+describe('payrollBatchLabel', () => {
+  it('a salary voucher: the batch, without the person', () => {
+    expect(payrollBatchLabel(pv({}))).toBe('Payroll disbursement Sep 2026')
+    expect(payrollBatchLabel(pv({ description: 'Director salary Aug 2026 — Somebody' }))).toBe('Director salary Aug 2026')
+  })
+
+  it('a statutory voucher: the body and the month, without the department', () => {
+    const kwsp = { reference_type: 'payroll_statutory', voucher_type: 'expense' }
+    expect(payrollBatchLabel(pv({ ...kwsp, description: 'KWSP — Sep 2026 payroll (IT · 1 staff)' }))).toBe('KWSP Sep 2026')
+    expect(payrollBatchLabel(pv({ ...kwsp, description: 'KWSP (EPF) — Jul 2026 payroll — HR' }))).toBe('KWSP (EPF) Jul 2026')
+    expect(payrollBatchLabel(pv({ ...kwsp, description: 'PERKESO (SOCSO + EIS) — Jul 2026 payroll (Marketing + HR)' }))).toBe('PERKESO (SOCSO + EIS) Jul 2026')
+  })
+
+  it('a funding transfer: the month, without the department', () => {
+    const transfer = { reference_type: 'payroll_payment_request', voucher_type: 'payroll_bank_transfer' }
+    expect(payrollBatchLabel(pv({ ...transfer, description: 'Payroll bank transfer — Sep 2026 (IT)' }))).toBe('Payroll bank transfer Sep 2026')
+    expect(payrollBatchLabel(pv({ ...transfer, description: 'Director salary bank transfer — Aug 2026' }))).toBe('Director salary bank transfer Aug 2026')
+  })
+
+  it('a description in no known shape is never used as the name — it may be the only place a person is', () => {
+    expect(payrollBatchLabel(pv({ description: 'Salary for Aina binti Example' }))).toBe('Payroll disbursement Oct 2026')
+    expect(payrollBatchLabel(pv({ description: null, payment_date: null }))).toBe('Payroll disbursement Oct 2026') // from created_at
+    expect(payrollBatchLabel(pv({ reference_type: 'payroll_statutory', description: 'EPF top-up, Bala', payment_date: '2026-09-15' }))).toBe('Statutory contribution Sep 2026')
+    expect(payrollBatchLabel(pv({ reference_type: 'payroll_payment_request', description: '', payment_date: null, created_at: 'not a date' }))).toBe('Payroll bank transfer')
+  })
+})
+
+describe('lockPayrollBatches', () => {
+  it('one line per batch: how many, how much, and where they stand', () => {
+    const batches = lockPayrollBatches([
+      pv({ amount: 3200.5 }),
+      pv({ amount: '4100.25', description: 'Payroll disbursement Sep 2026 — Bala' }),
+      pv({ amount: 2500, description: 'Payroll disbursement Sep 2026 — Chong', status: 'pending_approval', payment_date: null }),
+    ])
+    expect(batches).toHaveLength(1)
+    expect(batches[0]).toMatchObject({
+      label: 'Payroll disbursement Sep 2026',
+      count: 3,
+      total: 9800.75,
+      latest: '2026-10-05',
+      statusText: '2 paid · 1 pending approval',
+      voucherType: 'other',
+    })
+    expect(batches[0].statuses.sort()).toEqual(['paid', 'pending_approval'])
+  })
+
+  it('a voided voucher is counted and named, but its money is not in the total', () => {
+    const [batch] = lockPayrollBatches([
+      pv({ amount: 1000 }),
+      pv({ amount: 700, status: 'voided' }),
+    ])
+    expect(batch.count).toBe(2)
+    expect(batch.total).toBe(1000)
+    expect(batch.statusText).toBe('1 paid · 1 voided')
+  })
+
+  it('departments of one body and month fold together, so a one-person department has no line of its own', () => {
+    const kwsp = { reference_type: 'payroll_statutory', voucher_type: 'expense', payment_date: '2026-09-15' }
+    const batches = lockPayrollBatches([
+      pv({ ...kwsp, description: 'KWSP — Sep 2026 payroll (IT · 1 staff)', amount: 1014 }),
+      pv({ ...kwsp, description: 'KWSP — Sep 2026 payroll (HR · 3 staff)', amount: 3081 }),
+      pv({ ...kwsp, description: 'SOCSO — Sep 2026 payroll (IT · 1 staff)', amount: 95.6 }),
+    ])
+    expect(batches.map((b) => [b.label, b.count, b.total])).toEqual([
+      ['KWSP Sep 2026', 2, 4095],
+      ['SOCSO Sep 2026', 1, 95.6],
+    ])
+  })
+
+  it('newest batch first', () => {
+    const batches = lockPayrollBatches([
+      pv({ description: 'Payroll disbursement Jul 2026 — A', payment_date: '2026-08-04' }),
+      pv({ description: 'Payroll disbursement Sep 2026 — A', payment_date: '2026-10-05' }),
+      pv({ description: 'Payroll disbursement Aug 2026 — A', payment_date: '2026-09-05' }),
+    ])
+    expect(batches.map((b) => b.label)).toEqual([
+      'Payroll disbursement Sep 2026', 'Payroll disbursement Aug 2026', 'Payroll disbursement Jul 2026',
+    ])
+  })
+
+  it('nothing in, nothing out', () => {
+    expect(lockPayrollBatches([])).toEqual([])
+  })
+})
+
+describe('filterLockedBatches', () => {
+  const batches = lockPayrollBatches([
+    pv({ amount: 3000 }),
+    pv({ amount: 2000, status: 'pending_approval', description: 'Payroll disbursement Sep 2026 — Bala', created_at: '2026-10-02T03:00:00+00:00' }),
+    pv({ reference_type: 'payroll_statutory', voucher_type: 'expense', description: 'KWSP — Aug 2026 payroll (HR · 3 staff)', payment_date: '2026-09-15', created_at: '2026-09-10T03:00:00+00:00' }),
+  ])
+  const labels = (f: Partial<LedgerFilters>) => filterLockedBatches(batches, { ...NO_FILTER, ...f }).map((b) => b.label)
+
+  it('with no filter, every batch', () => {
+    expect(labels({})).toEqual(['Payroll disbursement Sep 2026', 'KWSP Aug 2026'])
+  })
+
+  it('a status tab keeps a batch that has a voucher in that status — and shows it whole', () => {
+    expect(labels({ tab: 'pending_approval' })).toEqual(['Payroll disbursement Sep 2026'])
+    expect(labels({ tab: 'voided' })).toEqual([])
+    const [kept] = filterLockedBatches(batches, { ...NO_FILTER, tab: 'pending_approval' })
+    expect([kept.count, kept.total]).toEqual([2, 5000]) // not the one pending voucher's 2,000
+  })
+
+  it('a pool or an amount filter hides them: answering it would read inside the batch', () => {
+    expect(labels({ poolFilter: 'dept_pool_hr' })).toEqual([])
+    expect(labels({ minFilter: 2500 })).toEqual([])
+    expect(labels({ maxFilter: 2500 })).toEqual([])
+  })
+
+  it('a search matches the name of the batch, never a person inside it', () => {
+    expect(labels({ qFilter: 'kwsp' })).toEqual(['KWSP Aug 2026'])
+    expect(labels({ qFilter: 'sep 2026' })).toEqual(['Payroll disbursement Sep 2026'])
+    expect(labels({ qFilter: 'bala' })).toEqual([])
+    expect(labels({ qFilter: 'aina' })).toEqual([])
+  })
+
+  it('the voucher type and the date range are the batch’s own', () => {
+    expect(labels({ typeFilter: 'expense' })).toEqual(['KWSP Aug 2026'])
+    expect(labels({ typeFilter: 'loan_repayment' })).toEqual([])
+    expect(labels({ fromFilter: '2026-10-01' })).toEqual(['Payroll disbursement Sep 2026'])
+    expect(labels({ toFilter: '2026-09-30' })).toEqual(['KWSP Aug 2026'])
+    expect(labels({ fromFilter: '2026-10-02', toFilter: '2026-10-02' })).toEqual(['Payroll disbursement Sep 2026'])
+  })
+})

@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { requirePermission } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
 import { fetchPaymentExtras } from '@/lib/payment-extras'
 import { formatMoney } from '@/lib/utils'
+import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 import PaymentTabs from './PaymentTabs'
 import PaymentFilters from './PaymentFilters'
 import BackToTop from './BackToTop'
@@ -26,9 +28,6 @@ const POOL_LABELS: Record<string, string> = {
 }
 
 
-/** Vouchers HR Payment generates. Their dates are HR's to change. */
-const PAYROLL_REFERENCE_TYPES = new Set(['payroll_disbursement', 'payroll_statutory', 'payroll_payment_request'])
-
 export interface LedgerSearchParams {
   status?: string
   q?: string
@@ -48,6 +47,9 @@ export default async function VoucherLedger({
   params: LedgerSearchParams
 }) {
   const user = await requirePermission('treasury')
+  // Without Payroll payouts (2026-10-02) payroll is one locked total per
+  // batch: its vouchers are folded here, on the server, and never sent on.
+  const seesPayroll = canSeePayrollPayouts(user)
   const supabase = await createClient()
   const isReceipts = direction === 'credit'
   const statusFilter = params.status
@@ -69,7 +71,7 @@ export default async function VoucherLedger({
     .range(lo, hi))
 
   // Stage D/E surface: payroll requests badge — payment side only.
-  const { count: payrollRequestsPending } = isReceipts
+  const { count: payrollRequestsPending } = isReceipts || !seesPayroll
     ? { count: 0 }
     : await supabase
         .from('payroll_payment_requests')
@@ -118,10 +120,17 @@ export default async function VoucherLedger({
 
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
+  const filters = { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter }
 
-  const extraFiltered = filterReceiptExtras(extraRows, {
-    tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter,
-  })
+  const extraFiltered = filterReceiptExtras(extraRows, filters)
+
+  // The rows this account may open, and the payroll batches it may only see
+  // the total of. The summary above the table still counts every voucher.
+  const open = seesPayroll ? all : all.filter((v) => !isPayrollReference(v.reference_type))
+  const lockedBatches = seesPayroll
+    ? []
+    : filterLockedBatches(lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type))), filters)
+  const lockedCount = lockedBatches.reduce((n, b) => n + b.count, 0)
 
   // Apply all filters in-memory. Summary stats below use `all` (unfiltered
   // context), only the table uses `filtered`.
@@ -133,7 +142,7 @@ export default async function VoucherLedger({
   const isLoanRepay = (v: { fund_source_id?: string | null; loan_id?: string | null; voucher_type?: string | null }) =>
     v.fund_source_id != null || v.loan_id != null || v.voucher_type === 'loan_repayment'
 
-  const filtered = all.filter((v) => {
+  const filtered = open.filter((v) => {
     if (tab !== 'all' && v.status !== tab) return false
     if (typeFilter === 'loan_repayment') {
       if (!isLoanRepay(v)) return false
@@ -218,7 +227,7 @@ export default async function VoucherLedger({
               </>
             )
           })()}
-          {!isReceipts ? (
+          {!isReceipts && seesPayroll ? (
             <Link
               href="/payments/payroll-requests"
               className={
@@ -320,12 +329,12 @@ export default async function VoucherLedger({
           </Suspense>
 
           <p className="font-serif italic text-graphite text-sm mb-4">
-            {filtered.length + extraFiltered.length} of {all.length + extraRows.length} {noun}
+            {filtered.length + lockedCount + extraFiltered.length} of {all.length + extraRows.length} {noun}
             {all.length + extraRows.length === 1 ? '' : 's'}
             {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
           </p>
 
-          {filtered.length + extraFiltered.length === 0 ? (
+          {filtered.length + lockedCount + extraFiltered.length === 0 ? (
             <div className="border border-hairline rounded-md bg-surface p-8 text-center">
               <p className="font-serif italic text-muted text-sm">
                 No {tab.replace('_', ' ')} {noun}s.
@@ -379,11 +388,24 @@ export default async function VoucherLedger({
                     // A paid voucher's date is corrected in place (改日期) — a
                     // draft or pending one with Edit, and payroll's from HR Payment.
                     amendDate:
-                      v.status === 'paid' && v.payment_date && !PAYROLL_REFERENCE_TYPES.has(v.reference_type ?? '')
+                      v.status === 'paid' && v.payment_date && !isPayrollReference(v.reference_type)
                         ? { kind: 'voucher' as const, id: v.id, date: (v.payment_date as string).slice(0, 10) }
                         : undefined,
                   }
-                }), ...extraFiltered]}
+                }), ...lockedBatches.map<VoucherRow>((b) => ({
+                  // One row for the whole batch: what it is, how many, how much.
+                  id: `locked-${b.label}`,
+                  voucher_no: null,
+                  direction: 'debit',
+                  amount: b.total,
+                  payee_name: b.label,
+                  status: b.statuses.length === 1 ? b.statuses[0] : 'mixed',
+                  catLabel: 'Payroll',
+                  poolLabel: '—',
+                  description: `${b.count} 张 · ${b.statusText} · 只显示总数`,
+                  paymentOrCreatedDate: b.latest,
+                  locked: true,
+                })), ...extraFiltered]}
                 // A text search must be able to land on one person's salary
                 // PV, so the batches stay flat while ?q= is set.
                 collapseBatches={!qFilter}

@@ -14,6 +14,7 @@
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import {
   applyPoolAdjust,
   buildBankDay,
@@ -46,6 +47,9 @@ export interface DailyBankData {
 export async function fetchDailyBank(
   supabase: SupabaseClient,
   date: string, // YYYY-MM-DD
+  // false = the account may not see what one named person is paid
+  // (canSeePayrollPayouts): its pending payroll is one line per bank.
+  opts: { seesPayroll: boolean },
 ): Promise<DailyBankData> {
   const dayEndIso = `${date}T23:59:59.999+08:00`
 
@@ -142,7 +146,7 @@ export async function fetchDailyBank(
   if (pendingIds.length > 0) {
     const { data: pvRows } = await supabase
       .from('payment_vouchers')
-      .select('id, voucher_no, payee_name, description, amount, bank_account_id, direction, status, updated_at')
+      .select('id, voucher_no, payee_name, description, amount, bank_account_id, direction, status, updated_at, reference_type')
       .in('id', pendingIds)
     const vouchers = ((pvRows ?? []) as Array<{
       id: string
@@ -154,6 +158,7 @@ export async function fetchDailyBank(
       direction: string
       status: string
       updated_at: string
+      reference_type: string | null
     }>).filter(
       v =>
         v.direction === 'debit' &&
@@ -178,16 +183,25 @@ export async function fetchDailyBank(
       srcByVoucher.set(s.voucher_id, list)
     }
 
-    pendingByBank = new Map()
-    for (const v of vouchers) {
-      if (!v.bank_account_id) continue
-      const amounts = emptyAmounts()
+    // A pending payroll voucher names who is paid what. An account without
+    // Payroll payouts gets them folded into one line per bank (below), so
+    // what is pending — and what is free — still comes out right.
+    const folded = opts.seesPayroll ? [] : vouchers.filter(v => isPayrollReference(v.reference_type))
+    const listed = opts.seesPayroll ? vouchers : vouchers.filter(v => !isPayrollReference(v.reference_type))
+    const addVoucher = (amounts: SegAmounts, v: { id: string; amount: number }) => {
       const srcs = srcByVoucher.get(v.id) ?? []
       if (srcs.length > 0) {
         for (const s of srcs) addAmounts(amounts, columnForPool(s.pool), s.amount)
       } else {
         addAmounts(amounts, 'venture', Number(v.amount))
       }
+    }
+
+    pendingByBank = new Map()
+    for (const v of listed) {
+      if (!v.bank_account_id) continue
+      const amounts = emptyAmounts()
+      addVoucher(amounts, v)
       const item: PendingItem = {
         voucherNo: v.voucher_no ?? '—',
         payee: v.payee_name ?? '—',
@@ -203,6 +217,29 @@ export async function fetchDailyBank(
     // rows in arbitrary DB order, which read as a jumble on the day sheet.
     for (const list of pendingByBank.values()) {
       list.sort((a, b) => a.voucherNo.localeCompare(b.voucherNo))
+    }
+
+    // Payroll, folded: last on each bank's list. English only — the same
+    // payload feeds the PDF, which has no CJK glyphs.
+    const foldedByBank = new Map<string, { amounts: SegAmounts; total: number; count: number }>()
+    for (const v of folded) {
+      if (!v.bank_account_id) continue
+      const f = foldedByBank.get(v.bank_account_id) ?? { amounts: emptyAmounts(), total: 0, count: 0 }
+      addVoucher(f.amounts, v)
+      f.total = r2(f.total + Number(v.amount))
+      f.count += 1
+      foldedByBank.set(v.bank_account_id, f)
+    }
+    for (const [bankId, f] of foldedByBank) {
+      const list = pendingByBank.get(bankId) ?? []
+      list.push({
+        voucherNo: '—',
+        payee: 'Payroll',
+        description: `${f.count} voucher${f.count === 1 ? '' : 's'} — total only`,
+        amounts: f.amounts,
+        total: f.total,
+      })
+      pendingByBank.set(bankId, list)
     }
   }
 

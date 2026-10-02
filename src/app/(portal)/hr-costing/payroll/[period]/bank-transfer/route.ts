@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePayrollPayouts } from '@/lib/auth'
 import { generateAllianceBankCsv } from '@/lib/bank-transfer/alliance-bank'
 import { salaryBankPayees, type SalaryBankLine } from '@/lib/bank-transfer/payroll-voucher-payees'
 
@@ -12,7 +12,9 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ period: string }> },
 ) {
-  await requirePermission('hr_costing', 'treasury')
+  // Every employee's net pay and bank account: HR Costing, or Treasury WITH
+  // Payroll payouts (2026-10-02).
+  await requirePayrollPayouts('hr_costing', 'treasury')
   const { period } = await context.params
 
   if (!/^\d{4}-\d{2}-01$/.test(period)) {

@@ -27,7 +27,7 @@ function database(options: { covered?: boolean; error?: boolean; status?: string
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ id: 'finance' })
+  mocks.requirePermission.mockResolvedValue({ id: 'finance', permissions: ['treasury', 'payroll_payouts'] })
   mocks.notFound.mockImplementation(() => { throw new Error('NOT_FOUND') })
   mocks.redirect.mockImplementation(() => { throw new Error('NEXT_REDIRECT') })
 })
@@ -59,5 +59,20 @@ describe('salary PV edit route', () => {
     const from = database({ status: 'approved' })
     await expect(EditPaymentPage({ params: Promise.resolve({ id: 'salary' }) })).rejects.toThrow('NEXT_REDIRECT')
     expect(from).toHaveBeenCalledTimes(1)
+  })
+
+  // 2026-10-02: what one person is paid does not open without Payroll payouts.
+  it('does not open a payroll voucher for a treasury account without Payroll payouts', async () => {
+    mocks.requirePermission.mockResolvedValue({ id: 'executive', permissions: ['treasury'] })
+    const from = database()
+    await expect(EditPaymentPage({ params: Promise.resolve({ id: 'salary' }) })).rejects.toThrow('NOT_FOUND')
+    expect(from).toHaveBeenCalledTimes(1)
+  })
+
+  it('…and still opens an ordinary one for that account', async () => {
+    mocks.requirePermission.mockResolvedValue({ id: 'executive', permissions: ['treasury'] })
+    database({ reference: 'ordinary_payment' })
+    render(await EditPaymentPage({ params: Promise.resolve({ id: 'salary' }) }))
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThan(0)
   })
 })

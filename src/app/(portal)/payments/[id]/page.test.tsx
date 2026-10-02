@@ -72,7 +72,7 @@ describe('HR payroll voucher detail access', () => {
   })
 
   it('does not expose generic financial reversal for a paid salary PV', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
     const { voucher } = database('payroll_disbursement')
     voucher.status = 'paid'
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
@@ -224,6 +224,8 @@ describe('改日期 on the voucher page', () => {
     expect(screen.queryByTestId('amend-date')).toBeNull()
     pending.unmount()
 
+    // A payroll voucher opens only with Payroll payouts; even then its date is HR's.
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
     const payroll = database('payroll_disbursement')
     Object.assign(payroll.voucher, paid)
     const salary = render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
@@ -235,5 +237,34 @@ describe('改日期 on the voucher page', () => {
     Object.assign(statutory.voucher, paid)
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(screen.queryByTestId('amend-date')).toBeNull()
+  })
+})
+
+// 2026-10-02 (user: "我不希望他看到 payroll detail，也就是每个人的 payout").
+describe('a payroll voucher, for a treasury account without Payroll payouts', () => {
+  const asExecutive = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+
+  it.each(['payroll_disbursement', 'payroll_statutory', 'payroll_payment_request'])(
+    'does not open a %s voucher, and reads nothing more about it',
+    async (referenceType) => {
+      asExecutive()
+      const { from } = database(referenceType)
+      await expect(PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) })).rejects.toThrow('NOT_FOUND')
+      expect(from).toHaveBeenCalledTimes(1) // the voucher, and no line, attachment or name after it
+    },
+  )
+
+  it('opens any other voucher as before', async () => {
+    asExecutive()
+    database('ordinary_payment')
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByRole('heading', { level: 1, name: 'TEST-STAT-PV' })).toBeVisible()
+  })
+
+  it('opens payroll for the same account once it is given Payroll payouts', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
+    database('payroll_statutory')
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByRole('table', { name: 'Statutory contributions covered by this voucher' })).toHaveTextContent('Recorded Employee')
   })
 })

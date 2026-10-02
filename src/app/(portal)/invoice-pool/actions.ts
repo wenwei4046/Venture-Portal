@@ -2,12 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePayrollPayouts } from '@/lib/auth'
 
 // ─── Request invoice pool release (Finance) ─────────────────────────────────
 
 export async function requestRelease(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requirePayrollPayouts('treasury')
   const supabase = await createClient()
 
   const amountRaw = (formData.get('amount') as string) ?? '0'

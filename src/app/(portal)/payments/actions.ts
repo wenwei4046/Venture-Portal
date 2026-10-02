@@ -7,6 +7,8 @@ import dayjs from 'dayjs'
 import { officeDate } from '@/lib/office-clock'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
@@ -911,10 +913,12 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
 
   const { data: src, error: srcErr } = await supabase
     .from('payment_vouchers')
-    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool')
+    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool, reference_type')
     .eq('id', sourceId)
     .single()
   if (srcErr || !src) throw new Error('Source voucher not found')
+  // A copy carries the payee and the amount into a draft the caller can read.
+  if (isPayrollReference(src.reference_type) && !canSeePayrollPayouts(user)) throw new Error('Source voucher not found')
 
   // New voucher number — same scheme as createPaymentVoucher.
   const period = dayjs().format('YYYYMM')

@@ -1,6 +1,8 @@
 import React from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
@@ -34,7 +36,8 @@ const POOL_LABELS: Record<string, string> = {
 }
 
 export async function GET(req: Request) {
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury')
+  const seesPayroll = canSeePayrollPayouts(user)
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 
@@ -93,9 +96,17 @@ export async function GET(req: Request) {
 
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
+  const filters = { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter }
+
+  // Without Payroll payouts the file carries payroll the way the page shows
+  // it: one total per batch and none of its vouchers (lib/payroll-vouchers.ts).
+  const open = seesPayroll ? all : all.filter((v) => !isPayrollReference(v.reference_type))
+  const lockedBatches = seesPayroll
+    ? []
+    : filterLockedBatches(lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type))), filters)
 
   // Apply all filters in-memory (same logic as page)
-  const filtered = all.filter((v) => {
+  const filtered = open.filter((v) => {
     if (tab !== 'all' && v.status !== tab) return false
     if (typeFilter && v.voucher_type !== typeFilter) return false
     if (poolFilter) {
@@ -154,6 +165,24 @@ export async function GET(req: Request) {
     }
   })
 
+  for (const b of lockedBatches) {
+    dated.push({
+      raw: b.latest,
+      row: {
+        voucher_no: null,
+        date: dayjs(b.latest).format('DD/MM/YYYY'),
+        direction: 'debit',
+        type: 'payroll',
+        status: b.statusText,
+        payee_name: `${b.label} (${b.count} voucher${b.count === 1 ? '' : 's'}, total only)`,
+        amount: b.total,
+        catLabel: 'Payroll',
+        poolLabel: '—',
+      },
+    })
+  }
+  if (lockedBatches.length > 0) dated.sort((a, b) => new Date(b.raw).getTime() - new Date(a.raw).getTime())
+
   // Exports mirror their pages: outside-the-voucher-flow rows ride along,
   // deduped and filtered by the same rules. Receipts: direct loan repayments +
   // Fund IN capital. Payments: direct fund-source repayments + Loan OUT
@@ -162,7 +191,7 @@ export async function GET(req: Request) {
     const isCredit = directionFilter === 'credit'
     const extras = filterReceiptExtras(
       isCredit ? await fetchReceiptExtras(supabase) : await fetchPaymentExtras(supabase),
-      { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter },
+      filters,
     )
     for (const r of extras) {
       dated.push({

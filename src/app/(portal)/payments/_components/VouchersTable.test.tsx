@@ -164,3 +164,57 @@ describe('改日期 from the row menu', () => {
     expect(screen.getByTestId('redate')).toHaveTextContent('repayment · abc · 2026-09-19 · 还款 · principal · The Cont')
   })
 })
+
+// 2026-10-02 (user: "我不希望他看到 payroll detail，也就是每个人的 payout"): an account
+// without Payroll payouts is sent a payroll batch as ONE row — its total — in
+// place of the batch's vouchers (lib/payroll-vouchers.ts).
+describe('a locked payroll batch', () => {
+  const locked: VoucherRow = {
+    id: 'locked-Payroll disbursement Sep 2026',
+    voucher_no: null,
+    direction: 'debit',
+    amount: 86420,
+    payee_name: 'Payroll disbursement Sep 2026',
+    status: 'paid',
+    catLabel: 'Payroll',
+    poolLabel: '—',
+    description: '26 张 · 26 paid · 只显示总数',
+    paymentOrCreatedDate: '2026-10-05',
+    locked: true,
+  }
+
+  it('is a row like any other: what it is, how many, how much, when', () => {
+    render(<VouchersTable rows={[voucher, locked]} />)
+    const row = rowOf('Payroll disbursement Sep 2026')
+    expect(row).toHaveTextContent('Payroll')
+    expect(row).toHaveTextContent('26 张 · 26 paid · 只显示总数')
+    expect(row).toHaveTextContent('−86,420.00')
+    expect(row).toHaveTextContent('5 Oct')
+    // It sorts by date with the vouchers: newest first.
+    expect(Array.from(document.querySelectorAll('tbody tr')).map((tr) => tr.querySelectorAll('td')[3]?.textContent)).toEqual([
+      'Payroll disbursement Sep 2026', 'TNB',
+    ])
+  })
+
+  it('opens nothing: no double-click, no menu, no Tab stop — while the voucher beside it still does', () => {
+    render(<VouchersTable rows={[voucher, locked]} />)
+    const row = rowOf('Payroll disbursement Sep 2026')
+    fireEvent.doubleClick(screen.getByText('Payroll disbursement Sep 2026'))
+    fireEvent.contextMenu(row)
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(push).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(row.getAttribute('tabindex')).toBeNull()
+
+    expect(rowOf('TNB').getAttribute('tabindex')).toBe('0')
+    fireEvent.doubleClick(screen.getByText('TNB'))
+    expect(push).toHaveBeenCalledWith('/payments/pv-1')
+  })
+
+  it('is not something to unfold', () => {
+    render(<VouchersTable rows={[locked]} />)
+    expect(screen.queryByText('展开')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Payroll disbursement/ })).toBeNull()
+    expect(screen.getByRole('table')).toBeVisible()
+  })
+})

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
-import { getMemberUser, getUser } from './auth'
+import { redirect } from 'next/navigation'
+import { getMemberUser, getUser, requirePayrollPayouts } from './auth'
 
 const mocks = vi.hoisted(() => ({
   subject: 'signed-in-id' as string | null,
@@ -88,5 +89,39 @@ describe('getUser view mask', () => {
     expect(await getMemberUser()).toBeNull()
     expect(mocks.rpc).not.toHaveBeenCalled()
     expect(mocks.maskLookup).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-02: Payroll Requests, the payroll bank file, the Invoice Pool — the
+// surfaces that are about what one named person is paid.
+describe('requirePayrollPayouts', () => {
+  const signedInAs = (role: User['role'], permissions: string[]) => {
+    mocks.row!.role = role
+    mocks.rpc.mockResolvedValue({ data: permissions })
+  }
+
+  it('lets a treasury account through once it holds Payroll payouts', async () => {
+    signedInAs('finance', ['treasury', 'payroll_payouts'])
+    const user = await requirePayrollPayouts('treasury')
+    expect(user.permissions).toContain('payroll_payouts')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('sends a treasury account without it back to the dashboard', async () => {
+    signedInAs('finance', ['treasury'])
+    await requirePayrollPayouts('treasury')
+    expect(redirect).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('lets HR through on HR Costing alone: the payroll vouchers are theirs', async () => {
+    signedInAs('hr', ['hr_costing'])
+    await requirePayrollPayouts('hr_costing', 'treasury')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('asks for the page permission first: Payroll payouts by itself opens nothing', async () => {
+    signedInAs('dept_manager', ['payroll_payouts'])
+    await requirePayrollPayouts('treasury')
+    expect(redirect).toHaveBeenCalledWith('/dashboard')
   })
 })

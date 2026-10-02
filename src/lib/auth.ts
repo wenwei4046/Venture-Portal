@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import type { User, UserRole } from '@/types'
 import { VIEW_AS_COOKIE, honouredViewAs, type ViewSurface } from '@/lib/view-as'
 import { can, type Permission } from '@/lib/permissions'
+import { canSeePayrollPayouts } from '@/lib/roles'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -98,6 +99,20 @@ export async function requireAuth(): Promise<User> {
 export async function requirePermission(...keys: Permission[]): Promise<User> {
   const user = await requireAuth()
   if (!can(user, ...keys)) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/**
+ * requirePermission, for a surface that is about what one named person is
+ * paid: Payroll Requests, the payroll bank file, the Invoice Pool. Treasury
+ * reaches those only with Payroll payouts on top (2026-10-02 — see
+ * canSeePayrollPayouts in lib/roles.ts).
+ */
+export async function requirePayrollPayouts(...keys: Permission[]): Promise<User> {
+  const user = await requirePermission(...keys)
+  if (!canSeePayrollPayouts(user)) {
     redirect('/dashboard')
   }
   return user

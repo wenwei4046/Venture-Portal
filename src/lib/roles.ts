@@ -16,6 +16,15 @@ export function canAccessTreasury(u: PermissionHolder): boolean {
   return can(u, 'treasury')
 }
 
+export function canSeePayrollPayouts(u: PermissionHolder): boolean {
+  // What ONE named person is paid, as the treasury side shows it: a salary or
+  // statutory voucher, its print, the payroll bank file, Payroll Requests.
+  // Treasury alone stops short of it (2026-10-02, the finance executive) —
+  // such an account gets payroll as one total per batch (lib/payroll-vouchers).
+  // Whoever runs payroll in HR Costing sees it regardless: the vouchers are theirs.
+  return can(u, 'payroll_payouts', 'hr_costing')
+}
+
 export function canAccessBilling(u: PermissionHolder): boolean {
   return can(u, 'billing')
 }

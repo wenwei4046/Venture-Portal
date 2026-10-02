@@ -39,7 +39,7 @@ function mockDatabase(vouchers: ReturnType<typeof voucher>[], coverageError: obj
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ role: 'principal', permissions: ['treasury'] })
+  mocks.requirePermission.mockResolvedValue({ role: 'principal', permissions: ['treasury', 'payroll_payouts'] })
   mocks.exportPdfResponse.mockResolvedValue(new Response('pdf'))
 })
 
@@ -115,5 +115,25 @@ describe('voucher PDF statutory coverage', () => {
     const response = await GET(new Request('http://localhost/payments/voucher-doc?id=ordinary'))
     expect(response.status).toBe(404)
     expect(mocks.exportPdfResponse).not.toHaveBeenCalled()
+  })
+
+  // 2026-10-02: a payroll voucher prints who is paid what, and into which account.
+  it('prints no payroll voucher for a treasury account without Payroll payouts', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    const { from } = mockDatabase([voucher('salary', 'payroll_disbursement'), voucher('stat', 'payroll_statutory'), voucher('fund', 'payroll_payment_request')])
+    const response = await GET(new Request('http://localhost/payments/voucher-doc?ids=salary,stat,fund'))
+    expect(response.status).toBe(404)
+    expect(mocks.exportPdfResponse).not.toHaveBeenCalled()
+    expect(from).not.toHaveBeenCalledWith('payroll_voucher_lines')
+    expect(from).not.toHaveBeenCalledWith('payroll_statutory_voucher_lines')
+  })
+
+  it('…and from a mixed selection prints only what that account may see', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    const { from } = mockDatabase([voucher('ordinary', null), voucher('salary', 'payroll_disbursement')])
+    const response = await GET(new Request('http://localhost/payments/voucher-doc?ids=ordinary,salary'))
+    expect(response.status).toBe(200)
+    expect(mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers.map((v: { id: string }) => v.id)).toEqual(['ordinary'])
+    expect(from).not.toHaveBeenCalledWith('payroll_voucher_lines')
   })
 })

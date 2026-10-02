@@ -1,5 +1,151 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-02 d (SHIPPED) — 改日期, the office clock, and Payroll payouts
+
+The user confirmed a three-part sample ("照这个做"). All three are on `main`. This supersedes the two
+"asked, NOT built" items of checkpoint c below.
+
+### 1. 改日期 — a wrong date on something posted is corrected in place (e75a7946)
+
+Right-click a row on Payments / Receipts → 改日期 (also beside the date on a paid
+voucher's page). Date + reason. For a **paid** receipt or payment voucher and a
+**received** loan repayment. Not a draft / pending voucher (that is Edit), not a
+payroll voucher (its date is HR Payment's).
+
+- `amend_voucher_date`, `amend_loan_repayment_date` — migration
+  `20261002020000_amend_posted_dates.sql`. SECURITY DEFINER, finance / principal
+  only, the role check written `IS NULL OR NOT IN` (see the finding below),
+  EXECUTE revoked from anon. They move the record, its journal entries
+  (`transaction_date` + `period_month`), the `fund_source_repayments` /
+  auto-synced `repayments` rows a repayment voucher wrote, and leave a note on
+  each. Refused: a future date, the same date, no reason, a closed month (old
+  or new), lines already matched in a bank reconciliation.
+- `AmendDateButton` (payments/_components), `amendVoucherDate` (payments/actions),
+  `amendRepaymentDate` (fund-out/actions). `VoucherRow.amendDate` says which rows
+  have it.
+- Its two tests that ended on a click raced the end of the save (the result
+  shows a moment before `isPending` drops, and Close / 确认改 wait for that).
+  They now wait for the button. The dialog itself was right.
+
+### 2. Times printed by the server are on the office clock (e727a1be)
+
+A server component printing `dayjs(x).format('… HH:mm')` printed UTC on Vercel:
+12:47 read 04:47. `lib/office-time.ts` — `officeTime(x)` is `dayjs(x)` at +08:00,
+so every format string stayed as it was. 28 places in 22 files (approvals, audit
+log, billing requests, dept pool, director salary, fund in / out, HR costing,
+payslip, payroll requests, statements, the invoice / credit note / voucher /
+table PDFs, team activity), plus the two pages that used `toLocaleString`
+(`approvals/payroll-run/[id]`, `print/director-pool`), which now name
+`OFFICE_TZ`.
+
+- **Client components were left alone**: they print the viewer's own time. They
+  still hydrate with a text mismatch when the server's first paint (UTC) differs
+  — React re-renders that boundary on the client. `officeTime` there would
+  remove it (CombinedApprovalCard, PendingApprovals, InvoiceDetailButton,
+  StaffTab, PeopleDirectory, PersonCard, AttachmentList, CommissionWorkbench).
+- Still not done: a moment printed as a DATE only on the server
+  (`dayjs(created_at).format('D MMM YYYY')`) is a day early for anything made
+  between 00:00 and 08:00.
+
+### 3. Payroll payouts — a treasury account that must not see each person's pay
+
+User: "我现在有 finance executive 了，我不希望他看到 payroll detail，也就是每个人的
+payout". The executive's login does not exist yet.
+
+**The permission**: `payroll_payouts` ("Payroll payouts", section Daily, scope
+`none`) — migration `20261002030000_payroll_payouts_permission.sql`, applied.
+Role default: principal only. The finance account that existed that day holds
+it as a **personal grant** (`user_permissions`), so nothing changed for it. A
+finance account created later does not have it. In the app:
+`canSeePayrollPayouts(u)` = `payroll_payouts` OR `hr_costing` (lib/roles.ts) and
+`requirePayrollPayouts(...keys)` (lib/auth.ts).
+
+**What an account with Treasury but without it gets** (all folded or refused on
+the server; nothing person-level is sent to the browser):
+
+| Surface | Without Payroll payouts |
+| --- | --- |
+| `/payments` | each payroll batch is ONE row — "Payroll disbursement Sep 2026 · 26 张 · 只显示总数" — that opens nothing; statutory vouchers fold per body per month ("KWSP Sep 2026"), funding transfers per month. The summary above still totals every voucher. No Payroll Requests button. |
+| `/payments/[id]`, `/payments/[id]/edit` | a payroll voucher is not found |
+| `/payments/voucher-doc` | payroll vouchers dropped from the selection; 404 if none left |
+| `/payments/export` | the same batch rows as the page |
+| `copyPaymentVoucher` | refuses a payroll source |
+| `/hr-costing/payroll/[period]/bank-transfer` | redirect (needs hr_costing, or treasury + payroll_payouts) |
+| `/payments/payroll-requests` + its four actions | redirect |
+| `/invoice-pool` + `requestRelease` | redirect |
+| `/approvals/[id]` | the request of a payroll voucher is not found |
+| `/daily-bank` (+ PDF) | pending payroll is one "Payroll — N vouchers — total only" line per bank; pending and available totals unchanged |
+
+`lib/payroll-vouchers.ts` holds the folding: `isPayrollReference`,
+`payrollBatchLabel` (what and which month — never who, never which department;
+a description in an unknown shape is never used as the name),
+`lockPayrollBatches`, `filterLockedBatches` (a batch is always shown whole: a
+pool or amount filter hides the locked rows, a search matches the batch's name
+only, a status tab keeps a batch that has a voucher in that status).
+`SortableTable` gained `rowOpens` for a row with no page of its own.
+
+**In the database (RLS)** only the tables that are nothing but one person's pay
+were narrowed for a treasury reader without the permission:
+`payroll_voucher_lines`, `payroll_statutory_voucher_lines`, and the finance
+own-department policies on `hr_monthly_payroll` / `hr_staff_costs`. HR's and the
+Principal's reading is untouched. Verified as each role in a rolled-back
+transaction (holder 71 / 110 lines, non-holder 0 / 0, HR and Principal as before,
+`payment_vouchers` 455 visible either way).
+
+**`payment_vouchers` was deliberately NOT narrowed.** Every voucher number is
+"how many vouchers this session can see, plus one" (payments/actions.ts ×2,
+billing/actions.ts, claims/actions.ts, payroll-requests/actions.ts) against
+`UNIQUE (voucher_no)`. An account that could not see the ~140 payroll vouchers
+would collide on every voucher it created. So for vouchers, approval requests,
+dept pool rows and the journal the boundary is the PAGES, not the database:
+
+- A treasury account can still read `payment_vouchers` (payee + amount),
+  `approval_requests`, `dept_pools` and `journal_entries` / `journal_lines`
+  through the API with its own login. The journal's payroll entries name the
+  payee ("PV …: Payroll net Sep 2026 — <name> (<dept>)"); that text is written
+  by HR's payroll RPCs.
+- So the pages that list the journal or the pool rows must be switched off for
+  such an account: **Reports, Department reports, Reconciliation, Dept Pool**.
+  Nothing in code does this — the Principal does, per person (Team › People ›
+  the person › permissions → deny) or by configuring the title (Team ›
+  Permissions). A new finance account gets all four from its role until then.
+- To make it a database boundary: move voucher numbering into a SECURITY
+  DEFINER function (or a sequence), then narrow `pv_select` / `approvals_
+  privileged_select`; the journal would need the payee taken out of the entry
+  text, which is HR's RPC.
+- A department with one person: anything shown per department (Daily Bank's
+  columns, Billing's payroll allocation, a dept pool balance) is that person's.
+  The batch rows fold across departments for that reason; the per-department
+  reports cannot.
+
+**View as Finance** (the Principal's switcher) now shows what a NEW finance
+account sees — locked payroll — because the mask is the role's defaults and the
+grant is personal. It is the way to look at the executive's view.
+
+Not built, not asked: the General Ledger and the other reports made safe for
+such an account (the user: "暂时不需要").
+
+### Found, NOT fixed — needs the user's go-ahead ("先确定")
+
+**Role checks that let a caller with no role through.** `IF v_role NOT IN
+('finance', 'principal') THEN RAISE …` passes when `v_role` is NULL (not logged
+in, or deactivated): `NULL NOT IN (…)` is NULL and the IF does not fire. About
+60 SECURITY DEFINER functions in `public` are written that way with no NULL
+guard, and about 50 of them are EXECUTE-able by `anon` (regex count,
+2026-10-02). Proven as `anon` in rolled-back transactions:
+`amend_loan_repayment` reached "Repayment not found", `create_manual_journal_
+voucher` reached "Description is required", `get_staff_billing_allocation`
+returned rows. Among them: amend_fund_source, amend_loan, create_loan_with_
+approval, generate_monthly_invoices, mint_invoice_no,
+reassign_voucher_gl_account, void_issued_invoice, get_director_payout_summary,
+get_payroll_accrual_totals.
+
+Proposed (not applied): `REVOKE EXECUTE … FROM anon, PUBLIC` on every one of
+them — no function body changes, and no anon caller exists in the app (the API
+routes are `/api/erp/v1/*`, the `/api/member-queue` cron and `/api/wasm-health`;
+the admin client is service-role) — then add the NULL guard function by
+function. Many of them are HR's.
+
 ## CHECKPOINT 2026-10-02 c — the voucher page rebuilt (SHIPPED); two things asked and NOT built
 
 ### Shipped: `/payments/[id]`
