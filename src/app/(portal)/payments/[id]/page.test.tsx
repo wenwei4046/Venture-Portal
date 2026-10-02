@@ -12,12 +12,12 @@ vi.mock('./_components/AttachmentUploader', () => ({ default: () => <div data-te
 vi.mock('@/components/voucher/AttachmentList', () => ({ default: () => <div data-testid="attachment-list" /> }))
 import PaymentDetailPage from './page'
 
-function database(referenceType = 'payroll_statutory', salaryLines: Record<string, unknown>[] = [], salaryError: object | null = null) {
-  const voucher = { id: 'stat', voucher_no: 'TEST-STAT-PV', reference_type: referenceType, status: 'pending_approval', amount: 100.10, direction: 'debit', voucher_type: 'salary_payout', payee_name: 'KWSP', payee_company_id: null, bank_account_id: null, source_pool: null, target_pool: null, created_by: 'creator', approved_by: null, approved_at: null, created_at: '2026-09-11T00:00:00Z', updated_at: '2026-09-11T00:00:00Z', executed_at: null, payment_method: 'bank_transfer', description: 'Statutory fixture', notes: null }
+function database(referenceType = 'payroll_statutory', salaryLines: Record<string, unknown>[] = [], salaryError: object | null = null, invoices: Record<string, unknown>[] = []) {
+  const voucher: Record<string, unknown> & { status: string } = { id: 'stat', voucher_no: 'TEST-STAT-PV', reference_type: referenceType, status: 'pending_approval', amount: 100.10, direction: 'debit', voucher_type: 'salary_payout', payee_name: 'KWSP', payee_company_id: null, bank_account_id: null, source_pool: null, target_pool: null, created_by: 'creator', approved_by: null, approved_at: null, created_at: '2026-09-11T00:00:00Z', updated_at: '2026-09-11T00:00:00Z', executed_at: null, payment_method: 'bank_transfer', description: 'Statutory fixture', notes: null }
   const filters: string[][] = []
   const from = vi.fn((table: string) => {
     let allowedReferences: string[] | null = null
-    const result = { data: table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : table === 'payroll_voucher_lines' ? salaryLines : [], error: table === 'payroll_voucher_lines' ? salaryError : null }
+    const result = { data: table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : table === 'payroll_voucher_lines' ? salaryLines : table === 'invoices' ? invoices : [], error: table === 'payroll_voucher_lines' ? salaryError : null }
     const query = {
       select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
       in: vi.fn((column: string, values: string[]) => { if (column === 'reference_type') { allowedReferences = values; filters.push(values) } return query }),
@@ -117,5 +117,88 @@ describe('HR payroll voucher detail access', () => {
     mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
     database('payroll_disbursement', [], { message: 'private database detail' })
     await expect(PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) })).rejects.toThrow('Unable to load the recorded salary payment details')
+  })
+})
+
+// 2026-10-02 (user: "这个 pv 点开看 detail 也是很乱 / receipt 也是字体你看怪怪的").
+describe('the voucher page, laid out like the deal forms', () => {
+  const asFinance = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  const stepLabels = () => Array.from(document.querySelectorAll('.trail-step')).map((li) => li.firstElementChild?.textContent)
+  const panel = () => document.querySelector('aside.deal-side') as HTMLElement
+
+  it('sets the number in the figures’ face, with its status beside it', async () => {
+    asFinance()
+    database('ordinary_payment')
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    const number = screen.getByRole('heading', { level: 1, name: 'TEST-STAT-PV' })
+    expect(number).toHaveClass('title-number') // not the Georgia page title, whose figures are old-style
+    expect(number.parentElement).toHaveTextContent('等批准 · pending approval')
+  })
+
+  it('prints times as the office reads them, not as the server keeps them', async () => {
+    asFinance()
+    database('ordinary_payment') // created 2026-09-11T00:00Z — 08:00 in Kuala Lumpur
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByText(/Creator 建立 · 11 Sep 2026 · 08:00/)).toBeVisible()
+  })
+
+  it('keeps what the voucher is in one panel: amount, payee, date, method — and the actions', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    voucher.payment_date = '2026-09-12'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    const side = panel()
+    expect(side).toHaveTextContent('RM 100.10')
+    expect(side).toHaveTextContent('付给 KWSP')
+    expect(side).toHaveTextContent('付款日期12 Sep 2026')
+    expect(side).toHaveTextContent('方式bank transfer')
+    expect(within(side).getByTestId('voucher-actions')).toBeInTheDocument()
+  })
+
+  it('says so when no payment date was set', async () => {
+    asFinance()
+    database('ordinary_payment')
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(panel()).toHaveTextContent('付款日期还没定')
+  })
+
+  it('a payment waiting for approval has got as far as 送批', async () => {
+    asFinance()
+    database('ordinary_payment')
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(stepLabels()).toEqual(['建立', '送批', '批准', '付款'])
+    const [made, sent, approve, pay] = Array.from(document.querySelectorAll('.trail-step'))
+    expect(made).toHaveClass('done', 'joined')
+    expect(sent).toHaveClass('done')
+    expect(sent).not.toHaveClass('joined') // nothing beyond it has happened
+    expect(approve).not.toHaveClass('done')
+    expect(approve).toHaveTextContent('等 Principal')
+    expect(pay).not.toHaveClass('done')
+  })
+
+  it('a receipt has no approval to show, and names the invoices it settled', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment', [], null, [{ invoice_no: 'HV-INV-202609-0039' }, { invoice_no: 'HV-INV-202609-0041' }])
+    Object.assign(voucher, {
+      direction: 'credit', status: 'paid', payee_name: 'Hookka', payment_date: '2026-09-29',
+      approved_at: '2026-09-29T03:54:53Z', approved_by: 'creator', executed_at: '2026-09-29T03:54:53Z',
+    })
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(stepLabels()).toEqual(['建立', '已入账'])
+    const side = panel()
+    expect(side).toHaveTextContent('+RM 100.10')
+    expect(side).toHaveTextContent('收自 Hookka')
+    expect(side).toHaveTextContent('收款日期29 Sep 2026')
+    expect(side).toHaveTextContent('结哪张发票HV-INV-202609-0039 等 2 张')
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).toHaveTextContent('已收 · paid')
+  })
+
+  it('a voided voucher ends in 作废', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    voucher.status = 'voided'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(stepLabels()).toEqual(['建立', '作废'])
+    expect(document.querySelectorAll('.trail-step')[1]).toHaveClass('bad')
   })
 })

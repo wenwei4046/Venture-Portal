@@ -1,5 +1,81 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-02 c — the voucher page rebuilt (SHIPPED); two things asked and NOT built
+
+### Shipped: `/payments/[id]`
+
+User: "这个 pv 点开看 detail 也是很乱 / receipt 也是字体你看怪怪的". Confirmed on a
+before/after sample ("对，照这个做").
+
+- Laid out like New loan / New fund source: numbered cards on the left (付给谁 /
+  收自谁 · 从哪个池出 / 进哪个池 · people on a payroll voucher · statutory lines ·
+  附件, folded until wanted · 记录), and the navy panel on the right with the
+  status, amount, payee, **payment date** (it was shown nowhere), bank, pool,
+  account, the invoices a receipt settled, method — and the actions.
+- `VoucherActions` is drawn inside that panel. What each state offers is
+  unchanged; the paid / voided sentences are new, and its test follows them.
+- The number is `h1.title-number`: page titles are Georgia, whose figures are
+  old-style, which is what looked odd in "HV-OR-202609-0443".
+- Times go through `officeStamp` (`lib/office-clock`). The page printed 04:47
+  for a voucher made at 12:47: server components run in UTC on Vercel.
+  **About 30 other server-rendered files still do** — find them with
+  `grep -rln "format('[^']*HH:mm" src` (approvals, audit log, fund-in/out
+  detail, statements, the PDFs …). Client components are fine. Not fixed.
+- 记录: a receipt shows 建立 → 已入账 (it is booked on the spot; the approved_at
+  it carries is the creator's own). There is no submitted_at / voided_at column,
+  so 送批 shows a time only while pending and 作废 uses updated_at.
+
+### Asked, investigated, NOT built — waiting on the user
+
+**1. A finance executive must not see what each person is paid** ("我不希望他看到
+payroll detail，也就是每个人的 payout"). No such login exists yet (finance has
+one account, the Finance Manager; Finance titles exist with no login). Facts:
+
+- Permissions are per title / per person (`permission_defs`, `title_permissions`,
+  `user_permissions`, `current_permissions()`, `has_perm()` in SQL, Team › Permissions
+  for the Principal). `salary_individual` exists but **nothing checks it**, and its
+  scope is `hr` (holding it opens the HR tables at RLS level).
+- Anyone with a treasury-scope permission reads every payroll voucher. A named
+  person with an amount shows on (sweep by an Explore agent; the gates on the
+  gates were re-checked by hand):
+  - `/payments` — payroll batch unfolds to one PV per person; the folded rows
+    are in the page data even while folded. Per-employee statutory PVs are not
+    folded at all.
+  - `/payments/[id]` and `/payments/[id]/edit` — People on this voucher (name,
+    bank account, net), statutory lines per employee.
+  - `/payments/voucher-doc` (print) and `/payments/export`.
+  - `/hr-costing/payroll/[period]/bank-transfer` — gate is hr_costing OR
+    treasury: name, account, net. Not linked for Finance, reachable by URL.
+  - `/approvals/[id]` — **login only, no permission check**; title is
+    "HV-PV-…: Name — RM net".
+  - `/daily-bank` (+export) — every voucher pending on a day.
+  - `/dept-pool/hr?tab=history` — pool rows "PV …: Payroll net Sep 2026 — Name".
+  - `/reports/ledger` (+export), balance sheet / cash flow / receipt-payment
+    drill-downs, `/reconciliation/journal`, `/reconciliation/[sessionId]` — the
+    journal entry is "PV <no>: Payroll net <Mon YYYY> — <Name> (<Dept>)" and the
+    4070 line "other - <Name> (4070)". All 71 payroll PVs name the payee.
+  - `/invoice-pool` — director code + the director invoice share.
+  Totals only (fine): payroll-requests, payroll-run approvals, dept-pool index,
+  venture pool, P&L / TB / monthly reports, journal-entries, billing, statements.
+  Outside the app, by querying with the login: `hr_cost_submissions.staff_snapshot`,
+  own-department payroll rows, `payroll_salary_entitlements` / `payroll_row_delta`.
+- Proposed, not agreed: a new permission (scope `none`) for payroll payouts, off
+  for the finance role and granted to the present Finance Manager; without it
+  the screens show one line per batch and no names, the detail tables and the
+  bank file are closed in RLS. The journal text is written by HR's payroll
+  RPCs — changing what they write is not this session's to decide.
+
+**2. A date recorded wrong on a posted receipt / loan repayment** ("这个日期我录错了
+怎么办？能自己改吗？"). Today: no in-place edit. A voucher's date is editable only
+while draft / pending; a receipt is paid the moment it is made, so it is
+作废收据 + record again. A loan repayment is 撤销 on the loan page + record
+again. The date lives in `repayments.payment_date` and the journal entry's
+`transaction_date` / `period_month` (JE: reference_type `repayment`, reference_id =
+the LOAN id, matched by type + amount + date, as `amend_loan_repayment` does).
+Proposed: 改日期 beside 改金额, same shape (reason required, both months must be
+open). For a voucher more follows the date (its JEs, pool rows' period_month,
+the invoice) — check each before building.
+
 ## CHECKPOINT 2026-10-02 b (SHIPPED) — Columns panel, rows open on a double-click, dates on the left
 
 Same day, second round on the finance tables. User, on three screenshots:

@@ -23,12 +23,11 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
 
   if (!canUpload) {
     return (
-      <div className="border border-hairline rounded-md bg-surface-2/40 p-4 mb-4">
-        <p className="font-serif italic text-muted text-sm">
-          Attachments are locked once the voucher is {voucherStatus.replace('_', ' ')}. To change,
-          revert or void this voucher first.
-        </p>
-      </div>
+      // No box of its own: it sits inside the voucher page's 附件 card (2026-10-02).
+      <p className="font-sans text-muted text-sm">
+        Attachments are locked once the voucher is {voucherStatus.replace('_', ' ')}. To change,
+        revert or void this voucher first.
+      </p>
     )
   }
 
@@ -80,7 +79,7 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
   }
 
   return (
-    <div className="border border-hairline rounded-md bg-surface p-5 mb-4">
+    <div className="border border-hairline rounded-md bg-paper p-4">
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="font-serif text-md text-ink">Add attachments</h3>
         <span className="font-mono text-xs text-muted">PDF, image, Excel, Word, CSV · ≤ 10 MB</span>
