@@ -65,7 +65,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   const demo = useMemo(() => crmDemo(), []);
   const [leads, setLeads] = useState<CrmLead[]>(() => (live ? [] : applyAutoFollowUp(demo.leads)));
   const [appointments, setAppointments] = useState<CrmAppointment[]>(live ? [] : demo.appointments);
-  const [load, setLoad] = useState<{ state: "loading" | "ready" } | { state: "error"; error: string }>({ state: live ? "loading" : "ready" });
+  const [load, setLoad] = useState<{ state: "loading" | "ready"; setup?: "not_linked" | "no_role" | null } | { state: "error"; error: string }>({ state: live ? "loading" : "ready" });
   // Live replies: one at a time, and why the last one failed.
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
@@ -176,7 +176,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       setLeads(result.data.leads);
       setAppointments(result.data.appointments);
       setConfig(result.data.config);
-      setLoad({ state: "ready" });
+      setLoad({ state: "ready", setup: result.data.setup });
     });
     return () => { current = false; };
   }, [live]);
@@ -194,7 +194,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
           {load.state === "error" && <><h2>The CRM could not open</h2><p className={s.sub}>{load.error}</p></>}
           {load.state === "ready" && <>
             <h2>Your CRM is not set up yet</h2>
-            <p className={s.sub}>Your account is not linked to a role in the CRM yet. Once your administrator links your title (TL, TA, RS…) in the CRM settings, your customers appear here.</p>
+            {/* Say which link is missing, so the administrator knows what to fix. */}
+            <p className={s.sub}>{load.setup === "no_role"
+              ? "Your job title has no role in the CRM. The CRM is for the Revenue team (TL, TA, RS and their leaders); if you should be in it, ask your administrator to check your title in People."
+              : "Your login is not linked to your employee record in People yet. Once your administrator links them, your customers appear here."}</p>
           </>}
         </section>
       </main>

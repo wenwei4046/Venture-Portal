@@ -80,6 +80,8 @@ export interface CrmRows {
 export interface CrmLiveData {
   /** The signed-in person; null when their login is not linked to a person or their title has no CRM role. */
   viewerId: string | null;
+  /** Why there is no viewer: the login is not linked to a person in People, or that person's title has no CRM role. */
+  setup: "not_linked" | "no_role" | null;
   members: CrmMember[];
   leads: CrmLead[];
   appointments: CrmAppointment[];
@@ -167,6 +169,7 @@ export function configFromRows(rules: CrmAssignRuleRow[], teams: CrmTeamSettings
 export function crmFromRows(rows: CrmRows): CrmLiveData {
   return {
     viewerId: rows.people.role ? rows.people.me : null,
+    setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
     members: membersFromPeople(rows.people.people),
     leads: rows.contacts.map(c => leadFromRow(c, rows.messages)),
     appointments: rows.appointments.map(a => ({ id: a.id, leadId: a.contact_id, showroomId: a.showroom, start: a.start_at, minutes: a.minutes, state: a.state })),

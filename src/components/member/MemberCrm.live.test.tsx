@@ -16,6 +16,7 @@ afterEach(() => { cleanup(); fetchCrm.mockReset(); sendCrmReply.mockReset(); });
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const data = (extra: Partial<CrmLiveData> = {}, lastCustomerAt = hoursAgo(2)): CrmLiveData => ({
   viewerId: "ann",
+  setup: null,
   members: [{ id: "ann", name: "Ann Tan", role: "rs", fullTime: true }],
   leads: [{
     id: "c1", name: "Tan Mei Ling", phone: "+60123", adName: "Akemi Fair", pageName: "WhatsApp", campaign: "AD9",
@@ -81,10 +82,15 @@ describe("the CRM on live data", () => {
     expect(screen.queryByLabelText("Reply")).toBeNull();
   });
 
-  it("says so when the person has no CRM role yet", async () => {
-    fetchCrm.mockResolvedValue({ ok: true, data: data({ viewerId: null, members: [], leads: [] }) });
+  it("says which link is missing: the login, or a CRM role for the title", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: data({ viewerId: null, setup: "not_linked", members: [], leads: [] }) });
     render(<MemberCrm live />);
     expect(await screen.findByText("Your CRM is not set up yet")).toBeTruthy();
+    expect(screen.getByText(/login is not linked to your employee record/)).toBeTruthy();
+    cleanup();
+    fetchCrm.mockResolvedValue({ ok: true, data: data({ viewerId: null, setup: "no_role", members: [], leads: [] }) });
+    render(<MemberCrm live />);
+    expect(await screen.findByText(/job title has no role in the CRM/)).toBeTruthy();
   });
 
   it("says why when it cannot load", async () => {

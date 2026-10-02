@@ -90,7 +90,8 @@ describe("the people and the settings", () => {
 
   it("has no viewer when the person has no CRM role", () => {
     const rows: CrmRows = { people: { me: "zed", role: null, people: [] }, contacts: [], messages: [], appointments: [], rules: [], teams: [] };
-    expect(crmFromRows(rows).viewerId).toBeNull();
-    expect(crmFromRows({ ...rows, people: { me: "ann", role: "rs", people } }).viewerId).toBe("ann");
+    expect(crmFromRows(rows)).toMatchObject({ viewerId: null, setup: "no_role" });
+    expect(crmFromRows({ ...rows, people: { me: null, role: null, people: [] } })).toMatchObject({ viewerId: null, setup: "not_linked" });
+    expect(crmFromRows({ ...rows, people: { me: "ann", role: "rs", people } })).toMatchObject({ viewerId: "ann", setup: null });
   });
 });
