@@ -24,14 +24,14 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   grant usage on schema auth to anon, authenticated, service_role;
   grant execute on function auth.uid() to anon, authenticated, service_role;
-  create table public.users (id uuid primary key, is_active boolean not null default true);
+  create table public.users (id uuid primary key, is_active boolean not null default true, role text);
   create table public.titles (id uuid primary key, name text);
   create table public.hr_staff_costs (
     id uuid primary key, employee_name text, user_id uuid references public.users(id),
     title_id uuid references public.titles(id), reports_to uuid references public.hr_staff_costs(id), status text not null default 'active');
   grant usage on schema public to anon, authenticated, service_role;
 `)
-for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql', '20261002100000_crm_people.sql', '20261002110000_crm_reply.sql', '20261003010000_crm_team_days.sql']) {
+for (const file of ['20261002010000_crm_whatsapp.sql', '20261002070000_crm_team_read_path.sql', '20261002080000_crm_read_path_only_yourself.sql', '20261002090000_crm_policies_once_per_query.sql', '20261002100000_crm_people.sql', '20261002110000_crm_reply.sql', '20261003010000_crm_team_days.sql', '20261003070000_crm_principal_is_boss.sql']) {
   await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`, import.meta.url), 'utf8'))
 }
 
@@ -90,6 +90,12 @@ check(await names('boss'), everyone, 'the Boss sees every customer')
 // 3. No role, no login, not signed in: nothing.
 check(await names('zed'), [], 'a person whose title is not mapped sees nothing')
 check(await names(null), [], 'a login not linked to a person sees nothing')
+
+// 3b. The Principal account (no staff record of its own) opens the CRM as the Boss; any other unlinked account still sees nothing.
+await q(`insert into users (id, role) values ($1, 'principal'), ($2, 'hr')`, [id('u', 'principal'), id('u', 'hr-desk')])
+check(await names('principal'), everyone, 'the Principal sees what the Boss sees')
+check((await as('principal', `select public.crm_my_role() as r, public.crm_me() as me`))[0], { r: 'boss', me: id('s', 'boss') }, 'as the Boss, the CEO\'s record')
+check(await names('hr-desk'), [], 'another unlinked account still sees nothing')
 await q(`update users set is_active = false where id = $1`, [id('u', 'ann')])
 check(await names('ann'), [], 'a deactivated login sees nothing')
 await q(`update users set is_active = true where id = $1`, [id('u', 'ann')])

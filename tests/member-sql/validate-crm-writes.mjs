@@ -20,7 +20,7 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   grant usage on schema auth to anon, authenticated, service_role;
   grant execute on function auth.uid() to anon, authenticated, service_role;
-  create table public.users (id uuid primary key, is_active boolean not null default true);
+  create table public.users (id uuid primary key, is_active boolean not null default true, role text);
   create table public.titles (id uuid primary key, name text);
   create table public.hr_staff_costs (
     id uuid primary key, employee_name text, user_id uuid references public.users(id),
