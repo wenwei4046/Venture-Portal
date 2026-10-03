@@ -194,8 +194,10 @@ export function crmTeamDemo(you = "You"): { members: CrmMember[]; config: CrmAss
       { id: "c2", name: "Vincent Lim", role: "rs", uplineId: "c1", fullTime: true },
     ],
     config: {
-      rules: [{ adName: "Sofa Clearance · Carousel", tlIds: ["lkv", "lnt"] }],
-      teamRatios: { lkv: 50, lnt: 25, lst: 25 }, // percentages, adding up to 100
+      rules: [
+        { adId: "SOFA CLEARANCE", adName: "Sofa Clearance · Carousel", tlIds: ["lkv", "lnt"] },
+        { adId: "AKEMI OCT", adName: "Akemi Mattress · October Fair", tlIds: ["lkv", "lnt", "lst"], shares: { lkv: 50, lnt: 25, lst: 25 } },
+      ],
       teams: {
         // Klang Valley: every weekday by %, weekends to full time. Northern: by hand Mon–Thu.
         // Southern: Mon–Wed by % (Thursday by hand), weekends by % too.
@@ -219,7 +221,8 @@ function teamLeads(): CrmLead[] {
     askedMinutesAgo: number, replyAfter: number | null, question: string, answer = "Hi! Thanks for your message — when would you like to visit the showroom?"): CrmLead => ({
     id, name, phone, adName, status,
     ...(to === "" ? {} : to.endsWith(":") ? { teamId: to.slice(0, -1) } : { assignedTo: to, teamId: team[to] }),
-    campaign: adName.split(" · ")[0].toUpperCase(),
+    // The same ad id as the main leads use, so one ad is one row on Assignment.
+    campaign: ({ "Akemi Mattress · October Fair": "AKEMI OCT", "Akemi Mattress · September": "AKEMI SEP", "Sofa Clearance · Carousel": "SOFA CLEARANCE", "Bedframe Bundle · Reels": "BEDFRAME BUNDLE" } as Record<string, string>)[adName] ?? adName.split(" · ")[0].toUpperCase(),
     pageName: adName.startsWith("Sofa") ? "The Conts Property Management" : "Dream Crafter Design",
     createdAt: real(askedMinutesAgo), unread: replyAfter === null ? 1 : 0,
     messages: [

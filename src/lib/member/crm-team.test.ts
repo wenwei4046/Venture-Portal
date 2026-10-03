@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CrmAppointment, CrmLead, CrmMessage } from "./crm";
 import {
   allDownlines, assignEnquiry, canEditTeamRules, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
-  memberStats, overLimit, pickByShare, previewAssignments, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
+  memberStats, overLimit, pickByShare, pickTeam, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
   type CrmAssignConfig, type CrmMember,
 } from "./crm-team";
 
@@ -69,11 +69,13 @@ describe("who sees and does what", () => {
     expect([isUnassigned(leads[0]), isUnassigned(leads[1]), isUnassigned({ teamId: "tla" })]).toEqual([true, false, false]);
   });
 
-  it("lets uplines who take enquiries reply, never the Boss or HOD", () => {
+  it("lets uplines who take enquiries reply, never the Boss; the HOD only to their own", () => {
     const lead = { assignedTo: "a2" };
     expect([canReply(who("a2"), lead, members), canReply(who("taa"), lead, members), canReply(who("tla"), lead, members)]).toEqual([true, true, true]);
     expect([canReply(who("boss"), lead, members), canReply(who("hod"), lead, members), canReply(who("a1"), lead, members), canReply(who("tlb"), lead, members)])
       .toEqual([false, false, false, false]);
+    // The HOD sells too (2026-10-03): a customer given to them is theirs to answer; the Principal still never replies.
+    expect([canReply(who("hod"), { assignedTo: "hod" }, members), canReply(who("boss"), { assignedTo: "hod" }, members)]).toEqual([true, false]);
   });
 
   it("lets a team's TL, the Boss and the HOD change its rules — not another TL or the TA", () => {
@@ -81,8 +83,8 @@ describe("who sees and does what", () => {
     expect([canEditTeamRules(who("tlb"), "tla"), canEditTeamRules(who("taa"), "tla")]).toEqual([false, false]);
   });
 
-  it("lets only the HOD set who is full time", () => {
-    expect(["boss", "hod", "tla", "taa", "a1"].map(id => setsFullTime(who(id)))).toEqual([false, true, false, false, false]);
+  it("lets the HOD and the Principal set who is full time", () => {
+    expect(["boss", "hod", "tla", "taa", "a1"].map(id => setsFullTime(who(id)))).toEqual([true, true, false, false, false]);
   });
 
   it("lets only the team's TL reassign", () => {
@@ -94,13 +96,24 @@ describe("who sees and does what", () => {
 
 describe("assignment", () => {
   const config: CrmAssignConfig = {
-    rules: [{ adName: "Sofa", tlIds: ["tla", "tlb"] }],
-    teamRatios: { tla: 2, tlb: 1 },
+    rules: [
+      { adId: "AD-SOFA", adName: "Sofa", tlIds: ["tla", "tlb"] },
+      { adId: "AD-AKEMI", adName: "Akemi", tlIds: ["tla", "tlb"], shares: { tla: 2, tlb: 1 } },
+      { adName: "Only A", tlIds: ["tla"] },
+      { adName: "Only B", tlIds: ["tlb"] },
+    ],
     teams: {
       // TL A: every weekday by %, Fri–Sun full time only. TL B: nothing ticked yet.
       tla: { percentDays: [1, 2, 3, 4], weekendFullTime: true, ratios: { a1: 1, a2: 1 } },
       tlb: { percentDays: [], weekendFullTime: true, ratios: {} },
     },
+  };
+  /** The next n enquiries for an ad, without changing anything. */
+  const deal = (ad: string, at: Date, n: number, cfg: CrmAssignConfig = config) => {
+    const out = [];
+    let counts = emptyCounts();
+    for (let i = 0; i < n; i++) { const r = assignEnquiry(ad, at, cfg, counts, members); out.push(r.assignment); counts = r.counts; }
+    return out;
   };
 
   it("spreads by share, not in runs", () => {
@@ -118,33 +131,35 @@ describe("assignment", () => {
     expect(isWeekendEnquiry(friday)).toBe(true);
   });
 
-  it("Mode 1: an ad handed to TLs rotates evenly among their teams", () => {
-    const picks = previewAssignments("Sofa", tuesday, 4, config, emptyCounts(), members);
-    expect(picks.map(p => [p.teamId, p.teamBy])).toEqual([["tla", 1], ["tlb", 1], ["tla", 1], ["tlb", 1]]);
+  it("an ad handed to several teams rotates evenly among them — found by its Meta id or name", () => {
+    expect(deal("AD-SOFA", tuesday, 4).map(p => [p.teamId, p.teamBy])).toEqual([["tla", 1], ["tlb", 1], ["tla", 1], ["tlb", 1]]);
+    expect(deal("Sofa", tuesday, 2).map(p => p.teamId)).toEqual(["tla", "tlb"]);
   });
 
-  it("Mode 2: any other ad goes by the ratio between teams", () => {
-    const picks = previewAssignments("Akemi", tuesday, 9, config, emptyCounts(), members);
+  it("an ad split by % follows the %", () => {
+    const picks = deal("AD-AKEMI", tuesday, 9);
     expect(picks.filter(p => p.teamId === "tla")).toHaveLength(6);
     expect(picks.every(p => p.teamBy === 2)).toBe(true);
   });
 
+  it("an ad nobody set, and an enquiry from no ad: evenly across every team (2026-10-03)", () => {
+    expect(deal("A NEW AD", tuesday, 4).map(p => [p.teamId, p.teamBy])).toEqual([["tla", 3], ["tlb", 3], ["tla", 3], ["tlb", 3]]);
+    expect(pickTeam("", config, { tla: 3 }, members)).toEqual({ teamId: "tlb", teamBy: 3 });
+  });
+
   it("Friday to Sunday: only full-time RS, evenly in turn", () => {
-    const picks = previewAssignments("Akemi", friday, 6, { ...config, teamRatios: { tla: 1 } }, emptyCounts(), members);
+    const picks = deal("Only A", friday, 6);
     expect(picks.map(p => p.memberId)).toEqual(["a1", "a3", "a1", "a3", "a1", "a3"]);
     expect(picks.every(p => p.memberBy === "weekend")).toBe(true);
   });
 
   it("Friday to Sunday with no full-time RS: waits for the TL", () => {
-    const r = assignEnquiry("Akemi", friday, { ...config, teamRatios: { tlb: 1 } }, emptyCounts(), members);
-    expect(r.assignment).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "no_full_time" });
+    expect(deal("Only B", friday, 1)[0]).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "no_full_time" });
   });
 
   it("Monday to Thursday: a ticked day goes by the TL's %s, an unticked one to the TL's list", () => {
-    const auto = previewAssignments("Akemi", tuesday, 4, { ...config, teamRatios: { tla: 1 } }, emptyCounts(), members);
-    expect(auto.map(p => p.memberId)).toEqual(["a1", "a2", "a1", "a2"]);
-    const manual = assignEnquiry("Akemi", tuesday, { ...config, teamRatios: { tlb: 1 } }, emptyCounts(), members);
-    expect(manual.assignment).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "manual" });
+    expect(deal("Only A", tuesday, 4).map(p => p.memberId)).toEqual(["a1", "a2", "a1", "a2"]);
+    expect(deal("Only B", tuesday, 1)[0]).toMatchObject({ teamId: "tlb", memberId: null, memberBy: "manual" });
     // TL A ticks Monday and Thursday only: Tuesday now waits for them.
     const mondayThursday = { ...config, teams: { ...config.teams, tla: { ...config.teams.tla, percentDays: [1, 4] } } };
     expect(pickInTeam("tla", tuesday, mondayThursday, {}, members)).toEqual({ memberId: null, memberBy: "manual" });
@@ -153,20 +168,19 @@ describe("assignment", () => {
 
   it("the %s include people who are not full time", () => {
     // a2 (Amir) is part time: on a ticked weekday he takes his share.
-    const picks = previewAssignments("Akemi", tuesday, 2, { ...config, teamRatios: { tla: 1 } }, emptyCounts(), members);
-    expect(picks.some(p => p.memberId === "a2")).toBe(true);
+    expect(deal("Only A", tuesday, 2).some(p => p.memberId === "a2")).toBe(true);
   });
 
   it("Friday to Sunday with the switch off: the same %s, part time included", () => {
-    const off = { ...config, teamRatios: { tla: 1 }, teams: { ...config.teams, tla: { ...config.teams.tla, weekendFullTime: false } } };
-    const picks = previewAssignments("Akemi", friday, 4, off, emptyCounts(), members);
+    const off = { ...config, teams: { ...config.teams, tla: { ...config.teams.tla, weekendFullTime: false } } };
+    const picks = deal("Only A", friday, 4, off);
     expect(picks.map(p => p.memberId)).toEqual(["a1", "a2", "a1", "a2"]);
     expect(picks.every(p => p.memberBy === "ratio")).toBe(true);
   });
 
   it("a team nobody has set up: every weekday by hand, Fri–Sun to full-time RS", () => {
-    expect(pickInTeam("tla", tuesday, { rules: [], teamRatios: {}, teams: {} }, {}, members)).toEqual({ memberId: null, memberBy: "manual" });
-    expect(pickInTeam("tla", friday, { rules: [], teamRatios: {}, teams: {} }, {}, members).memberBy).toBe("weekend");
+    expect(pickInTeam("tla", tuesday, { rules: [], teams: {} }, {}, members)).toEqual({ memberId: null, memberBy: "manual" });
+    expect(pickInTeam("tla", friday, { rules: [], teams: {} }, {}, members).memberBy).toBe("weekend");
   });
 
   it("sending to a team by hand follows that team's own rules", () => {
@@ -177,8 +191,8 @@ describe("assignment", () => {
     expect(pickInTeam("tlb", tuesday, config, held, members)).toEqual({ memberId: null, memberBy: "manual" });
   });
 
-  it("waits for the Boss or HOD when no team can take it", () => {
-    expect(assignEnquiry("x", tuesday, { rules: [], teamRatios: {}, teams: {} }, emptyCounts(), members).assignment).toEqual({ teamId: null, memberId: null });
+  it("waits for the Principal or HOD only when there is no team at all", () => {
+    expect(assignEnquiry("x", tuesday, { rules: [], teams: {} }, emptyCounts(), members.filter(m => m.role !== "tl")).assignment).toEqual({ teamId: null, memberId: null });
   });
 });
 

@@ -64,54 +64,64 @@ const arrive = async (sentAt, ad = null, waId = null) => {
 }
 const reset = async () => { await q(`delete from crm_contacts`); await q(`delete from crm_team_settings`); await q(`delete from crm_assign_rules`) }
 
-// 1. No rules at all: nobody can take it — it waits for the Boss or HOD.
-check(await arrive(TUE), { team: null, member: null, unread: 1, assigned: 0 }, 'no rule, no %: waits unassigned')
+// Hand an ad to one team, to test who in that team gets it.
+const handTo = (ad, ...tls) => q(`insert into crm_assign_rules (ad_source_id, tl_ids) values ($1, $2::uuid[])`, [ad, tls.map(id)])
 
-// 2. Mode 2: each team's %; weekdays ticked → by each person's %, part time included.
+// 1. No ad, or an ad nobody set: evenly across every team (2026-10-03) — never left waiting.
+check(await arrive(TUE), { team: 'tla', member: null, unread: 1, assigned: 1 }, 'no rule: to a team (A), its TL assigns')
+check([(await arrive(TUE)).team, (await arrive(TUE, 'NEW AD')).team, (await arrive(TUE)).team], ['tlb', 'tla', 'tlb'], 'then B, A, B — evenly, ad or not')
+
+// 2. An ad handed to team A; weekdays ticked → by each person's %, part time included.
 await reset()
-await q(`insert into crm_team_settings (tl_id, team_share, percent_days, weekend_full_time, ratios) values
-  ($1, 100, '{1,2,3,4}', true, $2), ($3, 0, '{}', true, '{}')`, [id('tla'), JSON.stringify({ [id('ann')]: 50, [id('amir')]: 50 }), id('tlb')])
+await handTo('ADA', 'tla')
+await q(`insert into crm_team_settings (tl_id, percent_days, weekend_full_time, ratios) values
+  ($1, '{1,2,3,4}', true, $2), ($3, '{}', true, '{}')`, [id('tla'), JSON.stringify({ [id('ann')]: 50, [id('amir')]: 50 }), id('tlb')])
 const tue = []
-for (let i = 0; i < 4; i++) tue.push(await arrive(TUE))
-check(tue.map(r => r.team), ['tla', 'tla', 'tla', 'tla'], 'all to team A (100%)')
+for (let i = 0; i < 4; i++) tue.push(await arrive(TUE, 'ADA'))
+check(tue.map(r => r.team), ['tla', 'tla', 'tla', 'tla'], 'all to team A (the ad is theirs)')
 check(tue.map(r => r.member).sort(), ['amir', 'amir', 'ann', 'ann'], 'by %: 50/50, part-time Amir included')
 
 // 3. An unticked weekday waits in the TL's To assign list.
 await reset()
-await q(`insert into crm_team_settings (tl_id, team_share, percent_days, weekend_full_time, ratios) values ($1, 100, '{1,4}', true, $2)`,
+await handTo('ADA', 'tla')
+await q(`insert into crm_team_settings (tl_id, percent_days, weekend_full_time, ratios) values ($1, '{1,4}', true, $2)`,
   [id('tla'), JSON.stringify({ [id('ann')]: 100 })])
-check(await arrive(TUE), { team: 'tla', member: null, unread: 1, assigned: 1 }, 'Tuesday unticked: team A, nobody yet')
+check(await arrive(TUE, 'ADA'), { team: 'tla', member: null, unread: 1, assigned: 1 }, 'Tuesday unticked: team A, nobody yet')
 
 // 4. Friday with the switch on: full-time RS only, in turn.
-const fri = [await arrive(FRI), await arrive(FRI), await arrive(FRI), await arrive(FRI)]
+const fri = [await arrive(FRI, 'ADA'), await arrive(FRI, 'ADA'), await arrive(FRI, 'ADA'), await arrive(FRI, 'ADA')]
 check(fri.map(r => r.member).sort(), ['aida', 'aida', 'ann', 'ann'], 'weekend: full-time Ann and Aida in turn, never Amir')
 
 // 5. Friday with the switch off: by each person's %.
 await q(`update crm_team_settings set weekend_full_time = false, ratios = $1`, [JSON.stringify({ [id('amir')]: 100 })])
-check((await arrive(FRI)).member, 'amir', 'switch off: by %, so part-time Amir')
+check((await arrive(FRI, 'ADA')).member, 'amir', 'switch off: by %, so part-time Amir')
 
 // 6. A team with no full-time RS at the weekend: the TL assigns.
 await reset()
-await q(`insert into crm_team_settings (tl_id, team_share) values ($1, 100)`, [id('tlb')])
-check(await arrive(FRI), { team: 'tlb', member: null, unread: 1, assigned: 1 }, 'no full-time RS: waits for TL B')
+await handTo('ADB', 'tlb')
+check(await arrive(FRI, 'ADB'), { team: 'tlb', member: null, unread: 1, assigned: 1 }, 'no full-time RS: waits for TL B')
 
-// 7. Mode 1: an ad handed to TLs rotates evenly among them — it wins over the %.
+// 7. An ad handed to several teams rotates evenly among them; an ad split by % follows the %.
 await reset()
-await q(`insert into crm_team_settings (tl_id, team_share) values ($1, 100), ($2, 0)`, [id('tla'), id('tlb')])
-await q(`insert into crm_assign_rules (ad_source_id, tl_ids) values ('AD9', array[$1::uuid, $2::uuid])`, [id('tla'), id('tlb')])
+await handTo('AD9', 'tla', 'tlb')
 const ad = [await arrive(TUE, 'AD9'), await arrive(TUE, 'AD9'), await arrive(TUE, 'AD9'), await arrive(TUE, 'AD9')]
-check(ad.map(r => r.team).sort(), ['tla', 'tla', 'tlb', 'tlb'], 'the ad rotates A, B, A, B — even though B has 0%')
-check((await arrive(TUE, 'OTHER')).team, 'tla', 'another ad still goes by the %')
-// A TL named in a rule who is no longer a TL is skipped.
-await q(`update crm_assign_rules set tl_ids = array[$1::uuid]`, [id('taa')])
-check((await arrive(TUE, 'AD9')).team, 'tla', 'a rule naming someone who is not a TL falls back to the %')
+check(ad.map(r => r.team).sort(), ['tla', 'tla', 'tlb', 'tlb'], 'the ad rotates A, B, A, B')
+await q(`insert into crm_assign_rules (ad_source_id, tl_ids, shares) values ('AD5', $1::uuid[], $2::jsonb)`,
+  [[id('tla'), id('tlb')], JSON.stringify({ [id('tla')]: 75, [id('tlb')]: 25 })])
+const split = []
+for (let i = 0; i < 8; i++) split.push((await arrive(TUE, 'AD5')).team)
+check([split.filter(x => x === 'tla').length, split.filter(x => x === 'tlb').length], [6, 2], '75 / 25: six to A, two to B — balanced on that ad alone')
+// A TL named in a rule who is no longer a TL is skipped: back to even across every team.
+await q(`update crm_assign_rules set tl_ids = array[$1::uuid], shares = null where ad_source_id = 'AD9'`, [id('taa')])
+check((await arrive(TUE, 'AD9')).team, 'tlb', 'a rule naming nobody who is a TL: evenly across every team (B is behind)')
 
 // 8. A returning customer keeps their team and person, and every new message counts as unread.
 await reset()
-await q(`insert into crm_team_settings (tl_id, team_share, percent_days, ratios) values ($1, 100, '{2}', $2)`, [id('tla'), JSON.stringify({ [id('ann')]: 100 })])
-const first = await arrive(TUE, null, '60999')
+await handTo('ADA', 'tla')
+await q(`insert into crm_team_settings (tl_id, percent_days, ratios) values ($1, '{2}', $2)`, [id('tla'), JSON.stringify({ [id('ann')]: 100 })])
+const first = await arrive(TUE, 'ADA', '60999')
 await q(`update crm_contacts set assigned_to = $1 where external_id = '60999'`, [id('amir')]) // the TL moved them to Amir
-const again = await arrive(TUE, null, '60999')
+const again = await arrive(TUE, 'ADA', '60999')
 check([first.member, again.member, again.unread, again.assigned], ['ann', 'amir', 2, 0], 'kept with Amir, unread 2, not dealt again')
 
 // 9. Only the ingest deals: nobody signed in may call the helpers.

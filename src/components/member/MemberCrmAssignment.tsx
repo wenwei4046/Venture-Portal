@@ -1,25 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import type { CrmLead } from "@/lib/member/crm";
 import {
-  DEFAULT_TEAM_SETTINGS, ROLE_LABELS, WEEKDAYS, allTeams, assignsAds, canEditTeamRules, emptyCounts, previewAssignments, teamHandlers, visibleTeams,
-  type CrmAssignConfig, type CrmAssignment, type CrmMember, type CrmTeamSettings,
+  DEFAULT_TEAM_SETTINGS, ROLE_LABELS, WEEKDAYS, allTeams, assignsAds, canEditTeamRules, ruleForAd, teamHandlers, visibleTeams,
+  type CrmAssignConfig, type CrmMember, type CrmTeamSettings,
 } from "@/lib/member/crm-team";
 import s from "./member.module.css";
 import c from "./MemberCrm.module.css";
 import { Icon } from "./MemberUI";
 import { roleTag } from "./MemberCrmTeam";
 
-const NO_RULE = "\u0000no-rule";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const sum = (values: number[]) => values.reduce((a, b) => a + Math.max(0, b), 0);
+const dayMonth = (iso: string) => new Date(iso).toLocaleDateString("en-MY", { day: "numeric", month: "short" });
 
-/** The next date (from today) that falls on this day of the week, at 11am — what the preview deals for. */
-function nextOn(day: number): Date {
-  const d = new Date();
-  d.setHours(11, 0, 0, 0);
-  d.setDate(d.getDate() + ((day - d.getDay() + 7) % 7));
-  return d;
+/** An ad as the Assignment page lists it: from the enquiries it brought (and any rule already set). */
+export interface CrmAdInfo {
+  /** The Meta ad id. */
+  id: string;
+  name: string;
+  /** WhatsApp / Messenger. */
+  channel?: string;
+  leads: number;
+  /** When its first and latest enquiries arrived. */
+  firstAt?: string;
+  lastAt?: string;
+}
+
+/** Every ad that brought an enquiry, newest first, plus any ad with a rule and no enquiry yet. */
+export function adsFromLeads(leads: CrmLead[], config: CrmAssignConfig): CrmAdInfo[] {
+  const byId = new Map<string, CrmAdInfo>();
+  for (const l of leads) {
+    if (!l.campaign) continue;
+    const ad = byId.get(l.campaign) ?? { id: l.campaign, name: l.adName, channel: l.pageName, leads: 0, firstAt: l.createdAt, lastAt: l.createdAt };
+    ad.leads += 1;
+    if (l.createdAt < (ad.firstAt ?? l.createdAt)) ad.firstAt = l.createdAt;
+    if (l.createdAt > (ad.lastAt ?? "")) ad.lastAt = l.createdAt;
+    byId.set(l.campaign, ad);
+  }
+  for (const r of config.rules) if (r.adId && !byId.has(r.adId)) byId.set(r.adId, { id: r.adId, name: r.adName, leads: 0 });
+  return [...byId.values()].sort((a, b) => (b.lastAt ?? "").localeCompare(a.lastAt ?? ""));
 }
 
 /** One line a Boss or HOD reads a team's rules by: "Mon Tue Wed Thu by % · Fri–Sun full time only". */
@@ -29,19 +50,28 @@ function rulesSummary(st: CrmTeamSettings): string {
 }
 
 /**
- * Who gets a new enquiry.
- *   Which team — the Boss and HOD: an ad handed to TLs (rotates evenly), any other ad by each team's %.
- *   Who in the team — each TL: which Mon–Thu days go by %, and whether Fri–Sun is full time only.
- * The Boss and HOD may change a team's rules too; the TL then sees who did.
+ * Who gets a new enquiry (revised by the user 2026-10-03).
+ *   Which team — the Principal (Boss) and HOD, ad by ad: hand it to one or more
+ *   teams (evenly among them) or split it by %; saved with a Save. An ad not
+ *   set yet, and an enquiry from no ad, goes evenly across every team.
+ *   Who in the team — each TL: which Mon–Thu days go by %, and whether Fri–Sun
+ *   is full time only. The Principal and HOD may change it too; the TL sees who did.
  */
-export default function MemberCrmAssignment({ viewer, members, ads, config, onConfig, onBack, readOnly = false }: {
+export default function MemberCrmAssignment({ viewer, members, ads, config, onConfig, onSaveAd, waiting = [], onSendToTeam, onOpenLead, onBack, readOnly = false }: {
   viewer: CrmMember;
   members: CrmMember[];
-  ads: string[];
+  ads: CrmAdInfo[];
   config: CrmAssignConfig;
+  /** A team's own rules changed (saved a moment later). */
   onConfig: (config: CrmAssignConfig) => void;
-  onBack: () => void;
-  /** Live data, before saving settings is built: everything shows, nothing edits. */
+  /** Save which teams take an ad: tlIds evenly, or shares (TL → %, adding to 100). Resolves false when not saved. */
+  onSaveAd?: (ad: CrmAdInfo, tlIds: string[], shares: Record<string, number> | null) => Promise<boolean>;
+  /** Enquiries in no team (only when no team could take them), for the Principal / HOD to send. */
+  waiting?: CrmLead[];
+  onSendToTeam?: (leadId: string, tlId: string) => void;
+  onOpenLead?: (leadId: string) => void;
+  /** Opened from Settings: the way back. Absent when Assignment is a tab of its own (the Principal). */
+  onBack?: () => void;
   readOnly?: boolean;
 }) {
   const top = assignsAds(viewer);
@@ -51,36 +81,44 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
   const tls = allTeams(members);
   const nameOf = (id: string | null) => members.find(m => m.id === id)?.name ?? "—";
   const teamName = (id: string | null) => members.find(m => m.id === id)?.teamName ?? nameOf(id);
-  const [editingAd, setEditingAd] = useState<string | null>(null);
   const [openTeam, setOpenTeam] = useState<string | null>(ownTeam);
-  const [previewAd, setPreviewAd] = useState<string>(NO_RULE);
-  const [previewDay, setPreviewDay] = useState(() => new Date().getDay());
+  // The ad being decided: a draft until Save.
+  const [draft, setDraft] = useState<{ adId: string; mode: "teams" | "percent"; tlIds: string[]; shares: Record<string, number> } | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const ruleFor = (ad: string) => config.rules.find(r => r.adName === ad)?.tlIds ?? [];
-  const toggleAd = (ad: string, tlId: string) => {
-    const now = ruleFor(ad);
-    const next = now.includes(tlId) ? now.filter(id => id !== tlId) : [...now, tlId];
-    onConfig({ ...config, rules: [...config.rules.filter(r => r.adName !== ad), ...(next.length ? [{ adName: ad, tlIds: next }] : [])] });
+  const startEdit = (ad: CrmAdInfo) => {
+    const rule = ruleForAd(config, ad.id);
+    setDraft(rule?.shares
+      ? { adId: ad.id, mode: "percent", tlIds: rule.tlIds, shares: { ...rule.shares } }
+      : { adId: ad.id, mode: "teams", tlIds: rule?.tlIds ?? [], shares: {} });
+  };
+  /** One line saying who takes an ad's enquiries now. */
+  const adSummary = (ad: CrmAdInfo): { kind: "percent" | "teams" | "even"; text: string } => {
+    const rule = ruleForAd(config, ad.id);
+    const live = (ids: string[]) => ids.filter(id => tls.some(x => x.id === id));
+    if (rule?.shares) {
+      const parts = Object.entries(rule.shares).filter(([id, n]) => n > 0 && live([id]).length);
+      if (parts.length) return { kind: "percent", text: parts.map(([id, n]) => `${teamName(id)} ${n}%`).join(" · ") };
+    }
+    if (rule && live(rule.tlIds).length) return { kind: "teams", text: live(rule.tlIds).map(teamName).join(" · ") };
+    return { kind: "even", text: "Not set — evenly across every team" };
+  };
+  const draftTotal = draft ? sum(Object.values(draft.shares)) : 0;
+  const draftOk = !!draft && (draft.mode === "teams" || draftTotal === 100);
+  const save = async (ad: CrmAdInfo) => {
+    if (!draft || !onSaveAd || !draftOk) return;
+    setSaving(true);
+    const shares = draft.mode === "percent" ? Object.fromEntries(Object.entries(draft.shares).filter(([, n]) => n > 0)) : null;
+    const tlIds = shares ? Object.keys(shares) : draft.tlIds;
+    const ok = await onSaveAd(ad, tlIds, shares);
+    setSaving(false);
+    if (ok) setDraft(null);
   };
   const settingsOf = (tlId: string): CrmTeamSettings => config.teams[tlId] ?? DEFAULT_TEAM_SETTINGS;
   const setTeam = (tlId: string, change: Partial<CrmTeamSettings>) => onConfig({
     ...config,
     teams: { ...config.teams, [tlId]: { ...settingsOf(tlId), ...change, editedBy: { memberId: viewer.id, at: new Date().toISOString() } } },
   });
-  const teamTotal = sum(tls.map(t => config.teamRatios[t.id] ?? 0));
-
-  // The preview: the whole flow for the Boss and HOD; for a TL, how their own team's enquiries are dealt.
-  const at = useMemo(() => nextOn(previewDay), [previewDay]);
-  const previewConfig: CrmAssignConfig = ownTeam ? { rules: [], teamRatios: { [ownTeam]: 1 }, teams: { [ownTeam]: settingsOf(ownTeam) } } : config;
-  const picks = previewAssignments(previewAd === NO_RULE ? "" : previewAd, at, 10, previewConfig, emptyCounts(), members);
-  const pickLabel = (p: CrmAssignment) =>
-    !p.teamId ? "Nobody can take it — waits for the Boss or HOD"
-      : p.memberId ? nameOf(p.memberId)
-        : p.memberBy === "no_full_time" ? `No full-time RS — waits for ${nameOf(p.teamId)}`
-          : p.memberBy === "no_shares" ? `Nobody has a % — waits for ${nameOf(p.teamId)}`
-            : `Waits for ${nameOf(p.teamId)} to assign`;
-  const pickTag = (p: CrmAssignment) => (p.memberBy === "weekend" ? "Full time" : p.memberId ? "By %" : "By hand");
-
   const percent = (value: number, onChange: (n: number) => void, label: string, disabled: boolean) => <>
     <input className={c.shareInput} type="number" inputMode="numeric" min={0} max={100} step={1} value={value} disabled={disabled} aria-label={`${label} (%)`}
       onChange={e => onChange(Math.min(100, Math.max(0, Math.floor(Number(e.target.value) || 0))))} />
@@ -146,44 +184,77 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
     </>;
   };
 
-  return <div className={c.chat}>
-    <div className={c.chatHead}>
-      <button className={c.back} onClick={onBack} aria-label="Back to Settings"><Icon name="back" size={20} /></button>
-      <div className={c.chatWho}><strong>Assignment</strong><span className={s.caption}>{ownTeam ? `Who in ${viewer.teamName ?? "your team"} gets a new enquiry` : "Who gets a new enquiry"}</span></div>
-    </div>
+  const subtitle = ownTeam ? `Who in ${viewer.teamName ?? "your team"} gets a new enquiry` : "Which teams take each ad";
+  return <div className={onBack ? c.chat : undefined}>
+    {onBack
+      ? <div className={c.chatHead}>
+        <button className={c.back} onClick={onBack} aria-label="Back to Settings"><Icon name="back" size={20} /></button>
+        <div className={c.chatWho}><strong>Assignment</strong><span className={s.caption}>{subtitle}</span></div>
+      </div>
+      : <div className={c.tabTitle}><h1>Assignment</h1><p className={s.sub}>{subtitle}</p></div>}
 
-    {/* Which team — the Boss and HOD's step; a TL only deals with their own team. */}
-    {!ownTeam && <section className={s.card} aria-label="Which team">
-      <h2>Which team</h2>
+    {/* Enquiries in no team — only when no team could take them; the Principal / HOD send each one. */}
+    {top && waiting.length > 0 && <section className={`${s.card} ${c.queue}`} aria-label="Not in a team">
+      <h3><Icon name="info" size={16} /> Not in a team · {waiting.length}</h3>
+      <p className={s.caption}>Send each to a team — its rules decide who gets it.</p>
+      {waiting.map(l => <div key={l.id} className={c.queueRow}>
+        <button className={c.queueLead} onClick={() => onOpenLead?.(l.id)}><strong>{l.name}</strong><span className={s.caption}>{l.adName}</span></button>
+        {onSendToTeam && !readOnly && <select value="" onChange={e => e.target.value && onSendToTeam(l.id, e.target.value)} aria-label={`Send ${l.name} to a team`}>
+          <option value="">Send to team…</option>
+          {tls.map(tl => <option key={tl.id} value={tl.id}>{tl.teamName} · {tl.name}</option>)}
+        </select>}
+      </div>)}
+    </section>}
 
-      <h3 className={c.subHead}>Ads handed to TLs</h3>
-      <p className={s.caption}>An ad&apos;s enquiries rotate evenly among the TLs it is handed to.</p>
+    {/* Which team — ad by ad, the Principal's and HOD's; a TL only deals with their own team. */}
+    {!ownTeam && <section className={s.card} aria-label="Ads">
+      <h2>Ads</h2>
+      <p className={s.caption}>A new ad appears here with its first enquiry. Until you choose, its enquiries go evenly across every team.</p>
+      {ads.length === 0 && <p className={s.sub}>No ad has brought an enquiry yet.</p>}
       {ads.map(ad => {
-        const ids = ruleFor(ad);
-        if (!top && !ids.some(id => teams.some(t => t.id === id))) return null;
-        const shown = ids.filter(id => top || teams.some(t => t.id === id));
-        return <div key={ad} className={c.adRow}>
+        const now = adSummary(ad);
+        const editing = draft?.adId === ad.id;
+        return <div key={ad.id} className={c.adRow}>
           <div className={c.ruleHead}>
-            <strong>{ad}</strong>
-            {topEdits && <button className={c.linkButton} onClick={() => setEditingAd(editingAd === ad ? null : ad)}>{editingAd === ad ? "Done" : "Edit"}</button>}
+            <span className={c.adName}><strong>{ad.name}</strong>
+              <small className={s.caption}>{[ad.channel, `${ad.leads} ${ad.leads === 1 ? "enquiry" : "enquiries"}`, ad.firstAt && `since ${dayMonth(ad.firstAt)}`].filter(Boolean).join(" · ")}</small></span>
+            {topEdits && onSaveAd && !editing && <button className={c.linkButton} onClick={() => startEdit(ad)}>Choose teams</button>}
           </div>
-          {editingAd === ad
-            ? <div className={c.dayChips} role="group" aria-label={`TLs for ${ad}`}>
-              {tls.map(t => <button key={t.id} className={c.dayChip} aria-pressed={ids.includes(t.id)} onClick={() => toggleAd(ad, t.id)}>
-                {ids.includes(t.id) && <Icon name="check" size={14} />}{t.teamName}
-              </button>)}
+          {!editing && <p className={c.adTeams} data-kind={now.kind}><Icon name={now.kind === "even" ? "info" : "team"} size={14} /> {now.text}</p>}
+          {editing && draft && <div className={c.adEditor}>
+            <div className={c.segment2} role="radiogroup" aria-label="How">
+              <button role="radio" aria-checked={draft.mode === "teams"} onClick={() => setDraft({ ...draft, mode: "teams" })}>Hand to teams</button>
+              <button role="radio" aria-checked={draft.mode === "percent"} onClick={() => setDraft({ ...draft, mode: "percent" })}>Split by %</button>
             </div>
-            : <p className={s.caption}>{shown.length ? `${shown.map(teamName).join(" · ")}${!top && ids.length > shown.length ? " + another team" : ""}` : "Not handed to a TL — split by %"}</p>}
+            {draft.mode === "teams"
+              ? <>
+                <div className={c.dayChips} role="group" aria-label={`Teams for ${ad.name}`}>
+                  {tls.map(tl => {
+                    const on = draft.tlIds.includes(tl.id);
+                    return <button key={tl.id} className={c.dayChip} aria-pressed={on}
+                      onClick={() => setDraft({ ...draft, tlIds: on ? draft.tlIds.filter(x => x !== tl.id) : [...draft.tlIds, tl.id] })}>
+                      {on && <Icon name="check" size={14} />}{tl.teamName}
+                    </button>;
+                  })}
+                </div>
+                <p className={s.caption}>{draft.tlIds.length === 0 ? "None ticked — evenly across every team." : draft.tlIds.length === 1 ? "Only this team takes it." : "Evenly among the ticked teams."}</p>
+              </>
+              : <>
+                {tls.map(tl => <div key={tl.id} className={c.shareRow}>
+                  <span>{tl.teamName} <small className={s.caption}>· {tl.name}</small></span>
+                  {percent(draft.shares[tl.id] ?? 0, n => setDraft({ ...draft, shares: { ...draft.shares, [tl.id]: n } }), `${tl.teamName} share of ${ad.name}`, false)}
+                </div>)}
+                {totalLine(draftTotal)}
+              </>}
+            <div className={c.saveBar}>
+              <button className={s.button} disabled={saving} onClick={() => setDraft(null)}>Cancel</button>
+              <button className={`${s.button} ${s.primary}`} disabled={saving || !draftOk} onClick={() => void save(ad)}>{saving ? "Saving…" : "Save"}</button>
+            </div>
+          </div>}
         </div>;
       })}
-
-      <h3 className={c.subHead}>Split between teams</h3>
-      <p className={s.caption}>Every ad not handed to a TL.</p>
-      {tls.filter(t => top || teams.some(x => x.id === t.id)).map(t => <div key={t.id} className={c.shareRow}>
-        <span>{t.teamName} <small className={s.caption}>· {t.name}</small></span>
-        {percent(config.teamRatios[t.id] ?? 0, n => onConfig({ ...config, teamRatios: { ...config.teamRatios, [t.id]: n } }), `${t.teamName} share`, !topEdits)}
-      </div>)}
-      {topEdits && totalLine(teamTotal)}
+      <h3 className={c.subHead}>Not from an ad</h3>
+      <p className={s.caption}>Customers who message us directly go evenly across every team. Move one from its chat.</p>
     </section>}
 
     {/* Who in the team: a TL's own team open; the Boss and HOD see each team as one line, opened on a tap. */}
@@ -201,28 +272,5 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
         </div>)}
       </section>}
 
-    {/* Preview */}
-    <section className={s.card} aria-label="Preview: the next 10 enquiries">
-      <h2>Next 10 enquiries</h2>
-      <div className={`${c.dayChips} ${c.dayRow}`} role="radiogroup" aria-label="Day">
-        {[1, 2, 3, 4, 5, 6, 0].map(d => <button key={d} role="radio" className={c.dayChip} aria-checked={previewDay === d} onClick={() => setPreviewDay(d)}>
-          {DAY_NAMES[d]}
-        </button>)}
-      </div>
-      {!ownTeam && <label className={s.field}><span>From the ad</span>
-        <select value={previewAd} onChange={e => setPreviewAd(e.target.value)}>
-          <option value={NO_RULE}>An ad not handed to a TL</option>
-          {ads.map(ad => <option key={ad} value={ad}>{ad}</option>)}
-        </select>
-      </label>}
-      <ol className={c.preview}>
-        {picks.map((p, i) => <li key={i}>
-          <strong>{pickLabel(p)}</strong>
-          {p.teamId && !ownTeam && <span className={s.caption}>{teamName(p.teamId)}</span>}
-          {p.teamId && <span className={c.modeTag}>{pickTag(p)}</span>}
-        </li>)}
-      </ol>
-      <p className={s.caption}>From a fresh round. Nothing is changed.</p>
-    </section>
   </div>;
 }

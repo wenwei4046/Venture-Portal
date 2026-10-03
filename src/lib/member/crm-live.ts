@@ -60,7 +60,7 @@ export interface CrmAppointmentRow {
 }
 
 export interface CrmShowroomRow { id: string; name: string; active: boolean; sort_order: number }
-export interface CrmAssignRuleRow { ad_source_id: string; ad_label: string | null; tl_ids: string[] }
+export interface CrmAssignRuleRow { ad_source_id: string; ad_label: string | null; tl_ids: string[]; shares?: Record<string, number> | null }
 export interface CrmTeamSettingsRow {
   tl_id: string;
   team_share: number;
@@ -170,8 +170,10 @@ export function membersFromPeople(people: CrmPeopleRow["people"]): CrmMember[] {
 
 export function configFromRows(rules: CrmAssignRuleRow[], teams: CrmTeamSettingsRow[]): CrmAssignConfig {
   return {
-    rules: rules.filter(r => r.tl_ids.length > 0).map(r => ({ adName: r.ad_label?.trim() || `Ad ${r.ad_source_id}`, tlIds: r.tl_ids })),
-    teamRatios: Object.fromEntries(teams.map(t => [t.tl_id, t.team_share])),
+    rules: rules.filter(r => r.tl_ids.length > 0).map(r => ({
+      adId: r.ad_source_id, adName: r.ad_label?.trim() || `Ad ${r.ad_source_id}`, tlIds: r.tl_ids,
+      ...(r.shares && Object.keys(r.shares).length ? { shares: r.shares } : {}),
+    })),
     teams: Object.fromEntries(teams.map(t => [t.tl_id, {
       percentDays: (t.percent_days ?? []).filter(d => d >= 1 && d <= 4),
       weekendFullTime: t.weekend_full_time ?? true,

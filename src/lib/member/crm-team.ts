@@ -6,8 +6,10 @@
  *   Boss → HOD → Senior TL (vacant for now) → TL → TA → RS
  * Everyone has at most 3 direct downlines (an RS has none).
  *
- *   - Boss and HOD hand ads to TLs and watch performance. They read chats
- *     but never reply in them.
+ *   - The Boss (the Principal account) watches the numbers and decides which
+ *     teams take each ad; reads chats, never replies, takes no enquiries.
+ *   - The HOD sells too (2026-10-03): takes enquiries given to them and
+ *     replies to those; reads every team's chats; sets the same assignment.
  *   - A team is a TL and everyone below them. TL, TA and RS all take
  *     enquiries and reply to customers.
  *   - Everyone sees themselves and their whole downline, nobody else: a TL
@@ -15,8 +17,10 @@
  *     TL, TA) may step into a downline's chat and reply.
  *
  * Assignment:
- *   1. Which team. An ad the Boss or HOD handed to TLs rotates evenly among
- *      them (Mode 1). Any other ad is split by each team's % (Mode 2).
+ *   1. Which team (revised 2026-10-03). An ad the Boss or HOD handed to
+ *      teams rotates evenly among them; an ad they split by % follows the %.
+ *      Any other ad, and an enquiry from no ad, goes evenly across every team
+ *      until the Boss or HOD moves it.
  *   2. Who in the team (revised by the user 2026-10-03).
  *      Monday–Thursday: the TL ticks which days go by the %s they set
  *      (everyone with a %, full time or not); an unticked day waits in the
@@ -83,8 +87,8 @@ export const teamHandlers = (tlId: string, members: CrmMember[]) =>
 
 /* ── Who may see and do what ────────────────────────────────────────────── */
 
-/** TL, TA and RS take enquiries and reply to customers; Boss, HOD and Senior TL do not take them. */
-export const takesEnquiries = (m: CrmMember) => m.role === "tl" || m.role === "ta" || m.role === "rs";
+/** HOD, TL, TA and RS take enquiries and reply to customers; the Boss and a Senior TL do not take them. */
+export const takesEnquiries = (m: CrmMember) => m.role === "hod" || m.role === "tl" || m.role === "ta" || m.role === "rs";
 
 /** Everyone the viewer may see: themselves and their whole downline. */
 export const visibleMembers = (viewer: CrmMember, members: CrmMember[]) => [viewer, ...allDownlines(viewer.id, members)];
@@ -117,9 +121,14 @@ export const hasDownlines = (viewer: CrmMember, members: CrmMember[]) => directD
 /** Boss and HOD hand ads to TLs, set each team's %, and send any enquiry to a team by hand. */
 export function assignsAds(viewer: CrmMember) { return viewer.role === "boss" || viewer.role === "hod"; }
 
-/** Whether the viewer may reply in this lead's chat: its own person, or an upline who takes enquiries or is a Senior TL. */
+/**
+ * Whether the viewer may reply in this lead's chat: its own person, or an
+ * upline who takes enquiries or is a Senior TL. The HOD only in their own
+ * customers' chats; the Boss never.
+ */
 export function canReply(viewer: CrmMember, lead: Pick<CrmLead, "assignedTo" | "teamId">, members: CrmMember[]): boolean {
-  if (viewer.role === "boss" || viewer.role === "hod") return false;
+  if (viewer.role === "boss") return false;
+  if (viewer.role === "hod") return !!lead.assignedTo && lead.assignedTo === viewer.id;
   const owner = lead.assignedTo ?? lead.teamId;
   return !!owner && (owner === viewer.id || allDownlines(viewer.id, members).some(m => m.id === owner));
 }
@@ -133,11 +142,23 @@ export function canReassign(viewer: CrmMember, lead: Pick<CrmLead, "assignedTo" 
 
 /* ── Assignment ─────────────────────────────────────────────────────────── */
 
-/** Mode 1: the Boss or HOD hands an ad to these TLs; its enquiries rotate evenly among their teams. */
+/**
+ * Which teams take an ad's enquiries, set by the Boss or HOD: handed to these
+ * TLs' teams (evenly among them) or, with shares, split by each team's %.
+ * An ad with no rule goes evenly across every team.
+ */
 export interface CrmAdRule {
+  /** The Meta ad id (what the database keys the rule by). */
+  adId?: string;
   adName: string;
   tlIds: string[];
+  /** TL → % (adding up to 100) when the ad is split by %. */
+  shares?: Record<string, number>;
 }
+
+/** The rule for an ad, found by its Meta id or its name. */
+export const ruleForAd = (config: Pick<CrmAssignConfig, "rules">, ad: string) =>
+  config.rules.find(r => (r.adId && r.adId === ad) || r.adName === ad);
 
 /** Monday–Thursday as JavaScript numbers them (Date.getDay): the days a TL may tick for %. */
 export const WEEKDAYS = [1, 2, 3, 4] as const;
@@ -160,16 +181,14 @@ export interface CrmTeamSettings {
 /** A team nobody has set up: every weekday by hand, Fri–Sun to full-time RS (the rule before the TL decides). */
 export const DEFAULT_TEAM_SETTINGS: CrmTeamSettings = { percentDays: [], weekendFullTime: true, ratios: {} };
 
-/** Whether an RS is full time (takes Friday–Sunday enquiries) is the HOD's call, decided 2026-10-02. */
-export const setsFullTime = (viewer: CrmMember) => viewer.role === "hod";
+/** Whether an RS is full time (takes Friday–Sunday enquiries): the HOD's call (2026-10-02), and the Boss's (2026-10-03). */
+export const setsFullTime = (viewer: CrmMember) => viewer.role === "hod" || viewer.role === "boss";
 
 /** Who may change a team's Mon–Thu mode and %s: its TL, and the Boss and HOD. */
 export const canEditTeamRules = (viewer: CrmMember, tlId: string) => viewer.id === tlId || assignsAds(viewer);
 
 export interface CrmAssignConfig {
   rules: CrmAdRule[];
-  /** Mode 2: TL → % of the enquiries no ad rule claims, set by the Boss or HOD (100 in all). */
-  teamRatios: Record<string, number>;
   /** TL → their team's settings, set by that TL. */
   teams: Record<string, CrmTeamSettings>;
 }
@@ -208,24 +227,30 @@ export interface CrmAssignment {
   teamId: string | null;
   /** Who in the team; null when it waits in the TL's "To assign" list. */
   memberId: string | null;
-  /** Why that team: an ad rule (1) or the split between teams (2). */
-  teamBy?: 1 | 2;
+  /** Why that team: the ad handed to teams (1), the ad split by % (2), evenly across every team (3). */
+  teamBy?: 1 | 2 | 3;
   /** Why that person. */
   memberBy?: "weekend" | "ratio" | "manual" | "no_full_time" | "no_shares";
+}
+
+/** Which team takes an enquiry from this ad (its Meta id or name; "" for none) — the twin of crm_pick_team. */
+export function pickTeam(ad: string, config: CrmAssignConfig, given: Record<string, number>, members: CrmMember[]): Pick<CrmAssignment, "teamId" | "teamBy"> {
+  const tls = allTeams(members).map(t => t.id);
+  const rule = ad ? ruleForAd(config, ad) : undefined;
+  const byPercent = Object.fromEntries(Object.entries(rule?.shares ?? {}).filter(([id, n]) => tls.includes(id) && n > 0));
+  if (Object.keys(byPercent).length) return { teamId: pickByShare(byPercent, given), teamBy: 2 };
+  const handed = (rule?.tlIds ?? []).filter(id => tls.includes(id));
+  if (handed.length) return { teamId: pickByShare(even(handed), given), teamBy: 1 };
+  const teamId = pickByShare(even(tls), given);
+  return teamId ? { teamId, teamBy: 3 } : { teamId: null };
 }
 
 /** Who gets a new enquiry from this ad arriving at `at`, and the counts after it. */
 export function assignEnquiry(adName: string, at: Date, config: CrmAssignConfig, counts: CrmAssignCounts, members: CrmMember[]):
   { assignment: CrmAssignment; counts: CrmAssignCounts } {
-  const tls = new Set(allTeams(members).map(t => t.id));
-
   // 1. Which team.
-  const rule = config.rules.find(r => r.adName === adName && r.tlIds.some(id => tls.has(id)));
-  const teamId = rule
-    ? pickByShare(even(rule.tlIds.filter(id => tls.has(id))), counts.team)
-    : pickByShare(Object.fromEntries(Object.entries(config.teamRatios).filter(([id]) => tls.has(id))), counts.team);
+  const { teamId, teamBy } = pickTeam(adName, config, counts.team, members);
   if (!teamId) return { assignment: { teamId: null, memberId: null }, counts };
-  const teamBy = rule ? 1 : 2;
   const withTeam = { ...counts, team: { ...counts.team, [teamId]: (counts.team[teamId] ?? 0) + 1 } };
 
   // 2. Who in the team.
@@ -262,18 +287,6 @@ export function leadsHeld(leads: Pick<CrmLead, "assignedTo">[]): Record<string, 
   const given: Record<string, number> = {};
   for (const l of leads) if (l.assignedTo) given[l.assignedTo] = (given[l.assignedTo] ?? 0) + 1;
   return given;
-}
-
-/** The next n enquiries for an ad arriving at `at`, without changing anything — the settings' preview. */
-export function previewAssignments(adName: string, at: Date, n: number, config: CrmAssignConfig, counts: CrmAssignCounts, members: CrmMember[]): CrmAssignment[] {
-  const out: CrmAssignment[] = [];
-  let c = counts;
-  for (let i = 0; i < n; i++) {
-    const r = assignEnquiry(adName, at, config, c, members);
-    out.push(r.assignment);
-    c = r.counts;
-  }
-  return out;
 }
 
 /* ── Numbers ────────────────────────────────────────────────────────────── */

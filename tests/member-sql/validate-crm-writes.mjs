@@ -139,13 +139,32 @@ await refused('hod', `select public.crm_save_ad_rule('AD9', null, array[$1::uuid
 await as('hod', `select public.crm_save_ad_rule('AD9', null, '{}')`)
 check((await q(`select count(*)::int as n from crm_assign_rules`))[0].n, 0, 'no TLs left: the rule goes')
 await denied('tla', `select public.crm_save_ad_rule('AD9', null, array[$1::uuid])`, [id('s', 'tla')], 'a TL cannot hand themselves an ad')
+// 2026-10-03: an ad split by % between teams (adding to 100), by the Principal (Boss) or HOD.
+const split = (await as('boss', `select public.crm_save_ad_rule('AD5', 'Akemi', '{}', $1) as r`, [JSON.stringify({ [id('s', 'tla')]: 60, [id('s', 'tlb')]: 40 })]))[0].r
+check([split.tl_ids.length, (await row(`select shares from crm_assign_rules where ad_source_id = 'AD5'`)).shares[id('s', 'tlb')]], [2, 40], 'the Principal splits an ad 60 / 40')
+await refused('hod', `select public.crm_save_ad_rule('AD5', null, '{}', $1)`, [JSON.stringify({ [id('s', 'tla')]: 60, [id('s', 'tlb')]: 30 })], /add up to 100/, 'the % must add up to 100')
+await refused('hod', `select public.crm_save_ad_rule('AD5', null, '{}', $1)`, [JSON.stringify({ [id('s', 'ann')]: 100 })], /for a TL/, 'only teams get a %')
+await as('hod', `select public.crm_save_ad_rule('AD5', null, array[$1::uuid], null)`, [id('s', 'tla')])
+check(await row(`select tl_ids, shares from crm_assign_rules where ad_source_id = 'AD5'`), { tl_ids: [id('s', 'tla')], shares: null }, 'back to handing it to a team: the % goes')
+await denied('tla', `select public.crm_save_ad_rule('AD5', null, '{}', $1)`, [JSON.stringify({ [id('s', 'tla')]: 100 })], 'a TL cannot split an ad')
 
-// 8. Full time: the HOD only, and only for an RS.
+// 8. Full time: the HOD and (2026-10-03) the Principal; only for an RS.
 await as('hod', `select public.crm_set_full_time($1, true)`, [id('s', 'amir')])
 check((await row(`select full_time from crm_staff where staff_id = $1`, [id('s', 'amir')])).full_time, true, 'the HOD makes Amir full time')
-await denied('boss', `select public.crm_set_full_time($1, false)`, [id('s', 'amir')], 'not the Boss — the HOD decides (2026-10-02)')
+await as('boss', `select public.crm_set_full_time($1, false)`, [id('s', 'amir')])
+check((await row(`select full_time from crm_staff where staff_id = $1`, [id('s', 'amir')])).full_time, false, 'the Principal may too (2026-10-03)')
 await denied('tla', `select public.crm_set_full_time($1, false)`, [id('s', 'amir')], 'not the TL')
 await refused('hod', `select public.crm_set_full_time($1, true)`, [id('s', 'taa')], /Only an RS/, 'a TA is not full time or part time')
+
+// 8b. The HOD sells too (2026-10-03): given an enquiry, they reply to it — never to a team's. The Principal never replies.
+await denied('taa', `select public.crm_give_to_hod($1, $2)`, [c.none, id('s', 'hod')], 'a TA cannot give an enquiry to the HOD')
+await refused('boss', `select public.crm_give_to_hod($1, $2)`, [c.none, id('s', 'tla')], /Choose an HOD/, 'only to an HOD')
+await as('boss', `select public.crm_give_to_hod($1, $2)`, [c.none, id('s', 'hod')])
+check(await row(`select assigned_to, team_id from crm_contacts where id = $1`, [c.none]), { assigned_to: id('s', 'hod'), team_id: null }, 'the Principal gives it to the HOD')
+check((await as('hod', `select public.crm_can_reply($1) as r`, [c.none]))[0].r, true, 'the HOD may reply to their own')
+check((await as('hod', `select public.crm_can_reply($1) as r`, [c.ben]))[0].r, false, 'not to a team’s customer')
+check((await as('boss', `select public.crm_can_reply($1) as r`, [c.none]))[0].r, false, 'the Principal never replies')
+check((await as('tla', `select public.crm_can_reply($1) as r`, [c.none]))[0].r, false, 'a TL cannot reply to the HOD’s customer')
 
 // 9. Still no direct writes.
 await denied('hod', `update crm_contacts set status = 'won'`, [], 'no direct update')

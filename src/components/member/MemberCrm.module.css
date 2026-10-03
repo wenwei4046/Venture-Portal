@@ -480,3 +480,17 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .dayRow + label { margin-top: 10px; }
 /* A document the customer sent: a download, never shown in place */
 .fileLink { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: inherit; }
+
+/* Principal / HOD (2026-10-03): the Overview team rows open the team; an ad: its teams, its editor and Save. */
+.compareRow { cursor: pointer; }
+.compareRow:hover { background: var(--m-soft); }
+.adTeams { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--m-text); }
+.adTeams[data-kind="even"] { color: var(--m-sub); font-weight: 500; }
+.adEditor { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--m-soft); }
+.segment2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; padding: 4px; border-radius: 12px; background: var(--m-card); }
+.segment2 button { min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: var(--m-sub); font: inherit; font-weight: 700; cursor: pointer; }
+.segment2 [aria-checked="true"] { background: var(--m-brand); color: #fff; }
+.saveBar { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.adName { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adRow .linkButton { white-space: nowrap; flex: none; }
+.queueButton { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }

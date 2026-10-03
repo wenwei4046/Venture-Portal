@@ -191,7 +191,7 @@ export function MemberCrmPerformance({ viewer, members, leads, appointments, now
 }
 
 /** One person, seen by an upline: their numbers and every lead. */
-export function MemberCrmMember({ member, members, leads, appointments, now, viewer, stepIn, nameOf, onBack, onOpenLead }: {
+export function MemberCrmMember({ member, members, leads, appointments, now, viewer, stepIn, nameOf, onBack, onOpenLead, backLabel = "Back to Team" }: {
   member: CrmMember;
   members: CrmMember[];
   leads: CrmLead[];
@@ -203,13 +203,14 @@ export function MemberCrmMember({ member, members, leads, appointments, now, vie
   nameOf: (memberId: string) => string;
   onBack: () => void;
   onOpenLead: (leadId: string) => void;
+  backLabel?: string;
 }) {
   const own = sortByUrgency(leads.filter(l => l.assignedTo === member.id), now);
   const st = memberStats(own, appointments, now);
   const upline = members.find(m => m.id === member.uplineId);
   return <div className={c.chat}>
     <div className={c.chatHead}>
-      <button className={c.back} onClick={onBack} aria-label="Back to Team"><Icon name="back" size={20} /></button>
+      <button className={c.back} onClick={onBack} aria-label={backLabel}><Icon name="back" size={20} /></button>
       <span className={c.leadAvatar} aria-hidden="true">{initials(member.name)}</span>
       <div className={c.chatWho}><strong>{member.name}</strong><span className={s.caption}>{roleTag(member)}{upline ? ` · reports to ${upline.name}` : ""}</span></div>
     </div>
@@ -225,7 +226,7 @@ export function MemberCrmMember({ member, members, leads, appointments, now, vie
       <h2>Leads</h2>
       <p className={s.caption}>{stepIn
         ? <>Open a chat to reply for {firstName(member.name)} — the customer sees one conversation; the team sees &ldquo;Replied by&rdquo; you.</>
-        : "View only — the Boss and HOD read chats but don't reply in them."}</p>
+        : viewer.role === "boss" ? "View only — the Principal reads chats but doesn't reply in them." : "View only."}</p>
       {own.length === 0 && <p className={s.sub}>No leads yet.</p>}
       {own.map(l => <MemberCrmLeadRow key={l.id} lead={l} now={now} viewerId={viewer.id} nameOf={nameOf} onOpen={() => onOpenLead(l.id)} />)}
     </section>

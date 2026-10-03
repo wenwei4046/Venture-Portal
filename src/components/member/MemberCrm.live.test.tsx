@@ -26,7 +26,7 @@ const data = (extra: Partial<CrmLiveData> = {}, lastCustomerAt = hoursAgo(2)): C
     messages: [{ id: "m1", from: "lead", text: "Is the promotion still on?", at: lastCustomerAt }],
   }],
   appointments: [],
-  config: { rules: [], teamRatios: {}, teams: {} },
+  config: { rules: [], teams: {} },
   showrooms: [{ id: "kl", name: "Kuala Lumpur Showroom", active: true }, { id: "old", name: "Old Showroom", active: false }],
   ...extra,
 });
@@ -125,6 +125,77 @@ describe("the CRM on live data", () => {
     await openChat();
     expect(screen.getByText(/More than 24 hours/)).toBeTruthy();
     expect(screen.queryByLabelText("Reply")).toBeNull();
+  });
+
+  const tl = { id: "tla", name: "Kelvin", role: "tl" as const, teamName: "Team Kelvin" };
+  const tl2 = { id: "tlb", name: "Priya", role: "tl" as const, teamName: "Team Priya" };
+  const asPrincipal = (extra: Partial<CrmLiveData> = {}) => {
+    const d = data();
+    return { ...d, viewerId: "boss", members: [{ id: "boss", name: "Loo", role: "boss" as const }, tl, tl2, { ...d.members[0], uplineId: "tla" }], ...extra };
+  };
+
+  it("opens the Principal on the numbers — no Inbox, no Contacts", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
+    render(<MemberCrm live salesperson="Principal" />);
+    expect(await screen.findByRole("heading", { name: "Overview" })).toBeTruthy();
+    expect(screen.getByText("Appt rate")).toBeTruthy();
+    expect(screen.getByText("Show-up rate")).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "Team Kelvin" })).toBeTruthy();
+    const bar = screen.getByRole("navigation", { name: "CRM" });
+    expect(Array.from(bar.querySelectorAll("button")).map(b => b.textContent?.replace(/\d+/g, ""))).toEqual(["Overview", "Assignment", "Calendar"]);
+  });
+
+  it("lets the Principal hand an ad to teams — saved only on Save", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
+    crmWrite.mockResolvedValue({ ok: true, data: {} });
+    render(<MemberCrm live salesperson="Principal" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Assignment/ }));
+    expect(screen.getByText("Akemi Fair")).toBeTruthy();
+    expect(screen.getByText(/Not set — evenly across every team/)).toBeTruthy();
+    expect(screen.queryByText(/Next 10 enquiries/)).toBeNull();
+    fireEvent.click(screen.getByText("Choose teams"));
+    fireEvent.click(screen.getByRole("button", { name: "Team Priya" }));
+    expect(crmWrite).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_save_ad_rule", { p_ad: "AD9", p_label: "Akemi Fair", p_tls: ["tlb"], p_shares: null }));
+    expect(await screen.findByText("Team Priya", { selector: "p" })).toBeTruthy();
+  });
+
+  it("lets the Principal split an ad by % — Save waits for 100%", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
+    crmWrite.mockResolvedValue({ ok: true, data: {} });
+    render(<MemberCrm live salesperson="Principal" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Assignment/ }));
+    fireEvent.click(screen.getByText("Choose teams"));
+    fireEvent.click(screen.getByRole("radio", { name: "Split by %" }));
+    fireEvent.change(screen.getByLabelText("Team Kelvin share of Akemi Fair (%)"), { target: { value: "60" } });
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Team Priya share of Akemi Fair (%)"), { target: { value: "40" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_save_ad_rule", { p_ad: "AD9", p_label: "Akemi Fair", p_tls: ["tla", "tlb"], p_shares: { tla: 60, tlb: 40 } }));
+    expect(await screen.findByText("Team Kelvin 60% · Team Priya 40%")).toBeTruthy();
+  });
+
+  it("opens on the member the Principal picked in Today", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
+    render(<MemberCrm live salesperson="Principal" viewingStaffId="ann" />);
+    expect(await screen.findByText("Ann Tan")).toBeTruthy();
+    expect(screen.getByText("Reply within 24 h")).toBeTruthy();
+    expect(screen.getByText("Tan Mei Ling")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Back to Overview"));
+    expect(await screen.findByRole("heading", { name: "Overview" })).toBeTruthy();
+  });
+
+  it("gives the HOD their own enquiries to answer, and Mine / Teams", async () => {
+    const d = data();
+    const own = { ...d.leads[0], id: "c2", name: "Lim Ah Kow", assignedTo: "hod", teamId: undefined };
+    fetchCrm.mockResolvedValue({ ok: true, data: { ...d, viewerId: "hod", members: [{ id: "hod", name: "Peter", role: "hod" }, { ...tl, uplineId: "hod" }, { ...d.members[0], uplineId: "tla" }], leads: [...d.leads, own] } });
+    render(<MemberCrm live salesperson="Peter" />);
+    expect(await screen.findByRole("radio", { name: /Teams/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: /Mine/ }));
+    expect(screen.queryByText("Tan Mei Ling")).toBeNull();
+    fireEvent.click(screen.getByText("Lim Ah Kow"));
+    expect(await screen.findByLabelText("Reply")).toBeTruthy();
   });
 
   it("lets the HOD read but never reply", async () => {

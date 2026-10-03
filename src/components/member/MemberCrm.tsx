@@ -12,7 +12,7 @@ import {
 import { detectRequestedTime } from "@/lib/member/crm-datetime";
 import { crmDemo, crmTeamDemo, demoShowrooms } from "@/lib/member/crm-demo";
 import {
-  ROLE_LABELS, allTeams, assignsAds, canReassign, canReply, hasDownlines, leadsHeld, setsFullTime, takesEnquiries, pickInTeam, teamHandlers, teamOf, visibleLeads, visibleMembers,
+  ROLE_LABELS, allTeams, assignsAds, canReassign, canReply, hasDownlines, isUnassigned, leadsHeld, setsFullTime, takesEnquiries, pickInTeam, teamHandlers, teamOf, visibleLeads, visibleMembers,
   type CrmAssignConfig, type CrmAssignment, type CrmMember,
 } from "@/lib/member/crm-team";
 import s from "./member.module.css";
@@ -24,7 +24,8 @@ import MemberCrmContacts from "./MemberCrmContacts";
 import MemberCrmAutoReplies from "./MemberCrmAutoReplies";
 import MemberCrmLeadRow, { firstName } from "./MemberCrmLeadRow";
 import { MemberCrmMember, MemberCrmPerformance, MemberCrmTeam, roleTag } from "./MemberCrmTeam";
-import MemberCrmAssignment from "./MemberCrmAssignment";
+import MemberCrmAssignment, { adsFromLeads, type CrmAdInfo } from "./MemberCrmAssignment";
+import MemberCrmOverview from "./MemberCrmOverview";
 import { apptLabel, dayLabel, openShowrooms, roomName, setShowroomList, time, whenLabel } from "./crm-format";
 import MemberCrmShowrooms from "./MemberCrmShowrooms";
 import { crmWrite, fetchCrm, sendCrmReply, type CrmWrite } from "@/app/(member)/member/crm-actions";
@@ -37,8 +38,12 @@ const systemNote = (text: string, kind?: CrmMessage["kind"]): CrmMessage =>
 /** Which calendars a slot must be free on: the showroom's and the salesperson's own. */
 type BusyFor = (showroomId: string) => { room: CrmBusySlot[]; mine: CrmBusySlot[] };
 
-/** The CRM's own bottom bar: Inbox (leads and chats), Calendar (appointments), Profile (your numbers). */
-type Tab = "inbox" | "contacts" | "calendar" | "team" | "profile";
+/**
+ * The CRM's own bottom bar. Everyone who takes enquiries: Inbox, Contacts,
+ * Calendar, (Team for a leader), Profile. The Principal (Boss) takes none
+ * (user 2026-10-03): Overview (the numbers), Assignment, Calendar.
+ */
+type Tab = "overview" | "assignment" | "inbox" | "contacts" | "calendar" | "team" | "profile";
 type View =
   | { kind: "tab" }
   | { kind: "chat"; leadId: string; fromMember?: string } // fromMember: opened from that salesperson's page in Team
@@ -54,9 +59,11 @@ type View =
  * cancels; a customer asks in the chat, the time they name is picked out for
  * the salesperson to confirm, and the customer is told the new time.
  */
-export default function MemberCrm({ salesperson = "your salesperson", onExit, live = false }: {
+export default function MemberCrm({ salesperson = "your salesperson", onExit, live = false, viewingStaffId }: {
   salesperson?: string;
   onExit?: () => void;
+  /** The Principal picked this member in the Revenue app's Today: the Overview opens on their numbers and leads. */
+  viewingStaffId?: string | null;
   /**
    * The signed-in member's real CRM, read and written under their own session
    * (crm-actions.ts). Every change is saved first and shown only once the
@@ -94,7 +101,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   const [showrooms, setShowrooms] = useState<CrmShowroom[]>(live ? [] : demoShowrooms);
   // The format helpers name showrooms from this list (crm-format.ts) — hand it over before anything below renders.
   setShowroomList(showrooms);
-  const [config, setConfig] = useState<CrmAssignConfig>(live ? { rules: [], teamRatios: {}, teams: {} } : team.config);
+  const [config, setConfig] = useState<CrmAssignConfig>(live ? { rules: [], teams: {} } : team.config);
+  // The Principal looking at one member (from Today), until they close it.
+  const [viewing, setViewing] = useState<string | null>(viewingStaffId ?? null);
+  useEffect(() => { setViewing(viewingStaffId ?? null); }, [viewingStaffId]);
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   // Before live data arrives (or for someone with no CRM role) there is nobody to look through: see the guard below.
   const viewer: CrmMember = members.find(m => m.id === viewerId) ?? members[0] ?? { id: "", name: salesperson, role: "rs" };
@@ -114,6 +124,8 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     setInboxScope("all");
     setMemberPick([]);
     if (next && !hasDownlines(next, members) && tab === "team") setTab("inbox");
+    if (next?.role === "boss") setTab("overview");
+    else if (tab === "overview" || tab === "assignment") setTab("inbox");
   }
 
   /**
@@ -189,8 +201,8 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   }
 
   /**
-   * A settings change: on screen at once; live, saved a moment after the last
-   * keystroke — one save per thing that changed (a team's rules, the split, an ad).
+   * A team's rules changed: on screen at once; live, saved a moment after the
+   * last keystroke — one save per team. Ads are saved with their own Save.
    */
   function changeConfig(next: CrmAssignConfig) {
     const prev = config;
@@ -206,17 +218,26 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       if (was && same({ ...was, editedBy: null }, { ...st, editedBy: null })) continue;
       later(`team:${tlId}`, "crm_save_team_settings", () => ({ p_tl: tlId, p_percent_days: st.percentDays, p_weekend_full_time: st.weekendFullTime, p_ratios: st.ratios }));
     }
-    if (!same(prev.teamRatios, next.teamRatios)) later("shares", "crm_save_team_shares", () => ({ p_shares: next.teamRatios }));
-    const ads = new Set([...prev.rules, ...next.rules].map(r => r.adName));
-    for (const ad of ads) {
-      const before = prev.rules.find(r => r.adName === ad)?.tlIds ?? [];
-      const after = next.rules.find(r => r.adName === ad)?.tlIds ?? [];
-      if (same(before, after)) continue;
-      // Rules are kept by the Meta ad id; the screen shows the ad's name.
-      const adId = leads.find(l => l.adName === ad)?.campaign;
-      if (!adId) { setLiveError(`Could not find the ad "${ad}".`); continue; }
-      later(`ad:${adId}`, "crm_save_ad_rule", () => ({ p_ad: adId, p_label: ad, p_tls: after }));
-    }
+  }
+
+  /** The Principal or HOD decides which teams take an ad: handed to teams (evenly), or split by %. */
+  async function saveAd(ad: CrmAdInfo, tlIds: string[], shares: Record<string, number> | null): Promise<boolean> {
+    if (!(await persist("crm_save_ad_rule", { p_ad: ad.id, p_label: ad.name, p_tls: tlIds, p_shares: shares })).ok) return false;
+    setConfig(cfg => ({
+      ...cfg,
+      rules: [...cfg.rules.filter(r => r.adId !== ad.id && r.adName !== ad.name),
+        ...(tlIds.length ? [{ adId: ad.id, adName: ad.name, tlIds, ...(shares ? { shares } : {}) }] : [])],
+    }));
+    return true;
+  }
+
+  /** The Principal or HOD gives an enquiry to an HOD, who sells too. */
+  async function giveToHod(leadId: string, hodId: string) {
+    if (!(await persist("crm_give_to_hod", { p_contact: leadId, p_hod: hodId })).ok) return;
+    updateLead(leadId, l => ({
+      ...l, assignedTo: hodId, teamId: undefined,
+      messages: [...l.messages, systemNote(`Given to ${nameOf(hodId)} (HOD) by ${nameOf(viewer.id)}.`)],
+    }));
   }
 
   /** A TL hands a lead to someone in their team (or takes it back from one). */
@@ -253,6 +274,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       setAppointments(result.data.appointments);
       setConfig(result.data.config);
       setShowrooms(result.data.showrooms);
+      if (result.data.members.find(m => m.id === result.data.viewerId)?.role === "boss") setTab("overview");
       setLoad({ state: "ready", setup: result.data.setup });
     });
     return () => { current = false; };
@@ -411,7 +433,9 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
         canCompose={mayReply && !windowShut}
         composer={live ? { textOnly: true, sending, error: sendError } : undefined}
         moveTo={assignsAds(viewer) ? allTeams(members) : undefined}
+        hods={assignsAds(viewer) ? members.filter(m => m.role === "hod") : undefined}
         onMoveTeam={tlId => void sendToTeam(lead.id, tlId)}
+        onGiveToHod={hodId => void giveToHod(lead.id, hodId)}
         reassignTo={canReassign(viewer, lead, members) ? teamHandlers(lead.teamId ?? teamOf(lead.assignedTo ?? "", members) ?? "", members) : undefined}
         onReassign={memberId => void assign(lead.id, memberId)}
         onBack={() => { setView(fromMember ? { kind: "member", memberId: fromMember } : { kind: "tab" }); setBooking(false); }}
@@ -503,8 +527,8 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   // ── Assignment, from Settings ─────────────────────────────────────────────
   if (view.kind === "assignment" && seesAssignment) {
     inDetail = true;
-    body = <MemberCrmAssignment viewer={viewer} members={members} readOnly={false}
-      ads={[...new Set(leads.map(l => l.adName))].sort()} config={config} onConfig={changeConfig}
+    body = <MemberCrmAssignment viewer={viewer} members={members} ads={adsFromLeads(leads, config)} config={config} onConfig={changeConfig}
+      onSaveAd={saveAd} waiting={leads.filter(isUnassigned)} onSendToTeam={(id, tl) => void sendToTeam(id, tl)} onOpenLead={id => openLead(id)}
       onBack={() => setView({ kind: "settings" })} />;
   }
 
@@ -523,29 +547,30 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     ...visibleMembers(viewer, members).filter(m => m.id !== viewer.id && membersOnly.some(l => l.assignedTo === m.id)).map(m => ({ id: m.id, label: firstName(m.name) })),
     ...(membersOnly.some(l => !l.assignedTo) ? [{ id: "", label: "To assign" }] : []),
   ];
-  // The Boss, HOD (and a Senior TL) narrow by team instead — the same choice as on the Team tab. "" = no team yet.
-  const byTeam = manager && !takesEnquiries(viewer);
+  // A Senior TL narrows by team instead — the same choice as on the Team tab — and so does the HOD under "Teams". "" = no team yet.
+  const hod = viewer.role === "hod";
+  const byTeam = manager && (!takesEnquiries(viewer) || (hod && inboxScope === "members"));
   const teamOfLead = (l: CrmLead) => l.teamId ?? (l.assignedTo ? teamOf(l.assignedTo, members) : undefined) ?? "";
   const teamChoices = byTeam ? [
     ...allTeams(members).filter(t => visibleMembers(viewer, members).some(m => m.id === t.id)),
     ...(visible.some(l => teamOfLead(l) === "") ? [{ id: "", teamName: "No team" }] : []),
   ] : [];
-  const inScope = byTeam ? visible.filter(l => teamFilter === null || teamOfLead(l) === teamFilter)
+  const inScope = byTeam ? (hod ? membersOnly : visible).filter(l => teamFilter === null || teamOfLead(l) === teamFilter)
     : scope === "all" ? visible
       : scope === "mine" ? visible.filter(l => l.assignedTo === viewer.id)
         : membersOnly.filter(l => memberPick.length === 0 || memberPick.includes(l.assignedTo ?? ""));
   const scopeBar = <>
+    {scoped && <div className={c.segment3} role="radiogroup" aria-label="Whose leads">
+      {([["all", "All", visible.length], ["mine", "Mine", visible.filter(l => l.assignedTo === viewer.id).length], ["members", hod ? "Teams" : "Members", visible.filter(l => l.assignedTo !== viewer.id).length]] as const).map(([value, label, n]) =>
+        <button key={value} role="radio" aria-checked={inboxScope === value} onClick={() => setInboxScope(value)}>{label} <small>{n}</small></button>)}
+    </div>}
     {byTeam && teamChoices.length > 1 && <div className={c.chips} role="group" aria-label="Team">
       <button className={c.chip} aria-pressed={teamFilter === null} onClick={() => setTeamFilter(null)}>All teams {visible.length}</button>
       {teamChoices.map(t => <button key={t.id || "no-team"} className={c.chip} aria-pressed={teamFilter === t.id} onClick={() => setTeamFilter(t.id)}>
         {t.teamName} {visible.filter(l => teamOfLead(l) === t.id).length}
       </button>)}
     </div>}
-    {scoped && <div className={c.segment3} role="radiogroup" aria-label="Whose leads">
-      {([["all", "All", visible.length], ["mine", "Mine", visible.filter(l => l.assignedTo === viewer.id).length], ["members", "Members", visible.filter(l => l.assignedTo !== viewer.id).length]] as const).map(([value, label, n]) =>
-        <button key={value} role="radio" aria-checked={inboxScope === value} onClick={() => setInboxScope(value)}>{label} <small>{n}</small></button>)}
-    </div>}
-    {scope === "members" && pickable.length > 1 && <div className={c.chips} role="group" aria-label="Filter by member">
+    {scope === "members" && !hod && pickable.length > 1 && <div className={c.chips} role="group" aria-label="Filter by member">
       <button className={c.chip} aria-pressed={memberPick.length === 0} onClick={() => setMemberPick([])}>Everyone</button>
       {pickable.map(p => <button key={p.id || "to-assign"} className={c.chip} aria-pressed={memberPick.includes(p.id)}
         onClick={() => setMemberPick(list => (list.includes(p.id) ? list.filter(x => x !== p.id) : [...list, p.id]))}>
@@ -560,7 +585,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     const waiting = (level: CrmUrgency) => inScope.filter(l => replyUrgency(l, now).level === level).length;
     const scopeWaiting = inScope.filter(l => l.unread > 0 || replyUrgency(l, now).level !== "none").length;
     body = <>
-      <div className={c.tabTitle}><h1>Inbox</h1><p className={s.sub}>{byTeam && teamFilter !== null ? `${teamChoices.find(x => x.id === teamFilter)?.teamName ?? "This"} team` : scope === "mine" ? "Your own leads" : scope === "members" ? "Your members' leads" : manager ? "Your downline's leads" : "Leads from Meta ads"} · {scopeWaiting} waiting</p></div>
+      <div className={c.tabTitle}><h1>Inbox</h1><p className={s.sub}>{byTeam && teamFilter !== null ? `${teamChoices.find(x => x.id === teamFilter)?.teamName ?? "This"} team` : scope === "mine" ? "Your own leads" : scope === "members" ? (hod ? "Your teams' leads" : "Your members' leads") : manager ? "Your downline's leads" : "Leads from Meta ads"} · {scopeWaiting} waiting</p></div>
       {scopeBar}
       <p className={c.demoNote}><Icon name="info" size={16} /> {live ? "Live · read only for now — replying from the CRM arrives next" : "Demo data · not connected to Meta yet"}</p>
       <section className={s.card}>
@@ -648,6 +673,23 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       onAssign={(id, m) => void assign(id, m)} onSendToTeam={(id, tl) => void sendToTeam(id, tl)} />;
   }
 
+  // ── Overview: the Principal's numbers; one member's, when picked in Today ──
+  if (!inDetail && tab === "overview") {
+    const picked = viewing ? members.find(m => m.id === viewing) : undefined;
+    body = picked
+      ? <MemberCrmMember member={picked} members={members} leads={visible} appointments={visibleAppts} now={now} viewer={viewer}
+        stepIn={false} nameOf={nameOf} backLabel="Back to Overview" onBack={() => setViewing(null)} onOpenLead={id => openLead(id)} />
+      : <MemberCrmOverview viewer={viewer} members={members} leads={visible} appointments={visibleAppts} now={now}
+        onOpenMember={id => setView({ kind: "member", memberId: id })} onOpenAssignment={() => goTab("assignment")} />;
+    inDetail = !!picked;
+  }
+
+  // ── Assignment as a tab (the Principal) ──────────────────────────────────
+  if (!inDetail && tab === "assignment" && assignsAds(viewer)) {
+    body = <MemberCrmAssignment viewer={viewer} members={members} ads={adsFromLeads(leads, config)} config={config} onConfig={changeConfig}
+      onSaveAd={saveAd} waiting={leads.filter(isUnassigned)} onSendToTeam={(id, tl) => void sendToTeam(id, tl)} onOpenLead={id => openLead(id)} />;
+  }
+
   // ── Profile ───────────────────────────────────────────────────────────────
   if (!inDetail && tab === "profile") {
     const lostLeads = visible.filter(l => l.status === "lost");
@@ -690,7 +732,12 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     </>;
   }
 
-  const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = [
+  const principal = viewer.role === "boss";
+  const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = principal ? [
+    { id: "overview", icon: "chart", label: "Overview" },
+    { id: "assignment", icon: "branch", label: "Assignment", badge: leads.filter(isUnassigned).length },
+    { id: "calendar", icon: "calendar", label: "Calendar", badge: upcomingCount },
+  ] : [
     { id: "inbox", icon: "chat", label: "Inbox", badge: needsReply },
     { id: "contacts", icon: "team", label: "Contacts" },
     { id: "calendar", icon: "calendar", label: "Calendar", badge: upcomingCount },
@@ -732,7 +779,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   );
 }
 
-function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, readOnly, notice, demoTools = true, canCompose, composer, reassignTo, onReassign, moveTo, onMoveTeam, onBack, onOpenAppointment, onStatus, onSend, onAttachment, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
+function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, readOnly, notice, demoTools = true, canCompose, composer, reassignTo, onReassign, moveTo, hods, onMoveTeam, onGiveToHod, onBack, onOpenAppointment, onStatus, onSend, onAttachment, onCustomerMessage, booking, onBooking, busy, onBook, onReschedule }: {
   lead: CrmLead;
   now: Date;
   appointments: CrmAppointment[];
@@ -756,7 +803,10 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
   onReassign: (memberId: string) => void;
   /** Every TL, when the viewer is the Boss or HOD and may send the lead to another team. */
   moveTo?: CrmMember[];
+  /** The HODs, who sell too: the Boss or HOD may give the lead to one. */
+  hods?: CrmMember[];
   onMoveTeam: (tlId: string) => void;
+  onGiveToHod?: (hodId: string) => void;
   onBack: () => void;
   onOpenAppointment: (id: string) => void;
   onStatus: (status: CrmStatus, lost?: CrmLost) => void;
@@ -827,18 +877,27 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
       </div>
       <p className={c.chatAd}><Icon name="target" size={14} /> {lead.adName}</p>
       {readOnly
-        ? <p className={c.stepIn}><Icon name="eye" size={16} /> View only · {lead.assignedTo ? `${firstName(salesperson)}'s customer` : "not assigned yet"} — the {ROLE_LABELS[viewer.role]} reads chats but doesn&apos;t reply</p>
+        ? <p className={c.stepIn}><Icon name="eye" size={16} /> View only · {lead.assignedTo ? `${firstName(salesperson)}'s customer` : "not assigned yet"} — {viewer.role === "hod" ? "you reply to your own customers; this one is the team’s" : <>the {ROLE_LABELS[viewer.role]} reads chats but doesn&apos;t reply</>}</p>
         : lead.assignedTo !== viewer.id && <p className={c.stepIn}>
           <Icon name="eye" size={16} /> {lead.assignedTo ? `${firstName(salesperson)}'s customer` : "Not assigned yet"} · your replies show to the team as &ldquo;Replied by {firstName(viewer.name)}&rdquo;
         </p>}
       {notice && <p className={c.waitBanner} data-urgency="soon" role="status">{notice}</p>}
-      {moveTo && <label className={c.reassign}>
-        <span>{lead.teamId ? "Team" : "Send to team"}</span>
-        <select value={lead.teamId ?? ""} onChange={e => e.target.value && e.target.value !== lead.teamId && onMoveTeam(e.target.value)}>
-          {!lead.teamId && <option value="">Choose a TL…</option>}
-          {moveTo.map(t => <option key={t.id} value={t.id}>{t.teamName} · {t.name}</option>)}
-        </select>
-      </label>}
+      {moveTo && (() => {
+        const withHod = !lead.teamId && !!lead.assignedTo && !!hods?.some(h => h.id === lead.assignedTo);
+        const current = lead.teamId ?? (withHod ? `hod:${lead.assignedTo}` : "");
+        return <label className={c.reassign}>
+          <span>{lead.teamId || withHod ? "With" : "Send to"}</span>
+          <select value={current} onChange={e => {
+            const v = e.target.value;
+            if (!v || v === current) return;
+            if (v.startsWith("hod:")) onGiveToHod?.(v.slice(4)); else onMoveTeam(v);
+          }}>
+            {!current && <option value="">Choose a team…</option>}
+            {moveTo.map(t => <option key={t.id} value={t.id}>{t.teamName} · {t.name}</option>)}
+            {hods?.map(h => <option key={h.id} value={`hod:${h.id}`}>{h.name} · HOD</option>)}
+          </select>
+        </label>;
+      })()}
       {reassignTo && <label className={c.reassign}>
         <span>{lead.assignedTo ? "Assigned to" : "Assign to"}</span>
         <select value={lead.assignedTo ?? ""} onChange={e => e.target.value && e.target.value !== lead.assignedTo && onReassign(e.target.value)}>
