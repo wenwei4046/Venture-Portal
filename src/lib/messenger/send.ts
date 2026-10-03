@@ -32,17 +32,29 @@ export async function pageToken(pageId: string, systemToken: string, fetchImpl: 
   }
 }
 
-/** "First Last" from the customer's Messenger profile, or null when Meta does not say. */
-export async function profileName(psid: string, token: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
-  if (!/^\d{5,32}$/.test(psid)) return null;
-  try {
-    const r = await fetchImpl(graph(`${psid}?fields=first_name,last_name`), { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(3000) });
-    const j = (await r.json().catch(() => null)) as { first_name?: string; last_name?: string } | null;
-    const name = [j?.first_name, j?.last_name].filter(Boolean).join(" ").trim();
-    return r.ok && name ? name : null;
-  } catch {
-    return null;
-  }
+/**
+ * The customer's name, or null when Meta does not say. The profile API
+ * (first_name/last_name) needs Meta's "Business Asset User Profile Access"
+ * review, which the app does not have yet — so, failing that, the name is
+ * read from the Page's conversation with them (its participants), which the
+ * Page token may read (found 2026-10-03, first real Messenger test).
+ */
+export async function profileName(pageId: string, psid: string, token: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  if (!/^\d{5,32}$/.test(psid) || !/^\d{5,32}$/.test(pageId)) return null;
+  const ask = async <T,>(path: string): Promise<T | null> => {
+    try {
+      const r = await fetchImpl(graph(path), { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(3000) });
+      return r.ok ? ((await r.json().catch(() => null)) as T | null) : null;
+    } catch {
+      return null;
+    }
+  };
+  const profile = await ask<{ first_name?: string; last_name?: string }>(`${psid}?fields=first_name,last_name`);
+  const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+  if (name) return name;
+  const talk = await ask<{ data?: { participants?: { data?: { id?: string; name?: string }[] } }[] }>(
+    `${pageId}/conversations?platform=messenger&user_id=${psid}&fields=participants`);
+  return talk?.data?.[0]?.participants?.data?.find(p => p.id === psid)?.name?.trim() || null;
 }
 
 /** The Send API request: a normal response inside 24 hours, the HUMAN_AGENT tag after. */

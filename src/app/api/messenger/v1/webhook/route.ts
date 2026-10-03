@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     for (const m of messages) {
       if (!tokens.has(m.pageId)) tokens.set(m.pageId, await pageToken(m.pageId, systemToken))
       const token = tokens.get(m.pageId)
-      if (token && !names.has(m.psid)) names.set(m.psid, await profileName(m.psid, token))
+      if (token && !names.has(m.psid)) names.set(m.psid, await profileName(m.pageId, m.psid, token))
       m.name = names.get(m.psid) ?? null
     }
   }

@@ -34,8 +34,16 @@ describe("talking to Meta", () => {
   });
 
   it("reads the customer's name, and gives up quietly", async () => {
-    expect(await profileName("123456789", "T", vi.fn().mockResolvedValue(json(200, { first_name: "Mei", last_name: "Ling" })))).toBe("Mei Ling");
-    expect(await profileName("123456789", "T", vi.fn().mockRejectedValue(new Error("timeout")))).toBeNull();
+    expect(await profileName("102351059576534", "123456789", "T", vi.fn().mockResolvedValue(json(200, { first_name: "Mei", last_name: "Ling" })))).toBe("Mei Ling");
+    expect(await profileName("102351059576534", "123456789", "T", vi.fn().mockRejectedValue(new Error("timeout")))).toBeNull();
+  });
+
+  it("falls back to the Page's conversation when the profile API is not allowed", async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce(json(400, { error: { code: 100, error_subcode: 33 } }))
+      .mockResolvedValueOnce(json(200, { data: [{ participants: { data: [{ id: "123456789", name: "Tan Mei Ling" }, { id: "102351059576534", name: "The Conts" }] } }] }));
+    expect(await profileName("102351059576534", "123456789", "T", f)).toBe("Tan Mei Ling");
+    expect(f.mock.calls[1][0]).toContain("102351059576534/conversations?platform=messenger&user_id=123456789");
   });
 
   it("returns Meta's message id, or a reason in plain words", async () => {
