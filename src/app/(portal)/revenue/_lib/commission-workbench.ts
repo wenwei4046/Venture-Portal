@@ -60,6 +60,7 @@ export async function loadCommissionWorkbench(
     const fair = fairId ? fairById.get(fairId) : undefined
     return {
       orderId: o.orderId, venue: o.venueGroupName ?? o.venue, location: o.location,
+      refNo: o.refNo, paperNo: o.paperNo,
       organizer: fair?.organiserName ?? fair?.erpOrganiserText ?? o.organizer,
       eventName: fair?.startDate ? fairDays(fair.startDate, fair.endDate) : null,
       fair: fair ? { id: fair.fairId, venueKey: fair.venueKey, venueName: fair.displayName } : null,

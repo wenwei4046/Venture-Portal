@@ -80,7 +80,7 @@ function fixture(orders = [sale('one', 1_000, 'agent'), sale('two', 2_000, 'agen
       { staffId: 'ch', name: 'CHEA HUAN', employeeCode: 'HV011' },
       { staffId: 'leader', name: 'ALEX', employeeCode: 'HV002' },
     ],
-    orders: orders.map(o => ({ orderId: o.id, venue: 'MID VALLEY', eventName: '11–13 Sep', organizer: 'REX', location: 'KL', fair: null, booth: null })),
+    orders: orders.map(o => ({ orderId: o.id, venue: 'MID VALLEY', eventName: '11–13 Sep', organizer: 'REX', location: 'KL', fair: null, booth: null, refNo: null, paperNo: null })),
   }
 }
 

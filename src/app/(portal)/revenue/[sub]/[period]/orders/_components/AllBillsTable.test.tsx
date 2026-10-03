@@ -23,7 +23,7 @@ import AllBillsTable, { type BillRow } from './AllBillsTable'
 
 function bill(extra: Partial<BillRow> = {}): BillRow {
   return {
-    orderId: 'order-1', orderNo: 'HC-SO-013493', href: '/revenue/fair/2026-09-01/orders/order-1',
+    orderId: 'order-1', orderNo: 'HC-SO-013493', refNo: 'HC13369', paperNo: 'HC13369', href: '/revenue/fair/2026-09-01/orders/order-1',
     orderDate: '2026-09-07', eventDate: '2026-09-07', sequenceInDay: 1, customerName: 'Sarida',
     venue: 'SETIA SPICE CONVENTION CENTRE', venueHref: '/revenue/fair/2026-09-01/orders?venue=setia', venuePlace: null,
     eventName: null, organizer: null, location: null, brands: ['AKEMI'], categories: [],
@@ -232,5 +232,44 @@ describe('AllBillsTable — Share this bill…', () => {
     const row = screen.getByRole('menuitem', { name: /Share this bill/ })
     expect(row).toBeDisabled()
     expect(row).toHaveTextContent('The run for September 2026 has paid')
+  })
+})
+
+// The paper beside the document (2026-10-03, user: follow erp sales order number,
+// but with reference hc123123 (which is paper sales order number)).
+describe('AllBillsTable — the Ref No. column', () => {
+  it('shows the handwritten bill’s number beside the ERP’s', () => {
+    table()
+    const header = screen.getAllByRole('columnheader').map(th => th.textContent)
+    expect(header.slice(0, 2)).toEqual(['Sales order', 'Ref No.'])
+    const row = screen.getByRole('link', { name: 'HC-SO-013493' }).closest('tr')!
+    expect(within(row).getByText('HC13369')).toBeInTheDocument()
+  })
+
+  it('finds a bill by its Ref No.', () => {
+    table([bill(), bill({ orderId: 'order-2', orderNo: 'HC-SO-013494', refNo: 'ZNT6762+HC13245', paperNo: 'ZNT6762' })])
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search bills' }), { target: { value: 'hc13245' } })
+    expect(screen.queryByRole('link', { name: 'HC-SO-013493' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'HC-SO-013494' })).toBeInTheDocument()
+    // The cell carries two papers; the check reads the first as this bill's own.
+    expect(screen.getByText('Checked as ZNT6762')).toBeInTheDocument()
+  })
+
+  it('says when the check cannot read a paper number from the bill', () => {
+    table([
+      bill({ refNo: null, paperNo: null }),
+      bill({ orderId: 'order-2', orderNo: 'HC-SO-013509', refNo: '6760', paperNo: null }),
+    ])
+    expect(screen.getByText('No Ref No. in the ERP')).toBeInTheDocument()
+    const odd = screen.getByRole('link', { name: 'HC-SO-013509' }).closest('tr')!
+    expect(within(odd).getByText('6760')).toBeInTheDocument()
+    expect(within(odd).getByText('Not a paper number')).toBeInTheDocument()
+  })
+
+  it('can be hidden from the Columns menu like any other', () => {
+    table()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ref No.' }))
+    expect(screen.queryByRole('columnheader', { name: 'Ref No.' })).toBeNull()
+    expect(screen.queryByText('HC13369')).toBeNull()
   })
 })

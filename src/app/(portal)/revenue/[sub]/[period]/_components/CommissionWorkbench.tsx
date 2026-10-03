@@ -35,6 +35,7 @@ import PayrollBar from './PayrollBar'
 import DirectorPayNote from './DirectorPayNote'
 import PersonCloseControl from './PersonCloseControl'
 import UnpricedBillsNotice from './UnpricedBillsNotice'
+import PaperRefCell from './PaperRefCell'
 import { useSalespersonCloses } from './useSalespersonCloses'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
@@ -52,11 +53,13 @@ const TABS: [Tab, string][] = [
 ]
 /** The tabs that are the page's panels rather than cuts of the workbench's own board. */
 const REVIEW_TABS: readonly Tab[] = ['changes', 'claims']
-type Column = 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+type Column = 'ref' | 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 // Sales person (2026-09-30): the one column a person's own ledger rarely
 // needs — until a bill is shared, and then it names both holders.
+// Ref No. (2026-10-03): the handwritten bill's number beside the ERP's — the
+// one a bill is checked back against, and the one double claims match on.
 const COLUMNS: [Column, string][] = [
-  ['salesperson', 'Sales person'], ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
+  ['ref', 'Ref No.'], ['salesperson', 'Sales person'], ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
   ['location', 'Sales location'], ['brand', 'Brand'], ['category', 'Category'], ['sales', 'Sales value'],
   ['commissionable', 'Commissionable value'],
   ['margin', 'Margin'], ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
@@ -104,6 +107,9 @@ export interface ReviewTab {
 export interface NotCountedBill {
   orderId: string
   orderNo: string
+  /** The ERP's Ref No. and the paper number read from it (`paper-ref.ts`). */
+  refNo?: string | null
+  paperNo?: string | null
   orderDate: string
   staffId: string | null
   orderTotal: number
@@ -643,7 +649,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function matches(row: CommissionOrderRow | OverrideOrderRow) {
     const q = query.trim().toLowerCase()
     // A shared bill answers to every holder's name — ADRIAN finds the part on ANTHONY's ledger.
-    return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories, ...(row.share?.parts.map(p => p.name) ?? [])].some(v => v?.toLowerCase().includes(q)))
+    return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.refNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories, ...(row.share?.parts.map(p => p.name) ?? [])].some(v => v?.toLowerCase().includes(q)))
   }
   function pickControl(row: CommissionOrderRow) {
     const order = data.input.orders.find(o => o.id === row.orderId)
@@ -663,6 +669,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function cell(row: CommissionOrderRow | OverrideOrderRow, key: Column, overriding: boolean) {
     const own = row as CommissionOrderRow
     switch (key) {
+      // An upsale is no bill, so it has no paper of its own.
+      case 'ref': return row.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={row.refNo} paperNo={row.paperNo} />
       // A shared bill names every holder, the owner first; the ledger's own person in bold.
       case 'salesperson': return row.share
         ? <span className={s.holders}>{row.share.parts.map(p => <span key={p.staffId} className={p.staffId === row.staffId ? s.holderSelf : undefined}>
@@ -730,7 +738,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     return <div className={s.tableFrame} key={withPerson ? 'deposit-team' : 'deposit-person'}>
       <div className={s.tableScroll} role="region" aria-label="Orders below deposit, scroll horizontally" tabIndex={0}>
         <table className={s.table} aria-label={withPerson ? 'Orders below deposit' : `${selected?.name ?? 'Salesperson'} orders below deposit`}>
-          <thead><tr><th className={s.stickyFirst}>Sales order</th>{withPerson && <th>Sales person</th>}<th>Date</th><th>Venue</th>
+          <thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th>{withPerson && <th>Sales person</th>}<th>Date</th><th>Venue</th>
             <th title={SALES_VALUE_HINT}>Sales value</th><th title={COMMISSIONABLE_HINT}>Commissionable value</th>
             <th>Paid</th><th title={DEPOSIT_HINT}>Deposit needed</th><th className={s.stickyTotal}>Still to collect</th></tr></thead>
           <tbody>{filtered.map(row => {
@@ -739,6 +747,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
               <td className={s.stickyFirst}>{billCell(row, <>
                 {row.share && <small className={s.shareNote}>{shareNote(row)}</small>}
                 {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}</>)}</td>
+              <td><PaperRefCell refNo={row.refNo} paperNo={row.paperNo} /></td>
               {withPerson && <td><button type="button" className={s.ghostButton} onClick={() => choosePerson(row.staffId, 'deposit')}>{row.staffName}</button></td>}
               <td>{row.orderDate}</td>
               <td>{row.venue || <span className={s.muted}>Not linked</span>}{row.eventName && <small>{row.eventName}</small>}</td>
@@ -749,7 +758,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
               <td className={s.stickyTotal}>{money(short)}</td>
             </tr>
           })}</tbody>
-          <tfoot><tr><td className={s.stickyFirst}>Visible subtotal</td><td colSpan={withPerson ? 7 : 6}>{filtered.length} sales orders</td><td className={s.stickyTotal}>{money(sum(filtered, r => depositOf(r).short))}</td></tr></tfoot>
+          <tfoot><tr><td className={s.stickyFirst}>Visible subtotal</td><td colSpan={withPerson ? 8 : 7}>{filtered.length} sales orders</td><td className={s.stickyTotal}>{money(sum(filtered, r => depositOf(r).short))}</td></tr></tfoot>
         </table>
         {!filtered.length && <div className={s.empty}>{rows.length ? 'No sales orders match this view.' : 'Every bill has met its deposit.'}</div>}
       </div>
@@ -911,7 +920,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         <button role="tab" aria-selected={view === 'deposit'} className={view === 'deposit' ? s.activeTab : undefined} onClick={() => showLedger('deposit')}>Below deposit <span className={s.badge}>{personHeld.length}</span></button>
       </div>
       {view === 'deposit' && <p className={`${s.subtitle} ${s.tabNote}`}>{depositNote}</p>}
-      <div className={s.toolbar}><input className={s.search} aria-label="Search sales orders" placeholder="Search order, venue or brand…" value={query} onChange={e => setQuery(e.target.value)} />
+      <div className={s.toolbar}><input className={s.search} aria-label="Search sales orders" placeholder="Search order, Ref No., venue or brand…" value={query} onChange={e => setQuery(e.target.value)} />
         <select aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}><option value="">All brands</option>{brands.map(b => <option key={b}>{b}</option>)}</select>
         {view !== 'deposit' && <select aria-label="Sort sales orders" value={sort} onChange={e => setSort(e.target.value as LedgerSort)}><option value="date_asc">Date · oldest first</option><option value="date_desc">Date · newest first</option><option value="commission_desc">Commission · highest first</option></select>}
         {view !== 'deposit' && <label className={s.chip}><input type="checkbox" checked={showExcluded} onChange={e => setShowExcluded(e.target.checked)} />Show not counted ({personNotCounted.length})</label>}
@@ -925,9 +934,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       {view === 'personal' ? orderTable(selected.personalRows, false) : view === 'overriding' ? orderTable(selected.overridingRows, true) : depositTable(personHeld, false)}
       {view !== 'deposit' && showExcluded && <div className={`${s.tableFrame} ${s.notCounted}`}>
         <div className={s.tableScroll}><table className={s.table} aria-label={`${selected.name} bills not counted`}>
-          <thead><tr><th className={s.stickyFirst}>Not counted</th><th>Date</th><th title={SALES_VALUE_HINT}>Sales value</th><th>Count</th></tr></thead>
+          <thead><tr><th className={s.stickyFirst}>Not counted</th><th>Ref No.</th><th>Date</th><th title={SALES_VALUE_HINT}>Sales value</th><th>Count</th></tr></thead>
           <tbody>{personNotCounted.map(b => <tr key={b.orderId}>
             <td className={s.stickyFirst}><Link href={orderHref({ periodMonth: period, orderId: b.orderId })}>{b.orderNo}</Link><small>Taken out by hand</small></td>
+            <td><PaperRefCell refNo={b.refNo ?? null} paperNo={b.paperNo ?? null} /></td>
             <td>{b.orderDate}</td>
             <td className={s.numeric}>{money(b.orderTotal)}</td>
             <td><button type="button" className={s.ghostButton} disabled={lockedMonths.has(period) || billPending}
@@ -961,8 +971,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.topLine}><div><h2 className={s.sectionHeading}>Open Bill allocation</h2><p className={s.subtitle}>Review every selected bill across the team. One rank per salesperson, per event day.</p></div><div className={s.overviewTotal}><span>Total Open Bill bonus</span><strong>{money(totals.open)}</strong></div></div>
       {!openEnabled && <p className={s.notice}>Open Bill payout is switched off for this month. Saved picks remain visible and pay zero; picks open once it is switched on under Review settings › This month pays.</p>}
       {locked && <p className={s.notice}>This month is in payroll, so its Open Bill picks cannot change.</p>}
-      <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
-      <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}><td className={s.stickyFirst}>{r.orderNo}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
+      <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order, Ref No. or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
+      <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}><td className={s.stickyFirst}>{r.orderNo}</td><td>{r.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
       <div className={s.footerTotal}><span>All selected bills · allocated bonus</span><strong>{money(totals.open)}</strong></div>
     </>}
 

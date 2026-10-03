@@ -180,5 +180,33 @@ describe('DoubleClaimPanel', () => {
       expect(screen.getByRole('article')).toHaveTextContent('Why it is here')
       expect(screen.getByRole('button', { name: 'Ask again' })).toBeVisible()
     })
+
+    // User 2026-10-03: 你 check 一下是否能 capture 得到 — the check matches on the
+    // paper number in the ERP's Ref No., so a bill with none is out of its sight.
+    it('names the month’s bills it cannot check, because their Ref No. names no paper number', () => {
+      render(<DoubleClaimPanel {...props} groups={[]} carried={[]} explanations={{}} inTab returnTo="/revenue/fair/2026-09-01?view=claims"
+        unreadable={[
+          { orderId: 'a', orderNo: 'HC-SO-2609-164', refNo: null, seller: 'LIM', orderTotal: 15_060 },
+          { orderId: 'b', orderNo: 'HC-SO-013509', refNo: '6760', seller: 'WEI PIN', orderTotal: 3_788 },
+        ]} />)
+      const panel = screen.getByRole('region', { name: 'Possible double claims' })
+      expect(panel).toHaveTextContent('No bill of September 2026 shares its paper number with another bill.')
+      expect(panel).toHaveTextContent('2 bills of September 2026 cannot be checked · RM 18,848.00')
+      expect(panel).toHaveTextContent('Their Ref No. in the ERP names no paper number, so a second bill on the same paper would not be found.')
+      const table = within(panel).getByRole('table', { name: 'Bills the double-claim check cannot read' })
+      const rows = within(table).getAllByRole('row').slice(1)
+      expect(rows.map(r => r.textContent)).toEqual([
+        'HC-SO-2609-164—No Ref No. in the ERPLIMRM 15,060.00',
+        'HC-SO-0135096760Not a paper numberWEI PINRM 3,788.00',
+      ])
+      expect(within(table).getByRole('link', { name: 'HC-SO-013509' })).toHaveAttribute('href',
+        `/revenue/fair/2026-09-01/orders/b?from=${encodeURIComponent('/revenue/fair/2026-09-01?view=claims')}`)
+    })
+
+    it('says the subtitle’s paper number is the ERP’s Ref No.', () => {
+      render(<DoubleClaimPanel {...props} groups={[]} carried={[]} explanations={{}} inTab />)
+      expect(screen.getByRole('region', { name: 'Possible double claims' }))
+        .toHaveTextContent("which the ERP keeps as the sales order's Ref No.")
+    })
   })
 })

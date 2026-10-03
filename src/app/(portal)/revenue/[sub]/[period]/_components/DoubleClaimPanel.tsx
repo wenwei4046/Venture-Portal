@@ -7,8 +7,20 @@ import { formatMoney } from '@/lib/utils'
 import type { CarriedMonth, DoubleClaimBill, DoubleClaimGroup } from '@/lib/commission/double-claims'
 import type { ClaimExplanation, ClaimVerdict, Sameness } from '@/lib/commission/double-claim-reasons'
 import { dismissDoubleClaim, restoreDoubleClaim } from '../../../double-claim-actions'
+import PaperRefCell from './PaperRefCell'
 import s from './commission-workbench.module.css'
 import d from './double-claims.module.css'
+
+/** A bill of the month whose Ref No. names no paper number, so the check cannot match it. */
+export interface UnreadableBill {
+  orderId: string
+  orderNo: string
+  /** The ERP's Ref No. as typed — "6760", "-" — or null when there is none. */
+  refNo: string | null
+  /** The salesperson, or the ERP's agent string when nobody is matched. */
+  seller: string
+  orderTotal: number
+}
 
 interface Props {
   period: string
@@ -17,6 +29,12 @@ interface Props {
   basePath: string
   groups: DoubleClaimGroup[]
   carried: CarriedMonth[]
+  /**
+   * The month's bills the check cannot see (2026-10-03): it matches bills on
+   * the paper number in the ERP's Ref No., and these name none — a second bill
+   * on the same paper would go unnoticed.
+   */
+  unreadable?: UnreadableBill[]
   /** Why the check could not run, when it could not. */
   unavailable: string | null
   /** Why each group was flagged, by paper number (`lib/commission/double-claim-reasons.ts`). */
@@ -67,7 +85,7 @@ function Summary({ label, value, note }: { label: string; value: string; note?: 
  * answered here; the second is a decision about months, not bills.
  */
 export default function DoubleClaimPanel({
-  period, subDepartmentId, basePath, groups, carried, unavailable, explanations, evidenceUnavailable = null, returnTo, inTab = false,
+  period, subDepartmentId, basePath, groups, carried, unreadable = [], unavailable, explanations, evidenceUnavailable = null, returnTo, inTab = false,
 }: Props) {
   const router = useRouter()
   const [showChecked, setShowChecked] = useState(false)
@@ -79,7 +97,7 @@ export default function DoubleClaimPanel({
   const carriedBills = carried.reduce((a, c) => a + c.bills, 0)
   const carriedValue = carried.reduce((a, c) => a + c.value, 0)
 
-  if (!inTab && !unavailable && openGroups.length === 0 && checked.length === 0 && carried.length === 0) return null
+  if (!inTab && !unavailable && openGroups.length === 0 && checked.length === 0 && carried.length === 0 && unreadable.length === 0) return null
 
   const explained = openGroups.map(g => explanations?.[g.billRef]).filter((x): x is ClaimExplanation => Boolean(x))
   const twice = explained.filter(x => x.verdict === 'paid_again' || x.verdict === 'copy')
@@ -99,8 +117,9 @@ export default function DoubleClaimPanel({
     })
   }
 
-  const billHref = (b: DoubleClaimBill) =>
+  const billHref = (b: Pick<DoubleClaimBill, 'periodMonth' | 'orderId'>) =>
     `${basePath}/${b.periodMonth}/orders/${b.orderId}${returnTo ? `?from=${encodeURIComponent(returnTo)}` : ''}`
+  const unreadableValue = unreadable.reduce((a, b) => a + b.orderTotal, 0)
 
   function answerButton(g: DoubleClaimGroup): ReactNode {
     return g.dismissed ? (
@@ -243,10 +262,10 @@ export default function DoubleClaimPanel({
         <div>
           <h2 className={s.sectionHeading}>Possible double claims</h2>
           <p className={s.subtitle}>
-            A bill is flagged when its paper number — the number on the customer&apos;s paper bill, which the
-            ERP keeps as its Customer SO no. — is on more than one bill a run could pay or already paid. Each
-            one says why it looks like one sale paid twice (or why it probably is not), what the bills share
-            and where they part, and what every bill has been through.
+            A bill is flagged when its paper number — the number on the customer&apos;s handwritten bill, which
+            the ERP keeps as the sales order&apos;s Ref No. — is on more than one bill a run could pay or already
+            paid. Each one says why it looks like one sale paid twice (or why it probably is not), what the bills
+            share and where they part, and what every bill has been through.
           </p>
         </div>
         {atRisk > 0 ? (
@@ -284,6 +303,40 @@ export default function DoubleClaimPanel({
           No bill of {monthName(period)} shares its paper number with another bill.
           {checked.length ? ` ${checked.length} checked earlier ${checked.length === 1 ? 'is' : 'are'} below.` : ''}
         </div>
+      ) : null}
+
+      {/* What the check cannot see (2026-10-03, user: 你 check 一下是否能 capture 得到). */}
+      {unreadable.length > 0 ? (
+        <details className={d.unreadable}>
+          <summary>
+            <strong>
+              {unreadable.length} {unreadable.length === 1 ? 'bill' : 'bills'} of {monthName(period)} cannot be
+              checked · {formatMoney(unreadableValue)}
+            </strong>
+            <span>
+              {unreadable.length === 1 ? 'Its' : 'Their'} Ref No. in the ERP names no paper number, so a second bill
+              on the same paper would not be found.
+            </span>
+          </summary>
+          <p>Key the handwritten bill&apos;s number into the Ref No. of each in the ERP.</p>
+          <div className={s.tableFrame}>
+            <div className={`${s.tableScroll} ${d.unbounded}`}>
+              <table className={s.table} aria-label="Bills the double-claim check cannot read">
+                <thead><tr><th>Bill</th><th>Ref No.</th><th>Salesperson</th><th className={s.numeric}>Sales value</th></tr></thead>
+                <tbody>
+                  {unreadable.map(b => (
+                    <tr key={b.orderId}>
+                      <td><Link href={billHref({ periodMonth: period, orderId: b.orderId })}>{b.orderNo}</Link></td>
+                      <td><PaperRefCell refNo={b.refNo} paperNo={null} /></td>
+                      <td>{b.seller}</td>
+                      <td className={s.numeric}>{formatMoney(b.orderTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
       ) : null}
 
       {carried.length > 0 ? (

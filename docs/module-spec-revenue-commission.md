@@ -1191,8 +1191,9 @@ checks and its words are that file's. No migration.
 ### 4.14 Possible double claims — and why each one is there (2026-09-30)
 
 **The check** (2026-09-26, `revenue_possible_double_claims`): a paper number
-(`sales_orders.bill_ref` — the first number in the ERP's `customer_so_no`, else
-the order's own) on more than one bill a run could pay or already paid. A
+(`sales_orders.bill_ref` — the first number in the ERP's Ref No., else the
+order's own; the Ref No. is `customer_so_no`, else `ref` since 2026-10-03,
+§4.15) on more than one bill a run could pay or already paid. A
 "Checked — separate sales" answer covers exactly the bills it was given for; a
 new bill under the number asks again.
 
@@ -1206,7 +1207,7 @@ closes, the cutover — existing tables, the viewer's own session) and
 
 | Verdict | When | What to do |
 |---|---|---|
-| **Would pay twice** (`paid_again`) | one bill is already claimed — on a claim form, in a month before the cutover, by an applied run, or inside a salesperson's close — and another is still payable | same sale → *Don't count this bill* on the payable copy; different sale → its paper number is wrong in the ERP |
+| **Would pay twice** (`paid_again`) | one bill is already claimed — on a claim form, in a month before the cutover, by an applied run, or inside a salesperson's close — and another is still payable | same sale → *Don't count this bill* on the payable copy; different sale → its Ref No. in the ERP carries the wrong paper number |
 | **Same sale twice** (`copy`) | both payable; identical goods and value, or, under one salesperson, two or more of customer / fair / what earns / deposit / items alike and nothing against | take the copy out, unless the customer bought twice |
 | **One sale, two documents** (`split`) | opened in the ERP within the hour or numbered one after the other, no goods in common | mark checked — each document earns only on its own lines |
 | **Second bill on the paper** (`second_sale`) | the same customer (or none to tell), days apart | an add-on should earn only what was added; a separate purchase → mark checked |
@@ -1236,7 +1237,45 @@ extra RM 1,056 is transport); HC13241 — MELVIN's two documents three minutes
 apart with nothing in common; PG10457 — SHAWN's customer ROY again twenty days
 later at another fair, nothing paid yet.
 
-### 4.15 Sales exhibition — one brand at one fair (2026-10-03)
+### 4.15 The paper beside the document — Ref No. (2026-10-03)
+
+**Two numbers per sale.** At a fair the customer signs a handwritten bill —
+HC13369. Days later the back office keys it into the ERP as a sales order with
+a number of its own — HC-SO-2609-400 — and types the paper's number into the
+order's **Ref No.** A bill in the portal is the ERP's document (its number
+links, sorts and pays); the Ref No. is how a bill is checked back against the
+paper, and the paper number in it is what §4.14 matches on (user: follow erp
+sales order number, but with reference hc123123 (which is paper sales order
+number)).
+
+**Which field.** The ERP keeps two: its order forms write *Ref No.* into
+`customer_so_no` (an order the ERP opened itself has `ref` NULL — every one
+since 2026-09-08); `ref` holds AutoCount's copy on the orders brought over,
+equal to `customer_so_no` on all but a handful. `sales_order_ref_no(header)` is
+THE Ref No.: `customer_so_no`, else `ref` — the form's field first, because an
+edit lands there and leaves an old `ref` behind (the ERP's own header shows
+`ref` first, and so the old number, on such an order). `ref` second because one
+comment in the ERP still calls `customer_so_no` transitional; if the ERP ever
+wrote `ref` instead, a check reading `customer_so_no` alone would match nothing
+and Double claims would go quiet without a word. `sales_orders.bill_ref` reads
+it (changed in place, PG 17 `SET EXPRESSION`; not one of 1,116 bills moved),
+and so does `erp_sync_note_adjustment`, which reads `bill_ref` now rather than
+working the paper out again.
+
+| Where | What it shows |
+|---|---|
+| **Ref No.** column | the first optional column after *Sales order* — All bills, a salesperson's Personal / Overriding / Below deposit, the month's Below deposit and Open Bill tabs, *Not counted*; the Ref No. as typed (`ref_no`). A cell naming several papers ("HC11589+HC12443": the customer's other paper after this one's own) adds *Checked as HC11589*. The search boxes find a bill by it |
+| Cannot be checked | `paper_no` NULL: an ERP document with no Ref No. (*No Ref No. in the ERP*) or one that names no paper — "-", "ZNT", "6760" (*Not a paper number*). Said on the row, and listed on the Double claims tab as *N bills of {month} cannot be checked* (live, worth something: the bills the check could pay) |
+| The bill's page | its header leads with *Ref HC13369* |
+| A bill worked out by hand | its own number is its paper (August's claim-form rows) |
+
+`ref_no(sales_orders)` / `paper_no(sales_orders)` are computed fields (PostgREST
+selects them by name); `revenue_month_orders` returns both. Mig
+`20261003170000`. On 2026-10-03 September had 15 ERP bills the check could not
+read — 12 with no Ref No. at all, and "-", "ZNT", "6760" — 9 of them live and
+worth something.
+
+### 4.16 Sales exhibition — one brand at one fair (2026-10-03)
 
 **What an exhibition is** (user 2026-10-03): 这个 venue 本身其实应该换成 sales
 exhibition … 我做 Akemi，然后在哪个 venue（比如 Mid Valley）、什么 organizer
