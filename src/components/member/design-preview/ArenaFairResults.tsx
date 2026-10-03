@@ -1,6 +1,7 @@
 "use client";
 
 import { Icon } from "../MemberUI";
+import { arenaShortDay } from "@/lib/member/arena";
 import { summarizeFairResults } from "./arena-fair-results";
 import type { FairEvent, Period } from "./arena-model";
 import s from "./ArenaFairResults.module.css";
@@ -10,9 +11,7 @@ const places = [
   { key: "second", label: "2nd place", short: "2nd", position: 2 },
   { key: "third", label: "3rd place", short: "3rd", position: 3 },
 ] as const;
-const shortDate = (date: string) => new Intl.DateTimeFormat("en-GB", {
-  day: "numeric", month: "short", timeZone: "UTC",
-}).format(new Date(`${date}T00:00:00Z`));
+const shortDate = arenaShortDay;
 const placeLabel = (position: number) => position === 1 ? "1st" : position === 2 ? "2nd" : position === 3 ? "3rd" : `${position}th`;
 
 export function ArenaFairResults({ events, people, cutoff, period, periodLabel, selfId = "jia", selfLabel = "You", personalLabel = "Your", provisional = false }: {

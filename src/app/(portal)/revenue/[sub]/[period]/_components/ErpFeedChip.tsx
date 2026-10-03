@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { formatIntlDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { closeErpMonth, reopenErpMonth } from '../../../sync-actions'
 
@@ -22,7 +23,7 @@ export interface ErpFeedChipProps {
 }
 
 function when(iso: string): string {
-  return new Date(iso).toLocaleString('en-MY', {
+  return formatIntlDate(new Date(iso), {
     day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur',
   })
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { formatIntlDate } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import { clearFirstPaidMonth, setFirstPaidMonth } from '../cutover-actions'
 
@@ -14,7 +15,7 @@ function monthName(period: string): string {
 }
 
 function day(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kuala_Lumpur' })
+  return formatIntlDate(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kuala_Lumpur' }, 'en-GB')
 }
 
 /**

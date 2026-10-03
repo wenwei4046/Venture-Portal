@@ -10,6 +10,7 @@
  */
 
 import type { ReactNode } from "react";
+import { formatIntlDate } from "@/lib/utils";
 import s from "./member.module.css";
 
 export const icons: Record<string, string> = {
@@ -88,7 +89,7 @@ export const fmtShort = (n: number) =>
     : fmt(n);
 
 export const date = (raw: string) =>
-  new Date(raw).toLocaleDateString("en-MY", {
+  formatIntlDate(new Date(raw), {
     timeZone: "Asia/Kuala_Lumpur",
     month: "short",
     day: "numeric",

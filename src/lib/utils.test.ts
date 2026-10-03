@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMoney, formatMoneyBare, formatRate, cn, fundingSourceFromTerms, getPeriodMonth, lentToFromNotes } from './utils'
+import { formatMoney, formatMoneyBare, formatRate, cn, fundingSourceFromTerms, getPeriodMonth, lentToFromNotes, formatIntlDate } from './utils'
 
 describe('fundingSourceFromTerms', () => {
   it('extracts 资金来源: value up to the next · separator', () => {
@@ -151,5 +151,26 @@ describe('getPeriodMonth', () => {
     // The `effectiveFrom >= from` guard in hierarchy-writes.ts is a STRING
     // comparison; an unpadded '2026-9-01' would sort after '2026-10-01'.
     expect(getPeriodMonth(new Date('2026-03-15T04:00:00Z'))).toBe('2026-03-01')
+  })
+})
+
+describe('formatIntlDate — three-letter months', () => {
+  const sep4 = new Date('2026-09-04T00:00:00Z')
+
+  it('spells September Sep in en-GB and en-MY, which write Sept', () => {
+    // The Arena read "closed on 13 Sept" beside its brand weeks' "Closed 13 Sep" (2026-10-03).
+    expect(formatIntlDate(sep4, { day: 'numeric', month: 'short', timeZone: 'UTC' }, 'en-GB')).toBe('4 Sep')
+    expect(formatIntlDate(sep4, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })).toBe('4 Sep 2026')
+  })
+
+  it('keeps the order and the clock of the locale', () => {
+    expect(formatIntlDate(sep4, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }, 'en-MY')).toMatch(/^4 Sep, 12:00\sam$/) // ICU puts a narrow no-break space before am
+    expect(formatIntlDate(sep4, { day: 'numeric', month: 'short', timeZone: 'UTC' }, 'en-US')).toBe('Sep 4')
+  })
+
+  it('leaves the other months and long or numeric months alone', () => {
+    expect(formatIntlDate(new Date('2026-06-30T00:00:00Z'), { day: 'numeric', month: 'short', timeZone: 'UTC' }, 'en-AU')).toBe('30 Jun')
+    expect(formatIntlDate(sep4, { month: 'long', year: 'numeric', timeZone: 'UTC' }, 'en-GB')).toBe('September 2026')
+    expect(formatIntlDate(sep4, { day: 'numeric', month: 'numeric', timeZone: 'UTC' }, 'en-GB')).toBe('04/09')
   })
 })

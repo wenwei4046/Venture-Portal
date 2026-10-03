@@ -2341,6 +2341,13 @@ Add `@axe-core/react` in dev and `eslint-plugin-jsx-a11y` in CI.
 | Form input | ISO `2026-04-09` | mono |
 | Period | "April 2026" | serif |
 
+A month is always three letters — *Sep*, never *Sept*. `formatDate()` (dayjs)
+writes it so; a page that needs an `Intl` format for a locale's order or clock
+goes through `formatIntlDate()` (`lib/utils.ts`), because en-GB and en-MY spell
+September *Sept* in current ICU and every other month in three letters
+(2026-10-03: the Arena's Fair results read *closed on 13 Sept* beside its brand
+weeks' *Closed 13 Sep*).
+
 ### Bilingual canonical labels
 
 | English | 中文 |

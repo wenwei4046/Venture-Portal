@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatIntlDate } from "@/lib/utils";
 import { fetchMemberArena, saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
 import { arenaBrandWeeksFrom, arenaIncentive, arenaMonthFridays, arenaRankings, arenaShortDay, arenaWeekendLabel, closedWeekChanged, ARENA_WEEK_BRANDS, type ArenaBrandWeeks, type ArenaIncentive, type ArenaMetric, type ArenaPerson, type ArenaWeekBrand, type ArenaWeekPicks, type ArenaWindow, type MemberArenaSnapshot, type ArenaRankedPerson } from "@/lib/member/arena";
 import { Icon, initials } from "./MemberUI";
@@ -151,7 +152,7 @@ function Incentive({ person, tiers, readOnly, name }: { person?: ArenaPerson; ti
   </section>;
 }
 
-const fairDay = (date: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+const fairDay = arenaShortDay;
 const fairRange = (start: string, end: string) => start === end ? fairDay(start) : `${fairDay(start)} – ${fairDay(end)}`;
 
 /**
@@ -253,7 +254,7 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
     <div className={s.controls}><div className={s.segments} role="group" aria-label="Ranking period">{(["monthly", "quarterly", "annual"] as const).map(value => <button key={value} aria-pressed={window === value} onClick={() => { setWindow(value); if (view === "weeks") setView("home"); }}>{value === "monthly" ? "Monthly" : value === "quarterly" ? "Quarterly" : "Annual"}</button>)}</div>
       <label>Month<input type="month" value={period} max={currentMonth()} onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) setPeriod(event.target.value); }} /></label>
       {data && <p className={s.periodLabel}>{periodTitle}{data.live ? " · Live" : ""}</p>}
-      {data && <div className={s.refresh}><span>Updated {new Intl.DateTimeFormat("en-MY", { hour: "numeric", minute: "2-digit", day: "numeric", month: "short", timeZone: "Asia/Kuala_Lumpur" }).format(new Date(data.asOf))}</span><button className={s.back} onClick={() => setRevision(value => value + 1)} disabled={busy}><Icon name="refresh" size={16} />Refresh</button></div>}
+      {data && <div className={s.refresh}><span>Updated {formatIntlDate(new Date(data.asOf), { hour: "numeric", minute: "2-digit", day: "numeric", month: "short", timeZone: "Asia/Kuala_Lumpur" })}</span><button className={s.back} onClick={() => setRevision(value => value + 1)} disabled={busy}><Icon name="refresh" size={16} />Refresh</button></div>}
     </div>
     {busy ? <p className={s.message} role="status">Loading your rankings…</p> : error ? <div className={s.message} role="alert"><p>{error}</p><button className={s.primary} onClick={() => setRevision(value => value + 1)}>Try again</button></div> : data && <div key={`${view}-${window}-${period}-${brand}`} className={s.page}>
       {view === "home" && <><div className={s.overview}>{metrics.map(metric => {
