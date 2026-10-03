@@ -643,18 +643,28 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       .slice(0, 5);
     const leadName = (a: CrmAppointment) => leads.find(l => l.id === a.leadId)?.name ?? "Lead";
     body = <>
-      <div className={c.tabTitle}><h1>Calendar</h1><p className={s.sub}>{scopeUpcoming} upcoming · show-up rate {scopeShowUp.rate == null ? "—" : `${Math.round(scopeShowUp.rate * 100)}%`}</p></div>
+      <div className={c.tabTitle}>
+        <span className={c.eyebrow}>{now.toLocaleDateString("en-MY", { month: "long", year: "numeric" })}</span>
+        <h1>Calendar</h1>
+        <p className={s.sub}>{scopeUpcoming} upcoming · show-up rate <span className={c.mono}>{scopeShowUp.rate == null ? "—" : `${Math.round(scopeShowUp.rate * 100)}%`}</span></p>
+      </div>
       {scopeBar}
       {/* Marking show-ups and recent visits is the salesperson's work; a leader or the Boss only looks ahead. */}
-      {!manager && unmarked.length > 0 && <section className={s.card} aria-label="Did they show up?">
-        <h2>Did they show up?</h2>
-        <p className={s.caption}>Past appointments not marked yet count as no-shows.</p>
+      {!manager && unmarked.length > 0 && <section className={`${s.card} ${c.showUp}`} aria-label="Did they show up?">
+        <div className={c.cardHead}><h2>Did they show up?</h2><em>{unmarked.length} to mark</em></div>
         {unmarked.map(a => (
-          <button key={a.id} className={`${s.listRow} ${s.listButton}`} onClick={() => openAppointment(a.id)}>
-            <div className={s.listIcon}><Icon name="info" /><div><strong>{leadName(a)}</strong><p className={s.caption}>{apptLabel(a)}</p></div></div>
-            <Icon name="chevron" size={16} />
-          </button>
+          <div key={a.id} className={c.showUpRow}>
+            <button className={c.showUpWho} onClick={() => openAppointment(a.id)}>
+              <span className={c.leadAvatar} aria-hidden="true">{initials(leadName(a))}</span>
+              <span><strong>{leadName(a)}</strong><small>{apptLabel(a)}</small></span>
+            </button>
+            <div className={c.showUpActions}>
+              <button className={`${s.button} ${s.primary}`} onClick={() => void showedUp(a)}>Came</button>
+              <button className={s.button} onClick={() => openAppointment(a.id)}>Didn&apos;t come…</button>
+            </div>
+          </div>
         ))}
+        <p className={s.caption}>Not marked = a no-show. Didn&apos;t come opens the appointment to move or cancel it.</p>
       </section>}
       <MemberCrmUpcoming appointments={scopeAppts} leads={inScope} now={now} onOpen={openAppointment} />
       {scopeUpcoming === 0 && <section className={s.card}><p className={s.sub}>No upcoming appointments. Book one from a chat in Inbox.</p></section>}
@@ -826,19 +836,8 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
 }) {
   const [demoDraft, setDemoDraft] = useState("");
   const [askingLost, setAskingLost] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [handled, setHandled] = useState<Set<string>>(() => new Set());
   const [pickingFor, setPickingFor] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  // The ⋯ menu closes on a tap outside it or on Escape.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const away = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
-    document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", esc);
-    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc); };
-  }, [menuOpen]);
 
   const urgency = replyUrgency(lead, now);
   const active = appointments.find(a => a.state === "booked") ?? null;
@@ -852,35 +851,29 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
   const room = active?.showroomId ?? openShowrooms()[0]?.id ?? "";
   const clash = requestedIso ? (() => { const b = busy(active?.id)(room); return slotClash(requestedIso, 60, b.room) ? "The showroom is full then" : slotClash(requestedIso, 60, b.mine) ? "You're busy then" : null; })() : null;
   const done = (id: string) => setHandled(prev => new Set(prev).add(id));
+  // How long the free reply window (Meta's 24 hours) has left, while it is open.
+  const windowLeft = (() => {
+    const t = lead.lastCustomerAt ? new Date(lead.lastCustomerAt).getTime() : NaN;
+    const left = Math.floor((t + 24 * 3_600_000 - now.getTime()) / 60_000);
+    return Number.isFinite(left) && left > 0 ? `${Math.floor(left / 60)}h ${left % 60}m` : null;
+  })();
 
   return (
     <div className={c.chat}>
       <div className={c.chatHead}>
         <button className={c.back} onClick={onBack} aria-label="Back to leads"><Icon name="back" size={20} /></button>
-        <span className={c.leadAvatar} aria-hidden="true">{initials(lead.name)}</span>
         <div className={c.chatWho}>
-          <span className={c.nameLine}>
-            <strong>{lead.name}</strong>
-            <span className={c.status} data-status={lead.status}>{crmStatusLabel(lead.status)}</span>
-            {lead.previous && <span className={c.previous}>{previousLabel(lead.previous)}</span>}
-          </span>
-          <a href={`tel:${lead.phone.replace(/[^+\d]/g, "")}`} className={s.caption}>{lead.phone}</a>
+          <strong>{lead.name}</strong>
+          <span className={c.chatAdLine}>{lead.adName}</span>
         </div>
-        {!readOnly && <div className={c.menuWrap} ref={menuRef}>
-          <button className={c.back} aria-label="More actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(v => !v)}>
-            <Icon name="more" size={20} />
-          </button>
-          {menuOpen && <div className={c.menu} role="menu">
-            <button role="menuitem" disabled={lead.status === "won"} onClick={() => { setMenuOpen(false); setAskingLost(false); onStatus("won"); }}>
-              <Icon name="check" size={18} /> Mark as Won
-            </button>
-            <button role="menuitem" disabled={lead.status === "lost"} onClick={() => { setMenuOpen(false); setAskingLost(true); }}>
-              <Icon name="close" size={18} /> Mark as Lost…
-            </button>
-          </div>}
-        </div>}
+        <a className={c.back} href={`tel:${lead.phone.replace(/[^+\d]/g, "")}`} aria-label={`Call ${lead.phone}`}><Icon name="phone" size={18} /></a>
       </div>
-      <p className={c.chatAd}><Icon name="target" size={14} /> {lead.adName}</p>
+      <p className={c.chatStatus}>
+        <strong>{crmStatusLabel(lead.status)}</strong>
+        {lead.previous && <span className={c.previous}>{previousLabel(lead.previous)}</span>}
+        <span>· {lead.channel === "messenger" ? "Messenger" : "WhatsApp"}</span>
+        {windowLeft && <span data-open>· reply window open {windowLeft}</span>}
+      </p>
       {readOnly
         ? <p className={c.stepIn}><Icon name="eye" size={16} /> View only · {lead.assignedTo ? `${firstName(salesperson)}'s customer` : "not assigned yet"} — {viewer.role === "hod" ? "you reply to your own customers; this one is the team’s" : <>the {ROLE_LABELS[viewer.role]} reads chats but doesn&apos;t reply</>}</p>
         : lead.assignedTo !== viewer.id && <p className={c.stepIn}>
@@ -915,7 +908,6 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
         {urgency.level === "overdue" && lead.status === "follow_up" && " · moved to Follow up automatically"}
       </p>}
 
-      {askingLost && <LostSheet onCancel={() => setAskingLost(false)} onConfirm={lost => { onStatus("lost", lost); setAskingLost(false); }} />}
       {!askingLost && lead.lost && <p className={c.lostBanner}>Lost · {lostReasonLabel(lead.lost)} <span>· moves back to Follow up if the customer writes again</span></p>}
       {lead.status === "won" && <p className={c.wonBanner}><Icon name="check" size={16} /> Won <span>· moves back to Follow up if the customer writes again</span></p>}
 
@@ -951,16 +943,17 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
 
       {!readOnly && requestedIso && lastCustomer && !sameAsBooked && pickingFor !== lastCustomer.id && (
         <section className={c.suggest} aria-label="Customer asked for a time">
-          <p className={c.suggestHead}><Icon name="calendar" size={16} /> {lead.name.split(" ")[0]} asked for <strong>{dayLabel(requestedIso)}, {time(requestedIso)}</strong></p>
-          <p className={s.caption}>{active ? `Currently booked: ${apptLabel(active)}` : "No appointment yet"}{clash ? ` · ${clash}` : " · Free on the showroom calendar and yours"}</p>
-          <div className={c.sheetActions}>
-            <button className={s.button} onClick={() => done(lastCustomer.id)}>Ignore</button>
-            <button className={s.button} onClick={() => setPickingFor(lastCustomer.id)}>Pick another time</button>
+          <span className={c.suggestHead}>{lead.name.split(" ")[0]} asked for {active ? "a new time" : "a visit"}</span>
+          <strong className={c.suggestWhen}>{dayLabel(requestedIso)} · {time(requestedIso)} · {roomName(room)}</strong>
+          <span className={c.suggestNote} data-clash={clash ? true : undefined}>{clash ?? "Free on the showroom's calendar and yours"}</span>
+          <div className={c.suggestActions}>
             <button className={`${s.button} ${s.primary}`} disabled={!!clash} onClick={() => {
               if (active) onReschedule(active, requestedIso); else onBook(room, requestedIso);
               done(lastCustomer.id);
             }}>{active ? "Confirm new time" : "Book this time"}</button>
+            <button className={s.button} onClick={() => setPickingFor(lastCustomer.id)}>Other time</button>
           </div>
+          <button className={c.linkButton} onClick={() => done(lastCustomer.id)}>Ignore</button>
         </section>
       )}
 
@@ -971,9 +964,16 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
           onConfirm={(r, start) => { if (active) onReschedule(active, start); else onBook(r, start); done(lastCustomer.id); setPickingFor(null); }} />
       )}
 
-      {!readOnly && !active && !pickingFor && (booking
-        ? <BookingSheet title="Book appointment" confirmLabel="Confirm" busy={busy()} onCancel={() => onBooking(false)} onConfirm={(r, start) => onBook(r, start)} />
-        : <button className={`${s.button} ${s.primary} ${s.full}`} onClick={() => onBooking(true)}><Icon name="calendar" /> Book appointment</button>)}
+      {!readOnly && !active && !pickingFor && booking
+        && <BookingSheet title="Book appointment" confirmLabel="Confirm" busy={busy()} onCancel={() => onBooking(false)} onConfirm={(r, start) => onBook(r, start)} />}
+      {askingLost && <LostSheet onCancel={() => setAskingLost(false)} onConfirm={lost => { onStatus("lost", lost); setAskingLost(false); }} />}
+
+      {/* The outcomes and the booking, one tap each, right above the reply box. */}
+      {!readOnly && <div className={c.quickActions} role="group" aria-label="Actions">
+        {!active && <button aria-pressed={booking} disabled={!!pickingFor} onClick={() => onBooking(!booking)}><Icon name="calendar" size={14} /> Book visit</button>}
+        <button disabled={lead.status === "won"} onClick={() => { setAskingLost(false); onStatus("won"); }}><Icon name="check" size={14} /> Mark Won</button>
+        <button disabled={lead.status === "lost"} aria-pressed={askingLost} onClick={() => setAskingLost(v => !v)}><Icon name="close" size={14} /> Mark Lost</button>
+      </div>}
 
       {(canCompose ?? !readOnly) && <MemberCrmComposer placeholder={`Reply to ${lead.name.split(" ")[0]}…`} onText={onSend} onAttachment={onAttachment} {...composer} />}
 
@@ -1069,21 +1069,28 @@ function BookingSheet({ title, confirmLabel, busy, initialShowroom, hint, onCanc
   const [slot, setSlot] = useState<string | null>(null);
   const { room, mine } = busy(showroom);
 
+  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
   return (
     <section className={c.sheet} aria-label={title}>
-      <h3>{title}</h3>
-      {hint && <p className={s.caption}>{hint}</p>}
-      <label className={s.field}><span>Showroom</span>
-        <select value={showroom} onChange={e => { setShowroom(e.target.value); setSlot(null); }}>
-          {open.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-          {!open.length && <option value="">No showroom is open</option>}
-        </select>
-      </label>
-      <div className={c.days}>
+      <div className={c.sheetHead}>
+        <div><h3>{title}</h3><p className={s.caption}>{hint ?? "1 hour visit"}</p></div>
+        <button className={c.back} onClick={onCancel} aria-label="Close"><Icon name="close" size={18} /></button>
+      </div>
+      {open.length === 0 && <p className={c.composerProblem}>No showroom is open.</p>}
+      <div className={c.roomPick} role="radiogroup" aria-label="Showroom">
+        {open.map(r => <button key={r.id} role="radio" aria-checked={showroom === r.id} onClick={() => { setShowroom(r.id); setSlot(null); }}>
+          <strong>{r.name.replace(/ Showroom$/, "")}</strong><small>Showroom</small>
+        </button>)}
+      </div>
+      <div className={c.days} role="group" aria-label="Day">
         {days.map((d, i) => (
-          <button key={i} className={c.chip} aria-pressed={day === i} onClick={() => { setDay(i); setSlot(null); }}>{dayLabel(d.toISOString())}</button>
+          <button key={i} className={c.chip} aria-pressed={day === i} aria-label={dayLabel(d.toISOString())} onClick={() => { setDay(i); setSlot(null); }}>
+            <span>{d.toLocaleDateString("en-MY", { weekday: "short" })}</span><strong>{d.getDate()}</strong>
+          </button>
         ))}
       </div>
+      <div className={c.slotsHead}><strong>{dayLabel(days[day].toISOString())}</strong><span className={s.caption}>Free on the showroom &amp; you</span></div>
       <div className={c.slots}>
         {daySlots(days[day]).map(start => {
           const roomClash = slotClash(start, 60, room);
@@ -1091,11 +1098,12 @@ function BookingSheet({ title, confirmLabel, busy, initialShowroom, hint, onCanc
           const clash = roomClash ?? myClash;
           return <button key={start} className={c.slot} disabled={!!clash} aria-pressed={slot === start}
             title={clash?.label} onClick={() => setSlot(start)}>
-            {time(start)}
-            {clash && <small>{roomClash ? "Showroom full" : "You're busy"}</small>}
+            {hhmm(start)}
+            {clash ? <small>{roomClash ? "Showroom full" : "You're busy"}</small> : slot === start && <small>Selected</small>}
           </button>;
         })}
       </div>
+      <p className={c.sheetSummary}>{slot ? `${dayLabel(slot)} · ${hhmm(slot)} · ${roomName(showroom)}` : "Pick a time"}</p>
       <div className={c.sheetActions}>
         <button className={s.button} onClick={onCancel}>Back</button>
         <button className={`${s.button} ${s.primary}`} disabled={!slot} onClick={() => slot && onConfirm(showroom, slot)}>{confirmLabel}</button>

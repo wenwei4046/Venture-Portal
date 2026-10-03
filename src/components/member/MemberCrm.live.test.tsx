@@ -71,8 +71,7 @@ describe("the CRM on live data", () => {
     crmWrite.mockResolvedValue({ ok: true, data: { status: "won" } });
     render(<MemberCrm live salesperson="Ann Tan" />);
     await openChat();
-    fireEvent.click(screen.getByLabelText("More actions"));
-    fireEvent.click(screen.getByText("Mark as Won"));
+    fireEvent.click(screen.getByRole("button", { name: "Mark Won" }));
     await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_set_status", { p_contact: "c1", p_status: "won", p_reason: null, p_note: null }));
     expect(await screen.findByText(/moves back to Follow up if the customer writes again/)).toBeTruthy();
   });
@@ -82,8 +81,7 @@ describe("the CRM on live data", () => {
     crmWrite.mockResolvedValue({ ok: false, error: "You may not change this customer." });
     render(<MemberCrm live salesperson="Ann Tan" />);
     await openChat();
-    fireEvent.click(screen.getByLabelText("More actions"));
-    fireEvent.click(screen.getByText("Mark as Won"));
+    fireEvent.click(screen.getByRole("button", { name: "Mark Won" }));
     expect(await screen.findByText(/You may not change this customer/)).toBeTruthy();
     expect(screen.queryByText(/moves back to Follow up if the customer writes again/)).toBeNull();
   });
@@ -93,9 +91,9 @@ describe("the CRM on live data", () => {
     crmWrite.mockResolvedValue({ ok: true, data: { id: "appt-db-1" } });
     render(<MemberCrm live salesperson="Ann Tan" />);
     await openChat();
-    fireEvent.click(screen.getByText("Book appointment"));
+    fireEvent.click(screen.getByRole("button", { name: "Book visit" }));
     // Only the database's open showrooms are offered.
-    expect(screen.getAllByRole("option").map(o => o.textContent)).toEqual(["Kuala Lumpur Showroom"]);
+    expect(screen.getAllByRole("radio").map(o => o.textContent)).toEqual(["Kuala LumpurShowroom"]);
     fireEvent.click(screen.getAllByRole("button").find(b => /^[0-9]{1,2}:00/.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled)!);
     fireEvent.click(screen.getByText("Confirm"));
     await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_book", expect.objectContaining({ p_contact: "c1", p_showroom: "kl", p_minutes: 60 })));

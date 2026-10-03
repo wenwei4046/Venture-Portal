@@ -51,7 +51,6 @@
 .back { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .chatWho { display: flex; flex-direction: column; }
 .chatWho a { text-decoration: none; }
-.chatAd { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: var(--m-link); }
 .apptBanner { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: rgb(90 62 43 / .1); font-size: 13px; font-weight: 600; }
 
 .messages { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--m-soft); }
@@ -70,7 +69,7 @@
 
 /* Booking */
 .sheet { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px; border: 1px solid var(--m-border); background: var(--m-card); }
-.sheet h3 { margin: 0; }
+.app .sheet h3 { margin: 0; }
 .days { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .slot {
@@ -108,18 +107,6 @@
 .lostSummary strong { color: var(--m-text); }
 
 /* The chat's ⋯ menu: the outcomes, Won and Lost */
-.menuWrap { position: relative; margin-left: auto; }
-.menu {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 190px; padding: 6px;
-  border-radius: 12px; border: 1px solid var(--m-border); background: var(--m-card);
-  box-shadow: 0 10px 30px rgb(0 0 0 / .14);
-}
-.menu button {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 10px;
-  border: 0; border-radius: 8px; background: none; color: var(--m-text); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
-}
-.menu button:hover:not(:disabled) { background: var(--m-soft); }
-.menu button:disabled { opacity: .4; cursor: default; }
 .wonBanner { display: flex; align-items: center; gap: 6px; margin: 0; padding: 10px 12px; border-radius: 10px; background: rgb(52 140 90 / .14); color: rgb(40 110 70); font-size: 13px; font-weight: 700; }
 .wonBanner span, .lostBanner span { font-weight: 500; opacity: .8; }
 
@@ -145,27 +132,7 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .demoRow { display: flex; gap: 6px; margin: 8px 0 4px; }
 .demoRow input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font: inherit; }
 
-/* Upcoming appointments — next up, the week strip, a timeline per day.
-   Each showroom keeps one colour (data-tone = its place in the list). */
-[data-tone="0"].nextUp, [data-tone="0"].slotRow, .legend [data-tone="0"] { --room: rgb(90 62 43); --room-bg: rgb(90 62 43 / .08); }
-[data-tone="1"].nextUp, [data-tone="1"].slotRow, .legend [data-tone="1"] { --room: rgb(214 140 40); --room-bg: rgb(214 140 40 / .1); }
-[data-tone="2"].nextUp, [data-tone="2"].slotRow, .legend [data-tone="2"] { --room: rgb(52 120 150); --room-bg: rgb(52 120 150 / .1); }
-
-.upHead { display: flex; align-items: center; gap: 8px; }
-.upCount { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--m-soft); color: var(--m-sub); }
-
-.nextUp {
-  display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 12px; width: 100%;
-  padding: 16px; margin-bottom: 14px; border: 0; border-radius: 16px; text-align: left; cursor: pointer;
-  background: var(--room); color: var(--m-on-brand);
-}
-.nextLabel { grid-column: 1 / -1; font-size: 11px; letter-spacing: .06em; opacity: .85; }
-.nextTime { font-size: 34px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.nextDay { font-size: 14px; font-weight: 600; opacity: .9; }
-.nextWho { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgb(255 255 255 / .25); }
-.nextWho > span:nth-child(2) { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.nextWho small { font-size: 12px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nextWho .leadAvatar { background: rgb(255 255 255 / .18); border-color: rgb(255 255 255 / .3); color: var(--m-on-brand); }
+/* The Calendar's week strip: a day per button, a dot when it has a visit. */
 
 .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
 .weekDay {
@@ -181,26 +148,6 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .weekDay[aria-pressed="true"] { background: var(--m-brand); border-color: var(--m-brand); color: var(--m-on-brand); }
 .weekDay[aria-pressed="true"] span { color: var(--m-on-brand); }
 .weekDay[aria-pressed="true"] b { background: var(--m-on-brand); }
-.clearDay { background: none; border: 0; padding: 4px 0; color: var(--m-link); font-weight: 600; font-size: 13px; cursor: pointer; }
-
-.dayGroup { margin-top: 12px; }
-.dayHead { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--m-sub); }
-.dayHead span { font-weight: 600; padding: 1px 6px; border-radius: 8px; background: var(--m-soft); }
-
-.slotRow {
-  display: flex; align-items: stretch; gap: 10px; width: 100%; padding: 10px; margin-bottom: 6px;
-  border: 0; border-radius: 12px; background: var(--room-bg); color: inherit; text-align: left; cursor: pointer;
-}
-.slotTime { display: flex; flex-direction: column; justify-content: center; min-width: 64px; }
-.slotTime strong { font-size: 15px; font-variant-numeric: tabular-nums; }
-.slotTime small, .slotBody small { font-size: 12px; color: var(--m-sub); }
-.slotBar { width: 4px; border-radius: 2px; background: var(--room); }
-.slotBody { display: flex; flex-direction: column; justify-content: center; flex: 1; min-width: 0; }
-.slotWhen { align-self: center; font-size: 12px; font-weight: 700; color: var(--room); white-space: nowrap; }
-
-.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; color: var(--m-sub); }
-.legend span { display: inline-flex; align-items: center; gap: 5px; }
-.legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--room); }
 
 /* The CRM as its own app: top bar, content, and a bottom bar of four tabs; Settings is the gear at the top right. */
 .app { min-height: 100vh; min-height: 100dvh; background: var(--m-bg); color: var(--m-text); }
@@ -230,7 +177,7 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .appNav [aria-current="page"] { color: var(--m-brand); }
 .appNav [aria-current="page"] .appNavIcon { background: var(--m-soft); }
 
-.tabTitle h1 { margin: 0; font-size: 28px; }
+.app .tabTitle h1 { margin: 0; font-size: 28px; }
 .tabTitle p { margin: 2px 0 0; }
 
 .profileHead { display: flex; align-items: center; gap: 14px; }
@@ -349,16 +296,6 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .byTag { display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .8; margin-bottom: 2px; }
 
 /* Team */
-.teamHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
-.teamHead h2 { margin: 0; }
-.teamHead p { margin: 2px 0 0; }
-.teamTotal { flex: none; font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 8px; background: var(--m-soft); color: var(--m-sub); }
-.memberRow {
-  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; text-align: left;
-  background: none; border: 0; border-top: 1px solid var(--m-border); color: inherit; cursor: pointer;
-}
-.memberNums { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--m-sub); }
-.memberNums b { color: var(--m-text); font-variant-numeric: tabular-nums; }
 
 /* Assignment */
 .shareRow { display: grid; grid-template-columns: 1fr 76px 44px; align-items: center; gap: 10px; padding: 6px 0; }
@@ -380,11 +317,6 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .appNav[data-tabs="6"] .appNavIcon { width: 40px; }
 
 /* A tab title with one action on its right (Team › Assignment) */
-.titleRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.titleAction {
-  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; margin-top: 4px; padding: 6px 12px;
-  border-radius: 19px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
-}
 .shareHead { display: grid; grid-template-columns: 1fr 76px 44px; gap: 10px; font-size: 11px; font-weight: 700; color: var(--m-sub); text-transform: uppercase; letter-spacing: .04em; }
 .shareHead span:nth-child(2) { text-align: center; }
 .shareHead span:nth-child(3) { text-align: right; }
@@ -397,11 +329,6 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .stats > .stat:nth-child(n+5) small { white-space: normal; }
 
 /* The reporting line: role tags, the TL's "To assign" list, reassigning a lead */
-.roleTag { margin-left: 4px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--m-soft); color: var(--m-sub); vertical-align: middle; white-space: nowrap; }
-.roleTag[data-role="tl"] { background: rgb(90 62 43 / .14); color: var(--m-text); }
-.roleTag[data-role="ta"] { background: rgb(52 120 150 / .14); color: rgb(36 92 118); }
-.roleTag[data-full] { background: rgb(52 140 90 / .14); color: rgb(40 110 70); }
-.memberNums [data-over] b { color: rgb(190 50 50); }
 .queue { margin: 6px 0 4px; padding: 10px 12px; border-radius: 12px; border: 1.5px dashed var(--m-brand); }
 .queue h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 14px; }
 .queue p { margin: 0; }
@@ -413,7 +340,6 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .flowSteps strong { color: var(--m-text); }
 .segment button:disabled { cursor: default; }
 .segment [role="radio"][aria-checked="true"] { background: var(--m-card); color: var(--m-text); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
-.memberRow .waitBadge { flex: none; white-space: nowrap; align-self: flex-start; }
 
 /* Shares typed as percentages: name · [ 40 ] % — and the group's total */
 .shareRow { grid-template-columns: 1fr 76px 16px; }
@@ -486,7 +412,7 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
    appointment, the next visit), Harbour (--m-link, the portal's accent) as the
    only signal — the active tab, unread counts, a time the customer asked for.
    Georgia for the tab title only; figures and times in Chivo Mono. */
-.tabTitle h1 { font-family: var(--font-display); font-weight: 400; font-size: 32px; letter-spacing: -.01em; line-height: 1.15; }
+.app .tabTitle h1 { font-family: var(--font-display); font-weight: 400; font-size: 32px; letter-spacing: -.01em; line-height: 1.15; }
 .tabTitle p { margin-top: 4px; font-size: 13px; }
 
 /* Inbox: the hero, the status chips, the list as one card of rows */
@@ -531,7 +457,6 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .chatHead .leadAvatar { width: 40px; height: 40px; }
 .chatWho strong { font-size: 16px; font-weight: 600; }
 .back, .appGear { width: 44px; height: 44px; }
-.chatAd { color: var(--m-link); font-size: 12px; }
 .apptBanner, button.apptBanner {
   padding: 12px 14px; border-radius: 14px; background: var(--m-brand); color: var(--m-on-brand);
   font-size: 14px; font-weight: 500;
@@ -560,7 +485,7 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 
 /* Booking: showroom, seven days, a grid of hours */
 .sheet { gap: 14px; border-radius: 20px; }
-.sheet h3 { font-family: var(--font-display); font-weight: 400; font-size: 22px; }
+.app .sheet h3 { font-family: var(--font-display); font-weight: 400; font-size: 22px; }
 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .days .chip { min-height: 52px; padding: 4px 0; border-radius: 12px; font-size: 12px; white-space: normal; line-height: 1.2; }
 .days .chip[aria-pressed="true"] { background: var(--m-brand); border-color: var(--m-brand); color: var(--m-on-brand); }
@@ -577,12 +502,9 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .weekDay b { background: var(--m-link); }
 .weekDay[aria-pressed="true"] { background: var(--m-text); border-color: var(--m-text); color: var(--m-card); }
 .weekDay[aria-pressed="true"] span { color: var(--m-card); }
-.nextTime { font-family: var(--font-mono), monospace; font-weight: 500; font-size: 30px; }
-.slotTime strong { font-family: var(--font-mono), monospace; font-weight: 500; font-size: 13px; }
-.dayHead { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 500; color: var(--m-text); }
 
 /* Numbers (Team, Overview, Profile) */
-.stat strong, .barRow strong, .memberNums b, .compare > div { font-family: var(--font-mono), monospace; font-weight: 500; }
+.stat strong, .barRow strong, .compare > div { font-family: var(--font-mono), monospace; font-weight: 500; }
 .stat strong { font-size: 18px; }
 .segment2 [aria-checked="true"] { background: var(--m-card); color: var(--m-text); box-shadow: 0 0 0 1px var(--m-border); }
 .queue { border: 1px solid var(--m-link); border-radius: 16px; }
@@ -615,7 +537,7 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 
 .waitQueue { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: var(--m-brand); color: var(--m-on-brand); }
 .waitQueueHead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.waitQueueHead h2 { margin: 0; font-size: 15px; font-weight: 500; color: inherit; }
+.app .waitQueueHead h2 { margin: 0; font-size: 15px; font-weight: 500; color: inherit; }
 .waitQueueHead span { font-size: 11px; opacity: .78; }
 .waitQueue .queueRow { padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--m-on-brand) 18%, transparent); }
 .waitQueue .queueLead span { font-size: 12px; opacity: .78; }
@@ -623,7 +545,7 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 
 .adList { display: flex; flex-direction: column; gap: 10px; }
 .adListHead { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px; }
-.adListHead h2 { margin: 0; font-size: 15px; font-weight: 500; }
+.app .adListHead h2 { margin: 0; font-size: 15px; font-weight: 500; }
 .adCard { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--m-border); background: var(--m-card); }
 .adCard[data-state="unset"] { border-style: dashed; }
 .adCard[data-state="editing"] { border-color: var(--m-link); }
@@ -651,3 +573,147 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .adCard .dayChip[aria-pressed="true"] { background: var(--m-link); border-color: var(--m-link); color: var(--m-on-brand); }
 .adCard .shareInput { color: var(--m-link); font-family: var(--font-mono), monospace; }
 .adFoot { margin: 0; padding: 0 2px; }
+
+/* Every screen on the canvas (2026-10-04): Chat, Booking, Calendar, Overview,
+   Contacts and Team laid out as the CRM Redesign artboards. */
+.eyebrow { display: block; font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--m-sub); }
+.mono { font-family: var(--font-mono), monospace; font-variant-numeric: tabular-nums; }
+.cardHead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.app .cardHead h2 { margin: 0; font-size: 15px; font-weight: 500; }
+.cardHead em { font-size: 12px; color: rgb(var(--alert)); }
+.tableCard { padding: 14px; }
+
+/* Chat: who, which ad, and how long the reply window has left */
+.chatAdLine { font-size: 12px; color: var(--m-link); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chatWho { flex: 1; min-width: 0; }
+.chatStatus { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 0; font-size: 12px; color: var(--m-sub); }
+.chatStatus strong { font-weight: 500; color: var(--m-text); }
+.chatStatus [data-open] { color: rgb(var(--ledger)); }
+.suggest { padding: 14px; gap: 4px; }
+.suggestHead { font-size: 12px; font-weight: 500; color: var(--m-link); }
+.suggestWhen { font-size: 15px; font-weight: 500; }
+.suggestNote { font-size: 12px; color: rgb(var(--ledger)); }
+.suggestNote[data-clash] { color: rgb(var(--danger)); }
+.suggestActions { display: flex; gap: 8px; margin-top: 8px; }
+.suggestActions > :first-child { flex: 1; }
+.suggest .linkButton { align-self: flex-start; color: var(--m-sub); font-weight: 500; font-size: 12px; }
+.quickActions { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.quickActions button {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 12px; border-radius: 17px;
+  border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font-size: 12px; font-weight: 500;
+}
+.quickActions button[aria-pressed="true"] { background: var(--m-text); border-color: var(--m-text); color: var(--m-card); }
+.quickActions button:disabled { opacity: .45; }
+
+/* Booking */
+.sheetHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.app .sheetHead h3 { margin: 0; }
+.sheetHead p { margin: 2px 0 0; }
+.roomPick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.roomPick button {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 52px; padding: 8px 12px;
+  border-radius: 12px; border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); text-align: left;
+}
+.roomPick button strong { font-size: 13px; font-weight: 500; }
+.roomPick button small { font-size: 11px; opacity: .75; }
+.roomPick [aria-checked="true"] { background: var(--m-text); border-color: var(--m-text); color: var(--m-card); }
+.days .chip { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.days .chip span { font-size: 11px; }
+.days .chip strong { font-family: var(--font-mono), monospace; font-size: 15px; font-weight: 500; }
+.slotsHead { display: flex; justify-content: space-between; align-items: baseline; }
+.slotsHead strong { font-size: 14px; font-weight: 500; }
+.sheetSummary { margin: 0; text-align: center; font-size: 12px; color: var(--m-sub); }
+.sheetActions > :last-child { flex: 1; }
+
+/* Calendar */
+.showUp { display: flex; flex-direction: column; gap: 12px; padding: 14px; }
+.showUp > p { margin: 0; }
+.showUpRow { display: flex; flex-direction: column; gap: 10px; }
+.showUpRow + .showUpRow { padding-top: 12px; border-top: 1px solid var(--m-border); }
+.showUpWho { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; color: inherit; text-align: left; }
+.showUpWho > span:last-child { display: flex; flex-direction: column; }
+.showUpWho strong { font-size: 14px; font-weight: 500; }
+.showUpWho small { font-size: 12px; color: var(--m-sub); }
+.showUpActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.app .dayPlan h2 { margin: 0 0 8px; font-size: 15px; font-weight: 500; }
+.dayPlan > p { margin: 0; }
+.dayPlanRow { display: grid; grid-template-columns: 52px 1fr; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--m-border); }
+.dayPlanRow > .mono { font-size: 12px; color: var(--m-text); }
+.dayPlanCard {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 0; border-radius: 14px; text-align: left;
+  background: var(--m-brand); color: var(--m-on-brand);
+}
+.dayPlanCard strong { font-size: 14px; font-weight: 500; }
+.dayPlanCard small { font-size: 12px; opacity: .78; }
+.comingUp { padding: 14px 14px 4px; }
+.app .comingUp h2 { margin: 0 0 4px; font-size: 15px; font-weight: 500; }
+.comingRow {
+  display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; width: 100%; padding: 12px 0;
+  border: 0; border-top: 1px solid var(--m-border); background: none; color: inherit; text-align: left;
+}
+.comingRow > .mono { font-size: 12px; color: var(--m-sub); }
+.comingRow > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; }
+.comingRow strong { font-size: 14px; font-weight: 500; }
+.comingRow small { font-size: 12px; color: var(--m-sub); }
+.comingRow em { font-size: 12px; font-style: normal; color: rgb(var(--ledger)); white-space: nowrap; }
+
+/* The walnut numbers card: Overview and Team */
+.statHero { display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 18px; background: var(--m-brand); color: var(--m-on-brand); }
+.statHeroTop { display: flex; flex-direction: column; gap: 2px; }
+.statHeroTop span, .statHeroTop small, .statHeroGrid span { font-size: 11px; opacity: .78; }
+.statHeroTop strong { font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.statHeroGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; }
+.statHeroTop + .statHeroGrid { padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--m-on-brand) 18%, transparent); }
+.statHeroGrid[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.statHeroGrid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.statHeroGrid strong { font-family: var(--font-mono), monospace; font-size: 17px; font-weight: 500; }
+.actionRow {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border-radius: 14px; text-align: left;
+  border: 1px solid var(--m-border); background: var(--m-card); color: var(--m-text); font: inherit;
+}
+.actionRow > span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.actionRow strong { font-size: 14px; font-weight: 500; }
+.actionRow small { font-size: 12px; color: var(--m-sub); }
+.actionRow em { font-size: 13px; color: var(--m-sub); white-space: nowrap; }
+.actionRow em[data-tone="danger"] { color: rgb(var(--danger)); }
+.actionRow em[data-tone="link"] { font-family: var(--font-mono), monospace; font-style: normal; color: var(--m-link); }
+.teamRow { display: grid; grid-template-columns: 1fr 44px 48px 52px; gap: 6px; align-items: center; padding: 10px 0; border-top: 1px solid var(--m-border); }
+.teamRow > span:not(:first-child) { font-family: var(--font-mono), monospace; font-size: 13px; text-align: right; }
+.teamRow > span:first-child, .teamRow button { display: flex; flex-direction: column; min-width: 0; }
+.teamRow button { padding: 0; border: 0; background: none; color: inherit; text-align: left; }
+.teamRow strong { font-size: 14px; font-weight: 500; }
+.teamRow small { font-size: 12px; color: var(--m-sub); }
+.reasonRow { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+.reasonRow strong { font-family: var(--font-mono), monospace; font-weight: 500; }
+
+/* Contacts */
+.contactRow { padding: 12px 0; gap: 12px; }
+.contactRow:first-child { border-top: 0; }
+.contactMain { padding: 0; }
+.contactMain .leadBody strong { font-size: 15px; font-weight: 500; }
+.contactPhone { font-family: var(--font-mono), monospace; font-size: 12px; color: var(--m-sub); }
+.contactLine { font-size: 12px; color: var(--m-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contactLine b { font-weight: 500; color: var(--m-text); }
+.callButton { width: 44px; height: 44px; background: none; border: 1px solid var(--m-border); color: var(--m-text); }
+.search { min-height: 46px; margin: 0; border-radius: 14px; }
+
+/* Team */
+.teamBlock { display: flex; flex-direction: column; gap: 14px; }
+.app .queue h2 { color: var(--m-text); }
+.queueRow { padding: 10px 0; }
+.peopleHead { display: grid; grid-template-columns: 1fr 44px 56px 48px; gap: 6px; align-items: end; padding-bottom: 8px; font-size: 11px; color: var(--m-sub); }
+.app .peopleHead h2 { margin: 0; font-size: 15px; font-weight: 500; color: var(--m-text); }
+.peopleHead span { text-align: right; }
+.personRow {
+  display: grid; grid-template-columns: 1fr 44px 56px 48px; gap: 6px; align-items: center; width: 100%; padding: 10px 0;
+  border: 0; border-top: 1px solid var(--m-border); background: none; color: inherit; text-align: left;
+}
+.personRow > .mono { font-size: 13px; text-align: right; font-style: normal; color: var(--m-sub); }
+.personRow > em[data-urgency="urgent"] { color: rgb(var(--alert)); font-style: italic; }
+.personRow > em[data-urgency="overdue"] { color: rgb(var(--danger)); font-style: italic; }
+.personWho { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.personWho .leadAvatar { width: 34px; height: 34px; font-size: 12px; }
+.personWho > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.personWho strong { font-size: 14px; font-weight: 500; }
+.personWho small { font-size: 11px; color: var(--m-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.personWho small[data-over] { color: rgb(var(--danger)); }

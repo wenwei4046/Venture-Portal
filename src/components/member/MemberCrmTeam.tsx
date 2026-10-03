@@ -56,23 +56,38 @@ export function MemberCrmTeam({ viewer, members, leads, appointments, now, teamF
   const nameOf = (id: string) => members.find(m => m.id === id)?.name ?? "—";
   const vacantStl = above && viewer.role !== "stl" && !members.some(m => m.role === "stl");
 
+  // The walnut card: everyone the viewer is looking at, as one set of numbers.
+  const shownLeads = leads.filter(l => shown.some(t => l.teamId === t.id || (!!l.assignedTo && teamHandlers(t.id, members).some(h => h.id === l.assignedTo))));
+  const sum = memberStats(shown.length ? shownLeads : leads, appointments, now);
+  const headcount = shown.reduce((n, t) => n + allDownlines(t.id, members).filter(m => seen.has(m.id)).length + (seen.has(t.id) ? 1 : 0), 0);
+
   return <>
-    <div className={c.titleRow}>
-      <div className={c.tabTitle}>
-        <h1>Team</h1>
-        <p className={s.sub}>{above ? `${teams.length} teams · tap a person` : viewer.role === "tl" ? `${viewer.teamName ?? "Your team"} · your people` : "Your RS"}</p>
-      </div>
+    <div className={c.tabTitle}>
+      <span className={c.eyebrow}>{ROLE_LABELS[viewer.role]} · {viewer.name}</span>
+      <h1>Team</h1>
+      <p className={s.sub}>{above ? `${teams.length} teams · tap a person` : `${viewer.teamName ?? "Your team"} · ${headcount} people`}</p>
     </div>
     {teams.length > 1 && <div className={c.chips} role="group" aria-label="Team">
       <button className={c.chip} aria-pressed={!teamFilter} onClick={() => onTeamFilter(null)}>All teams</button>
       {teams.map(t => <button key={t.id} className={c.chip} aria-pressed={teamFilter === t.id} onClick={() => onTeamFilter(t.id)}>{t.teamName ?? t.name}</button>)}
     </div>}
+
+    <section className={c.statHero} aria-label="Team numbers">
+      <div className={c.statHeroGrid} data-cols="3">
+        <div><span>Leads</span><strong>{sum.leads}</strong></div>
+        <div><span>Reply in 24 h</span><strong>{pct(sum.replyRate)}</strong></div>
+        <div><span>1st reply</span><strong>{sum.avgFirstReplyMinutes == null ? "—" : durationLabel(sum.avgFirstReplyMinutes)}</strong></div>
+        <div><span>Appt rate</span><strong>{pct(sum.apptRate)}</strong></div>
+        <div><span>Show-up</span><strong>{pct(sum.showUpRate)}</strong></div>
+        <div><span>Won</span><strong>{sum.won}</strong></div>
+      </div>
+    </section>
+
     {/* Boss and HOD: enquiries no team took wait here to be sent to a TL; the team's own rules take it from there. */}
     {assignsAds(viewer) && (() => {
       const unassigned = leads.filter(isUnassigned);
       return unassigned.length > 0 && <section className={`${s.card} ${c.queue}`} aria-label="Unassigned">
-        <h3><Icon name="info" size={16} /> Unassigned · {unassigned.length}</h3>
-        <p className={s.caption}>No team took these. Send each to a TL — their team&apos;s rules decide who gets it.</p>
+        <div className={c.cardHead}><h2>Unassigned · {unassigned.length}</h2><span className={s.caption}>their team&apos;s rules pick who</span></div>
         {unassigned.map(l => <div key={l.id} className={c.queueRow}>
           <button className={c.queueLead} onClick={() => onOpenLead(l.id)}><strong>{l.name}</strong><span className={s.caption}>{l.adName}</span></button>
           {onSendToTeam && <select value="" onChange={e => e.target.value && onSendToTeam(l.id, e.target.value)} aria-label={`Send ${l.name} to a team`}>
@@ -90,56 +105,44 @@ export function MemberCrmTeam({ viewer, members, leads, appointments, now, teamF
       const handlers = teamHandlers(team.id, members);
       const teamLeads = leads.filter(l => l.teamId === team.id || (l.assignedTo && handlers.some(h => h.id === l.assignedTo)));
       const waiting = teamLeads.filter(l => !l.assignedTo);
-      const total = memberStats(teamLeads, appointments, now);
-      return <section key={team.id} className={s.card} aria-label={team.teamName ?? team.name}>
-        {/* Peers never see each other: below the TL, the header counts only the viewer's own downline. */}
-        <div className={c.teamHead}>
-          {seen.has(team.id)
-            ? <div><h2>{team.teamName ?? team.name}</h2><p className={s.caption}>TL: {team.name} · {allDownlines(team.id, members).length} people</p></div>
-            : <div><h2>Your downline</h2><p className={s.caption}>{allDownlines(viewer.id, members).length} people report to you</p></div>}
-          <span className={c.teamTotal}>{total.leads} leads · reply {pct(total.replyRate)}</span>
-        </div>
-
-        {waiting.length > 0 && <div className={c.queue} aria-label="To assign">
-          <h3><Icon name="info" size={16} /> To assign · {waiting.length}</h3>
+      return <div key={team.id} className={c.teamBlock}>
+        {waiting.length > 0 && <section className={`${s.card} ${c.queue}`} aria-label="To assign">
+          <div className={c.cardHead}><h2>To assign · {waiting.length}</h2>{shown.length > 1 && <span className={s.caption}>{team.teamName ?? team.name}</span>}</div>
           {onAssign && canReassign(viewer, waiting[0], members)
             ? waiting.map(l => <div key={l.id} className={c.queueRow}>
-              <button className={c.queueLead} onClick={() => onOpenLead(l.id)}><strong>{l.name}</strong><span className={s.caption}>{l.adName}</span></button>
+              <button className={c.queueLead} onClick={() => onOpenLead(l.id)}><strong>{l.name}</strong><span className={c.chatAdLine}>{l.adName}</span></button>
               <select value="" onChange={e => e.target.value && onAssign(l.id, e.target.value)} aria-label={`Assign ${l.name}`}>
                 <option value="">Assign to…</option>
                 {handlers.map(h => <option key={h.id} value={h.id}>{h.name} · {roleTag(h)}</option>)}
               </select>
             </div>)
             : <p className={s.caption}>Waiting for {firstName(team.name)} to assign them.</p>}
-        </div>}
+        </section>}
 
-        {people.map(({ member: p, depth }) => {
-          const own = leads.filter(l => l.assignedTo === p.id);
-          const st = memberStats(own, appointments, now);
-          const pending = own.filter(l => replyUrgency(l, now).level !== "none").length;
-          const overdue = own.some(l => replyUrgency(l, now).level === "overdue");
-          const downs = directDownlines(p.id, members).length;
-          return <button key={p.id} className={c.memberRow} style={{ paddingLeft: depth * 14 }} onClick={() => onOpenMember(p.id)}>
-            <span className={c.leadAvatar} aria-hidden="true">{initials(p.name)}</span>
-            <span className={c.leadBody}>
-              <span className={c.leadTop}>
-                <strong>{p.name} <span className={c.roleTag} data-role={p.role} data-full={p.fullTime || undefined}>{roleTag(p)}</span></strong>
-                {pending > 0 && <span className={c.waitBadge} data-urgency={overdue ? "overdue" : "urgent"}>{pending} waiting</span>}
+        {/* Peers never see each other: below the TL, the header counts only the viewer's own downline. */}
+        <section className={`${s.card} ${c.tableCard}`} aria-label={team.teamName ?? team.name}>
+          <div className={c.peopleHead}>
+            <h2>{seen.has(team.id) ? (shown.length > 1 ? team.teamName ?? team.name : "People") : "Your downline"}</h2>
+            <span>Leads</span><span>Waiting</span><span>Appt</span>
+          </div>
+          {people.map(({ member: p, depth }) => {
+            const own = leads.filter(l => l.assignedTo === p.id);
+            const st = memberStats(own, appointments, now);
+            const pending = own.filter(l => replyUrgency(l, now).level !== "none").length;
+            const overdue = own.some(l => replyUrgency(l, now).level === "overdue");
+            const downs = directDownlines(p.id, members).length;
+            return <button key={p.id} className={c.personRow} onClick={() => onOpenMember(p.id)}>
+              <span className={c.personWho} style={{ paddingLeft: depth * 10 }}>
+                <span className={c.leadAvatar} aria-hidden="true">{initials(p.name)}</span>
+                <span><strong>{p.name}</strong><small data-over={downs > MAX_DOWNLINES || undefined}>{roleTag(p)}{p.role !== "rs" ? ` · ${downs}/${MAX_DOWNLINES} downlines` : ""}</small></span>
               </span>
-              <span className={c.memberNums}>
-                <span><b>{st.leads}</b> leads</span>
-                <span><b>{pct(st.replyRate)}</b> reply 24h</span>
-                <span><b>{st.avgFirstReplyMinutes == null ? "—" : durationLabel(st.avgFirstReplyMinutes)}</b> 1st reply</span>
-                <span><b>{pct(st.apptRate)}</b> appt</span>
-                <span><b>{pct(st.showUpRate)}</b> show-up</span>
-                <span><b>{st.won}</b> won</span>
-                {p.role !== "rs" && <span data-over={downs > MAX_DOWNLINES || undefined}><b>{downs}/{MAX_DOWNLINES}</b> downlines</span>}
-              </span>
-            </span>
-            <Icon name="chevron" size={16} />
-          </button>;
-        })}
-      </section>;
+              <span className={c.mono}>{st.leads}</span>
+              <em className={c.mono} data-urgency={pending ? (overdue ? "overdue" : "urgent") : undefined}>{pending}</em>
+              <span className={c.mono}>{pct(st.apptRate)}</span>
+            </button>;
+          })}
+        </section>
+      </div>;
     })}
     <p className={c.demoNote}><Icon name="info" size={16} /> Reply rate = first message answered by a person within 24 real hours; auto-replies don&apos;t count. Showing {nameOf(viewer.id)}&apos;s downline only.</p>
   </>;
