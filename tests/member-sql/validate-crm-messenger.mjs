@@ -76,4 +76,15 @@ await db.exec(`set role authenticated`)
 await assert.rejects(() => q(`select public.crm_ingest_messenger('[]', '[]', '[]', 0, '{}')`), /permission denied/, 'a signed-in user cannot ingest'); checks++
 await db.exec(`reset role`)
 
+// 6. A status that beat the reply to the database is picked up when the reply is recorded.
+const ev = p => q(`insert into crm_channel_events (channel, status, counts, payload) values ('messenger', 'ignored', '{}', $1::jsonb)`, [JSON.stringify(p)])
+await ev({ entry: [{ id: 'PAGE1', messaging: [{ delivery: { mids: ['m_early'], watermark: 1 } }] }] })
+await ev({ entry: [{ changes: [{ value: { statuses: [{ id: 'wamid.E1', status: 'sent' }, { id: 'wamid.E1', status: 'read' }, { id: 'wamid.OTHER', status: 'failed' }] } }] }] })
+await ev({ entry: [{ changes: [{ value: { statuses: [{ id: 'wamid.E2', status: 'delivered' }, { id: 'wamid.E2', status: 'failed' }] } }] }] })
+const early = async id => (await q(`select public.crm_early_status($1) as s`, [id]))[0].s
+check([await early('m_early'), await early('wamid.E1'), await early('wamid.E2'), await early('m_never')], ['delivered', 'read', 'failed', null], 'early statuses found, the furthest wins, failed wins, none is null')
+await db.exec(`set role authenticated`)
+await assert.rejects(() => q(`select public.crm_early_status('m_early')`), /permission denied/, 'not callable by a signed-in user'); checks++
+await db.exec(`reset role`)
+
 console.log(`crm messenger: ${checks} checks passed`)
