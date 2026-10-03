@@ -582,25 +582,29 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   // ── Inbox ─────────────────────────────────────────────────────────────────
   if (!inDetail && tab === "inbox") {
     const shown = sortByUrgency(inScope.filter(l => filter === "all" || l.status === filter), now);
-    const waiting = (level: CrmUrgency) => inScope.filter(l => replyUrgency(l, now).level === level).length;
+    const urgencies = inScope.map(l => replyUrgency(l, now));
+    const waiting = (level: CrmUrgency) => urgencies.filter(u => u.level === level).length;
     const scopeWaiting = inScope.filter(l => l.unread > 0 || replyUrgency(l, now).level !== "none").length;
+    const longest = Math.max(0, ...urgencies.filter(u => u.level !== "none").map(u => u.waitingMinutes));
     body = <>
-      <div className={c.tabTitle}><h1>Inbox</h1><p className={s.sub}>{byTeam && teamFilter !== null ? `${teamChoices.find(x => x.id === teamFilter)?.teamName ?? "This"} team` : scope === "mine" ? "Your own leads" : scope === "members" ? (hod ? "Your teams' leads" : "Your members' leads") : manager ? "Your downline's leads" : "Leads from Meta ads"} · {scopeWaiting} waiting</p></div>
+      <div className={c.tabTitle}><h1>Inbox</h1><p className={s.sub}>{byTeam && teamFilter !== null ? `${teamChoices.find(x => x.id === teamFilter)?.teamName ?? "This"} team` : scope === "mine" ? "Your own leads" : scope === "members" ? (hod ? "Your teams' leads" : "Your members' leads") : manager ? "Your downline's leads" : "Leads from Meta ads"} · WhatsApp &amp; Messenger</p></div>
       {scopeBar}
-      <p className={c.demoNote}><Icon name="info" size={16} /> {live ? "Live · read only for now — replying from the CRM arrives next" : "Demo data · not connected to Meta yet"}</p>
-      <section className={s.card}>
-        <div className={c.urgencyKey} aria-label="Waiting for your reply">
-          {(["overdue", "urgent", "soon"] as const).map(level => (
-            <span key={level} data-urgency={level}><i aria-hidden="true" />{waiting(level)} {URGENCY_LABELS[level].toLowerCase()}</span>
-          ))}
+      {/* The one dark object on the page: how many wait for a reply, and how badly. */}
+      <section className={c.waitHero} aria-label="Waiting for your reply">
+        <div><span>Waiting for your reply</span><strong>{scopeWaiting} {scopeWaiting === 1 ? "customer" : "customers"}</strong></div>
+        <div className={c.waitHeroKey}>
+          {(["overdue", "urgent"] as const).map(level => waiting(level) > 0 && <em key={level} data-urgency={level}>{waiting(level)} {URGENCY_LABELS[level].toLowerCase()}</em>)}
+          {longest > 0 && <span>oldest {waitingLabel(longest)}</span>}
         </div>
-        <div className={c.chips} role="group" aria-label="Filter by status">
-          {([{ value: "all", label: "All" }, ...CRM_STATUSES] as const).map(f => (
-            <button key={f.value} className={c.chip} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>
-              {f.label}{f.value !== "all" && ` ${inScope.filter(l => l.status === f.value).length}`}
-            </button>
-          ))}
-        </div>
+      </section>
+      <div className={c.chips} role="group" aria-label="Filter by status">
+        {([{ value: "all", label: "All" }, ...CRM_STATUSES] as const).map(f => (
+          <button key={f.value} className={c.chip} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>
+            {f.label} <small>{f.value === "all" ? inScope.length : inScope.filter(l => l.status === f.value).length}</small>
+          </button>
+        ))}
+      </div>
+      <section className={`${s.card} ${c.leadList}`}>
         {filter === "lost" && shown.length > 0 && <div className={c.lostSummary} aria-label="Why leads were lost">
           {CRM_LOST_REASONS.map(r => ({ r, n: shown.filter(l => l.lost?.reason === r.value).length })).filter(x => x.n > 0)
             .map(({ r, n }) => <span key={r.value}>{r.label} <strong>{n}</strong></span>)}
@@ -610,6 +614,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
           owner={!lead.assignedTo ? (lead.teamId ? "To assign" : "No team") : lead.assignedTo !== viewer.id ? firstName(nameOf(lead.assignedTo)) : undefined}
           onOpen={() => openLead(lead.id)} />)}
       </section>
+      <p className={c.demoNote}><Icon name="info" size={16} /> {live ? "Live · read only for now — replying from the CRM arrives next" : "Demo data · not connected to Meta yet"}</p>
     </>;
   }
 

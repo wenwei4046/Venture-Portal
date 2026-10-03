@@ -92,16 +92,16 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
       ? { adId: ad.id, mode: "percent", tlIds: rule.tlIds, shares: { ...rule.shares } }
       : { adId: ad.id, mode: "teams", tlIds: rule?.tlIds ?? [], shares: {} });
   };
-  /** One line saying who takes an ad's enquiries now. */
-  const adSummary = (ad: CrmAdInfo): { kind: "percent" | "teams" | "even"; text: string } => {
+  /** Who takes an ad's enquiries now: each team, with its % when split. */
+  const adSummary = (ad: CrmAdInfo): { kind: "percent" | "teams" | "even"; parts: { id: string; name: string; pct?: number }[] } => {
     const rule = ruleForAd(config, ad.id);
     const live = (ids: string[]) => ids.filter(id => tls.some(x => x.id === id));
     if (rule?.shares) {
       const parts = Object.entries(rule.shares).filter(([id, n]) => n > 0 && live([id]).length);
-      if (parts.length) return { kind: "percent", text: parts.map(([id, n]) => `${teamName(id)} ${n}%`).join(" · ") };
+      if (parts.length) return { kind: "percent", parts: parts.map(([id, n]) => ({ id, name: teamName(id), pct: n })) };
     }
-    if (rule && live(rule.tlIds).length) return { kind: "teams", text: live(rule.tlIds).map(teamName).join(" · ") };
-    return { kind: "even", text: "Not set — evenly across every team" };
+    if (rule && live(rule.tlIds).length) return { kind: "teams", parts: live(rule.tlIds).map(id => ({ id, name: teamName(id) })) };
+    return { kind: "even", parts: [] };
   };
   const draftTotal = draft ? sum(Object.values(draft.shares)) : 0;
   const draftOk = !!draft && (draft.mode === "teams" || draftTotal === 100);
@@ -184,8 +184,10 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
     </>;
   };
 
-  const subtitle = ownTeam ? `Who in ${viewer.teamName ?? "your team"} gets a new enquiry` : "Which teams take each ad";
-  return <div className={onBack ? c.chat : undefined}>
+  const subtitle = ownTeam ? `Who in ${viewer.teamName ?? "your team"} gets a new enquiry` : "Which team gets each ad's enquiries";
+  const summaries = new Map(ads.map(ad => [ad.id, adSummary(ad)]));
+  const unset = ads.filter(ad => summaries.get(ad.id)?.kind === "even").length;
+  return <div className={onBack ? c.chat : c.assignPage}>
     {onBack
       ? <div className={c.chatHead}>
         <button className={c.back} onClick={onBack} aria-label="Back to Settings"><Icon name="back" size={20} /></button>
@@ -193,12 +195,18 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
       </div>
       : <div className={c.tabTitle}><h1>Assignment</h1><p className={s.sub}>{subtitle}</p></div>}
 
+    {/* At a glance: how many ads, how many decided, how many still left to the even split. */}
+    {!ownTeam && ads.length > 0 && <div className={c.adCounts}>
+      <div><strong>{ads.length}</strong><span>{ads.length === 1 ? "Ad" : "Ads"} running</span></div>
+      <div data-kind="set"><strong>{ads.length - unset}</strong><span>Assigned</span></div>
+      <div data-kind="unset"><strong>{unset}</strong><span>Not set yet</span></div>
+    </div>}
+
     {/* Enquiries in no team — only when no team could take them; the Principal / HOD send each one. */}
-    {top && waiting.length > 0 && <section className={`${s.card} ${c.queue}`} aria-label="Not in a team">
-      <h3><Icon name="info" size={16} /> Not in a team · {waiting.length}</h3>
-      <p className={s.caption}>Send each to a team — its rules decide who gets it.</p>
+    {top && waiting.length > 0 && <section className={c.waitQueue} aria-label="Not in a team">
+      <div className={c.waitQueueHead}><h2>Waiting for a team · {waiting.length}</h2><span>its team&apos;s rules pick who</span></div>
       {waiting.map(l => <div key={l.id} className={c.queueRow}>
-        <button className={c.queueLead} onClick={() => onOpenLead?.(l.id)}><strong>{l.name}</strong><span className={s.caption}>{l.adName}</span></button>
+        <button className={c.queueLead} onClick={() => onOpenLead?.(l.id)}><strong>{l.name}</strong><span>{l.adName || "Messaged the page directly"}</span></button>
         {onSendToTeam && !readOnly && <select value="" onChange={e => e.target.value && onSendToTeam(l.id, e.target.value)} aria-label={`Send ${l.name} to a team`}>
           <option value="">Send to team…</option>
           {tls.map(tl => <option key={tl.id} value={tl.id}>{tl.teamName} · {tl.name}</option>)}
@@ -207,20 +215,29 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
     </section>}
 
     {/* Which team — ad by ad, the Principal's and HOD's; a TL only deals with their own team. */}
-    {!ownTeam && <section className={s.card} aria-label="Ads">
-      <h2>Ads</h2>
-      <p className={s.caption}>A new ad appears here with its first enquiry. Until you choose, its enquiries go evenly across every team.</p>
-      {ads.length === 0 && <p className={s.sub}>No ad has brought an enquiry yet.</p>}
+    {!ownTeam && <section className={c.adList} aria-label="Ads">
+      <div className={c.adListHead}><h2>Ads</h2><span className={s.caption}>Not set = evenly to every team</span></div>
+      {ads.length === 0 && <p className={s.sub}>No ad has brought an enquiry yet. A new ad appears here with its first enquiry.</p>}
       {ads.map(ad => {
-        const now = adSummary(ad);
+        const now = summaries.get(ad.id) ?? { kind: "even" as const, parts: [] };
         const editing = draft?.adId === ad.id;
-        return <div key={ad.id} className={c.adRow}>
+        return <article key={ad.id} className={c.adCard} data-state={editing ? "editing" : now.kind === "even" ? "unset" : "set"}>
           <div className={c.ruleHead}>
             <span className={c.adName}><strong>{ad.name}</strong>
               <small className={s.caption}>{[ad.channel, `${ad.leads} ${ad.leads === 1 ? "enquiry" : "enquiries"}`, ad.firstAt && `since ${dayMonth(ad.firstAt)}`].filter(Boolean).join(" · ")}</small></span>
-            {topEdits && onSaveAd && !editing && <button className={c.linkButton} onClick={() => startEdit(ad)}>Choose teams</button>}
+            {topEdits && onSaveAd && <button className={c.adAction} disabled={saving}
+              onClick={() => (editing ? setDraft(null) : startEdit(ad))}>{editing ? "Close" : now.kind === "even" ? "Choose teams" : "Change"}</button>}
           </div>
-          {!editing && <p className={c.adTeams} data-kind={now.kind}><Icon name={now.kind === "even" ? "info" : "team"} size={14} /> {now.text}</p>}
+          {!editing && now.kind === "even" && <em className={c.adUnset}>Not set · going evenly to every team</em>}
+          {!editing && now.kind !== "even" && <>
+            {now.kind === "percent" && <div className={c.adSplitBar} aria-hidden="true">
+              {now.parts.map((p, i) => <i key={p.id} data-shade={i % 3} style={{ flexGrow: p.pct ?? 1 }} />)}
+            </div>}
+            <div className={c.adTags}>
+              {now.parts.map(p => <span key={p.id} className={c.adTag}><Icon name="check" size={12} />{p.name}
+                {(p.pct != null || now.parts.length === 1) && <small>{p.pct != null ? `${p.pct}%` : "only"}</small>}</span>)}
+            </div>
+          </>}
           {editing && draft && <div className={c.adEditor}>
             <div className={c.segment2} role="radiogroup" aria-label="How">
               <button role="radio" aria-checked={draft.mode === "teams"} onClick={() => setDraft({ ...draft, mode: "teams" })}>Hand to teams</button>
@@ -251,10 +268,9 @@ export default function MemberCrmAssignment({ viewer, members, ads, config, onCo
               <button className={`${s.button} ${s.primary}`} disabled={saving || !draftOk} onClick={() => void save(ad)}>{saving ? "Saving…" : "Save"}</button>
             </div>
           </div>}
-        </div>;
+        </article>;
       })}
-      <h3 className={c.subHead}>Not from an ad</h3>
-      <p className={s.caption}>Customers who message us directly go evenly across every team. Move one from its chat.</p>
+      <p className={`${s.caption} ${c.adFoot}`}>Not from an ad: customers who message us directly go evenly across every team. Move one from its chat.</p>
     </section>}
 
     {/* Who in the team: a TL's own team open; the Boss and HOD see each team as one line, opened on a tap. */}

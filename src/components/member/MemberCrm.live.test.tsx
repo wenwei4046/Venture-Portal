@@ -151,14 +151,15 @@ describe("the CRM on live data", () => {
     render(<MemberCrm live salesperson="Principal" />);
     fireEvent.click(await screen.findByRole("button", { name: /Assignment/ }));
     expect(screen.getByText("Akemi Fair")).toBeTruthy();
-    expect(screen.getByText(/Not set — evenly across every team/)).toBeTruthy();
+    expect(screen.getByText("Not set · going evenly to every team")).toBeTruthy();
     expect(screen.queryByText(/Next 10 enquiries/)).toBeNull();
     fireEvent.click(screen.getByText("Choose teams"));
     fireEvent.click(screen.getByRole("button", { name: "Team Priya" }));
     expect(crmWrite).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_save_ad_rule", { p_ad: "AD9", p_label: "Akemi Fair", p_tls: ["tlb"], p_shares: null }));
-    expect(await screen.findByText("Team Priya", { selector: "p" })).toBeTruthy();
+    expect(await screen.findByText(/^Team Priya/, { selector: "span" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Change" })).toBeTruthy();
   });
 
   it("lets the Principal split an ad by % — Save waits for 100%", async () => {
@@ -173,7 +174,8 @@ describe("the CRM on live data", () => {
     fireEvent.change(screen.getByLabelText("Team Priya share of Akemi Fair (%)"), { target: { value: "40" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_save_ad_rule", { p_ad: "AD9", p_label: "Akemi Fair", p_tls: ["tla", "tlb"], p_shares: { tla: 60, tlb: 40 } }));
-    expect(await screen.findByText("Team Kelvin 60% · Team Priya 40%")).toBeTruthy();
+    expect(await screen.findByText("60%")).toBeTruthy();
+    expect(screen.getByText("40%")).toBeTruthy();
   });
 
   it("opens on the member the Principal picked in Today", async () => {
