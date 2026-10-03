@@ -1356,9 +1356,19 @@ the Big Home fair at Mid Valley, never with the 10k written elsewhere that week.
   bills at Zanotti; Sunway Carnival: PEI FEN).
 - **After it closes, only the ERP or the back office changes it** (除非是 ERP 那边
   改，或者是后台这边改): the ERP by changing which booth the bills were picked at;
-  the back office in the Principal's view of the member, where *Member brand
-  weeks* edits every week, closed ones too
-  (`member_principal_save_brand_week_picks`, mig `20261003190000`).
+  the back office in two places, both any week, closed ones too — the Principal's
+  view of one member, where *Member brand weeks* is an editor
+  (`member_principal_save_brand_week_picks`, mig `20261003190000`), and, for HR,
+  **People › Member services › Brand weeks**: a department's month on one grid,
+  every member and every week, each cell saying what is stored (*Picked*,
+  *Unconfirmed · AKEMI*, *Auto-located · AKEMI*, *No bills*) and the booths the
+  member wrote at that week with their bills, the one that earns the points marked;
+  one Save for every member changed. Whoever reviews member requests may use it
+  (`member_is_manager('member_requests_manage')`: HR and the Principal) —
+  `member_admin_brand_weeks` / `member_admin_save_brand_weeks`, mig
+  `20261003210000`. Every save now records who made it
+  (`member_arena_brand_weeks.updated_by`), and the grid says *Saved 3 Oct · HR
+  Manager* or *by the member*.
 - **A bill with no ERP booth pick** (before the fair picker, or a fair placed by a
   person or the calendar) counts at its seller's booth that week.
 - **Highest Fair Record** is the best single scoring booth.

@@ -1,0 +1,83 @@
+/* People › Member services › Brand weeks (2026-10-03). A department's month
+   on the sheet's ledger table: one row per member, one cell per fair weekend,
+   a dropdown over two small lines — what is stored, and the booths written at. */
+
+.toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.toolbar small {
+  font-size: 11px;
+}
+
+.grid thead th {
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+/* The week's weekend and when it closes, under the header's label. */
+.grid thead th small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.grid td {
+  min-width: 150px;
+  vertical-align: top;
+}
+.grid td small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.member {
+  min-width: 160px;
+}
+.member strong {
+  display: block;
+  font-weight: 600;
+}
+.member small {
+  margin-top: 2px;
+}
+.grid select {
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 12px;
+}
+.grid select:focus-visible {
+  outline: 2px solid rgb(var(--ink));
+  outline-offset: 1px;
+}
+/* A cell whose dropdown differs from what is stored: the sheet's peach wash
+   with an orange edge, until it is saved or discarded. */
+.grid td[data-changed] {
+  background: rgb(var(--accent-bg));
+  box-shadow: inset 3px 0 0 rgb(var(--accent));
+}
+.grid td small.booths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+.booths span[data-scoring] {
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--accent));
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}

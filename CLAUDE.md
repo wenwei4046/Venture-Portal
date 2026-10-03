@@ -1387,7 +1387,16 @@ src/
 │   │                                  or the BACK OFFICE changes it: the
 │   │                                  Principal's view of a member makes *Member
 │   │                                  brand weeks* an editor for every week
-│   │                                  (`member_principal_save_brand_week_picks`).
+│   │                                  (`member_principal_save_brand_week_picks`),
+│   │                                  and HR has **People › Member services ›
+│   │                                  Brand weeks** — a department's month on
+│   │                                  one grid, member × week, what is stored
+│   │                                  and the booths written at under each, one
+│   │                                  Save (`member_admin_brand_weeks` /
+│   │                                  `member_admin_save_brand_weeks`, gate
+│   │                                  `member_is_manager('member_requests_
+│   │                                  manage')`, mig `20261003210000`; every
+│   │                                  save records `updated_by`).
 │   │                                  On 2026-10-03 no Revenue seller has a
 │   │                                  member login, so every finish starts
 │   │                                  guessed. A bill with no ERP booth pick
