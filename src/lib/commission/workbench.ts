@@ -21,6 +21,9 @@ export interface WorkbenchOrderMeta {
   location?: string | null
   /** The fair the calendar placed the bill at, and that fair's own place. */
   fair?: { id: string; venueKey: string; venueName: string } | null
+  /** The ERP's Ref No. — the handwritten bill's number — and the paper number read from it (`paper-ref.ts`). */
+  refNo?: string | null
+  paperNo?: string | null
 }
 
 export interface WorkbenchOptions {
@@ -38,6 +41,13 @@ export interface CommissionOrderRow {
   orderId: string
   originalOrderId: string
   orderNo: string
+  /**
+   * The paper beside the document (2026-10-03): the ERP's Ref No. as typed —
+   * HC13369 on HC-SO-2609-400 — and the paper number the double-claim check
+   * reads from it. Both null on an upsale, which is no bill.
+   */
+  refNo: string | null
+  paperNo: string | null
   orderDate: string
   eventDate: string
   periodMonth: string
@@ -298,6 +308,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const openBillRank = order.upsale ? null : tagByOrder.get(order.id) ?? null
     return {
       key, orderId: order.id, originalOrderId: order.id, orderNo: order.orderNo,
+      refNo: meta?.refNo ?? null, paperNo: meta?.paperNo ?? null,
       orderDate: order.orderDate, eventDate: order.eventDate, periodMonth: order.periodMonth,
       staffId: order.staffId, staffName: nameOf(order.staffId),
       venue: meta?.venue ?? null, eventName: meta?.eventName ?? null,

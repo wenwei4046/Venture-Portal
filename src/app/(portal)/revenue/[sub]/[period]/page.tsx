@@ -345,6 +345,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     ? Object.fromEntries(claimGroups.map(group => [group.billRef,
       explainDoubleClaim(group, doubleClaims.evidence.evidence, doubleClaims.evidence.context)]))
     : {}
+  // The bills the check cannot see (2026-10-03): it matches on the paper
+  // number in the ERP's Ref No., and these name none — the bills it could pay,
+  // as the check itself reads them (live, worth something).
+  const unreadable = orders.filter(o => o.orderTotal > 0 && !o.paperNo).map(o => ({
+    orderId: o.orderId, orderNo: o.orderNo, refNo: o.refNo,
+    seller: o.employeeName ?? o.agentName, orderTotal: o.orderTotal,
+  }))
   const doubleClaimPanel = doubleClaims ? (
     <DoubleClaimPanel
       key="double-claims"
@@ -353,6 +360,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       basePath={revenuePath(subDept.slug)}
       groups={claimGroups}
       carried={carriedUnpaid}
+      unreadable={unreadable}
       unavailable={doubleClaims.unavailable}
       explanations={explanations}
       evidenceUnavailable={doubleClaims.evidence.unavailable}
@@ -461,7 +469,8 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         // Bills taken out by hand (Don't count this bill) — out of the
         // calculation, and listed on their seller's page to count again.
         notCounted={monthOrders.filter(o => o.cancelled && o.excludedReason === 'manual').map(o => ({
-          orderId: o.orderId, orderNo: o.orderNo, orderDate: o.orderDate, staffId: o.staffId, orderTotal: o.orderTotal,
+          orderId: o.orderId, orderNo: o.orderNo, refNo: o.refNo, paperNo: o.paperNo,
+          orderDate: o.orderDate, staffId: o.staffId, orderTotal: o.orderTotal,
         }))}
         payroll={{
           monthLabel: label(period),

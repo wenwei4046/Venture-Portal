@@ -87,7 +87,7 @@ describe('explainDoubleClaim', () => {
       'Sales value differs: RM 12,005.00 on HC11357 and RM 13,000.00 on HC-SO-2609-287 — RM 995.00 more on the later one.',
       'A claim form names no customer and lists no items, so those cannot be compared for HC11357.',
     ])
-    expect(x.action).toBe('If it is the same sale, take HC-SO-2609-287 out of September 2026: right-click it on All bills or on ETHAN’s ledger › Don’t count this bill. If the customer really did add to the order, only the RM 995.00 above HC11357 is new. If it is a different sale, its paper number is wrong in the ERP — correct it there, then mark this checked.')
+    expect(x.action).toBe('If it is the same sale, take HC-SO-2609-287 out of September 2026: right-click it on All bills or on ETHAN’s ledger › Don’t count this bill. If the customer really did add to the order, only the RM 995.00 above HC11357 is new. If it is a different sale, its Ref No. in the ERP carries the wrong paper number — correct it there, then mark this checked.')
     expect(x.atRisk).toBe(13_000)
     expect(x.copies).toEqual(['HC-SO-2609-287'])
   })

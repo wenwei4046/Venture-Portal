@@ -27,6 +27,7 @@ import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { describeExclusion } from '@/lib/commission/bill-exclusion'
 import { parseWorkbenchReturn } from '@/lib/commission/workbench-nav'
 import { holdersLine, holdersOf } from '@/lib/commission/bill-share'
+import { paperRef } from '@/lib/commission/paper-ref'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 
@@ -133,7 +134,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       // The FK is named: since sales_order_shares (20260924010000) joins
       // sales_orders to hr_staff_costs as well, a bare `hr_staff_costs (…)`
       // is ambiguous to PostgREST (PGRST201) and the page read no order.
-      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, excluded_reason, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
+      // `ref_no` / `paper_no` are computed fields (20261003170000): the ERP's
+      // Ref No. and the paper number the double-claim check reads from it.
+      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, excluded_reason, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, source, ref_no, paper_no, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -162,6 +165,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     staff_id: string | null
     synced_at: string | null
     raw: { payments?: PaymentRow[] } | null
+    source: string
+    ref_no: string | null
+    paper_no: string | null
     hr_staff_costs: { employee_name: string; employee_code: string | null } | null
   } | null
 
@@ -306,6 +312,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
   const payments = Array.isArray(order.raw?.payments) ? order.raw.payments : []
 
+  // The paper beside the document (2026-10-03): the ERP's Ref No., beside its
+  // own number the way the ERP prints it. A bill worked out by hand is its paper.
+  const paper = order.source === 'erp_sync' ? paperRef(order.ref_no, order.paper_no) : null
+
   const backLabel = !back
     ? null
     : back.personId
@@ -329,6 +339,21 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           </div>
           <h1 className="page-title">{order.order_no}</h1>
           <p className="text-sm mt-3">
+            {paper ? (
+              <>
+                {paper.kind === 'missing' ? (
+                  <span className="text-alert">No Ref No. in the ERP — double claims cannot be checked</span>
+                ) : (
+                  <>
+                    Ref <span className="font-mono">{paper.text}</span>
+                    {paper.kind === 'unreadable' ? (
+                      <span className="text-alert"> (not a paper number — double claims cannot be checked)</span>
+                    ) : null}
+                  </>
+                )}
+                {' · '}
+              </>
+            ) : null}
             {order.customer_name ?? 'no customer name'} ·{' '}
             {holders ? `shared ${holdersLine(holders)}` : order.hr_staff_costs?.employee_name ?? `${order.agent_name} (unmatched)`} ·{' '}
             {formatDate(order.order_date)}

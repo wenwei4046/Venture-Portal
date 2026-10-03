@@ -191,6 +191,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     return {
       orderId: o.orderId,
       orderNo: o.orderNo,
+      refNo: o.refNo,
+      paperNo: o.paperNo,
       href: revenuePath(subDept.slug, period, 'orders', o.orderId),
       orderDate: o.orderDate,
       eventDate: o.eventDate,

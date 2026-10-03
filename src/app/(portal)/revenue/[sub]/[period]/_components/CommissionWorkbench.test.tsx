@@ -97,8 +97,9 @@ function fixture(): CommissionWorkbenchData {
       { staffId: 'leader', name: 'Alex', employeeCode: 'HV002' },
     ],
     orders: [
-      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null },
-      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null },
+      // The handwritten bill's number beside the ERP's (2026-10-03); 'two' was keyed with none.
+      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, refNo: 'HC13369', paperNo: 'HC13369' },
+      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, refNo: null, paperNo: null },
     ],
   }
 }
@@ -297,11 +298,13 @@ describe('CommissionWorkbench', () => {
     expect(within(table).queryByText('SO-one')).toBeNull()
     const row = salesRow(table, 'SO-two')
     const cells = within(row).getAllByRole('cell')
-    expect(cells[1]).toHaveTextContent('Anthony')
-    expect(cells[4]).toHaveTextContent('RM 2,000.00')
-    expect(cells[6]).toHaveTextContent('RM 100.005% of the bill')
-    expect(cells[7]).toHaveTextContent('RM 600.0030% of the bill')
-    expect(cells[8]).toHaveTextContent('RM 500.00')
+    // SO-two was keyed into the ERP with no Ref No. (2026-10-03).
+    expect(cells[1]).toHaveTextContent('No Ref No. in the ERP')
+    expect(cells[2]).toHaveTextContent('Anthony')
+    expect(cells[5]).toHaveTextContent('RM 2,000.00')
+    expect(cells[7]).toHaveTextContent('RM 100.005% of the bill')
+    expect(cells[8]).toHaveTextContent('RM 600.0030% of the bill')
+    expect(cells[9]).toHaveTextContent('RM 500.00')
     expect(within(row).getByRole('link', { name: 'SO-two' })).toHaveAttribute('href',
       `/revenue/fair/2026-08-01/orders/two?from=${encodeURIComponent('/revenue/fair/2026-08-01?view=deposit')}`)
     expect(screen.getByText('Still to collect', { selector: 'span' }).parentElement).toHaveTextContent('RM 500.00')
@@ -492,6 +495,31 @@ describe('CommissionWorkbench', () => {
       lockedPeriods={['2026-08-01']} />)
     choose('Anthony')
     expect(within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Don’t count' })).toBeDisabled()
+  })
+
+  // User 2026-10-03: follow erp sales order number, but with reference
+  // hc123123 (which is paper sales order number).
+  it('shows each bill’s Ref No. — the handwritten bill’s number — beside the ERP’s, and finds a bill by it', () => {
+    renderBoard()
+    choose('Anthony')
+    const table = personalTable()
+    expect(within(table).getAllByRole('columnheader').slice(0, 2).map(h => h.textContent)).toEqual(['Sales order', 'Ref No.'])
+    expect(within(salesRow(table, 'SO-one')).getAllByRole('cell')[1]).toHaveTextContent('HC13369')
+    // Keyed with no Ref No.: the double-claim check cannot match it, and the row says so.
+    expect(within(salesRow(table, 'SO-two')).getAllByRole('cell')[1]).toHaveTextContent('—No Ref No. in the ERP')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search sales orders' }), { target: { value: 'hc133' } })
+    expect(within(table).getByRole('link', { name: 'SO-one' })).toBeVisible()
+    expect(within(table).queryByRole('link', { name: 'SO-two' })).toBeNull()
+  })
+
+  it('names no paper for an upsale, which is no bill', () => {
+    const data = fixture()
+    data.input.orders = [...data.input.orders, ...upsalesToOrders([{ id: 'up', staff_id: 'agent', amount: 300, sold_on: '2026-08-20', original_ref: 'HC5315' }], '2026-08-01')]
+    renderBoard(data)
+    choose('Anthony')
+    const cell = within(salesRow(personalTable(), 'UPSALE HC5315')).getAllByRole('cell')[1]
+    expect(cell).toHaveTextContent('—')
+    expect(cell).not.toHaveTextContent('No Ref No.')
   })
 
   it('toggles optional columns without losing required order or total columns or changing the money', () => {
