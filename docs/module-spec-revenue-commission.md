@@ -1236,6 +1236,102 @@ extra RM 1,056 is transport); HC13241 — MELVIN's two documents three minutes
 apart with nothing in common; PG10457 — SHAWN's customer ROY again twenty days
 later at another fair, nothing paid yet.
 
+### 4.15 Sales exhibition — one brand at one fair (2026-10-03)
+
+**What an exhibition is** (user 2026-10-03): 这个 venue 本身其实应该换成 sales
+exhibition … 我做 Akemi，然后在哪个 venue（比如 Mid Valley）、什么 organizer
+（比如 Big Home）、什么日期 … 同一个日期里，可能会在同一个 venue、同一个
+organizer，但是是不同的 brand（比如 Dunlopillo）。所以其实我是看 brand 来区分
+那一场 exhibition 的 result. An exhibition is a **brand at a fair** — the ERP's own
+grain (one `public.projects` row per brand booth: MVEC SOUTHKEY 18–20 Sep MLE is
+projects 344 + 345) and the Arena's (it ranks the team by brand). The month's tab
+was *Sales by venue*, one row per FAIR, which folded a fair's booths together.
+
+**The rule** (`salesByExhibition`, `lib/exhibitions.ts`):
+
+| Part | Read from |
+|---|---|
+| The fair — venue, days, organiser | the bill's `fair_event_id`, the ERP's pick (§14, `erp_sync_fair`). A bill no fair claims falls back to its canonical place and reads *Not linked* |
+| The brand | 1. the **booth** the salesperson picked when opening the bill in the ERP (`raw.fair.brand`, while the bill's fair IS that pick — `fair_source = 'erp'` — and the project is not cancelled), as the portal's code (`DUNLOPILLO` → `DUNLOP`, the twin of `erp_sync_brand_code`); 2. else the bill's own `sales_orders.brand_code` — its goods, or the brand the salesperson named in the ERP for goods that name none (a bed frame alone); 3. else *No brand* |
+
+The booth wins over the goods (user 2026-10-03): 如果有一些单本身选了那一场
+venue、organizer，还有 event 是 Akemi，但是他开的 order 可能是在 Akemi 的 booth
+那边卖 Dunlopillo 的枕头 … 其实还是会落在他选的那个 venue、那个 fair 那一边.
+So a Dunlopillo pillow sold at the Akemi booth is the Akemi exhibition's, and
+September's six Akemi bills written on the Sunway Carnival Dunlopillo project are
+Dunlopillo's (five of them typed KLCC or AEON NILAI — if that pick is wrong, it is
+fixed in the ERP). Only the grouping follows the booth: the margin ladder, the
+ledger's *Brand* column and the Arena's brand ranking still read `brand_code`.
+`exhibitionBrandOf` in `lib/exhibitions.ts`; the booth is read beside each bill's
+fair by `_lib/order-fairs.ts`.
+
+Every live bill sits in exactly one row, matched or not, so the tab adds up to the
+*Total sales value* card. A row's venue opens exactly its bills on All bills:
+`?fair=<id>&brand=<code>` (a fair is matched on its own, whatever venue its bills
+typed), `?venue=<place>&fair=none&brand=…` for a place no fair claims, and
+`brand=none` for bills with no brand. `?view=venue` still opens the tab. No
+migration.
+
+September 2026 on 2026-10-03: 31 venue rows became 50 exhibitions — AKEMI 24,
+ZANOTTI 13, DUNLOP 2, ERGOTEX 2, no brand 9 — still 357 bills and RM 1,981,717.60.
+PENANG WATERFRONT 25–27 Sep MLE, for one, is ZANOTTI RM 139,804 (28 bills) +
+AKEMI RM 105,470 (19) + one bill with no brand; SUNWAY CARNIVAL 25–29 Sep is
+DUNLOP RM 140,208 (29) + ZANOTTI RM 64,614 (11) + AKEMI RM 4,588 (1, placed by
+the calendar from its venue, no booth).
+
+**The Arena ranks booth by booth too** (2026-10-03, `member_arena_booth_history`).
+Its *Championship & Fair results* ranked each FAIR with every booth together; now
+each booth is ranked on its own, however few people worked it (user: 人少也算),
+and a seller's figure is what they sold at that booth — 100k at the Akemi booth of
+the Big Home fair at Mid Valley, never with the 10k written elsewhere that week.
+
+- **Every bill is on a board.** A booth's board holds everything written there —
+  the bills picked at it, bills with no pick from sellers who worked it that week,
+  and (ten old bills on 2026-10-03, RM 45,876) the fair's no-brand board for bills
+  nothing names a brand for. The boards add up to the old whole-fair totals.
+- **Ranked everywhere, points once a week** (user: 一个人在一周里，只可以在一个
+  地方参与第一、第二、第三、第四、第五名的排名 — then: 他应该是要上榜 … 你照样
+  上榜，只是你上榜了没有拿到积分 … 就是能算积分的只有一个 — then: 30 千本身在
+  那个 booth 的排行榜上可能是第三名，所以还是会显示第三名 … 依然会显示属于那个
+  名次，而不是直接不算名次). A seller is ranked on every board they sold at, like
+  anybody, and those behind them move down. The one place a week that earns points
+  (`scoring`) is at the booth of the brand they pick for that week in *My brand
+  weeks* — one dropdown per fair weekend (the Monday–Sunday week a fair opens in,
+  named by its Friday; September 2026 has four, October five), stored in
+  `member_arena_brand_weeks.picks` (`member_arena_save_brand_week_picks`) — at the
+  fair with the most bills for it. Every other place shows *No points*
+  (`offWeekOrders` / `offWeekSales`). Medal counts and the Highest Fair Record
+  read scoring places only.
+- **A week closes seven days after its fair** (user: 在这一边我建议加一道锁，就是
+  在结束之后的一个星期 … 7 号是最后一天，那就从 7 号开始多给 7 天时间让他们去填，
+  没有填就 closing 了): `member_arena_week_closes_on` = the last day of that
+  week's fairs + 7 (a week with no fair: its Sunday + 7). September 2026's weeks
+  closed on 13, 20 and 27 September and 6 October (Sunway Carnival ran to the
+  29th). The member's own save refuses to change a closed week.
+- **A week nobody picked** counts the brand the seller opened the most bills for
+  that week (开最多单的那个 brand), then the most sales: *Unconfirmed* while the
+  week is open, *Auto-located* once it closes — and the board shows which. On
+  2026-10-03 none of the 32 Revenue sellers had a member login, so every finish
+  started that way; the guess matched the ERP's booth attendance lists except for
+  two people (Penang 25–27 Sep: LAWRENCE is on the Akemi list but wrote as many
+  bills at Zanotti; Sunway Carnival: PEI FEN).
+- **After it closes, only the ERP or the back office changes it** (除非是 ERP 那边
+  改，或者是后台这边改): the ERP by changing which booth the bills were picked at;
+  the back office in the Principal's view of the member, where *Member brand
+  weeks* edits every week, closed ones too
+  (`member_principal_save_brand_week_picks`, mig `20261003190000`).
+- **A bill with no ERP booth pick** (before the fair picker, or a fair placed by a
+  person or the calendar) counts at its seller's booth that week.
+- **Highest Fair Record** is the best single scoring booth.
+
+On 2026-10-03 data: 38 fairs became 66 booth boards (7 of them no-brand); RM
+4,331,895 on the old boards = the same RM 4,331,895 on the booth boards, of which
+RM 4,179,185 earns points and RM 152,710 (29 bills) is ranked with no points;
+nobody scores twice in a week. Penang 25–27 Sep: Akemi — JAMES SEOW 27,888 · LUCAS
+23,949 · KAR JUN 21,476; Zanotti — WEI PIN 52,006 · ANTHONY 25,606 · ADRIAN
+24,188 … with LUCAS 6th, SALLY 7th and JAMES SEOW 8th there, no points
+(mig `20261003200000`; the ranking itself is `lib/member/arena-history.ts`).
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total

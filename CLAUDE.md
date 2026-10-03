@@ -905,19 +905,38 @@ src/
 │   │   │                              **ONE RAIL AT THE TOP (2026-09-26):** the
 │   │   │                              workbench's tabs (`CommissionWorkbench`)
 │   │   │                              are Total Sales Orders / KPI Items / Open
-│   │   │                              Bill / **Below deposit** / **Sales by
-│   │   │                              venue**, one table design. Below deposit =
+│   │   │                              Bill / **Below deposit** / **Sales
+│   │   │                              exhibition**, one table design. Below deposit =
 │   │   │                              every bill the gate holds (live engine
 │   │   │                              verdict, `status = 'deposit_pending'`) with
 │   │   │                              Paid, Deposit needed and **Still to
 │   │   │                              collect**; a salesperson's page has the
 │   │   │                              same tab beside Personal / Overriding.
-│   │   │                              Sales by venue is one row per FAIR (venue ·
-│   │   │                              days · organiser, `salesByFair` in
-│   │   │                              `lib/venues.ts`, from each bill's
-│   │   │                              `fair_event_id`), READ-ONLY — the fair and
-│   │   │                              its organiser come from the ERP (2026-09-27,
-│   │   │                              above). The Total Sales Orders table
+│   │   │                              **SALES EXHIBITION (2026-10-03, was Sales by
+│   │   │                              venue)** is one row per BRAND AT A FAIR
+│   │   │                              (brand · venue · days · organiser,
+│   │   │                              `salesByExhibition` in `lib/exhibitions.ts`):
+│   │   │                              the same venue, organiser and days with
+│   │   │                              another brand is ANOTHER exhibition (user:
+│   │   │                              我是看 brand 来区分那一场 exhibition 的
+│   │   │                              result — the ERP's one project per booth,
+│   │   │                              the Arena's by-brand). Fair = each bill's
+│   │   │                              `fair_event_id`; brand = the BOOTH the
+│   │   │                              salesperson picked in the ERP
+│   │   │                              (`raw.fair.brand` while `fair_source =
+│   │   │                              'erp'`) — a Dunlopillo pillow sold at the
+│   │   │                              Akemi booth is Akemi's (user) — else the
+│   │   │                              bill's own `brand_code`, else No brand
+│   │   │                              (`exhibitionBrandOf`; the booth is read by
+│   │   │                              `_lib/order-fairs.ts`). The margin ladder
+│   │   │                              still reads `brand_code`. READ-ONLY — the fair and its
+│   │   │                              organiser come from the ERP (2026-09-27,
+│   │   │                              above). A row's venue opens exactly its
+│   │   │                              bills on All bills (`?fair=&brand=`, a
+│   │   │                              place no fair claims `?venue=&fair=none`);
+│   │   │                              `?view=venue` still opens the tab. Spec
+│   │   │                              §4.15. The Arena's Fair results rank booth
+│   │   │                              by booth too (member app, below). The Total Sales Orders table
 │   │   │                              gained **Group sales**; the saved run's
 │   │   │                              per-person table, the old *Waiting on a
 │   │   │                              deposit* section and *Sales by person* are
@@ -1310,6 +1329,56 @@ src/
 │   │                                  `ArenaFairResults`/`RankingList` are the
 │   │                                  live board (parameterized `selfId`, so
 │   │                                  one component serves both).
+│   │                                  **BOOTH BY BOOTH (2026-10-03):** a result
+│   │                                  is a brand's BOOTH at a fair, not the fair
+│   │                                  (the month page's Sales exhibition), so
+│   │                                  every booth is ranked on its own (small
+│   │                                  ones too — 人少也算) and holds EVERY bill
+│   │                                  written there (no-pick bills at the
+│   │                                  seller's booth, ten brandless old ones on
+│   │                                  the fair's no-brand board): the boards add
+│   │                                  up to the old whole-fair totals. A seller
+│   │                                  is RANKED on every board they sold at (a
+│   │                                  30k that is third there shows third —
+│   │                                  依然会显示属于那个名次); ONE A WEEK EARNS
+│   │                                  POINTS (`scoring`, user: 你照样上榜，只是你
+│   │                                  上榜了没有拿到积分 … 能算积分的只有一个):
+│   │                                  the booth of the brand they pick for that
+│   │                                  week in *My brand weeks* — one dropdown
+│   │                                  per fair weekend (the week a fair opens in,
+│   │                                  named by its Friday: Sep 2026 = 4/11/18/25),
+│   │                                  stored as `member_arena_brand_weeks.picks`
+│   │                                  — at the fair with the most bills for it.
+│   │                                  On the others the place stands — sellers
+│   │                                  behind it move down — and reads *No
+│   │                                  points* (`offWeekOrders`/`Sales`); the
+│   │                                  medal counts and Highest Fair Record read
+│   │                                  scoring boards only. A WEEK CLOSES seven days after its
+│   │                                  fair's last day (`member_arena_week_
+│   │                                  closes_on`; 5–7 → open to the 14th; user:
+│   │                                  结束之后的一个星期 … 没有填就 closing 了):
+│   │                                  until then a week nobody picked shows
+│   │                                  *Unconfirmed*, after it *Auto-located* —
+│   │                                  the brand they opened the MOST BILLS for
+│   │                                  that week (开最多单), then sales — and the
+│   │                                  member's save refuses to change it. After
+│   │                                  that only the ERP (the bills' booth picks)
+│   │                                  or the BACK OFFICE changes it: the
+│   │                                  Principal's view of a member makes *Member
+│   │                                  brand weeks* an editor for every week
+│   │                                  (`member_principal_save_brand_week_picks`).
+│   │                                  On 2026-10-03 no Revenue seller has a
+│   │                                  member login, so every finish starts
+│   │                                  guessed. A bill with no ERP booth pick
+│   │                                  counts at its seller's booth. Highest Fair
+│   │                                  Record = the best single booth.
+│   │                                  `member_arena_booth_history` (+ principal
+│   │                                  twin), migs `20261003180000` (additive —
+│   │                                  the old `member_arena_history*` stay
+│   │                                  unread), `20261003190000` (the lock) and
+│   │                                  `20261003200000` (every booth shows,
+│   │                                  one scores), all LIVE before the code
+│   │                                  merged.
 │   │                                  **TEAM** is a mapping map, not an indented
 │   │                                  list: every sub-department as a frame, its
 │   │                                  directors above it, one card per MEMBERSHIP,

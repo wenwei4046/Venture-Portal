@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { fetchMemberArena, saveMemberArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
-import { arenaIncentive, arenaRankings, validArenaBrandWeeks, ARENA_WEEK_BRANDS, type ArenaBrandWeeks, type ArenaIncentive, type ArenaMetric, type ArenaPerson, type ArenaWindow, type MemberArenaSnapshot, type ArenaRankedPerson } from "@/lib/member/arena";
+import { fetchMemberArena, saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
+import { arenaBrandWeeksFrom, arenaIncentive, arenaMonthFridays, arenaRankings, arenaShortDay, arenaWeekendLabel, closedWeekChanged, ARENA_WEEK_BRANDS, type ArenaBrandWeeks, type ArenaIncentive, type ArenaMetric, type ArenaPerson, type ArenaWeekBrand, type ArenaWeekPicks, type ArenaWindow, type MemberArenaSnapshot, type ArenaRankedPerson } from "@/lib/member/arena";
 import { Icon, initials } from "./MemberUI";
 import { ArenaPodium } from "./design-preview/ArenaPodium";
 import { ArenaFairResults } from "./design-preview/ArenaFairResults";
@@ -28,23 +28,76 @@ function Leaders({ rows, metric, selfId, readOnly, onOpen }: { rows: ArenaRanked
   return <ArenaPodium rows={presentation} selfId={selfId} selfLabel={readOnly ? "Selected" : "You"} format={value => format(metric, value)} onOpen={onOpen} />;
 }
 
-function BrandWeeks({ data, onSaved }: { data: MemberArenaSnapshot; onSaved: (value: ArenaBrandWeeks) => void }) {
-  const [draft, setDraft] = useState<ArenaBrandWeeks>(data.brandWeeks ?? { weeks: 4, counts: { AKEMI: 0, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 } });
+const pickedCount = (period: string, weeks: ArenaBrandWeeks | null) => arenaMonthFridays(period).filter(week => weeks?.picks?.[week]).length;
+
+/**
+ * Where each closed week nobody picked was auto-located for this person: the
+ * booth they were placed at that week, as the Fair results have it.
+ */
+function autoLocatedWeeks(data: MemberArenaSnapshot, personId: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const event of data.history?.events ?? []) {
+    if (!event.week || !event.brand || !event.locked) continue;
+    if (event.people.some(person => person.id === personId && person.confirmed === false)) found.set(event.week, event.brand);
+  }
+  return found;
+}
+
+/**
+ * The brand the member worked each week of the month (2026-10-03, user: 排行榜
+ * 完全是跟着他自己选的 brand/week 来走的). One choice per fair weekend; the
+ * Fair results rank them only at that brand's booth that week. A week closes
+ * seven days after its fair (结束之后的一个星期 … 没有填就 closing 了): the
+ * member can no longer change it, a week nobody picked is auto-located at the
+ * booth with the most bills, and only the back office — the Principal's view
+ * of the member — changes it after that.
+ */
+function BrandWeeks({ data, personId, personName, backOffice, context, onSaved }: {
+  data: MemberArenaSnapshot; personId: string; personName: string; backOffice: boolean; context?: MemberReadContext;
+  onSaved: (value: ArenaBrandWeeks) => void;
+}) {
+  const weeks = arenaMonthFridays(data.period);
+  const locks = new Map((data.weekLocks ?? []).map(lock => [lock.week, lock]));
+  const stored = data.brandWeeks?.picks ?? {};
+  const auto = autoLocatedWeeks(data, personId);
+  const [draft, setDraft] = useState<ArenaWeekPicks>(() => ({ ...stored }));
   const [busy, setBusy] = useState(false), [feedback, setFeedback] = useState("");
-  const allocated = Object.values(draft.counts).reduce((sum, value) => sum + value, 0);
+  const picked = weeks.filter(week => draft[week]).length;
+  const open = weeks.filter(week => !locks.get(week)?.locked).length;
   return <form className={s.weeks} onSubmit={async event => {
-    event.preventDefault(); if (!validArenaBrandWeeks(draft) || busy) return;
+    event.preventDefault(); if (busy) return;
+    const closed = backOffice ? null : closedWeekChanged(draft, stored, data.weekLocks ?? []);
+    if (closed) { setFeedback(`The weekend of ${arenaWeekendLabel(closed)} has closed — only the back office can change it now.`); return; }
     setBusy(true); setFeedback("");
-    try { const result = await saveMemberArenaBrandWeeks(data.membershipId, data.period, draft);
-      if (result.ok) { onSaved(draft); setFeedback("Your brand weeks are saved."); } else setFeedback(result.error);
-    } catch { setFeedback("Your weeks could not be saved. Please try again."); } finally { setBusy(false); }
+    try {
+      const result = backOffice && context
+        ? await savePrincipalArenaBrandWeeks(data.membershipId, data.period, draft, context)
+        : await saveMemberArenaBrandWeeks(data.membershipId, data.period, draft);
+      if (result.ok) { onSaved(arenaBrandWeeksFrom(data.period, draft)); setFeedback(backOffice ? `${personName}’s brand weeks are saved.` : "Your brand weeks are saved."); }
+      else setFeedback(result.error);
+    } catch { setFeedback("The weeks could not be saved. Please try again."); } finally { setBusy(false); }
   }}>
-    <fieldset disabled={busy}><legend>Weeks this month</legend><div className={s.segments}>{([4, 5] as const).map(weeks => <label key={weeks}><input type="radio" name="arena-weeks" checked={draft.weeks === weeks} onChange={() => { setDraft(value => ({ ...value, weeks })); setFeedback(""); }} />{weeks} weeks</label>)}</div></fieldset>
-    {ARENA_WEEK_BRANDS.map(({ code, name }) => <div className={s.weekRow} key={code}><span><strong>{name}</strong><small>{Math.round(draft.counts[code] / draft.weeks * 100)}%</small></span>
-      <div><button type="button" aria-label={`Remove one week from ${name}`} disabled={busy || draft.counts[code] === 0} onClick={() => { setDraft(value => ({ ...value, counts: { ...value.counts, [code]: value.counts[code] - 1 } })); setFeedback(""); }}>−</button>
-        <output aria-label={`${name} weeks`}>{draft.counts[code]}</output><button type="button" aria-label={`Add one week to ${name}`} disabled={busy || allocated >= draft.weeks} onClick={() => { setDraft(value => ({ ...value, counts: { ...value.counts, [code]: value.counts[code] + 1 } })); setFeedback(""); }}>+</button></div></div>)}
-    <p>{allocated} of {draft.weeks} weeks allocated{allocated > draft.weeks ? " · Remove extra weeks to save." : ""}</p>
-    <button className={s.primary} disabled={busy || !validArenaBrandWeeks(draft)}>{busy ? "Saving…" : "Save brand weeks"}</button>
+    {backOffice
+      ? <><h2>{personName}</h2><p>Back office · any week can be changed here, closed ones too. The member picks their own weeks until seven days after each fair.</p></>
+      : <p>Pick the brand you worked each week. Fair results rank you at that brand’s booth only — bills you write at another booth that week still count in your sales. Each week stays open until seven days after its fair.</p>}
+    <fieldset disabled={busy}><legend>Weeks this month</legend>
+      {weeks.map((week, index) => {
+        const lock = locks.get(week);
+        const closed = lock?.locked === true;
+        const state = !lock ? "" : !closed ? `Open until ${arenaShortDay(lock.closesOn)}`
+          : stored[week] ? `Closed ${arenaShortDay(lock.closesOn)}`
+            : auto.get(week) ? `Closed ${arenaShortDay(lock.closesOn)} · auto-located: ${auto.get(week)}` : `Closed ${arenaShortDay(lock.closesOn)} · not picked`;
+        return <label className={s.weekRow} key={week} data-closed={closed || undefined}>
+          <span><strong>Week {index + 1}</strong><small>Weekend of {arenaWeekendLabel(week)}</small>{state && <small>{state}</small>}</span>
+          <select aria-label={`Brand for week ${index + 1}`} value={draft[week] ?? ""} disabled={closed && !backOffice} onChange={event => {
+            const brand = event.target.value as ArenaWeekBrand | "";
+            setDraft(value => ({ ...value, [week]: brand || undefined })); setFeedback("");
+          }}><option value="">Not picked</option>{ARENA_WEEK_BRANDS.map(({ code, name }) => <option key={code} value={code}>{name}</option>)}</select></label>;
+      })}
+    </fieldset>
+    <p>{picked} of {weeks.length} weeks picked{!backOffice && open > 0 && picked < weeks.length ? " · A week not picked counts the booth with the most bills — unconfirmed until it closes, then auto-located." : ""}</p>
+    {(backOffice || open > 0) && <button className={s.primary} disabled={busy}>{busy ? "Saving…" : "Save brand weeks"}</button>}
+    {!backOffice && open === 0 && <p>Every week of this month has closed. Ask the back office to change one.</p>}
     {feedback && <p role="status" aria-label="Brand weeks save status">{feedback}</p>}
   </form>;
 }
@@ -120,18 +173,26 @@ function FairHistory({ data, viewedId, viewedName, readOnly, window, periodLabel
   const events = arenaFairEvents(history, data.from, data.through);
   const records = arenaFairRecords(history);
   const selfLabel = readOnly ? "Selected" : "You";
+  // A finish placed by guess (no brand picked for that week) says so: still
+  // open to pick, or auto-located now that the week has closed.
+  const guessed = events.filter(event => event.rows.some(row => row.id === viewedId && row.unconfirmed)).length;
+  const autoLocated = events.filter(event => event.rows.some(row => row.id === viewedId && row.autoLocated)).length;
+  const offWeek = history.offWeekOrders ?? 0;
   return <section className={s.availability}>
     {events.length
       ? <ArenaFairResults events={events} people={data.people.map(person => ({ id: person.id, name: person.name }))}
           cutoff={data.through} period={window} periodLabel={periodLabel} selfId={viewedId} selfLabel={selfLabel}
           personalLabel={readOnly ? `${viewedName}’s` : "Your"} provisional />
       : <p>No fair on the calendar closed inside {periodLabel}.</p>}
+    {guessed > 0 && <p className={s.message}>{guessed} of {readOnly ? `${viewedName}’s` : "your"} fair finishes {guessed === 1 ? "is" : "are"} placed by the booth with the most bills that week, because no brand is picked for {guessed === 1 ? "that week" : "those weeks"} yet. {readOnly ? "The member picks" : "Pick"} the brand of each week in {readOnly ? "Member" : "My"} brand weeks before it closes, seven days after the fair.</p>}
+    {autoLocated > 0 && <p className={s.message}>{autoLocated} of {readOnly ? `${viewedName}’s` : "your"} fair finishes {autoLocated === 1 ? "was" : "were"} auto-located: no brand was picked before the week closed, so the booth with the most bills that week counts. {readOnly ? "Change it in Member brand weeks if it is wrong." : "Only the back office can change it now."}</p>}
     {records.length > 0 && <RankingList heading="Highest Fair Record" format={money} points={false}
       unrankedLabel="No record yet" selfId={viewedId} selfLabel={selfLabel} rows={records.map(record => ({
         id: record.id, name: record.name, value: record.value ?? Number.NaN, eligible: !record.pending, active: true,
         position: record.position, scoringPosition: null, scoringValue: 0, basePoints: 0, incentivePoints: 0, points: 0,
-        note: `${record.venue} · ${fairRange(record.start, record.end)}`,
+        note: `${record.brand ? `${record.brand} · ` : ""}${record.venue} · ${fairRange(record.start, record.end)}`,
       }))} />}
+    {offWeek > 0 && <p className={s.message}>{money(history.offWeekSales ?? 0)} over {offWeek} bill{offWeek === 1 ? " was" : "s were"} written at another booth than the seller’s brand week, or at a second fair the same week. They are ranked on that booth’s board like any other sale and earn no points there — only the brand week’s booth scores.</p>}
     {history.unassignedOrders > 0 && <p className={s.message}>{money(history.unassignedSales)} over {history.unassignedOrders} bill{history.unassignedOrders === 1 ? "" : "s"} sits on no fair yet — a place the calendar has no dates for cannot claim its bills. Those sales still count in the rankings; only the finishes wait.</p>}
     <h2>Championship</h2><p>{history.championship.reason}</p>
   </section>;
@@ -160,6 +221,19 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
     return () => { active = false; };
   }, [membershipId, period, window, revision, contextStaffId, contextDepartmentId]);
   useEffect(() => { setView("home"); setBrand(""); setShowAll(false); }, [membershipId, context?.staffId]);
+  /**
+   * A saved brand week moves the Fair results: read them again without
+   * blanking the page, so the form keeps its "saved" line. A newer read wins.
+   */
+  function reloadQuietly() {
+    // Not a new load of its own: a month or member chosen meanwhile starts one,
+    // and that one wins.
+    const sequence = request.current;
+    const pending = contextStaffId !== undefined && contextDepartmentId !== undefined
+      ? fetchMemberArena(membershipId, period, window, { staffId: contextStaffId, subDepartmentId: contextDepartmentId })
+      : fetchMemberArena(membershipId, period, window);
+    void pending.then(result => { if (request.current === sequence && result.ok) setData(result.data); }).catch(() => {});
+  }
   const readOnly = !!context || !!data?.principalView;
   const viewedId = context?.staffId ?? data?.viewedStaffId ?? data?.selfId ?? "";
   const viewedName = data?.people.find(person => person.id === viewedId)?.name ?? "Selected member";
@@ -186,8 +260,8 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
         const own = arenaRankings(data.people, metric.id).find(row => row.id === viewedId);
         return <button key={metric.id} className={s.metric} data-metric={metric.id} onClick={() => go(metric.id)}><span className={s.metricIcon}><Icon name={metric.icon} size={28} /></span><span><strong>{metric.label}</strong><small>{metric.subtitle}</small><b>{format(metric.id, own?.value ?? null)}</b></span><span className={s.ownRank}>{own?.position ? `#${own.position}` : "—"}<Icon name="arrow" size={17} /></span></button>;
       })}</div>{window === "monthly" && <button className={s.feature} onClick={() => go("incentive")}><span><strong>Margin Incentive</strong><small>{readOnly ? `${viewedName}'s tier this month, brand by brand` : "Your tier this month, brand by brand"}</small></span><Icon name="arrow" /></button>}
-        <button className={s.feature} onClick={() => go("availability")}><span><strong>Championship & Fair results</strong><small>{fairsClosed === null ? "Scoreboard and fair history setup" : `${fairsClosed} completed fair${fairsClosed === 1 ? "" : "s"} · Highest Fair Record`}</small></span><Icon name="arrow" /></button>
-        {window === "monthly" && <button className={s.feature} onClick={() => go("weeks")}><span><strong>{readOnly ? "Member brand weeks" : "My brand weeks"}</strong><small>{data.brandWeeks ? `${data.brandWeeks.weeks} weeks saved` : readOnly ? "No brand weeks saved" : "Choose 4 or 5 weeks"}</small></span><Icon name="arrow" /></button>}</>}
+        <button className={s.feature} onClick={() => go("availability")}><span><strong>Championship & Fair results</strong><small>{fairsClosed === null ? "Scoreboard and fair history setup" : `${fairsClosed} completed booth${fairsClosed === 1 ? "" : "s"} · Highest Fair Record`}</small></span><Icon name="arrow" /></button>
+        {window === "monthly" && <button className={s.feature} onClick={() => go("weeks")}><span><strong>{readOnly ? "Member brand weeks" : "My brand weeks"}</strong><small>{`${pickedCount(data.period, data.brandWeeks)} of ${arenaMonthFridays(data.period).length} weeks picked`}</small></span><Icon name="arrow" /></button>}</>}
       {selected && <>{selected.id !== "kpi" && <label className={s.brand}>Ranking by<select value={brand} onChange={event => setBrand(event.target.value)}><option value="">All brands · Total</option>{brands.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>}
         <Leaders rows={rankings} metric={selected.id} selfId={viewedId} readOnly={readOnly} onOpen={() => { setShowAll(true); requestAnimationFrame(() => table.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })); }} />
         {me && <section className={s.personal}><span>{readOnly ? `${viewedName} · Result` : "Your result"}</span><div><strong>{me.position ? `Rank ${me.position}` : "Not ranked"}</strong><b>{format(selected.id, me.value)}</b></div>{me.pending && <p>Waiting for complete {selected.id === "margin" ? "cost" : "sales"} data.</p>}</section>}
@@ -195,7 +269,9 @@ export default function MemberArena({ membershipId, context }: { membershipId: s
           <ol>{(showAll ? rankings : rankings.slice(0, 10)).map(row => <li key={row.id} data-self={row.id === viewedId || undefined}><span data-place={row.position !== null && row.position <= 3 ? row.position : undefined}>{row.position ?? "—"}</span><span className={s.avatar}>{initials(row.name)}</span><span><strong>{row.name}</strong>{row.id === viewedId && <small>{readOnly ? "Selected" : "You"}</small>}{row.pending && <small>Pending data</small>}</span><b>{format(selected.id, row.value)}</b></li>)}</ol>
           {!rankings.length && <p>No people in this department yet.</p>}{!showAll && rankings.length > 10 && <button className={s.textLink} onClick={() => setShowAll(true)}>View all {rankings.length} people<Icon name="arrow" /></button>}
         </section></>}
-      {view === "weeks" && (readOnly ? <section className={s.weeks} aria-label="Member brand weeks"><h2>{viewedName}</h2><p>Only the member can save brand weeks from their own account.</p>{data.brandWeeks ? <><p>{data.brandWeeks.weeks} weeks saved</p>{ARENA_WEEK_BRANDS.map(({ code, name }) => <div className={s.weekRow} key={code}><strong>{name}</strong><span>{data.brandWeeks!.counts[code]} weeks</span></div>)}</> : <p>No brand weeks saved for this month.</p>}</section> : <BrandWeeks key={`${membershipId}-${period}`} data={data} onSaved={value => setData(previous => previous ? { ...previous, brandWeeks: value } : previous)} />)}
+      {/* The member's own weeks — or, in the Principal's view of a member, the back office's (2026-10-03). */}
+      {view === "weeks" && <BrandWeeks key={`${membershipId}-${period}-${viewedId}`} data={data} personId={viewedId} personName={viewedName}
+        backOffice={readOnly} context={context} onSaved={value => { setData(previous => previous ? { ...previous, brandWeeks: value } : previous); reloadQuietly(); }} />}
       {view === "incentive" && <Incentive person={data.people.find(person => person.id === viewedId)} tiers={data.tiers} readOnly={readOnly} name={viewedName} />}
       {view === "availability" && <FairHistory data={data} viewedId={viewedId} viewedName={viewedName} readOnly={readOnly} window={window} periodLabel={periodTitle} />}
       {view !== "weeks" && view !== "incentive" && <details className={s.basis}><summary>How these rankings are measured</summary><p>Deposit-cleared commissionable sales and KPI items. Each order is counted once in its released commission month; unreleased orders are shown in the current open month. Quarterly and Annual aggregate those months.</p><p>Margin uses commissionable goods revenue and cost together. A salesperson with incomplete cost data stays pending for Margin Ranking. Directors are excluded. These are live performance figures, not a payroll statement.</p></details>}

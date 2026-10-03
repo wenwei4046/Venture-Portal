@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { arenaIncentive, arenaRankings, validArenaBrandWeeks, type ArenaPerson, type ArenaTier } from "./arena";
+import {
+  arenaBrandWeeksFrom, arenaIncentive, arenaMonthFridays, arenaRankings, arenaShortDay, arenaWeekendLabel, arenaWeekPicksToSave,
+  closedWeekChanged, validArenaWeekPicks,
+  type ArenaPerson, type ArenaTier,
+} from "./arena";
 const row = (id: string, sales: number, cost: number, extra: Partial<ArenaPerson> = {}): ArenaPerson => ({ id, name: id, self: false, sales, held: 0, orders: 1, kpiQty: 2, marginRevenue: sales, marginCost: cost, blindOrders: 0, brands: {}, ...extra });
 describe("Live Arena rankings", () => {
   it("keeps competition ties and all sellers, including zero sales", () => {
@@ -30,10 +34,51 @@ describe("Live Arena rankings", () => {
     expect(arenaRankings([row("sales-only",500,300,{kpiQty:0})],"kpi")[0]).toMatchObject({position:null,value:0,hasActivity:false});
     expect(arenaRankings([row("loss",100,150)],"margin")[0]).toMatchObject({position:1,value:-50,hasActivity:true});
   });
-  it("validates exact whole-week allocations without additional brand budgets", () => {
-    const counts={AKEMI:3,ERGOTEX:0,ZANOTTI:1,DUNLOP:0};
-    expect(validArenaBrandWeeks({weeks:4,counts})).toBe(true);
-    for(const value of [{weeks:5,counts},{weeks:4,counts:{...counts,EXTRA:0}},{weeks:4,counts:{...counts,AKEMI:2.5,ZANOTTI:1.5}},{weeks:4,counts:{...counts,AKEMI:5,ZANOTTI:-1}}]) expect(validArenaBrandWeeks(value)).toBe(false);
+});
+
+// The brand a member worked each week (2026-10-03): the Fair results rank them
+// only at that brand's booth that week.
+describe("brand weeks", () => {
+  it("names a month's weeks by their Fridays, as SQL's member_arena_month_fridays does", () => {
+    expect(arenaMonthFridays("2026-09")).toEqual(["2026-09-04","2026-09-11","2026-09-18","2026-09-25"]);
+    expect(arenaMonthFridays("2026-10")).toEqual(["2026-10-02","2026-10-09","2026-10-16","2026-10-23","2026-10-30"]);
+    expect(arenaMonthFridays("2026-02")).toEqual(["2026-02-06","2026-02-13","2026-02-20","2026-02-27"]);
+    expect(arenaMonthFridays("2026-13")).toEqual([]);
+  });
+
+  it("takes picks for the month's own weeks and the four brands only", () => {
+    expect(validArenaWeekPicks("2026-09",{"2026-09-04":"AKEMI","2026-09-25":"DUNLOP"})).toBe(true);
+    expect(validArenaWeekPicks("2026-09",{})).toBe(true);
+    expect(validArenaWeekPicks("2026-09",{"2026-09-11":undefined})).toBe(true);
+    for(const value of [{"2026-09-05":"AKEMI"},{"2026-10-02":"AKEMI"},{"2026-09-04":"MYLATEX"},{"2026-09-04":4},[],null,"AKEMI"])
+      expect(validArenaWeekPicks("2026-09",value)).toBe(false);
+    expect(validArenaWeekPicks("2026-9",{"2026-09-04":"AKEMI"})).toBe(false);
+  });
+
+  it("saves only the weeks picked, and counts them per brand", () => {
+    expect(arenaWeekPicksToSave("2026-09",{"2026-09-04":"AKEMI","2026-09-11":undefined,"2026-09-18":"AKEMI"}))
+      .toEqual({"2026-09-04":"AKEMI","2026-09-18":"AKEMI"});
+    expect(arenaBrandWeeksFrom("2026-10",{"2026-10-02":"ZANOTTI","2026-10-30":"AKEMI","2026-10-09":"AKEMI"})).toEqual({
+      weeks:5,counts:{AKEMI:2,ERGOTEX:0,ZANOTTI:1,DUNLOP:0},picks:{"2026-10-02":"ZANOTTI","2026-10-09":"AKEMI","2026-10-30":"AKEMI"},
+    });
+  });
+
+  it("labels a week by its weekend, across a month end too", () => {
+    expect(arenaWeekendLabel("2026-09-04")).toBe("4–6 Sep");
+    expect(arenaWeekendLabel("2026-10-30")).toBe("30 Oct – 1 Nov");
+    expect(arenaShortDay("2026-10-06")).toBe("6 Oct");
+  });
+
+  // A week closes seven days after its fair (user 2026-10-03): the member's own
+  // save must hand a closed week back exactly as it was.
+  it("finds a closed week the member's picks would change", () => {
+    const locks=[{week:"2026-09-04",closesOn:"2026-09-13",locked:true},{week:"2026-09-25",closesOn:"2026-10-06",locked:false}];
+    const stored={"2026-09-04":"AKEMI" as const};
+    expect(closedWeekChanged({"2026-09-04":"AKEMI","2026-09-25":"ZANOTTI"},stored,locks)).toBeNull();
+    expect(closedWeekChanged({"2026-09-04":"ZANOTTI"},stored,locks)).toBe("2026-09-04");
+    expect(closedWeekChanged({"2026-09-04":undefined},stored,locks)).toBe("2026-09-04");
+    expect(closedWeekChanged({"2026-09-04":"DUNLOP"},{},locks)).toBe("2026-09-04");
+    expect(closedWeekChanged({},{},locks)).toBeNull();
   });
 });
 
