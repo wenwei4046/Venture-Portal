@@ -4,7 +4,7 @@
  * same CrmLead / CrmAppointment / CrmMember / CrmAssignConfig the demo uses.
  * Pure, so every rule is tested; the reads are crm-actions.ts.
  */
-import { CRM_LOST_REASONS, type CrmAppointment, type CrmAttachment, type CrmLead, type CrmLostReason, type CrmMessage, type CrmStatus } from "./crm";
+import { CRM_LOST_REASONS, type CrmAppointment, type CrmAttachment, type CrmLead, type CrmLostReason, type CrmMessage, type CrmShowroom, type CrmStatus } from "./crm";
 import type { CrmAssignConfig, CrmMember, CrmRole } from "./crm-team";
 
 /* ── The rows, as PostgREST returns them ───────────────────────────────── */
@@ -59,6 +59,7 @@ export interface CrmAppointmentRow {
   state: CrmAppointment["state"];
 }
 
+export interface CrmShowroomRow { id: string; name: string; active: boolean; sort_order: number }
 export interface CrmAssignRuleRow { ad_source_id: string; ad_label: string | null; tl_ids: string[] }
 export interface CrmTeamSettingsRow {
   tl_id: string;
@@ -77,6 +78,7 @@ export interface CrmRows {
   appointments: CrmAppointmentRow[];
   rules: CrmAssignRuleRow[];
   teams: CrmTeamSettingsRow[];
+  showrooms: CrmShowroomRow[];
 }
 
 /** What the CRM screen needs to run on live data. */
@@ -89,6 +91,8 @@ export interface CrmLiveData {
   leads: CrmLead[];
   appointments: CrmAppointment[];
   config: CrmAssignConfig;
+  /** Open and closed, in the list's order. */
+  showrooms: CrmShowroom[];
 }
 
 /* ── Rows → screen ─────────────────────────────────────────────────────── */
@@ -185,5 +189,6 @@ export function crmFromRows(rows: CrmRows): CrmLiveData {
     leads: rows.contacts.map(c => leadFromRow(c, rows.messages)),
     appointments: rows.appointments.map(a => ({ id: a.id, leadId: a.contact_id, showroomId: a.showroom, start: a.start_at, minutes: a.minutes, state: a.state })),
     config: configFromRows(rows.rules, rows.teams),
+    showrooms: [...rows.showrooms].sort((a, b) => a.sort_order - b.sort_order).map(r => ({ id: r.id, name: r.name, active: r.active })),
   };
 }

@@ -98,9 +98,15 @@ describe("the people and the settings", () => {
   });
 
   it("has no viewer when the person has no CRM role", () => {
-    const rows: CrmRows = { people: { me: "zed", role: null, people: [] }, contacts: [], messages: [], appointments: [], rules: [], teams: [] };
+    const rows: CrmRows = { people: { me: "zed", role: null, people: [] }, contacts: [], messages: [], appointments: [], rules: [], teams: [], showrooms: [] };
     expect(crmFromRows(rows)).toMatchObject({ viewerId: null, setup: "no_role" });
     expect(crmFromRows({ ...rows, people: { me: null, role: null, people: [] } })).toMatchObject({ viewerId: null, setup: "not_linked" });
     expect(crmFromRows({ ...rows, people: { me: "ann", role: "rs", people } })).toMatchObject({ viewerId: "ann", setup: null });
+  });
+
+  it("lists the showrooms in the list's order, closed ones kept", () => {
+    const rows: CrmRows = { people: { me: "ann", role: "rs", people: [] }, contacts: [], messages: [], appointments: [], rules: [], teams: [],
+      showrooms: [{ id: "x", name: "Penang Showroom", active: false, sort_order: 2 }, { id: "kl", name: "Kuala Lumpur Showroom", active: true, sort_order: 1 }] };
+    expect(crmFromRows(rows).showrooms).toEqual([{ id: "kl", name: "Kuala Lumpur Showroom", active: true }, { id: "x", name: "Penang Showroom", active: false }]);
   });
 });

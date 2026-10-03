@@ -27,6 +27,7 @@ const data = (extra: Partial<CrmLiveData> = {}, lastCustomerAt = hoursAgo(2)): C
   }],
   appointments: [],
   config: { rules: [], teamRatios: {}, teams: {} },
+  showrooms: [{ id: "kl", name: "Kuala Lumpur Showroom", active: true }, { id: "old", name: "Old Showroom", active: false }],
   ...extra,
 });
 const openChat = async () => { fireEvent.click(await screen.findByText("Tan Mei Ling")); };
@@ -93,9 +94,11 @@ describe("the CRM on live data", () => {
     render(<MemberCrm live salesperson="Ann Tan" />);
     await openChat();
     fireEvent.click(screen.getByText("Book appointment"));
+    // Only the database's open showrooms are offered.
+    expect(screen.getAllByRole("option").map(o => o.textContent)).toEqual(["Kuala Lumpur Showroom"]);
     fireEvent.click(screen.getAllByRole("button").find(b => /^[0-9]{1,2}:00/.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled)!);
     fireEvent.click(screen.getByText("Confirm"));
-    await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_book", expect.objectContaining({ p_contact: "c1", p_minutes: 60 })));
+    await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_book", expect.objectContaining({ p_contact: "c1", p_showroom: "kl", p_minutes: 60 })));
     expect(await screen.findByText(/Not sent to the customer — tell them in the chat/)).toBeTruthy();
     expect(screen.queryByText("APPOINTMENT CONFIRMED")).toBeNull();
   });
@@ -131,6 +134,25 @@ describe("the CRM on live data", () => {
     await openChat();
     expect(screen.getByText("Is the promotion still on?")).toBeTruthy();
     expect(screen.queryByLabelText("Reply")).toBeNull();
+  });
+
+  it("lets the HOD add a showroom in Settings — saved first", async () => {
+    const d = data();
+    fetchCrm.mockResolvedValue({ ok: true, data: { ...d, viewerId: "hod", members: [{ id: "hod", name: "Peter", role: "hod" }, ...d.members] } });
+    crmWrite.mockResolvedValue({ ok: true, data: { id: "new-1", name: "Penang Showroom", active: true } });
+    render(<MemberCrm live salesperson="Peter" />);
+    fireEvent.click(await screen.findByLabelText("Settings"));
+    fireEvent.change(screen.getByPlaceholderText("e.g. Penang Showroom"), { target: { value: "Penang Showroom" } });
+    fireEvent.click(screen.getByText("Add showroom"));
+    await waitFor(() => expect(crmWrite).toHaveBeenCalledWith("crm_save_showroom", { p_id: null, p_name: "Penang Showroom", p_active: true }));
+    expect(await screen.findByDisplayValue("Penang Showroom")).toBeTruthy();
+  });
+
+  it("shows a salesperson no showroom settings", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: data() });
+    render(<MemberCrm live salesperson="Ann Tan" />);
+    fireEvent.click(await screen.findByLabelText("Settings"));
+    expect(screen.queryByText("Add showroom")).toBeNull();
   });
 
   it("says which link is missing: the login, or a CRM role for the title", async () => {

@@ -76,17 +76,31 @@ await refused('ann', `select public.crm_set_status($1, 'lost', 'other', '  ')`, 
 await denied('hod', `select public.crm_set_status($1, 'won')`, [c.ann], 'the HOD reads, does not change')
 await denied('tlb', `select public.crm_set_status($1, 'won')`, [c.ann], 'another TL may not')
 
+// 3a. Showrooms: everyone in the CRM reads the list; the Boss / HOD add, rename, close; bookings take only an open one.
+check((await as('ann', `select id, name, active from crm_showrooms`)).map(r => [r.id, r.name, r.active]), [['kl', 'Kuala Lumpur Showroom', true]], 'Kuala Lumpur is on the list for a salesperson')
+check((await as(null, `select id from crm_showrooms`)).length, 0, 'nobody without a CRM role reads it')
+await denied('ann', `select public.crm_save_showroom(null, 'Penang Showroom')`, [], 'a salesperson does not add showrooms')
+await denied('tla', `select public.crm_save_showroom(null, 'Penang Showroom')`, [], 'nor does a TL')
+const pg = (await as('hod', `select public.crm_save_showroom(null, ' Penang Showroom ') as r`))[0].r
+check([pg.name, pg.active, pg.sort_order], ['Penang Showroom', true, 2], 'the HOD adds Penang, next in the list')
+await refused('boss', `select public.crm_save_showroom(null, 'penang showroom')`, [], /already a showroom/, 'no second showroom of the same name')
+await refused('ann', `select public.crm_book($1, 'Nowhere', now(), 60)`, [c.ann], /showroom that is open/, 'a showroom not on the list is refused')
+
 // 3. Appointments: book (→ Appointment), move, came / cancel (→ Follow up when none stands).
-const appt = (await as('ann', `select public.crm_book($1, 'KL Showroom', '2026-10-10T03:00:00Z', 60) as a`, [c.ann]))[0].a
+const appt = (await as('ann', `select public.crm_book($1, 'kl', '2026-10-10T03:00:00Z', 60) as a`, [c.ann]))[0].a
 check((await row(`select status from crm_contacts where id = $1`, [c.ann])).status, 'appointment', 'booking makes the customer Appointment')
-await as('ann', `select public.crm_move_appointment($1, '2026-10-11T03:00:00Z', 'PG Showroom')`, [appt.id])
-check(await row(`select showroom, to_char(start_at at time zone 'UTC', 'MM-DD') as day from crm_appointments where id = $1`, [appt.id]), { showroom: 'PG Showroom', day: '10-11' }, 'moved')
+await as('ann', `select public.crm_move_appointment($1, '2026-10-11T03:00:00Z', $2)`, [appt.id, pg.id])
+check(await row(`select showroom, to_char(start_at at time zone 'UTC', 'MM-DD') as day from crm_appointments where id = $1`, [appt.id]), { showroom: pg.id, day: '10-11' }, 'moved')
+await as('boss', `select public.crm_save_showroom($1, 'Penang Showroom', false)`, [pg.id])
+await as('ann', `select public.crm_move_appointment($1, '2026-10-12T03:00:00Z', $2)`, [appt.id, pg.id])
+check((await row(`select to_char(start_at at time zone 'UTC', 'MM-DD') as day from crm_appointments where id = $1`, [appt.id])).day, '10-12', 'a booking at a closed showroom may still change time')
+await refused('ann', `select public.crm_book($1, $2, now(), 60)`, [c.ann, pg.id], /showroom that is open/, 'a closed showroom takes no new booking')
 const cancelled = (await as('ann', `select public.crm_set_appointment_state($1, 'cancelled') as r`, [appt.id]))[0].r
 check([cancelled.state, cancelled.contact_status], ['cancelled', 'follow_up'], 'cancelled → back to Follow up')
 await refused('ann', `select public.crm_set_appointment_state($1, 'attended')`, [appt.id], /Only a booked/, 'a cancelled one cannot be marked came')
-await denied('hod', `select public.crm_book($1, 'KL', now(), 60)`, [c.ann], 'the HOD does not book')
-await denied('ben', `select public.crm_book($1, 'KL', now(), 60)`, [c.ann], 'a peer does not book')
-const second = (await as('tla', `select public.crm_book($1, 'KL', now(), 60) as a`, [c.ann]))[0].a
+await denied('hod', `select public.crm_book($1, 'kl', now(), 60)`, [c.ann], 'the HOD does not book')
+await denied('ben', `select public.crm_book($1, 'kl', now(), 60)`, [c.ann], 'a peer does not book')
+const second = (await as('tla', `select public.crm_book($1, 'kl', now(), 60) as a`, [c.ann]))[0].a
 check((await as('tla', `select public.crm_set_appointment_state($1, 'attended') as r`, [second.id]))[0].r.state, 'attended', 'the TL marks they came')
 
 // 4. Assign: the team's TL, to someone in the team.

@@ -206,6 +206,8 @@ export interface CrmLead {
 export interface CrmShowroom {
   id: string;
   name: string;
+  /** false = closed: keeps its appointments, takes no new booking. */
+  active?: boolean;
 }
 
 /** A calendar slot someone already holds: a showroom booking or the salesperson's own. */

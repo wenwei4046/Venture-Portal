@@ -7,7 +7,7 @@ import {
   lostReasonComplete, lostReasonLabel, markAttended, previousLabel, receiveCustomerMessage, replyUrgency,
   rescheduleAppointment, setLeadStatus, slotClash, sortByUrgency, statusAfterCancel, statusAfterReply, waitingLabel,
   type CrmAppointment, type CrmBusySlot, type CrmLead, type CrmLost, type CrmLostReason,
-  type CrmAttachment, type CrmAutoReplySettings, type CrmMessage, type CrmStatus, type CrmUrgency,
+  type CrmAttachment, type CrmAutoReplySettings, type CrmShowroom, type CrmMessage, type CrmStatus, type CrmUrgency,
 } from "@/lib/member/crm";
 import { detectRequestedTime } from "@/lib/member/crm-datetime";
 import { crmDemo, crmTeamDemo, demoShowrooms } from "@/lib/member/crm-demo";
@@ -25,7 +25,8 @@ import MemberCrmAutoReplies from "./MemberCrmAutoReplies";
 import MemberCrmLeadRow, { firstName } from "./MemberCrmLeadRow";
 import { MemberCrmMember, MemberCrmPerformance, MemberCrmTeam, roleTag } from "./MemberCrmTeam";
 import MemberCrmAssignment from "./MemberCrmAssignment";
-import { apptLabel, dayLabel, roomName, time, whenLabel } from "./crm-format";
+import { apptLabel, dayLabel, openShowrooms, roomName, setShowroomList, time, whenLabel } from "./crm-format";
+import MemberCrmShowrooms from "./MemberCrmShowrooms";
 import { crmWrite, fetchCrm, sendCrmReply, type CrmWrite } from "@/app/(member)/member/crm-actions";
 import { windowOpen } from "@/lib/whatsapp/send";
 import { messengerWindow } from "@/lib/messenger/send";
@@ -90,6 +91,9 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
   // The people, as state: the HOD may switch an RS between full time and part time.
   const [members, setMembers] = useState<CrmMember[]>(live ? [] : team.members);
   const [viewerId, setViewerId] = useState(live ? "" : "a1");
+  const [showrooms, setShowrooms] = useState<CrmShowroom[]>(live ? [] : demoShowrooms);
+  // The format helpers name showrooms from this list (crm-format.ts) — hand it over before anything below renders.
+  setShowroomList(showrooms);
   const [config, setConfig] = useState<CrmAssignConfig>(live ? { rules: [], teamRatios: {}, teams: {} } : team.config);
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   // Before live data arrives (or for someone with no CRM role) there is nobody to look through: see the guard below.
@@ -168,6 +172,16 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     return result;
   }
 
+  /** The Boss / HOD add, rename, close or reopen a showroom (id null = a new one). */
+  async function saveShowroom(id: string | null, name: string, active: boolean): Promise<boolean> {
+    const saved = await persist("crm_save_showroom", { p_id: id, p_name: name, p_active: active });
+    if (!saved.ok) return false;
+    const row = saved.data as { id: string; name: string; active: boolean } | null;
+    const next: CrmShowroom = row ? { id: row.id, name: row.name, active: row.active } : { id: id ?? crypto.randomUUID(), name: name.trim(), active };
+    setShowrooms(list => (list.some(r => r.id === next.id) ? list.map(r => (r.id === next.id ? next : r)) : [...list, next]));
+    return true;
+  }
+
   /** The HOD sets who is full time (takes Fri–Sun enquiries). */
   async function setFullTime(staffId: string, on: boolean) {
     if (!(await persist("crm_set_full_time", { p_staff: staffId, p_full_time: on })).ok) return;
@@ -238,6 +252,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       setLeads(result.data.leads);
       setAppointments(result.data.appointments);
       setConfig(result.data.config);
+      setShowrooms(result.data.showrooms);
       setLoad({ state: "ready", setup: result.data.setup });
     });
     return () => { current = false; };
@@ -479,6 +494,8 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
           </label>)}
         </div>)}
       </section>}
+      {/* The Boss and HOD keep the showroom list: a new one opens here and every booking list follows. */}
+      {assignsAds(viewer) && <MemberCrmShowrooms showrooms={showrooms} onSave={saveShowroom} />}
       {!live ? <MemberCrmAutoReplies settings={autoReplies} onChange={setAutoReplies} /> : <p className={c.demoNote}><Icon name="info" size={16} /> Auto-replies are coming soon on live data.</p>}
     </div>;
   }
@@ -777,7 +794,7 @@ function Conversation({ lead, now, appointments, salesperson, viewer, nameOf, re
   const requested = lastCustomer && !answeredAfter && !handled.has(lastCustomer.id) ? detectRequestedTime(lastCustomer.text, now) : null;
   const requestedIso = requested?.toISOString() ?? null;
   const sameAsBooked = active && requestedIso === active.start;
-  const room = active?.showroomId ?? demoShowrooms[0].id;
+  const room = active?.showroomId ?? openShowrooms()[0]?.id ?? "";
   const clash = requestedIso ? (() => { const b = busy(active?.id)(room); return slotClash(requestedIso, 60, b.room) ? "The showroom is full then" : slotClash(requestedIso, 60, b.mine) ? "You're busy then" : null; })() : null;
   const done = (id: string) => setHandled(prev => new Set(prev).add(id));
 
@@ -982,7 +999,8 @@ function BookingSheet({ title, confirmLabel, busy, initialShowroom, hint, onCanc
   onConfirm: (showroomId: string, start: string) => void;
 }) {
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i + 1); d.setHours(0, 0, 0, 0); return d; }), []);
-  const [showroom, setShowroom] = useState(initialShowroom ?? demoShowrooms[0].id);
+  const open = openShowrooms();
+  const [showroom, setShowroom] = useState(initialShowroom && open.some(r => r.id === initialShowroom) ? initialShowroom : open[0]?.id ?? "");
   const [day, setDay] = useState(0);
   const [slot, setSlot] = useState<string | null>(null);
   const { room, mine } = busy(showroom);
@@ -993,7 +1011,8 @@ function BookingSheet({ title, confirmLabel, busy, initialShowroom, hint, onCanc
       {hint && <p className={s.caption}>{hint}</p>}
       <label className={s.field}><span>Showroom</span>
         <select value={showroom} onChange={e => { setShowroom(e.target.value); setSlot(null); }}>
-          {demoShowrooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          {open.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          {!open.length && <option value="">No showroom is open</option>}
         </select>
       </label>
       <div className={c.days}>

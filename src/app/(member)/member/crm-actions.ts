@@ -26,15 +26,16 @@ export async function fetchCrm(): Promise<{ ok: true; data: CrmLiveData } | { ok
       return (data ?? []) as T;
     };
     // Independent reads start together.
-    const [people, contacts, messages, appointments, rules, teams] = await Promise.all([
+    const [people, contacts, messages, appointments, rules, teams, showrooms] = await Promise.all([
       read<CrmPeopleRow>(db.rpc("crm_people")),
       read<CrmRows["contacts"]>(db.from("crm_contacts").select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at")),
       read<CrmRows["messages"]>(db.from("crm_messages").select("id, contact_id, direction, kind, body, media_id, auto, sent_by, sent_at, status, error").order("sent_at")),
       read<CrmRows["appointments"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state")),
       read<CrmRows["rules"]>(db.from("crm_assign_rules").select("ad_source_id, ad_label, tl_ids")),
       read<CrmRows["teams"]>(db.from("crm_team_settings").select("tl_id, team_share, percent_days, weekend_full_time, ratios, edited_by, edited_at")),
+      read<CrmRows["showrooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order")),
     ]);
-    return { ok: true, data: crmFromRows({ people, contacts, messages, appointments, rules, teams }) };
+    return { ok: true, data: crmFromRows({ people, contacts, messages, appointments, rules, teams, showrooms }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return {
@@ -113,7 +114,7 @@ export async function sendCrmReply(contactId: string, text: string): Promise<{ o
  */
 const CRM_WRITES = [
   "crm_mark_read", "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state",
-  "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time",
+  "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time", "crm_save_showroom",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 

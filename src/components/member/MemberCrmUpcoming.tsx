@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { relativeWhen, upcomingByDay, type CrmAppointment, type CrmLead } from "@/lib/member/crm";
-import { demoShowrooms } from "@/lib/member/crm-demo";
 import s from "./member.module.css";
 import c from "./MemberCrm.module.css";
-import { dayLabel, roomName, roomTone, time } from "./crm-format";
+import { dayLabel, roomName, roomTone, showroomList, time } from "./crm-format";
 import { Icon, initials } from "./MemberUI";
 
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -85,7 +84,7 @@ export default function MemberCrmUpcoming({ appointments, leads, now, onOpen }: 
       ))}
 
       <div className={c.legend} aria-label="Showrooms">
-        {demoShowrooms.map(r => <span key={r.id} data-tone={roomTone(r.id)}><i aria-hidden="true" />{r.name}</span>)}
+        {showroomList().map(r => <span key={r.id} data-tone={roomTone(r.id)}><i aria-hidden="true" />{r.name}</span>)}
       </div>
     </section>
   );
