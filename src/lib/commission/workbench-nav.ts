@@ -10,7 +10,9 @@
  * is a history entry: Back from the bill is Anthony again, on the same table,
  * and a ledger is a link somebody can send.
  *
- *   ?view=kpi|open|deposit|venue   the cut of the month (absent: Total Sales Orders)
+ *   ?view=kpi|open|deposit|exhibition  the cut of the month (absent: Total Sales Orders);
+ *                                  `venue` — the tab's name until 2026-10-03, Sales by
+ *                                  venue — still opens Sales exhibition
  *   ?view=changes|claims           the month's review panels (2026-09-30): Drops &
  *                                  upsells, Possible double claims
  *   ?person=<staff id>             whose ledger is open (the cut is then theirs)
@@ -22,7 +24,7 @@
  * alone.
  */
 
-export type WorkbenchTab = 'sales' | 'kpi' | 'open' | 'deposit' | 'venue' | 'changes' | 'claims'
+export type WorkbenchTab = 'sales' | 'kpi' | 'open' | 'deposit' | 'exhibition' | 'changes' | 'claims'
 export type LedgerView = 'personal' | 'overriding' | 'deposit'
 export type LedgerSort = 'date_asc' | 'date_desc' | 'commission_desc'
 
@@ -35,7 +37,7 @@ export interface WorkbenchLocation {
   sort: LedgerSort
 }
 
-const TABS: readonly WorkbenchTab[] = ['sales', 'kpi', 'open', 'deposit', 'venue', 'changes', 'claims']
+const TABS: readonly WorkbenchTab[] = ['sales', 'kpi', 'open', 'deposit', 'exhibition', 'changes', 'claims']
 const VIEWS: readonly LedgerView[] = ['personal', 'overriding', 'deposit']
 const SORTS: readonly LedgerSort[] = ['date_asc', 'date_desc', 'commission_desc']
 
@@ -49,9 +51,11 @@ function oneOf<T extends string>(value: string | null, allowed: readonly T[], fa
 /** Where a query string puts the workbench. A value it does not know is the default. */
 export function readWorkbenchLocation(params: { get(key: string): string | null }): WorkbenchLocation {
   const personId = params.get('person')?.trim() || null
+  // Sales by venue became Sales exhibition (2026-10-03); a link saved before keeps working.
+  const view = params.get('view') === 'venue' ? 'exhibition' : params.get('view')
   return {
     // A ledger is always opened from Total Sales Orders' list of people.
-    tab: personId ? 'sales' : oneOf(params.get('view'), TABS, 'sales'),
+    tab: personId ? 'sales' : oneOf(view, TABS, 'sales'),
     personId,
     view: personId ? oneOf(params.get('orders'), VIEWS, 'personal') : 'personal',
     query: params.get('q') ?? '',

@@ -40,12 +40,42 @@ describe('commission workbench server metadata', () => {
     expect(mocks.input).toHaveBeenCalledWith('2026-08-01', 'sub-1', db, { replayRunId: undefined, includeCurrentRules: true, monthOrders: [order] })
     expect(result.orders).toEqual([{
       orderId: 'order-a', venue: 'Venue', location: 'Warehouse', organizer: 'Assigned organiser', eventName: '28–31 Aug',
-      // The fair itself rides along, so Sales by venue can group on it (2026-09-26).
+      // The fair itself rides along, so Sales exhibition can group on it (2026-09-26).
       fair: { id: 'fair-aug', venueKey: 'VENUE', venueName: 'Venue Hall' },
+      // No ERP pick on this bill, so no booth (2026-10-03).
+      booth: null,
     }])
     expect(result.payRows).toEqual([])
     expect(result.payUnavailable).toBe(true)
     expect(result.payLinesClosed).toBeNull()
+  })
+
+  // Sales exhibition groups a bill under the booth the salesperson picked in
+  // the ERP (user 2026-10-03) — but only while that pick IS the bill's fair.
+  it('carries the ERP booth a bill was opened at, only while the ERP’s pick is its fair', async () => {
+    mocks.input.mockResolvedValue({
+      input: { hierarchy: [], orders: [] }, currentHierarchy: [], currentRules: {}, unmatchedOrderNos: [],
+    })
+    mocks.calendar.mockResolvedValue([])
+    mocks.pay.mockRejectedValue(new Error('no pay'))
+    const selects: string[] = []
+    const db = {
+      from: (table: string) => ({ select: (columns: string) => {
+        if (table === 'sales_orders') selects.push(columns)
+        return { in: () => Promise.resolve({
+          data: table === 'sales_orders' ? [
+            { id: 'picked', fair_event_id: 'f1', fair_source: 'erp', booth_brand: ' DUNLOPILLO ', booth_status: 'confirmed' },
+            { id: 'pinned', fair_event_id: 'f1', fair_source: 'manual', booth_brand: 'AKEMI', booth_status: 'confirmed' },
+            { id: 'cancelled', fair_event_id: null, fair_source: 'erp', booth_brand: 'AKEMI', booth_status: 'cancelled' },
+          ] : [], error: null,
+        }) }
+      } }),
+      rpc: () => Promise.resolve({ data: null, error: null }),
+    } as unknown as SupabaseClient
+    const bill = (orderId: string) => ({ orderId, venue: 'HALL', venueGroupName: 'HALL', location: null, organizer: null }) as MonthOrder
+    const result = await loadCommissionWorkbench(db, 'sub-1', '2026-09-01', [bill('picked'), bill('pinned'), bill('cancelled')])
+    expect(selects).toEqual(['id, fair_event_id, fair_source, booth_brand:raw->fair->>brand, booth_status:raw->fair->>status'])
+    expect(result.orders.map(o => [o.orderId, o.booth])).toEqual([['picked', 'DUNLOPILLO'], ['pinned', null], ['cancelled', null]])
   })
 
   it('says why the month’s pay lines can no longer change (2026-09-27)', async () => {

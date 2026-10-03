@@ -98,8 +98,8 @@ function fixture(): CommissionWorkbenchData {
     ],
     orders: [
       // The handwritten bill's number beside the ERP's (2026-10-03); 'two' was keyed with none.
-      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, refNo: 'HC13369', paperNo: 'HC13369' },
-      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, refNo: null, paperNo: null },
+      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, booth: null, refNo: 'HC13369', paperNo: 'HC13369' },
+      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, booth: null, refNo: null, paperNo: null },
     ],
   }
 }
@@ -339,31 +339,63 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByText('Every bill has met its deposit.')).toBeVisible()
   })
 
-  it('shows Sales by venue as a tab in the same table, reading each fair rather than picking one', () => {
+  // Sales by venue became Sales exhibition (user 2026-10-03): one venue,
+  // organiser and days with two brands is two exhibitions, each its own row.
+  it('shows Sales exhibition as a tab in the same table — one row per brand at each fair', () => {
     render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
-      venues={[
-        { key: 'fair:f1', venueKey: 'ARENA', displayName: 'Arena', fairId: 'f1', event: '12–14 Aug', organizer: 'Fair Co', orders: 2, people: 1, total: 3_000, commissionable: 2_800 },
-        { key: 'place:HALL', venueKey: 'HALL', displayName: 'Hall', fairId: null, event: null, organizer: null, orders: 1, people: 1, total: 500, commissionable: 500 },
+      exhibitions={[
+        { key: 'fair:f1|AKEMI', brand: 'AKEMI', venueKey: 'ARENA', displayName: 'Arena', fairId: 'f1', event: '12–14 Aug', organizer: 'Fair Co', orders: 2, people: 1, total: 3_000, commissionable: 2_800 },
+        { key: 'fair:f1|DUNLOP', brand: 'DUNLOP', venueKey: 'ARENA', displayName: 'Arena', fairId: 'f1', event: '12–14 Aug', organizer: 'Fair Co', orders: 1, people: 1, total: 800, commissionable: 800 },
+        { key: 'place:HALL|', brand: null, venueKey: 'HALL', displayName: 'Hall', fairId: null, event: null, organizer: null, orders: 1, people: 1, total: 500, commissionable: 500 },
       ]} />)
-    const tab = screen.getByRole('tab', { name: /^Sales by venue/ })
-    expect(tab).toHaveTextContent('2')
+    expect(screen.queryByRole('tab', { name: /Sales by venue/ })).toBeNull()
+    const tab = screen.getByRole('tab', { name: /^Sales exhibition/ })
+    expect(tab).toHaveTextContent('3')
     fireEvent.click(tab)
-    const table = screen.getByRole('table', { name: 'Sales by venue' })
+    expect(window.location.search).toBe('?view=exhibition')
+    const table = screen.getByRole('table', { name: 'Sales exhibition' })
     expect(within(table).getAllByRole('columnheader').map(h => h.textContent))
-      .toEqual(['Venue', 'Event', 'Organizer', 'Salespeople', 'Bills', 'Sales value'])
-    const arena = salesRow(table, 'Arena')
-    expect(arena).toHaveTextContent('12–14 Aug')
-    expect(arena).toHaveTextContent('Fair Co')
-    expect(arena).toHaveTextContent('RM 3,000.00RM 200.00 no commission')
-    expect(within(arena).getByRole('link', { name: 'Arena' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?venue=ARENA')
-    expect(within(salesRow(table, 'Hall')).getAllByText('Not linked')).toHaveLength(2)
-    // Nothing to pick here any more: the fair calendar locates every bill.
+      .toEqual(['Brand', 'Venue', 'Event', 'Organizer', 'Salespeople', 'Bills', 'Sales value'])
+    const akemi = salesRow(table, 'AKEMI')
+    expect(akemi).toHaveTextContent('Arena')
+    expect(akemi).toHaveTextContent('12–14 Aug')
+    expect(akemi).toHaveTextContent('Fair Co')
+    expect(akemi).toHaveTextContent('RM 3,000.00RM 200.00 no commission')
+    // The venue opens exactly that exhibition's bills: this fair, this brand.
+    expect(within(akemi).getByRole('link', { name: 'Arena' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?fair=f1&brand=AKEMI')
+    expect(within(salesRow(table, 'DUNLOP')).getByRole('link', { name: 'Arena' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?fair=f1&brand=DUNLOP')
+    const hall = salesRow(table, 'Hall')
+    expect(hall).toHaveTextContent('No brand')
+    expect(within(hall).getAllByText('Not linked')).toHaveLength(2)
+    expect(within(hall).getByRole('link', { name: 'Hall' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?venue=HALL&fair=none&brand=none')
+    // Nothing to pick here: the ERP names every bill's fair.
     expect(within(table).queryByRole('combobox')).toBeNull()
-    expect(within(table).queryByText(/same place as/)).toBeNull()
-    expect(salesRow(table, 'All venues')).toHaveTextContent('RM 3,500.00')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search venues' }), { target: { value: 'fair co' } })
+    expect(salesRow(table, 'All exhibitions')).toHaveTextContent('3 exhibitions')
+    expect(salesRow(table, 'All exhibitions')).toHaveTextContent('RM 4,300.00')
+
+    // One brand's exhibitions at a time, from the brands on the tab (no brand last).
+    const brands = screen.getByRole('combobox', { name: 'Filter exhibitions by brand' })
+    expect(within(brands).getAllByRole('option').map(o => o.textContent)).toEqual(['All brands', 'AKEMI', 'DUNLOP', 'No brand'])
+    fireEvent.change(brands, { target: { value: 'DUNLOP' } })
+    expect(window.location.search).toBe('?view=exhibition&brand=DUNLOP')
+    expect(within(table).queryByText('AKEMI')).toBeNull()
+    expect(salesRow(table, 'Visible exhibitions')).toHaveTextContent('RM 800.00')
+    fireEvent.change(brands, { target: { value: 'none' } })
+    expect(salesRow(table, 'Visible exhibitions')).toHaveTextContent('RM 500.00')
+    fireEvent.change(brands, { target: { value: '' } })
+
+    // The search reads the brand as well as the venue and organiser.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search exhibitions' }), { target: { value: 'akemi' } })
     expect(within(table).queryByText('Hall')).toBeNull()
-    expect(salesRow(table, 'Visible venues')).toHaveTextContent('RM 3,000.00')
+    expect(within(table).queryByText('DUNLOP')).toBeNull()
+    expect(salesRow(table, 'Visible exhibitions')).toHaveTextContent('RM 3,000.00')
+  })
+
+  it('opens Sales exhibition from a link to the old Sales by venue', () => {
+    visit('?view=venue')
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats} exhibitions={[]} />)
+    expect(screen.getByRole('tab', { name: /^Sales exhibition/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('No bills this month.')).toBeVisible()
   })
 
   // The two panels that sat above the month's cards became the rail's last
