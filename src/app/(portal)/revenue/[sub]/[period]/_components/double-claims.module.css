@@ -111,6 +111,13 @@
 .carried h3 { margin-bottom: 4px; font-size: 13px; font-weight: 600; }
 .carried ul { margin-top: 8px; font-family: var(--font-mono, 'Chivo Mono'), monospace; font-size: 11px; }
 
+/* Bills whose Ref No. names no paper number (2026-10-03): the check cannot see them. */
+.unreadable { margin-top: 22px; padding: 14px 16px; border: 1px solid rgb(var(--alert) / 0.45); border-radius: 10px; background: rgb(var(--alert-bg)); font-size: 12px; line-height: 1.65; }
+.unreadable > summary { cursor: pointer; }
+.unreadable > summary strong { font-size: 13px; font-weight: 600; }
+.unreadable > summary span { display: block; }
+.unreadable > p { margin: 8px 0 10px; }
+
 .checked { margin-top: 18px; }
 
 @media (max-width: 767px) {

@@ -348,7 +348,12 @@ src/
 │   │   │                              still refuses. **POSSIBLE DOUBLE CLAIMS:**
 │   │   │                              `revenue_possible_double_claims` = a paper
 │   │   │                              number (`sales_order_bill_ref`: first number
-│   │   │                              in `customer_so_no`, else the order's own —
+│   │   │                              in the ERP's Ref No., else the order's own —
+│   │   │                              the Ref No. is `sales_order_ref_no()` =
+│   │   │                              `customer_so_no`, else `ref` (2026-10-03:
+│   │   │                              the ERP's forms write the first, AutoCount
+│   │   │                              left the second, and a check reading one
+│   │   │                              field would go silent if the ERP moved) —
 │   │   │                              STORED on the row as the generated column
 │   │   │                              `sales_orders.bill_ref` since mig
 │   │   │                              `20260926110000`, so the check never opens
@@ -382,6 +387,22 @@ src/
 │   │   │                              evidence: `loadDoubleClaimEvidence` in
 │   │   │                              `revenue/_lib/double-claims.ts` — existing
 │   │   │                              tables under the viewer's session, no mig.
+│   │   │                              **THE PAPER BESIDE THE DOCUMENT
+│   │   │                              (2026-10-03):** a fair sale is a
+│   │   │                              handwritten bill (HC13369) keyed into the
+│   │   │                              ERP later as its own document
+│   │   │                              (HC-SO-2609-400) with the paper's number in
+│   │   │                              the Ref No. The bill stays the ERP's
+│   │   │                              document; every list of bills on Comm Cal
+│   │   │                              carries a **Ref No.** column beside it
+│   │   │                              (`PaperRefCell`, `lib/commission/
+│   │   │                              paper-ref.ts`) from the computed fields
+│   │   │                              `ref_no(sales_orders)` /
+│   │   │                              `paper_no(sales_orders)` — `paper_no` NULL
+│   │   │                              = the check cannot match the bill (no Ref
+│   │   │                              No., or one naming no paper), said on the
+│   │   │                              row and listed on the Double claims tab.
+│   │   │                              Spec §4.15, mig `20261003170000`.
 │   │   │                              **SALES VALUE vs COMMISSIONABLE VALUE:**
 │   │   │                              the ledger shows both — the whole bill
 │   │   │                              (transport included) and the lines that earn

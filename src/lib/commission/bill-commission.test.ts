@@ -4,7 +4,7 @@ import type { CommissionOrderRow } from './workbench'
 
 function row(over: Partial<CommissionOrderRow>): CommissionOrderRow {
   return {
-    key: 'k', orderId: 'o1', originalOrderId: 'o1', orderNo: 'SO-1', orderDate: '2026-08-02',
+    key: 'k', orderId: 'o1', originalOrderId: 'o1', orderNo: 'SO-1', refNo: null, paperNo: null, orderDate: '2026-08-02',
     eventDate: '2026-08-02', periodMonth: '2026-08-01', staffId: 's1', staffName: 'A',
     venue: null, eventName: null, organizer: null, location: null, brands: ['AKEMI'],
     categories: ['mattress'], upsale: false, orderTotal: 1000, commissionableValue: 1000, paidAmount: 1000, productRevenue: 1000,

@@ -70,6 +70,15 @@ export interface MonthOrder {
   openBillAuto: boolean | null
   depositRequired: number | null
   depositMet: boolean
+  /**
+   * The paper beside the document (2026-10-03): the ERP's Ref No. as typed —
+   * the handwritten bill's number, HC13369 on HC-SO-2609-400; customer_so_no,
+   * else ref — and the paper number the double-claim check reads from it, null
+   * when it names none (`ref_no` / `paper_no`, mig 20261003170000;
+   * `lib/commission/paper-ref.ts`).
+   */
+  refNo: string | null
+  paperNo: string | null
 }
 
 interface Row {
@@ -110,6 +119,8 @@ interface Row {
   open_bill_auto: boolean | null
   deposit_required: number | string | null
   deposit_met: boolean
+  ref_no: string | null
+  paper_no: string | null
 }
 
 export async function loadMonthOrders(
@@ -160,6 +171,9 @@ export async function loadMonthOrders(
     openBillAuto: r.open_bill_auto,
     depositRequired: r.deposit_required === null ? null : Number(r.deposit_required),
     depositMet: r.deposit_met,
+    // Absent until 20261003170000 is applied: the column then reads as unknown.
+    refNo: r.ref_no ?? null,
+    paperNo: r.paper_no ?? null,
   }))
 }
 
