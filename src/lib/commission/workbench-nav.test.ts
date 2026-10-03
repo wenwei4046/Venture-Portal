@@ -24,7 +24,15 @@ describe('readWorkbenchLocation', () => {
 
   it('reads a cut of the month', () => {
     expect(at('view=deposit').tab).toBe('deposit')
-    expect(at('view=venue').tab).toBe('venue')
+    expect(at('view=exhibition').tab).toBe('exhibition')
+    expect(workbenchSearch('', { ...HOME, tab: 'exhibition' })).toBe('?view=exhibition')
+  })
+
+  // Sales by venue became Sales exhibition (2026-10-03): a link to the old tab
+  // — a bookmark, a month page left open — still lands on it.
+  it('opens Sales exhibition from a link to the old Sales by venue', () => {
+    expect(at('view=venue').tab).toBe('exhibition')
+    expect(parseWorkbenchReturn('/revenue/fair/2026-09-01?view=venue', 'fair')).toMatchObject({ tab: 'exhibition' })
   })
 
   // The month's review panels became tabs of the rail (2026-09-30); the months

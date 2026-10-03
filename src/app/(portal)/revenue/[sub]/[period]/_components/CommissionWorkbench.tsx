@@ -15,7 +15,7 @@ import {
 import { formatMoney } from '@/lib/utils'
 import { computeRevenuePay } from '@/lib/revenue-pay'
 import { personPayLinesLock } from '@/lib/revenue-pay-lines'
-import type { FairSales } from '@/lib/venues'
+import { brandLabel, exhibitionQuery, NO_BRAND, type ExhibitionSales } from '@/lib/exhibitions'
 import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import { excludeOrder, includeOrder, saveOpenBillPicks } from '../../../run-actions'
@@ -43,7 +43,9 @@ import c from './close-controls.module.css'
 type Tab = WorkbenchTab
 const TABS: [Tab, string][] = [
   ['sales', 'Total Sales Orders'], ['kpi', 'KPI Items'], ['open', 'Open Bill'],
-  ['deposit', 'Below deposit'], ['venue', 'Sales by venue'],
+  // Sales exhibition (2026-10-03) — Sales by venue until the user said a result
+  // is read by BRAND at a venue, organiser and date, not by the venue.
+  ['deposit', 'Below deposit'], ['exhibition', 'Sales exhibition'],
   // The month's two review panels, above the cards until 2026-09-30 (user:
   // 把这两个 move 去 … 让它们形成两个 tab). Drawn only when the page hands them over.
   ['changes', 'Drops & upsells'], ['claims', 'Double claims'],
@@ -116,10 +118,11 @@ interface Props {
   savedTotals: { staffId: string; total: number }[]
   monthStats: CommissionMonthStats
   /**
-   * The month's bills by the fair they were written at — every live bill,
-   * matched or not, so the tab adds up to the Total sales value card.
+   * The month's bills by the exhibition they were written at — a brand at a
+   * fair (`lib/exhibitions.ts`). Every live bill, matched or not, so the tab
+   * adds up to the Total sales value card.
    */
-  venues?: FairSales[]
+  exhibitions?: ExhibitionSales[]
   monthOverview?: ReactNode
   payroll?: PayrollBarFacts
   /**
@@ -185,7 +188,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, exhibitions = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -408,15 +411,20 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const depositNote = threshold == null
     ? 'This scheme has no deposit gate — every bill counts in the month it is written.'
     : `Below ${pct(threshold)} of the order total, so none of the commission is released yet. Nothing is lost — each one pays in the month its deposit clears.`
-  const venueTotals = { bills: venues.reduce((a, v) => a + v.orders, 0), total: sum(venues, v => v.total), commissionable: sum(venues, v => v.commissionable) }
-  const venueQuery = query.trim().toLowerCase()
-  const shownVenues = venues.filter(v => !venueQuery || [v.displayName, v.event, v.organizer].some(x => x?.toLowerCase().includes(venueQuery)))
+  const exhibitionTotals = { bills: exhibitions.reduce((a, x) => a + x.orders, 0), total: sum(exhibitions, x => x.total), commissionable: sum(exhibitions, x => x.commissionable) }
+  // The brands on the tab, bills with none last — one brand's exhibitions at a time.
+  const exhibitionBrands = [...new Set(exhibitions.map(x => x.brand))]
+    .sort((a, b) => a === null ? 1 : b === null ? -1 : a.localeCompare(b))
+  const exhibitionQueryText = query.trim().toLowerCase()
+  const shownExhibitions = exhibitions.filter(x =>
+    (!brand || (brand === NO_BRAND ? x.brand === null : x.brand === brand)) &&
+    (!exhibitionQueryText || [brandLabel(x.brand), x.displayName, x.event, x.organizer].some(v => v?.toLowerCase().includes(exhibitionQueryText))))
   const badges: Record<Tab, ReactNode> = {
     sales: new Set(data.input.orders.filter(o => !o.upsale && o.periodMonth === period).map(o => o.id)).size,
     kpi: quantity(totals.kpiQty),
     open: new Set(tags.map(t => t.orderId)).size,
     deposit: heldTotals.bills,
-    venue: venues.length,
+    exhibition: exhibitions.length,
     changes: reviews?.changes?.count ?? 0,
     claims: reviews?.claims?.count ?? 0,
   }
@@ -971,23 +979,31 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.footerTotal}><span>All bills below deposit · still to collect</span><strong>{money(heldTotals.short)}</strong></div>
     </>}
 
-    {tab === 'venue' && <>
-      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Sales by venue</h2><p className={s.subtitle}>Every bill of the month at the fair it was written at. The venue, the days and the organiser come with the bill from the ERP, where the salesperson picks the event — nothing is picked here. A venue that held two fairs this month has a row for each; bills no fair claims are grouped by venue, and are placed by fixing the event on the order in the ERP.</p></div>
-        <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(venueTotals.total)}</strong></div></div>
-      <div className={s.toolbar}><input className={s.search} aria-label="Search venues" placeholder="Search venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} /></div>
-      <div className={s.tableFrame}><div className={s.tableScroll} role="region" aria-label="Sales by venue, scroll horizontally" tabIndex={0}><table className={s.table} aria-label="Sales by venue">
-        <thead><tr><th className={s.stickyFirst}>Venue</th><th>Event</th><th>Organizer</th><th>Salespeople</th><th>Bills</th><th className={s.stickyTotal} title={SALES_VALUE_HINT}>Sales value</th></tr></thead>
-        <tbody>{shownVenues.map(v => <tr key={v.key}>
-          <td className={s.stickyFirst}><Link href={`/revenue/${sub}/${period}/orders?venue=${encodeURIComponent(v.venueKey)}`}>{v.displayName}</Link></td>
-          <td>{v.event || <span className={s.muted}>{v.fairId ? 'Dates not set' : 'Not linked'}</span>}</td>
-          <td>{v.organizer || <span className={s.muted}>Not linked</span>}</td>
-          <td>{v.people}</td><td>{v.orders}</td>
-          <td className={s.stickyTotal}>{money(v.total)}<NoCommission amount={v.total - v.commissionable} /></td>
+    {tab === 'exhibition' && <>
+      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Sales exhibition</h2><p className={s.subtitle}>Every bill of the month at the exhibition it was written at. An exhibition is one brand’s booth at one fair: the same venue, organiser and days with another brand is another exhibition, the way the ERP opens one project per brand booth. A bill belongs to the booth the salesperson picked when opening it in the ERP, whatever its goods — a Dunlopillo pillow sold at the Akemi booth is Akemi’s — and a bill with no booth goes by its own brand. Nothing is picked here. Bills no fair claims are grouped by brand and venue, and are placed by fixing the event on the order in the ERP.</p></div>
+        <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(exhibitionTotals.total)}</strong></div></div>
+      <div className={s.toolbar}>
+        <input className={s.search} aria-label="Search exhibitions" placeholder="Search brand, venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} />
+        <select aria-label="Filter exhibitions by brand" value={brand} onChange={e => setBrand(e.target.value)}>
+          <option value="">All brands</option>
+          {exhibitionBrands.map(b => <option key={b ?? NO_BRAND} value={b ?? NO_BRAND}>{brandLabel(b)}</option>)}
+        </select>
+      </div>
+      <div className={s.tableFrame}><div className={s.tableScroll} role="region" aria-label="Sales exhibition, scroll horizontally" tabIndex={0}><table className={s.table} aria-label="Sales exhibition">
+        <thead><tr><th className={s.stickyFirst}>Brand</th><th>Venue</th><th>Event</th><th>Organizer</th><th>Salespeople</th><th>Bills</th><th className={s.stickyTotal} title={SALES_VALUE_HINT}>Sales value</th></tr></thead>
+        <tbody>{shownExhibitions.map(x => <tr key={x.key}>
+          <td className={s.stickyFirst}>{x.brand ?? <span className={s.muted}>{brandLabel(null)}</span>}</td>
+          {/* The venue opens exactly this exhibition's bills on All bills. */}
+          <td><Link href={`/revenue/${sub}/${period}/orders?${exhibitionQuery(x)}`}>{x.displayName}</Link></td>
+          <td>{x.event || <span className={s.muted}>{x.fairId ? 'Dates not set' : 'Not linked'}</span>}</td>
+          <td>{x.organizer || <span className={s.muted}>Not linked</span>}</td>
+          <td>{x.people}</td><td>{x.orders}</td>
+          <td className={s.stickyTotal}>{money(x.total)}<NoCommission amount={x.total - x.commissionable} /></td>
         </tr>)}</tbody>
-        <tfoot><tr><td className={s.stickyFirst}>{shownVenues.length < venues.length ? 'Visible venues' : 'All venues'}</td><td colSpan={3}>{shownVenues.length} {shownVenues.length === 1 ? 'row' : 'rows'}</td><td>{shownVenues.reduce((a, v) => a + v.orders, 0)}</td><td className={s.stickyTotal}>{money(sum(shownVenues, v => v.total))}</td></tr></tfoot>
+        <tfoot><tr><td className={s.stickyFirst}>{shownExhibitions.length < exhibitions.length ? 'Visible exhibitions' : 'All exhibitions'}</td><td colSpan={4}>{shownExhibitions.length} {shownExhibitions.length === 1 ? 'exhibition' : 'exhibitions'}</td><td>{shownExhibitions.reduce((a, x) => a + x.orders, 0)}</td><td className={s.stickyTotal}>{money(sum(shownExhibitions, x => x.total))}</td></tr></tfoot>
       </table>
-      {!shownVenues.length && <div className={s.empty}>{venues.length ? 'No venues match this search.' : 'No bills this month.'}</div>}
-      </div><div className={s.tableFooter}><span>{venueTotals.bills} bills · {money(venueTotals.commissionable)} of it earns commission</span><span>A venue opens every bill written there →</span></div></div>
+      {!shownExhibitions.length && <div className={s.empty}>{exhibitions.length ? 'No exhibitions match this search.' : 'No bills this month.'}</div>}
+      </div><div className={s.tableFooter}><span>{exhibitionTotals.bills} bills · {money(exhibitionTotals.commissionable)} of it earns commission</span><span>A venue opens that exhibition’s bills →</span></div></div>
     </>}
 
     {/* The page's own panels, server-built (2026-09-30). */}

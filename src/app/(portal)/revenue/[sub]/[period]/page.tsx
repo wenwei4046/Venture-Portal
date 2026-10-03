@@ -6,7 +6,7 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
-import { salesByFair } from '@/lib/venues'
+import { exhibitionBrandOf, salesByExhibition } from '@/lib/exhibitions'
 import { agentKeyOf } from '@/lib/erp-sync/contract'
 import SchemeSwitches from './_components/SchemeSwitches'
 import { requireSubDepartment } from '../../_lib/sub-departments'
@@ -87,12 +87,13 @@ interface StatementRow {
  * sent — and every drop and upsell now comes from the ERP (user 2026-09-27).
  *
  * ONE RAIL AT THE TOP (2026-09-26): the workbench's tabs — Total Sales
- * Orders, KPI Items, Open Bill, Below deposit and Sales by venue — are every
- * cut of the month's bills, in one table design. Since 2026-09-30 the rail
- * also carries the month's two review panels, which sat stacked above the
- * cards: *Drops & upsells* (what the ERP changed on settled bills, and bills
- * of another month's fair) and *Double claims*, where every group says why it
- * was flagged and what each of its bills has been through.
+ * Orders, KPI Items, Open Bill, Below deposit and Sales exhibition (Sales by
+ * venue until 2026-10-03) — are every cut of the month's bills, in one table
+ * design. Since 2026-09-30 the rail also carries the month's two review
+ * panels, which sat stacked above the cards: *Drops & upsells* (what the ERP
+ * changed on settled bills, and bills of another month's fair) and *Double
+ * claims*, where every group says why it was flagged and what each of its
+ * bills has been through.
  */
 export default async function CommissionPeriodPage({ params }: PageProps) {
   const { sub, period } = await params
@@ -298,13 +299,14 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // directors' incentive threshold reads this same figure (2026-09-27).
   const commissionableTotal = monthCommissionableValue(monthOrders)
 
-  // Sales by venue (2026-09-26, the workbench's tab): every live bill —
-  // matched or not, so it adds up to Total sales value — at the fair the
-  // calendar placed it at. The fair is the workbench's own read of
-  // `sales_orders.fair_event_id`, so the tab and the bill rows beside it name
-  // the same venue, days and organiser.
+  // Sales exhibition (the workbench's tab; Sales by venue until 2026-10-03):
+  // every live bill — matched or not, so it adds up to Total sales value — at
+  // the exhibition it was written at, a BRAND at a fair. The fair is the
+  // workbench's own read of `sales_orders.fair_event_id`, so the tab and the
+  // bill rows beside it name the same venue, days and organiser; the brand is
+  // the booth the salesperson picked in the ERP, else the bill's own.
   const fairOf = new Map((workbench?.orders ?? []).map(meta => [meta.orderId, meta]))
-  const venueRows = salesByFair(
+  const exhibitionRows = salesByExhibition(
     orders.map(o => {
       const meta = fairOf.get(o.orderId)
       return {
@@ -314,6 +316,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         fair: meta?.fair ?? null,
         event: meta?.eventName ?? null,
         organizer: meta?.organizer ?? o.organizer,
+        brand: exhibitionBrandOf({ booth: meta?.booth ?? null, brandCode: o.brandCode }, brandMenu?.options ?? []),
         staffKey: o.staffId ?? o.agentName,
         amount: o.orderTotal,
         commissionable: o.marginRevenue,
@@ -457,7 +460,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         }}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
-        venues={venueRows}
+        exhibitions={exhibitionRows}
         // Bills taken out by hand (Don't count this bill) — out of the
         // calculation, and listed on their seller's page to count again.
         notCounted={monthOrders.filter(o => o.cancelled && o.excludedReason === 'manual').map(o => ({
