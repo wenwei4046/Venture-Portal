@@ -12,6 +12,7 @@
  */
 
 import { useState, type ReactNode } from "react";
+import { formatIntlDate } from "@/lib/utils";
 import {
   blendedMargin,
   daysSince,
@@ -262,7 +263,7 @@ export default function MemberInsightPanel({
   const freshness = (
     <p className={s.caption}>
       {insight.live ? "Updates as orders are committed" : "Closed month"} · as of{" "}
-      {new Date(insight.asOf).toLocaleString("en-MY", {
+      {formatIntlDate(new Date(insight.asOf), {
         timeZone: "Asia/Kuala_Lumpur",
         day: "numeric",
         month: "short",

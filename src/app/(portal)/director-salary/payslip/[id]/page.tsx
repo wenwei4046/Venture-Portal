@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatIntlDate } from '@/lib/utils'
 import dayjs from 'dayjs'
 import PayslipNav from './_components/PayslipNav'
 
@@ -173,7 +173,7 @@ export default async function DirectorPayslipPage({ params }: PageProps) {
         {/* Footer */}
         <div className="text-center pt-4 border-t border-hairline">
           <div className="font-mono text-xs mt-1">
-            Generated {new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Generated {formatIntlDate(new Date(), { day: 'numeric', month: 'short', year: 'numeric' })}
             {' · '}HOUZS Venture Portal
           </div>
         </div>

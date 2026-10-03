@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatIntlDate } from '@/lib/utils'
 import type { PayrollState } from '@/lib/commission/payroll-send'
 import s from './commission-workbench.module.css'
 
@@ -21,9 +21,9 @@ type Tone = 'ok' | 'stale' | 'blocked' | 'idle' | 'quiet'
 
 function sentOn(iso: string | null): string {
   if (!iso) return ''
-  return new Date(iso).toLocaleString('en-GB', {
+  return formatIntlDate(new Date(iso), {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur',
-  })
+  }, 'en-GB')
 }
 
 function difference(now: number, before: number): string {

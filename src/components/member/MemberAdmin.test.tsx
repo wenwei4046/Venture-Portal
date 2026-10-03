@@ -1,8 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminMemberData } from "@/lib/member/server";
 
 vi.mock("@/app/(member)/member/actions", () => ({ adminMemberAction: vi.fn() }));
+// The Brand weeks tab reads the live grid; it never answers in these tests.
+vi.mock("@/app/(portal)/member-admin/brand-weeks-actions", () => ({
+  fetchBrandWeeksAdmin: vi.fn(() => new Promise(() => {})),
+  saveBrandWeeksAdmin: vi.fn(),
+}));
 
 import MemberAdmin from "./MemberAdmin";
 
@@ -49,5 +54,23 @@ describe("MemberAdmin", () => {
     expect(screen.getByRole("link", { name: "Member workspace →" })).toHaveAttribute("href", "/member");
     // A refused request is a word on the danger wash, not the amber pill.
     expect(screen.getByText("Rejected").closest(".chip")).toHaveClass("danger");
+  });
+
+  // The back office of My brand weeks (2026-10-03): whoever reviews member
+  // requests sets any member's week there, closed ones too. Live data only —
+  // never in the member app's admin preview.
+  it("offers Brand weeks on the portal to whoever reviews member requests", () => {
+    render(<MemberAdmin initialData={{ ...data, departments: [{ id: "71709f7e-9f7c-4e28-80cf-ce21be336995", name: "Fair", occupied: 25, reserved: 0, capacity: null }] }} portal />);
+    fireEvent.click(screen.getByRole("button", { name: "Brand weeks" }));
+    expect(screen.getByRole("heading", { name: /^Brand weeks · / })).toBeInTheDocument();
+    expect(screen.getByText("Loading brand weeks…")).toBeInTheDocument();
+  });
+
+  it("keeps Brand weeks out of the preview and away from a memo-only account", () => {
+    render(<MemberAdmin initialData={data} demo />);
+    expect(screen.queryByRole("button", { name: "Brand weeks" })).toBeNull();
+    cleanup();
+    render(<MemberAdmin initialData={{ ...data, canManageRequests: false }} portal />);
+    expect(screen.queryByRole("button", { name: "Brand weeks" })).toBeNull();
   });
 });

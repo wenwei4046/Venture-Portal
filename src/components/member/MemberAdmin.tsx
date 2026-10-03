@@ -6,6 +6,7 @@ import {
   type AdminMemberData,
   type AdminMemberInput,
 } from "@/app/(member)/member/actions";
+import MemberBrandWeeksAdmin from "./MemberBrandWeeksAdmin";
 import s from "./member.module.css";
 
 const names: Record<string, string> = {
@@ -543,6 +544,11 @@ export default function MemberAdmin({
                   ["requests", "Request reviews"],
                   ["capacity", "Capacity & waiting list"],
                 ]
+              : []),
+            // The back office of My brand weeks (2026-10-03): live data, so
+            // the portal page only, not the member app's admin preview.
+            ...(portal && !demo && data.canManageRequests
+              ? [["weeks", "Brand weeks"]]
               : []),
             ...(data.canPublishMemos ? [["memos", "Publish memo"]] : []),
             ...(data.canConfigureProducts
@@ -1139,6 +1145,11 @@ export default function MemberAdmin({
               </form>
             ))}
           </section>
+        )}
+        {tab === "weeks" && (
+          <MemberBrandWeeksAdmin
+            departments={data.departments.map(({ id, name }) => ({ id, name }))}
+          />
         )}
         {tab === "products" && (
           <section className={s.card}>

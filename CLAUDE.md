@@ -1387,7 +1387,16 @@ src/
 │   │                                  or the BACK OFFICE changes it: the
 │   │                                  Principal's view of a member makes *Member
 │   │                                  brand weeks* an editor for every week
-│   │                                  (`member_principal_save_brand_week_picks`).
+│   │                                  (`member_principal_save_brand_week_picks`),
+│   │                                  and HR has **People › Member services ›
+│   │                                  Brand weeks** — a department's month on
+│   │                                  one grid, member × week, what is stored
+│   │                                  and the booths written at under each, one
+│   │                                  Save (`member_admin_brand_weeks` /
+│   │                                  `member_admin_save_brand_weeks`, gate
+│   │                                  `member_is_manager('member_requests_
+│   │                                  manage')`, mig `20261003210000`; every
+│   │                                  save records `updated_by`).
 │   │                                  On 2026-10-03 no Revenue seller has a
 │   │                                  member login, so every finish starts
 │   │                                  guessed. A bill with no ERP booth pick
@@ -1618,7 +1627,7 @@ Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key wit
 Navigation speed (2026-09-26) — a click must answer at once. Every route folder with child routes has a `loading.tsx` rendering `RouteSkeleton` (`src/app/route-boundaries.test.ts` fails otherwise): without it Next keeps the page being left frozen until the server answers. The client router keeps pages 30 s (`experimental.staleTimes`), so a write must `revalidatePath` (or set a cookie) before it redirects — that is what empties that memory. Warm a page only through `lib/nav-warm.ts` (`warmOnIntent` / `warmRoute`): one link at a time, never an `AUDITED_ROUTES` page — a full prefetch reaches the server as a render, so a page that writes access_log while rendering would log a view for a mouse-over. Nothing may fire a Server Action on its own after a navigation (page views go through `lib/page-view.ts` from the browser): Next refreshes the whole page after any navigation that interrupts a pending action. Progress: `NavProgress` in the root layout, started by `src/instrumentation-client.ts`; DESIGN.md › Navigation feedback (v3.8). A page's independent reads start together and only real dependencies wait (the month page `revenue/[sub]/[period]/page.tsx` is the pattern; wrap a PostgREST builder you await twice in `Promise.resolve` — awaiting a builder again sends it again). `fetchByKeys` runs 4 chunks at a time. Two database traps behind the 3–10 s month page (mig `20260926100000`): a SQL function that calls another SQL function PER ROW re-checks the caller's permissions on every call (`has_scope`, ~1.7 ms each — 317 bills = 1.5 s), so join the answer once instead; and under RLS only LEAKPROOF comparisons reach an index (int, date and text equality do; numeric and enum comparisons do not), so a big lookup table searched by an amount needs a SECURITY DEFINER function (`lookup_pcb`).
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
-Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases.
+Date handling — store as `date` or `timestamptz` in DB, use `dayjs` for formatting. Compare by day (`dayjs().isAfter(x, 'day')`) to avoid timezone edge cases. A month is three letters (DESIGN.md › Date format): an `Intl` format goes through `formatIntlDate()` (`lib/utils.ts`), because en-GB and en-MY write September "Sept" (2026-10-03).
 Money — `decimal(15,2)` in DB. Display with `formatMoney()` from `lib/utils.ts`. Negative amounts render as red parenthesis notation `(1,000.00)`.
 Naming — DB: snake_case, TypeScript: camelCase, Components: PascalCase
 Files — one component per file, co-locate related files (`_components/` subfolders per route)
