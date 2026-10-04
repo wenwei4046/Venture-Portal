@@ -171,7 +171,9 @@ export function crmDemo(): {
 /* ── The team behind the CRM (demo) ─────────────────────────────────────── */
 
 /**
- * Boss → HOD Peter → (Senior TL vacant) → three TLs → a TA each → RS.
+ * Boss → HOD Peter → Senior TL Marcus → three TLs → a TA each → RS. The
+ * post is vacant in the real company; the demo fills it so every position can
+ * be tried from "Demo as" (user 2026-10-04).
  * Nobody has more than 3 direct downlines. `a1` is "you" — the RS whose
  * Inbox the prototype has always shown — so the demo's own leads are theirs.
  */
@@ -180,16 +182,17 @@ export function crmTeamDemo(you = "You"): { members: CrmMember[]; config: CrmAss
     members: [
       { id: "boss", name: "Alex Wong", role: "boss" },
       { id: "hod", name: "Peter", role: "hod", uplineId: "boss" },
-      { id: "lkv", name: "Kelvin Lee", role: "tl", uplineId: "hod", teamName: "Klang Valley" },
+      { id: "stl", name: "Marcus Tan", role: "stl", uplineId: "hod" },
+      { id: "lkv", name: "Kelvin Lee", role: "tl", uplineId: "stl", teamName: "Klang Valley" },
       { id: "a2", name: "Farah Aziz", role: "ta", uplineId: "lkv" },
       { id: "a1", name: you, role: "rs", uplineId: "a2", fullTime: true },
       { id: "a3", name: "Daniel Ong", role: "rs", uplineId: "a2" },
       { id: "a4", name: "Amir Hamzah", role: "rs", uplineId: "a2", fullTime: true },
-      { id: "lnt", name: "Priya Nair", role: "tl", uplineId: "hod", teamName: "Northern" },
+      { id: "lnt", name: "Priya Nair", role: "tl", uplineId: "stl", teamName: "Northern" },
       { id: "b1", name: "Hafiz Rahman", role: "ta", uplineId: "lnt" },
       { id: "b2", name: "Joanne Teh", role: "rs", uplineId: "b1", fullTime: true },
       { id: "b3", name: "Lina Ho", role: "rs", uplineId: "b1" },
-      { id: "lst", name: "Ryan Goh", role: "tl", uplineId: "hod", teamName: "Southern" },
+      { id: "lst", name: "Ryan Goh", role: "tl", uplineId: "stl", teamName: "Southern" },
       { id: "c1", name: "Nadia Salleh", role: "ta", uplineId: "lst" },
       { id: "c2", name: "Vincent Lim", role: "rs", uplineId: "c1", fullTime: true },
     ],

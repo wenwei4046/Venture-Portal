@@ -695,7 +695,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
       ? <MemberCrmMember member={picked} members={members} leads={visible} appointments={visibleAppts} now={now} viewer={viewer}
         stepIn={false} nameOf={nameOf} backLabel="Back to Overview" onBack={() => setViewing(null)} onOpenLead={id => openLead(id)} />
       : <MemberCrmOverview viewer={viewer} members={members} leads={visible} appointments={visibleAppts} now={now}
-        onOpenMember={id => setView({ kind: "member", memberId: id })} onOpenAssignment={() => goTab("assignment")} />;
+        onOpenMember={id => setViewing(id)} onOpenAssignment={() => goTab("assignment")} />;
     inDetail = !!picked;
   }
 
@@ -760,8 +760,10 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     ...(manager ? [{ id: "team" as const, icon: "chart", label: "Team" }] : []),
     { id: "profile", icon: "user", label: "Profile" },
   ];
-  // Demo: one of each level, and two TLs to show they never see each other's team.
-  const demoViewers = ["boss", "hod", "lkv", "lnt", "a2", "a1"].map(id => members.find(m => m.id === id)).filter((m): m is CrmMember => !!m);
+  // Demo: everyone, grouped by position, so each level can be tried (user 2026-10-04).
+  const demoGroups = (Object.keys(ROLE_LABELS) as CrmMember["role"][])
+    .map(role => ({ role, people: members.filter(m => m.role === role) }))
+    .filter(g => g.people.length > 0);
 
   return (
     <div className={c.app}>
@@ -771,9 +773,11 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
         {/* Demo only: until sign-in decides the role, try the CRM as each of them. */}
         {!live && <label className={c.roleSwitch}><span>Demo as</span>
           <select value={viewer.id} onChange={e => viewAs(e.target.value)} aria-label="Demo: view the CRM as">
-            {demoViewers.map(m => <option key={m.id} value={m.id}>
-              {ROLE_LABELS[m.role]} · {firstName(m.name)}{m.teamName ? ` (${m.teamName})` : ""}
-            </option>)}
+            {demoGroups.map(g => <optgroup key={g.role} label={ROLE_LABELS[g.role]}>
+              {g.people.map(m => <option key={m.id} value={m.id}>
+                {ROLE_LABELS[m.role]} · {firstName(m.name)}{m.teamName ? ` (${m.teamName})` : ""}{m.role === "rs" ? ` · ${m.fullTime ? "Full time" : "Part time"}` : ""}
+              </option>)}
+            </optgroup>)}
           </select>
         </label>}
         <button className={live ? c.appGear : c.back} onClick={() => setView({ kind: "settings" })} aria-label="Settings"><Icon name="gear" size={20} /></button>
