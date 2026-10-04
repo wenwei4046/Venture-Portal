@@ -7,6 +7,7 @@ import {
   type AdminMemberInput,
 } from "@/app/(member)/member/actions";
 import MemberBrandWeeksAdmin from "./MemberBrandWeeksAdmin";
+import MemberClaimRatesAdmin from "./MemberClaimRatesAdmin";
 import s from "./member.module.css";
 
 const names: Record<string, string> = {
@@ -548,7 +549,7 @@ export default function MemberAdmin({
             // The back office of My brand weeks (2026-10-03): live data, so
             // the portal page only, not the member app's admin preview.
             ...(portal && !demo && data.canManageRequests
-              ? [["weeks", "Brand weeks"]]
+              ? [["weeks", "Brand weeks"], ["claims", "Claim rates"]]
               : []),
             ...(data.canPublishMemos ? [["memos", "Publish memo"]] : []),
             ...(data.canConfigureProducts
@@ -1151,6 +1152,7 @@ export default function MemberAdmin({
             departments={data.departments.map(({ id, name }) => ({ id, name }))}
           />
         )}
+        {tab === "claims" && <MemberClaimRatesAdmin />}
         {tab === "products" && (
           <section className={s.card}>
             <div className={s.sectionHead}>

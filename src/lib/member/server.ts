@@ -412,8 +412,10 @@ export async function loadMemberInsightRange(
 /**
  * My income (2026-10-05, user: 跟着 up to date … close 的时候就是 fix): the
  * member's month worked out by Comm Cal's own engine — `loadCommissionInput`
- * and the workbench — until HR closes them, then the close's figures; a month
- * before the portal paid is the payroll row. The engine needs the whole
+ * and the workbench — until HR closes them, then the close's figures. A month
+ * before the portal paid was paid from the claim form, outside the portal: it
+ * shows the portal's own working of it, as Comm Cal's month page does, and
+ * says so (user: 显示 VP 自己算的). The engine needs the whole
  * sub-department's bills and costs, which only the service role may read, so
  * the member's session is authorised FIRST (their own membership, or a
  * Principal's view of one) and only that person's own money and bills leave
@@ -457,25 +459,24 @@ export async function loadMemberIncome(
     }));
     const row = rows.find(r => r.period_month.slice(0, 7) === period);
     const firstPaid = ((cutover.data as { first_paid_month: string } | null)?.first_paid_month ?? null)?.slice(0, 7) ?? null;
+    // Paid from the claim form, before the portal paid: the portal's own working, said as such.
+    const byHand = firstPaid !== null && period < firstPaid;
     const payLines: IncomePayLine[] = ((lines.data ?? []) as { kind: string; description: string | null; amount: number | string }[])
       .map(l => ({ kind: l.kind, description: l.description ?? "", amount: num(l.amount) }));
     const extra = {
       period, payLines,
-      basic: row ? num(row.basic_salary) : staff.data ? num((staff.data as { basic_salary: unknown }).basic_salary) : null,
+      // A month paid outside the portal has no salary here unless payroll kept one — never today's contract.
+      basic: row ? num(row.basic_salary) : !byHand && staff.data ? num((staff.data as { basic_salary: unknown }).basic_salary) : null,
       payrollStatus: row?.status ?? null,
       paidOn: row?.status === "paid" ? paidAt.get(period) ?? null : null,
     };
     const empty = (state: IncomeMonth["state"], notice: string): IncomeMonth => ({
       ...extra, state, asOf: new Date().toISOString(), closedAt: null, rankLabel: null, rate: 0,
       personal: 0, kpi: 0, kpiQty: 0, openBill: 0, incentive: 0, override: 0, group: 0, director: 0,
-      commission: state === "manual" && row ? num(row.commission_amount) : 0, countedSales: 0, bandKey: null, brands: [],
+      commission: 0, countedSales: 0, bandKey: null, brands: [],
       bills: [], overrides: [], switches: { kpi: false, openBill: false, incentive: false, override: false, group: false }, notice,
     });
 
-    // Before the portal paid: the claim forms settled it; payroll holds what was paid.
-    if (firstPaid && period < firstPaid) {
-      return { month: empty("manual", `${period} was settled by hand before the portal paid commission.`), past, cutover: firstPaid };
-    }
     const { data: scheme, error: schemeError } = await admin.from("comm_schemes")
       .select("enable_kpi, enable_open_bill, enable_margin_incentive, enable_override, enable_group_incentive")
       .eq("sub_department_id", subDepartmentId).eq("is_active", true).is("effective_to", null).maybeSingle();
@@ -485,7 +486,7 @@ export async function loadMemberIncome(
 
     // Closed by HR: the close's own figures, fixed.
     const close = closes.data as { closed_at: string; summary: unknown; statement: StatementDto | null; deferred_orders: { orderId: string }[] | null } | null;
-    if (close) {
+    if (close && !byHand) {
       const ov = (close.statement?.lines ?? []).filter(l => l.component === "override");
       const orderIds = [...new Set(ov.map(l => l.source_order_id).filter((v): v is string => !!v))];
       const sellerIds = [...new Set(ov.map(l => l.source_staff_id).filter((v): v is string => !!v))];
@@ -505,7 +506,7 @@ export async function loadMemberIncome(
       return { month, past, cutover: firstPaid };
     }
 
-    // Still open: the engine's figure now, exactly as Comm Cal shows it.
+    // Still open (or paid by hand): the engine's figure now, exactly as Comm Cal shows it.
     const { data: run, error: runError } = await admin.from("comm_runs").select("id")
       .eq("sub_department_id", subDepartmentId).eq("period_month", first).maybeSingle();
     if (runError) throw new Error(runError.message);
@@ -524,7 +525,7 @@ export async function loadMemberIncome(
     const board = buildCommissionWorkbench(input, { people: people.map(p => ({ staffId: p.id, name: p.employee_name })) });
     const person = board.people.find(p => p.staffId === staffId) ?? null;
     const month = liveIncome(person, { ...extra, asOf: new Date().toISOString(), switches });
-    return { month, past, cutover: firstPaid };
+    return { month: byHand ? { ...month, state: "manual" } : month, past, cutover: firstPaid };
   });
 }
 

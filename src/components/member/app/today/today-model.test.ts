@@ -132,3 +132,15 @@ describe("This week and Your Arena", () => {
     expect(m.boards.map(b => b.rankNum + b.rankSuf)).toEqual(["2nd", "1st", "1st", "—"]);
   });
 });
+
+describe("todayModel — a Principal viewing nobody", () => {
+  it("names the department's commission as the department's, not as somebody's income", () => {
+    const income = { schemeId: "s", period: "2026-09", status: "computed", personal: 0, override: 0, kpi: 0, openBill: 0, incentive: 0, group: 0,
+      total: 89460.99, sales: 0, groupSales: 0, deferred: 0, rank: "", rate: 0, kpis: [], brands: [] };
+    const m = todayModel({ ...base, first: "Principal", salary: 0, income, department: "Fair" });
+    expect(m.heroLabel).toBe("September · Fair commission");
+    expect(m.heroAmount).toBe("RM 89,460.99");
+    expect(m.heroSplit).toBe("Everybody in Fair, before salaries · View as a member for their own");
+    expect(todayModel({ ...base, income }).heroLabel).toBe("September · Estimated income");
+  });
+});

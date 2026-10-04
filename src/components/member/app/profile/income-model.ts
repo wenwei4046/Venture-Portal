@@ -26,7 +26,7 @@ function brandList(codes: readonly string[]): string {
 
 function heroOf(m: IncomeMonth): { label: string; note: string } {
   const month = monthName(m.period);
-  if (m.state === "manual") return { label: "Paid income · settled by hand", note: `${month} was paid from the claim form, before the portal paid commission. Your official payslip has the detail.` };
+  if (m.state === "manual") return { label: "Claim form month · portal's working", note: `${month} was paid from the claim form, before the portal paid commission. This is the portal's own working of your bills; your payslip shows what you were paid.` };
   if (m.payrollStatus === "paid") return { label: "Paid income", note: `Paid${m.paidOn ? ` ${shortDay(m.paidOn.slice(0, 10))}` : ""}. Your official payslip shows the deductions.` };
   if (m.state === "closed") return { label: "Closed income · final", note: `Closed${m.closedAt ? ` ${shortDay(m.closedAt.slice(0, 10))}` : ""}. It goes to payroll as it stands. Check your official payslip for payment.` };
   if (m.state === "none") return { label: "Estimated income · not settled", note: m.notice ?? "Nothing to work out for this month yet." };
@@ -48,21 +48,20 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
   const signed = (v: number) => (hidden ? "RM ••••" : v < 0 ? `−${rm2(-v)}` : rm2(v));
   const basic = m.basic ?? 0;
   const held = m.bills.filter(b => b.status === "deposit_pending");
-  const rows: IncomeRowVM[] = [{ label: "Fixed salary", sub: m.basic === null ? "Not set" : basic === 0 ? "Commission only" : "Monthly base", amt: money(basic) }];
-  if (m.state === "manual") {
-    rows.push({ label: "Commission", sub: "Settled by hand", amt: money(m.commission) });
-  } else {
-    rows.push({ label: "Personal sales commission", sub: `${rm(m.countedSales)} counted sales${held.length ? ` · ${plural(held.length, "order")} held` : ""}`, amt: money(m.personal) });
-    if ((m.switches.override && hasTeam) || m.override !== 0 || m.overrides.length > 0) {
-      const sellers = new Set(m.overrides.map(o => o.seller)).size;
-      rows.push({ label: "Team override", sub: sellers ? `From ${plural(sellers, "person", "people")} in your team` : "From your team's sales", amt: money(m.override) });
-    }
-    if (m.switches.kpi || m.kpi !== 0) rows.push({ label: "KPI pay", sub: plural(m.kpiQty, "item"), amt: money(m.kpi) });
-    if (m.switches.openBill || m.openBill !== 0) rows.push({ label: "Open Bill bonus", sub: plural(m.bills.filter(b => b.openBill > 0).length, "open bill"), amt: money(m.openBill) });
-    if (m.switches.incentive || m.incentive !== 0) rows.push({ label: "Margin incentive", sub: incentiveSub(m), amt: money(m.incentive) });
-    if (m.switches.group || m.group !== 0) rows.push({ label: "Group incentive", sub: "Your team's group reward", amt: money(m.group) });
-    if (m.director !== 0) rows.push({ label: "Director pay", sub: "Fixed amount and incentive", amt: money(m.director) });
+  // A month paid outside the portal keeps no salary here unless payroll did.
+  const rows: IncomeRowVM[] = [m.basic === null && m.state === "manual"
+    ? { label: "Fixed salary", sub: "Paid outside the portal", amt: "—" }
+    : { label: "Fixed salary", sub: m.basic === null ? "Not set" : basic === 0 ? "Commission only" : "Monthly base", amt: money(basic) }];
+  rows.push({ label: "Personal sales commission", sub: `${rm(m.countedSales)} counted sales${held.length ? ` · ${plural(held.length, "order")} held` : ""}`, amt: money(m.personal) });
+  if ((m.switches.override && hasTeam) || m.override !== 0 || m.overrides.length > 0) {
+    const sellers = new Set(m.overrides.map(o => o.seller)).size;
+    rows.push({ label: "Team override", sub: sellers ? `From ${plural(sellers, "person", "people")} in your team` : "From your team's sales", amt: money(m.override) });
   }
+  if (m.switches.kpi || m.kpi !== 0) rows.push({ label: "KPI pay", sub: plural(m.kpiQty, "item"), amt: money(m.kpi) });
+  if (m.switches.openBill || m.openBill !== 0) rows.push({ label: "Open Bill bonus", sub: plural(m.bills.filter(b => b.openBill > 0).length, "open bill"), amt: money(m.openBill) });
+  if (m.switches.incentive || m.incentive !== 0) rows.push({ label: "Margin incentive", sub: incentiveSub(m), amt: money(m.incentive) });
+  if (m.switches.group || m.group !== 0) rows.push({ label: "Group incentive", sub: "Your team's group reward", amt: money(m.group) });
+  if (m.director !== 0) rows.push({ label: "Director pay", sub: "Fixed amount and incentive", amt: money(m.director) });
   for (const l of m.payLines) {
     const v = l.kind === "deduction" ? -Math.abs(l.amount) : l.amount;
     rows.push({ label: PAY_LINE[l.kind] ?? l.kind, sub: l.description || "Added by HR", amt: signed(v), neg: v < 0 });
