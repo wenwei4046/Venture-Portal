@@ -148,12 +148,12 @@ AS $function$
       ORDER BY l.line_no,l.id),'[]'::jsonb)
      FROM public.sales_order_lines l LEFT JOIN hits h ON h.line_id=l.id
      WHERE l.order_id=f.order_id))
-   ORDER BY f.order_date,f.order_no),'[]'::jsonb)
+   ORDER BY f.order_date,f.order_no)
   FROM facts f
   CROSS JOIN scheme c
   JOIN public.sales_orders so ON so.id=f.order_id
   LEFT JOIN public.comm_venue_events ev ON ev.id=so.fair_event_id
-  LEFT JOIN public.comm_organisers org ON org.id=ev.organiser_id));
+  LEFT JOIN public.comm_organisers org ON org.id=ev.organiser_id),'[]'::jsonb));
 $function$;
 
 -- ── 4. The member's own reads, and the Principal's ──────────────────────────
