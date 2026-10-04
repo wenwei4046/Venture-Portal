@@ -15,6 +15,7 @@ import { ICON } from "../icons";
 import { protoInsight } from "./proto-insight";
 import { protoArena, type ArenaFixture } from "./proto-arena";
 import { protoQuote, type QuoteFixture } from "./proto-quote";
+import { protoProfile, type ProfileFixture } from "./proto-profile";
 
 export interface InsightFixture {
   /** The month Insight opens on (the prototype: September, on 3 October). */
@@ -39,6 +40,7 @@ export interface AppFixture {
   insight?: InsightFixture;
   arena?: ArenaFixture;
   quote?: QuoteFixture;
+  profile?: ProfileFixture;
 }
 
 const membership = (id: string, name: string, code: string, title: string, rank: string, calculator: boolean) => ({
@@ -46,7 +48,8 @@ const membership = (id: string, name: string, code: string, title: string, rank:
   capacity: 27, occupied: 26, people: [],
 });
 
-export function protoData(): MemberData {
+export function protoData(options: { principal?: boolean } = {}): MemberData {
+  if (options.principal) return protoPrincipalData();
   return {
     demo: true,
     configured: true,
@@ -62,6 +65,19 @@ export function protoData(): MemberData {
   };
 }
 
+/** The preview as a Principal (): every sub-department with its people, for View as. */
+function protoPrincipalData(): MemberData {
+  const base = protoData();
+  const va = protoProfile().va.people;
+  return {
+    ...base,
+    principalView: true,
+    profile: { ...base.profile, name: "Principal", salary: null },
+    memberships: base.memberships.map(m => ({ ...m, title: "Principal", rank: "All access",
+      people: va.filter(p => p.departmentId === m.id).map(p => ({ id: p.id, name: p.name, title: p.sub.split(" · ")[0], rank: p.sub.split(" · ")[1] ?? "", parentId: null })) })),
+  };
+}
+
 const memo = (id: string, time: string, title: string, sub: string) => ({
   id, kind: "memo" as const, tab: "memos" as const, icon: ICON.nMemo, time, title, sub, open: true, unread: true, big: null,
   link: "Read memo to acknowledge", done: null, go: { to: "memo" as const, memoId: id },
@@ -73,6 +89,7 @@ export function protoFixture(quote: { brand?: string; sheet?: string; charges?: 
     insight: protoInsight(),
     arena: protoArena(),
     quote: protoQuote(quote),
+    profile: protoProfile(),
     greeting: "Good morning",
     cartItems: 4,
     brands: [

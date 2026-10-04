@@ -12,6 +12,9 @@ import {
   calculateMemberQuote as calculate,
   submitMemberRequest as submit,
   acknowledgeMemberMemo as acknowledge,
+  cancelMemberRequest as cancel,
+  loadMemberRequestHistory,
+  loadMemberClaimRates,
   adminMemberAction as administer,
   type AdminMemberCommand,
 } from "@/lib/member/server";
@@ -48,6 +51,20 @@ export async function submitMemberRequest(form: FormData) {
     revalidatePath("/claims");
   }
   return result;
+}
+export async function fetchMemberRequestHistory(id: string) {
+  return loadMemberRequestHistory(id);
+}
+export async function cancelMemberRequest(id: string) {
+  const result = await cancel(id);
+  if (result.ok) {
+    revalidatePath("/member");
+    revalidatePath("/claims");
+  }
+  return result;
+}
+export async function fetchMemberClaimRates() {
+  return loadMemberClaimRates();
 }
 export async function acknowledgeMemberMemo(id: string, ack: boolean) {
   const result = await acknowledge(id, ack);

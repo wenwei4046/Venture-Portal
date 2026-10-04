@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import type { MemberData, MemberMembership, MemberReadContext, MemberRequest, QuoteInput } from "@/lib/member/types";
+import type { MemberData, MemberMembership, MemberOrgMap, MemberReadContext, QuoteInput } from "@/lib/member/types";
 import { tierLabel } from "@/lib/member/catalog";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
@@ -43,6 +43,17 @@ import QuoteCalc, { CalcDock, DeskCalc, ProductsDock, type CalcProps } from "./q
 import ProductSheet from "./quote/ProductSheet";
 import { AllModelsSheet, CartSheet, CustomerQuoteSheet, type CustomerQuote } from "./quote/QuoteSheets";
 import qs from "./quote/quote.module.css";
+import ProfileMain, { ProfileMini } from "./profile/ProfileMain";
+import ViewAsPage from "./profile/ViewAsPage";
+import { CommissionSheet, IncomeOrdersPage, IncomePage } from "./profile/IncomePages";
+import HonoursPage, { HonourSheet } from "./profile/HonoursPage";
+import TeamPage, { PersonSheet } from "./profile/TeamPage";
+import RequestsPage, { RequestSheet, type RequestFilter } from "./profile/RequestsPage";
+import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
+import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
+import { memoVM, profileMainVM, requestCode, requestDetailVM, requestRowsVM, teamVM, vaGroupsVM, type RequestEvent } from "./profile/profile-model";
+import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
+import { protoVaGroups } from "./fixtures/proto-profile";
 
 export type Device = "live" | "ios" | "android" | "desktop";
 
@@ -65,11 +76,7 @@ const SETTLED = new Set(["applied", "locked"]);
 const BRAND_NAMES: Record<string, string> = { AKEMI: "Akemi", ERGOTEX: "Ergotex", DUNLOP: "Dunlopillo", ZANOTTI: "Zanotti" };
 const BRAND_ORDER = ["AKEMI", "ERGOTEX", "DUNLOP", "ZANOTTI"];
 
-/** `RQ-2609-004` once the request carries its number; until then the head of its id. */
-export function requestCode(request: MemberRequest): string {
-  const number = (request.detail as Record<string, unknown> | undefined)?.requestNo;
-  return typeof number === "string" && number ? number : `RQ-${request.id.slice(0, 8).toUpperCase()}`;
-}
+export { requestCode };
 
 /**
  * A Principal's Arena marks nobody as `self` (the RPC is read-only for them):
@@ -121,6 +128,31 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const live = device === "live";
   const today = fixedToday ?? klToday();
   const period = today.slice(0, 7);
+
+  // ── Profile: its pages' choices and the sheet each opens ──
+  const [compact, setCompact] = useState(false);
+  const [vaOpen, setVaOpen] = useState(false);
+  const [vaQuery, setVaQuery] = useState("");
+  const [coTab, setCoTab] = useState<"mine" | "override">("mine");
+  const [coPick, setCoPick] = useState<string | null>(null);
+  const [honKind, setHonKind] = useState<HonourKind>("monthly");
+  const [honPlace, setHonPlace] = useState<number | null>(null);
+  const [personPick, setPersonPick] = useState<string | null>(null);
+  const [reqFilter, setReqFilter] = useState<RequestFilter>("all");
+  const [reqPick, setReqPick] = useState<string | null>(null);
+  const [reqForm, setReqForm] = useState<RequestKindVM | null>(null);
+  const [revising, setRevising] = useState<{ id: string; detail: Record<string, unknown> } | null>(null);
+  const [reqBusy, setReqBusy] = useState(false);
+  const [reqError, setReqError] = useState<string | null>(null);
+  const [memoTab, setMemoTab] = useState<MemoTab>("all");
+  const [memoPick, setMemoPick] = useState<string | null>(null);
+  const [memoBusy, setMemoBusy] = useState(false);
+  const [memoError, setMemoError] = useState<string | null>(null);
+  const [memoRead, setMemoRead] = useState<ReadonlySet<string>>(() => new Set());
+  const [memoAcked, setMemoAcked] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const closeProfileSheets = useCallback(() => {
+    setCoPick(null); setHonPlace(null); setPersonPick(null); setReqPick(null); setReqForm(null); setMemoPick(null); setReqError(null); setMemoError(null);
+  }, []);
 
   useEffect(() => {
     if (live && /Android/i.test(navigator.userAgent)) setAndroid(true);
@@ -274,12 +306,15 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     setFairsOpen(false);
     setChampOpen(false);
     setScrolled(false);
+    setCompact(false);
+    setVaOpen(false);
+    closeProfileSheets();
     if (screen !== "quote" && screen !== "calc") { quote.closeSheet(); quote.setCartOpen(false); quote.setAllOpen(false); }
     quote.setPreviewOpen(false);
     go({ screen, pf: null, ins: "main", arena: "hub", ...extra });
     if (mainRef.current) mainRef.current.scrollTop = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the quote's setters are stable
-  }, [go]);
+  }, [go, closeProfileSheets]);
   const toInsight = useCallback((view: InsightView, status: BillsStatus = "counted") => {
     if (view === "bills") setBillStatus(status);
     goScreen("insight", { ins: view });
@@ -300,7 +335,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   };
   const openNotifItem = (n: NotifItem) => {
     setNfOpen(false);
-    if (n.go.to === "memo") goScreen("account", { pf: "memos" });
+    if (n.go.to === "memo") { goScreen("account", { pf: "memos" }); if (n.go.memoId) openMemo(n.go.memoId); }
     else if (n.go.to === "requests") goScreen("account", { pf: "requests" });
     else if (n.go.to === "income") goScreen("account", { pf: "income" });
     else openBoard("sales");
@@ -406,12 +441,154 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const nfGroupsVM = fixture?.notifications.groups ?? notifGroups(nf.items, nfTab, settledMonth);
   const nfSummaryVM = fixture?.notifications.summary ?? notifSummary(nf.count, settledMonth);
 
+  // ── Profile ──
+  const fxp = fixture?.profile;
+  /** A Principal looking at somebody else's app: nothing can be sent or changed. */
+  const readOnlyView = principal;
+  const nameOf = useCallback((staffId: string) => {
+    for (const m of data.memberships) { const p = m.people.find(x => x.id === staffId); if (p) return p.name; }
+    return null;
+  }, [data.memberships]);
+  // The viewed person's requests (a Principal's snapshot holds everybody's).
+  const myRequests = useMemo(() => (principal ? (viewed ? requests.filter(r => r.staffId === viewed.id) : []) : requests), [principal, viewed, requests]);
+  const memoVMs: MemoVM[] = useMemo(() => {
+    if (fxp) return fxp.memos.map(m => ({ ...m, read: m.read || memoRead.has(m.id) || memoAcked.has(m.id), acked: m.acked || memoAcked.has(m.id) }));
+    return memos.map(m => memoVM(m, { read: memoRead, acked: memoAcked }));
+  }, [fxp, memos, memoRead, memoAcked]);
+  const profileVM = useMemo(() => {
+    if (fxp) return principal && !viewed ? fxp.main.principal : viewed ? fxp.main.viewing[viewed.id] ?? fxp.main.me : fxp.main.me;
+    return profileMainVM({ name: me.name, title: me.title, rank: me.rank, subName: principal && !viewed ? null : membership?.name ?? null,
+      requests: myRequests, memos: principal && !viewed ? [] : memoVMs });
+  }, [fxp, principal, viewed, me, membership?.name, myRequests, memoVMs]);
+  const [cancelled, setCancelled] = useState<ReadonlySet<string>>(() => new Set());
+  const reqRows = useMemo(() => {
+    const rows = fxp ? fxp.requests.rows : requestRowsVM(myRequests, nameOf);
+    return rows.map(r => (cancelled.has(r.id) ? { ...r, status: "Cancelled", tone: "none" as const } : r));
+  }, [fxp, myRequests, nameOf, cancelled]);
+  const [history, setHistory] = useState<Record<string, RequestEvent[]>>({});
+  const reqDetail = useMemo(() => {
+    if (!reqPick) return null;
+    if (fxp) {
+      const d = fxp.requests.details[reqPick];
+      if (!d || !cancelled.has(reqPick)) return d ?? null;
+      return { ...d, status: "Cancelled", tone: "none" as const, canCancel: false, facts: d.facts.map(f => (f.l === "Current step" ? { ...f, v: "Cancelled" } : f)),
+        log: [...d.log.map(e => ({ ...e, dot: "past" as const })), { what: "Cancelled", who: "You", when: "Just now", note: "", dot: "bad" as const }] };
+    }
+    const r = myRequests.find(x => x.id === reqPick);
+    return r ? requestDetailVM(r, history[r.id] ?? null, { nameOf, readOnly: readOnlyView }) : null;
+  }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView]);
+  const vaGroups = useMemo(() => (fxp
+    ? protoVaGroups(fxp.va.people, fxp.va.departments, vaQuery, viewed?.id ?? "")
+    : vaGroupsVM(data.memberships, vaQuery, viewed?.id ?? "")), [fxp, data.memberships, vaQuery, viewed?.id]);
+  const pickVa = useCallback((staffId: string, departmentId: string) => {
+    setVaOpen(false); setVaQuery("");
+    goScreen("today", { staff: staffId, department: departmentId });
+  }, [goScreen]);
+
+  // Memos: opening one is reading it; acknowledging records the member's name and time for HR.
+  const openMemo = useCallback((id: string) => {
+    setMemoError(null);
+    setMemoPick(id);
+    if (readOnlyView || memoRead.has(id)) return;
+    setMemoRead(prev => new Set(prev).add(id));
+    const memo = memos.find(m => m.id === id);
+    if (!fxp && memo && !memo.readAt) void source.memo(id, false);
+  }, [readOnlyView, memoRead, memos, fxp, source]);
+  const ackMemo = useCallback(async () => {
+    if (!memoPick || readOnlyView) return;
+    setMemoBusy(true); setMemoError(null);
+    const result = fxp ? { ok: true as const, data: { acknowledgedAt: new Date().toISOString() } } : await source.memo(memoPick, true);
+    setMemoBusy(false);
+    if (!result.ok) { setMemoError(result.error); return; }
+    const at = result.data.acknowledgedAt ?? new Date().toISOString();
+    setMemoAcked(prev => new Map(prev).set(memoPick, at));
+  }, [memoPick, readOnlyView, fxp, source]);
+  const memoPickVM = memoPick ? memoVMs.find(m => m.id === memoPick) ?? null : null;
+
+  // Requests: send one, cancel one still with HR, update one HR returned.
+  const openRequest = useCallback((id: string) => {
+    setReqError(null);
+    setReqPick(id);
+    if (fxp || history[id]) return;
+    void source.requestHistory(id).then(r => { if (r.ok) setHistory(prev => ({ ...prev, [id]: r.data })); });
+  }, [fxp, history, source]);
+  const submitRequest = useCallback(async (form: FormData): Promise<SubmitOutcome> => {
+    if (fxp) { await new Promise(r => setTimeout(r, 250)); return { ok: true, code: "RQ-2610-004" }; }
+    const result = await source.submitRequest(form);
+    if (!result.ok) return result;
+    void source.refresh().then(r => { if (r.ok) setData(r.data); });
+    setHistory(prev => { const next = { ...prev }; delete next[result.data.id]; return next; });
+    return { ok: true, code: requestCode(result.data) };
+  }, [fxp, source]);
+  const cancelRequest = useCallback(async () => {
+    if (!reqPick || readOnlyView) return;
+    if (fxp) { setCancelled(prev => new Set(prev).add(reqPick)); return; }
+    setReqBusy(true); setReqError(null);
+    const result = await source.cancelRequest(reqPick);
+    setReqBusy(false);
+    if (!result.ok) { setReqError(result.error); return; }
+    setHistory(prev => { const next = { ...prev }; delete next[reqPick]; return next; });
+    const refreshed = await source.refresh();
+    if (refreshed.ok) setData(refreshed.data);
+    void source.requestHistory(reqPick).then(r => { if (r.ok) setHistory(prev => ({ ...prev, [reqPick]: r.data })); });
+  }, [reqPick, readOnlyView, fxp, source]);
+  const updateRequest = useCallback(() => {
+    const r = myRequests.find(x => x.id === reqPick);
+    if (!r) return;
+    setReqPick(null);
+    setRevising({ id: r.id, detail: r.detail });
+    setReqForm(r.kind);
+  }, [myRequests, reqPick]);
+
+  // Team & capacity: the department's map, read when the page opens.
+  const [orgMap, setOrgMap] = useState<MemberOrgMap | null>(null);
+  useEffect(() => {
+    if (fxp || route.screen !== "account" || route.pf !== "team" || orgMap || !readable) return;
+    let stale = false;
+    void source.orgMap(context ? { subDepartmentId: context.subDepartmentId } : undefined).then(r => { if (!stale && r.ok) setOrgMap(r.data); });
+    return () => { stale = true; };
+  }, [fxp, route.screen, route.pf, orgMap, readable, context, source]);
+  const teamView = useMemo(() => {
+    if (fxp) return fxp.team;
+    if (!orgMap || !membership) return null;
+    const staffId = viewed?.id ?? data.profile.id;
+    return teamVM({
+      map: orgMap, departmentId: membership.id, subName: membership.name, staffId,
+      people: arena?.people ?? [], month: working ?? period, kpi: kpiRule,
+      capacity: membership.capacity, occupied: membership.occupied,
+      ranks: new Map(membership.people.map(p => [p.id, p.rank])),
+    });
+  }, [fxp, orgMap, membership, viewed?.id, data.profile.id, arena?.people, working, period, kpiRule]);
+
+  const incomeView = fxp ? (hidden ? fxp.income.hidden : fxp.income.shown) : null;
+  const ordersView = fxp ? (hidden ? fxp.orders.hidden : fxp.orders.shown) : null;
+  const honoursView = fxp ? fxp.honours[honKind] : null;
+
+  // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
+  const formOptions: FormOptions = useMemo(() => {
+    if (fxp) return fxp.form;
+    return {
+      subName: membership?.name ?? "",
+      weeks: [],
+      rates: { base: "Klang Valley", perSpot: null, perPaxNight: null, regions: [] },
+      members: [],
+      departments: data.departments ?? [],
+      departmentId: membership?.id ?? "",
+      waitingList: [],
+    };
+  }, [fxp, membership?.name, membership?.id, data.departments]);
+
+  const signOut = () => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); };
+
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
-  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel;
-  const rail = desk && (nfOpen || anyPanel || route.screen === "quote");
+  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null);
+  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
+  // View as takes the page column's place too (the prototype's `vaPE` opens the rail).
+  const rail = desk && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
   const showHeader = route.screen === "today" || route.screen === "calc";
-  const statusBg = route.screen === "account" && !route.pf ? "var(--rv-peach)" : "var(--rv-white)";
+  // Profile's glow runs up into the status bar until the page scrolls (or View as covers it).
+  const statusBg = route.screen === "account" && !route.pf && !compact && !vaOpen ? "var(--rv-peach)" : "var(--rv-white)";
   const screenVars = {
     "--status-bg": statusBg,
     "--status-h": live ? "env(safe-area-inset-top, 0px)" : android ? "38px" : "54px",
@@ -499,6 +676,36 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
       onAll={() => { quote.setQuery(""); quote.setAllOpen(true); }} onFrameOnly={quote.openFrameOnly} onAccOnly={quote.openAccOnly} />;
   } else if (route.screen === "calc" && quote.catalog) {
     page = <QuoteCalc {...calcProps} />;
+  } else if (route.screen === "account") {
+    const back = () => goScreen("account");
+    const pf = route.pf;
+    if (pf === "income") {
+      page = <IncomePage vm={incomeView} hidden={hidden} onBack={back} onPeriod={() => undefined} onToggleHide={() => setHidden(!hidden)}
+        onOrders={() => goScreen("account", { pf: "incOrders" })} onMonth={() => undefined} />;
+    } else if (pf === "incOrders") {
+      page = <IncomeOrdersPage vm={ordersView} tab={coTab} onTab={t => { setCoTab(t); setCoPick(null); }} onBack={() => goScreen("account", { pf: "income" })}
+        onPeriod={() => undefined} onRow={setCoPick} />;
+    } else if (pf === "honours") {
+      page = <HonoursPage vm={honoursView} kind={honKind} onKind={k => { setHonKind(k); setHonPlace(null); }} onBack={back} onPeriod={() => undefined} onPlace={setHonPlace} />;
+    } else if (pf === "team") {
+      page = <TeamPage vm={teamView} onBack={back} onPerson={setPersonPick} />;
+    } else if (pf === "requests") {
+      page = <RequestsPage rows={reqRows} filter={reqFilter} readOnly={readOnlyView} onFilter={setReqFilter} onBack={back}
+        onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
+    } else if (pf === "memos") {
+      page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
+    } else if (pf === "brandWeeks") {
+      page = <Pending screen={route.screen} />;
+    } else {
+      page = <ProfileMain vm={profileVM} hidden={hidden} actions={{
+        open: (key: WorkKey) => goScreen("account", { pf: key }),
+        scheme: () => undefined,
+        brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),
+        toggleHide: () => setHidden(!hidden),
+        signOut,
+        viewAs: principal && !viewed ? () => setVaOpen(true) : undefined,
+      }} />;
+    }
   } else {
     page = <Pending screen={route.screen} />;
   }
@@ -511,13 +718,13 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
         unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
         onSignOut={() => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); }} />
-      {viewed && <ViewingAsBar me={me} onSwitch={() => goScreen("account")} onExit={() => goScreen("account", { staff: "" })} />}
+      {viewed && <ViewingAsBar me={me} onSwitch={() => setVaOpen(true)} onExit={() => goScreen("account", { staff: "" })} />}
       {showHeader && (
         <MobileHeader ruled={scrolled} back={route.screen === "calc"} subName={membership?.name ?? ""} count={nfCount} me={me}
           onLogo={() => goScreen("today")} onBack={() => goScreen("quote")} onSubDept={() => openSheet("sd")} onBell={openNotif}
           onProfile={() => goScreen("account")} />
       )}
-      <main ref={mainRef} className={s.main} onScroll={e => { const v = e.currentTarget.scrollTop > 4; if (v !== scrolled) setScrolled(v); }}>
+      <main ref={mainRef} className={s.main} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
         {page}
       </main>
       {route.screen === "quote" && quote.catalog && (
@@ -563,6 +770,25 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
           {route.board === "champ" && <ChampSheet open={champOpen} champ={boardVM.rank?.champ ?? null} onClose={() => setChampOpen(false)} />}
         </>
       )}
+      {route.screen === "account" && !route.pf && !desk && (
+        <ProfileMini on={compact} name={profileVM.name} ini={profileVM.ini} title={profileVM.title} rank={profileVM.rank} />
+      )}
+      {route.screen === "account" && (
+        <>
+          {route.pf === "incOrders" && <CommissionSheet open={coPick !== null} vm={coPick ? ordersView?.sheets[coPick] ?? null : null} onClose={() => setCoPick(null)} />}
+          {route.pf === "honours" && <HonourSheet open={honPlace !== null} place={honPlace} vm={honoursView} periodLabel={honoursView?.periodLabel ?? ""} onClose={() => setHonPlace(null)} />}
+          {route.pf === "team" && <PersonSheet open={personPick !== null} vm={personPick ? teamView?.sheets[personPick] ?? null : null} onClose={() => setPersonPick(null)} />}
+          {route.pf === "requests" && (
+            <>
+              <RequestSheet open={reqPick !== null} vm={reqDetail} busy={reqBusy} error={reqError} onCancel={() => void cancelRequest()} onUpdate={updateRequest} onClose={() => setReqPick(null)} />
+              <RequestForm kind={reqForm} options={formOptions} revising={revising} readOnly={readOnlyView} onSubmit={submitRequest}
+                onClose={() => { setReqForm(null); setRevising(null); }} />
+            </>
+          )}
+          {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={readOnlyView} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)} />}
+        </>
+      )}
+      {principal && <ViewAsPage open={vaOpen} query={vaQuery} groups={vaGroups} onQuery={setVaQuery} onPick={pickVa} onClose={() => setVaOpen(false)} />}
     </div>
   );
 

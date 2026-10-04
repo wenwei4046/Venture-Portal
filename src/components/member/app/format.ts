@@ -96,6 +96,36 @@ export function dayRange(start: string, end: string): string {
     : `${a.getUTCDate()} ${MONTHS_SHORT[a.getUTCMonth()]} – ${b.getUTCDate()} ${MONTHS_SHORT[b.getUTCMonth()]}`;
 }
 
+/** An instant's wall clock in Kuala Lumpur: date, hour and minute. */
+function klParts(iso: string): { date: string; hour: number; minute: number } | null {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(d).map(x => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) % 24, minute: Number(p.minute) };
+}
+
+/** The day an instant falls on in Kuala Lumpur, `YYYY-MM-DD`. */
+export function klDate(iso: string): string {
+  return klParts(iso)?.date ?? "";
+}
+
+/** `28 Sep, 10:42` — an audit entry's time in Kuala Lumpur. */
+export function klDayTime(iso: string): string {
+  const p = klParts(iso);
+  if (!p) return "";
+  return `${shortDay(p.date)}, ${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+}
+
+/** `2 Oct 2026, 9:00 am` — a memo's full time in Kuala Lumpur. */
+export function klLongTime(iso: string): string {
+  const p = klParts(iso);
+  if (!p) return "";
+  const h12 = p.hour % 12 === 0 ? 12 : p.hour % 12;
+  return `${shortDay(p.date)} ${p.date.slice(0, 4)}, ${h12}:${String(p.minute).padStart(2, "0")} ${p.hour < 12 ? "am" : "pm"}`;
+}
+
 /** `Good morning` / `Good afternoon` / `Good evening`, by the hour in Kuala Lumpur. */
 export function greeting(now: Date = new Date()): string {
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", hour: "2-digit", hour12: false }).format(now));

@@ -1,8 +1,9 @@
-import type { MemberData, MemberInsight, MemberOrgMap, MemberReadContext, QuoteInput, QuoteResult } from "@/lib/member/types";
+import type { MemberData, MemberInsight, MemberOrgMap, MemberReadContext, MemberRequest, QuoteInput, QuoteResult } from "@/lib/member/types";
+import type { RequestEvent } from "./profile/profile-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
-import { calculateMemberQuote, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, refreshMemberData } from "@/app/(member)/member/actions";
+import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, fetchMemberRequestHistory, refreshMemberData, submitMemberRequest } from "@/app/(member)/member/actions";
 import { fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 
@@ -27,12 +28,20 @@ export interface RevenueSource {
   insightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberInsightRange>>;
   /** A cart's margin at a price — priced on the server; no cost ever comes back. */
   quote(input: QuoteInput): Promise<Outcome<QuoteResult>>;
+  /** Mark a memo read (`ack` false) or acknowledge it — the member's own receipt. */
+  memo(id: string, ack: boolean): Promise<Outcome<{ acknowledgedAt: string | null }>>;
+  /** Who moved a request, when, and why. */
+  requestHistory(id: string): Promise<Outcome<RequestEvent[]>>;
+  submitRequest(form: FormData): Promise<Outcome<MemberRequest>>;
+  /** Withdraw a request HR has not acted on yet. */
+  cancelRequest(id: string): Promise<Outcome<MemberRequest>>;
 }
 
 /** The design preview: reads nothing — its screens come from fixtures. */
 const nothing = async () => ({ ok: false as const, error: "Preview data only." });
 export const demoSource: RevenueSource = {
   refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing, quote: nothing,
+  memo: nothing, requestHistory: nothing, submitRequest: nothing, cancelRequest: nothing,
 };
 
 export const liveSource: RevenueSource = {
@@ -47,4 +56,11 @@ export const liveSource: RevenueSource = {
   orderBook: (subDepartmentId, from, until, context) => fetchMemberOrderBook(subDepartmentId, from, until, context),
   insightRange: (subDepartmentId, from, until, context) => fetchMemberInsightRange(subDepartmentId, from, until, context),
   quote: input => calculateMemberQuote(input),
+  async memo(id, ack) {
+    const result = await acknowledgeMemberMemo(id, ack);
+    return result.ok ? { ok: true, data: { acknowledgedAt: result.data.acknowledgedAt } } : result;
+  },
+  requestHistory: id => fetchMemberRequestHistory(id),
+  submitRequest: form => submitMemberRequest(form),
+  cancelRequest: id => cancelMemberRequest(id),
 };

@@ -178,6 +178,12 @@ export interface MemberRequest {
   title: string;
   status: string;
   createdAt: string;
+  /** When it was first sent to HR (mig 20261005030000); absent on an older snapshot. */
+  submittedAt?: string | null;
+  /** `RQ-2610-004` — numbered when first sent, never reused (mig 20261005030000). */
+  requestNo?: string | null;
+  /** Whose request it is — a Principal's snapshot holds everybody's (mig 20261005030000). */
+  staffId?: string | null;
   detail: Record<string, unknown>;
   note?: string;
   claimId?: string | null;

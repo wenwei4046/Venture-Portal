@@ -272,6 +272,37 @@
   --rv-hero-grad: linear-gradient(140deg,#F2995E 0%,#D9622A 55%,#B8461A 100%);
   --rv-hero-sub: #FFE6D6;
   --rv-hero-good: #DDF5E7;
+  /* Profile (2026-10-05): the peach glow, My honours' walnut card and metal
+     medals, the family chart, a request's audit notes */
+  --rv-profile-glow: linear-gradient(180deg,#F6B48A 0%,#FFD9BC 70%,#FFFFFF 100%);
+  --rv-ink-05: rgba(63,43,34,.05);
+  --rv-ink-10: rgba(63,43,34,.10);
+  --rv-ink-25: rgba(63,43,34,.25);
+  --rv-white-12: rgba(255,255,255,.12);
+  --rv-black-15: rgba(0,0,0,.15);
+  --rv-black-30: rgba(0,0,0,.3);
+  --rv-honour-grad: linear-gradient(165deg,#5A3626 0%,#3F2B22 62%,#2E1F18 100%);
+  --rv-honour-glow: radial-gradient(closest-side,rgba(225,176,79,.32),rgba(225,176,79,0));
+  --rv-gold-45: rgba(225,176,79,.45);
+  --rv-gold-18: rgba(225,176,79,.18);
+  --rv-gold-label: #F3D27E;
+  --rv-gold-line: #F3DFB0;
+  --rv-gold-coin: radial-gradient(circle at 35% 30%,#FFF1C2,#E1B04F 60%,#B9862C);
+  --rv-metal-gold: radial-gradient(circle at 35% 30%,#FFF4CC,#E9BC57 55%,#B9862C);
+  --rv-metal-gold-ink: #4A3110;
+  --rv-metal-silver: radial-gradient(circle at 35% 30%,#FFFFFF,#CFCAC2 55%,#8F897F);
+  --rv-metal-silver-ink: #3D3832;
+  --rv-metal-silver-label: #E4E0DA;
+  --rv-metal-bronze: radial-gradient(circle at 35% 30%,#FBE3CF,#C98F65 55%,#8C5A3A);
+  --rv-metal-bronze-ink: #3E2416;
+  --rv-metal-bronze-label: #E4B793;
+  --rv-tree-bg: linear-gradient(180deg,#FBF7F3,#FFFFFF);
+  --rv-paper-warm: #FBF7F3;
+  --rv-tree-line: #D9CABD;
+  --rv-tree-guide: #E3D6CC;
+  --rv-tree-level: #A08E82;
+  --rv-note-bg: #FAF6F2;
+  --rv-cancel-line: #F1C5B4;
   /* the simulated device a preview draws around the app */
   --rv-frame: #1C1A19;
   --rv-frame-ring: #3A3634;

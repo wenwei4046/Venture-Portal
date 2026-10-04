@@ -687,7 +687,41 @@ export async function submitMemberRequest(
     uuid(subDepartmentId, "department");
     const detail: Record<string, string | number | boolean> = {};
     let verified: VerifiedInvoice | null = null;
-    if (kind === "claim") {
+    const claimType = kind === "claim" ? field(form, "claimType") : "";
+    if (claimType) {
+      // A fair claim (2026-10-05): its amount is the rate HR set, worked out by
+      // `member_prepare_request` — nothing typed here is money. Outstation goes
+      // by the route's spots and needs no invoice; Airbnb by people × nights.
+      if (claimType !== "outstation" && claimType !== "airbnb") throw new Error("Choose Outstation or Airbnb.");
+      Object.assign(detail, {
+        claimType,
+        week: date(field(form, "week"), "brand week"),
+        location: field(form, "location", 150),
+        notes: field(form, "notes", 1500),
+      });
+      const brand = field(form, "brand", 20);
+      if (brand) detail.brand = brand;
+      if (claimType === "outstation") {
+        detail.region = uuid(field(form, "region"), "region");
+      } else {
+        const count = (name: string) => {
+          const n = Number(field(form, name));
+          if (!Number.isInteger(n) || n < 0 || n > 40) throw new Error("Check who stayed.");
+          return n;
+        };
+        verified = await invoice(form);
+        Object.assign(detail, {
+          start: date(field(form, "start"), "check-in date"),
+          end: date(field(form, "end"), "check-out date"),
+          male: count("male"),
+          female: count("female"),
+          invoiceName: verified.name,
+          invoiceHash: createHash("sha256").update(verified.bytes).digest("hex"),
+        });
+        if (detail.end <= detail.start) throw new Error("Check-out must be after check-in.");
+        if (Number(detail.male) + Number(detail.female) < 1) throw new Error("Add who stayed.");
+      }
+    } else if (kind === "claim") {
       const amount = cents(field(form, "amount"));
       if (amount === null || amount < 1)
         throw new Error("Enter a claim amount greater than 0.");
@@ -705,8 +739,12 @@ export async function submitMemberRequest(
         throw new Error("Check the location, arrival date and departure date.");
     } else {
       detail.newPerson = field(form, "newPerson", 160);
-      if (kind === "replacement")
+      if (kind === "replacement") {
         detail.replacementSource = field(form, "replacementSource") || "new";
+        // The approved waiting-list request the replacement comes from, when it does.
+        const waiting = field(form, "waitingRequestId");
+        if (waiting) detail.waitingRequestId = uuid(waiting, "waiting-list request");
+      }
       if (!detail.newPerson && detail.replacementSource !== "vacancy")
         throw new Error("Enter the new member name.");
       if (kind === "waiting") {
@@ -843,6 +881,54 @@ export async function submitMemberRequest(
         p_request: prepared.id,
       }),
     );
+  });
+}
+
+export interface MemberRequestEvent {
+  at: string;
+  status: string;
+  from: string | null;
+  actor: "you" | "hr" | "finance" | "system" | "principal";
+  actorName: string | null;
+  note: string | null;
+}
+
+/** Who moved a request, when and why — the member's own, or anybody's for the Principal and HR. */
+export async function loadMemberRequestHistory(id: string): Promise<MemberOutcome<MemberRequestEvent[]>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    const client = await session(undefined);
+    const data = await rpc<unknown>(client, "member_request_history", { p_request: uuid(id, "request") });
+    if (!Array.isArray(data)) throw new Error("The request's history is temporarily unavailable.");
+    const actors = ["you", "hr", "finance", "system", "principal"] as const;
+    return data.flatMap((raw) => {
+      const e = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+      if (!e || typeof e.at !== "string" || typeof e.status !== "string") return [];
+      const actor = actors.find((a) => a === e.actor) ?? "system";
+      return [{
+        at: e.at, status: e.status, from: typeof e.from === "string" ? e.from : null, actor,
+        actorName: typeof e.actorName === "string" && e.actorName ? e.actorName : null,
+        note: typeof e.note === "string" && e.note ? e.note : null,
+      }];
+    });
+  });
+}
+
+/** Withdraw a request HR has not acted on: still pending, or returned for more information. */
+export async function cancelMemberRequest(id: string): Promise<MemberOutcome<MemberRequest>> {
+  return outcome(async () => {
+    const client = await session("member_requests");
+    return requestLabels(await rpc<MemberRequest>(client, "member_cancel_request", { p_request: uuid(id, "request") }));
+  });
+}
+
+/** HR's claim rates: the base, the rate per spot, Airbnb per person per night, the regions' spots. */
+export async function loadMemberClaimRates(): Promise<MemberOutcome<unknown>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    const client = await session("member_portal", !!user && isPrincipalAccount(user));
+    return rpc<unknown>(client, "member_claim_rates");
   });
 }
 
