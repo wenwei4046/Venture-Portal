@@ -10,7 +10,7 @@
  */
 
 import { heightKey, valueKey } from './keys'
-import { TIERS, type PriceCell } from './pricing'
+import { poolPriceOf, TIERS, type PriceCell } from './pricing'
 
 export class EditError extends Error {}
 
@@ -137,13 +137,19 @@ export interface OptionPriceEdit {
   price: string | null
 }
 
-/** Surcharges may be negative — the ERP's own "No Side Panel" takes RM 40 off. */
+/**
+ * A cost surcharge may be negative — the ERP's own "No Side Panel" takes RM 40
+ * off. A charge may not: it is what the customer pays for a bed frame's divan,
+ * leg, gap or total height (2026-10-05). A sofa's seat size carries no price at
+ * all (CHECK catalogue_option_prices_unpriced_pools).
+ */
 export function validateOptionPrices(pool: string, edits: readonly OptionPriceEdit[]): {
   upserts: Array<{ pool: string; value: string; price: number }>
   clears: string[]
 } {
   if (!/^(bedframe|sofa)_[a-z_]+$/.test(pool)) throw new EditError('Unknown pool')
-  if (pool === 'bedframe_gaps' || pool === 'sofa_sizes') throw new EditError('That list carries no price')
+  const kind = poolPriceOf(pool)
+  if (kind === null) throw new EditError('That list carries no price')
   const upserts: Array<{ pool: string; value: string; price: number }> = []
   const clears: string[] = []
   const seen = new Set<string>()
@@ -153,7 +159,7 @@ export function validateOptionPrices(pool: string, edits: readonly OptionPriceEd
     const k = valueKey(value)!
     if (seen.has(k)) throw new EditError(`${value} appears twice`)
     seen.add(k)
-    const price = parseMoney(e.price, value, true)
+    const price = parseMoney(e.price, value, kind === 'cost')
     if (price === null) clears.push(value)
     else upserts.push({ pool, value, price })
   }

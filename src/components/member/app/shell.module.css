@@ -1,0 +1,349 @@
+/*
+ * The app's frame: the screen, the headers, the bottom bar and the desktop
+ * sidebar — RevenueApp.dc.html lines 20–140 and 1217–1250, value for value.
+ *
+ * One app answers both shapes. A phone gets the bottom bar and bottom sheets;
+ * at 1024px and wider the same app sits beside a 240px sidebar with a 60px top
+ * bar, the page in a 760px column and every sheet as a 400px panel on the
+ * right. The switch is a container query on `.app`, so a preview drawn inside a
+ * 414px phone frame lays out as a phone whatever the window is.
+ */
+
+.app {
+  container-type: inline-size;
+  container-name: rv;
+  width: 100%;
+}
+
+/* ── previews only: the device the prototype draws around the app ── */
+.frame {
+  box-sizing: border-box;
+  background: var(--rv-frame);
+  box-shadow: 0 0 0 1.5px var(--rv-frame-ring) inset, 0 30px 60px var(--rv-ink-18);
+  color: var(--rv-ink);
+}
+.frameIos { width: 414px; height: 868px; padding: 12px; border-radius: 64px; }
+.frameAndroid { width: 410px; height: 884px; padding: 10px; border-radius: 46px; }
+.frameDesk { width: 1440px; height: 900px; padding: 0; border-radius: 14px; }
+
+/* the screen: a column of status bar, header, page, dock and bottom bar */
+.screen {
+  width: 100%;
+  overflow: hidden;
+  background: var(--rv-white);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-left: 0;
+  box-sizing: border-box;
+}
+.screenFramed { height: 100%; }
+.frameIos .screen { border-radius: 52px; }
+.frameAndroid .screen { border-radius: 36px; }
+.frameDesk .screen { border-radius: 14px; }
+/* live: the real status bar and home indicator are the phone's own */
+.screenLive {
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: var(--status-bg, var(--rv-white));
+  transition: background-color 220ms ease;
+}
+
+.statusIos {
+  flex: 0 0 54px;
+  height: 54px;
+  position: relative;
+  background: var(--status-bg, var(--rv-white));
+  transition: background-color 220ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 28px 0 46px;
+  box-sizing: border-box;
+}
+.statusIosTime { font-size: 16px; font-weight: 600; color: var(--rv-black); letter-spacing: -.01em; }
+.statusIosIsland { position: absolute; left: 50%; top: 11px; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: var(--rv-black); }
+.statusIosIcons { display: flex; align-items: center; gap: 6px; }
+.statusIosBars { display: flex; align-items: flex-end; gap: 1.5px; height: 11px; }
+.statusIosBar { width: 3px; border-radius: 1px; background: var(--rv-black); }
+.statusIosWifi { width: 11px; height: 11px; background: var(--rv-black); border-radius: 100% 0 0 0; transform: rotate(45deg); margin: 3px 3px 0; }
+.statusIosBattery { display: flex; align-items: center; gap: 1px; }
+.statusIosCell { width: 22px; height: 11px; border: 1px solid var(--rv-black-38); border-radius: 3.5px; padding: 1.5px; box-sizing: border-box; }
+.statusIosLevel { width: 80%; height: 100%; background: var(--rv-black); border-radius: 1.5px; }
+.statusIosNub { width: 1.5px; height: 4px; background: var(--rv-black-38); border-radius: 0 1px 1px 0; }
+
+.statusAndroid {
+  flex: 0 0 38px;
+  height: 38px;
+  position: relative;
+  background: var(--status-bg, var(--rv-white));
+  transition: background-color 220ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 22px 0 24px;
+  box-sizing: border-box;
+}
+.statusAndroidLeft { display: flex; align-items: center; gap: 8px; color: var(--rv-android-ink); }
+.statusAndroidTime { font-size: 14px; font-weight: 500; }
+.statusAndroidCam { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: 13px; height: 13px; border-radius: 50%; background: var(--rv-android-cam); }
+.statusAndroidRight { display: flex; align-items: center; gap: 7px; }
+.statusAndroidWifi { width: 11px; height: 11px; background: var(--rv-android-ink); border-radius: 100% 0 0 0; transform: rotate(45deg); margin-top: 4px; }
+.statusAndroidSignal { width: 0; height: 0; border-left: 11px solid transparent; border-bottom: 11px solid var(--rv-android-ink); }
+.statusAndroidBattery { width: 7px; height: 12px; border-radius: 2px; background: var(--rv-android-ink); position: relative; }
+.statusAndroidTip { position: absolute; top: -2px; left: 2px; width: 3px; height: 2px; background: var(--rv-android-ink); border-radius: 1px 1px 0 0; }
+
+/* ── desktop sidebar and top bar ── */
+.aside, .deskHeader { display: none; }
+
+.aside {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 240px;
+  z-index: 3;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 16px 20px;
+  background: var(--rv-desk);
+  border-right: 1px solid var(--rv-line);
+  box-sizing: border-box;
+}
+.asideLogo { padding: 0 10px 18px; border: 0; background: transparent; text-align: left; }
+.asideWord { display: block; font-size: 16px; font-weight: 700; letter-spacing: .14em; color: var(--rv-brown); line-height: 1.2; }
+.asideDept { display: block; font-size: 12.5px; font-weight: 600; color: var(--rv-accent); margin-top: 3px; }
+.asideNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-brown);
+  font-size: 15px;
+  font-weight: 550;
+  text-align: left;
+}
+.asideNavOn { background: var(--rv-active); color: var(--rv-accent); font-weight: 650; }
+.asideNotif { font-weight: 550; color: var(--rv-brown); }
+.asideNotifOn { background: var(--rv-active); }
+.asideNotifLabel { flex: 1; }
+.asideCount {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--rv-accent);
+  color: var(--rv-white);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+.asideSpacer { flex: 1; }
+.asideMe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  text-align: left;
+  color: var(--rv-ink);
+}
+.asideAvatar {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--rv-brown);
+  color: var(--rv-white);
+  font-size: 12.5px;
+  font-weight: 650;
+  display: grid;
+  place-items: center;
+}
+.asideMeText { min-width: 0; }
+.asideMeName { display: block; font-size: 14px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asideMeSub { display: block; font-size: 12px; color: var(--rv-sub); }
+
+.deskHeader {
+  flex: 0 0 60px;
+  height: 60px;
+  align-items: center;
+  gap: 16px;
+  padding: 0 28px;
+  background: var(--rv-desk);
+  border-bottom: 1px solid var(--rv-line);
+  box-sizing: border-box;
+}
+.deskGreet { flex: 1; min-width: 0; font-size: 15px; color: var(--rv-ink); }
+.deskGreetName { color: var(--rv-accent); font-weight: 650; }
+.deskSd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-white);
+  color: var(--rv-brown);
+  font-size: 14px;
+  font-weight: 650;
+}
+.deskSdDot { width: 7px; height: 7px; border-radius: 50%; background: var(--rv-accent); }
+.deskDate { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--rv-sub); letter-spacing: .02em; white-space: nowrap; }
+.deskBell {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-brown);
+  display: grid;
+  place-items: center;
+}
+.deskBellDot { position: absolute; top: 5px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--rv-accent); box-shadow: 0 0 0 2px var(--rv-desk); }
+.deskSignOut { height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--rv-sub); font-size: 12.5px; font-weight: 650; letter-spacing: .1em; }
+
+/* ── Viewing as (a Principal, read-only) ── */
+.vaBar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 16px; background: var(--rv-ink); color: var(--rv-white); }
+.vaIcon { flex: 0 0 17px; }
+.vaText { flex: 1; min-width: 0; font-size: 13px; line-height: 1.3; }
+.vaName { display: block; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vaSub { display: block; font-size: 11.5px; color: var(--rv-blush); }
+.vaSwitch { height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--rv-white-30); background: transparent; color: var(--rv-white); font-size: 12.5px; font-weight: 650; }
+.vaExit { height: 32px; padding: 0 10px; border-radius: 9px; border: 0; background: var(--rv-peach); color: var(--rv-ink); font-size: 12.5px; font-weight: 700; }
+
+/* ── the phone header (`header-style="d"`), on Today and Quote step 2 ── */
+.header {
+  flex: 0 0 auto;
+  background: var(--rv-white);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 20px 10px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 160ms;
+}
+.headerRuled { border-bottom-color: var(--rv-line); }
+.headerBack { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--rv-accent); font-size: 15px; font-weight: 600; }
+.headerLogo { min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; }
+.headerWord { display: block; font-size: 15px; font-weight: 700; letter-spacing: .14em; color: var(--rv-brown); line-height: 1.2; white-space: nowrap; }
+.headerDept { display: block; font-size: 12px; font-weight: 600; color: var(--rv-accent); margin-top: 2px; }
+.capsule {
+  display: flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 4px 0 0;
+  border-radius: 23px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px var(--rv-ink-06);
+}
+.capsuleSd { display: flex; align-items: center; gap: 3px; height: 44px; padding: 0 8px 0 14px; border: 0; background: transparent; color: var(--rv-brown); font-size: 14px; font-weight: 650; }
+.capsuleRule { width: 1px; height: 20px; background: var(--rv-line); }
+.capsuleBell {
+  position: relative;
+  width: 46px;
+  height: 44px;
+  padding: 0 0 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-brown);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  box-sizing: border-box;
+}
+.capsuleBadge {
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--rv-accent);
+  color: var(--rv-white);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--rv-white);
+}
+.capsuleAvatar { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 1px 6px; background: var(--rv-brown); color: var(--rv-white); font-size: 12px; font-weight: 650; }
+
+/* ── the page ── */
+.main {
+  flex: 1 1 auto;
+  scrollbar-width: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--rv-white);
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+  transition: padding 320ms cubic-bezier(.2,.8,.2,1);
+}
+.main::-webkit-scrollbar { display: none; }
+
+/* ── the bottom bar ── */
+.nav { flex: 0 0 auto; background: var(--rv-white); border-top: 1px solid var(--rv-line); position: relative; z-index: 2; }
+.navLive { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.navGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; height: 62px; padding: 0 4px; }
+.navItem { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 8px; border: 0; background: transparent; color: var(--rv-sub); }
+.navItemOn { color: var(--rv-accent); }
+.navPill { width: 56px; height: 30px; border-radius: 16px; background: transparent; display: grid; place-items: center; }
+.navPillOn { background: var(--rv-orange-bg); }
+.navLabel { font-size: 11px; font-weight: 500; }
+.navLabelOn { font-weight: 650; }
+.navQuote { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 0 8px; border: 0; background: transparent; color: var(--rv-sub); }
+.navQuoteOn { color: var(--rv-accent); }
+.navQuoteCircle {
+  position: relative;
+  z-index: 6;
+  width: 58px;
+  height: 58px;
+  margin-top: -22px;
+  border-radius: 50%;
+  background: var(--rv-accent);
+  border: 4px solid var(--rv-white);
+  box-sizing: border-box;
+  box-shadow: 0 6px 16px var(--rv-accent-30);
+  color: var(--rv-white);
+  display: grid;
+  place-items: center;
+}
+.navQuoteLabel { font-size: 11px; font-weight: 650; }
+.homeIos { height: 26px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; box-sizing: border-box; }
+.homeIosBar { width: 134px; height: 5px; border-radius: 3px; background: var(--rv-black); }
+.homeAndroid { height: 18px; display: flex; align-items: center; justify-content: center; }
+.homeAndroidBar { width: 108px; height: 4px; border-radius: 2px; background: var(--rv-ink); }
+
+/* ── desktop: sidebar, top bar, a 760px column, no bottom bar ── */
+@container rv (min-width: 1024px) {
+  .screen { padding-left: 240px; }
+  .screenLive { padding-top: 0; }
+  .aside { display: flex; }
+  .deskHeader { display: flex; }
+  .header, .nav, .statusIos, .statusAndroid { display: none; }
+  .main {
+    padding-left: max(20px, calc((100% - 760px) / 2));
+    padding-right: max(20px, calc((100% - 760px) / 2));
+  }
+  .rail .main {
+    padding-left: max(20px, calc((100% - 400px - 760px) / 2));
+    padding-right: max(420px, calc((100% - 400px - 760px) / 2 + 400px));
+  }
+}

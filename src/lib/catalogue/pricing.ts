@@ -1,7 +1,8 @@
 /**
  * The portal's own prices, read the way the run reads them — the TypeScript
  * twins of `catalogue_grid_price`, `catalogue_unit_price` and
- * `catalogue_line_surcharge` (migration 20260924030000); the twin of
+ * `catalogue_line_surcharge` (migration 20260924030000) and
+ * `catalogue_line_charge` (20261005010000); the twin of
  * `catalogue_line_cost` + `catalogue_apply_combos` built from them is the
  * member calculator's `costLines` (lib/member/calculator.ts). The Product List
  * shows what a SKU would cost with these, and the SQL costs a sales line with
@@ -125,9 +126,30 @@ export const POOLS = [
 ] as const
 export type Pool = (typeof POOLS)[number]
 
-/** A pool whose options carry a surcharge. Gaps and seat sizes do not. */
+/**
+ * What a price keyed on the Maintenance tab MEANS (user 2026-10-04):
+ *
+ *   'charge' — a bed frame's divan height, leg height, gap and total
+ *              height: what the CUSTOMER pays for that option, on top. Out of
+ *              the margin on both sides, in the commissionable sales, never
+ *              KPI (`lineCharge`, catalogue_line_charge, 20261005010000).
+ *   'cost'   — a bed frame's specials, a sofa's leg height and specials: a
+ *              cost surcharge, in the margin (`lineSurcharge`).
+ *   null     — no price: a sofa's seat size, which is the grid's own axis.
+ */
+export type PoolPrice = 'charge' | 'cost' | null
+
+export const CHARGED_POOLS = ['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps', 'bedframe_total_heights'] as const
+
+export function poolPriceOf(pool: string): PoolPrice {
+  if ((CHARGED_POOLS as readonly string[]).includes(pool)) return 'charge'
+  if (pool === 'sofa_sizes') return null
+  return 'cost'
+}
+
+/** A pool whose options carry a price of either kind. A sofa's seat sizes do not. */
 export function isPricedPool(pool: string): boolean {
-  return pool !== 'bedframe_gaps' && pool !== 'sofa_sizes'
+  return poolPriceOf(pool) !== null
 }
 
 /** An option price as keyed on the Maintenance tab. */
@@ -168,10 +190,12 @@ export interface SurchargePart {
 }
 
 /**
- * The surcharges a line's options add, per unit — the ERP's computeMfgLineCost
- * shape: a bed frame's divan, leg and total height and its specials; a sofa
- * module's leg height and specials. Gaps and seat sizes add nothing. An option
- * with no portal price adds nothing too, and is reported so the page can say so.
+ * The surcharges a line's options add to its COST, per unit — the twin of
+ * catalogue_line_surcharge: a sofa module's leg height and specials, a bed
+ * frame's specials. A bed frame's divan, leg, gap and total height are
+ * CHARGED to the customer instead (`lineCharge`, 2026-10-05), so
+ * `facts.divan` / `facts.total` and a bed frame's leg add nothing here. An option with no portal price adds nothing too, and is reported so
+ * the page can say so.
  */
 export function lineSurcharge(
   category: string | null,
@@ -179,22 +203,11 @@ export function lineSurcharge(
   prices: OptionPrices,
 ): { amount: number; parts: SurchargePart[] } {
   const cat = (category ?? '').toUpperCase()
-  const pairs: Array<[string, string | null]> =
-    cat === 'BEDFRAME'
-      ? [
-          ['bedframe_divan_heights', facts.divan],
-          ['bedframe_leg_heights', facts.leg],
-          ['bedframe_total_heights', facts.total],
-        ]
-      : cat === 'SOFA'
-        ? [['sofa_leg_heights', facts.leg]]
-        : []
-  if (pairs.length === 0) return { amount: 0, parts: [] }
+  if (cat !== 'BEDFRAME' && cat !== 'SOFA') return { amount: 0, parts: [] }
 
   const parts: SurchargePart[] = []
-  for (const [pool, value] of pairs) {
-    if (value === null) continue
-    parts.push({ pool, value, price: prices.get(pool, value) })
+  if (cat === 'SOFA' && facts.leg !== null) {
+    parts.push({ pool: 'sofa_leg_heights', value: facts.leg, price: prices.get('sofa_leg_heights', facts.leg) })
   }
   const specialsPool = cat === 'BEDFRAME' ? 'bedframe_specials' : 'sofa_specials'
   for (const sp of facts.specials) {
@@ -202,6 +215,42 @@ export function lineSurcharge(
   }
   const amount = parts.reduce((a, p) => a + (p.price ?? 0), 0)
   return { amount, parts }
+}
+
+export interface ChargePart {
+  pool: (typeof CHARGED_POOLS)[number]
+  value: string
+  /** What the customer pays for it, per unit — always above zero. */
+  price: number
+}
+
+/**
+ * What a bed frame's divan, leg, gap and total height are CHARGED to the customer, per unit
+ * — the twin of catalogue_line_charge (user 2026-10-04: "16 寸需要 100 块 …
+ * 这 100 本身不会算进 margin 里面，而是算 commission amount 来的"). Only an option
+ * priced above zero is a charge; one nobody priced, or priced at 0, is FOC.
+ * Anything but a bed frame is never charged.
+ */
+export function lineCharge(
+  category: string | null,
+  facts: Pick<LineFacts, 'divan' | 'leg' | 'gap' | 'total'>,
+  prices: OptionPrices,
+): { amount: number; parts: ChargePart[] } {
+  if ((category ?? '').toUpperCase() !== 'BEDFRAME') return { amount: 0, parts: [] }
+  const pairs: Array<[ChargePart['pool'], string | null]> = [
+    ['bedframe_divan_heights', facts.divan],
+    ['bedframe_leg_heights', facts.leg],
+    ['bedframe_gaps', facts.gap],
+    ['bedframe_total_heights', facts.total],
+  ]
+  const parts: ChargePart[] = []
+  for (const [pool, value] of pairs) {
+    if (value === null || value.trim() === '') continue
+    const price = prices.get(pool, value)
+    if (price === null || !(price > 0)) continue
+    parts.push({ pool, value, price })
+  }
+  return { amount: parts.reduce((a, p) => a + p.price, 0), parts }
 }
 
 /**

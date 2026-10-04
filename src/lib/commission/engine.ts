@@ -219,8 +219,11 @@ export interface MarginBase {
  * The revenue is the bill's MAIN sales (2026-09-27): what its KPI items take
  * off is paid flat as KPI and is not the main product's price, so a RM 10,000
  * bill with HB Straight at RM 200 is judged on 9,800 — the items' cost stays.
- * Every line's cost is divided by its own SKU's ratio, else the sub-
- * department's (`cost-basis.ts`).
+ * Less, too, what its bed frames' divan, leg, gap and total height were CHARGED
+ * (`SalesLine.optionCharge`, 2026-10-05): a RM 10,000 bill with a 6" leg at
+ * RM 100 is judged on 9,900 against a cost that never had the leg in it, and
+ * its rate is still paid on 10,000. Every line's cost is divided by its own
+ * SKU's ratio, else the sub-department's (`cost-basis.ts`).
  *
  * Every line counts toward the margin, whatever brand it carries: the ladder
  * is the BILL's (user 2026-09-27 — an Akemi bill that gives away a
@@ -239,6 +242,7 @@ export function marginBase(
 ): MarginBase {
   let revenue = 0
   let cost = 0
+  let charges = 0
   let complete = true
   const byBrand = new Map<string, number>()
   const basis = typeof costBasis === 'number' ? costBasisOf(costBasis) : costBasis
@@ -248,6 +252,7 @@ export function marginBase(
   for (const line of lines) {
     if (!inGoodsScope(line, groupIndex)) continue
     revenue = round2(revenue + line.lineAmount)
+    charges = round2(charges + (line.optionCharge ?? 0))
     if (line.costAmount === undefined || line.costAmount === null) complete = false
     else cost = round2(cost + line.costAmount / costDivisorFor(line.productCode, basis))
     if (line.brandCode) {
@@ -256,6 +261,10 @@ export function marginBase(
     }
   }
   if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
+  // What its bed frames' divan, leg, gap and total height were charged is the customer's
+  // price for an option, not the product's (2026-10-05): out of the margin on
+  // both sides — it was never in the cost — while the rate is still paid on it.
+  revenue = round2(revenue - charges)
 
   // The bill's own brand decides; the lines only speak for a bill without one.
   if (orderBrand) return { revenue, cost, complete, brandCode: orderBrand, mixedBrand: false }

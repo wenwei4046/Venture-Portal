@@ -338,8 +338,19 @@ describe('validateOptionPrices', () => {
     ])
   })
 
-  it.each(['bedframe_gaps', 'sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
+  it.each(['sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
     expect(() => validateOptionPrices(pool, [{ value: '12"', price: '5' }])).toThrow('That list carries no price')
+  })
+
+  // 2026-10-05: a bed frame's gap is charged to the customer, like its divan and leg.
+  it('prices a gap — what the customer pays for it', () => {
+    expect(validateOptionPrices('bedframe_gaps', [{ value: '12"', price: '20' }]).upserts).toEqual([
+      { pool: 'bedframe_gaps', value: '12"', price: 20 },
+    ])
+  })
+
+  it.each(['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps', 'bedframe_total_heights'])('a charge on %s cannot be negative', pool => {
+    expect(() => validateOptionPrices(pool, [{ value: '6"', price: '-10' }])).toThrow('a price cannot be negative')
   })
 
   it.each(['', 'mattress_sizes', 'Sofa_specials', 'sofa-specials', 'bedframe_', 'sofa_specials; drop', 'sofa_Specials'])(

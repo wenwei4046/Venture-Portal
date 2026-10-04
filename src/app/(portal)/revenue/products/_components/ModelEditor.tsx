@@ -308,6 +308,15 @@ export default function ModelEditor({ model, brands, options, position, onClose,
                 )}
               </section>
             })}
+            {/* 2026-10-05: what the ticks above do to a bed frame's divan, leg,
+                gap and total height on the Quote. */}
+            {(model.category ?? '').toUpperCase() === 'BEDFRAME' ? (
+              <p className="text-xs">
+                On the Quote, a divan, leg, gap or total height turned on here is offered with its charge from Maintenance
+                (paid by the customer on top: out of the margin, in the commission); one turned on with no charge is FOC;
+                one not turned on is never offered.
+              </p>
+            ) : null}
           </fieldset>
         </div>
 

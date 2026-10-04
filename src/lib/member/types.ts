@@ -75,10 +75,30 @@ export interface MemberModelOptions {
   total_heights?: string[];
   gaps?: string[];
 }
+/** A bed frame option the customer may be CHARGED for, and what (RM, always above zero). */
+export interface OptionCharge {
+  value: string;
+  charge: number;
+}
+/**
+ * A bed frame model's divan, leg, gap and total height the customer may pay for (user
+ * 2026-10-04): what the ERP lets the model take, priced on Product List ›
+ * Maintenance above zero. The Quote offers FOC plus these; a charge is out of
+ * the margin on both sides and in the commission. A customer's price, not a
+ * cost, so the member's own snapshot carries it.
+ */
+export interface MemberModelCharges {
+  divan_heights?: OptionCharge[];
+  leg_heights?: OptionCharge[];
+  gaps?: OptionCharge[];
+  total_heights?: OptionCharge[];
+}
 export interface MemberCatalogueModel {
   id: string;
   kind: "SOFA" | "BEDFRAME";
   options: MemberModelOptions;
+  /** A bed frame's chargeable options; absent = every option is FOC. */
+  charges?: MemberModelCharges;
 }
 export interface MemberBand {
   brand: string;
@@ -158,6 +178,12 @@ export interface MemberRequest {
   title: string;
   status: string;
   createdAt: string;
+  /** When it was first sent to HR (mig 20261005030000); absent on an older snapshot. */
+  submittedAt?: string | null;
+  /** `RQ-2610-004` — numbered when first sent, never reused (mig 20261005030000). */
+  requestNo?: string | null;
+  /** Whose request it is — a Principal's snapshot holds everybody's (mig 20261005030000). */
+  staffId?: string | null;
   detail: Record<string, unknown>;
   note?: string;
   claimId?: string | null;
@@ -216,8 +242,16 @@ export interface QuoteLine {
   quantity: number;
   /** The role selected for this line, independently of the product's eligibility. */
   gift: boolean;
+  /**
+   * This bed frame's own build (2026-10-05): each bed frame in a cart is built
+   * on its own — its divan, leg, gap and total height FOC or charged, its
+   * specials. Absent =
+   * the cart's `build.bedframe`, if any. Two lines of one SKU built
+   * differently are two lines.
+   */
+  bedframe?: BedframeBuild;
 }
-/** The bed frame build for every bed frame in the cart — the ERP's bed frame options. */
+/** The bed frame build — the ERP's bed frame options. */
 export interface BedframeBuild {
   divan?: string;
   leg?: string;
@@ -284,9 +318,22 @@ export interface QuoteResult {
   kpiItems?: { label: string; qty: number; amount: number }[];
   /** KPI items the price does not cover, RM — not paid; the whole price is the sale. */
   kpiNotPaid?: number;
+  /**
+   * What the cart's bed frames' divan, leg, gap and total height are CHARGED, RM (2026-10-05)
+   * — on top of the selling price, out of the margin, in the commission.
+   * 0 when every option is FOC.
+   */
+  optionCharge?: number;
+  optionCharges?: { label: string; qty: number; amount: number }[];
+  /** The KPI items the customer BUYS, RM — on top of the selling price. A free one is not. */
+  addOnAmount?: number;
+  /** Selling price + bought KPI items + option charges + additional charges. */
+  customerPays?: number;
   version: string;
   inputKey: string;
   customerText?: string;
+  /** The cost ÷ this ratio the margin was judged on (Fair 0.7) — the department's rule, not a cost. */
+  costDivisor?: number;
   suggestions: {
     productId: string;
     name: string;

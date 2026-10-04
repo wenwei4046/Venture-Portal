@@ -22,12 +22,14 @@ import type { DirectorTerms } from './types'
 /**
  * Comm Cal's "Commissionable value" card: the month's live bills (every one
  * not cancelled, matched to a salesperson or not) at their commissionable
- * sales — the lines in groups the scheme pays on.
+ * sales — the lines in groups the scheme pays on. `commissionable`, not the
+ * margin's revenue: a bed frame option's charge is in the one and not the
+ * other (2026-10-05).
  */
 export function monthCommissionableValue(
-  orders: readonly { cancelled: boolean; marginRevenue: number }[],
+  orders: readonly { cancelled: boolean; commissionable: number }[],
 ): number {
-  return Math.round(orders.filter(o => !o.cancelled).reduce((a, o) => a + o.marginRevenue, 0) * 100) / 100
+  return Math.round(orders.filter(o => !o.cancelled).reduce((a, o) => a + o.commissionable, 0) * 100) / 100
 }
 
 /** Is the incentive paid this month? Half a sen of rounding never decides it. */

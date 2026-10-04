@@ -35,6 +35,8 @@ export interface ArenaFairEvent {
   /** The booth's brand. Absent from a whole-fair result. */
   brand?: string | null;
   fairId?: string;
+  /** Who ran the fair (`comm_organisers`), when the calendar names one. */
+  organizer?: string | null;
   /** The fair weekend — the Friday of the week the fair opens in. */
   week?: string;
   /** The last day the week's brand can be picked: seven days after its fairs. */

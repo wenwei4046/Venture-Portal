@@ -163,6 +163,153 @@
   --arena-medal-silver-mid: 180 174 164;
   --arena-medal-silver-deep: 107 100 90;
 }
+/* ─── Revenue app (2026-10-04) ───
+   The member app as drawn in Claude Design (`Revenue Mobile.dc.html`). Every
+   value is the prototype's own, copied literally — the design is signed off
+   pixel for pixel, so nothing here is rounded or mapped onto the portal set.
+   Components read these through `var(--rv-*)`; no hex lives anywhere else. */
+[data-revenue-app] {
+  color-scheme: light;
+  /* ink */
+  --rv-ink: #3F2B22;
+  --rv-sub: #806B60;
+  --rv-brown: #4E2F20;
+  --rv-accent: #BD4A19;
+  --rv-red: #A3371A;
+  --rv-amber: #A46312;
+  --rv-green: #387557;
+  --rv-white: #FFFFFF;
+  --rv-black: #000000;
+  /* rules */
+  --rv-line: #EBDDD2;
+  --rv-line-strong: #E2CFC1;
+  --rv-rule: #F1E7DF;
+  --rv-handle: #E3D6CC;
+  /* fills */
+  --rv-sand: #F5EBE3;
+  --rv-cream: #FFF5EC;
+  --rv-peach-bg: #FFF0E4;
+  --rv-green-bg: #E8F3ED;
+  --rv-amber-bg: #FFF0CC;
+  --rv-red-bg: #F8E1D8;
+  --rv-orange-bg: #FFE5CF;
+  --rv-active: #FFF1E6;
+  --rv-desk: #FBF6F2;
+  --rv-peach: #F6B48A;
+  --rv-blush: #F0DDCE;
+  --rv-gold: #E1B04F;
+  --rv-gold-tint: #FFF4D9;
+  --rv-gold-sub: #6B4A1C;
+  --rv-green-pale: #D9EDE2;
+  --rv-unread: #FFFBF7;
+  --rv-rose: #F6D7C0;
+  --rv-cream-2: #FFF6EF;
+  --rv-line-tan: #D9C7BA;
+  /* Insight: tones, the margin ladder and its bar, KPI shades */
+  --rv-neutral-bg: #F7F3EF;
+  --rv-none-bg: #FAF7F4;
+  --rv-wait-bg: #FFF8E6;
+  --rv-tier-top: #2E6249;
+  --rv-tier-inc: #6FAA8A;
+  --rv-tier-ref: #C9BBAE;
+  --rv-tier-pen1: #E7A08A;
+  --rv-tier-pen2: #D9775A;
+  --rv-tier-deep: #1E4532;
+  --rv-zone-pen2: #E7B3A2;
+  --rv-zone-pen1: #F1CDBF;
+  --rv-zone-low: #F6DFAE;
+  --rv-zone-ref: #E9E1D8;
+  --rv-zone-inc: #B7DBC7;
+  --rv-kpi-ink: #24513B;
+  --rv-kpi-4: #4E8A6B;
+  --rv-kpi-5: #679E80;
+  --rv-kpi-6: #86B79C;
+  --rv-kpi-7: #A8CDB8;
+  --rv-kpi-8: #CBE3D5;
+  --rv-kpi-9: #E2F0E8;
+  /* Arena: silver and bronze medals, the podium steps, an empty count */
+  --rv-silver-bg: #F2F0EB;
+  --rv-silver: #B4AEA4;
+  --rv-silver-ink: #6B645A;
+  --rv-bronze: #BA855D;
+  --rv-bronze-ink: #7A4B35;
+  --rv-step-2: #DAD5CC;
+  --rv-step-2-ink: #4A443C;
+  --rv-step-3: #D3A07A;
+  --rv-step-3-ink: #4A2A1A;
+  --rv-muted: #C9B8AC;
+  --rv-pill: #F7F0EA;
+  --rv-radio: #CDBCAE;
+  --rv-placeholder: #757575;
+  /* translucent */
+  --rv-ink-06: rgba(63,43,34,.06);
+  --rv-ink-08: rgba(63,43,34,.08);
+  --rv-ink-14: rgba(63,43,34,.14);
+  --rv-ink-15: rgba(63,43,34,.15);
+  --rv-ink-18: rgba(63,43,34,.18);
+  --rv-ink-20: rgba(63,43,34,.2);
+  --rv-accent-18: rgba(189,74,25,.18);
+  --rv-accent-20: rgba(189,74,25,.20);
+  --rv-accent-30: rgba(189,74,25,.3);
+  --rv-brown-18: rgba(78,47,32,.18);
+  --rv-green-18: rgba(56,117,87,.18);
+  --rv-gold-28: rgba(225,176,79,.28);
+  --rv-white-14: rgba(255,255,255,.14);
+  --rv-white-16: rgba(255,255,255,.16);
+  --rv-white-20: rgba(255,255,255,.2);
+  --rv-white-24: rgba(255,255,255,.24);
+  --rv-white-30: rgba(255,255,255,.3);
+  --rv-white-35: rgba(255,255,255,.35);
+  --rv-white-55: rgba(255,255,255,.55);
+  --rv-amber-12: rgba(164,99,18,.12);
+  --rv-black-38: rgba(0,0,0,.38);
+  --rv-black-06: rgba(0,0,0,.06);
+  --rv-dim: rgba(40,25,18,.45);
+  --rv-dim-brown: rgba(78,47,32,.42);
+  --rv-dim-35: rgba(40,25,18,.35);
+  --rv-dim-40: rgba(40,25,18,.4);
+  /* the income hero (`hero-style="grad"`) */
+  --rv-hero-grad: linear-gradient(140deg,#F2995E 0%,#D9622A 55%,#B8461A 100%);
+  --rv-hero-sub: #FFE6D6;
+  --rv-hero-good: #DDF5E7;
+  /* Profile (2026-10-05): the peach glow, My honours' walnut card and metal
+     medals, the family chart, a request's audit notes */
+  --rv-profile-glow: linear-gradient(180deg,#F6B48A 0%,#FFD9BC 70%,#FFFFFF 100%);
+  --rv-ink-05: rgba(63,43,34,.05);
+  --rv-ink-10: rgba(63,43,34,.10);
+  --rv-ink-25: rgba(63,43,34,.25);
+  --rv-white-12: rgba(255,255,255,.12);
+  --rv-black-15: rgba(0,0,0,.15);
+  --rv-black-30: rgba(0,0,0,.3);
+  --rv-honour-grad: linear-gradient(165deg,#5A3626 0%,#3F2B22 62%,#2E1F18 100%);
+  --rv-honour-glow: radial-gradient(closest-side,rgba(225,176,79,.32),rgba(225,176,79,0));
+  --rv-gold-45: rgba(225,176,79,.45);
+  --rv-gold-18: rgba(225,176,79,.18);
+  --rv-gold-label: #F3D27E;
+  --rv-gold-line: #F3DFB0;
+  --rv-gold-coin: radial-gradient(circle at 35% 30%,#FFF1C2,#E1B04F 60%,#B9862C);
+  --rv-metal-gold: radial-gradient(circle at 35% 30%,#FFF4CC,#E9BC57 55%,#B9862C);
+  --rv-metal-gold-ink: #4A3110;
+  --rv-metal-silver: radial-gradient(circle at 35% 30%,#FFFFFF,#CFCAC2 55%,#8F897F);
+  --rv-metal-silver-ink: #3D3832;
+  --rv-metal-silver-label: #E4E0DA;
+  --rv-metal-bronze: radial-gradient(circle at 35% 30%,#FBE3CF,#C98F65 55%,#8C5A3A);
+  --rv-metal-bronze-ink: #3E2416;
+  --rv-metal-bronze-label: #E4B793;
+  --rv-tree-bg: linear-gradient(180deg,#FBF7F3,#FFFFFF);
+  --rv-paper-warm: #FBF7F3;
+  --rv-tree-line: #D9CABD;
+  --rv-tree-guide: #E3D6CC;
+  --rv-tree-level: #A08E82;
+  --rv-note-bg: #FAF6F2;
+  --rv-cancel-line: #F1C5B4;
+  /* the simulated device a preview draws around the app */
+  --rv-frame: #1C1A19;
+  --rv-frame-ring: #3A3634;
+  --rv-android-ink: #1D1B1A;
+  --rv-android-cam: #111111;
+}
+
 /* Real devices supply these insets; simulated device chrome lives outside the iframe. */
 [data-arena-design] > [data-arena-chrome] {
   position: sticky;
@@ -773,9 +920,9 @@ html[data-nav-pending] .route-surface {
 }
 
 /* ───────── Motion: input focus glow ───────── */
-input:not([type="checkbox"]):not([type="radio"]):focus,
-textarea:focus,
-select:focus {
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *)),
+textarea:focus:not(:where([data-revenue-app] *)),
+select:focus:not(:where([data-revenue-app] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;
@@ -1341,7 +1488,7 @@ tr:hover .icon-btn { opacity: 1; }
   text-transform: none;
   letter-spacing: 0.01em;
 }
-h1:not(.sr-only), .page-title {
+h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title {
   font-family: var(--font-display);
   font-weight: 400;
   font-style: normal;
@@ -1606,7 +1753,7 @@ table.ledger-table tr.lt-detail {
   .statement-amount, .num-hero { font-size: 23px; }
 }
 @media (max-width: 680px) {
-  h1:not(.sr-only), .page-title { font-size: 30px; }
+  h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title { font-size: 30px; }
   .statement-amount, .num-hero { font-size: 21px; }
 }
 
@@ -1636,16 +1783,21 @@ table.ledger-table tr.lt-detail {
   select,
   textarea {
     font-size: 16px !important;
+  }
+  /* The Revenue app keeps the prototype's own control heights. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *)),
+  select:not(:where([data-revenue-app] *)),
+  textarea:not(:where([data-revenue-app] *)) {
     min-height: 44px;
   }
   /* Checkboxes stay small but get a bigger hit area via padding on the label
      in the markup; bump the box itself to the platform minimum. */
-  input[type='checkbox'],
-  input[type='radio'] {
+  input[type='checkbox']:not(:where([data-revenue-app] *)),
+  input[type='radio']:not(:where([data-revenue-app] *)) {
     width: 18px;
     height: 18px;
   }
-  textarea {
+  textarea:not(:where([data-revenue-app] *)) {
     min-height: 88px;
   }
   /* Money inputs inside a folded table panel are laid out by width utility

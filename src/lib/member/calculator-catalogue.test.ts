@@ -107,7 +107,9 @@ describe("option surcharges", () => {
     expect(r.margin).toBeCloseTo(margin(1000), 10);
   });
 
-  it("lets a surcharge take money off (the ERP's No Side Panel)", () => {
+  // 2026-10-05: a bed frame's divan is CHARGED to the customer, not costed —
+  // its RM 100 rides on top of the price, out of the margin; a special is still a cost.
+  it("lets a surcharge take money off (the ERP's No Side Panel), and charges the divan on top", () => {
     const r = calculateQuote(
       quote([one("y04-q")], { bedframe: { divan: '10"', specials: ["No Side Panel"] } }, "2000"),
       products,
@@ -115,7 +117,9 @@ describe("option surcharges", () => {
       undefined,
       pricing(),
     );
-    expect(r.margin).toBeCloseTo(margin(800 + 100 - 40, 2000), 10);
+    expect(r.margin).toBeCloseTo(margin(800 - 40, 2000), 10);
+    expect(r.optionCharge).toBe(100);
+    expect(r.customerPays).toBe(2100);
   });
 
   it("refuses an option the cart's models were not ticked for", () => {

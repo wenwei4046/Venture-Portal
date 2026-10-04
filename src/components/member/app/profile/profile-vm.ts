@@ -1,0 +1,278 @@
+import type { ClaimRates } from "@/lib/member/claim-rules";
+
+/**
+ * What every Profile screen draws — strings and flags only, ready to render.
+ * The live app builds these from the database (`profile-model.ts`); the design
+ * preview hands them over from the prototype's own data (`fixtures/proto-profile.ts`),
+ * so both run the very same screens.
+ */
+
+export type Tone = "good" | "neutral" | "warn" | "bad" | "none";
+
+// ── Profile ──
+export type WorkKey = "income" | "honours" | "team" | "requests" | "memos";
+export interface ProfileMainVM {
+  name: string;
+  ini: string;
+  /** `HOUZS Venture · Revenue · Fair`. */
+  sub: string;
+  title: string;
+  rank: string;
+  /** `1 pending`, `2 new` — a row's badge, when it has one. */
+  badges: Partial<Record<WorkKey, string>>;
+}
+
+// ── My income ──
+export interface IncomeRowVM {
+  label: string;
+  sub: string;
+  amt: string;
+  /** A deduction: drawn in red. */
+  neg?: boolean;
+}
+export interface IncomePastVM {
+  /** `YYYY-MM` — tapping the row opens that month. */
+  period: string;
+  month: string;
+  /** `Paid 7 Sep`, `With Finance`, `Closed 30 Sep`. */
+  paid: string;
+  amt: string;
+  /** `Paid` (green) or another state (amber). */
+  status: string;
+  settled: boolean;
+}
+export interface IncomeVM {
+  period: string;
+  periodLabel: string;
+  /** `Estimated income · not settled`, `Closed income · final`. */
+  heroLabel: string;
+  amount: string;
+  heroNote: string;
+  rows: IncomeRowVM[];
+  total: string;
+  /** `2 orders are waiting for a deposit.` + why — absent when nothing is held. */
+  held: { strong: string; rest: string } | null;
+  past: IncomePastVM[];
+  /** The month has bills or override to list. */
+  hasOrders: boolean;
+  /** Said instead of the breakdown when the month cannot be worked out. */
+  notice: string | null;
+}
+
+// ── Commission by order ──
+export interface CoRowVM {
+  id: string;
+  no: string;
+  meta: string;
+  pay: string;
+  /** Commission held (no cost yet / waiting for a deposit): the amount in amber. */
+  held: boolean;
+  sub: string;
+}
+export interface CoTabVM {
+  tab: string;
+  label: string;
+  total: string;
+  base: string;
+  rate: string;
+  rows: CoRowVM[];
+  note: string;
+}
+export interface CoLineVM {
+  name: string;
+  qty: string;
+  amt: string;
+  pay: string;
+  kpiPay: string;
+  kpi: boolean;
+}
+export interface CoSheetVM {
+  no: string;
+  meta: string;
+  tag: string;
+  tone: Tone;
+  amt: string;
+  commLabel: string;
+  comm: string;
+  kpiPay: string;
+  kpiSub: string;
+  /** KPI pay in green, or a dash in the muted ink. */
+  kpiPaid: boolean;
+  lines: CoLineVM[];
+  total: string;
+  note: string;
+}
+export interface IncomeOrdersVM {
+  periodLabel: string;
+  mine: CoTabVM;
+  override: CoTabVM;
+  /** By row id: `m:<order>` for the member's own bills, `o:<order>` for override. */
+  sheets: Record<string, CoSheetVM>;
+}
+
+// ── My honours ──
+export type HonourBoard = "Sales" | "Margin" | "KPI" | "Championship" | "Fair";
+export type HonourKind = "monthly" | "quarterly" | "annual";
+export interface HonourItemVM {
+  title: string;
+  sub: string;
+  board: HonourBoard;
+}
+export interface HonourPlaceVM {
+  place: number;
+  label: string;
+  short: string;
+  count: number;
+  unit: string;
+}
+export interface HonoursVM {
+  periodLabel: string;
+  eyebrow: string;
+  podiums: number;
+  finishes: number;
+  /** `+3 vs Aug` — absent with no earlier period to compare, or no change. */
+  delta: string | null;
+  podium: { gold: number; silver: number; bronze: number };
+  highlight: string | null;
+  places: HonourPlaceVM[];
+  /** By place. */
+  sheets: Record<number, { title: string; items: HonourItemVM[] }>;
+  /** Said when nothing is final yet. */
+  notice: string | null;
+}
+
+// ── Team & capacity ──
+export type TeamDot = "good" | "wait" | "up";
+export interface TeamNodeVM {
+  id: string;
+  name: string;
+  title: string;
+  ini: string;
+  dot: TeamDot;
+}
+export interface TeamUpVM extends TeamNodeVM {
+  level: string;
+}
+export interface TeamKidVM extends TeamNodeVM {
+  kids: TeamNodeVM[];
+}
+export interface PersonSheetVM {
+  name: string;
+  role: string;
+  ini: string;
+  self: boolean;
+  stats: { label: string; value: string; tone: "ink" | "good" | "up" | "wait" }[];
+  reportsTo: string;
+}
+export interface TeamVM {
+  lede: string;
+  capacity: {
+    occupied: number;
+    capacity: number | null;
+    /** `1 open place`, `Full`, `No limit set`. */
+    chip: string;
+    full: boolean;
+    note: string;
+  };
+  count: string;
+  /** Green, amber and grey — `KPI hit · Pending · Upline` or the sales reading when KPI is off. */
+  legend: [string, string, string];
+  ups: TeamUpVM[];
+  me: TeamNodeVM;
+  kids: TeamKidVM[];
+  sheets: Record<string, PersonSheetVM>;
+}
+
+// ── Requests ──
+export type RequestKindVM = "claim" | "replacement" | "waiting";
+export interface RequestRowVM {
+  id: string;
+  kind: RequestKindVM;
+  title: string;
+  sub: string;
+  status: string;
+  tone: Tone;
+}
+export interface RequestEventVM {
+  what: string;
+  who: string;
+  when: string;
+  note: string;
+  /** The last event's colour: good news, a stop, or a step on the way. */
+  dot: "past" | "good" | "bad";
+}
+export interface RequestDetailVM {
+  id: string;
+  title: string;
+  code: string;
+  status: string;
+  tone: Tone;
+  facts: { l: string; v: string }[];
+  log: RequestEventVM[];
+  canCancel: boolean;
+  /** HR returned it: the member updates it and sends it again. */
+  canUpdate: boolean;
+}
+
+// ── Memos ──
+export type MemoCat = "hr" | "mgmt" | "arena" | "ops";
+export interface MemoVM {
+  id: string;
+  cat: MemoCat;
+  from: string;
+  when: string;
+  whenFull: string;
+  title: string;
+  paras: string[];
+  read: boolean;
+  needsAck: boolean;
+  acked: boolean;
+  ackedText: string;
+}
+
+// ── View as ──
+export interface VaPersonVM {
+  id: string;
+  departmentId: string;
+  name: string;
+  ini: string;
+  sub: string;
+  /** 0 = directs the sub-department, 1 = top of its tree, 2+ below. */
+  level: number;
+  viewing: boolean;
+}
+export interface VaGroupVM {
+  title: string;
+  people: VaPersonVM[];
+}
+
+// ── The request form ──
+/** A fair weekend a claim can be for — the brand the member worked and the booth it was at. */
+export interface ClaimWeek {
+  key: string;
+  n: string;
+  /** `Akemi week` — or `Brand week not picked`. */
+  brandWeek: string;
+  brand: string | null;
+  dates: string;
+  venue: string | null;
+  org: string | null;
+  /** The brand's colours: the badge, and the card when picked. */
+  color: string;
+  tint: string;
+}
+export interface FormOptions {
+  /** `Fair` — and `Klang Valley`, the base an outstation route starts from. */
+  subName: string;
+  weeks: ClaimWeek[];
+  rates: ClaimRates;
+  /** Replacement: the people the member may propose (their own team). */
+  members: { id: string; name: string }[];
+  /** Every Revenue sub-department: a transfer's receiver, a waiting list's preference. */
+  departments: { id: string; name: string; capacity: number | null; occupied: number }[];
+  departmentId: string;
+  /** The member's waiting-list requests that HR approved — a replacement may use one. */
+  waitingList: { id: string; name: string; sub: string; status: string; ok: boolean }[];
+  /** First choices, as the design preview shows them. Live: nothing is chosen for the member. */
+  initial?: { region?: string; member?: string; male?: number; female?: number; department?: string };
+}

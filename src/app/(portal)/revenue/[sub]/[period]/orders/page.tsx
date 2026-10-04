@@ -244,7 +244,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       orderTotal: o.orderTotal,
       // What the live calculation says earns; a bill it never saw (cancelled,
       // or the calculation failed) falls back to the lines in paying groups.
-      commissionable: paid?.commissionable ?? o.marginRevenue,
+      commissionable: paid?.commissionable ?? o.commissionable,
       paidAmount: o.paidAmount,
       depositShort: o.depositRequired !== null && !o.depositMet ? o.depositRequired : null,
       marginPct: o.marginPct,

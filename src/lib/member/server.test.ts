@@ -264,7 +264,9 @@ describe('the catalogue behind the member calculator', () => {
     expect(result.data.margin).toBeCloseTo(60, 10)
   })
 
-  it('costs a bed frame with its divan and leg surcharges', async () => {
+  // 2026-10-05: a bed frame's divan, leg and gap are CHARGED to the customer
+  // on top of the price — out of the margin, in the commission.
+  it('charges a bed frame’s divan and leg on top of the price, out of the margin', async () => {
     const result = await calculateMemberQuote({
       schemeId, price: '2000', delivery: '0',
       lines: [{ productId: frame, quantity: 1, gift: false }],
@@ -272,9 +274,43 @@ describe('the catalogue behind the member calculator', () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
-    // 800 + 100 + 20 = 920 → (2,000 − 920) ÷ 2,000
-    expect(result.data.margin).toBeCloseTo(54, 10)
+    // The frame's 800 alone → (2,000 − 800) ÷ 2,000; the 100 + 20 ride on top.
+    expect(result.data.margin).toBeCloseTo(60, 10)
+    expect(result.data.optionCharge).toBe(120)
+    expect(result.data.customerPays).toBe(2120)
     expect(result.data.customerText).toContain('Bed frame build: divan 10" · leg 4" · gap 12"')
+    expect(result.data.customerText).toContain('Bed frame options: RM 120.00')
+    expect(result.data.customerText).toContain('Total: RM 2120.00')
+  })
+
+  it('builds each bed frame on its own: FOC, or what Maintenance charges for it', async () => {
+    const charged = models.map(m => m.id === frameModel
+      ? { ...m, charges: { divan_heights: [{ value: '10"', charge: 100 }], leg_heights: [{ value: '4"', charge: 20 }] } }
+      : m)
+    mocks.adminRpc.mockResolvedValue(pricedCatalogue([bedFrame], { models: charged, optionPrices }))
+    const result = await calculateMemberQuote({
+      schemeId, price: '4000', delivery: '0',
+      lines: [
+        { productId: frame, quantity: 1, gift: false, bedframe: { leg: '4"' } },
+        { productId: frame, quantity: 1, gift: false },
+      ],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.data.margin).toBeCloseTo(((4000 - 1600) / 4000) * 100, 10)
+    expect(result.data.optionCharge).toBe(20)
+    expect(result.data.optionCharges).toEqual([{ label: 'Y04 · leg 4"', qty: 1, amount: 20 }])
+    expect(result.data.customerText).toContain('Product · Y04 / Queen (leg 4") × 1')
+    expect(result.data.customerText).toContain('Product · Y04 / Queen × 1')
+
+    // An option it is not charged for is FOC — not a choice the server takes.
+    const foc = await calculateMemberQuote({
+      schemeId, price: '2000', delivery: '0',
+      lines: [{ productId: frame, quantity: 1, gift: false, bedframe: { leg: 'No Leg' } }],
+    })
+    expect(foc.ok).toBe(false)
+    if (foc.ok) throw new Error('expected a refusal')
+    expect(foc.error).toMatch(/leg height is not offered for this bed frame/)
   })
 
   it('never lets a price or grid reach the snapshot, and keeps only well-formed dropdowns', async () => {

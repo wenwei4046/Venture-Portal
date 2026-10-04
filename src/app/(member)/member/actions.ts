@@ -6,10 +6,18 @@ export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
   loadMemberData,
   loadMemberInsight,
+  loadMemberInsightRange,
+  loadMemberOrderBook,
   loadMemberOrgMap,
   calculateMemberQuote as calculate,
   submitMemberRequest as submit,
   acknowledgeMemberMemo as acknowledge,
+  cancelMemberRequest as cancel,
+  loadMemberRequestHistory,
+  loadMemberClaimRates,
+  loadPrincipalMemoReceipts,
+  loadMemberIncome,
+  loadMemberHonours,
   adminMemberAction as administer,
   type AdminMemberCommand,
 } from "@/lib/member/server";
@@ -27,6 +35,12 @@ export async function refreshMemberData() {
 export async function fetchMemberInsight(period?: string, context?: MemberReadContext) {
   return loadMemberInsight(period, context);
 }
+export async function fetchMemberOrderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberOrderBook(subDepartmentId, from, until, context);
+}
+export async function fetchMemberInsightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberInsightRange(subDepartmentId, from, until, context);
+}
 export async function fetchMemberOrgMap(context?: Pick<MemberReadContext, "subDepartmentId">) {
   return loadMemberOrgMap(context);
 }
@@ -40,6 +54,29 @@ export async function submitMemberRequest(form: FormData) {
     revalidatePath("/claims");
   }
   return result;
+}
+export async function fetchMemberRequestHistory(id: string) {
+  return loadMemberRequestHistory(id);
+}
+export async function cancelMemberRequest(id: string) {
+  const result = await cancel(id);
+  if (result.ok) {
+    revalidatePath("/member");
+    revalidatePath("/claims");
+  }
+  return result;
+}
+export async function fetchPrincipalMemoReceipts(staffId: string) {
+  return loadPrincipalMemoReceipts(staffId);
+}
+export async function fetchMemberIncome(subDepartmentId: string, period: string, context?: MemberReadContext) {
+  return loadMemberIncome(subDepartmentId, period, context);
+}
+export async function fetchMemberHonours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberHonours(subDepartmentId, from, until, context);
+}
+export async function fetchMemberClaimRates() {
+  return loadMemberClaimRates();
 }
 export async function acknowledgeMemberMemo(id: string, ack: boolean) {
   const result = await acknowledge(id, ack);

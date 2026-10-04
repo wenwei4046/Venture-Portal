@@ -1,4 +1,4 @@
-import type { MemberProduct, QuoteLine } from "./types";
+import type { BedframeBuild, MemberProduct, QuoteLine } from "./types";
 
 export type ProductCategory =
   | "mattress"
@@ -139,9 +139,26 @@ export function isCompatibleGift(
   );
 }
 
-/** The same SKU can be purchased and offered as a gift in separate cart lines. */
-export function quoteLineKey(line: Pick<QuoteLine, "productId" | "gift">): string {
-  return JSON.stringify([line.productId, line.gift]);
+/**
+ * A bed frame build written the same way whatever order it was chosen in:
+ * its divan, leg, gap and total height as typed, its specials sorted. Two
+ * builds with one key are one build.
+ */
+export function bedframeKey(build: BedframeBuild | undefined): string {
+  const one = (v: string | undefined) => (v ?? "").trim();
+  const specials = [...new Set((build?.specials ?? []).map((s) => s.trim()).filter(Boolean))].sort();
+  return JSON.stringify([one(build?.divan), one(build?.leg), one(build?.gap), one(build?.total), specials]);
+}
+
+/**
+ * The same SKU can be purchased and offered as a gift in separate cart lines
+ * — and, since 2026-10-05, one bed frame built two ways is two lines. A line
+ * with no build of its own keys as it always has.
+ */
+export function quoteLineKey(line: Pick<QuoteLine, "productId" | "gift" | "bedframe">): string {
+  return line.bedframe
+    ? JSON.stringify([line.productId, line.gift, bedframeKey(line.bedframe)])
+    : JSON.stringify([line.productId, line.gift]);
 }
 
 /** Merge repeated additions by SKU and role, retaining every chosen quantity. */

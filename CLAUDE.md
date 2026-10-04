@@ -638,6 +638,33 @@ src/
 │   │   │                              be computed again. The TypeScript twins
 │   │   │                              are `lib/catalogue/*` — the calculator and
 │   │   │                              the run cannot disagree about a sofa.
+│   │   │                              **A BED FRAME'S OPTIONS ARE CHARGED, NOT
+│   │   │                              COSTED (2026-10-05):** a bed frame's divan,
+│   │   │                              leg, GAP and total height priced on
+│   │   │                              Maintenance above 0 is what the CUSTOMER
+│   │   │                              pays on top (user: 16
+│   │   │                              寸需要 100 块 … 不会算进 margin … 只会给普通
+│   │   │                              commission): `sales_order_lines.
+│   │   │                              option_charge_amount` = qty × charges,
+│   │   │                              filled with the cost (fill-cost trigger,
+│   │   │                              Recost). OUT of the margin on both sides —
+│   │   │                              `marginBase` / `revenue_month_orders.
+│   │   │                              margin_revenue` / `member_order_facts.
+│   │   │                              goods_revenue` take it off the revenue,
+│   │   │                              the cost never had it — IN the sales the
+│   │   │                              rate is paid on (`commissionable`, and the
+│   │   │                              director threshold reads `commissionable`,
+│   │   │                              not margin revenue), never KPI. Not set
+│   │   │                              = FOC (total height too, user 2026-10-05);
+│   │   │                              specials stay a cost. Maintenance says *Charge (RM)*
+│   │   │                              for those pools. The Quote offers one ONLY
+│   │   │                              while it is turned ON for that model on
+│   │   │                              Modular (user 2026-10-05: 选择 Turn ON 的他才会
+│   │   │                              出现) — ON + charged = "+ RM x", ON without
+│   │   │                              a charge = FOC, not ON = never offered, as
+│   │   │                              a SKU or model not ON is never offered.
+│   │   │                              `lineCharge` (`lib/catalogue/pricing.ts`),
+│   │   │                              migs `20261005010000` / `020000`.
 │   │   │                              The ERP pushes the catalogue to
 │   │   │                              `POST /api/erp/v1/products` (contract §9,
 │   │   │                              v2) on the sales-order feed's key, whole,
@@ -1259,6 +1286,68 @@ src/
 │   │                                  it in a phone frame on demo data
 │   │                                  (`lib/member/demo*.ts`); dev-only, and
 │   │                                  Principal/HR in production.
+│   │                                  **THE REVENUE APP (2026-10-05):** /member
+│   │                                  is `components/member/app/RevenueApp.tsx`,
+│   │                                  built to the Claude Design prototype
+│   │                                  (Revenue Mobile, kept outside the repo):
+│   │                                  Today / Insight / Quote / Arena / Profile,
+│   │                                  one URL state (`app/route.ts`), its own
+│   │                                  palette (`[data-revenue-app]` in
+│   │                                  globals.css), desktop by container query.
+│   │                                  Every rule number is VP's (bands, cost
+│   │                                  divisor, KPI), never the prototype's. The
+│   │                                  old `MemberWorkspace` survives only in
+│   │                                  `preview/`; `?app=proto` renders the new
+│   │                                  app on the prototype's own data, which is
+│   │                                  what it is pixel-compared against.
+│   │                                  **My income** is Comm Cal's own engine
+│   │                                  run for the member's month
+│   │                                  (`loadMemberIncome`: the service role,
+│   │                                  only AFTER `member_income_context`
+│   │                                  authorised the session — the engine reads
+│   │                                  costs no member may; only their own money
+│   │                                  and bills leave the server): LIVE until HR
+│   │                                  closes them, then the close's own figures
+│   │                                  (user: 跟着 up to date … close 的时候就是
+│   │                                  fix); a month before the cutover reads
+│   │                                  "settled by hand" (`lib/member/income.ts`).
+│   │                                  **My honours** = every finish of a FINAL
+│   │                                  month — Sales / Margin / KPI total and by
+│   │                                  brand, Championship, and the weekly booth
+│   │                                  of the member's brand week; ties shared —
+│   │                                  from the Arena's own rankings
+│   │                                  (`lib/member/honours.ts`). A month the
+│   │                                  portal CLOSED is kept once
+│   │                                  (`member_honours`, service role, so no
+│   │                                  browser can put a place there) and
+│   │                                  forgotten — taken afresh on the next
+│   │                                  open — when a close or run of it reopens,
+│   │                                  a brand week of it changes, one of its
+│   │                                  bills or lines changes (a Recost too:
+│   │                                  Fair's pay ignores margin, so a Recost
+│   │                                  reopens nobody) or the cutover moves past
+│   │                                  it; a change of RULES (divisor, bands)
+│   │                                  keeps the closing ranks. A month BEFORE
+│   │                                  the cutover is NEVER kept (23HON): it is
+│   │                                  worked out afresh on every open, so HR's
+│   │                                  brand-week fixes and a Recost reach it as
+│   │                                  they reach the Arena (side review
+│   │                                  2026-10-05 — a test had frozen Jun–Aug).
+│   │                                  **Requests** are numbered RQ-YYMM-NNN by
+│   │                                  trigger, with a history the member reads
+│   │                                  (`member_request_history`) and Cancel
+│   │                                  while pending with HR (23REQ). A claim is
+│   │                                  Outstation (spots per region × RM per
+│   │                                  spot, no invoice) or Airbnb (RM per
+│   │                                  person per NIGHT, invoice); the amount is
+│   │                                  worked out in the DB (`member_claim_
+│   │                                  detail`) from HR's rates
+│   │                                  (`member_claim_rates` / `_regions`), never
+│   │                                  taken from the phone. Memos, Team &
+│   │                                  capacity and View as (the Principal reads
+│   │                                  any member, read-only) read real data.
+│   │                                  Migs `20261005030000` / `040000` /
+│   │                                  `050000` / `060000` / `070000`.
 │   │                                  **INSIGHT (2026-09-16)** answers "how am I
 │   │                                  doing" from COMMITTED ORDERS, not from the
 │   │                                  month's statement — a run happens once a
@@ -1590,7 +1679,7 @@ Finance CANNOT access the Director Salary module or Director Pool at all. (Direc
 HR CAN access Director Pool v2 (standalone calculator — full per-director detail; granted by user 2026-07-21)
 Only HR and Principal can see individual salary details
 Member catalogue & margin cost basis (2026-09-12, catalogue 2026-09-24)
-The member Quote page sells from the Product List, not a list of its own: `member_catalogue()` (mig `20260924040000`) answers every SKU ticked on **Product List › Modular** (`catalogue_skus.offered`, and its model's `catalogue_models.offered`), still ACTIVE in the ERP, under a brand the member's calculator scheme sells — "10 SKUs, 7 ticked → the calculator offers 7" (user 2026-09-24). Both snapshots read it UNPRICED (names, sizes, the sofa grid's height × tier choices, each sofa / bed frame model's dropdowns = the portal's ticks ∩ what the ERP still allows ∩ the live Maintenance pool) and return `catalogueModels`; the quote reads it PRICED through the service role only (`lib/member/server.ts`, after `member_quote_context` authorised the session) — no price ever reaches a browser. The cart carries ONE sofa build (seat height, tier, leg, specials) and ONE bed frame build (divan, leg, total, gap, specials); a dropdown offers only what every model of that kind in the cart was ticked for (`lib/member/build.ts`), and the server refuses anything else. The calculator costs the way the run does (`lib/member/calculator.ts` `costLines` over `lib/catalogue/*`): SKU price at the build + option surcharges, a matched priced combo costed as the combo. People › Member Services › Product options is now a pointer to Modular (`comm_products` / `member_product_options` are no longer read by the member app). **Riders**: bed frames and accessories carry NO brand — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (in the run: the bill's own brand, the ERP's Branding — `SalesOrder.brandCode` into `marginBase`, 2026-09-27) — and so does anything marked *Rider* on Modular (`catalogue_models.brand_code = 'RIDER'`, read as no brand, never as one). A mattress or sofa is never a rider by default: one whose ERP branding matches no brand (MYLATEX, or none — 170 SKUs on 2026-09-24) is not offered until a Margin ladder is chosen for it, and Modular says so (`isRiderModel`, `lib/catalogue/options.ts`). A model's dropdown with an EMPTY ERP list is the whole Maintenance pool — the ERP's own "no restriction" (`erpAllows`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
+The member Quote page sells from the Product List, not a list of its own: `member_catalogue()` (mig `20260924040000`) answers every SKU ticked on **Product List › Modular** (`catalogue_skus.offered`, and its model's `catalogue_models.offered`), still ACTIVE in the ERP, under a brand the member's calculator scheme sells — "10 SKUs, 7 ticked → the calculator offers 7" (user 2026-09-24). Both snapshots read it UNPRICED (names, sizes, the sofa grid's height × tier choices, each sofa / bed frame model's dropdowns = the portal's ticks ∩ what the ERP still allows ∩ the live Maintenance pool) and return `catalogueModels`; the quote reads it PRICED through the service role only (`lib/member/server.ts`, after `member_quote_context` authorised the session) — no price ever reaches a browser. The cart carries ONE sofa build (seat height, tier, leg, specials); since 2026-10-05 EACH bed frame line carries its own build (`QuoteLine.bedframe`): its divan, leg, gap and total height are FOC or one of the options turned ON for the model on Modular that Maintenance CHARGES and the ERP still allows (`MemberCatalogueModel.charges` — a customer's price, so the unpriced snapshot carries it), its specials what Modular ticked; one frame built two ways is two lines (`frameBuildError`, `lib/member/build.ts`), and the server refuses anything else. The keypad is the SELLING price: bought KPI items and the option charges ride on top, out of the margin (a FREE KPI item comes off the price), and `QuoteResult.customerPays` says the total. The calculator costs the way the run does (`lib/member/calculator.ts` `costLines` over `lib/catalogue/*`): SKU price at the build + option surcharges, a matched priced combo costed as the combo. People › Member Services › Product options is now a pointer to Modular (`comm_products` / `member_product_options` are no longer read by the member app). **Riders**: bed frames and accessories carry NO brand — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (in the run: the bill's own brand, the ERP's Branding — `SalesOrder.brandCode` into `marginBase`, 2026-09-27) — and so does anything marked *Rider* on Modular (`catalogue_models.brand_code = 'RIDER'`, read as no brand, never as one). A mattress or sofa is never a rider by default: one whose ERP branding matches no brand (MYLATEX, or none — 170 SKUs on 2026-09-24) is not offered until a Margin ladder is chosen for it, and Modular says so (`isRiderModel`, `lib/catalogue/options.ts`). A model's dropdown with an EMPTY ERP list is the whole Maintenance pool — the ERP's own "no restriction" (`erpAllows`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
 Development Phases
 Phase 1 (✅ Shipped 2026-04-10): Treasury Core
 Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,
@@ -1623,7 +1712,7 @@ Server Components by default — Client Components only when needed (forms, inte
 Writes — use Server Actions (`'use server'`), NOT API Route Handlers. Every action calls `requireRole(...)` at entry.
 Read-only file downloads (PDF, CSV, ZIP binary streams) — GET Route Handlers (`app/**/route.ts`) are OK because Server Actions can't stream binary responses cleanly. Still call `requireRole(...)` at entry. Never accept write-side params — POST/PUT/DELETE route handlers remain forbidden. Locked by user 2026-04-17 (Spec 5 blocker Q5).
 Machine ingest — the ONE exception to the rule above (2026-09-05, ERP live sync): another SYSTEM pushing data in (the Houzs ERP's database via pg_net) cannot call a Server Action and has no session, so it gets a POST Route Handler under `app/api/<system>/v<n>/`. TWO of them exist, both the Houzs ERP's: `sales-orders` and, since 2026-09-17, `products` (the catalogue mirror; items only since 2026-09-24). A second endpoint of an existing feed is not a second exception — a second SYSTEM would be. The exception is narrow and every part of it is required: a static shared secret from env compared in constant time and failing closed when unset (never a session, never a query param); the service-role client used for ONE thing — calling a single ingest RPC that owns every write; the path excluded from `middleware.ts`; every delivery logged (`erp_sync_events`); 2xx for every delivery the portal chose not to apply, because the sender's outbox retries non-2xx forever. Nothing a browser calls may ever be a POST handler.
-Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly SIX callers: `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second, since 2026-09-24 the items-only catalogue mirror, is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `app/api/member-queue/route.ts` (the cron-secret queue sweep, `member_process_all_queues`), `lib/member/server.ts` (a member quote's PRICES — `member_catalogue(…, p_priced)`, service-role-only, read only after `member_quote_context` authorised the session — and the invoice attestation insert), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
+Supabase client — server-side (`lib/supabase/server.ts`) uses the anon key with RLS via SSR cookies. `admin.ts` is the service-role client and BYPASSES RLS entirely. It is `'server-only'` guarded and has exactly SIX callers: `app/api/erp/v1/sales-orders/route.ts` and `app/api/erp/v1/products/route.ts` (each uses it for one thing — calling its ingest RPC; the second, since 2026-09-24 the items-only catalogue mirror, is the SAME machine path as the first, a second endpoint of one feed rather than a new kind of caller), `app/api/member-queue/route.ts` (the cron-secret queue sweep, `member_process_all_queues`), `lib/member/server.ts` (a member quote's PRICES — `member_catalogue(…, p_priced)`, service-role-only, read only after `member_quote_context` authorised the session — and the invoice attestation insert; since 2026-10-05 also the member's month through Comm Cal's engine, `loadMemberIncome`, read only after `member_income_context` authorised the session because the engine reads costs no member session may, and My honours' kept finishes, `member_honours`, written there so no browser can put a place in them), `team/people/invite-actions.ts`, and `lib/erp-sync/feed-key.ts` (2026-09-13: the key the ERP generated and somebody pasted on Comm Cal lives in Supabase Vault behind `erp_link_put/get/drop_secret` + `erp_feed_secret`, executable by the service role ONLY — because whatever an HR user's server action can read with their session, their browser can read too, and that key opens the receiver). Reach for it only when a machine path has no session to act under or a secret must stay out of every session's reach, never to dodge an RLS policy that is merely inconvenient.
 Navigation speed (2026-09-26) — a click must answer at once. Every route folder with child routes has a `loading.tsx` rendering `RouteSkeleton` (`src/app/route-boundaries.test.ts` fails otherwise): without it Next keeps the page being left frozen until the server answers. The client router keeps pages 30 s (`experimental.staleTimes`), so a write must `revalidatePath` (or set a cookie) before it redirects — that is what empties that memory. Warm a page only through `lib/nav-warm.ts` (`warmOnIntent` / `warmRoute`): one link at a time, never an `AUDITED_ROUTES` page — a full prefetch reaches the server as a render, so a page that writes access_log while rendering would log a view for a mouse-over. Nothing may fire a Server Action on its own after a navigation (page views go through `lib/page-view.ts` from the browser): Next refreshes the whole page after any navigation that interrupts a pending action. Progress: `NavProgress` in the root layout, started by `src/instrumentation-client.ts`; DESIGN.md › Navigation feedback (v3.8). A page's independent reads start together and only real dependencies wait (the month page `revenue/[sub]/[period]/page.tsx` is the pattern; wrap a PostgREST builder you await twice in `Promise.resolve` — awaiting a builder again sends it again). `fetchByKeys` runs 4 chunks at a time. Two database traps behind the 3–10 s month page (mig `20260926100000`): a SQL function that calls another SQL function PER ROW re-checks the caller's permissions on every call (`has_scope`, ~1.7 ms each — 317 bills = 1.5 s), so join the answer once instead; and under RLS only LEAKPROOF comparisons reach an index (int, date and text equality do; numeric and enum comparisons do not), so a big lookup table searched by an amount needs a SECURITY DEFINER function (`lookup_pcb`).
 Aggregate queries — prefer RPC functions (`dashboard_summary`, `get_hr_cost_summary`) over scattered per-field selects. Single round-trip, clearer intent, easier to unit test at SQL level.
 Error handling — Server Actions throw, pages use error boundaries, never return `{ data, error }` to the client
