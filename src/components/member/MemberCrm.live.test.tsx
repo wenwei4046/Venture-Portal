@@ -143,6 +143,19 @@ describe("the CRM on live data", () => {
     expect(Array.from(bar.querySelectorAll("button")).map(b => b.textContent?.replace(/\d+/g, ""))).toEqual(["Overview", "Assignment", "Calendar"]);
   });
 
+  it("switches the Overview between this month and this week", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
+    render(<MemberCrm live salesperson="Principal" />);
+    await screen.findByRole("heading", { name: "Overview" });
+    const month = new Date().toLocaleDateString("en-MY", { month: "long" });
+    expect(screen.getByRole("radio", { name: "Month" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText(`Leads in ${month}`)).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "Week" }));
+    expect(screen.getByText("Leads this week")).toBeTruthy();
+    expect(screen.getByText(/last week/)).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Week" }).getAttribute("aria-checked")).toBe("true");
+  });
+
   it("lets the Principal hand an ad to teams — saved only on Save", async () => {
     fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
     crmWrite.mockResolvedValue({ ok: true, data: {} });

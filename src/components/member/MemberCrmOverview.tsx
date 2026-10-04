@@ -1,6 +1,7 @@
 "use client";
 
-import { allTeams, assignsAds, isUnassigned, memberStats, teamHandlers, visibleTeams, type CrmMember } from "@/lib/member/crm-team";
+import { useState } from "react";
+import { allTeams, assignsAds, isUnassigned, leadsBetween, memberStats, periodRange, teamHandlers, visibleTeams, type CrmMember, type CrmPeriod } from "@/lib/member/crm-team";
 import { CRM_LOST_REASONS, replyUrgency, type CrmAppointment, type CrmLead } from "@/lib/member/crm";
 import s from "./member.module.css";
 import c from "./MemberCrm.module.css";
@@ -10,11 +11,13 @@ const pct = (rate: number | null) => (rate == null ? "—" : `${Math.round(rate 
 
 /**
  * The Principal's first screen (user 2026-10-03): the numbers that matter —
- * leads, appointment rate, show-up rate — for everyone on the walnut card,
+ * leads, appointment rate, show-up rate — for everyone on the rust card,
  * what waits on somebody, then each team side by side. Tap a team to open its
- * TL's page.
+ * TL's page. Week / Month (user 2026-10-04) narrows the numbers, the teams and
+ * the lost reasons to the leads that arrived this week or this month; what
+ * waits on somebody is always now.
  */
-export default function MemberCrmOverview({ viewer, members, leads, appointments, now, onOpenMember, onOpenAssignment }: {
+export default function MemberCrmOverview({ viewer, members, leads: allLeads, appointments, now, onOpenMember, onOpenAssignment }: {
   viewer: CrmMember;
   members: CrmMember[];
   leads: CrmLead[];
@@ -23,6 +26,11 @@ export default function MemberCrmOverview({ viewer, members, leads, appointments
   onOpenMember: (memberId: string) => void;
   onOpenAssignment: () => void;
 }) {
+  const [period, setPeriod] = useState<CrmPeriod>("month");
+  const range = periodRange(period, now);
+  // The period's leads drive the numbers; what waits on somebody is read from all of them.
+  const leads = leadsBetween(allLeads, range.start, range.end);
+  const before = leadsBetween(allLeads, range.prevStart, range.start).length;
   const all = memberStats(leads, appointments, now);
   // The Principal and HOD compare every team, whether or not the reporting line reaches them.
   const teams = assignsAds(viewer) ? allTeams(members) : visibleTeams(viewer, members);
@@ -31,9 +39,9 @@ export default function MemberCrmOverview({ viewer, members, leads, appointments
     return leads.filter(l => l.teamId === tlId || (!!l.assignedTo && h.has(l.assignedTo)));
   };
   const hodLeads = leads.filter(l => !!l.assignedTo && members.find(m => m.id === l.assignedTo)?.role === "hod");
-  const waiting = leads.filter(isUnassigned);
-  const overdue = leads.filter(l => replyUrgency(l, now).level === "overdue").length;
-  const thisWeek = leads.filter(l => now.getTime() - new Date(l.createdAt).getTime() < 7 * 24 * 3_600_000).length;
+  const waiting = allLeads.filter(isUnassigned);
+  const overdue = allLeads.filter(l => replyUrgency(l, now).level === "overdue").length;
+  const thisWeek = allLeads.filter(l => now.getTime() - new Date(l.createdAt).getTime() < 7 * 24 * 3_600_000).length;
   const lost = leads.filter(l => l.status === "lost");
   const rows = [
     ...teams.map(t => ({ id: t.id, name: t.teamName ?? t.name, who: t.name, st: memberStats(teamLeads(t.id), appointments, now), open: true })),
@@ -41,14 +49,22 @@ export default function MemberCrmOverview({ viewer, members, leads, appointments
   ];
 
   return <>
-    <div className={c.tabTitle}>
-      <span className={c.eyebrow}>{viewer.role === "boss" ? "Boss" : viewer.role.toUpperCase()} · {viewer.name}</span>
-      <h1>Overview</h1>
-      <p className={s.sub}>{teams.length} teams · {thisWeek} new leads this week</p>
+    <div className={c.titleWithAction}>
+      <div className={c.tabTitle}>
+        <span className={c.eyebrow}>{viewer.role === "boss" ? "Boss" : viewer.role.toUpperCase()} · {viewer.name}</span>
+        <h1>Overview</h1>
+        <p className={s.sub}>{teams.length} teams · {thisWeek} new leads in the last 7 days</p>
+      </div>
+      <div className={c.periodSwitch} role="radiogroup" aria-label="Period">
+        {(["week", "month"] as const).map(p => <button key={p} role="radio" aria-checked={period === p} onClick={() => setPeriod(p)}>{p === "week" ? "Week" : "Month"}</button>)}
+      </div>
     </div>
 
     <section className={c.statHero} aria-label="Everyone">
-      <div className={c.statHeroTop}><span>Leads</span><strong>{all.leads}</strong><small>{thisWeek} in the last 7 days</small></div>
+      <div className={c.statHeroTop}>
+        <span>Leads {range.label}</span><strong>{all.leads}</strong>
+        <small>{all.leads === before ? `Same as ${range.prevLabel}` : `${all.leads > before ? "+" : "−"}${Math.abs(all.leads - before)} vs ${range.prevLabel} (${before})`}</small>
+      </div>
       <div className={c.statHeroGrid}>
         <div><span>Appt rate</span><strong>{pct(all.apptRate)}</strong></div>
         <div><span>Show-up rate</span><strong>{pct(all.showUpRate)}</strong></div>
@@ -83,7 +99,7 @@ export default function MemberCrmOverview({ viewer, members, leads, appointments
           <span role="cell">{pct(r.st.showUpRate)}</span>
         </div>)}
       </div>}
-      <p className={s.caption}>Appt = leads booked · Show-up = booked visits that came. Tap a team for its people.</p>
+      <p className={s.caption}>Leads that arrived {range.label}. Appt = leads booked · Show-up = booked visits that came. Tap a team for its people.</p>
     </section>
 
     {lost.length > 0 && <section className={`${s.card} ${c.tableCard}`} aria-label="Why leads were lost">

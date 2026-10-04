@@ -729,3 +729,9 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 }
 /* On rust the danger / alert lanes lose their contrast: white, told apart by weight. */
 .app .waitHeroKey em[data-urgency] { color: var(--m-on-brand); font-weight: 600; }
+
+/* Overview: Week / Month beside the title (user 2026-10-04) */
+.titleWithAction { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.periodSwitch { flex: none; display: flex; padding: 3px; border-radius: 12px; background: var(--m-soft); border: 1px solid var(--m-border); }
+.periodSwitch button { min-height: 36px; min-width: 56px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--m-sub); font-size: 13px; font-weight: 500; }
+.periodSwitch [aria-checked="true"] { background: var(--m-brand); color: var(--m-on-brand); }

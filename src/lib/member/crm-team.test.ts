@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CrmAppointment, CrmLead, CrmMessage } from "./crm";
 import {
-  allDownlines, assignEnquiry, canEditTeamRules, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
+  allDownlines, assignEnquiry, canEditTeamRules, leadsBetween, periodRange, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
   memberStats, overLimit, pickByShare, pickTeam, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
   type CrmAssignConfig, type CrmMember,
 } from "./crm-team";
@@ -233,5 +233,44 @@ describe("numbers", () => {
 
   it("writes durations people read", () => {
     expect([durationLabel(8), durationLabel(125), durationLabel(27 * 60)]).toEqual(["8 min", "2 h 5 min", "1 d 3 h"]);
+  });
+});
+
+describe("the Overview's week / month", () => {
+  // Sunday 4 October 2026, mid-morning.
+  const now = new Date(2026, 9, 4, 10, 30);
+
+  it("starts the week on Monday and compares with the week before", () => {
+    const r = periodRange("week", now);
+    expect(r.start).toEqual(new Date(2026, 8, 28));
+    expect(r.end).toEqual(new Date(2026, 9, 5));
+    expect(r.prevStart).toEqual(new Date(2026, 8, 21));
+    expect(r.label).toBe("this week");
+  });
+
+  it("keeps Sunday in the week that began the Monday before, and starts a new one on Monday", () => {
+    expect(periodRange("week", new Date(2026, 9, 4, 23, 59)).start).toEqual(new Date(2026, 8, 28));
+    expect(periodRange("week", new Date(2026, 9, 5, 0, 0)).start).toEqual(new Date(2026, 9, 5));
+  });
+
+  it("covers the calendar month and names it, and the one before", () => {
+    const r = periodRange("month", now);
+    expect(r.start).toEqual(new Date(2026, 9, 1));
+    expect(r.end).toEqual(new Date(2026, 10, 1));
+    expect(r.prevStart).toEqual(new Date(2026, 8, 1));
+    expect(r.label).toBe("in October");
+    expect(r.prevLabel).toBe("September");
+  });
+
+  it("rolls January back into December of the year before", () => {
+    expect(periodRange("month", new Date(2027, 0, 15)).prevStart).toEqual(new Date(2026, 11, 1));
+  });
+
+  it("counts a lead in exactly one period: the end is not included", () => {
+    const at = (d: Date) => ({ id: d.toISOString(), createdAt: d.toISOString() }) as CrmLead;
+    const leads = [at(new Date(2026, 8, 30, 23, 59)), at(new Date(2026, 9, 1)), at(new Date(2026, 9, 31, 23))];
+    const r = periodRange("month", now);
+    expect(leadsBetween(leads, r.start, r.end)).toHaveLength(2);
+    expect(leadsBetween(leads, r.prevStart, r.start)).toHaveLength(1);
   });
 });

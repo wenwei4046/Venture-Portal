@@ -344,6 +344,31 @@ export function memberStats(leads: CrmLead[], appointments: CrmAppointment[], no
   };
 }
 
+/** The span the Overview's numbers cover (user 2026-10-04): this week or this month. */
+export type CrmPeriod = "week" | "month";
+
+/**
+ * This week (from Monday) or this calendar month, in local time, and the one
+ * before it to compare against. `end` is exclusive, so a lead counts in exactly
+ * one period.
+ */
+export function periodRange(period: CrmPeriod, now: Date = new Date()): { start: Date; end: Date; prevStart: Date; label: string; prevLabel: string } {
+  if (period === "week") {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    const prevStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7);
+    return { start, end, prevStart, label: "this week", prevLabel: "last week" };
+  }
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const month = (d: Date) => d.toLocaleDateString("en-MY", { month: "long" });
+  const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return { start, end: new Date(now.getFullYear(), now.getMonth() + 1, 1), prevStart, label: `in ${month(start)}`, prevLabel: month(prevStart) };
+}
+
+/** The leads that arrived in [from, to). */
+export const leadsBetween = (leads: CrmLead[], from: Date, to: Date) =>
+  leads.filter(l => { const t = new Date(l.createdAt).getTime(); return t >= from.getTime() && t < to.getTime(); });
+
 /** "8 min", "2 h 5 min", "1 d 3 h". */
 export function durationLabel(minutes: number): string {
   const m = Math.round(minutes);
