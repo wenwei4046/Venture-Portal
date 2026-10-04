@@ -22,7 +22,7 @@ export interface CalcVM {
   next: { tier: string; price: string; value: number } | null;
   /** KPI items on top of the price: `2 KPI items` · `+ RM 500`. */
   kpi: { label: string; total: string } | null;
-  /** The bed frames' divan, leg and gap charged on top (2026-10-05): `+ RM 120`. */
+  /** The bed frames' divan, leg, gap and total height charged on top (2026-10-05): `+ RM 120`. */
   options: { total: string } | null;
   /** Customer pays: the price, what rides on top of it, and the fee — once anything does. */
   pay: string | null;

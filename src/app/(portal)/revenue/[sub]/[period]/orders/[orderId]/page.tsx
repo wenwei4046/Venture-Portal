@@ -87,7 +87,7 @@ interface LineRow {
   line_amount: number | string
   brand_code: string | null
   cost_amount: number | string | null
-  /** What the customer paid for a bed frame's divan, leg and gap (20261005010000; absent before it). */
+  /** What the customer paid for a bed frame's divan, leg, gap and total height (20261005010000; absent before it). */
   option_charge_amount?: number | string | null
   /** Which rule priced it (catalogue / catalogue_combo / manual / the pre-2026-09-24 chain). */
   cost_source?: string | null
@@ -278,7 +278,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     specials: lineSpecialsOf(l.item_group, l.description2, l.raw?.variants),
   }))
   const classed = lines.map((l, i) => ({ line: l, cls: classifyLine(salesLines[i], groupIndex) }))
-  // What its bed frames' divan, leg and gap were charged (2026-10-05): in the
+  // What its bed frames' divan, leg, gap and total height were charged (2026-10-05): in the
   // commissionable sales, out of the margin on both sides — as marginBase() reads it.
   const charged = classed
     .filter(c => c.cls === 'commissionable')
@@ -629,7 +629,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           {formatMoney(excluded)}. A KPI item&apos;s amount comes off the bill&apos;s sales and is paid flat as KPI
           instead of a rate; transport and disposal earn nothing either way.
           {charged !== 0
-            ? ` What its bed frames' divan, leg and gap were charged (${formatMoney(charged)}) earns the rate like the rest of the bill and is left out of its margin on both sides.`
+            ? ` What its bed frames' divan, leg, gap and total height were charged (${formatMoney(charged)}) earns the rate like the rest of the bill and is left out of its margin on both sides.`
             : ''}
           {split.uncovered
             ? ' Its sales do not cover the KPI items it carries, so none is paid on it — it is paid as sales.'

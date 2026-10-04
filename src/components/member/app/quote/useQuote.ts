@@ -222,7 +222,7 @@ export function useQuote(args: UseQuoteArgs) {
   const brandBands = useMemo(() => bands.filter(b => b.brand === brand), [bands, brand]);
   const kpiLines = cart.filter(l => l.kind === "kpi");
   const kpiAmount = kpiLines.reduce((a, l) => a + (catalog?.kpis.find(k => k.key === l.key)?.price ?? 0) * l.qty, 0);
-  // The bed frames' charged divan, leg and gap (2026-10-05): the server's figure
+  // The bed frames' charged divan, leg, gap and total height (2026-10-05): the server's figure
   // for the cart on screen, else the catalogue's own — the same charges.
   const optionCharge = answer && answer.key === inputKey && answer.result?.optionCharge !== undefined
     ? answer.result.optionCharge

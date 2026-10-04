@@ -76,7 +76,7 @@ interface CostedLine {
   unit: number | null;
   /** What the build's options add per unit to the COST, RM. */
   surcharge: number;
-  /** What a bed frame's divan, leg and gap are CHARGED per unit, RM — out of the margin. */
+  /** What a bed frame's divan, leg, gap and total height are CHARGED per unit, RM — out of the margin. */
   charge: number;
   chargeParts: ChargePart[];
   /** A grid SKU whose grid does not come in the build's seat height. */
@@ -94,6 +94,7 @@ const CHARGE_WORD: Record<ChargePart["pool"], string> = {
   bedframe_divan_heights: "divan",
   bedframe_leg_heights: "leg",
   bedframe_gaps: "gap",
+  bedframe_total_heights: "total height",
 };
 
 /** A bed frame line's build: its own (2026-10-05), else the cart's. */
@@ -144,9 +145,9 @@ function costLines(
       line,
       product,
       unit: priced.price,
-      // A bed frame's specials only — its divan, leg and gap are charged, not costed.
+      // A bed frame's specials only — its divan, leg, gap and total height are charged, not costed.
       surcharge: facts && pricing ? lineSurcharge(kind, facts, prices).amount : 0,
-      ...chargeOf(kind === "BEDFRAME" && pricing ? lineCharge(kind, { divan: frame?.divan ?? null, leg: frame?.leg ?? null, gap: frame?.gap ?? null }, prices) : null),
+      ...chargeOf(kind === "BEDFRAME" && pricing ? lineCharge(kind, { divan: frame?.divan ?? null, leg: frame?.leg ?? null, gap: frame?.gap ?? null, total: frame?.total ?? null }, prices) : null),
       noHeight: grid.length > 0 && priced.how !== "grid",
       comboCents: null,
     };
@@ -256,7 +257,7 @@ function cartKpiLines(
  * TOP of it, out of the margin, and the run reads the bill the same way:
  *   - the KPI items the customer buys (2026-09-27), paid flat as KPI — the
  *     bill's sales are price + K and its main sales, the margin's, price;
- *   - what the bed frames' divan, leg and gap are CHARGED (user 2026-10-04),
+ *   - what the bed frames' divan, leg, gap and total height are CHARGED (user 2026-10-04),
  *     paid the ordinary rate — in the commission, out of the margin.
  * A KPI item given FREE is not on top: the customer pays nothing for it, so
  * its amount comes off the price — margin = (price − Kgift − cost) ÷
@@ -393,7 +394,7 @@ export function calculateQuote(
       if (problem) return invalid(problem);
     }
   } else if (selected.some(({ line, product }) => line.bedframe && kindOf(product!) !== "BEDFRAME")) {
-    return invalid("Only a bed frame is built with a divan, leg and gap. Choose the product again.");
+    return invalid("Only a bed frame is built with a divan, leg, gap and total height. Choose the product again.");
   }
   const costed = costLines(
     selected.map(({ line, product }) => ({ line, product: product! })),
@@ -443,7 +444,7 @@ export function calculateQuote(
     return invalid(
       `The free KPI items (RM ${(kpiGift / 100).toFixed(2)}) take the whole price. Raise it to see a margin.`,
     );
-  // What the bed frames' divan, leg and gap are charged (user 2026-10-04): on
+  // What the bed frames' divan, leg, gap and total height are charged (user 2026-10-04): on
   // top of the price, in the commission, out of the margin on both sides.
   const charged = costed.filter((l) => l.charge > 0);
   const charge = charged.reduce((sum, l) => sum + Math.round(l.charge * 100) * l.line.quantity, 0);

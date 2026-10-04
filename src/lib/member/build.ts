@@ -168,15 +168,16 @@ export function pruneBuild(build: QuoteBuild | undefined, choices: BuildChoices)
 }
 
 /**
- * What ONE bed frame may be built with (user 2026-10-04): its divan, leg and
- * gap are FOC — no choice at all — or one of the options Maintenance charges
- * that the ERP lets the model take (`charges`); its specials are what Modular
- * ticked. Total height is offered nowhere.
+ * What ONE bed frame may be built with (user 2026-10-04): its divan, leg, gap
+ * and total height are FOC — no choice at all — or one of the options
+ * Maintenance charges that the ERP lets the model take (`charges`); its
+ * specials are what Modular ticked.
  */
 export interface FrameChoices {
   divans: OptionCharge[];
   legs: OptionCharge[];
   gaps: OptionCharge[];
+  totals: OptionCharge[];
   specials: string[];
 }
 
@@ -185,6 +186,7 @@ export function frameChoicesOf(model: MemberCatalogueModel | undefined): FrameCh
     divans: model?.charges?.divan_heights ?? [],
     legs: model?.charges?.leg_heights ?? [],
     gaps: model?.charges?.gaps ?? [],
+    totals: model?.charges?.total_heights ?? [],
     specials: model?.options.specials ?? [],
   };
 }
@@ -197,7 +199,7 @@ export function chargeIn(list: readonly OptionCharge[], value: string | undefine
 
 /** What one built bed frame is charged per unit, by the model's own list — the member's preview. */
 export function frameCharge(choices: FrameChoices, build: BedframeBuild | undefined): number {
-  return chargeIn(choices.divans, build?.divan) + chargeIn(choices.legs, build?.leg) + chargeIn(choices.gaps, build?.gap);
+  return chargeIn(choices.divans, build?.divan) + chargeIn(choices.legs, build?.leg) + chargeIn(choices.gaps, build?.gap) + chargeIn(choices.totals, build?.total);
 }
 
 /** Why one bed frame's own build cannot be quoted, or null. */
@@ -206,14 +208,14 @@ export function frameBuildError(
   product: MemberProduct,
   catalogueModels: readonly MemberCatalogueModel[] | undefined,
 ): string | null {
-  if (kindOf(product) !== "BEDFRAME") return "Only a bed frame is built with a divan, leg and gap. Choose the product again.";
-  if (build.total) return "A total height is not chosen on a quote. Choose the bed frame again.";
+  if (kindOf(product) !== "BEDFRAME") return "Only a bed frame is built with a divan, leg, gap and total height. Choose the product again.";
   const c = frameChoicesOf((catalogueModels ?? []).find((m) => m.id === product.modelId));
   const charged = (value: string | undefined, list: OptionCharge[]) =>
     !value || list.some((o) => valueKey(o.value) === valueKey(value));
   if (!charged(build.divan, c.divans)) return "That divan height is not offered for this bed frame. Choose FOC or another.";
   if (!charged(build.leg, c.legs)) return "That leg height is not offered for this bed frame. Choose FOC or another.";
   if (!charged(build.gap, c.gaps)) return "That gap is not offered for this bed frame. Choose FOC or another.";
+  if (!charged(build.total, c.totals)) return "That total height is not offered for this bed frame. Choose FOC or another.";
   if ((build.specials ?? []).some((sp) => !inList(sp, c.specials)))
     return "A bed frame special is not offered for this bed frame. Choose again.";
   return null;
@@ -226,6 +228,7 @@ export function frameBuildText(build: BedframeBuild | undefined): string {
   if (build.divan) parts.push(`divan ${build.divan}`);
   if (build.leg) parts.push(`leg ${build.leg}`);
   if (build.gap) parts.push(`gap ${build.gap}`);
+  if (build.total) parts.push(`total height ${build.total}`);
   if (build.specials?.length) parts.push(build.specials.join(", "));
   return parts.join(" · ");
 }

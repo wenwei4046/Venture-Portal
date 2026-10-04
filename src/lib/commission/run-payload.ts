@@ -182,7 +182,7 @@ export interface SalesLineRow {
   line_amount: Num
   brand_code: string | null
   cost_amount: Num
-  /** What its bed frame's divan, leg and gap were charged (2026-10-05). Absent in older fixtures. */
+  /** What its bed frame's divan, leg, gap and total height were charged (2026-10-05). Absent in older fixtures. */
   option_charge_amount?: Num
   /** The ERP's option summary and structured variants — where specials are read. */
   description2?: string | null

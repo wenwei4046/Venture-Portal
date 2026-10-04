@@ -81,7 +81,7 @@ export interface OptionCharge {
   charge: number;
 }
 /**
- * A bed frame model's divan, leg and gap the customer may pay for (user
+ * A bed frame model's divan, leg, gap and total height the customer may pay for (user
  * 2026-10-04): what the ERP lets the model take, priced on Product List ›
  * Maintenance above zero. The Quote offers FOC plus these; a charge is out of
  * the margin on both sides and in the commission. A customer's price, not a
@@ -91,6 +91,7 @@ export interface MemberModelCharges {
   divan_heights?: OptionCharge[];
   leg_heights?: OptionCharge[];
   gaps?: OptionCharge[];
+  total_heights?: OptionCharge[];
 }
 export interface MemberCatalogueModel {
   id: string;
@@ -237,7 +238,8 @@ export interface QuoteLine {
   gift: boolean;
   /**
    * This bed frame's own build (2026-10-05): each bed frame in a cart is built
-   * on its own — its divan, leg and gap FOC or charged, its specials. Absent =
+   * on its own — its divan, leg, gap and total height FOC or charged, its
+   * specials. Absent =
    * the cart's `build.bedframe`, if any. Two lines of one SKU built
    * differently are two lines.
    */
@@ -311,7 +313,7 @@ export interface QuoteResult {
   /** KPI items the price does not cover, RM — not paid; the whole price is the sale. */
   kpiNotPaid?: number;
   /**
-   * What the cart's bed frames' divan, leg and gap are CHARGED, RM (2026-10-05)
+   * What the cart's bed frames' divan, leg, gap and total height are CHARGED, RM (2026-10-05)
    * — on top of the selling price, out of the margin, in the commission.
    * 0 when every option is FOC.
    */

@@ -84,6 +84,7 @@ const CHARGE_WORD: Record<string, string> = {
   bedframe_divan_heights: 'divan',
   bedframe_leg_heights: 'leg',
   bedframe_gaps: 'gap',
+  bedframe_total_heights: 'total height',
 }
 
 /**

@@ -219,7 +219,7 @@ export interface MarginBase {
  * The revenue is the bill's MAIN sales (2026-09-27): what its KPI items take
  * off is paid flat as KPI and is not the main product's price, so a RM 10,000
  * bill with HB Straight at RM 200 is judged on 9,800 — the items' cost stays.
- * Less, too, what its bed frames' divan, leg and gap were CHARGED
+ * Less, too, what its bed frames' divan, leg, gap and total height were CHARGED
  * (`SalesLine.optionCharge`, 2026-10-05): a RM 10,000 bill with a 6" leg at
  * RM 100 is judged on 9,900 against a cost that never had the leg in it, and
  * its rate is still paid on 10,000. Every line's cost is divided by its own
@@ -261,7 +261,7 @@ export function marginBase(
     }
   }
   if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
-  // What its bed frames' divan, leg and gap were charged is the customer's
+  // What its bed frames' divan, leg, gap and total height were charged is the customer's
   // price for an option, not the product's (2026-10-05): out of the margin on
   // both sides — it was never in the cost — while the rate is still paid on it.
   revenue = round2(revenue - charges)

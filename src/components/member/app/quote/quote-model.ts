@@ -66,13 +66,13 @@ export interface QFrame {
   name: string;
   sizes: Partial<Record<SizeKey, string>>;
   /**
-   * What it may be built with (user 2026-10-04): FOC or a divan, leg and gap
+   * What it may be built with (user 2026-10-04): FOC or a divan, leg, gap and total height
    * Maintenance charges; the specials Modular ticked. Nothing = always FOC.
    */
   choices: FrameChoices;
 }
 
-const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], specials: [] };
+const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
 
 /** A frame build with only what this frame still offers; undefined = all FOC, no specials. */
 export function frameBuildFor(choices: FrameChoices, build: BedframeBuild | undefined): BedframeBuild | undefined {
@@ -83,10 +83,12 @@ export function frameBuildFor(choices: FrameChoices, build: BedframeBuild | unde
   const divan = keep(build.divan, choices.divans);
   const leg = keep(build.leg, choices.legs);
   const gap = keep(build.gap, choices.gaps);
+  const total = keep(build.total, choices.totals);
   const specials = (build.specials ?? []).filter(sp => choices.specials.some(c => valueKey(c) === valueKey(sp)));
   if (divan) out.divan = divan;
   if (leg) out.leg = leg;
   if (gap) out.gap = gap;
+  if (total) out.total = total;
   if (specials.length) out.specials = specials;
   return Object.keys(out).length ? out : undefined;
 }
@@ -99,6 +101,7 @@ export function frameBuildMeta(choices: FrameChoices, build: BedframeBuild | und
     priced("divan", build.divan, choices.divans),
     priced("leg", build.leg, choices.legs),
     priced("gap", build.gap, choices.gaps),
+    priced("total height", build.total, choices.totals),
     ...(build.specials ?? []),
   ].filter(Boolean).join(" · ");
 }
@@ -150,7 +153,7 @@ export interface CartLine {
   size: string;
   qty: number;
   productId: string;
-  /** A bed frame's own build (2026-10-05): its charged divan / leg / gap and its specials. */
+  /** A bed frame's own build (2026-10-05): its charged divan / leg / gap / total height and its specials. */
   bedframe?: BedframeBuild;
   /** What that build is charged per unit, RM — on top of the price, out of the margin. */
   charge?: number;
@@ -329,7 +332,7 @@ export interface BfPick {
   frame: string;
   kpi: string[];
   qty: number;
-  /** Its divan, leg and gap — absent = FOC — and its specials (2026-10-05). */
+  /** Its divan, leg, gap and total height — absent = FOC — and its specials (2026-10-05). */
   build?: BedframeBuild;
 }
 

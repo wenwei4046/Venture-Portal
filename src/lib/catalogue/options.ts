@@ -45,10 +45,10 @@ export function optionKeysOf(category: string | null): OptionKey[] {
       { key: 'specials', pool: 'sofa_specials', label: 'Specials', priced: true },
     ]
   }
-  // A bed frame's divan, leg and gap are no longer ticked here (2026-10-05):
-  // the Quote offers FOC and every one of them Maintenance CHARGES that the
-  // ERP lets the model take (`MemberCatalogueModel.charges`), and its total
-  // height is offered nowhere. Its specials still are ticked, and costed.
+  // A bed frame's divan, leg, gap and total height are no longer ticked here
+  // (2026-10-05): the Quote offers FOC and every one of them Maintenance
+  // CHARGES that the ERP lets the model take (`MemberCatalogueModel.charges`).
+  // Its specials still are ticked, and costed.
   if (c === 'BEDFRAME') {
     return [
       { key: 'specials', pool: 'bedframe_specials', label: 'Specials', priced: true },
@@ -60,15 +60,15 @@ export function optionKeysOf(category: string | null): OptionKey[] {
 /**
  * The Maintenance tab's rail, as the ERP draws it (the Products Maintenance
  * pools are not mirrored). `charge`: the price is the customer's, out of the
- * margin (a bed frame's divan, leg and gap); otherwise a priced pool's price
- * is a cost surcharge.
+ * margin (a bed frame's divan, leg, gap and total height); otherwise a priced
+ * pool's price is a cost surcharge.
  */
 export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: Array<{ pool: string; label: string; priced: boolean; charge: boolean }> }> = [
   {
     section: 'Bedframe',
     pools: [
       { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true, charge: true },
-      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: false, charge: false },
+      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true, charge: true },
       { pool: 'bedframe_gaps', label: 'Gaps', priced: true, charge: true },
       { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true, charge: true },
       { pool: 'bedframe_specials', label: 'Specials', priced: true, charge: false },

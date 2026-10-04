@@ -1387,17 +1387,18 @@ The user, deciding how the member Quote sells a bed frame (2026-10-04): its
 divan, leg and gap show ONE "FOC" choice plus the options that carry a charge —
 *"如果是 free、没有填任何价钱的话，那边就会变成 FOC。除非我有填特定的尺寸，比如 16 寸需要
 100 块，这样它就会出现 FOC 跟 16 寸"* — and that charge *"本身不会算进 margin 里面，而是算
-commission amount 来的 … 跟 KPI item 也不一样 … 只会给普通 commission"*. Total height
-*"不需要存在"*; specials stay as they were.
+commission amount 来的 … 跟 KPI item 也不一样 … 只会给普通 commission"*. Total height the
+same (2026-10-05: *"没 set 的话就没有，有 set 的话就和其他的一样不算 margin 但是有给 normal
+comm"*); specials stay as they were.
 
-- **What a charge is.** A bed frame's divan height, leg height or gap priced on
-  Product List › Maintenance above zero (the column reads *Charge (RM)* there;
-  0 or blank = FOC). It is the customer's price for the option, paid on top of
-  the selling price. A bed frame's specials, and a sofa's leg height and
-  specials, are still a COST surcharge (*Surcharge (RM)*). A total height and a
-  sofa's seat size carry no price at all (CHECKs on `catalogue_option_prices`).
-- **On a sales line.** `option_charge_amount` = qty × Σ the line's divan, leg and
-  gap charges, read from its `raw.variants` / `description2` like every option
+- **What a charge is.** A bed frame's divan height, leg height, gap or total
+  height priced on Product List › Maintenance above zero (the column reads
+  *Charge (RM)* there; 0 or blank = FOC). It is the customer's price for the
+  option, paid on top of the selling price. A bed frame's specials, and a sofa's
+  leg height and specials, are still a COST surcharge (*Surcharge (RM)*). A
+  sofa's seat size carries no price (CHECKs on `catalogue_option_prices`).
+- **On a sales line.** `option_charge_amount` = qty × Σ the line's divan, leg,
+  gap and total height charges, read from its `raw.variants` / `description2` like every option
   (`catalogue_line_option_charge`), filled where the cost is: on every line that
   lands and by Recost — a hand-costed line too, a charge being a price.
 - **In the money.** The bill's commissionable sales keep the charge — the rate is
@@ -1410,7 +1411,7 @@ commission amount 来的 … 跟 KPI item 也不一样 … 只会给普通 commi
   option the ERP lets that model take (`MemberCatalogueModel.charges`); one frame
   built two ways is two lines. The keypad is the selling price; *Bed frame
   options · not in margin + RM x* and *Customer pays* sit under the margin, like
-  KPI items. Modular no longer ticks a bed frame's divan / leg / gap.
+  KPI items. Modular no longer ticks a bed frame's divan / leg / gap / total height.
 
 Readers that take it off the margin: the engine's `marginBase`,
 `revenue_month_orders` (`margin_revenue`; `commissionable` unchanged),

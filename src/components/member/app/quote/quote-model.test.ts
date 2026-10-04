@@ -239,9 +239,9 @@ describe("a bed frame's own build", () => {
   it("reads each frame's charges and specials from the catalogue's models; a frame with none is all FOC", () => {
     const c = withCharges();
     expect(c.frames.find(f => f.key === "m-cody")?.choices).toEqual({
-      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], specials: ["HB Straight"],
+      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], totals: [], specials: ["HB Straight"],
     });
-    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], specials: [] });
+    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], totals: [], specials: [] });
   });
 
   it("adds a built frame as its own line, with what it is charged — FOC is no build at all", () => {

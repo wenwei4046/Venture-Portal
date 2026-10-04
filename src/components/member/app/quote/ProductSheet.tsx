@@ -178,7 +178,7 @@ function FrameSections({ fv, catalog, memory, brandName, hasKpi, onPatch, onRece
   const frame = catalog.frames.find(f => f.key === fv.frame && f.sizes[fv.size]);
   const onSize = (size: SizeKey) => onPatch({ size, frame: catalog.frames.some(f => f.key === fv.frame && f.sizes[size]) ? fv.frame : firstFrame(catalog, size) });
   const kpiTotal = catalog.kpis.filter(k => fv.kpi.includes(k.key)).reduce((n, k) => n + k.price, 0);
-  // The frame's own divan, leg and gap (FOC or charged) and specials, numbered after the model.
+  // The frame's own divan, leg, gap and total height (FOC or charged) and specials, numbered after the model.
   const build = frame ? frameBuildFor(frame.choices, fv.build) : undefined;
   const optionRows = frame ? frameOptionRows(frame.choices) : [];
   const kpiNo = 3 + optionRows.length + (frame && frame.choices.specials.length ? 1 : 0);
@@ -230,20 +230,21 @@ function FrameSections({ fv, catalog, memory, brandName, hasKpi, onPatch, onRece
   );
 }
 
-type OptionRow = { key: "divan" | "leg" | "gap"; title: string; list: OptionCharge[] };
+type OptionRow = { key: "divan" | "leg" | "gap" | "total"; title: string; list: OptionCharge[] };
 
-/** The divan, leg and gap a frame may be CHARGED for — a row only where Maintenance charges something. */
+/** The divan, leg, gap and total height a frame may be CHARGED for — a row only where Maintenance charges something. */
 function frameOptionRows(c: FrameChoices): OptionRow[] {
   const rows: OptionRow[] = [
     { key: "divan", title: "Divan height", list: c.divans },
     { key: "leg", title: "Leg height", list: c.legs },
     { key: "gap", title: "Gap", list: c.gaps },
+    { key: "total", title: "Total height", list: c.totals },
   ];
   return rows.filter(r => r.list.length > 0);
 }
 
 /**
- * A bed frame's divan, leg and gap — FOC, or an option charged on top of the
+ * A bed frame's divan, leg, gap and total height — FOC, or an option charged on top of the
  * price, out of the margin — and its specials (user 2026-10-04: "only show a
  * FOC 1 option and other with charges option").
  */

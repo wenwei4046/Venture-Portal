@@ -54,12 +54,11 @@ describe('Maintenance workspace', () => {
     click('Gaps')
     expect(screen.getByText('5CM')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit charges' })).toBeInTheDocument()
-    // …and its total height carries no price at all.
+    // …and its total height, the same way (user 2026-10-05).
     click('Total Heights')
     expect(screen.getByText('30"')).toBeInTheDocument()
-    expect(screen.getByText('Read only')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Edit / })).not.toBeInTheDocument()
-    expect(screen.queryByRole('columnheader', { name: /\(RM\)/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit charges' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Charge (RM)' })).toBeInTheDocument()
     click('Specials')
     expect(screen.getByRole('button', { name: 'Edit surcharges' })).toBeInTheDocument()
     click('Sofa')

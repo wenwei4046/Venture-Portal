@@ -50,7 +50,7 @@ export interface SalesLine {
    */
   costAmount?: number
   /**
-   * What the customer paid for this bed frame's divan, leg and gap
+   * What the customer paid for this bed frame's divan, leg, gap and total height
    * (`sales_order_lines.option_charge_amount`, 2026-10-05) — qty × each
    * option's charge on Product List › Maintenance. In `lineAmount` and in the
    * sales the rate is paid on; OUT of the margin on both sides (marginBase

@@ -11,18 +11,19 @@
 -- "FOC" choice and the options that carry a charge — "如果是 free、没有填任何价钱的
 -- 话，那边就会变成 FOC。除非我有填特定的尺寸，比如 16 寸需要 100 块，这样它就会出现 FOC
 -- 跟 16 寸" — and that charge "本身不会算进 margin 里面，而是算 commission amount
--- 来的 … 跟 KPI item 也不一样 … 只会给普通 commission". Total height "不需要存在";
--- specials stay as they were.
+-- 来的 … 跟 KPI item 也不一样 … 只会给普通 commission". Total height the same
+-- (2026-10-05: "没 set 的话就没有，有 set 的话就和其他的一样不算 margin 但是有给
+-- normal comm"); specials stay as they were.
 --
 -- So, from here on:
 --
---   * A bed frame's divan height, leg height and gap priced on Maintenance
---     ABOVE ZERO is what the CUSTOMER pays for that option, on top: the line's
+--   * A bed frame's divan height, leg height, gap and total height priced on
+--     Maintenance ABOVE ZERO is what the CUSTOMER pays for that option, on top: the line's
 --     `option_charge_amount` = qty × the options' charges. It is OUT of the
 --     margin on both sides — not in the bill's margin revenue, not in its cost
 --     — and IN the commissionable sales the rate is paid on. Never KPI.
 --   * A bed frame's specials are still a cost surcharge; so are a sofa's leg
---     height and specials. Total height is priced nowhere (and may not be).
+--     height and specials. A sofa's seat size carries no price.
 --   * Gaps may now carry a price (they could not: a gap was never a cost).
 --
 -- Nothing changes today: no option carries a price (catalogue_option_prices
@@ -31,8 +32,8 @@
 -- migration checks that before it touches anything.
 --
 -- 1. sales_order_lines.option_charge_amount.
--- 2. catalogue_option_prices: a charge is never negative; total height and a
---    sofa's seat size carry no price.
+-- 2. catalogue_option_prices: a charge is never negative; a sofa's seat size
+--    carries no price.
 -- 3. catalogue_line_charge / catalogue_line_option_charge (+ the TypeScript
 --    twins `lineCharge` in lib/catalogue/pricing.ts) and
 --    catalogue_model_charges (what a model may be charged for).
@@ -73,24 +74,24 @@ ALTER TABLE sales_order_lines
     ADD COLUMN IF NOT EXISTS option_charge_amount NUMERIC(15,2) NOT NULL DEFAULT 0;
 
 COMMENT ON COLUMN sales_order_lines.option_charge_amount IS
-    'What the customer pays for this bed frame''s divan height, leg height and gap (2026-10-05): qty × each option''s charge on Product List › Maintenance, above zero. OUT of the margin on both sides, IN the commissionable sales, never KPI. Filled with the cost (sales_order_lines_fill_cost, recost_sales_order_lines).';
+    'What the customer pays for this bed frame''s divan height, leg height, gap and total height (2026-10-05): qty × each option''s charge on Product List › Maintenance, above zero. OUT of the margin on both sides, IN the commissionable sales, never KPI. Filled with the cost (sales_order_lines_fill_cost, recost_sales_order_lines).';
 
 -- ── 2. What a price on Maintenance may be ───────────────────────────────────
 
 ALTER TABLE catalogue_option_prices
     ADD CONSTRAINT catalogue_option_prices_unpriced_pools
-    CHECK (pool NOT IN ('bedframe_total_heights', 'sofa_sizes'));
+    CHECK (pool <> 'sofa_sizes');
 
 ALTER TABLE catalogue_option_prices
     ADD CONSTRAINT catalogue_option_prices_charge_not_negative
-    CHECK (pool NOT IN ('bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps') OR price >= 0);
+    CHECK (pool NOT IN ('bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps', 'bedframe_total_heights') OR price >= 0);
 
 -- ── 3. What a bed frame's options are charged ───────────────────────────────
 
--- Per unit: each of the divan, leg and gap priced above zero. FOC = an option
--- nobody priced, or priced at 0. Only a bed frame is charged.
+-- Per unit: each of the divan, leg, gap and total height priced above zero.
+-- FOC = an option nobody priced, or priced at 0. Only a bed frame is charged.
 CREATE OR REPLACE FUNCTION catalogue_line_charge(p_company BIGINT, p_category TEXT,
-                                                 p_divan TEXT, p_leg TEXT, p_gap TEXT)
+                                                 p_divan TEXT, p_leg TEXT, p_gap TEXT, p_total TEXT)
 RETURNS TABLE(amount NUMERIC, parts JSONB)
 LANGUAGE plpgsql
 STABLE
@@ -99,7 +100,8 @@ AS $fn$
 DECLARE
     v_pairs TEXT[][] := ARRAY[['bedframe_divan_heights', p_divan],
                               ['bedframe_leg_heights',   p_leg],
-                              ['bedframe_gaps',          p_gap]];
+                              ['bedframe_gaps',          p_gap],
+                              ['bedframe_total_heights', p_total]];
     v_price NUMERIC;
     k       INTEGER;
 BEGIN
@@ -109,7 +111,7 @@ BEGIN
         RETURN NEXT;
         RETURN;
     END IF;
-    FOR k IN 1 .. 3 LOOP
+    FOR k IN 1 .. 4 LOOP
         CONTINUE WHEN NULLIF(BTRIM(COALESCE(v_pairs[k][2], '')), '') IS NULL;
         v_price := catalogue_option_price(p_company, v_pairs[k][1], v_pairs[k][2]);
         CONTINUE WHEN v_price IS NULL OR v_price <= 0;
@@ -146,7 +148,7 @@ BEGIN
         RETURN;
     END IF;
     SELECT * INTO f FROM catalogue_line_facts(p_description2, p_raw);
-    SELECT * INTO c FROM catalogue_line_charge(p_company, v_cat, f.divan, f.leg, f.gap);
+    SELECT * INTO c FROM catalogue_line_charge(p_company, v_cat, f.divan, f.leg, f.gap, f.total);
     unit   := COALESCE(c.amount, 0);
     amount := ROUND(unit * COALESCE(p_qty, 0), 2);
     parts  := COALESCE(c.parts, '[]'::JSONB);
@@ -205,9 +207,9 @@ BEGIN
     END IF;
 
     -- A sofa module's leg height is still a cost. A bed frame's divan, leg
-    -- and total height are not (2026-10-05): its divan, leg and gap are
-    -- CHARGED to the customer (catalogue_line_charge) and its total height
-    -- is priced nowhere. p_divan / p_total are kept for the signature.
+    -- and total height are not (2026-10-05): they and its gap are CHARGED to
+    -- the customer (catalogue_line_charge). p_divan / p_total are kept for
+    -- the signature.
     IF v_cat = 'SOFA' AND p_leg IS NOT NULL THEN
         v_price := catalogue_option_price(p_company, 'sofa_leg_heights', p_leg);
         parts  := parts || jsonb_build_array(jsonb_build_object(
@@ -255,7 +257,7 @@ DECLARE
 BEGIN
     SELECT COALESCE(o.erp_company_id, 1) INTO v_company FROM sales_orders o WHERE o.id = NEW.order_id;
 
-    -- What the customer pays for a bed frame's divan, leg and gap (2026-10-05)
+    -- What the customer pays for a bed frame's divan, leg, gap and total height (2026-10-05)
     -- — whoever costs the line, a hand-keyed cost included: a charge is a
     -- price, not a cost. A fault here must not stop the order landing either.
     BEGIN
@@ -334,8 +336,8 @@ BEGIN
       JOIN sales_orders o ON o.id = sl.order_id
      WHERE o.batch_id = v_batch;
 
-    -- A bed frame's divan, leg and gap the customer pays for (2026-10-05) —
-    -- on EVERY line, a hand-costed one too: a charge is a price, not a cost.
+    -- A bed frame's divan, leg, gap and total height the customer pays for
+    -- (2026-10-05) — on EVERY line, a hand-costed one too: a charge is a price.
     WITH charged AS (
         SELECT sl.id, COALESCE(c.amount, 0) AS amount
           FROM sales_order_lines sl
@@ -551,14 +553,15 @@ BEGIN
                    'gaps', CASE WHEN UPPER(m.category) = 'BEDFRAME' THEN
                                       catalogue_model_options(v_company, 'bedframe_gaps',
                                                               cm.enabled->'gaps', m.allowed_options->'gaps') END)))
-               -- A bed frame's divan, leg and gap the customer may be CHARGED
+               -- A bed frame's divan, leg, gap and total height the customer may be CHARGED
                -- for (2026-10-05): what the ERP lets the model take, priced on
                -- Maintenance above zero. Anything else is FOC. A charge is the
                -- customer's price, not a cost, so the unpriced answer carries it.
                || CASE WHEN UPPER(m.category) = 'BEDFRAME' THEN jsonb_build_object('charges', jsonb_strip_nulls(jsonb_build_object(
                    'divan_heights', catalogue_model_charges(v_company, 'bedframe_divan_heights', m.allowed_options->'divan_heights'),
                    'leg_heights',   catalogue_model_charges(v_company, 'bedframe_leg_heights',   m.allowed_options->'leg_heights'),
-                   'gaps',          catalogue_model_charges(v_company, 'bedframe_gaps',          m.allowed_options->'gaps'))))
+                   'gaps',          catalogue_model_charges(v_company, 'bedframe_gaps',          m.allowed_options->'gaps'),
+                   'total_heights', catalogue_model_charges(v_company, 'bedframe_total_heights', m.allowed_options->'total_heights'))))
                   ELSE '{}'::JSONB END
                ORDER BY m.model_code, m.erp_id), '[]'::JSONB)
       INTO v_models
@@ -672,7 +675,7 @@ AS $function$
         COALESCE(l.amount, 0),
         -- What the rate is paid on: the bill's MAIN sales — its commissionable
         -- lines less its KPI items. What the margin is taken on: the same, less
-        -- what its bed frames' divan, leg and gap were CHARGED (2026-10-05) —
+        -- what its bed frames' divan, leg, gap and total height were CHARGED (2026-10-05) —
         -- the customer's price for an option is out of the margin on both
         -- sides, and still in the sales the rate is paid on.
         COALESCE(l.main, 0),
@@ -722,7 +725,7 @@ AS $function$
                   -- in it: its cost is real and that is how giving it away is
                   -- meant to hurt the margin.
                   SUM(sl.line_amount) FILTER (WHERE ig.commissionable) AS goods,
-                  -- What its bed frames' divan, leg and gap were charged.
+                  -- What its bed frames' divan, leg, gap and total height were charged.
                   SUM(sl.option_charge_amount) FILTER (WHERE ig.commissionable) AS charges,
                   -- NULL when ANY line of that base has no cost. A partial
                   -- cost would show as a fat margin and the engine would
@@ -839,7 +842,7 @@ AS $function$
   SELECT l.id,l.staff_id,l.order_no,l.order_date,l.period_month,l.recognition,
    l.brand_code,l.is_cleared,l.manual_margin_pct,
    coalesce(sum(l.line_amount) FILTER(WHERE l.is_goods),0) AS goods,
-   -- What its bed frames' divan, leg and gap were charged (2026-10-05).
+   -- What its bed frames' divan, leg, gap and total height were charged (2026-10-05).
    coalesce(sum(l.option_charge_amount) FILTER(WHERE l.is_goods),0) AS charges,
    bool_and(l.cost_amount IS NOT NULL) FILTER(WHERE l.is_goods) AS costed,
    sum(l.team_cost) FILTER(WHERE l.is_goods) AS team_cost,
@@ -881,7 +884,7 @@ GRANT EXECUTE ON FUNCTION catalogue_model_charges(BIGINT, TEXT, JSONB) TO servic
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM catalogue_option_prices
-                WHERE pool IN ('bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps')
+                WHERE pool IN ('bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps', 'bedframe_total_heights')
                   AND price > 0) THEN
         UPDATE sales_order_lines sl
            SET option_charge_amount = ch.amount

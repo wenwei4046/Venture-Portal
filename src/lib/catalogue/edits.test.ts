@@ -338,7 +338,7 @@ describe('validateOptionPrices', () => {
     ])
   })
 
-  it.each(['bedframe_total_heights', 'sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
+  it.each(['sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
     expect(() => validateOptionPrices(pool, [{ value: '12"', price: '5' }])).toThrow('That list carries no price')
   })
 
@@ -349,7 +349,7 @@ describe('validateOptionPrices', () => {
     ])
   })
 
-  it.each(['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps'])('a charge on %s cannot be negative', pool => {
+  it.each(['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps', 'bedframe_total_heights'])('a charge on %s cannot be negative', pool => {
     expect(() => validateOptionPrices(pool, [{ value: '6"', price: '-10' }])).toThrow('a price cannot be negative')
   })
 

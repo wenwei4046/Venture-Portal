@@ -140,8 +140,8 @@ export interface OptionPriceEdit {
 /**
  * A cost surcharge may be negative — the ERP's own "No Side Panel" takes RM 40
  * off. A charge may not: it is what the customer pays for a bed frame's divan,
- * leg or gap (2026-10-05). A bed frame's total height and a sofa's seat size
- * carry no price at all (CHECK catalogue_option_prices_*).
+ * leg, gap or total height (2026-10-05). A sofa's seat size carries no price at
+ * all (CHECK catalogue_option_prices_unpriced_pools).
  */
 export function validateOptionPrices(pool: string, edits: readonly OptionPriceEdit[]): {
   upserts: Array<{ pool: string; value: string; price: number }>

@@ -201,7 +201,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
         {fabricView ? 'Sofa and Bedframe mappings override the shared ERP tier independently. With neither mapping nor shared tier, P2 is used.' :
           meta?.charge ? 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC: the Quote offers FOC plus every option charged here.' :
           meta?.priced ? 'Portal surcharge (RM) added to the cost when this option is chosen. Blank adds nothing; 0 is a zero surcharge.' :
-            pool === 'bedframe_total_heights' ? 'ERP choices only. A total height is offered on no quote and carries no price.' : 'ERP choices only. This pool has no surcharge; model availability is set on Modular.'}
+            'ERP choices only. This pool has no surcharge; model availability is set on Modular.'}
         {editing && dirty > 0 ? ` ${dirty} unsaved change${dirty === 1 ? '' : 's'} across ${dirtyPools} pool${dirtyPools === 1 ? '' : 's'}; Save includes them all.` : ''}
       </p>
       {error ? <p className="sku-notice" data-tone="error" role="alert">{error}</p> : null}

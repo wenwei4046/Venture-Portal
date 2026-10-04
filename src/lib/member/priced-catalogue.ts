@@ -40,7 +40,7 @@ function optionList(v: unknown): string[] {
   });
 }
 
-const CHARGE_KEYS = ["divan_heights", "leg_heights", "gaps"] as const;
+const CHARGE_KEYS = ["divan_heights", "leg_heights", "gaps", "total_heights"] as const;
 
 /** `[{ value, charge }]`, each a short value and a charge above zero — anything else is dropped. */
 function chargeList(v: unknown): OptionCharge[] {
@@ -67,7 +67,7 @@ export function catalogueModelsOf(raw: unknown): MemberCatalogueModel[] {
       const list = optionList(src[key]);
       if (list.length) options[key] = list;
     }
-    // A bed frame's chargeable divan, leg and gap (20261005010000).
+    // A bed frame's chargeable divan, leg, gap and total height (20261005010000).
     const charges: MemberModelCharges = {};
     const chargeSrc = kind === "BEDFRAME" && isRow(m.charges) ? m.charges : {};
     for (const key of CHARGE_KEYS) {

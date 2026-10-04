@@ -100,11 +100,12 @@ const sp = (q: number, z: SizeKey) => Math.round((q * SIZE_M[z]) / 10) * 10;
 const sizes = (id: (z: SizeKey) => string) => Object.fromEntries(SIZE_KEYS.map(z => [z, id(z)])) as Record<SizeKey, string>;
 
 /** The prototype has no bed frame options; `?charges=1` shows what Maintenance charges would look like (2026-10-05). */
-const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], specials: [] };
+const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
 const DEMO_CHARGES: FrameChoices = {
   divans: [{ value: '12"', charge: 50 }],
   legs: [{ value: '6"', charge: 100 }, { value: '7"', charge: 120 }],
   gaps: [{ value: '12"', charge: 20 }],
+  totals: [],
   specials: [],
 };
 
