@@ -143,6 +143,19 @@ describe("the CRM on live data", () => {
     expect(Array.from(bar.querySelectorAll("button")).map(b => b.textContent?.replace(/\d+/g, ""))).toEqual(["Overview", "Assignment", "Calendar"]);
   });
 
+  it("opens a team in place on the Overview, then a person's page", async () => {
+    fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
+    render(<MemberCrm live salesperson="Principal" />);
+    await screen.findByRole("heading", { name: "Overview" });
+    expect(screen.queryByRole("cell", { name: "Ann Tan" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Team Kelvin/ }));
+    expect(screen.getByRole("button", { name: /Team Kelvin/ }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("cell", { name: "Kelvin" })).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "Ann Tan" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Ann Tan/ }));
+    expect(await screen.findByText("Reply within 24 h")).toBeTruthy();
+  });
+
   it("switches the Overview between this month and this week", async () => {
     fetchCrm.mockResolvedValue({ ok: true, data: asPrincipal() });
     render(<MemberCrm live salesperson="Principal" />);

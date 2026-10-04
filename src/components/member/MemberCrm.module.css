@@ -735,3 +735,16 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .periodSwitch { flex: none; display: flex; padding: 3px; border-radius: 12px; background: var(--m-soft); border: 1px solid var(--m-border); }
 .periodSwitch button { min-height: 36px; min-width: 56px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--m-sub); font-size: 13px; font-weight: 500; }
 .periodSwitch [aria-checked="true"] { background: var(--m-brand); color: var(--m-on-brand); }
+
+/* Overview: a team opens in place, its people listed under it (user 2026-10-04) */
+.teamGroup[data-open] { margin: 0 -14px; padding: 0 14px 6px; background: var(--m-soft); }
+.teamGroup[data-open] > .teamRow:first-child { border-top-color: transparent; }
+.teamRow button strong { display: inline-flex; align-items: center; gap: 4px; }
+.teamRow button strong svg { color: var(--m-sub); transition: transform .15s; }
+.teamRow button[aria-expanded="true"] strong svg { transform: rotate(90deg); }
+.teamPerson { padding: 8px 0; }
+.teamPerson button { flex-direction: row !important; align-items: center; gap: 10px; }
+.teamPerson .leadAvatar { width: 30px; height: 30px; font-size: 11px; background: var(--m-card); }
+.teamPerson button > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.teamPerson strong { font-size: 13px; }
+.teamPerson small em { color: rgb(var(--alert)); }

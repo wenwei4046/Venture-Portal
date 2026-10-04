@@ -17,7 +17,7 @@ const pct = (rate: number | null) => (rate == null ? "—" : `${Math.round(rate 
 export const roleTag = (m: CrmMember) => (m.role === "rs" ? `RS · ${m.fullTime ? "Full time" : "Part time"}` : ROLE_LABELS[m.role]);
 
 /** A team's people in reporting order — the TL, each TA, then that TA's RS — with how deep each sits. */
-function inLineOrder(tlId: string, members: CrmMember[]): { member: CrmMember; depth: number }[] {
+export function inLineOrder(tlId: string, members: CrmMember[]): { member: CrmMember; depth: number }[] {
   const out: { member: CrmMember; depth: number }[] = [];
   const walk = (id: string, depth: number) => {
     const m = members.find(x => x.id === id);

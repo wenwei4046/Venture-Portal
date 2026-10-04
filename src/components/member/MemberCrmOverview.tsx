@@ -5,15 +5,17 @@ import { allTeams, assignsAds, isUnassigned, leadsBetween, memberStats, periodRa
 import { CRM_LOST_REASONS, replyUrgency, type CrmAppointment, type CrmLead } from "@/lib/member/crm";
 import s from "./member.module.css";
 import c from "./MemberCrm.module.css";
-import { Icon } from "./MemberUI";
+import { Icon, initials } from "./MemberUI";
+import { inLineOrder, roleTag } from "./MemberCrmTeam";
 
 const pct = (rate: number | null) => (rate == null ? "—" : `${Math.round(rate * 100)}%`);
 
 /**
  * The Principal's first screen (user 2026-10-03): the numbers that matter —
  * leads, appointment rate, show-up rate — for everyone on the rust card,
- * what waits on somebody, then each team side by side. Tap a team to open its
- * TL's page. Week / Month (user 2026-10-04) narrows the numbers, the teams and
+ * what waits on somebody, then each team side by side. Tap a team to open it
+ * in place — everyone in it, TL to RS, with their own numbers (user
+ * 2026-10-04) — and tap a person for their page. Week / Month (user 2026-10-04) narrows the numbers, the teams and
  * the lost reasons to the leads that arrived this week or this month; what
  * waits on somebody is always now.
  */
@@ -27,6 +29,7 @@ export default function MemberCrmOverview({ viewer, members, leads: allLeads, ap
   onOpenAssignment: () => void;
 }) {
   const [period, setPeriod] = useState<CrmPeriod>("month");
+  const [openTeam, setOpenTeam] = useState<string | null>(null);
   const range = periodRange(period, now);
   // The period's leads drive the numbers; what waits on somebody is read from all of them.
   const leads = leadsBetween(allLeads, range.start, range.end);
@@ -90,16 +93,40 @@ export default function MemberCrmOverview({ viewer, members, leads: allLeads, ap
         <div role="row" className={c.srOnly}>
           <span role="columnheader">Team</span><span role="columnheader">Leads</span><span role="columnheader">Appt</span><span role="columnheader">Show</span>
         </div>
-        {rows.map(r => <div role="row" key={r.id} className={c.teamRow}>
-          <span role="cell" aria-label={r.name}>{r.open
-            ? <button onClick={() => onOpenMember(r.id)}><strong>{r.name}</strong><small>{r.who}</small></button>
-            : <><strong>{r.name}</strong><small>{r.who}</small></>}</span>
-          <span role="cell">{r.st.leads}</span>
-          <span role="cell">{pct(r.st.apptRate)}</span>
-          <span role="cell">{pct(r.st.showUpRate)}</span>
-        </div>)}
+        {rows.map(r => {
+          const expanded = openTeam === r.id;
+          return <div key={r.id} role="rowgroup" className={c.teamGroup} data-open={expanded || undefined}>
+            <div role="row" className={c.teamRow}>
+              <span role="cell" aria-label={r.name}>{r.open
+                ? <button aria-expanded={expanded} onClick={() => setOpenTeam(expanded ? null : r.id)}>
+                  <strong>{r.name} <Icon name="chevron" size={14} /></strong><small>{r.who}</small>
+                </button>
+                : <><strong>{r.name}</strong><small>{r.who}</small></>}</span>
+              <span role="cell">{r.st.leads}</span>
+              <span role="cell">{pct(r.st.apptRate)}</span>
+              <span role="cell">{pct(r.st.showUpRate)}</span>
+            </div>
+            {/* The team opened: each person's own leads in the same period; tap one for their page. */}
+            {expanded && inLineOrder(r.id, members).map(({ member: p, depth }) => {
+              const own = leads.filter(l => l.assignedTo === p.id);
+              const st = memberStats(own, appointments, now);
+              const pending = allLeads.filter(l => l.assignedTo === p.id && replyUrgency(l, now).level !== "none").length;
+              return <div role="row" key={p.id} className={`${c.teamRow} ${c.teamPerson}`}>
+                <span role="cell" aria-label={p.name}>
+                  <button onClick={() => onOpenMember(p.id)} style={{ paddingLeft: depth * 12 }}>
+                    <span className={c.leadAvatar} aria-hidden="true">{initials(p.name)}</span>
+                    <span><strong>{p.name}</strong><small>{roleTag(p)}{pending > 0 && <em> · {pending} waiting</em>}</small></span>
+                  </button>
+                </span>
+                <span role="cell">{st.leads}</span>
+                <span role="cell">{pct(st.apptRate)}</span>
+                <span role="cell">{pct(st.showUpRate)}</span>
+              </div>;
+            })}
+          </div>;
+        })}
       </div>}
-      <p className={s.caption}>Leads that arrived {range.label}. Appt = leads booked · Show-up = booked visits that came. Tap a team for its people.</p>
+      <p className={s.caption}>Leads that arrived {range.label}. Appt = leads booked · Show-up = booked visits that came. Tap a team to see its people, a person for their page.</p>
     </section>
 
     {lost.length > 0 && <section className={`${s.card} ${c.tableCard}`} aria-label="Why leads were lost">
