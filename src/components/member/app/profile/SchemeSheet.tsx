@@ -7,7 +7,7 @@ import s from "./profile.module.css";
 /** Commission scheme — the Profile chip (no prototype sheet; the person sheet's parts). */
 export default function SchemeSheet({ open, vm, onClose }: { open: boolean; vm: SchemeVM | null; onClose: () => void }) {
   return (
-    <Sheet open={open} onClose={onClose} z={22} className={`${s.sheetBody} ${s.sheetGap14}`} label="Commission scheme">
+    <Sheet open={open} onClose={onClose} z={22} maxHeight="86%" scroll className={`${s.sheetBody} ${s.sheetGap14}`} label="Commission scheme">
       <SheetHandle />
       {vm && (
         <>
