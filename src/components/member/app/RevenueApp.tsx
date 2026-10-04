@@ -1,13 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import type { MemberData, MemberInsight, MemberMembership, MemberReadContext, MemberRequest } from "@/lib/member/types";
-import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
+import type { MemberData, MemberMembership, MemberReadContext, MemberRequest } from "@/lib/member/types";
+import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
 import base from "./base.module.css";
 import s from "./shell.module.css";
 import { firstName, greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
-import { useRoute, type Board, type Route, type Screen } from "./route";
+import { useRoute, type Board, type InsightView, type Route, type Screen } from "./route";
+import { addMonths, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
+import { useInsightData } from "./insight/useInsightData";
+import { billsView, brandPage, insightMain, kpiView, orderSheet, type InsightInput } from "./insight/insight-model";
+import InsightMain, { type InsightTab } from "./insight/InsightMain";
+import BillsPage, { type BillsStatus } from "./insight/BillsPage";
+import KpiPage from "./insight/KpiPage";
+import BrandPage from "./insight/BrandPage";
+import { DateSheet, OrderSheet, TiersSheet } from "./insight/InsightSheets";
 import { demoSource, liveSource, type RevenueSource } from "./source";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me } from "./shell/Chrome";
 import StatusBar from "./shell/StatusBar";
@@ -123,24 +131,47 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     return { name: data.profile.name, first: firstName(data.profile.name), ini: initials(data.profile.name), title: membership?.title ?? "", rank: membership?.rank ?? "" };
   }, [viewed, principal, data.profile.name, membership]);
 
-  // ── this month's numbers for the chosen sub-department ──
-  const [insight, setInsight] = useState<MemberInsight | null>(null);
-  const [kpi, setKpi] = useState<MemberKpiSummary | null>(null);
+  // ── the month being worked: last month while it is still being closed ──
   const [arena, setArena] = useState<MemberArenaSnapshot | null>(null);
+  const [arenaNow, setArenaNow] = useState<MemberArenaSnapshot | null>(null);
   const [settledArena, setSettledArena] = useState<MemberArenaSnapshot | null>(null);
   const readable = !principal || !!context;
   const membershipId = membership?.id ?? "";
   const schemeId = membership?.schemeId ?? "";
+  const prevMonth = addMonths(period, -1);
 
+  // Last month's and this month's bills: which months are closed, which hold bills.
+  const [recent, setRecent] = useState<MemberOrderBook | null>(null);
+  const [recentFailed, setRecentFailed] = useState(false);
   useEffect(() => {
     if (!membershipId || !readable) return;
     let stale = false;
-    setInsight(null); setKpi(null); setArena(null);
-    void source.insight(undefined, context).then(r => { if (!stale && r.ok) setInsight(r.data); });
-    void source.kpi(schemeId, context).then(r => { if (!stale && r.ok) setKpi(r.data); });
-    void source.arena(membershipId, period, "monthly", context).then(r => { if (!stale && r.ok) setArena(viewedAs(r.data, context?.staffId)); });
+    setRecent(null); setRecentFailed(false);
+    void source.orderBook(membershipId, prevMonth, period, context).then(r => {
+      if (stale) return;
+      if (r.ok) setRecent(r.data); else setRecentFailed(true);
+    });
     return () => { stale = true; };
-  }, [membershipId, schemeId, period, readable, context, source]);
+  }, [membershipId, prevMonth, period, readable, context, source]);
+  const monthState = useMemo<MonthState>(() => ({ paysFrom: recent?.paysFrom ?? null, closed: recent?.closedMonths ?? [] }), [recent]);
+  const working = useMemo(() => {
+    if (fixture?.insight) return fixture.insight.month;
+    if (recent) return workingMonth(period, monthState, [...new Set(recent.orders.map(o => o.recognitionMonth))]);
+    return recentFailed || data.demo ? period : null;
+  }, [fixture, recent, recentFailed, data.demo, period, monthState]);
+  const workingPeriod = useMemo(() => (working ? monthPeriod(working, period) : null), [working, period]);
+  const work = useInsightData({ source, membershipId, schemeId, context, readable, period: workingPeriod, recent, recentFrom: prevMonth });
+
+  useEffect(() => {
+    if (!membershipId || !readable || !working) return;
+    let stale = false;
+    setArena(null); setArenaNow(null);
+    void source.arena(membershipId, working, "monthly", context).then(r => { if (!stale && r.ok) setArena(viewedAs(r.data, context?.staffId)); });
+    if (working !== period) {
+      void source.arena(membershipId, period, "monthly", context).then(r => { if (!stale && r.ok) setArenaNow(viewedAs(r.data, context?.staffId)); });
+    }
+    return () => { stale = true; };
+  }, [membershipId, working, period, readable, context, source]);
 
   const incomes = useMemo(() => data.incomes.filter(i => i.schemeId === schemeId).sort((a, b) => b.period.localeCompare(a.period)), [data.incomes, schemeId]);
   const income = incomes[0];
@@ -199,10 +230,17 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const goScreen = useCallback((screen: Screen, extra: Partial<Route> = {}) => {
     setSheet(null);
     setNfOpen(false);
+    setDateOpen(false);
+    setSoPick(null);
+    setTiersOpen(false);
     setScrolled(false);
     go({ screen, pf: null, ins: "main", arena: "hub", ...extra });
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [go]);
+  const toInsight = useCallback((view: InsightView, status: BillsStatus = "counted") => {
+    if (view === "bills") setBillStatus(status);
+    goScreen("insight", { ins: view });
+  }, [goScreen]);
   const openBoard = useCallback((board: Board) => goScreen("arena", { arena: "board", board }), [goScreen]);
   const openNotif = useCallback(() => { setSheet(null); setNfOpen(true); }, []);
   const toggleNotif = useCallback(() => { setSheet(null); setNfOpen(open => !open); }, []);
@@ -228,15 +266,57 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
 
   const model = useMemo(() => todayModel({
     today, first: me.first, title: me.title, rank: me.rank, income, salary: data.profile.salary, hidden,
-    insight: insight?.blocks.find(b => b.membershipId === membershipId), kpi, arena, memos, requests, requestCode,
-  }), [today, me, income, data.profile.salary, hidden, insight, membershipId, kpi, arena, memos, requests]);
+    insight: work.block ?? undefined, kpi: work.kpi, arena, arenaNow, memos, requests, requestCode,
+  }), [today, me, income, data.profile.salary, hidden, work.block, work.kpi, arena, arenaNow, memos, requests]);
+
+  // ── Insight: Month / Quarter / Year, opening on the working month ──
+  const [insKind, setInsKind] = useState<PeriodKind>("monthly");
+  const [insFrom, setInsFrom] = useState<string | null>(null);
+  const [insTab, setInsTab] = useState<InsightTab>("personal");
+  const [billStatus, setBillStatus] = useState<BillsStatus>("counted");
+  const [billWeek, setBillWeek] = useState<string | null>(null);
+  const [insBrand, setInsBrand] = useState("");
+  const [dateOpen, setDateOpen] = useState(false);
+  const [soPick, setSoPick] = useState<string | null>(null);
+  const [tiersOpen, setTiersOpen] = useState(false);
+  const insPeriod = useMemo(() => periodOf(insKind, insFrom ?? working ?? period, period), [insKind, insFrom, working, period]);
+  const sameAsWork = insPeriod.kind === "monthly" && insPeriod.from === working;
+  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: sameAsWork ? null : insPeriod, recent, recentFrom: prevMonth });
+  const ins = sameAsWork ? work : picked;
+  const insMonthly = insPeriod.kind === "monthly";
+  const insightInput = useMemo<InsightInput>(() => ({
+    period: insPeriod,
+    book: ins.book,
+    me: (insMonthly ? ins.block?.me : ins.range?.me) ?? null,
+    downline: (insMonthly ? ins.block?.downline : ins.range?.downline) ?? [],
+    target: insMonthly ? ins.block?.target ?? null : null,
+    kpi: insMonthly ? ins.kpi : null,
+    kpiEnabled: work.kpi?.enabled,
+    bands: data.bands,
+    name: me.name,
+    title: me.title,
+  }), [insPeriod, ins, insMonthly, work.kpi?.enabled, data.bands, me.name, me.title]);
+  const insMain = useMemo(() => fixture?.insight?.main ?? (ins.book ? insightMain(insightInput) : null), [fixture, ins.book, insightInput]);
+  const insBills = useMemo(() => fixture?.insight?.bills ?? (ins.book ? billsView(insightInput) : null), [fixture, ins.book, insightInput]);
+  const insKpi = useMemo(() => fixture?.insight?.kpi ?? (ins.book ? kpiView(insightInput, membership?.name ?? "this sub-department") : null), [fixture, ins.book, insightInput, membership?.name]);
+  const insBrandVM = useMemo(() => {
+    if (fixture?.insight) return fixture.insight.brands[insBrand] ?? Object.values(fixture.insight.brands)[0] ?? null;
+    return ins.book ? brandPage(insightInput, insBrand) : null;
+  }, [fixture, ins.book, insightInput, insBrand]);
+  const soVM = useMemo(() => {
+    if (!soPick) return null;
+    if (fixture?.insight) return fixture.insight.orders[soPick] ?? null;
+    return orderSheet(insightInput, soPick);
+  }, [fixture, soPick, insightInput]);
+  const insDateLabel = fixture?.insight?.dateLabel ?? insPeriod.label;
+  const dateOptions = useMemo(() => periodOptions(insKind, period, monthState), [insKind, period, monthState]);
   const todayVM = fixture?.today ?? model;
   const nfCount = fixture?.notifications.count ?? nf.count;
   const nfGroupsVM = fixture?.notifications.groups ?? notifGroups(nf.items, nfTab, settledMonth);
   const nfSummaryVM = fixture?.notifications.summary ?? notifSummary(nf.count, settledMonth);
 
   // ── layout ──
-  const anyPanel = sheet !== null;
+  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen;
   const rail = desk && (nfOpen || anyPanel || route.screen === "quote");
   const showHeader = route.screen === "today" || route.screen === "calc";
   const statusBg = route.screen === "account" && !route.pf ? "var(--rv-peach)" : "var(--rv-white)";
@@ -249,12 +329,32 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   if (route.screen === "today") {
     page = <Today model={todayVM} hidden={hidden} actions={{
       toggleHide: () => setHidden(!hidden),
-      openMetric: key => goScreen("insight", { ins: key === "sales" ? "bills" : key === "margin" ? "brand" : "kpi" }),
+      openMetric: key => toInsight(key === "sales" ? "bills" : key === "margin" ? "brand" : "kpi"),
       openTodo: todo,
-      openOrders: () => goScreen("insight", { ins: "bills" }),
+      openOrders: () => toInsight("bills"),
       openArena: () => goScreen("arena"),
       openBoard,
     }} />;
+  } else if (route.screen === "insight") {
+    const back = () => toInsight("main");
+    const openDate = () => setDateOpen(true);
+    if (route.ins === "bills") {
+      page = <BillsPage vm={insBills} dateLabel={insDateLabel} status={billStatus} week={billWeek} onStatus={setBillStatus} onWeek={setBillWeek}
+        onBill={setSoPick} onBack={back} onDate={openDate} />;
+    } else if (route.ins === "kpi") {
+      page = <KpiPage vm={insKpi} dateLabel={insDateLabel} onBill={setSoPick} onBack={back} onDate={openDate} />;
+    } else if (route.ins === "brand") {
+      page = <BrandPage vm={insBrandVM} dateLabel={insDateLabel} onBrand={code => { setInsBrand(code); setTiersOpen(false); }}
+        onTiers={() => setTiersOpen(true)} onBill={setSoPick} onBack={back} onDate={openDate} />;
+    } else {
+      page = <InsightMain vm={insMain} tab={insTab} dateLabel={insDateLabel} actions={{
+        openDate, setTab: setInsTab,
+        toBills: () => toInsight("bills"),
+        toKpi: () => toInsight("kpi"),
+        toWaiting: () => toInsight("bills", "waiting"),
+        openBrand: code => { setInsBrand(code); toInsight("brand"); },
+      }} />;
+    }
   } else {
     page = <Pending screen={route.screen} />;
   }
@@ -283,6 +383,15 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
         onTab={setNfTab} onClose={() => setNfOpen(false)} onReadAll={() => setReadAll(true)} onOpen={openNotifItem} />
       <BrandPicker open={sheet === "brand"} brands={brandList} current={currentBrand} onQuote={route.screen === "quote"} cartItems={fixture?.cartItems ?? 0}
         onClose={() => setSheet(null)} onPick={code => { setQuoteBrand(code); goScreen("quote"); }} />
+      {route.screen === "insight" && (
+        <>
+          <DateSheet open={dateOpen} kind={insKind} options={fixture?.insight?.dateOptions ?? dateOptions} selected={insPeriod.from}
+            onKind={kind => { setInsKind(kind); setInsFrom(null); setBillWeek(null); }}
+            onPick={o => { setInsFrom(o.period.from); setBillWeek(null); setDateOpen(false); }} onClose={() => setDateOpen(false)} />
+          {route.ins === "brand" && <TiersSheet open={tiersOpen} vm={insBrandVM} onClose={() => setTiersOpen(false)} />}
+          {route.ins !== "main" && <OrderSheet open={soPick !== null} vm={soVM} onClose={() => setSoPick(null)} />}
+        </>
+      )}
     </div>
   );
 

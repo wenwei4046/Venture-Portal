@@ -11,6 +11,7 @@ import { quoteCostRatios, quoteKpiItems } from "./quote-rules";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
+import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
 import type {
   BedframeBuild,
   MemberBand,
@@ -335,6 +336,67 @@ export async function loadMemberInsight(
         })),
       })),
     };
+  });
+}
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** Insight's month, quarter or year: 'YYYY-MM' to 'YYYY-MM', checked here and again by the RPC. */
+function insightWindow(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  uuid(subDepartmentId, "department");
+  if (!MONTH.test(from) || !MONTH.test(until) || until < from)
+    throw new Error("Choose a month, a quarter or a year.");
+  if (context && context.subDepartmentId !== subDepartmentId)
+    throw new Error("Choose a valid member and department.");
+}
+
+/**
+ * One member's bills, line by line, over a month, a quarter or a year — what
+ * Insight's bills, KPI and brand pages are built from. No cost: a bill carries
+ * its layer-2 margin percentage only.
+ */
+export async function loadMemberOrderBook(
+  subDepartmentId: string,
+  from: string,
+  until: string,
+  context?: MemberReadContext,
+): Promise<MemberOutcome<MemberOrderBook>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    const principal = principalReadContext(user, context);
+    insightWindow(subDepartmentId, from, until, context);
+    const client = await session("member_insight", principal);
+    const data = await rpc<unknown>(client, principal ? "member_principal_order_book" : "member_order_book", {
+      p_sub_department: subDepartmentId, p_from: from, p_until: until,
+      ...(principal ? { p_staff: context!.staffId } : {}),
+    });
+    const book = readOrderBook(data);
+    if (!book) throw new Error("Your bills are temporarily unavailable.");
+    return { ...book, orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })) };
+  });
+}
+
+/** Insight › Quarter / Year: the member and their team, `me` and `downline` over the range. */
+export async function loadMemberInsightRange(
+  subDepartmentId: string,
+  from: string,
+  until: string,
+  context?: MemberReadContext,
+): Promise<MemberOutcome<MemberInsightRange>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    const principal = principalReadContext(user, context);
+    insightWindow(subDepartmentId, from, until, context);
+    const client = await session("member_insight", principal);
+    const data = await rpc<unknown>(client, principal ? "member_principal_insight_range" : "member_insight_range", {
+      p_sub_department: subDepartmentId, p_from: from, p_until: until,
+      ...(principal ? { p_staff: context!.staffId } : {}),
+    });
+    const range = readInsightRange(data);
+    if (!range) throw new Error("Performance information is temporarily unavailable.");
+    return { ...range, downline: range.downline.map((row) => ({ ...row, title: legacyLabel(row.title) })) };
   });
 }
 

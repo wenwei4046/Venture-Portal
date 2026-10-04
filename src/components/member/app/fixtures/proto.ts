@@ -9,7 +9,24 @@ import type { MemberData } from "@/lib/member/types";
 import type { TodayModel } from "../today/today-model";
 import type { NotifGroup } from "../notifications/notify-model";
 import type { BrandOption } from "../overlays/BrandPicker";
+import type { BillsVM, BrandPageVM, InsightMainVM, KpiVM, OrderSheetVM } from "../insight/insight-model";
+import type { PeriodOption } from "../insight/period";
 import { ICON } from "../icons";
+import { protoInsight } from "./proto-insight";
+
+export interface InsightFixture {
+  /** The month Insight opens on (the prototype: September, on 3 October). */
+  month: string;
+  dateLabel: string;
+  dateOptions: PeriodOption[];
+  main: InsightMainVM;
+  bills: BillsVM;
+  kpi: KpiVM;
+  /** By brand code. */
+  brands: Record<string, BrandPageVM>;
+  /** By bill id. */
+  orders: Record<string, OrderSheetVM>;
+}
 
 export interface AppFixture {
   greeting: string;
@@ -17,6 +34,7 @@ export interface AppFixture {
   brands: BrandOption[];
   today: TodayModel;
   notifications: { count: number; summary: string; groups: NotifGroup[] };
+  insight?: InsightFixture;
 }
 
 const membership = (id: string, name: string, code: string, title: string, rank: string, calculator: boolean) => ({
@@ -47,6 +65,7 @@ const memo = (id: string, time: string, title: string, sub: string) => ({
 
 export function protoFixture(): AppFixture {
   return {
+    insight: protoInsight(),
     greeting: "Good morning",
     cartItems: 4,
     brands: [

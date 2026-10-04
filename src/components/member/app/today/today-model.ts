@@ -15,11 +15,19 @@ export interface TodayInput {
   income?: MemberIncome;
   salary: number | null;
   hidden: boolean;
-  /** This month's Insight block for this sub-department. */
+  /**
+   * The working month's Insight block for this sub-department — the month still
+   * being closed (September until it closes, then October), as Insight opens on.
+   */
   insight?: MemberInsightBlock;
   kpi?: MemberKpiSummary | null;
-  /** This month's Arena (monthly window). */
+  /** The working month's Arena (monthly window) — the boards' ranks and the margin tier. */
   arena?: MemberArenaSnapshot | null;
+  /**
+   * The current month's Arena, for this week's fair and the brand weeks still to
+   * save. Absent = `arena` (the working month IS the current month).
+   */
+  arenaNow?: MemberArenaSnapshot | null;
   memos: MemberMemo[];
   requests: MemberRequest[];
   /** RQ-2609-004 style code of a request. */
@@ -110,6 +118,7 @@ function kpiMetric(input: TodayInput): TodayMetric {
 }
 
 function todos(input: TodayInput): TodayTodo[] {
+  const now = input.arenaNow ?? input.arena;
   const out: TodayTodo[] = [];
   const memos = input.memos.filter(m => m.requiresAck && !m.acknowledgedAt);
   if (memos.length) {
@@ -120,7 +129,7 @@ function todos(input: TodayInput): TodayTodo[] {
     out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests",
       title: `${KIND[request.kind]} needs info`, sub: `${input.requestCode(request)} · HR returned it` });
   }
-  const arena = input.arena;
+  const arena = now;
   const period = input.today.slice(0, 7);
   if (arena && arena.period === period && arena.weekLocks?.length) {
     const picks = arena.brandWeeks?.picks ?? {};
@@ -134,7 +143,7 @@ function todos(input: TodayInput): TodayTodo[] {
 }
 
 function thisWeek(input: TodayInput): TodayWeek | null {
-  const arena = input.arena;
+  const arena = input.arenaNow ?? input.arena;
   if (!arena) return null;
   const friday = weekFriday(input.today);
   const fridays = arenaMonthFridays(friday.slice(0, 7));

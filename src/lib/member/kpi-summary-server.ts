@@ -7,8 +7,11 @@ import { principalReadContext } from "./read-access";
 import { isPrincipalAccount } from "@/lib/view-as";
 import type { MemberReadContext } from "./types";
 
-/** Employees stay self-scoped; Principal reads require an explicit, independently authorized context. */
-export async function loadMemberKpiSummary(schemeId: string, context?: MemberReadContext): Promise<MemberKpiSummaryOutcome> {
+/**
+ * Employees stay self-scoped; Principal reads require an explicit, independently authorized context.
+ * `period` ('YYYY-MM') reads that month; absent = the current month.
+ */
+export async function loadMemberKpiSummary(schemeId: string, context?: MemberReadContext, period?: string): Promise<MemberKpiSummaryOutcome> {
   try {
     const user = await getMemberUser();
     if (!user?.is_active || (!isPrincipalAccount(user) && !user.permissions.includes("member_portal"))) {
@@ -18,9 +21,12 @@ export async function loadMemberKpiSummary(schemeId: string, context?: MemberRea
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(schemeId)) {
       return { ok: false, error: "Choose an active membership." };
     }
+    if (period !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+      return { ok: false, error: "Choose a valid month." };
+    }
     const client = await createClient() as unknown as SupabaseClient;
     const result = await client.rpc(principal ? "member_principal_kpi_summary" : "member_kpi_summary", {
-      p_scheme: schemeId, ...(principal ? { p_staff: context!.staffId } : {}),
+      p_scheme: schemeId, ...(principal ? { p_staff: context!.staffId } : {}), ...(period ? { p_period: period } : {}),
     });
     if (result.error) return { ok: false, error: "KPI progress is temporarily unavailable. Please try again." };
     const data = readKpiSummary(result.data, schemeId);

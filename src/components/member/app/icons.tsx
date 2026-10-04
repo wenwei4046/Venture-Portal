@@ -24,6 +24,8 @@ export const ICON = {
   chevronRight: "m9 5 7 7-7 7",
   chevronRightWide: "m9 6 6 6-6 6",
   chevronLeft: "m15 18-6-6 6-6",
+  back: "m15 5-7 7 7 7",
+  arrowUp: "M12 19V5m-6 6 6-6 6 6",
   arrowLeft: "M19 12H5m6-6-6 6 6 6",
   arrowRight: "M5 12h14m-6-6 6 6-6 6",
   tick: "m5 12 5 5 9-10",

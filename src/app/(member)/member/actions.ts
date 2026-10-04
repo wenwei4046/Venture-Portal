@@ -6,6 +6,8 @@ export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
   loadMemberData,
   loadMemberInsight,
+  loadMemberInsightRange,
+  loadMemberOrderBook,
   loadMemberOrgMap,
   calculateMemberQuote as calculate,
   submitMemberRequest as submit,
@@ -26,6 +28,12 @@ export async function refreshMemberData() {
 }
 export async function fetchMemberInsight(period?: string, context?: MemberReadContext) {
   return loadMemberInsight(period, context);
+}
+export async function fetchMemberOrderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberOrderBook(subDepartmentId, from, until, context);
+}
+export async function fetchMemberInsightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberInsightRange(subDepartmentId, from, until, context);
 }
 export async function fetchMemberOrgMap(context?: Pick<MemberReadContext, "subDepartmentId">) {
   return loadMemberOrgMap(context);

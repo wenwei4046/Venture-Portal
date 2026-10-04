@@ -205,6 +205,28 @@
   --rv-rose: #F6D7C0;
   --rv-cream-2: #FFF6EF;
   --rv-line-tan: #D9C7BA;
+  /* Insight: tones, the margin ladder and its bar, KPI shades */
+  --rv-neutral-bg: #F7F3EF;
+  --rv-none-bg: #FAF7F4;
+  --rv-wait-bg: #FFF8E6;
+  --rv-tier-top: #2E6249;
+  --rv-tier-inc: #6FAA8A;
+  --rv-tier-ref: #C9BBAE;
+  --rv-tier-pen1: #E7A08A;
+  --rv-tier-pen2: #D9775A;
+  --rv-tier-deep: #1E4532;
+  --rv-zone-pen2: #E7B3A2;
+  --rv-zone-pen1: #F1CDBF;
+  --rv-zone-low: #F6DFAE;
+  --rv-zone-ref: #E9E1D8;
+  --rv-zone-inc: #B7DBC7;
+  --rv-kpi-ink: #24513B;
+  --rv-kpi-4: #4E8A6B;
+  --rv-kpi-5: #679E80;
+  --rv-kpi-6: #86B79C;
+  --rv-kpi-7: #A8CDB8;
+  --rv-kpi-8: #CBE3D5;
+  --rv-kpi-9: #E2F0E8;
   /* translucent */
   --rv-ink-06: rgba(63,43,34,.06);
   --rv-ink-08: rgba(63,43,34,.08);
@@ -223,6 +245,7 @@
   --rv-white-30: rgba(255,255,255,.3);
   --rv-white-35: rgba(255,255,255,.35);
   --rv-black-38: rgba(0,0,0,.38);
+  --rv-black-06: rgba(0,0,0,.06);
   --rv-dim: rgba(40,25,18,.45);
   --rv-dim-brown: rgba(78,47,32,.42);
   --rv-dim-35: rgba(40,25,18,.35);

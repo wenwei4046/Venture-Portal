@@ -1,7 +1,8 @@
 import type { MemberData, MemberInsight, MemberOrgMap, MemberReadContext } from "@/lib/member/types";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
-import { fetchMemberInsight, fetchMemberOrgMap, refreshMemberData } from "@/app/(member)/member/actions";
+import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
+import { fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, refreshMemberData } from "@/app/(member)/member/actions";
 import { fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 
@@ -15,14 +16,21 @@ export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
 export interface RevenueSource {
   refresh(): Promise<Outcome<MemberData>>;
   insight(period: string | undefined, context?: MemberReadContext): Promise<Outcome<MemberInsight>>;
-  kpi(schemeId: string, context?: MemberReadContext): Promise<Outcome<MemberKpiSummary>>;
+  /** KPI items of a month ('YYYY-MM'); absent = the current month. */
+  kpi(schemeId: string, context?: MemberReadContext, period?: string): Promise<Outcome<MemberKpiSummary>>;
   arena(membershipId: string, period: string, window: ArenaWindow, context?: MemberReadContext): Promise<Outcome<MemberArenaSnapshot>>;
   orgMap(context?: Pick<MemberReadContext, "subDepartmentId">): Promise<Outcome<MemberOrgMap>>;
+  /** One member's bills, line by line, from one month to another (inclusive). */
+  orderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberOrderBook>>;
+  /** The member and their team over a quarter or a year. */
+  insightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberInsightRange>>;
 }
 
 /** The design preview: reads nothing — its screens come from fixtures. */
 const nothing = async () => ({ ok: false as const, error: "Preview data only." });
-export const demoSource: RevenueSource = { refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing };
+export const demoSource: RevenueSource = {
+  refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing,
+};
 
 export const liveSource: RevenueSource = {
   async refresh() {
@@ -30,7 +38,9 @@ export const liveSource: RevenueSource = {
     return result.ok ? { ok: true, data: result.data } : { ok: false, error: result.error };
   },
   insight: (period, context) => fetchMemberInsight(period, context),
-  kpi: (schemeId, context) => fetchMemberKpiSummary(schemeId, context),
+  kpi: (schemeId, context, period) => fetchMemberKpiSummary(schemeId, context, period),
   arena: (membershipId, period, window, context) => fetchMemberArena(membershipId, period, window, context),
   orgMap: context => fetchMemberOrgMap(context),
+  orderBook: (subDepartmentId, from, until, context) => fetchMemberOrderBook(subDepartmentId, from, until, context),
+  insightRange: (subDepartmentId, from, until, context) => fetchMemberInsightRange(subDepartmentId, from, until, context),
 };
