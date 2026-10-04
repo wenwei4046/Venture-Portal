@@ -75,6 +75,10 @@
   letter-spacing: normal;
 }
 
+/* Chrome's own placeholder grey, over the preflight's blue-grey. */
+:where(.root) input::placeholder,
+:where(.root) textarea::placeholder { color: var(--rv-placeholder); opacity: 1; }
+
 :where(.root) h1 { font-size: 2em; font-weight: bold; margin: 0.67em 0; color: inherit; font-family: inherit; }
 :where(.root) h2 { font-size: 1.5em; font-weight: bold; margin: 0.83em 0; color: inherit; font-family: inherit; }
 :where(.root) h3 { font-size: 1.17em; font-weight: bold; margin: 1em 0; color: inherit; font-family: inherit; }

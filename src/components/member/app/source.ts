@@ -1,8 +1,8 @@
-import type { MemberData, MemberInsight, MemberOrgMap, MemberReadContext } from "@/lib/member/types";
+import type { MemberData, MemberInsight, MemberOrgMap, MemberReadContext, QuoteInput, QuoteResult } from "@/lib/member/types";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
-import { fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, refreshMemberData } from "@/app/(member)/member/actions";
+import { calculateMemberQuote, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, refreshMemberData } from "@/app/(member)/member/actions";
 import { fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 
@@ -25,12 +25,14 @@ export interface RevenueSource {
   orderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberOrderBook>>;
   /** The member and their team over a quarter or a year. */
   insightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberInsightRange>>;
+  /** A cart's margin at a price — priced on the server; no cost ever comes back. */
+  quote(input: QuoteInput): Promise<Outcome<QuoteResult>>;
 }
 
 /** The design preview: reads nothing — its screens come from fixtures. */
 const nothing = async () => ({ ok: false as const, error: "Preview data only." });
 export const demoSource: RevenueSource = {
-  refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing,
+  refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing, quote: nothing,
 };
 
 export const liveSource: RevenueSource = {
@@ -44,4 +46,5 @@ export const liveSource: RevenueSource = {
   orgMap: context => fetchMemberOrgMap(context),
   orderBook: (subDepartmentId, from, until, context) => fetchMemberOrderBook(subDepartmentId, from, until, context),
   insightRange: (subDepartmentId, from, until, context) => fetchMemberInsightRange(subDepartmentId, from, until, context),
+  quote: input => calculateMemberQuote(input),
 };

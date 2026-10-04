@@ -14,6 +14,7 @@ import type { PeriodOption } from "../insight/period";
 import { ICON } from "../icons";
 import { protoInsight } from "./proto-insight";
 import { protoArena, type ArenaFixture } from "./proto-arena";
+import { protoQuote, type QuoteFixture } from "./proto-quote";
 
 export interface InsightFixture {
   /** The month Insight opens on (the prototype: September, on 3 October). */
@@ -37,6 +38,7 @@ export interface AppFixture {
   notifications: { count: number; summary: string; groups: NotifGroup[] };
   insight?: InsightFixture;
   arena?: ArenaFixture;
+  quote?: QuoteFixture;
 }
 
 const membership = (id: string, name: string, code: string, title: string, rank: string, calculator: boolean) => ({
@@ -65,10 +67,12 @@ const memo = (id: string, time: string, title: string, sub: string) => ({
   link: "Read memo to acknowledge", done: null, go: { to: "memo" as const, memoId: id },
 });
 
-export function protoFixture(): AppFixture {
+/** `quote`: the brand and the sheet the preview opens on (the prototype's `quoteBrand`, `sofaSheet` …). */
+export function protoFixture(quote: { brand?: string; sheet?: string } = {}): AppFixture {
   return {
     insight: protoInsight(),
     arena: protoArena(),
+    quote: protoQuote(quote),
     greeting: "Good morning",
     cartItems: 4,
     brands: [

@@ -287,6 +287,8 @@ export interface QuoteResult {
   version: string;
   inputKey: string;
   customerText?: string;
+  /** The cost ÷ this ratio the margin was judged on (Fair 0.7) — the department's rule, not a cost. */
+  costDivisor?: number;
   suggestions: {
     productId: string;
     name: string;

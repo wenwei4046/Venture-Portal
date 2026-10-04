@@ -238,11 +238,16 @@
   --rv-step-3: #D3A07A;
   --rv-step-3-ink: #4A2A1A;
   --rv-muted: #C9B8AC;
+  --rv-pill: #F7F0EA;
+  --rv-radio: #CDBCAE;
+  --rv-placeholder: #757575;
   /* translucent */
   --rv-ink-06: rgba(63,43,34,.06);
   --rv-ink-08: rgba(63,43,34,.08);
   --rv-ink-14: rgba(63,43,34,.14);
+  --rv-ink-15: rgba(63,43,34,.15);
   --rv-ink-18: rgba(63,43,34,.18);
+  --rv-ink-20: rgba(63,43,34,.2);
   --rv-accent-18: rgba(189,74,25,.18);
   --rv-accent-20: rgba(189,74,25,.20);
   --rv-accent-30: rgba(189,74,25,.3);

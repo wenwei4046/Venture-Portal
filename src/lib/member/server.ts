@@ -530,7 +530,7 @@ export async function calculateMemberQuote(
     );
     if (!result.valid)
       throw new Error(result.error ?? "The quote could not be calculated.");
-    return { ...result, customerText: customerQuote(checked, products, result) };
+    return { ...result, costDivisor, customerText: customerQuote(checked, products, result) };
   });
 }
 

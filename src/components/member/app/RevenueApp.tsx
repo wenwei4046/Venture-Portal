@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import type { MemberData, MemberMembership, MemberReadContext, MemberRequest } from "@/lib/member/types";
+import type { MemberData, MemberMembership, MemberReadContext, MemberRequest, QuoteInput } from "@/lib/member/types";
+import { tierLabel } from "@/lib/member/catalog";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
@@ -33,6 +34,15 @@ import BrandPicker, { type BrandOption } from "./overlays/BrandPicker";
 import Notifications from "./notifications/Notifications";
 import { notifGroups, notifications, notifSummary, type NotifItem, type NotifTab, type SettledResults } from "./notifications/notify-model";
 import type { AppFixture } from "./fixtures/proto";
+import { useQuote } from "./quote/useQuote";
+import { catalogFromProducts, itemsText, type QCatalog } from "./quote/quote-model";
+import { costBasisNote } from "./quote/calc-model";
+import { tableCalc } from "./quote/table-calc";
+import QuoteProducts from "./quote/QuoteProducts";
+import QuoteCalc, { CalcDock, DeskCalc, ProductsDock, type CalcProps } from "./quote/QuoteCalc";
+import ProductSheet from "./quote/ProductSheet";
+import { AllModelsSheet, CartSheet, CustomerQuoteSheet, type CustomerQuote } from "./quote/QuoteSheets";
+import qs from "./quote/quote.module.css";
 
 export type Device = "live" | "ios" | "android" | "desktop";
 
@@ -105,7 +115,6 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useStoredBool("member-hide-amounts", false);
   const [android, setAndroid] = useState(device === "android");
-  const [quoteBrand, setQuoteBrand] = useState("");
   const appRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const desk = useDesk(appRef);
@@ -231,7 +240,29 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
       .map(([code, v]) => ({ code, name: names.get(code) ?? BRAND_NAMES[code] ?? code, sofa: v.sofa, models: v.models.size }));
   }, [membership?.calculator, data.products, arena?.brands]);
   const brandList = fixture?.brands ?? brands;
-  const currentBrand = quoteBrand || brandList[0]?.code || "";
+
+  // ── Quote: one brand's catalogue, the cart, and the calculator ──
+  const catalogs = useMemo<Record<string, QCatalog>>(() => {
+    if (fixture?.quote) return fixture.quote.catalogs;
+    return Object.fromEntries(brands.map(b => [b.code, catalogFromProducts(data.products, b.code, b.name)]));
+  }, [fixture, brands, data.products]);
+  const quoteCalc = useCallback((input: QuoteInput) => {
+    const fx = fixture?.quote;
+    if (!fx) return source.quote(input);
+    const incentives = [...new Set(fx.bands.filter(b => b.kind === "incentive").map(b => b.threshold))];
+    return Promise.resolve(tableCalc(input, fx.prices, fx.costDivisor, incentives));
+  }, [fixture, source]);
+  const quote = useQuote({
+    catalogs,
+    fallbackBrand: brandList[0]?.code ?? "",
+    schemeId,
+    bands: fixture?.quote?.bands ?? data.bands,
+    storeKey: fixture || data.demo ? null : `${data.profile.userId}-${membershipId}`,
+    readOnly: principal && !!route.staff,
+    calc: quoteCalc,
+    pricing: route.screen === "calc" || (desk && route.screen === "quote"),
+    initial: fixture?.quote?.initial,
+  });
 
   // ── navigation ──
   const goScreen = useCallback((screen: Screen, extra: Partial<Route> = {}) => {
@@ -243,8 +274,11 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     setFairsOpen(false);
     setChampOpen(false);
     setScrolled(false);
+    if (screen !== "quote" && screen !== "calc") { quote.closeSheet(); quote.setCartOpen(false); quote.setAllOpen(false); }
+    quote.setPreviewOpen(false);
     go({ screen, pf: null, ins: "main", arena: "hub", ...extra });
     if (mainRef.current) mainRef.current.scrollTop = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the quote's setters are stable
   }, [go]);
   const toInsight = useCallback((view: InsightView, status: BillsStatus = "counted") => {
     if (view === "bills") setBillStatus(status);
@@ -373,7 +407,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const nfSummaryVM = fixture?.notifications.summary ?? notifSummary(nf.count, settledMonth);
 
   // ── layout ──
-  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen;
+  const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
+  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel;
   const rail = desk && (nfOpen || anyPanel || route.screen === "quote");
   const showHeader = route.screen === "today" || route.screen === "calc";
   const statusBg = route.screen === "account" && !route.pf ? "var(--rv-peach)" : "var(--rv-white)";
@@ -381,6 +416,31 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     "--status-bg": statusBg,
     "--status-h": live ? "env(safe-area-inset-top, 0px)" : android ? "38px" : "54px",
   } as CSSProperties;
+
+  // ── Quote: step 1, step 2 and the desktop calculator share one set of props ──
+  const toCalc = () => { if (quote.items && !quote.readOnly) { quote.setCartOpen(false); goScreen("calc"); } };
+  const calcProps: CalcProps = {
+    vm: quote.vm,
+    brandName: quote.catalog?.name ?? "",
+    cart: quote.cart,
+    fee: quote.fee,
+    basis: costBasisNote(membership?.name ?? "", fixture?.quote?.costDivisor ?? quote.divisor ?? recent?.costDivisor ?? null),
+    kpiEach: Object.fromEntries((quote.catalog?.kpis ?? []).map(k => [k.key, k.price])),
+    onPress: quote.press,
+    onNext: quote.applyNext,
+    onBump: quote.bump,
+    onFee: quote.setFee,
+    onProducts: () => goScreen("quote"),
+  };
+  const customer: CustomerQuote | null = quote.confirmed ? {
+    lines: quote.cart.map(l => ({ name: [l.name, l.size].filter(Boolean).join(" · "), qty: l.qty })),
+    build: quote.cart.some(l => l.kind === "sofa") && quote.build.height && quote.build.tier
+      ? [`Sofa build: seat height ${quote.build.height} · ${tierLabel(quote.build.tier)} fabric`] : [],
+    price: quote.confirmed.price,
+    fee: quote.confirmed.delivery,
+    text: quote.confirmed.customerText ?? "",
+  } : null;
+  const onQuote = route.screen === "quote" || route.screen === "calc";
 
   let page: ReactNode;
   if (route.screen === "today") {
@@ -432,6 +492,13 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
         onBoard={board => { setArSub("total"); goScreen("arena", { arena: "board", board }); }}
         onRecord={() => goScreen("arena", { arena: "record" })} />;
     }
+  } else if (onQuote && !quote.catalog) {
+    page = <div className={qs.page}><p className={qs.recentEmpty}>No brands are set up for quotes in {membership?.name ?? "this sub-department"} yet.</p></div>;
+  } else if (route.screen === "quote" && quote.catalog) {
+    page = <QuoteProducts catalog={quote.catalog} memory={quote.memory} onBrand={() => openSheet("brand")} onSet={quote.applySet}
+      onAll={() => { quote.setQuery(""); quote.setAllOpen(true); }} onFrameOnly={quote.openFrameOnly} onAccOnly={quote.openAccOnly} />;
+  } else if (route.screen === "calc" && quote.catalog) {
+    page = <QuoteCalc {...calcProps} />;
   } else {
     page = <Pending screen={route.screen} />;
   }
@@ -453,13 +520,32 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
       <main ref={mainRef} className={s.main} onScroll={e => { const v = e.currentTarget.scrollTop > 4; if (v !== scrolled) setScrolled(v); }}>
         {page}
       </main>
+      {route.screen === "quote" && quote.catalog && (
+        <ProductsDock items={quote.items} itemsText={itemsText(quote.cart, quote.catalog.name)} open={quote.cartOpen} onBag={quote.toggleCart} onSetPrice={toCalc} />
+      )}
+      {route.screen === "calc" && quote.catalog && <CalcDock ready={!!customer} onPreview={() => { if (customer) quote.setPreviewOpen(true); }} />}
       <BottomNav active={route.screen} android={android} live={live} onGo={goScreen} onQuote={() => openSheet("brand")} />
       <SubDeptSheet open={sheet === "sd"} options={subOptions} current={membership?.id ?? ""} onClose={() => setSheet(null)}
         onPick={id => { setSheet(null); go({ department: id, staff: principal ? route.staff : "" }); }} />
       <Notifications open={nfOpen} summary={nfSummaryVM} tab={nfTab} groups={nfGroupsVM}
         onTab={setNfTab} onClose={() => setNfOpen(false)} onReadAll={() => setReadAll(true)} onOpen={openNotifItem} />
-      <BrandPicker open={sheet === "brand"} brands={brandList} current={currentBrand} onQuote={route.screen === "quote"} cartItems={fixture?.cartItems ?? 0}
-        onClose={() => setSheet(null)} onPick={code => { setQuoteBrand(code); goScreen("quote"); }} />
+      <BrandPicker open={sheet === "brand"} brands={brandList} current={quote.brand} onQuote={onQuote} cartItems={quote.items}
+        onClose={() => setSheet(null)} onPick={code => { quote.setBrand(code); goScreen("quote"); }} />
+      {onQuote && quote.catalog && (
+        <>
+          <DeskCalc show={desk && route.screen === "quote" && !anyPanel && !nfOpen} {...calcProps} />
+          <AllModelsSheet open={quote.allOpen} catalog={quote.catalog} cart={quote.cart} query={quote.query} onQuery={quote.setQuery}
+            onClose={() => quote.setAllOpen(false)} onModel={quote.openModel} />
+          <CartSheet open={quote.cartOpen && quote.cart.length > 0} cart={quote.cart} brandName={quote.catalog.name} itemsText={itemsText(quote.cart, quote.catalog.name)}
+            onClose={() => quote.setCartOpen(false)} onClear={quote.clearCart} onBump={quote.bump} onRemove={quote.remove} onSetPrice={toCalc} />
+          <ProductSheet sheet={quote.sheet} catalog={quote.catalog} memory={quote.memory} cart={quote.cart} build={quote.build} readOnly={quote.readOnly}
+            actions={{
+              close: quote.closeSheet, patch: quote.patch, patchFrame: quote.patchFrame, openBf: quote.openBf, editBf: quote.editBf,
+              removeBf: quote.removeBf, backToMattress: quote.backToMattress, applyFrame: quote.applyFrame, add: quote.addSheet,
+            }} />
+          <CustomerQuoteSheet open={quote.previewOpen} quote={customer} brandName={quote.catalog.name} onClose={() => quote.setPreviewOpen(false)} />
+        </>
+      )}
       {route.screen === "insight" && (
         <>
           <DateSheet open={dateOpen} kind={insKind} options={fixture?.insight?.dateOptions ?? dateOptions} selected={insPeriod.from}
