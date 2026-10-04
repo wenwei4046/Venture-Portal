@@ -17,7 +17,11 @@ export type IncomeState =
   | "live"
   /** HR closed them for the month: the close's figure, fixed. */
   | "closed"
-  /** A month before the portal paid commission: settled by hand. */
+  /**
+   * A month before the portal paid commission: paid from the claim form,
+   * outside the portal. The figures are the portal's own working of it, as
+   * Comm Cal's month page shows them (user 2026-10-05: 显示 VP 自己算的).
+   */
   | "manual"
   /** Nothing to work out (no import yet, not a member then). */
   | "none";

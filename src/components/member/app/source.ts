@@ -4,10 +4,10 @@ import { readClaimRates, type ClaimRates } from "@/lib/member/claim-rules";
 import type { MemberIncome } from "@/lib/member/income";
 import type { MemberHonours } from "@/lib/member/server";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
-import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
+import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberClaimRates, fetchMemberHonours, fetchMemberIncome, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, fetchMemberRequestHistory, fetchPrincipalMemoReceipts, refreshMemberData, submitMemberRequest } from "@/app/(member)/member/actions";
-import { fetchMemberArena } from "@/app/(member)/member/arena-actions";
+import { fetchMemberArena, saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 
 export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -46,6 +46,8 @@ export interface RevenueSource {
   honours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberHonours>>;
   /** View as: the viewed person's memo receipts. */
   memoReceipts(staffId: string): Promise<Outcome<{ memoId: string; readAt: string | null; acknowledgedAt: string | null }[]>>;
+  /** A month's brand weeks — the member's own open weeks, or (a Principal viewing them) any week. */
+  saveBrandWeeks(subDepartmentId: string, period: string, picks: ArenaWeekPicks, context?: MemberReadContext): Promise<Outcome<true>>;
 }
 
 /** The design preview: reads nothing — its screens come from fixtures. */
@@ -53,6 +55,7 @@ const nothing = async () => ({ ok: false as const, error: "Preview data only." }
 export const demoSource: RevenueSource = {
   refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing, quote: nothing,
   memo: nothing, requestHistory: nothing, submitRequest: nothing, cancelRequest: nothing, claimRates: nothing, memoReceipts: nothing, income: nothing, honours: nothing,
+  saveBrandWeeks: nothing,
 };
 
 export const liveSource: RevenueSource = {
@@ -81,4 +84,10 @@ export const liveSource: RevenueSource = {
   memoReceipts: staffId => fetchPrincipalMemoReceipts(staffId),
   income: (subDepartmentId, period, context) => fetchMemberIncome(subDepartmentId, period, context),
   honours: (subDepartmentId, from, until, context) => fetchMemberHonours(subDepartmentId, from, until, context),
+  async saveBrandWeeks(subDepartmentId, period, picks, context) {
+    const result = context
+      ? await savePrincipalArenaBrandWeeks(subDepartmentId, period, picks, context)
+      : await saveMemberArenaBrandWeeks(subDepartmentId, period, picks);
+    return result.ok ? { ok: true, data: true } : { ok: false, error: result.error };
+  },
 };

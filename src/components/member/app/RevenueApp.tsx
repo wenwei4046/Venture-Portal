@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import type { MemberData, MemberMembership, MemberOrgMap, MemberReadContext, QuoteInput } from "@/lib/member/types";
 import { tierLabel } from "@/lib/member/catalog";
 import type { MemberOrderBook } from "@/lib/member/order-book";
-import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaRankings, type ArenaWeekBrand, type ArenaWeekPicks, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
@@ -51,6 +51,10 @@ import { honourWindow, honoursVM } from "./profile/honours-model";
 import type { MemberHonours } from "@/lib/member/server";
 import type { MemberIncome } from "@/lib/member/income";
 import HonoursPage, { HonourSheet } from "./profile/HonoursPage";
+import BrandWeeksPage from "./profile/BrandWeeksPage";
+import SchemeSheet from "./profile/SchemeSheet";
+import { schemeVM } from "./profile/scheme-model";
+import { brandMonthVM, picksToSave } from "./profile/brand-weeks-model";
 import TeamPage, { PersonSheet } from "./profile/TeamPage";
 import RequestsPage, { RequestSheet, type RequestFilter } from "./profile/RequestsPage";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
@@ -143,6 +147,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [honKind, setHonKind] = useState<HonourKind>("monthly");
   const [honPlace, setHonPlace] = useState<number | null>(null);
   const [personPick, setPersonPick] = useState<string | null>(null);
+  const [schemeOpen, setSchemeOpen] = useState(false);
   const [reqFilter, setReqFilter] = useState<RequestFilter>("all");
   const [reqPick, setReqPick] = useState<string | null>(null);
   const [reqForm, setReqForm] = useState<RequestKindVM | null>(null);
@@ -159,6 +164,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [incPeriod, setIncPeriod] = useState<string | null>(null);
   const closeProfileSheets = useCallback(() => {
     setCoPick(null); setHonPlace(null); setPersonPick(null); setReqPick(null); setReqForm(null); setMemoPick(null); setReqError(null); setMemoError(null); setPfDateOpen(false);
+    setSchemeOpen(false);
   }, []);
 
   useEffect(() => {
@@ -634,6 +640,45 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     : honByKey[honKey] ? honoursVM(honByKey[honKey], honKind, honStart, period, membership?.name ?? "your sub-department") : null),
     [fxp, honKind, honByKey, honKey, honStart, period, membership?.name]);
 
+  // Commission scheme: the member's place in it and each brand's ladder (a Principal viewing cannot see their salary).
+  const schemeView = useMemo(() => schemeVM({ name: me.name, ini: me.ini, membership, salary: principal ? undefined : data.profile.salary, bands: data.bands, hidden }),
+    [me.name, me.ini, membership, principal, data.profile.salary, data.bands, hidden]);
+
+  // My brand weeks: this month's weekends first, then the month still being worked; the edits not saved yet, per month.
+  const backOffice = principal && !!context;
+  const [bwEdits, setBwEdits] = useState<Record<string, ArenaWeekPicks>>({});
+  const [bwBusy, setBwBusy] = useState(false);
+  const [bwError, setBwError] = useState<string | null>(null);
+  const [bwSaved, setBwSaved] = useState(false);
+  useEffect(() => { setBwEdits({}); setBwSaved(false); setBwError(null); }, [membershipId, context?.staffId]);
+  const bwSnaps = useMemo(() => [arenaNow ?? arena, arenaNow ? arena : null].filter((x): x is MemberArenaSnapshot => !!x), [arena, arenaNow]);
+  const bwMonths = useMemo(() => (bwSnaps.length ? bwSnaps.map(snap => brandMonthVM(snap, bwEdits[snap.period], backOffice)) : null), [bwSnaps, bwEdits, backOffice]);
+  const pickBrandWeek = (month: string, week: string, brand: ArenaWeekBrand | undefined) => {
+    setBwSaved(false); setBwError(null);
+    setBwEdits(prev => ({ ...prev, [month]: { ...prev[month], [week]: brand } }));
+  };
+  const saveBrandWeeks = async () => {
+    if (!membershipId || bwBusy) return;
+    setBwBusy(true); setBwError(null);
+    try {
+      for (const snap of bwSnaps) {
+        if (!brandMonthVM(snap, bwEdits[snap.period], backOffice).dirty) continue;
+        const r = await source.saveBrandWeeks(membershipId, snap.period, picksToSave(snap, bwEdits[snap.period]), context);
+        if (!r.ok) { setBwError(r.error); return; }
+        // Read the month again: the weeks' booths, Today's reminder and the Arena all follow the new picks.
+        const fresh = await source.arena(membershipId, snap.period, "monthly", context);
+        if (fresh.ok) {
+          const next = viewedAs(fresh.data, context?.staffId);
+          if (arena && snap.period === arena.period) setArena(next); else setArenaNow(next);
+        }
+        setBwEdits(prev => Object.fromEntries(Object.entries(prev).filter(([m]) => m !== snap.period)));
+      }
+      setBwSaved(true);
+    } finally {
+      setBwBusy(false);
+    }
+  };
+
   // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
   const [claimRates, setClaimRates] = useState<ClaimRates | null>(null);
   useEffect(() => {
@@ -659,7 +704,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
 
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
-  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen);
+  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen);
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail).
   const rail = desk && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
@@ -756,9 +801,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   } else if (route.screen === "account") {
     const back = () => goScreen("account");
     const pf = route.pf;
-    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== null && pf !== "brandWeeks";
+    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== null;
     if (pick) {
-      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : "Requests"} onBack={back} onViewAs={() => setVaOpen(true)} />;
+      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : "Requests"}
+        onBack={back} onViewAs={() => setVaOpen(true)} />;
     } else if (pf === "income") {
       page = <IncomePage vm={incomeView} hidden={hidden} message={incError[incKey] ?? null} onBack={back} onPeriod={() => setPfDateOpen(true)} onToggleHide={() => setHidden(!hidden)}
         onOrders={() => goScreen("account", { pf: "incOrders" })} onMonth={p => { setIncPeriod(p); if (mainRef.current) mainRef.current.scrollTop = 0; }} />;
@@ -776,11 +822,12 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
     } else if (pf === "brandWeeks") {
-      page = <Pending screen={route.screen} />;
+      page = <BrandWeeksPage months={bwMonths} backOffice={backOffice} busy={bwBusy} error={bwError} saved={bwSaved}
+        onPick={pickBrandWeek} onSave={() => void saveBrandWeeks()} onBack={back} />;
     } else {
       page = <ProfileMain vm={profileVM} hidden={hidden} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
-        scheme: () => undefined,
+        scheme: () => setSchemeOpen(true),
         brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),
         toggleHide: () => setHidden(!hidden),
         signOut,
@@ -875,6 +922,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
             </>
           )}
           {route.pf === "memos" && <MemoSheet open={memoPick !== null} memo={memoPickVM} busy={memoBusy} readOnly={readOnlyView} error={memoError} onAck={() => void ackMemo()} onClose={() => setMemoPick(null)} />}
+          {!route.pf && <SchemeSheet open={schemeOpen} vm={schemeView} onClose={() => setSchemeOpen(false)} />}
         </>
       )}
       {principal && <ViewAsPage open={vaOpen} query={vaQuery} groups={vaGroups} onQuery={setVaQuery} onPick={pickVa} onClose={() => setVaOpen(false)} />}
