@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
-import type { ArenaPerson } from "@/lib/member/arena";
-import { memoCat, memoVM, profileMainVM, requestCode, requestDetailVM, requestRowsVM, teamVM, vaGroupsVM, type RequestEvent } from "./profile-model";
+import type { ArenaPerson, MemberArenaSnapshot } from "@/lib/member/arena";
+import {
+  claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, teamVM, vaGroupsVM, waitingChoices,
+  type RequestEvent,
+} from "./profile-model";
 
 const request = (over: Partial<MemberRequest> = {}): MemberRequest => ({
   id: "11111111-2222-4333-8444-555555555555", kind: "claim", title: "legacy", status: "submitted",
@@ -133,5 +136,50 @@ describe("teamVM", () => {
   it("is null for somebody not on the department's map", () => {
     expect(teamVM({ map, departmentId: "fair", subName: "Fair", staffId: "ghost", people: [], month: "2026-09",
       kpi: { enabled: true, threshold: 10 }, capacity: null, occupied: 0, ranks: new Map() })).toBeNull();
+  });
+});
+
+describe("the request forms' choices", () => {
+  const sep = {
+    period: "2026-09",
+    brandWeeks: { weeks: 4, counts: { AKEMI: 1, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 }, picks: { "2026-09-04": "AKEMI" } },
+    history: { events: [{ id: "f1|AKEMI", venue: "HALL", organizer: "REX", start: "2026-09-04", end: "2026-09-06", periodMonth: "2026-09", week: "2026-09-04", brand: "AKEMI", people: [] }] },
+  } as unknown as MemberArenaSnapshot;
+
+  it("offers the fair weekends that have begun, each with the brand worked and the booth", () => {
+    const weeks = claimWeeks([sep, null, sep], "2026-09-12");
+    expect(weeks.map(w => [w.key, w.n, w.brandWeek, w.brand, w.dates, w.venue, w.org])).toEqual([
+      ["2026-09-04", "W1", "Akemi week", "AKEMI", "4–6 Sep", "HALL", "REX"],
+      ["2026-09-11", "W2", "Brand week not picked", null, "11–13 Sep", null, null],
+    ]);
+  });
+
+  it("lets a member replace only somebody in their own team below them", () => {
+    const membership: MemberMembership = {
+      id: "fair", schemeId: "s", name: "Fair", code: "FAIR", title: "Senior Executive", rank: "Rank B", rate: 0.05, calculator: true,
+      effective: "2026-01-01", capacity: null, occupied: 5,
+      people: [
+        { id: "top", name: "MARCUS", title: "Team Leader", rank: "Rank A", parentId: null },
+        { id: "me", name: "JIA HUI", title: "Senior Executive", rank: "Rank B", parentId: "top", self: true },
+        { id: "g1", name: "KELVIN", title: "Executive", rank: "Rank C", parentId: "k1" },
+        { id: "k1", name: "DARREN", title: "Executive", rank: "Rank C", parentId: "me" },
+        { id: "x", name: "ZED", title: "Executive", rank: "Rank C", parentId: "top" },
+      ],
+    };
+    expect(replaceable(membership)).toEqual([{ id: "k1", name: "DARREN" }, { id: "g1", name: "KELVIN" }]);
+    expect(replaceable(undefined)).toEqual([]);
+  });
+
+  it("lists the member's waiting-list requests, and only an approved one can fill a replacement", () => {
+    const choices = waitingChoices([
+      request({ id: "w1", kind: "waiting", status: "reserved", requestNo: "RQ-2610-002", detail: { newPerson: "Siti Aminah", start: "2026-11-01" } }),
+      request({ id: "w2", kind: "waiting", status: "submitted", requestNo: "RQ-2610-003", detail: { newPerson: "Lee Wei" } }),
+      request({ id: "w3", kind: "waiting", status: "rejected", detail: { newPerson: "Gone" } }),
+      request({ id: "c1" }),
+    ]);
+    expect(choices).toEqual([
+      { id: "w1", name: "Siti Aminah", sub: "RQ-2610-002 · start 1 Nov", status: "Approved", ok: true },
+      { id: "w2", name: "Lee Wei", sub: "RQ-2610-003 · submitted 5 Oct", status: "Pending HR", ok: false },
+    ]);
   });
 });

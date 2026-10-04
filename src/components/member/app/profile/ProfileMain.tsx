@@ -1,6 +1,7 @@
 "use client";
 
 import { ICON, Svg } from "../icons";
+import InstallRow from "./InstallRow";
 import type { ProfileMainVM, WorkKey } from "./profile-vm";
 import s from "./profile.module.css";
 
@@ -73,6 +74,7 @@ export default function ProfileMain({ vm, hidden, actions }: { vm: ProfileMainVM
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
             </button>
           ))}
+          <InstallRow />
         </section>
         <section className={s.privacy}>
           <h2 className={s.h2}>Privacy</h2>

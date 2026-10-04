@@ -1293,6 +1293,34 @@ points, inferred Fair boundaries or preview scoring policies run against live da
 sample data behind the existing preview access gate; it is not an authenticated
 member snapshot.
 
+### The Revenue app — built to the prototype (2026-10-05)
+
+`/member` is now `components/member/app/RevenueApp.tsx`, rebuilt screen by screen
+from the user's Claude Design prototype (Revenue Mobile, kept outside the repo).
+The prototype is the source of truth for layout, colour and wording, and every
+button in it does something; the NUMBERS never come from it — margin bands per
+brand, the Revenue cost divisor, KPI, Championship points and claim rates are
+VP's. The member C release above describes the screens this replaced.
+
+- **Palette** — its own tokens, `--rv-*` under `[data-revenue-app]` in
+  `globals.css` (peach glow, walnut honours card, metals, tree colours). Nothing
+  in the app writes a hex; the portal's walnut tokens are not used inside it.
+  Tailwind's preflight is undone for the app (`app/base.module.css`), and the
+  portal's global `h1` / input / 44px phone-input rules stop at its edge.
+- **Shell** — Today · Insight · Quote · Arena · Profile on a phone; on a desktop
+  (`@container rv`, 1024px+) a 240px sidebar, the page, and a 400px panel rail
+  that sheets, View as and the quote calculator open into. Sheets slide up on a
+  phone and sit in the rail on a desktop.
+- **Checked against the prototype** — every page and sheet is screenshotted on
+  the prototype's own data (`/member/preview?app=proto&device=ios|android|desktop`)
+  beside the prototype itself and diffed; a tab is done when its states differ by
+  ≤ 0.05% (the desktop header's date is the usual remainder).
+- **Where it deliberately differs** — phone inputs stay 16px (iOS zooms on less);
+  a figure the scheme does not pay says so (*KPI · Not counted*, *Commission
+  only*) instead of RM 0.00; a request HR sent back has *Update and send again*;
+  Profile keeps *Install the app* where the browser can install (the prototype has
+  no row for it); forms start empty where the prototype pre-picked an example.
+
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
 `/member/preview?design=compare` offers two interactive proposals, A and C, with C
@@ -2413,6 +2441,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-05 (the Revenue app)** — `/member` is rebuilt to the Claude Design prototype (see *The Revenue app — built to the prototype*): Today, Insight, Quote (bed frame options as customer charges), Arena (Championship points, booth-by-booth Fair results) and Profile (My income live from Comm Cal until the close, Commission by order, My honours, Team & capacity, Requests with RQ numbers and claim forms, Memos, View as). Its own `--rv-*` palette under `[data-revenue-app]`; every rule number is VP's.
 - **2026-10-03 (brand weeks back office · Sep)** — People › Member services gains a **Brand weeks** tab after *Capacity & waiting list* (the portal page only, for whoever reviews member requests — HR and the Principal): a `.sheet-toolbar` (Department, Month, Refresh — locked while changes are unsaved, with a line saying so) over a `.table-frame` ledger table. **Member** first (name, title, *No member login*, *Saved 3 Oct · HR Manager* or *· by the member*), then one column per fair weekend (*Week 1* · *4–6 Sep* · *Closed 13 Sep* / *Open until 6 Oct*). Each cell is a brand `<select>` (*Not picked* · Akemi · Dunlopillo · Zanotti · Ergotex) over two 11px lines: what is stored — *Picked*, *Unconfirmed · ZANOTTI*, *Auto-located · AKEMI*, *No bills*, or *No DUNLOP booth this week — no place scores* — and the booths written at that week with their bills (*AKEMI 5 · ZANOTTI 2*), the one that earns the points bold over an orange underline, each booth's title giving venue, bills and sales. A changed cell takes the peach wash with an orange left edge and reads *Changed · not saved yet*; the frame's foot counts *N of M weeks picked · N changes not saved* beside **Discard** and the orange **Save N changes**, which saves every changed member at once and reads the month again. Every closed week stays settable here. Dates: a month is three letters everywhere (*Sep*, not *Sept*) — see "Date format".
 - **2026-10-03 (Arena booths)** — Member app › Arena: *My brand weeks* is one row per fair weekend — **Week N**, *Weekend of 4–6 Sep* under it, and a brand `<select>` (*Not picked* · Akemi · Dunlopillo · Zanotti · Ergotex; 44px, the arena's hue-1 surface) — replacing the four −/+ steppers and the 4 / 5 weeks toggle; the line under them counts *N of M weeks picked*, and the Arena home card says the same. Each row says when its week closes — *Open until 6 Oct*, *Closed 13 Sep*, *Closed 27 Sep · auto-located: ZANOTTI* — and a closed week's select is disabled for the member; with every week closed the Save button gives way to a line saying the back office changes them. In the Principal's view of a member the same form is the back office: the member's name as an `h2`, a *Back office · any week can be changed here, closed ones too* line, every select live. *Championship & Fair results* ranks booth by booth: each weekly result reads *AKEMI · MID VALLEY*, a finish placed by guess carries a small secondary-tone *Unconfirmed · pick the brand week by 6 Oct* or, once the week has closed, *Auto-located · the brand week closed on 13 Sep*. A seller is ranked on every board they sold at but only one place a week earns points, so a board off their brand week appears in their weekly list with its real place in the finish chip (*8th*) — the medal colour withheld — and *No points · not this week's scoring booth* under the venue; the medal card's remainder line counts *Other booths, no points*. Notes join the unplaced-bills one — how many finishes wait on a brand week, how many were auto-located, and what is ranked with no points. The Highest Fair Record names the booth.
 - **2026-10-03 (sales exhibition)** — Comm Cal's month: *Sales by venue* becomes **Sales exhibition** — one row per brand at each fair (a sticky **Brand** column first, then Venue · Event · Organizer · Salespeople · Bills · Sales value), a brand filter beside the search, the `tfoot` counting exhibitions. A row's venue opens exactly that exhibition's bills on All bills, whose header names it (*BRAND · VENUE*, organiser · days under it) and leads back with *← Sales exhibition*. See "Tabbed pages".

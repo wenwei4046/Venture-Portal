@@ -530,8 +530,10 @@ export async function loadMemberIncome(
 
 export interface MemberHonours {
   finishes: { period: string; board: HonourBoard; title: string; sub: string; place: number }[];
-  /** Months of the window whose finishes are kept (final) — the rest are still moving. */
-  kept: string[];
+  /** Months of the window that are final — their finishes stand; the rest are still moving. */
+  final: string[];
+  /** Final months nobody in the sub-department sold in: nothing to win, nothing to compare with. */
+  empty: string[];
 }
 
 const monthsBetween = (from: string, until: string): string[] => {
@@ -543,10 +545,16 @@ const monthsBetween = (from: string, until: string): string[] => {
 };
 
 /**
- * My honours (2026-10-05): the member's finishes over a window of months. A
- * month that is final and not yet kept is worked out here, from the Arena the
- * member's own session reads, for everybody in the sub-department, and kept
- * with the service role (`member_honours`) — once, so a medal never changes.
+ * My honours (2026-10-05): the member's finishes over a window of months,
+ * worked out from the Arena the member's own session reads, for everybody in
+ * the sub-department. A month the portal CLOSED is kept with the service role
+ * (`member_honours`) the first time it is opened after it is final, so a
+ * closing rank stays the closing rank; the database forgets it when a close or
+ * run of it is reopened, a brand week of it changes or one of its bills
+ * changes (a Recost too), and the next open takes it afresh. A month before the
+ * cutover was paid by hand and never closes here, so it is never kept (23HON):
+ * it is worked out afresh on every open, and HR's brand-week corrections or a
+ * Recost reach it exactly as they reach the Arena's boards.
  */
 export async function loadMemberHonours(
   subDepartmentId: string,
@@ -569,17 +577,26 @@ export async function loadMemberHonours(
     const current = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
     const window = monthsBetween(from, until > current ? current : until);
     const ended = window.filter(m => m < current);
-    const [keptRows, firstBill] = await Promise.all([
-      admin.from("member_honour_months").select("period_month").eq("sub_department_id", subDepartmentId)
+    const [keptRows, firstBill, cutover] = await Promise.all([
+      admin.from("member_honour_months").select("period_month, finishes").eq("sub_department_id", subDepartmentId)
         .in("period_month", ended.map(m => `${m}-01`)),
       admin.from("sales_orders").select("period_month, sales_import_batches!inner (sub_department_id)")
         .eq("sales_import_batches.sub_department_id", subDepartmentId).order("period_month").limit(1).maybeSingle(),
+      admin.from("comm_cutovers").select("first_paid_month").eq("sub_department_id", subDepartmentId).maybeSingle(),
     ]);
-    if (keptRows.error || firstBill.error) throw new Error((keptRows.error ?? firstBill.error)!.message);
-    const kept = new Set(((keptRows.data ?? []) as { period_month: string }[]).map(r => r.period_month.slice(0, 7)));
+    if (keptRows.error || firstBill.error || cutover.error) throw new Error((keptRows.error ?? firstBill.error ?? cutover.error)!.message);
+    const paysFrom = (cutover.data as { first_paid_month: string } | null)?.first_paid_month?.slice(0, 7) ?? null;
+    const byHand = (m: string) => paysFrom !== null && m < paysFrom;
+    const kept = new Map(((keptRows.data ?? []) as { period_month: string; finishes: number | string }[])
+      .map(r => [r.period_month.slice(0, 7), Number(r.finishes)] as const).filter(([m]) => !byHand(m)));
     const earliest = ((firstBill.data as { period_month: string } | null)?.period_month ?? "9999-12").slice(0, 7);
-    const missing = ended.filter(m => !kept.has(m) && m >= earliest);
-    if (missing.length) {
+    const final = new Set<string>(), empty = new Set<string>();
+    // Months before the first bill are as final as they will ever be: nothing to win.
+    for (const m of ended) if (m < earliest) { final.add(m); empty.add(m); }
+    for (const [m, n] of kept) { final.add(m); if (n === 0) empty.add(m); }
+    const live: MemberHonours["finishes"] = [];
+    const ask = ended.filter(m => m >= earliest && !kept.has(m));
+    if (ask.length) {
       const { data: scheme, error: schemeError } = await admin.from("comm_schemes").select("id, enable_kpi")
         .eq("sub_department_id", subDepartmentId).eq("is_active", true).is("effective_to", null).maybeSingle();
       if (schemeError) throw new Error(schemeError.message);
@@ -590,19 +607,25 @@ export async function loadMemberHonours(
         threshold = t ? Number((t as { min_qty: number | string }).min_qty) : null;
       }
       const kpi = { enabled: !!s?.enable_kpi, threshold };
-      let history: ArenaHistorySnapshot | null | undefined;
-      for (const month of missing) {
-        const snapshot = await rpc<MemberArenaSnapshot>(client, principal ? "member_principal_arena_snapshot" : "member_arena_snapshot", {
+      const [snapshots, history] = await Promise.all([
+        Promise.all(ask.map(month => rpc<MemberArenaSnapshot>(client, principal ? "member_principal_arena_snapshot" : "member_arena_snapshot", {
           p_sub_department: subDepartmentId, p_period: month, p_window: "monthly", ...(principal ? { p_staff: context!.staffId } : {}),
-        });
+        }))),
+        client.rpc(principal ? "member_principal_arena_booth_history" : "member_arena_booth_history", {
+          p_sub_department: subDepartmentId, ...(principal ? { p_staff: context!.staffId } : {}),
+        }).then(h => (!h.error && h.data && Array.isArray((h.data as ArenaHistorySnapshot).events) ? (h.data as ArenaHistorySnapshot) : null)),
+      ]);
+      for (const [i, month] of ask.entries()) {
+        const snapshot = snapshots[i];
         if (!snapshot || !Array.isArray(snapshot.people) || !snapshot.final) continue;
-        if (history === undefined) {
-          const h = await client.rpc(principal ? "member_principal_arena_booth_history" : "member_arena_booth_history", {
-            p_sub_department: subDepartmentId, ...(principal ? { p_staff: context!.staffId } : {}),
-          });
-          history = !h.error && h.data && Array.isArray((h.data as ArenaHistorySnapshot).events) ? (h.data as ArenaHistorySnapshot) : null;
-        }
         const finishes = monthFinishes({ month, snapshot, history, kpi });
+        final.add(month);
+        if (!finishes.length) empty.add(month);
+        // Paid by hand: read afresh every time, never kept.
+        if (byHand(month)) {
+          for (const f of finishes) if (f.staffId === staffId) live.push({ period: month, board: f.board, title: f.title, sub: f.sub, place: f.place });
+          continue;
+        }
         // Kept once: the first to arrive writes the month; anybody after reads it.
         const { data: claimed, error: keepError } = await admin.from("member_honour_months")
           .upsert({ sub_department_id: subDepartmentId, period_month: `${month}-01`, finishes: finishes.length },
@@ -617,18 +640,21 @@ export async function loadMemberHonours(
             throw new Error(error.message);
           }
         }
-        kept.add(month);
       }
     }
-    // Months before the first bill are as final as they will ever be: nothing to win.
-    for (const m of ended) if (m < earliest) kept.add(m);
     const { data: rows, error: rowsError } = await admin.from("member_honours").select("period_month, board, title, sub, place")
       .eq("staff_id", staffId).eq("sub_department_id", subDepartmentId).gte("period_month", `${from}-01`).lte("period_month", `${until}-01`);
     if (rowsError) throw new Error(rowsError.message);
+    const inWindow = (m: string) => m >= from && m <= until;
     return {
-      finishes: ((rows ?? []) as { period_month: string; board: HonourBoard; title: string; sub: string; place: number }[])
-        .map(r => ({ period: r.period_month.slice(0, 7), board: r.board, title: r.title, sub: r.sub, place: r.place })),
-      kept: [...kept].filter(m => m >= from && m <= until).sort(),
+      finishes: [
+        ...((rows ?? []) as { period_month: string; board: HonourBoard; title: string; sub: string; place: number }[])
+          .filter(r => !byHand(r.period_month.slice(0, 7)))
+          .map(r => ({ period: r.period_month.slice(0, 7), board: r.board, title: r.title, sub: r.sub, place: r.place })),
+        ...live,
+      ],
+      final: [...final].filter(inWindow).sort(),
+      empty: [...empty].filter(inWindow).sort(),
     };
   });
 }

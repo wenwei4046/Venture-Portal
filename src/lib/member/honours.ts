@@ -7,8 +7,10 @@ import { championshipMonth, championshipStandings } from "./championship";
  * month's Sales, Margin, KPI and Championship boards, total and by brand, and
  * on each week's fair board (the booth of their brand week). Joint places
  * count for everyone tied. Worked out from the Arena's own rankings, so a
- * finish can never disagree with the board it was taken from; kept once the
- * month is final (`member_honours`).
+ * finish can never disagree with the board it was taken from. A month the
+ * portal closed is kept once it is final (`member_honours`); a month paid by
+ * hand before the cutover is worked out afresh every time
+ * (`loadMemberHonours`).
  */
 
 export type HonourBoard = "Sales" | "Margin" | "KPI" | "Championship" | "Fair";

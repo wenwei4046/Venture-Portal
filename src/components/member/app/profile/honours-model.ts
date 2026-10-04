@@ -3,8 +3,9 @@ import { ordinal } from "../format";
 import type { HonourBoard, HonourKind, HonoursVM } from "./profile-vm";
 
 /**
- * My honours from the member's kept finishes (`member_honours`) — the
- * prototype's `honStyle a` page: the period's podium, every place, a highlight.
+ * My honours from the member's finishes in the final months of the period
+ * (`loadMemberHonours`) — the prototype's `honStyle a` page: the period's
+ * podium, every place, a highlight.
  */
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
@@ -34,11 +35,13 @@ export function honoursVM(data: MemberHonours, kind: HonourKind, from: string, c
   const places = [...new Set(list.map(f => f.place))].sort((a, b) => a - b);
   const count = (p: number, xs = list) => xs.filter(f => f.place === p).length;
   const pods = count(1) + count(2) + count(3);
-  const prevKept = w.prev.some(m => data.kept.includes(m));
+  const isFinal = (m: string) => data.final.includes(m);
+  const open = w.months.filter(m => m <= current && !isFinal(m));
+  // "+3 vs Aug" only once this period is settled, against one that is over and that somebody sold in.
+  const prevDone = w.prevLabel !== null && w.prev.length > 0 && w.prev.every(isFinal) && w.prev.some(m => !data.empty.includes(m));
   const prevList = data.finishes.filter(f => w.prev.includes(f.period));
-  const d = prevKept && w.prevLabel ? pods - (count(1, prevList) + count(2, prevList) + count(3, prevList)) : null;
+  const d = prevDone && !open.length ? pods - (count(1, prevList) + count(2, prevList) + count(3, prevList)) : null;
   const best = [...list].sort((a, b) => a.place - b.place || PRIORITY.indexOf(a.board) - PRIORITY.indexOf(b.board) || b.period.localeCompare(a.period))[0];
-  const open = w.months.filter(m => m <= current && !data.kept.includes(m));
   const label = thisYear ? `${w.label} to date` : w.label;
   return {
     periodLabel: label,
