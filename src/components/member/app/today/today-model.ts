@@ -1,4 +1,6 @@
-import type { MemberIncome, MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member/types";
+import type { MemberBand, MemberIncome, MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member/types";
+import type { MemberOrderBook } from "@/lib/member/order-book";
+import { marginStanding } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import { arenaIncentive, arenaMonthFridays, arenaRankings, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { dayLabel, dayRange, monthName, ordinalSuffix, rm2, shortDay } from "../format";
@@ -28,6 +30,9 @@ export interface TodayInput {
    * save. Absent = `arena` (the working month IS the current month).
    */
   arenaNow?: MemberArenaSnapshot | null;
+  /** The working month's bills and the brands' ladders — the margin's tier. */
+  book?: MemberOrderBook | null;
+  bands?: MemberBand[];
   memos: MemberMemo[];
   requests: MemberRequest[];
   /** RQ-2609-004 style code of a request. */
@@ -102,6 +107,16 @@ export function reachedTier(input: TodayInput): string | null {
 }
 
 function marginMetric(input: TodayInput): TodayMetric {
+  if (input.book) {
+    // Insight's own reading (insight-model.marginStanding): the bills' layer-2
+    // margin, the tier every costed brand clears on its own ladder, held while
+    // a bill has no cost — so Today and Insight can never disagree.
+    const st = marginStanding(input.book, input.bands ?? []);
+    const tag = st.margin === null ? (st.blind > 0 ? "Cost pending" : "No sales yet")
+      : st.tier ? `${shortTier(st.tier.label)}${st.held ? " · held" : ""}`
+      : st.lowest ? `Below ${shortTier(st.lowest)}` : "No ladder";
+    return { key: "margin", label: "Margin", value: st.margin === null ? "—" : `${st.margin.toFixed(1)}%`, tag, tagTone: st.tier && !st.held ? "good" : "sub" };
+  }
   const me = input.insight?.me;
   // Uncosted bills stay in sales and out of the blended margin (Insight's rule).
   const margin = me && me.marginRevenue > 0 ? ((me.marginRevenue - me.marginCost) / me.marginRevenue) * 100 : null;

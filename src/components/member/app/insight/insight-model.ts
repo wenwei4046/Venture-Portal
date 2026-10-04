@@ -156,6 +156,32 @@ function tierReached(stats: readonly BrandStat[]): LadderRow | null {
   return (common ?? []).sort((a, b) => b.amount - a.amount || b.threshold - a.threshold)[0] ?? null;
 }
 
+export interface MarginStanding {
+  /** Blended layer-2 margin of every counted, costed bill, %. */
+  margin: number | null;
+  /** The incentive tier every costed brand reaches together. */
+  tier: LadderRow | null;
+  /** A bill without cost (or without a brand) holds the incentive back. */
+  held: boolean;
+  /** Counted bills still without a cost. */
+  blind: number;
+  /** The lowest incentive's label, for "Below Tier 1". */
+  lowest: string | null;
+}
+
+/** Where the month's margin stands — one reading for Today and Insight alike. */
+export function marginStanding(book: MemberOrderBook | null, bands: readonly MemberBand[]): MarginStanding {
+  const stats = brandStats(book, bands);
+  const lowest = stats.flatMap(s => s.ladder.incentives).sort((a, b) => a.threshold - b.threshold)[0]?.label ?? null;
+  return {
+    margin: blend(counted(book)),
+    tier: tierReached(stats),
+    held: stats.some(s => s.blind > 0 || s.code === "UNCLASSIFIED"),
+    blind: stats.reduce((n, s) => n + s.blind, 0),
+    lowest,
+  };
+}
+
 function heldNotice(stats: readonly BrandStat[]): { title: string; body: string } | null {
   const tier = tierReached(stats);
   if (!tier) return null;

@@ -266,8 +266,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
 
   const model = useMemo(() => todayModel({
     today, first: me.first, title: me.title, rank: me.rank, income, salary: data.profile.salary, hidden,
-    insight: work.block ?? undefined, kpi: work.kpi, arena, arenaNow, memos, requests, requestCode,
-  }), [today, me, income, data.profile.salary, hidden, work.block, work.kpi, arena, arenaNow, memos, requests]);
+    insight: work.block ?? undefined, kpi: work.kpi, arena, arenaNow, book: work.book, bands: data.bands, memos, requests, requestCode,
+  }), [today, me, income, data.profile.salary, hidden, work.block, work.kpi, arena, arenaNow, work.book, data.bands, memos, requests]);
 
   // ── Insight: Month / Quarter / Year, opening on the working month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
