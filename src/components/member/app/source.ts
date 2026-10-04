@@ -18,7 +18,8 @@ export interface RevenueSource {
   insight(period: string | undefined, context?: MemberReadContext): Promise<Outcome<MemberInsight>>;
   /** KPI items of a month ('YYYY-MM'); absent = the current month. */
   kpi(schemeId: string, context?: MemberReadContext, period?: string): Promise<Outcome<MemberKpiSummary>>;
-  arena(membershipId: string, period: string, window: ArenaWindow, context?: MemberReadContext): Promise<Outcome<MemberArenaSnapshot>>;
+  /** `history: false` leaves the booth history out (the Championship's months). */
+  arena(membershipId: string, period: string, window: ArenaWindow, context?: MemberReadContext, options?: { history?: boolean }): Promise<Outcome<MemberArenaSnapshot>>;
   orgMap(context?: Pick<MemberReadContext, "subDepartmentId">): Promise<Outcome<MemberOrgMap>>;
   /** One member's bills, line by line, from one month to another (inclusive). */
   orderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberOrderBook>>;
@@ -39,7 +40,7 @@ export const liveSource: RevenueSource = {
   },
   insight: (period, context) => fetchMemberInsight(period, context),
   kpi: (schemeId, context, period) => fetchMemberKpiSummary(schemeId, context, period),
-  arena: (membershipId, period, window, context) => fetchMemberArena(membershipId, period, window, context),
+  arena: (membershipId, period, window, context, options) => fetchMemberArena(membershipId, period, window, context, options),
   orgMap: context => fetchMemberOrgMap(context),
   orderBook: (subDepartmentId, from, until, context) => fetchMemberOrderBook(subDepartmentId, from, until, context),
   insightRange: (subDepartmentId, from, until, context) => fetchMemberInsightRange(subDepartmentId, from, until, context),

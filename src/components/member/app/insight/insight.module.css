@@ -362,10 +362,11 @@
   justify-content: center;
   gap: 1px;
 }
-.dateOptOn { border-color: var(--rv-brown); background: var(--rv-brown); color: var(--rv-white); font-weight: 700; }
+/* Insight marks the pick in walnut; Arena in its board's colour (`--d-*`). */
+.dateOptOn { border-color: var(--d-solid, var(--rv-brown)); background: var(--d-solid, var(--rv-brown)); color: var(--d-ink, var(--rv-white)); font-weight: 700; }
 .dateOptSub { font-size: 10.5px; font-weight: 600; color: var(--rv-sub); }
 .dateOptLive { color: var(--rv-accent); }
-.dateOptOn .dateOptSub { color: var(--rv-blush); }
+.dateOptOn .dateOptSub { color: var(--d-sub, var(--rv-blush)); }
 
 .tiersPanel { padding: 10px 20px 30px; display: flex; flex-direction: column; gap: 12px; }
 .tiersList { padding: 0 10px; }

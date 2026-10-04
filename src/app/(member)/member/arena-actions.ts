@@ -23,7 +23,8 @@ function failure(error: unknown) {
   return { ok: false as const, error: /schema cache|does not exist|could not find|SUPABASE_|JWT|permission denied for/i.test(message)
     ? "Arena setup is not complete. Your administrator needs to enable the live ranking service." : message.slice(0, 250) };
 }
-export async function fetchMemberArena(membershipId: string, period: string, window: ArenaWindow, context?: MemberReadContext) {
+export async function fetchMemberArena(membershipId: string, period: string, window: ArenaWindow, context?: MemberReadContext,
+  options: { history?: boolean } = {}) {
   try {
     if (!uuid.test(membershipId) || !validPeriod(period) || !["monthly", "quarterly", "annual"].includes(window)) throw new Error("Choose a valid department and period.");
     if (context && context.subDepartmentId !== membershipId) throw new Error("Choose a member in the selected department.");
@@ -35,6 +36,8 @@ export async function fetchMemberArena(membershipId: string, period: string, win
     if (error) throw new Error(error.message);
     if (!data || !Array.isArray(data.people)) throw new Error("Arena information is temporarily unavailable.");
     const snapshot = data as MemberArenaSnapshot;
+    // The Championship reads a month at a time and needs the fairs only once.
+    if (options.history === false) return { ok: true as const, data: snapshot };
     // A history rollout cannot take away the existing sales/margin/KPI boards.
     // Both reads retain the same explicitly authorized employee/Principal scope.
     // Booth by booth since 2026-10-03: one board per brand's booth at a fair,

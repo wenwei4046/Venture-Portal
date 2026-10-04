@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import type { MemberData, MemberMembership, MemberReadContext, MemberRequest } from "@/lib/member/types";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
 import { firstName, greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
 import { useRoute, type Board, type InsightView, type Route, type Screen } from "./route";
-import { addMonths, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
+import { addMonths, isLiveMonth, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
 import { useInsightData } from "./insight/useInsightData";
 import { billsView, brandPage, insightMain, kpiView, orderSheet, type InsightInput } from "./insight/insight-model";
 import InsightMain, { type InsightTab } from "./insight/InsightMain";
@@ -16,6 +17,12 @@ import BillsPage, { type BillsStatus } from "./insight/BillsPage";
 import KpiPage from "./insight/KpiPage";
 import BrandPage from "./insight/BrandPage";
 import { DateSheet, OrderSheet, TiersSheet } from "./insight/InsightSheets";
+import ArenaHub from "./arena/ArenaHub";
+import ArenaBoard from "./arena/ArenaBoard";
+import ArenaRecord from "./arena/ArenaRecord";
+import { ChampSheet, FairsSheet, boardThemeClass } from "./arena/ArenaSheets";
+import { arenaKey, boardModel, hubModel, recordModel, type ArenaSub } from "./arena/arena-model";
+import { useArenaData } from "./arena/useArenaData";
 import { demoSource, liveSource, type RevenueSource } from "./source";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me } from "./shell/Chrome";
 import StatusBar from "./shell/StatusBar";
@@ -233,6 +240,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     setDateOpen(false);
     setSoPick(null);
     setTiersOpen(false);
+    setFairsOpen(false);
+    setChampOpen(false);
     setScrolled(false);
     go({ screen, pf: null, ins: "main", arena: "hub", ...extra });
     if (mainRef.current) mainRef.current.scrollTop = 0;
@@ -241,7 +250,11 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     if (view === "bills") setBillStatus(status);
     goScreen("insight", { ins: view });
   }, [goScreen]);
-  const openBoard = useCallback((board: Board) => goScreen("arena", { arena: "board", board }), [goScreen]);
+  // A board from Today or the bell opens on its month, as the prototype's `go('arena', { period: 'monthly', sub: 'total' })`.
+  const openBoard = useCallback((board: Board) => {
+    setArKind("monthly"); setArFrom(null); setArSub("total");
+    goScreen("arena", { arena: "board", board });
+  }, [goScreen]);
   const openNotif = useCallback(() => { setSheet(null); setNfOpen(true); }, []);
   const toggleNotif = useCallback(() => { setSheet(null); setNfOpen(open => !open); }, []);
   const openSheet = useCallback((next: Sheet) => { setNfOpen(false); setSheet(next); }, []);
@@ -264,10 +277,19 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     meta: i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
   }));
 
+  // ── the Championship of the working month, for Today's board ──
+  const kpiRule = useMemo(() => ({ enabled: !!work.kpi?.enabled, threshold: work.kpi?.threshold ?? null }), [work.kpi?.enabled, work.kpi?.threshold]);
+  const selfId = arena?.selfId || context?.staffId || "";
+  const champRank = useMemo(() => {
+    if (!arena) return null;
+    const month = championshipMonth({ month: arena.period, people: arena.people, brands: arena.brands.map(b => b.code), tiers: arena.tiers, history: arena.history ?? null, kpi: kpiRule });
+    return championshipStandings([month]).find(s => s.id === selfId)?.position ?? null;
+  }, [arena, kpiRule, selfId]);
+
   const model = useMemo(() => todayModel({
     today, first: me.first, title: me.title, rank: me.rank, income, salary: data.profile.salary, hidden,
     insight: work.block ?? undefined, kpi: work.kpi, arena, arenaNow, book: work.book, bands: data.bands, memos, requests, requestCode,
-  }), [today, me, income, data.profile.salary, hidden, work.block, work.kpi, arena, arenaNow, work.book, data.bands, memos, requests]);
+  }, champRank), [today, me, income, data.profile.salary, hidden, work.block, work.kpi, arena, arenaNow, work.book, data.bands, memos, requests, champRank]);
 
   // ── Insight: Month / Quarter / Year, opening on the working month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -310,13 +332,45 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   }, [fixture, soPick, insightInput]);
   const insDateLabel = fixture?.insight?.dateLabel ?? insPeriod.label;
   const dateOptions = useMemo(() => periodOptions(insKind, period, monthState), [insKind, period, monthState]);
+
+  // ── Arena: Monthly / Quarterly / Annual, opening on the working month ──
+  const [arKind, setArKind] = useState<PeriodKind>("monthly");
+  const [arFrom, setArFrom] = useState<string | null>(null);
+  const [arSub, setArSub] = useState<ArenaSub>("total");
+  const [arBrand, setArBrand] = useState("");
+  const [fairsOpen, setFairsOpen] = useState(false);
+  const [champOpen, setChampOpen] = useState(false);
+  const arPeriod = useMemo(() => periodOf(arKind, arFrom ?? fixture?.arena?.from[arKind] ?? working ?? period, period), [arKind, arFrom, fixture, working, period]);
+  const markViewed = useCallback((snap: MemberArenaSnapshot) => viewedAs(snap, context?.staffId), [context?.staffId]);
+  const arData = useArenaData({
+    source, membershipId, context, readable, known: arena, kpi: kpiRule, mark: markViewed,
+    period: route.screen === "arena" && !fixture?.arena ? arPeriod : null,
+  });
+  const arInput = useMemo(() => ({
+    period: arPeriod, snapshot: arData.snapshot, history: arData.history, standings: arData.standings, selfId,
+    subName: membership?.name ?? "", costDivisor: recent?.costDivisor ?? null, kpiEnabled: kpiRule.enabled,
+    final: arPeriod.kind !== "monthly" || !isLiveMonth(arPeriod.from, period, monthState),
+  }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, recent?.costDivisor, kpiRule.enabled, period, monthState]);
+  const hubVM = useMemo(() => fixture?.arena?.hub[arKind] ?? hubModel(arInput), [fixture, arKind, arInput]);
+  const boardVM = useMemo(() => {
+    const fx = fixture?.arena;
+    if (fx) {
+      const sub: ArenaSub = route.board === "sales" ? arSub : route.board === "margin" && arSub !== "fair" ? arSub : "total";
+      return fx.boards[arenaKey(route.board, arKind, sub, sub === "brand" ? arBrand || "AKEMI" : "")];
+    }
+    return boardModel({ ...arInput, board: route.board, sub: arSub, brand: arBrand });
+  }, [fixture, route.board, arKind, arSub, arBrand, arInput]);
+  const recordVM = useMemo(() => fixture?.arena?.record ?? recordModel(arData.history, selfId), [fixture, arData.history, selfId]);
+  const arDateLabel = fixture?.arena?.dateLabel[arKind] ?? arPeriod.label;
+  const arDateOptions = useMemo(() => fixture?.arena?.dateOptions[arKind] ?? periodOptions(arKind, period, monthState), [fixture, arKind, period, monthState]);
+  const setArenaKind = (kind: PeriodKind) => { setArKind(kind); setArFrom(null); };
   const todayVM = fixture?.today ?? model;
   const nfCount = fixture?.notifications.count ?? nf.count;
   const nfGroupsVM = fixture?.notifications.groups ?? notifGroups(nf.items, nfTab, settledMonth);
   const nfSummaryVM = fixture?.notifications.summary ?? notifSummary(nf.count, settledMonth);
 
   // ── layout ──
-  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen;
+  const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen;
   const rail = desk && (nfOpen || anyPanel || route.screen === "quote");
   const showHeader = route.screen === "today" || route.screen === "calc";
   const statusBg = route.screen === "account" && !route.pf ? "var(--rv-peach)" : "var(--rv-white)";
@@ -355,6 +409,26 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
         openBrand: code => { setInsBrand(code); toInsight("brand"); },
       }} />;
     }
+  } else if (route.screen === "arena") {
+    const toHub = () => goScreen("arena", { arena: "hub" });
+    if (route.arena === "record") {
+      page = <ArenaRecord vm={recordVM} onBack={toHub} />;
+    } else if (route.arena === "board" && boardVM) {
+      page = <ArenaBoard vm={boardVM} kind={arKind} dateLabel={arDateLabel} actions={{
+        back: toHub,
+        openDate: () => setDateOpen(true),
+        setKind: setArenaKind,
+        setSub: setArSub,
+        setBrand: setArBrand,
+        openChamp: () => setChampOpen(true),
+        openFairs: () => setFairsOpen(true),
+        openFoot: () => toInsight("brand"),
+      }} />;
+    } else {
+      page = <ArenaHub vm={hubVM} kind={arKind} onKind={setArenaKind}
+        onBoard={board => { setArSub("total"); goScreen("arena", { arena: "board", board }); }}
+        onRecord={() => goScreen("arena", { arena: "record" })} />;
+    }
   } else {
     page = <Pending screen={route.screen} />;
   }
@@ -390,6 +464,14 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
             onPick={o => { setInsFrom(o.period.from); setBillWeek(null); setDateOpen(false); }} onClose={() => setDateOpen(false)} />
           {route.ins === "brand" && <TiersSheet open={tiersOpen} vm={insBrandVM} onClose={() => setTiersOpen(false)} />}
           {route.ins !== "main" && <OrderSheet open={soPick !== null} vm={soVM} onClose={() => setSoPick(null)} />}
+        </>
+      )}
+      {route.screen === "arena" && route.arena === "board" && boardVM && (
+        <>
+          <DateSheet open={dateOpen} kind={arKind} options={arDateOptions} selected={arPeriod.from} segmented={false} ctx={boardVM.title}
+            themeClass={boardThemeClass(route.board)} onPick={o => { setArFrom(o.period.from); setDateOpen(false); }} onClose={() => setDateOpen(false)} />
+          {boardVM.fair && <FairsSheet open={fairsOpen} fair={boardVM.fair} dateLabel={arDateLabel} onClose={() => setFairsOpen(false)} />}
+          {route.board === "champ" && <ChampSheet open={champOpen} champ={boardVM.rank?.champ ?? null} onClose={() => setChampOpen(false)} />}
         </>
       )}
     </div>

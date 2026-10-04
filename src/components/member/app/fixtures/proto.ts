@@ -13,6 +13,7 @@ import type { BillsVM, BrandPageVM, InsightMainVM, KpiVM, OrderSheetVM } from ".
 import type { PeriodOption } from "../insight/period";
 import { ICON } from "../icons";
 import { protoInsight } from "./proto-insight";
+import { protoArena, type ArenaFixture } from "./proto-arena";
 
 export interface InsightFixture {
   /** The month Insight opens on (the prototype: September, on 3 October). */
@@ -35,6 +36,7 @@ export interface AppFixture {
   today: TodayModel;
   notifications: { count: number; summary: string; groups: NotifGroup[] };
   insight?: InsightFixture;
+  arena?: ArenaFixture;
 }
 
 const membership = (id: string, name: string, code: string, title: string, rank: string, calculator: boolean) => ({
@@ -66,6 +68,7 @@ const memo = (id: string, time: string, title: string, sub: string) => ({
 export function protoFixture(): AppFixture {
   return {
     insight: protoInsight(),
+    arena: protoArena(),
     greeting: "Good morning",
     cartItems: 4,
     brands: [

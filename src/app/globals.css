@@ -227,6 +227,17 @@
   --rv-kpi-7: #A8CDB8;
   --rv-kpi-8: #CBE3D5;
   --rv-kpi-9: #E2F0E8;
+  /* Arena: silver and bronze medals, the podium steps, an empty count */
+  --rv-silver-bg: #F2F0EB;
+  --rv-silver: #B4AEA4;
+  --rv-silver-ink: #6B645A;
+  --rv-bronze: #BA855D;
+  --rv-bronze-ink: #7A4B35;
+  --rv-step-2: #DAD5CC;
+  --rv-step-2-ink: #4A443C;
+  --rv-step-3: #D3A07A;
+  --rv-step-3-ink: #4A2A1A;
+  --rv-muted: #C9B8AC;
   /* translucent */
   --rv-ink-06: rgba(63,43,34,.06);
   --rv-ink-08: rgba(63,43,34,.08);
@@ -244,6 +255,8 @@
   --rv-white-24: rgba(255,255,255,.24);
   --rv-white-30: rgba(255,255,255,.3);
   --rv-white-35: rgba(255,255,255,.35);
+  --rv-white-55: rgba(255,255,255,.55);
+  --rv-amber-12: rgba(164,99,18,.12);
   --rv-black-38: rgba(0,0,0,.38);
   --rv-black-06: rgba(0,0,0,.06);
   --rv-dim: rgba(40,25,18,.45);

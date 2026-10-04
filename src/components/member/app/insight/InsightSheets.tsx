@@ -9,26 +9,36 @@ import s from "./insight.module.css";
 const TITLES: Record<PeriodKind, string> = { monthly: "Choose a month", quarterly: "Choose a quarter", annual: "Choose a year" };
 const SEG: [PeriodKind, string][] = [["monthly", "Month"], ["quarterly", "Quarter"], ["annual", "Year"]];
 
-/** Choose a month / quarter / year (1509–1529, Insight's variant with the segmented control). */
-export function DateSheet({ open, kind, options, selected, onKind, onPick, onClose }: {
+/**
+ * Choose a month / quarter / year (1509–1529). Insight's variant has the
+ * Month / Quarter / Year control; Arena's has none (the board's own hero
+ * switches the kind), names the board, and marks the pick in its colour.
+ */
+export function DateSheet({ open, kind, options, selected, onKind, onPick, onClose, ctx = "Insight", segmented = true, themeClass }: {
   open: boolean;
   kind: PeriodKind;
   options: PeriodOption[];
   /** `from` of the selected period. */
   selected: string;
-  onKind: (kind: PeriodKind) => void;
+  onKind?: (kind: PeriodKind) => void;
   onPick: (option: PeriodOption) => void;
   onClose: () => void;
+  ctx?: string;
+  segmented?: boolean;
+  /** Sets `--d-solid` / `--d-ink` / `--d-sub` for the picked option. */
+  themeClass?: string;
 }) {
   return (
-    <Sheet open={open} onClose={onClose} z={21} dim="a" className={s.datePanel} label={TITLES[kind]}>
+    <Sheet open={open} onClose={onClose} z={21} dim="a" className={`${s.datePanel} ${themeClass ?? ""}`} label={TITLES[kind]}>
       <SheetHandle />
-      <div className={s.sheetHead}><h2 className={s.sheetTitle}>{TITLES[kind]}</h2><span className={s.sheetCtx}>Insight</span></div>
-      <div className={s.dateSeg}>
-        {SEG.map(([id, label]) => (
-          <button key={id} className={`${s.dateSegBtn} ${kind === id ? s.dateSegOn : ""}`} onClick={() => onKind(id)} aria-pressed={kind === id}>{label}</button>
-        ))}
-      </div>
+      <div className={s.sheetHead}><h2 className={s.sheetTitle}>{TITLES[kind]}</h2><span className={s.sheetCtx}>{ctx}</span></div>
+      {segmented && (
+        <div className={s.dateSeg}>
+          {SEG.map(([id, label]) => (
+            <button key={id} className={`${s.dateSegBtn} ${kind === id ? s.dateSegOn : ""}`} onClick={() => onKind?.(id)} aria-pressed={kind === id}>{label}</button>
+          ))}
+        </div>
+      )}
       <div className={s.dateGrid}>
         {options.map(o => {
           const on = o.period.from === selected && o.period.kind === kind;
