@@ -16,6 +16,11 @@ export interface TodayInput {
   /** The latest commission statement of this sub-department, if any. */
   income?: MemberIncome;
   salary: number | null;
+  /**
+   * A Principal viewing nobody: `income` is the whole sub-department's
+   * commission (the Principal's snapshot), named so — it is nobody's income.
+   */
+  department?: string;
   hidden: boolean;
   /**
    * The working month's Insight block for this sub-department — the month still
@@ -197,12 +202,14 @@ export function todayModel(input: TodayInput, championRank: number | null = null
   const fixed = input.salary ?? 0;
   const settled = income ? SETTLED.has(income.status) : false;
   const month = income ? monthName(income.period) : monthName(input.today.slice(0, 7));
+  const dept = input.department;
   return {
     hello: `Hello, ${input.first}`,
     helloSub: [dayLabel(input.today), input.title, input.rank].filter(Boolean).join(" · "),
-    heroLabel: `${month} · ${settled ? "Settled income" : "Estimated income"}`,
-    heroAmount: input.hidden ? "RM ••••••" : commission === null ? rm2(fixed) : rm2(fixed + commission),
+    heroLabel: dept ? `${month} · ${dept} commission` : `${month} · ${settled ? "Settled income" : "Estimated income"}`,
+    heroAmount: input.hidden ? "RM ••••••" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
     heroSplit: input.hidden ? "Amounts hidden"
+      : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`
       : commission === null ? `Fixed salary ${rm2(fixed)} · commission shows once ${month} is computed`
       : `Fixed salary ${rm2(fixed)} + commission ${rm2(commission)}`,
     metrics: [salesMetric(input), marginMetric(input), kpiMetric(input)],

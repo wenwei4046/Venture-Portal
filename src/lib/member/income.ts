@@ -1,6 +1,7 @@
 import type { CommissionOrderRow, OverrideOrderRow, WorkbenchPerson } from "@/lib/commission/workbench";
 import type { CloseSummary } from "@/lib/commission/closes";
 import type { StatementDto } from "@/lib/commission/run-payload";
+import type { MemberIncome as SnapshotIncome } from "./types";
 
 /**
  * My income (2026-10-05, user: 跟着 up to date … close 的时候就是 fix): the
@@ -244,6 +245,22 @@ export function closedIncome(close: {
     bills,
     overrides,
     notice: null,
+  };
+}
+
+/**
+ * One member's month in the shape Today's hero reads (the snapshot's), for a
+ * Principal viewing them: their own figure from the engine — the Principal's
+ * snapshot only carries the department's, which is nobody's income.
+ */
+export function snapshotIncome(m: IncomeMonth, schemeId: string): SnapshotIncome {
+  return {
+    schemeId, period: m.period,
+    status: m.state === "closed" || m.payrollStatus === "paid" ? "locked" : m.state === "manual" ? "applied" : "computed",
+    personal: m.personal, override: m.override, kpi: m.kpi, openBill: m.openBill, incentive: m.incentive, group: m.group,
+    total: m.commission, sales: m.countedSales, groupSales: 0,
+    deferred: sum(m.bills.filter(b => b.status === "deposit_pending").map(b => b.commissionable)),
+    rank: m.rankLabel ?? "", rate: m.rate, kpis: [], brands: [],
   };
 }
 

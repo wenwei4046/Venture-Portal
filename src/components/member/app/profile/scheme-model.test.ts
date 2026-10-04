@@ -14,15 +14,24 @@ const bands = [
   band("ZANOTTI", "Incentive Tier 1", "incentive", 33, 800),
 ];
 
+const who = { name: "ETHAN LIM", ini: "EL", title: "Revenue Specialist", rank: "Rank F" };
+
 describe("schemeVM", () => {
   it("names the member's place in the scheme", () => {
-    const vm = schemeVM({ name: "ETHAN LIM", ini: "EL", membership, salary: 0, bands, hidden: false });
+    const vm = schemeVM({ ...who, membership, salary: 0, bands, hidden: false });
     expect(vm.role).toBe("Revenue Specialist · Rank F");
     expect(vm.stats).toEqual([{ label: "Rate", value: "5.0%" }, { label: "Fixed salary", value: "Commission only" }, { label: "Since", value: "1 Jan 2026" }]);
   });
 
+  it("in a Principal's view shows the viewed person, the engine's rate once known, and no salary", () => {
+    const vm = schemeVM({ ...who, membership: undefined, rate: 0.05, salary: undefined, bands, hidden: false });
+    expect(vm.role).toBe("Revenue Specialist · Rank F");
+    expect(vm.stats).toEqual([{ label: "Rate", value: "5.0%" }, { label: "Fixed salary", value: "—" }, { label: "Since", value: "—" }]);
+    expect(schemeVM({ ...who, membership: undefined, rate: null, salary: undefined, bands, hidden: false }).stats[0].value).toBe("—");
+  });
+
   it("lists each brand's ladder as the scheme has it, money with the tiers that pay it", () => {
-    const vm = schemeVM({ name: "ETHAN LIM", ini: "EL", membership, salary: 0, bands, hidden: false });
+    const vm = schemeVM({ ...who, membership, salary: 0, bands, hidden: false });
     expect(vm.brands.map(b => b.brand)).toEqual(["Akemi", "Zanotti"]);
     expect(vm.brands[0].rows.map(r => [r.label, r.value])).toEqual([
       ["Incentive Tier 2", "43% +"], ["Incentive Tier 1", "36 – 43%"], ["Standard margin", "27 – 36%"], ["Below margin Tier 1", "27% or lower"],
@@ -31,8 +40,8 @@ describe("schemeVM", () => {
   });
 
   it("keeps the salary out of a view that may not see it, and hides it on request", () => {
-    expect(schemeVM({ name: "X", ini: "X", membership, salary: undefined, bands: [], hidden: false }).stats[1].value).toBe("—");
-    expect(schemeVM({ name: "X", ini: "X", membership, salary: 3000, bands: [], hidden: true }).stats[1].value).toBe("RM ••••");
-    expect(schemeVM({ name: "X", ini: "X", membership: undefined, salary: null, bands: [], hidden: false }).role).toBe("Not on the scheme yet");
+    expect(schemeVM({ ...who, membership, salary: undefined, bands: [], hidden: false }).stats[1].value).toBe("—");
+    expect(schemeVM({ ...who, membership, salary: 3000, bands: [], hidden: true }).stats[1].value).toBe("RM ••••");
+    expect(schemeVM({ name: "X", ini: "X", title: "", rank: "", membership: undefined, salary: null, bands: [], hidden: false }).role).toBe("Not on the scheme yet");
   });
 });

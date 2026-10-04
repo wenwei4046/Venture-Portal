@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { WorkbenchPerson } from "@/lib/commission/workbench";
 import type { CloseSummary } from "@/lib/commission/closes";
 import type { StatementDto } from "@/lib/commission/run-payload";
-import { closedIncome, liveIncome, payLinesTotal, type OverrideFacts } from "./income";
+import { closedIncome, liveIncome, payLinesTotal, snapshotIncome, type OverrideFacts } from "./income";
 
 const extra = {
   period: "2026-09", asOf: "2026-10-05T02:00:00Z", basic: 0, payLines: [], payrollStatus: null, paidOn: null,
@@ -107,5 +107,19 @@ describe("payLinesTotal", () => {
       { kind: "deduction", description: "", amount: -20 },
       { kind: "special_claim", description: "", amount: 0.1 },
     ])).toBe(50.1);
+  });
+});
+
+describe("snapshotIncome — one member's month for Today's hero", () => {
+  it("is the member's own engine figure, settled once closed or paid", () => {
+    const live = liveIncome({
+      rankLabel: "Rank F", productRate: 0.05, overrideTotal: 0, monthlyGroupIncentive: 0, monthlyDirectorPay: 0, totalCommission: 7974.2,
+      statement: { productCommission: 7974.2, kpiCommission: 0, kpiQty: 0, openBillBonus: 0, marginIncentive: 0, productRevenue: 159484, marginBandKey: null, marginByBrand: [] },
+      personalRows: [orderRow({ originalOrderId: "o2", orderNo: "SO-2", status: "deposit_pending", commissionableValue: 5388, productCommission: 0 })],
+      overridingRows: [],
+    } as unknown as WorkbenchPerson, extra);
+    expect(snapshotIncome(live, "s1")).toMatchObject({ schemeId: "s1", period: "2026-09", status: "computed", total: 7974.2, sales: 159484, deferred: 5388, rank: "Rank F", rate: 0.05 });
+    expect(snapshotIncome({ ...live, state: "closed" }, "s1").status).toBe("locked");
+    expect(snapshotIncome({ ...live, payrollStatus: "paid" }, "s1").status).toBe("locked");
   });
 });

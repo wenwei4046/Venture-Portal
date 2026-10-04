@@ -1309,8 +1309,18 @@ src/
 │   │                                  and bills leave the server): LIVE until HR
 │   │                                  closes them, then the close's own figures
 │   │                                  (user: 跟着 up to date … close 的时候就是
-│   │                                  fix); a month before the cutover reads
-│   │                                  "settled by hand" (`lib/member/income.ts`).
+│   │                                  fix). A month before the cutover was paid
+│   │                                  from the claim form, outside the portal:
+│   │                                  it shows the portal's OWN working of it,
+│   │                                  as Comm Cal's month page does, headed
+│   │                                  "Claim form month · portal's working",
+│   │                                  salary "—" unless payroll kept one (user
+│   │                                  2026-10-05: 显示 VP 自己算的;
+│   │                                  `lib/member/income.ts`). In View as,
+│   │                                  Today's income is the viewed person's own
+│   │                                  (`snapshotIncome`); a Principal viewing
+│   │                                  nobody sees "{Fair} commission" — the
+│   │                                  department's total, named as such.
 │   │                                  **My honours** = every finish of a FINAL
 │   │                                  month — Sales / Margin / KPI total and by
 │   │                                  brand, Championship, and the weekly booth
@@ -1343,7 +1353,22 @@ src/
 │   │                                  worked out in the DB (`member_claim_
 │   │                                  detail`) from HR's rates
 │   │                                  (`member_claim_rates` / `_regions`), never
-│   │                                  taken from the phone. Memos, Team &
+│   │                                  taken from the phone; HR sets them on
+│   │                                  People › Member services › **Claim rates**
+│   │                                  (`MemberClaimRatesAdmin`,
+│   │                                  `member-admin/claim-rates-actions.ts`,
+│   │                                  rules in `lib/member/claim-rates-admin.ts`
+│   │                                  = the RPC's; gate as Brand weeks).
+│   │                                  **My brand weeks** (Profile chip / Today's
+│   │                                  reminder; no prototype page) = this
+│   │                                  month's weekends then the month still
+│   │                                  worked, one brand per week, closed weeks
+│   │                                  locked for the member; a Principal viewing
+│   │                                  is the back office (any week). The
+│   │                                  **Commission scheme** chip opens the
+│   │                                  member's title, rank, rate and each
+│   │                                  brand's ladder — which parts a month PAYS
+│   │                                  is My income's to say. Memos, Team &
 │   │                                  capacity and View as (the Principal reads
 │   │                                  any member, read-only) read real data.
 │   │                                  Migs `20261005030000` / `040000` /

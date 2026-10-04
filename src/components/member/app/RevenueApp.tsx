@@ -49,7 +49,7 @@ import { CommissionSheet, IncomeOrdersPage, IncomePage, PickSomebody } from "./p
 import { incomeOrdersVM, incomeVM } from "./profile/income-model";
 import { honourWindow, honoursVM } from "./profile/honours-model";
 import type { MemberHonours } from "@/lib/member/server";
-import type { MemberIncome } from "@/lib/member/income";
+import { snapshotIncome, type IncomeMonth, type MemberIncome } from "@/lib/member/income";
 import HonoursPage, { HonourSheet } from "./profile/HonoursPage";
 import BrandWeeksPage from "./profile/BrandWeeksPage";
 import SchemeSheet from "./profile/SchemeSheet";
@@ -235,7 +235,19 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   }, [membershipId, working, period, readable, context, source]);
 
   const incomes = useMemo(() => data.incomes.filter(i => i.schemeId === schemeId).sort((a, b) => b.period.localeCompare(a.period)), [data.incomes, schemeId]);
-  const income = incomes[0];
+  // A Principal viewing somebody: Today's income is that person's own month — Comm Cal's engine, as on
+  // My income — never the department's total the Principal's snapshot carries.
+  const viewKey = principal && context && working && !fixture ? `${membershipId}|${context.staffId}|${working}` : "";
+  const [viewedMonth, setViewedMonth] = useState<{ key: string; month: IncomeMonth } | null>(null);
+  useEffect(() => {
+    if (!viewKey || !working) return;
+    let stale = false;
+    void source.income(membershipId, working, context).then(r => { if (!stale && r.ok) setViewedMonth({ key: viewKey, month: r.data.month }); });
+    return () => { stale = true; };
+  }, [viewKey, membershipId, working, context, source]);
+  const viewedIncome = viewKey && viewedMonth?.key === viewKey ? viewedMonth.month : null;
+  const income = viewKey ? (viewedIncome ? snapshotIncome(viewedIncome, schemeId) : undefined) : incomes[0];
+  const todaySalary = viewKey ? viewedIncome?.basic ?? null : data.profile.salary;
   // The newest settled month, while it is news (the month just gone, or the one before it).
   const settled = useMemo(() => {
     const candidate = incomes.find(i => SETTLED.has(i.status));
@@ -369,9 +381,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   }, [arena, kpiRule, selfId]);
 
   const model = useMemo(() => todayModel({
-    today, first: me.first, title: me.title, rank: me.rank, income, salary: data.profile.salary, hidden,
+    today, first: me.first, title: me.title, rank: me.rank, income, salary: todaySalary, hidden,
+    department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
     insight: work.block ?? undefined, kpi: work.kpi, arena, arenaNow, book: work.book, bands: data.bands, memos, requests, requestCode,
-  }, champRank), [today, me, income, data.profile.salary, hidden, work.block, work.kpi, arena, arenaNow, work.book, data.bands, memos, requests, champRank]);
+  }, champRank), [today, me, income, todaySalary, hidden, principal, viewed, fixture, membership?.name, work.block, work.kpi, arena, arenaNow, work.book, data.bands, memos, requests, champRank]);
 
   // ── Insight: Month / Quarter / Year, opening on the working month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -640,9 +653,14 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     : honByKey[honKey] ? honoursVM(honByKey[honKey], honKind, honStart, period, membership?.name ?? "your sub-department") : null),
     [fxp, honKind, honByKey, honKey, honStart, period, membership?.name]);
 
-  // Commission scheme: the member's place in it and each brand's ladder (a Principal viewing cannot see their salary).
-  const schemeView = useMemo(() => schemeVM({ name: me.name, ini: me.ini, membership, salary: principal ? undefined : data.profile.salary, bands: data.bands, hidden }),
-    [me.name, me.ini, membership, principal, data.profile.salary, data.bands, hidden]);
+  // Commission scheme: the member's place in it and each brand's ladder. A Principal's view has the viewed
+  // person's title and rank, the engine's rate once My income read it, and never their salary.
+  const schemeView = useMemo(() => schemeVM({
+    name: me.name, ini: me.ini, title: me.title, rank: me.rank,
+    membership: principal ? undefined : membership,
+    rate: principal ? incData?.month.rate ?? null : undefined,
+    salary: principal ? undefined : data.profile.salary, bands: data.bands, hidden,
+  }), [me.name, me.ini, me.title, me.rank, membership, principal, incData, data.profile.salary, data.bands, hidden]);
 
   // My brand weeks: this month's weekends first, then the month still being worked; the edits not saved yet, per month.
   const backOffice = principal && !!context;

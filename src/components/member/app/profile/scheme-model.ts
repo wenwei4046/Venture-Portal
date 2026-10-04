@@ -22,7 +22,13 @@ export interface SchemeVM {
 export function schemeVM(input: {
   name: string;
   ini: string;
+  /** The title and rank the member holds here. */
+  title: string;
+  rank: string;
+  /** The member's own membership — absent in a Principal's view of somebody (it would be the Principal's). */
   membership: MemberMembership | undefined;
+  /** The rate when the membership cannot say it (a Principal's view: the engine's, once My income has read it). */
+  rate?: number | null;
   /** The fixed salary on the member's contract; null when none is set, undefined when this view cannot know it. */
   salary: number | null | undefined;
   bands: readonly MemberBand[];
@@ -32,13 +38,14 @@ export function schemeVM(input: {
   const since = m?.effective ? `${shortDay(m.effective)} ${m.effective.slice(0, 4)}` : "—";
   const salary = input.salary === undefined ? "—" : input.hidden ? "RM ••••"
     : input.salary === null ? "Not set" : input.salary === 0 ? "Commission only" : rm2(input.salary);
+  const rate = m ? m.rate : input.rate ?? null;
   const codes = [...new Set(input.bands.map(b => b.brand))].sort((a, b) => brandName(a).localeCompare(brandName(b)));
   return {
     name: input.name,
     ini: input.ini,
-    role: [m?.title, m?.rank].filter(Boolean).join(" · ") || "Not on the scheme yet",
+    role: [input.title, input.rank].filter(Boolean).join(" · ") || "Not on the scheme yet",
     stats: [
-      { label: "Rate", value: m ? `${(Math.round(m.rate * 1000) / 10).toFixed(1)}%` : "—" },
+      { label: "Rate", value: rate === null ? "—" : `${(Math.round(rate * 1000) / 10).toFixed(1)}%` },
       { label: "Fixed salary", value: salary },
       { label: "Since", value: since },
     ],
