@@ -179,7 +179,7 @@ export function PickSomebody({ title, onBack, onViewAs }: { title: string; onBac
   return (
     <div className={s.page}>
       <PageHead back="Profile" title={title} onBack={onBack} />
-      <p className={s.note}>{title} is a member's own. Pick somebody in Revenue to see theirs, exactly as they do.</p>
+      <p className={s.note}>{`${title} is a member's own. Pick somebody in Revenue to see theirs, exactly as they do.`}</p>
       <button className={s.vaEntryBtn} onClick={onViewAs}>
         <span className={s.vaEntryIcon}><Svg d={ICON.viewing} size={20} sw={1.8} /></span>
         <span className={s.vaEntryText}>
