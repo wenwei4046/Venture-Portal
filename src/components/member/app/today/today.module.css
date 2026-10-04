@@ -1,0 +1,112 @@
+/* Today (`today-style="a"`, `hero-style="grad"`) — RevenueApp.dc.html 141–175. */
+.page { padding: 8px 20px 32px; display: flex; flex-direction: column; gap: 24px; }
+
+.hello { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.03em; line-height: 1.2; }
+.helloSub { margin: 6px 0 0; font-size: 14px; color: var(--rv-sub); }
+
+/* the income hero */
+.hero {
+  border-radius: 24px;
+  background: var(--rv-hero-grad);
+  border: 1px solid transparent;
+  color: var(--rv-white);
+  padding: 18px 18px 14px;
+  box-shadow: 0 12px 26px var(--rv-accent-30);
+}
+.heroTop { display: flex; justify-content: space-between; align-items: center; }
+.heroLabel { font-size: 13px; color: var(--rv-hero-sub); }
+.heroEye {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--rv-white-20);
+  color: var(--rv-white);
+  display: grid;
+  place-items: center;
+}
+.heroAmount { font-size: 36px; font-weight: 750; letter-spacing: -.03em; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+.heroSplit { margin: 0; font-size: 12.5px; color: var(--rv-hero-sub); }
+.heroMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; border-top: 1px solid var(--rv-white-24); }
+.metric {
+  min-width: 0;
+  padding: 12px 4px 4px;
+  border: 0;
+  border-right: 1px solid var(--rv-white-24);
+  background: transparent;
+  color: var(--rv-white);
+  text-align: left;
+}
+.metric:last-child { border-right-color: transparent; }
+.metricLabel { display: block; font-size: 11.5px; color: var(--rv-hero-sub); }
+.metricValue { display: block; font-size: 19px; font-weight: 750; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.metricTag { display: block; font-size: 11px; margin-top: 2px; }
+.metricTagSub { color: var(--rv-hero-sub); }
+.metricTagGood { color: var(--rv-hero-good); }
+.metric:not(:first-child) .metricLabel,
+.metric:not(:first-child) .metricValue,
+.metric:not(:first-child) .metricTag { padding-left: 12px; }
+
+/* section heads */
+.sectHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sectTitle { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
+.sectLink { display: flex; align-items: center; gap: 2px; height: 32px; padding: 0; border: 0; background: transparent; color: var(--rv-accent); font-size: 13.5px; font-weight: 600; }
+
+/* Needs your action */
+.todo {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rv-rule);
+  background: transparent;
+  text-align: left;
+  color: var(--rv-ink);
+}
+.todoIcon { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; }
+.toneMemo { background: var(--rv-amber-bg); color: var(--rv-amber); }
+.toneRequest { background: var(--rv-red-bg); color: var(--rv-red); }
+.toneWeeks { background: var(--rv-peach-bg); color: var(--rv-accent); }
+.todoText { flex: 1; min-width: 0; display: block; }
+.todoTitle { display: block; font-size: 14.5px; font-weight: 650; }
+.todoSub { display: block; font-size: 12.5px; color: var(--rv-sub); margin-top: 2px; }
+.todoEmpty { margin: 0; padding: 12px 0; font-size: 13px; color: var(--rv-sub); border-bottom: 1px solid var(--rv-rule); }
+
+/* This week */
+.week { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 18px; background: var(--rv-peach-bg); }
+.weekTop { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.weekTitle { font-size: 16px; font-weight: 700; }
+.weekDates { font-size: 13px; color: var(--rv-sub); }
+.weekPlace { font-size: 13px; }
+.weekOrg { color: var(--rv-sub); }
+
+/* Your Arena */
+.boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.board {
+  min-width: 0;
+  box-sizing: border-box;
+  height: 88px;
+  border: 0;
+  border-radius: 18px;
+  padding: 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.boardLabel { font-size: 12.5px; font-weight: 650; }
+.boardRank { display: flex; align-items: flex-start; line-height: 1; }
+.boardNum { font-size: 32px; font-weight: 800; letter-spacing: -.05em; }
+.boardSuf { font-size: 13px; font-weight: 700; margin: 3px 0 0 1px; }
+.board_sales { background: var(--rv-brown); color: var(--rv-white); }
+.board_sales .boardSuf { color: var(--rv-blush); }
+.board_margin { background: var(--rv-gold); color: var(--rv-ink); }
+.board_margin .boardSuf { color: var(--rv-gold-sub); }
+.board_kpi { background: var(--rv-green); color: var(--rv-white); }
+.board_kpi .boardSuf { color: var(--rv-green-pale); }
+.board_champ { background: var(--rv-accent); color: var(--rv-white); }
+.board_champ .boardSuf { color: var(--rv-orange-bg); }

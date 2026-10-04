@@ -10,6 +10,8 @@ import InsightDesignReview from "@/components/member/design-preview/InsightDesig
 import ArenaDesignReview from "@/components/member/design-preview/ArenaDesignReview";
 import ArenaDesignPreview from "@/components/member/design-preview/ArenaDesignPreview";
 import type { AdminMemberData } from "@/lib/member/server";
+import RevenueApp from "@/components/member/app/RevenueApp";
+import { protoData, protoFixture } from "@/components/member/app/fixtures/proto";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revenue · Mobile & Desktop Preview" };
@@ -40,6 +42,7 @@ export default async function MemberPreview({
     design?: string;
     view?: string;
     role?: string;
+    app?: string;
   }>;
 }) {
   if (process.env.NODE_ENV !== "development") {
@@ -47,6 +50,13 @@ export default async function MemberPreview({
     if (!user || !["principal", "hr"].includes(user.role)) notFound();
   }
   const params = await searchParams;
+  // The rebuilt app on the prototype's own content, drawn in the prototype's
+  // device frame — laid over a screenshot of the prototype to compare.
+  if (params.app === "proto") {
+    const device = params.device === "android" || params.device === "desktop" ? params.device : "ios";
+    const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
+    return <RevenueApp initialData={protoData()} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture()} />;
+  }
   if (params.design === "live") {
     const preview = memberDemo();
     if (params.role === "principal") {

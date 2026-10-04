@@ -1,0 +1,100 @@
+/**
+ * The prototype's number and date spellings, one helper each, so every screen
+ * writes "RM 57,930", "RM 6,842.50", "4th" and "Sat, 3 Oct" the same way.
+ */
+
+const whole = new Intl.NumberFormat("en-MY", { maximumFractionDigits: 0 });
+const cents = new Intl.NumberFormat("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** `RM 57,930` — whole ringgit (the prototype's `rm`). */
+export function rm(n: number): string {
+  return "RM " + whole.format(Math.round(n));
+}
+
+/** `RM 6,842.50` — to the sen (the prototype's `rm2`). */
+export function rm2(n: number): string {
+  return "RM " + cents.format(n);
+}
+
+/** `4th`, `21st`, `112th`. */
+export function ordinal(n: number): string {
+  return n + ordinalSuffix(n);
+}
+
+export function ordinalSuffix(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return "th";
+  return ["th", "st", "nd", "rd"][n % 10] ?? "th";
+}
+
+/** `JT` for Jia Hui Tan — the first letters of the first two words. */
+export function initials(name: string): string {
+  return name.trim().split(/\s+/).map(word => word[0] ?? "").slice(0, 2).join("").toUpperCase();
+}
+
+/** `Jia Hui` for Jia Hui Tan — the first two words (the prototype's `first`). */
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/).slice(0, 2).join(" ");
+}
+
+export const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+export const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
+const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** Today in Kuala Lumpur as `YYYY-MM-DD`. */
+export function klToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+function utc(date: string): Date {
+  return new Date(`${date}T00:00:00Z`);
+}
+
+/** `Sat, 3 Oct` */
+export function dayLabel(date: string): string {
+  const d = utc(date);
+  return `${WEEKDAYS_SHORT[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`;
+}
+
+/** `Sun 4 Oct 2026` */
+export function longDayLabel(date: string): string {
+  const d = utc(date);
+  return `${WEEKDAYS_SHORT[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+/** `Q4 2026` */
+export function quarterLabel(date: string): string {
+  const d = utc(date);
+  return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
+}
+
+/** `September` for `2026-09` */
+export function monthName(period: string): string {
+  return MONTHS_LONG[Number(period.slice(5, 7)) - 1] ?? period;
+}
+
+/** `Sep 2026` for `2026-09` */
+export function monthShort(period: string): string {
+  return `${MONTHS_SHORT[Number(period.slice(5, 7)) - 1] ?? ""} ${period.slice(0, 4)}`;
+}
+
+/** `5 Oct` */
+export function shortDay(date: string): string {
+  const d = utc(date);
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`;
+}
+
+/** `9–11 Oct`, or `30 Oct – 1 Nov` across a month end. */
+export function dayRange(start: string, end: string): string {
+  const a = utc(start), b = utc(end);
+  if (start === end) return shortDay(start);
+  return a.getUTCMonth() === b.getUTCMonth()
+    ? `${a.getUTCDate()}–${b.getUTCDate()} ${MONTHS_SHORT[b.getUTCMonth()]}`
+    : `${a.getUTCDate()} ${MONTHS_SHORT[a.getUTCMonth()]} – ${b.getUTCDate()} ${MONTHS_SHORT[b.getUTCMonth()]}`;
+}
+
+/** `Good morning` / `Good afternoon` / `Good evening`, by the hour in Kuala Lumpur. */
+export function greeting(now: Date = new Date()): string {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", hour: "2-digit", hour12: false }).format(now));
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+}
