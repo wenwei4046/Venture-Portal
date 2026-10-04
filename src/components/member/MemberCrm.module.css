@@ -717,3 +717,15 @@ button.apptBanner { width: 100%; border: 0; text-align: left; cursor: pointer; c
 .personWho strong { font-size: 14px; font-weight: 500; }
 .personWho small { font-size: 11px; color: var(--m-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .personWho small[data-over] { color: rgb(var(--danger)); }
+
+/* Rust, not walnut (user 2026-10-04): the CRM's one strong surface — the
+   numbers cards, the booked visit, the day's appointments, your own bubbles,
+   the primary buttons — is the member app's rust, the colour of Arena's
+   active Monthly segment (`--arena-secondary`, palette "c"). The fallback is
+   the same value, for a screen drawn outside an Arena palette. */
+.app {
+  --m-brand: rgb(var(--arena-secondary, 189 74 25));
+  --m-on-brand: rgb(var(--arena-on-primary, 255 255 255));
+}
+/* On rust the danger / alert lanes lose their contrast: white, told apart by weight. */
+.app .waitHeroKey em[data-urgency] { color: var(--m-on-brand); font-weight: 600; }
