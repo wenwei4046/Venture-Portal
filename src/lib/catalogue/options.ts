@@ -45,12 +45,16 @@ export function optionKeysOf(category: string | null): OptionKey[] {
       { key: 'specials', pool: 'sofa_specials', label: 'Specials', priced: true },
     ]
   }
-  // A bed frame's divan, leg, gap and total height are no longer ticked here
-  // (2026-10-05): the Quote offers FOC and every one of them Maintenance
-  // CHARGES that the ERP lets the model take (`MemberCatalogueModel.charges`).
-  // Its specials still are ticked, and costed.
+  // A bed frame's divan, leg, gap and total height are offered on the Quote
+  // only when turned ON here (user 2026-10-05) — and then with their charge
+  // when Maintenance prices them, else as FOC (`MemberCatalogueModel.charges`,
+  // 20261005020000). Its specials are a cost, as ever.
   if (c === 'BEDFRAME') {
     return [
+      { key: 'divan_heights', pool: 'bedframe_divan_heights', label: 'Divan height', priced: true },
+      { key: 'total_heights', pool: 'bedframe_total_heights', label: 'Total height', priced: true },
+      { key: 'gaps', pool: 'bedframe_gaps', label: 'Gap', priced: true },
+      { key: 'leg_heights', pool: 'bedframe_leg_heights', label: 'Leg height', priced: true },
       { key: 'specials', pool: 'bedframe_specials', label: 'Specials', priced: true },
     ]
   }

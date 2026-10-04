@@ -308,14 +308,14 @@ export default function ModelEditor({ model, brands, options, position, onClose,
                 )}
               </section>
             })}
-            {/* 2026-10-05: a bed frame's divan, leg, gap and total height are no
-                longer ticked — the Quote offers FOC and every option Maintenance
-                charges that the ERP lets this model take. */}
+            {/* 2026-10-05: what the ticks above do to a bed frame's divan, leg,
+                gap and total height on the Quote. */}
             {(model.category ?? '').toUpperCase() === 'BEDFRAME' ? (
-              <section className="modular-win-section" aria-label="Divan, leg, gap and total height">
-                <div className="modular-win-section-head"><h3>Divan, leg, gap and total height</h3></div>
-                <p className="text-xs">Members choose FOC, or an option charged on Maintenance that the ERP allows for this model. A charge is paid by the customer on top: out of the margin, in the commission.</p>
-              </section>
+              <p className="text-xs">
+                On the Quote, a divan, leg, gap or total height turned on here is offered with its charge from Maintenance
+                (paid by the customer on top: out of the margin, in the commission); one turned on with no charge is FOC;
+                one not turned on is never offered.
+              </p>
             ) : null}
           </fieldset>
         </div>

@@ -1407,11 +1407,15 @@ comm"*); specials stay as they were.
   charges, and the cost never had the option in it. Never a KPI item.
   RM 10,000 bill with a 6" leg at RM 100 and RM 6,000 of team cost: rate paid on
   10,000; margin (9,900 − 6,000) ÷ 9,900 = 39.4%.
-- **On the Quote.** Each bed frame line carries its own build: FOC, or a charged
-  option the ERP lets that model take (`MemberCatalogueModel.charges`); one frame
+- **On the Quote.** Each bed frame line carries its own build: FOC, or an option
+  turned ON for that model on Product List › Modular that Maintenance charges and
+  the ERP still allows (`MemberCatalogueModel.charges`, mig `20261005020000` —
+  user: *"要确保 modular 那一边，选择 Turn ON 的他才会出现在 calculate 的 option。如果没有，
+  他就不会出现"*). ON + charged = "+ RM x"; ON without a charge = FOC; not ON =
+  never offered, exactly as a SKU or model that is not ON never is. One frame
   built two ways is two lines. The keypad is the selling price; *Bed frame
   options · not in margin + RM x* and *Customer pays* sit under the margin, like
-  KPI items. Modular no longer ticks a bed frame's divan / leg / gap / total height.
+  KPI items.
 
 Readers that take it off the margin: the engine's `marginBase`,
 `revenue_month_orders` (`margin_revenue`; `commissionable` unchanged),
