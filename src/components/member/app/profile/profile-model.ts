@@ -1,8 +1,8 @@
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
-import type { ArenaPerson } from "@/lib/member/arena";
-import { initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
+import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
-  MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
+  ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
   TeamDot, TeamKidVM, TeamNodeVM, TeamUpVM, TeamVM, Tone, VaGroupVM,
 } from "./profile-vm";
 
@@ -323,4 +323,63 @@ export function teamVM(input: TeamInput): TeamVM | null {
     kids,
     sheets,
   };
+}
+
+// ── The request form's choices ──
+
+const WEEK_BRAND: Record<string, string> = { AKEMI: "Akemi", ERGOTEX: "Ergotex", ZANOTTI: "Zanotti", DUNLOP: "Dunlopillo" };
+/** A brand's two colours as palette tokens (the prototype's BILL_BRAND). */
+const WEEK_TONE: Record<string, [string, string]> = {
+  AKEMI: ["var(--rv-accent)", "var(--rv-peach-bg)"], ERGOTEX: ["var(--rv-green)", "var(--rv-green-bg)"],
+  ZANOTTI: ["var(--rv-amber)", "var(--rv-gold-tint)"], DUNLOP: ["var(--rv-brown)", "var(--rv-sand)"],
+};
+
+/**
+ * The fair weekends a claim can be for: every weekend of the months the
+ * member's Arena covers that has already begun, each with the brand they
+ * worked it and the booth they were at.
+ */
+export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | undefined)[], today: string): ClaimWeek[] {
+  const out = new Map<string, ClaimWeek>();
+  for (const snap of snapshots) {
+    if (!snap) continue;
+    arenaMonthFridays(snap.period).forEach((friday, i) => {
+      if (friday > today || out.has(friday)) return;
+      const pick = snap.brandWeeks?.picks?.[friday] ?? null;
+      const booth = pick ? snap.history?.events.find(e => e.week === friday && e.brand === pick) : undefined;
+      const [color, tint] = pick ? WEEK_TONE[pick] ?? ["var(--rv-brown)", "var(--rv-sand)"] : ["var(--rv-sub)", "var(--rv-sand)"];
+      out.set(friday, {
+        key: friday, n: `W${i + 1}`, brandWeek: pick ? `${WEEK_BRAND[pick] ?? pick} week` : "Brand week not picked", brand: pick,
+        dates: booth ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null, color, tint,
+      });
+    });
+  }
+  return [...out.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/** Who the member may propose for a replacement: their own team in this sub-department. */
+export function replaceable(membership: MemberMembership | undefined): { id: string; name: string }[] {
+  if (!membership) return [];
+  const self = membership.people.find(p => p.self);
+  if (!self) return [];
+  const below = new Set<string>([self.id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const p of membership.people) if (p.parentId && below.has(p.parentId) && !below.has(p.id)) { below.add(p.id); grew = true; }
+  }
+  return membership.people.filter(p => p.id !== self.id && below.has(p.id)).sort((a, b) => a.name.localeCompare(b.name)).map(p => ({ id: p.id, name: p.name }));
+}
+
+/** The member's waiting-list requests, and which an approved one a replacement may use. */
+export function waitingChoices(requests: readonly MemberRequest[]): { id: string; name: string; sub: string; status: string; ok: boolean }[] {
+  return requests.filter(r => r.kind === "waiting" && !["draft", "withdrawn", "rejected", "expired"].includes(r.status)).map(r => {
+    const start = typeof r.detail.start === "string" ? r.detail.start : "";
+    const ok = ["waiting", "reserved", "accepted", "allocated"].includes(r.status);
+    return {
+      id: r.id, name: typeof r.detail.newPerson === "string" ? r.detail.newPerson : "New member",
+      sub: `${requestCode(r)} · ${ok && start ? `start ${shortDay(start)}` : `submitted ${shortDay(klDate(r.submittedAt ?? r.createdAt))}`}`,
+      status: ok ? "Approved" : requestStatus(r.status)[0], ok,
+    };
+  });
 }

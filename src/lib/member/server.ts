@@ -12,6 +12,15 @@ import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
 import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
+import { closedIncome, liveIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
+import { parseCloseSummary } from "@/lib/commission/closes";
+import { buildCommissionWorkbench } from "@/lib/commission/workbench";
+import type { StatementDto } from "@/lib/commission/run-payload";
+import { fetchByKeys } from "@/lib/paginate";
+import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-input";
+import { monthFinishes, type HonourBoard } from "./honours";
+import type { MemberArenaSnapshot } from "./arena";
+import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
   BedframeBuild,
   MemberBand,
@@ -397,6 +406,230 @@ export async function loadMemberInsightRange(
     const range = readInsightRange(data);
     if (!range) throw new Error("Performance information is temporarily unavailable.");
     return { ...range, downline: range.downline.map((row) => ({ ...row, title: legacyLabel(row.title) })) };
+  });
+}
+
+/**
+ * My income (2026-10-05, user: 跟着 up to date … close 的时候就是 fix): the
+ * member's month worked out by Comm Cal's own engine — `loadCommissionInput`
+ * and the workbench — until HR closes them, then the close's figures; a month
+ * before the portal paid is the payroll row. The engine needs the whole
+ * sub-department's bills and costs, which only the service role may read, so
+ * the member's session is authorised FIRST (their own membership, or a
+ * Principal's view of one) and only that person's own money and bills leave
+ * this module — never a cost.
+ */
+export async function loadMemberIncome(
+  subDepartmentId: string,
+  period: string,
+  context?: MemberReadContext,
+): Promise<MemberOutcome<MemberIncome>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    insightWindow(subDepartmentId, period, period, context);
+    const principal = principalReadContext(user, context);
+    const client = await session("member_insight", principal);
+    // The member's own session says whose month it is — before anything is read for it.
+    const staffId = await rpc<string>(client, "member_income_context", {
+      p_sub_department: subDepartmentId, p_staff: principal ? context!.staffId : null,
+    });
+    if (typeof staffId !== "string" || !staffId) throw new Error("This department is not available to your account.");
+    const admin = adminClient() as unknown as SupabaseClient;
+    const first = `${period}-01`;
+    const [cutover, closes, payroll, lines, staff, runs] = await Promise.all([
+      admin.from("comm_cutovers").select("first_paid_month").eq("sub_department_id", subDepartmentId).maybeSingle(),
+      admin.from("comm_salesperson_closes").select("closed_at, summary, statement, deferred_orders")
+        .eq("sub_department_id", subDepartmentId).eq("period_month", first).eq("staff_id", staffId).is("reopened_at", null).maybeSingle(),
+      admin.from("hr_monthly_payroll").select("period_month, status, basic_salary, commission_amount, gross")
+        .eq("staff_id", staffId).order("period_month", { ascending: false }).limit(13),
+      admin.from("revenue_pay_lines").select("kind, description, amount, sort_order").eq("staff_id", staffId).eq("period_month", first).order("sort_order"),
+      admin.from("hr_staff_costs").select("basic_salary").eq("id", staffId).maybeSingle(),
+      admin.from("payroll_runs").select("period_month, paid_at").not("paid_at", "is", null).order("period_month", { ascending: false }).limit(13),
+    ]);
+    for (const r of [cutover, closes, payroll, lines, staff, runs]) if (r.error) throw new Error(r.error.message);
+    const paidAt = new Map(((runs.data ?? []) as { period_month: string; paid_at: string }[]).map(r => [r.period_month.slice(0, 7), r.paid_at]));
+    const rows = (payroll.data ?? []) as { period_month: string; status: string; basic_salary: number | string; commission_amount: number | string | null; gross: number | string | null }[];
+    const num = (v: unknown) => (v === null || v === undefined || v === "" ? 0 : Number(v));
+    const past: IncomePast[] = rows.filter(r => r.status !== "draft").map(r => ({
+      period: r.period_month.slice(0, 7), status: r.status, basic: num(r.basic_salary), commission: num(r.commission_amount),
+      gross: num(r.gross), paidOn: r.status === "paid" ? paidAt.get(r.period_month.slice(0, 7)) ?? null : null,
+    }));
+    const row = rows.find(r => r.period_month.slice(0, 7) === period);
+    const firstPaid = ((cutover.data as { first_paid_month: string } | null)?.first_paid_month ?? null)?.slice(0, 7) ?? null;
+    const payLines: IncomePayLine[] = ((lines.data ?? []) as { kind: string; description: string | null; amount: number | string }[])
+      .map(l => ({ kind: l.kind, description: l.description ?? "", amount: num(l.amount) }));
+    const extra = {
+      period, payLines,
+      basic: row ? num(row.basic_salary) : staff.data ? num((staff.data as { basic_salary: unknown }).basic_salary) : null,
+      payrollStatus: row?.status ?? null,
+      paidOn: row?.status === "paid" ? paidAt.get(period) ?? null : null,
+    };
+    const empty = (state: IncomeMonth["state"], notice: string): IncomeMonth => ({
+      ...extra, state, asOf: new Date().toISOString(), closedAt: null, rankLabel: null, rate: 0,
+      personal: 0, kpi: 0, kpiQty: 0, openBill: 0, incentive: 0, override: 0, group: 0, director: 0,
+      commission: state === "manual" && row ? num(row.commission_amount) : 0, countedSales: 0, bandKey: null, brands: [],
+      bills: [], overrides: [], switches: { kpi: false, openBill: false, incentive: false, override: false, group: false }, notice,
+    });
+
+    // Before the portal paid: the claim forms settled it; payroll holds what was paid.
+    if (firstPaid && period < firstPaid) {
+      return { month: empty("manual", `${period} was settled by hand before the portal paid commission.`), past, cutover: firstPaid };
+    }
+    const { data: scheme, error: schemeError } = await admin.from("comm_schemes")
+      .select("enable_kpi, enable_open_bill, enable_margin_incentive, enable_override, enable_group_incentive")
+      .eq("sub_department_id", subDepartmentId).eq("is_active", true).is("effective_to", null).maybeSingle();
+    if (schemeError) throw new Error(schemeError.message);
+    const sw = (scheme ?? {}) as Record<string, boolean | null>;
+    const switches = { kpi: !!sw.enable_kpi, openBill: !!sw.enable_open_bill, incentive: !!sw.enable_margin_incentive, override: !!sw.enable_override, group: !!sw.enable_group_incentive };
+
+    // Closed by HR: the close's own figures, fixed.
+    const close = closes.data as { closed_at: string; summary: unknown; statement: StatementDto | null; deferred_orders: { orderId: string }[] | null } | null;
+    if (close) {
+      const ov = (close.statement?.lines ?? []).filter(l => l.component === "override");
+      const orderIds = [...new Set(ov.map(l => l.source_order_id).filter((v): v is string => !!v))];
+      const sellerIds = [...new Set(ov.map(l => l.source_staff_id).filter((v): v is string => !!v))];
+      const [orders, sellers] = await Promise.all([
+        orderIds.length ? admin.from("sales_orders").select("id, order_no, brand_code, order_total, staff_id").in("id", orderIds) : Promise.resolve({ data: [], error: null }),
+        sellerIds.length ? admin.from("hr_staff_costs").select("id, employee_name").in("id", sellerIds) : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (orders.error || sellers.error) throw new Error((orders.error ?? sellers.error)!.message);
+      const names = new Map(((sellers.data ?? []) as { id: string; employee_name: string }[]).map(s => [s.id, s.employee_name]));
+      const facts = new Map<string, OverrideFacts>();
+      for (const o of (orders.data ?? []) as { id: string; order_no: string; brand_code: string | null; order_total: number | string; staff_id: string | null }[]) {
+        facts.set(o.id, { no: o.order_no, seller: (o.staff_id && names.get(o.staff_id)) || "Your team", brand: o.brand_code, orderTotal: num(o.order_total) });
+      }
+      for (const [id, name] of names) facts.set(`staff:${id}`, { no: "", seller: name, brand: null, orderTotal: null });
+      const month = closedIncome({ closedAt: close.closed_at, summary: parseCloseSummary(close.summary, ""), statement: close.statement, deferred: close.deferred_orders ?? [] },
+        facts, { ...extra, switches });
+      return { month, past, cutover: firstPaid };
+    }
+
+    // Still open: the engine's figure now, exactly as Comm Cal shows it.
+    const { data: run, error: runError } = await admin.from("comm_runs").select("id")
+      .eq("sub_department_id", subDepartmentId).eq("period_month", first).maybeSingle();
+    if (runError) throw new Error(runError.message);
+    let loaded: Awaited<ReturnType<typeof loadCommissionInput>>;
+    try {
+      loaded = await loadCommissionInput(first, subDepartmentId, admin, { replayRunId: (run as { id: string } | null)?.id });
+    } catch (error) {
+      const why = error instanceof Error ? error.message : "";
+      if (/Nothing has been imported/i.test(why)) return { month: empty("none", "No bills have arrived for this month yet."), past, cutover: firstPaid };
+      throw error;
+    }
+    const { input } = loaded;
+    const ids = [...new Set([...input.hierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId), staffId])];
+    const people = await fetchByKeys<{ id: string; employee_name: string }, string>(ids, keys =>
+      admin.from("hr_staff_costs").select("id, employee_name").in("id", keys));
+    const board = buildCommissionWorkbench(input, { people: people.map(p => ({ staffId: p.id, name: p.employee_name })) });
+    const person = board.people.find(p => p.staffId === staffId) ?? null;
+    const month = liveIncome(person, { ...extra, asOf: new Date().toISOString(), switches });
+    return { month, past, cutover: firstPaid };
+  });
+}
+
+export interface MemberHonours {
+  finishes: { period: string; board: HonourBoard; title: string; sub: string; place: number }[];
+  /** Months of the window whose finishes are kept (final) — the rest are still moving. */
+  kept: string[];
+}
+
+const monthsBetween = (from: string, until: string): string[] => {
+  const out: string[] = [];
+  for (let y = Number(from.slice(0, 4)), m = Number(from.slice(5, 7)); `${y}-${String(m).padStart(2, "0")}` <= until; m === 12 ? (y++, m = 1) : m++) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+  }
+  return out;
+};
+
+/**
+ * My honours (2026-10-05): the member's finishes over a window of months. A
+ * month that is final and not yet kept is worked out here, from the Arena the
+ * member's own session reads, for everybody in the sub-department, and kept
+ * with the service role (`member_honours`) — once, so a medal never changes.
+ */
+export async function loadMemberHonours(
+  subDepartmentId: string,
+  from: string,
+  until: string,
+  context?: MemberReadContext,
+): Promise<MemberOutcome<MemberHonours>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    insightWindow(subDepartmentId, from, until, context);
+    const principal = principalReadContext(user, context);
+    const client = await session("member_insight", principal);
+    const staffId = await rpc<string>(client, "member_income_context", {
+      p_sub_department: subDepartmentId, p_staff: principal ? context!.staffId : null,
+    });
+    if (typeof staffId !== "string" || !staffId) throw new Error("This department is not available to your account.");
+    const admin = adminClient() as unknown as SupabaseClient;
+    // A month still running is never final; nor is one before any bill arrived worth asking about.
+    const current = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+    const window = monthsBetween(from, until > current ? current : until);
+    const ended = window.filter(m => m < current);
+    const [keptRows, firstBill] = await Promise.all([
+      admin.from("member_honour_months").select("period_month").eq("sub_department_id", subDepartmentId)
+        .in("period_month", ended.map(m => `${m}-01`)),
+      admin.from("sales_orders").select("period_month, sales_import_batches!inner (sub_department_id)")
+        .eq("sales_import_batches.sub_department_id", subDepartmentId).order("period_month").limit(1).maybeSingle(),
+    ]);
+    if (keptRows.error || firstBill.error) throw new Error((keptRows.error ?? firstBill.error)!.message);
+    const kept = new Set(((keptRows.data ?? []) as { period_month: string }[]).map(r => r.period_month.slice(0, 7)));
+    const earliest = ((firstBill.data as { period_month: string } | null)?.period_month ?? "9999-12").slice(0, 7);
+    const missing = ended.filter(m => !kept.has(m) && m >= earliest);
+    if (missing.length) {
+      const { data: scheme, error: schemeError } = await admin.from("comm_schemes").select("id, enable_kpi")
+        .eq("sub_department_id", subDepartmentId).eq("is_active", true).is("effective_to", null).maybeSingle();
+      if (schemeError) throw new Error(schemeError.message);
+      const s = scheme as { id: string; enable_kpi: boolean | null } | null;
+      let threshold: number | null = null;
+      if (s?.enable_kpi) {
+        const { data: t } = await admin.from("comm_kpi_thresholds").select("min_qty").eq("scheme_id", s.id).order("min_qty").limit(1).maybeSingle();
+        threshold = t ? Number((t as { min_qty: number | string }).min_qty) : null;
+      }
+      const kpi = { enabled: !!s?.enable_kpi, threshold };
+      let history: ArenaHistorySnapshot | null | undefined;
+      for (const month of missing) {
+        const snapshot = await rpc<MemberArenaSnapshot>(client, principal ? "member_principal_arena_snapshot" : "member_arena_snapshot", {
+          p_sub_department: subDepartmentId, p_period: month, p_window: "monthly", ...(principal ? { p_staff: context!.staffId } : {}),
+        });
+        if (!snapshot || !Array.isArray(snapshot.people) || !snapshot.final) continue;
+        if (history === undefined) {
+          const h = await client.rpc(principal ? "member_principal_arena_booth_history" : "member_arena_booth_history", {
+            p_sub_department: subDepartmentId, ...(principal ? { p_staff: context!.staffId } : {}),
+          });
+          history = !h.error && h.data && Array.isArray((h.data as ArenaHistorySnapshot).events) ? (h.data as ArenaHistorySnapshot) : null;
+        }
+        const finishes = monthFinishes({ month, snapshot, history, kpi });
+        // Kept once: the first to arrive writes the month; anybody after reads it.
+        const { data: claimed, error: keepError } = await admin.from("member_honour_months")
+          .upsert({ sub_department_id: subDepartmentId, period_month: `${month}-01`, finishes: finishes.length },
+            { onConflict: "sub_department_id,period_month", ignoreDuplicates: true }).select("period_month");
+        if (keepError) throw new Error(keepError.message);
+        if ((claimed ?? []).length && finishes.length) {
+          const { error } = await admin.from("member_honours").insert(finishes.map(f => ({
+            sub_department_id: subDepartmentId, period_month: `${month}-01`, staff_id: f.staffId, board: f.board, title: f.title, sub: f.sub, place: f.place,
+          })));
+          if (error) {
+            await admin.from("member_honour_months").delete().eq("sub_department_id", subDepartmentId).eq("period_month", `${month}-01`);
+            throw new Error(error.message);
+          }
+        }
+        kept.add(month);
+      }
+    }
+    // Months before the first bill are as final as they will ever be: nothing to win.
+    for (const m of ended) if (m < earliest) kept.add(m);
+    const { data: rows, error: rowsError } = await admin.from("member_honours").select("period_month, board, title, sub, place")
+      .eq("staff_id", staffId).eq("sub_department_id", subDepartmentId).gte("period_month", `${from}-01`).lte("period_month", `${until}-01`);
+    if (rowsError) throw new Error(rowsError.message);
+    return {
+      finishes: ((rows ?? []) as { period_month: string; board: HonourBoard; title: string; sub: string; place: number }[])
+        .map(r => ({ period: r.period_month.slice(0, 7), board: r.board, title: r.title, sub: r.sub, place: r.place })),
+      kept: [...kept].filter(m => m >= from && m <= until).sort(),
+    };
   });
 }
 
@@ -929,6 +1162,23 @@ export async function loadMemberClaimRates(): Promise<MemberOutcome<unknown>> {
     const user = await getMemberUser();
     const client = await session("member_portal", !!user && isPrincipalAccount(user));
     return rpc<unknown>(client, "member_claim_rates");
+  });
+}
+
+/** View as: which memos the viewed person has read and acknowledged (their receipts, not the Principal's). */
+export async function loadPrincipalMemoReceipts(staffId: string): Promise<MemberOutcome<{ memoId: string; readAt: string | null; acknowledgedAt: string | null }[]>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active || !isPrincipalAccount(user)) throw new Error("Only the Principal can view another member's memos.");
+    const client = await session(undefined, true);
+    const data = await rpc<unknown>(client, "member_principal_memo_receipts", { p_staff: uuid(staffId, "member") });
+    if (!Array.isArray(data)) return [];
+    return data.flatMap((raw) => {
+      const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+      return r && typeof r.memoId === "string"
+        ? [{ memoId: r.memoId, readAt: typeof r.readAt === "string" ? r.readAt : null, acknowledgedAt: typeof r.acknowledgedAt === "string" ? r.acknowledgedAt : null }]
+        : [];
+    });
   });
 }
 

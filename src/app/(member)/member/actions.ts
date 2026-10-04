@@ -15,6 +15,9 @@ import {
   cancelMemberRequest as cancel,
   loadMemberRequestHistory,
   loadMemberClaimRates,
+  loadPrincipalMemoReceipts,
+  loadMemberIncome,
+  loadMemberHonours,
   adminMemberAction as administer,
   type AdminMemberCommand,
 } from "@/lib/member/server";
@@ -62,6 +65,15 @@ export async function cancelMemberRequest(id: string) {
     revalidatePath("/claims");
   }
   return result;
+}
+export async function fetchPrincipalMemoReceipts(staffId: string) {
+  return loadPrincipalMemoReceipts(staffId);
+}
+export async function fetchMemberIncome(subDepartmentId: string, period: string, context?: MemberReadContext) {
+  return loadMemberIncome(subDepartmentId, period, context);
+}
+export async function fetchMemberHonours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberHonours(subDepartmentId, from, until, context);
 }
 export async function fetchMemberClaimRates() {
   return loadMemberClaimRates();

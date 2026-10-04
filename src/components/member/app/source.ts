@@ -1,9 +1,12 @@
 import type { MemberData, MemberInsight, MemberOrgMap, MemberReadContext, MemberRequest, QuoteInput, QuoteResult } from "@/lib/member/types";
 import type { RequestEvent } from "./profile/profile-model";
+import { readClaimRates, type ClaimRates } from "@/lib/member/claim-rules";
+import type { MemberIncome } from "@/lib/member/income";
+import type { MemberHonours } from "@/lib/member/server";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
-import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, fetchMemberRequestHistory, refreshMemberData, submitMemberRequest } from "@/app/(member)/member/actions";
+import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberClaimRates, fetchMemberHonours, fetchMemberIncome, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, fetchMemberRequestHistory, fetchPrincipalMemoReceipts, refreshMemberData, submitMemberRequest } from "@/app/(member)/member/actions";
 import { fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 
@@ -35,13 +38,21 @@ export interface RevenueSource {
   submitRequest(form: FormData): Promise<Outcome<MemberRequest>>;
   /** Withdraw a request HR has not acted on yet. */
   cancelRequest(id: string): Promise<Outcome<MemberRequest>>;
+  /** HR's fair-claim rates and regions. */
+  claimRates(): Promise<Outcome<ClaimRates>>;
+  /** My income: one month as Comm Cal works it out (live until the close), and the months paid. */
+  income(subDepartmentId: string, period: string, context?: MemberReadContext): Promise<Outcome<MemberIncome>>;
+  /** My honours: the member's finishes over a window of months, and which months are final. */
+  honours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberHonours>>;
+  /** View as: the viewed person's memo receipts. */
+  memoReceipts(staffId: string): Promise<Outcome<{ memoId: string; readAt: string | null; acknowledgedAt: string | null }[]>>;
 }
 
 /** The design preview: reads nothing — its screens come from fixtures. */
 const nothing = async () => ({ ok: false as const, error: "Preview data only." });
 export const demoSource: RevenueSource = {
   refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing, quote: nothing,
-  memo: nothing, requestHistory: nothing, submitRequest: nothing, cancelRequest: nothing,
+  memo: nothing, requestHistory: nothing, submitRequest: nothing, cancelRequest: nothing, claimRates: nothing, memoReceipts: nothing, income: nothing, honours: nothing,
 };
 
 export const liveSource: RevenueSource = {
@@ -63,4 +74,11 @@ export const liveSource: RevenueSource = {
   requestHistory: id => fetchMemberRequestHistory(id),
   submitRequest: form => submitMemberRequest(form),
   cancelRequest: id => cancelMemberRequest(id),
+  async claimRates() {
+    const result = await fetchMemberClaimRates();
+    return result.ok ? { ok: true, data: readClaimRates(result.data) } : result;
+  },
+  memoReceipts: staffId => fetchPrincipalMemoReceipts(staffId),
+  income: (subDepartmentId, period, context) => fetchMemberIncome(subDepartmentId, period, context),
+  honours: (subDepartmentId, from, until, context) => fetchMemberHonours(subDepartmentId, from, until, context),
 };

@@ -45,13 +45,18 @@ import { AllModelsSheet, CartSheet, CustomerQuoteSheet, type CustomerQuote } fro
 import qs from "./quote/quote.module.css";
 import ProfileMain, { ProfileMini } from "./profile/ProfileMain";
 import ViewAsPage from "./profile/ViewAsPage";
-import { CommissionSheet, IncomeOrdersPage, IncomePage } from "./profile/IncomePages";
+import { CommissionSheet, IncomeOrdersPage, IncomePage, PickSomebody } from "./profile/IncomePages";
+import { incomeOrdersVM, incomeVM } from "./profile/income-model";
+import { honourWindow, honoursVM } from "./profile/honours-model";
+import type { MemberHonours } from "@/lib/member/server";
+import type { MemberIncome } from "@/lib/member/income";
 import HonoursPage, { HonourSheet } from "./profile/HonoursPage";
 import TeamPage, { PersonSheet } from "./profile/TeamPage";
 import RequestsPage, { RequestSheet, type RequestFilter } from "./profile/RequestsPage";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
 import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
-import { memoVM, profileMainVM, requestCode, requestDetailVM, requestRowsVM, teamVM, vaGroupsVM, type RequestEvent } from "./profile/profile-model";
+import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, teamVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
+import type { ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 
@@ -150,8 +155,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [memoError, setMemoError] = useState<string | null>(null);
   const [memoRead, setMemoRead] = useState<ReadonlySet<string>>(() => new Set());
   const [memoAcked, setMemoAcked] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const [pfDateOpen, setPfDateOpen] = useState(false);
+  const [incPeriod, setIncPeriod] = useState<string | null>(null);
   const closeProfileSheets = useCallback(() => {
-    setCoPick(null); setHonPlace(null); setPersonPick(null); setReqPick(null); setReqForm(null); setMemoPick(null); setReqError(null); setMemoError(null);
+    setCoPick(null); setHonPlace(null); setPersonPick(null); setReqPick(null); setReqForm(null); setMemoPick(null); setReqError(null); setMemoError(null); setPfDateOpen(false);
   }, []);
 
   useEffect(() => {
@@ -451,10 +458,25 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   }, [data.memberships]);
   // The viewed person's requests (a Principal's snapshot holds everybody's).
   const myRequests = useMemo(() => (principal ? (viewed ? requests.filter(r => r.staffId === viewed.id) : []) : requests), [principal, viewed, requests]);
+  // View as: the memos read as the viewed person read them — their receipts, not the Principal's.
+  const [viewedReceipts, setViewedReceipts] = useState<{ staffId: string; byMemo: Map<string, { readAt: string | null; acknowledgedAt: string | null }> } | null>(null);
+  useEffect(() => {
+    if (fxp || !principal || !viewed || viewedReceipts?.staffId === viewed.id) return;
+    let stale = false;
+    void source.memoReceipts(viewed.id).then(res => {
+      if (!stale && res.ok) setViewedReceipts({ staffId: viewed.id, byMemo: new Map(res.data.map(x => [x.memoId, x])) });
+    });
+    return () => { stale = true; };
+  }, [fxp, principal, viewed, viewedReceipts?.staffId, source]);
   const memoVMs: MemoVM[] = useMemo(() => {
     if (fxp) return fxp.memos.map(m => ({ ...m, read: m.read || memoRead.has(m.id) || memoAcked.has(m.id), acked: m.acked || memoAcked.has(m.id) }));
+    if (principal) {
+      const theirs = viewed && viewedReceipts?.staffId === viewed.id ? viewedReceipts.byMemo : new Map();
+      return memos.map(m => memoVM({ ...m, readAt: theirs.get(m.id)?.readAt ?? null, acknowledgedAt: theirs.get(m.id)?.acknowledgedAt ?? null },
+        { read: new Set(), acked: new Map() }));
+    }
     return memos.map(m => memoVM(m, { read: memoRead, acked: memoAcked }));
-  }, [fxp, memos, memoRead, memoAcked]);
+  }, [fxp, principal, viewed, viewedReceipts, memos, memoRead, memoAcked]);
   const profileVM = useMemo(() => {
     if (fxp) return principal && !viewed ? fxp.main.principal : viewed ? fxp.main.viewing[viewed.id] ?? fxp.main.me : fxp.main.me;
     return profileMainVM({ name: me.name, title: me.title, rank: me.rank, subName: principal && !viewed ? null : membership?.name ?? null,
@@ -560,29 +582,84 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     });
   }, [fxp, orgMap, membership, viewed?.id, data.profile.id, arena?.people, working, period, kpiRule]);
 
-  const incomeView = fxp ? (hidden ? fxp.income.hidden : fxp.income.shown) : null;
-  const ordersView = fxp ? (hidden ? fxp.orders.hidden : fxp.orders.shown) : null;
-  const honoursView = fxp ? fxp.honours[honKind] : null;
+  // My income: the month being worked unless another is picked — live until the close, fixed after.
+  const hasTeam = useMemo(() => replaceable(principal && viewed ? membership && { ...membership, people: membership.people.map(p => ({ ...p, self: p.id === viewed.id })) } : membership).length > 0, [principal, viewed, membership]);
+  const incMonth = incPeriod ?? working ?? period;
+  const incKey = `${membershipId}|${context?.staffId ?? ""}|${incMonth}`;
+  const [incomeByKey, setIncomeByKey] = useState<Record<string, MemberIncome>>({});
+  const [incBooks, setIncBooks] = useState<Record<string, MemberOrderBook>>({});
+  const [incError, setIncError] = useState<Record<string, string>>({});
+  const onIncome = route.screen === "account" && (route.pf === "income" || route.pf === "incOrders");
+  const inRecent = incMonth === prevMonth || incMonth === period;
+  useEffect(() => {
+    if (fxp || !onIncome || !membershipId || !readable || incomeByKey[incKey]) return;
+    let stale = false;
+    void source.income(membershipId, incMonth, context).then(r => {
+      if (stale) return;
+      if (r.ok) setIncomeByKey(prev => ({ ...prev, [incKey]: r.data }));
+      else setIncError(prev => ({ ...prev, [incKey]: r.error }));
+    });
+    if (!inRecent && !incBooks[incKey]) {
+      void source.orderBook(membershipId, incMonth, incMonth, context).then(r => { if (!stale && r.ok) setIncBooks(prev => ({ ...prev, [incKey]: r.data })); });
+    }
+    return () => { stale = true; };
+  }, [fxp, onIncome, membershipId, readable, incomeByKey, incBooks, incKey, incMonth, inRecent, context, source]);
+  const incData = incomeByKey[incKey] ?? null;
+  const incBook = inRecent ? recent : incBooks[incKey] ?? null;
+  const incomeView = useMemo(() => (fxp ? (hidden ? fxp.income.hidden : fxp.income.shown) : incData ? incomeVM(incData, hidden, hasTeam) : null), [fxp, hidden, incData, hasTeam]);
+  const ordersView = useMemo(() => (fxp ? (hidden ? fxp.orders.hidden : fxp.orders.shown)
+    : incData ? incomeOrdersVM(incData, incBook, data.bands, hidden) : null), [fxp, hidden, incData, incBook, data.bands]);
+  // My honours: the period picked (the month being worked by default), and the one before it for the chip.
+  const [honFrom, setHonFrom] = useState<string | null>(null);
+  const honStart = periodOf(honKind, honFrom ?? working ?? period, period).from;
+  const honWin = useMemo(() => honourWindow(honKind, honStart), [honKind, honStart]);
+  const honRange = useMemo(() => {
+    const all = [...honWin.prev, ...honWin.months].filter(m => m <= period).sort();
+    return all.length ? { from: all[0], until: all[all.length - 1] } : null;
+  }, [honWin, period]);
+  const honKey = honRange ? `${membershipId}|${context?.staffId ?? ""}|${honRange.from}|${honRange.until}` : "";
+  const [honByKey, setHonByKey] = useState<Record<string, MemberHonours>>({});
+  const [honError, setHonError] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (fxp || route.screen !== "account" || route.pf !== "honours" || !honRange || !membershipId || !readable || honByKey[honKey]) return;
+    let stale = false;
+    void source.honours(membershipId, honRange.from, honRange.until, context).then(r => {
+      if (stale) return;
+      if (r.ok) setHonByKey(prev => ({ ...prev, [honKey]: r.data }));
+      else setHonError(prev => ({ ...prev, [honKey]: r.error }));
+    });
+    return () => { stale = true; };
+  }, [fxp, route.screen, route.pf, honRange, membershipId, readable, honByKey, honKey, context, source]);
+  const honoursView = useMemo(() => (fxp ? fxp.honours[honKind]
+    : honByKey[honKey] ? honoursVM(honByKey[honKey], honKind, honStart, period, membership?.name ?? "your sub-department") : null),
+    [fxp, honKind, honByKey, honKey, honStart, period, membership?.name]);
 
   // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
+  const [claimRates, setClaimRates] = useState<ClaimRates | null>(null);
+  useEffect(() => {
+    if (fxp || route.screen !== "account" || route.pf !== "requests" || claimRates || readOnlyView) return;
+    let stale = false;
+    void source.claimRates().then(r => { if (!stale && r.ok) setClaimRates(r.data); });
+    return () => { stale = true; };
+  }, [fxp, route.screen, route.pf, claimRates, readOnlyView, source]);
   const formOptions: FormOptions = useMemo(() => {
     if (fxp) return fxp.form;
     return {
       subName: membership?.name ?? "",
-      weeks: [],
-      rates: { base: "Klang Valley", perSpot: null, perPaxNight: null, regions: [] },
-      members: [],
+      weeks: claimWeeks([arena, arenaNow], today),
+      rates: claimRates ?? { base: "Klang Valley", perSpot: null, perPaxNight: null, regions: [] },
+      members: replaceable(membership),
       departments: data.departments ?? [],
       departmentId: membership?.id ?? "",
-      waitingList: [],
+      waitingList: waitingChoices(myRequests),
     };
-  }, [fxp, membership?.name, membership?.id, data.departments]);
+  }, [fxp, membership, arena, arenaNow, today, claimRates, data.departments, myRequests]);
 
   const signOut = () => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); };
 
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
-  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null);
+  const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen);
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail).
   const rail = desk && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
@@ -679,14 +756,18 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   } else if (route.screen === "account") {
     const back = () => goScreen("account");
     const pf = route.pf;
-    if (pf === "income") {
-      page = <IncomePage vm={incomeView} hidden={hidden} onBack={back} onPeriod={() => undefined} onToggleHide={() => setHidden(!hidden)}
-        onOrders={() => goScreen("account", { pf: "incOrders" })} onMonth={() => undefined} />;
+    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== null && pf !== "brandWeeks";
+    if (pick) {
+      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : "Requests"} onBack={back} onViewAs={() => setVaOpen(true)} />;
+    } else if (pf === "income") {
+      page = <IncomePage vm={incomeView} hidden={hidden} message={incError[incKey] ?? null} onBack={back} onPeriod={() => setPfDateOpen(true)} onToggleHide={() => setHidden(!hidden)}
+        onOrders={() => goScreen("account", { pf: "incOrders" })} onMonth={p => { setIncPeriod(p); if (mainRef.current) mainRef.current.scrollTop = 0; }} />;
     } else if (pf === "incOrders") {
-      page = <IncomeOrdersPage vm={ordersView} tab={coTab} onTab={t => { setCoTab(t); setCoPick(null); }} onBack={() => goScreen("account", { pf: "income" })}
-        onPeriod={() => undefined} onRow={setCoPick} />;
+      page = <IncomeOrdersPage vm={ordersView} tab={coTab} message={incError[incKey] ?? null} onTab={t => { setCoTab(t); setCoPick(null); }} onBack={() => goScreen("account", { pf: "income" })}
+        onPeriod={() => setPfDateOpen(true)} onRow={setCoPick} />;
     } else if (pf === "honours") {
-      page = <HonoursPage vm={honoursView} kind={honKind} onKind={k => { setHonKind(k); setHonPlace(null); }} onBack={back} onPeriod={() => undefined} onPlace={setHonPlace} />;
+      page = <HonoursPage vm={honoursView} kind={honKind} message={honError[honKey] ?? null} onKind={k => { setHonKind(k); setHonFrom(null); setHonPlace(null); }} onBack={back}
+        onPeriod={() => setPfDateOpen(true)} onPlace={setHonPlace} />;
     } else if (pf === "team") {
       page = <TeamPage vm={teamView} onBack={back} onPerson={setPersonPick} />;
     } else if (pf === "requests") {
@@ -775,7 +856,15 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
       )}
       {route.screen === "account" && (
         <>
+          {(route.pf === "income" || route.pf === "incOrders") && (
+            <DateSheet open={pfDateOpen} kind="monthly" options={periodOptions("monthly", period, monthState)} selected={incMonth} segmented={false} ctx="My income"
+              onPick={o => { setIncPeriod(o.period.from); setPfDateOpen(false); }} onClose={() => setPfDateOpen(false)} />
+          )}
           {route.pf === "incOrders" && <CommissionSheet open={coPick !== null} vm={coPick ? ordersView?.sheets[coPick] ?? null : null} onClose={() => setCoPick(null)} />}
+          {route.pf === "honours" && (
+            <DateSheet open={pfDateOpen} kind={honKind} options={periodOptions(honKind, period, monthState)} selected={honStart} segmented={false} ctx="My honours"
+              onPick={o => { setHonFrom(o.period.from); setHonPlace(null); setPfDateOpen(false); }} onClose={() => setPfDateOpen(false)} />
+          )}
           {route.pf === "honours" && <HonourSheet open={honPlace !== null} place={honPlace} vm={honoursView} periodLabel={honoursView?.periodLabel ?? ""} onClose={() => setHonPlace(null)} />}
           {route.pf === "team" && <PersonSheet open={personPick !== null} vm={personPick ? teamView?.sheets[personPick] ?? null : null} onClose={() => setPersonPick(null)} />}
           {route.pf === "requests" && (

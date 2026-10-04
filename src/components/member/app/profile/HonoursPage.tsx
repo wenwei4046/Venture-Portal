@@ -16,8 +16,9 @@ const BADGE = (place: number) => (place === 1 ? s.b1 : place === 2 ? s.b2 : plac
 const SHEET_BADGE = (place: number) => (place === 1 ? s.hs1 : place === 2 ? s.hs2 : place === 3 ? s.hs3 : s.hsn);
 
 /** My honours (`hon-style="a"`, lines 953–998): the period's podium, then every place and what it was for. */
-export default function HonoursPage({ vm, kind, onKind, onBack, onPeriod, onPlace }: {
+export default function HonoursPage({ vm, kind, message, onKind, onBack, onPeriod, onPlace }: {
   vm: HonoursVM | null;
+  message?: string | null;
   kind: HonourKind;
   onKind: (kind: HonourKind) => void;
   onBack: () => void;
@@ -32,7 +33,7 @@ export default function HonoursPage({ vm, kind, onKind, onBack, onPeriod, onPlac
           <button key={k.id} className={`${s.segBtn} ${kind === k.id ? s.segOn : ""}`} onClick={() => onKind(k.id)} aria-pressed={kind === k.id}>{k.label}</button>
         ))}
       </div>
-      {!vm ? <p className={s.empty}>Counting your finishes…</p> : (
+      {!vm ? <p className={s.empty}>{message ?? "Counting your finishes…"}</p> : (
         <>
           <section className={s.honCard}>
             <span className={s.honGlow} />

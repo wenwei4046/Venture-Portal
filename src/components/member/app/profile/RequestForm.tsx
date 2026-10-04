@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
 import { initials, rm2 } from "../format";
-import type { RequestKindVM } from "./profile-vm";
-import { claimAmount, nightsBetween, type ClaimRates } from "@/lib/member/claim-rules";
+import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
+import { claimAmount, nightsBetween } from "@/lib/member/claim-rules";
 import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
@@ -13,35 +13,7 @@ const CAT_AIR = "M3 11 12 4l9 7v9h-6v-6H9v6H3v-9Z";
 const CAMERA = "M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z";
 const CLOSE = "M6 6l12 12M18 6 6 18";
 
-/** A fair weekend a claim can be for — the brand the member worked and the booth it was at. */
-export interface ClaimWeek {
-  key: string;
-  n: string;
-  /** `Akemi week` — or `Brand week not picked`. */
-  brandWeek: string;
-  brand: string | null;
-  dates: string;
-  venue: string | null;
-  org: string | null;
-  /** The brand's colours: the badge, and the card when picked. */
-  color: string;
-  tint: string;
-}
-export interface FormOptions {
-  /** `Fair` — and `Klang Valley`, the base an outstation route starts from. */
-  subName: string;
-  weeks: ClaimWeek[];
-  rates: ClaimRates;
-  /** Replacement: the people the member may propose (their own team). */
-  members: { id: string; name: string }[];
-  /** Every Revenue sub-department: a transfer's receiver, a waiting list's preference. */
-  departments: { id: string; name: string; capacity: number | null; occupied: number }[];
-  departmentId: string;
-  /** The member's waiting-list requests that HR approved — a replacement may use one. */
-  waitingList: { id: string; name: string; sub: string; status: string; ok: boolean }[];
-  /** First choices, as the design preview shows them. Live: nothing is chosen for the member. */
-  initial?: { region?: string; member?: string; male?: number; female?: number; department?: string };
-}
+export type { ClaimWeek, FormOptions };
 export type SubmitOutcome = { ok: true; code: string } | { ok: false; error: string };
 
 const TEXT: Record<RequestKindVM, [string, string, string, string]> = {

@@ -31,8 +31,10 @@ export function PageHead({ back, title, period, lede, centered, onBack, onPeriod
 }
 
 /** My income (lines 887–924): the month's estimate, its breakdown, and the months before it. */
-export function IncomePage({ vm, hidden, onBack, onPeriod, onToggleHide, onOrders, onMonth }: {
+export function IncomePage({ vm, hidden, message, onBack, onPeriod, onToggleHide, onOrders, onMonth }: {
   vm: IncomeVM | null;
+  /** Said instead of "Working out…" when the month could not be read. */
+  message?: string | null;
   hidden: boolean;
   onBack: () => void;
   onPeriod: () => void;
@@ -43,7 +45,7 @@ export function IncomePage({ vm, hidden, onBack, onPeriod, onToggleHide, onOrder
   return (
     <div className={s.page}>
       <PageHead back="Profile" title="My income" period={vm?.periodLabel ?? ""} onBack={onBack} onPeriod={onPeriod} />
-      {!vm ? <p className={s.empty}>Working out your income…</p> : (
+      {!vm ? <p className={s.empty}>{message ?? "Working out your income…"}</p> : (
         <>
           <section className={s.incHero}>
             <div className={s.incHeroTop}>
@@ -93,8 +95,9 @@ export function IncomePage({ vm, hidden, onBack, onPeriod, onToggleHide, onOrder
 }
 
 /** Commission by order (lines 925–952): every bill and its commission, then the override from the team. */
-export function IncomeOrdersPage({ vm, tab, onTab, onBack, onPeriod, onRow }: {
+export function IncomeOrdersPage({ vm, tab, message, onTab, onBack, onPeriod, onRow }: {
   vm: IncomeOrdersVM | null;
+  message?: string | null;
   tab: "mine" | "override";
   onTab: (tab: "mine" | "override") => void;
   onBack: () => void;
@@ -105,7 +108,7 @@ export function IncomeOrdersPage({ vm, tab, onTab, onBack, onPeriod, onRow }: {
   return (
     <div className={`${s.page} ${s.pageTight}`}>
       <PageHead back="My income" title="Commission by order" period={vm?.periodLabel ?? ""} centered onBack={onBack} onPeriod={onPeriod} />
-      {!vm || !co ? <p className={s.empty}>Working out your commission…</p> : (
+      {!vm || !co ? <p className={s.empty}>{message ?? "Working out your commission…"}</p> : (
         <>
           <div className={s.seg}>
             {(["mine", "override"] as const).map(t => (
@@ -168,5 +171,23 @@ export function CommissionSheet({ open, vm, onClose }: { open: boolean; vm: CoSh
         </>
       )}
     </Sheet>
+  );
+}
+
+/** A Principal on a member's own page without anybody picked: the way into View as. */
+export function PickSomebody({ title, onBack, onViewAs }: { title: string; onBack: () => void; onViewAs: () => void }) {
+  return (
+    <div className={s.page}>
+      <PageHead back="Profile" title={title} onBack={onBack} />
+      <p className={s.note}>{title} is a member's own. Pick somebody in Revenue to see theirs, exactly as they do.</p>
+      <button className={s.vaEntryBtn} onClick={onViewAs}>
+        <span className={s.vaEntryIcon}><Svg d={ICON.viewing} size={20} sw={1.8} /></span>
+        <span className={s.vaEntryText}>
+          <span className={s.vaEntryTitle}>View as a team member</span>
+          <span className={s.vaEntrySub}>Pick anyone in Revenue · read-only</span>
+        </span>
+        <Svg d={ICON.chevronRight} size={16} sw={1.9} stroke="var(--rv-blush)" />
+      </button>
+    </div>
   );
 }

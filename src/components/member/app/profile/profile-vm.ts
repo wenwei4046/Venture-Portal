@@ -1,3 +1,5 @@
+import type { ClaimRates } from "@/lib/member/claim-rules";
+
 /**
  * What every Profile screen draws — strings and flags only, ready to render.
  * The live app builds these from the database (`profile-model.ts`); the design
@@ -242,4 +244,35 @@ export interface VaPersonVM {
 export interface VaGroupVM {
   title: string;
   people: VaPersonVM[];
+}
+
+// ── The request form ──
+/** A fair weekend a claim can be for — the brand the member worked and the booth it was at. */
+export interface ClaimWeek {
+  key: string;
+  n: string;
+  /** `Akemi week` — or `Brand week not picked`. */
+  brandWeek: string;
+  brand: string | null;
+  dates: string;
+  venue: string | null;
+  org: string | null;
+  /** The brand's colours: the badge, and the card when picked. */
+  color: string;
+  tint: string;
+}
+export interface FormOptions {
+  /** `Fair` — and `Klang Valley`, the base an outstation route starts from. */
+  subName: string;
+  weeks: ClaimWeek[];
+  rates: ClaimRates;
+  /** Replacement: the people the member may propose (their own team). */
+  members: { id: string; name: string }[];
+  /** Every Revenue sub-department: a transfer's receiver, a waiting list's preference. */
+  departments: { id: string; name: string; capacity: number | null; occupied: number }[];
+  departmentId: string;
+  /** The member's waiting-list requests that HR approved — a replacement may use one. */
+  waitingList: { id: string; name: string; sub: string; status: string; ok: boolean }[];
+  /** First choices, as the design preview shows them. Live: nothing is chosen for the member. */
+  initial?: { region?: string; member?: string; male?: number; female?: number; department?: string };
 }
