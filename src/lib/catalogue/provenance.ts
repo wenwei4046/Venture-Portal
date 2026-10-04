@@ -79,3 +79,26 @@ export function costProvenance(
     }
   }
 }
+
+const CHARGE_WORD: Record<string, string> = {
+  bedframe_divan_heights: 'divan',
+  bedframe_leg_heights: 'leg',
+  bedframe_gaps: 'gap',
+}
+
+/**
+ * `for divan 12" · leg 6"` — what a line's bed frame options were charged for
+ * (`cost_detail.charges`, 20261005010000): the customer's price for each,
+ * out of the margin and in the commission.
+ */
+export function chargeText(detail: unknown): string {
+  const charges = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as Detail).charges : null
+  const words = (Array.isArray(charges) ? charges : []).flatMap(c => {
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return []
+    const pool = text((c as Detail).pool)
+    const value = text((c as Detail).value)
+    const word = pool ? CHARGE_WORD[pool] : undefined
+    return word && value ? [`${word} ${value}`] : []
+  })
+  return words.length ? `for ${words.join(' · ')}` : 'for bed frame options'
+}

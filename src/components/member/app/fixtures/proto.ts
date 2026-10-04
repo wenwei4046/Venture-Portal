@@ -68,7 +68,7 @@ const memo = (id: string, time: string, title: string, sub: string) => ({
 });
 
 /** `quote`: the brand and the sheet the preview opens on (the prototype's `quoteBrand`, `sofaSheet` …). */
-export function protoFixture(quote: { brand?: string; sheet?: string } = {}): AppFixture {
+export function protoFixture(quote: { brand?: string; sheet?: string; charges?: boolean } = {}): AppFixture {
   return {
     insight: protoInsight(),
     arena: protoArena(),

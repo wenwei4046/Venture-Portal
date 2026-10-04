@@ -319,7 +319,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         brand: exhibitionBrandOf({ booth: meta?.booth ?? null, brandCode: o.brandCode }, brandMenu?.options ?? []),
         staffKey: o.staffId ?? o.agentName,
         amount: o.orderTotal,
-        commissionable: o.marginRevenue,
+        commissionable: o.commissionable,
       }
     }),
   )

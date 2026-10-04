@@ -1381,6 +1381,46 @@ nobody scores twice in a week. Penang 25–27 Sep: Akemi — JAMES SEOW 27,888 �
 24,188 … with LUCAS 6th, SALLY 7th and JAMES SEOW 8th there, no points
 (mig `20261003200000`; the ranking itself is `lib/member/arena-history.ts`).
 
+### 4.17 A bed frame's options — charged, not costed (2026-10-05)
+
+The user, deciding how the member Quote sells a bed frame (2026-10-04): its
+divan, leg and gap show ONE "FOC" choice plus the options that carry a charge —
+*"如果是 free、没有填任何价钱的话，那边就会变成 FOC。除非我有填特定的尺寸，比如 16 寸需要
+100 块，这样它就会出现 FOC 跟 16 寸"* — and that charge *"本身不会算进 margin 里面，而是算
+commission amount 来的 … 跟 KPI item 也不一样 … 只会给普通 commission"*. Total height
+*"不需要存在"*; specials stay as they were.
+
+- **What a charge is.** A bed frame's divan height, leg height or gap priced on
+  Product List › Maintenance above zero (the column reads *Charge (RM)* there;
+  0 or blank = FOC). It is the customer's price for the option, paid on top of
+  the selling price. A bed frame's specials, and a sofa's leg height and
+  specials, are still a COST surcharge (*Surcharge (RM)*). A total height and a
+  sofa's seat size carry no price at all (CHECKs on `catalogue_option_prices`).
+- **On a sales line.** `option_charge_amount` = qty × Σ the line's divan, leg and
+  gap charges, read from its `raw.variants` / `description2` like every option
+  (`catalogue_line_option_charge`), filled where the cost is: on every line that
+  lands and by Recost — a hand-costed line too, a charge being a price.
+- **In the money.** The bill's commissionable sales keep the charge — the rate is
+  paid on it like the rest of the bill, and the override climbs on it. Its
+  margin does not see it on either side: the margin revenue is main sales −
+  charges, and the cost never had the option in it. Never a KPI item.
+  RM 10,000 bill with a 6" leg at RM 100 and RM 6,000 of team cost: rate paid on
+  10,000; margin (9,900 − 6,000) ÷ 9,900 = 39.4%.
+- **On the Quote.** Each bed frame line carries its own build: FOC, or a charged
+  option the ERP lets that model take (`MemberCatalogueModel.charges`); one frame
+  built two ways is two lines. The keypad is the selling price; *Bed frame
+  options · not in margin + RM x* and *Customer pays* sit under the margin, like
+  KPI items. Modular no longer ticks a bed frame's divan / leg / gap.
+
+Readers that take it off the margin: the engine's `marginBase`,
+`revenue_month_orders` (`margin_revenue`; `commissionable` unchanged),
+`member_order_facts` (`goods_revenue`; `revenue` unchanged), the bill page.
+Comm Cal's *Commissionable value* card and the director incentive threshold read
+`commissionable`, never the margin revenue. On 2026-10-05 nothing carried a
+price, so every cost, margin and commission stayed what it was — Fair August
+RM 193,427.45 and September RM 160,629.60, person by person, before = after
+(mig `20261005010000`).
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total

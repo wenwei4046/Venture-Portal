@@ -3,10 +3,13 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parseLineFacts } from './facts'
 import {
+  CHARGED_POOLS,
   gridPrice,
   isPricedPool,
+  lineCharge,
   lineSurcharge,
   OptionPrices,
+  poolPriceOf,
   POOLS,
   priceGridOf,
   roundCents,
@@ -190,9 +193,23 @@ describe('unitPrice — catalogue_unit_price', () => {
   })
 })
 
-describe('isPricedPool / POOLS / TIERS', () => {
-  it('gaps and seat sizes carry no price; every other pool does', () => {
-    expect(POOLS.filter(p => !isPricedPool(p))).toEqual(['bedframe_gaps', 'sofa_sizes'])
+describe('isPricedPool / poolPriceOf / POOLS / TIERS', () => {
+  it('total heights and seat sizes carry no price; every other pool does', () => {
+    expect(POOLS.filter(p => !isPricedPool(p))).toEqual(['bedframe_total_heights', 'sofa_sizes'])
+  })
+
+  it('a bed frame’s divan, leg and gap are charged to the customer; specials and a sofa’s leg are a cost', () => {
+    expect(POOLS.map(p => [p, poolPriceOf(p)])).toEqual([
+      ['bedframe_divan_heights', 'charge'],
+      ['bedframe_total_heights', null],
+      ['bedframe_gaps', 'charge'],
+      ['bedframe_leg_heights', 'charge'],
+      ['bedframe_specials', 'cost'],
+      ['sofa_sizes', null],
+      ['sofa_leg_heights', 'cost'],
+      ['sofa_specials', 'cost'],
+    ])
+    expect([...CHARGED_POOLS]).toEqual(['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps'])
   })
 
   it('POOLS is exactly the pool list erp_maintenance_options allows', () => {
@@ -262,14 +279,11 @@ describe('OptionPrices — catalogue_option_price', () => {
 })
 
 describe('lineSurcharge — catalogue_line_surcharge', () => {
-  it('a bed frame: divan, leg and total height, then each special — in that order', () => {
+  it('a bed frame: its specials only — its divan, leg and total height are not a cost (2026-10-05)', () => {
     const facts = { divan: '10”', leg: 'NO LEG', total: '24"', specials: ['Right Drawer (10")', 'No Side Panel', 'Unknown'] }
     expect(lineSurcharge('BEDFRAME', facts, prices)).toEqual({
-      amount: 60,
+      amount: 10,
       parts: [
-        { pool: 'bedframe_divan_heights', value: '10”', price: 30 },
-        { pool: 'bedframe_leg_heights', value: 'NO LEG', price: 0 },
-        { pool: 'bedframe_total_heights', value: '24"', price: 20 },
         { pool: 'bedframe_specials', value: 'Right Drawer (10")', price: 50 },
         { pool: 'bedframe_specials', value: 'No Side Panel', price: -40 },
         // No portal price: it adds nothing, and says so.
@@ -290,22 +304,17 @@ describe('lineSurcharge — catalogue_line_surcharge', () => {
   })
 
   it('an option the line does not name is skipped, not reported', () => {
-    expect(lineSurcharge('bedframe', { divan: null, leg: '4"', total: null, specials: [] }, prices)).toEqual({
-      amount: 15,
-      parts: [{ pool: 'bedframe_leg_heights', value: '4"', price: 15 }],
+    expect(lineSurcharge('sofa', { divan: null, leg: null, total: null, specials: ['Nylon Fabric'] }, prices)).toEqual({
+      amount: 80,
+      parts: [{ pool: 'sofa_specials', value: 'Nylon Fabric', price: 80 }],
     })
   })
 
-  it('a gap never adds anything', () => {
+  it('a real bed-frame summary, end to end: nothing but its specials is a cost', () => {
     const facts = parseLineFacts('NB-04 / DIVAN 10" + LEG 4" / GAP 12" / T.Heights 24"')
-    const r = lineSurcharge('BEDFRAME', facts, prices)
-    expect(r.parts.map(p => p.pool)).toEqual(['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_total_heights'])
-    expect(r.amount).toBe(65)
-  })
-
-  it('a real bed-frame summary, end to end', () => {
-    const facts = parseLineFacts('PC151-01 / DIVAN 10" + NO LEG / GAP 14" / T.Heights 24"')
-    expect(lineSurcharge('BEDFRAME', facts, prices).amount).toBe(50)
+    expect(lineSurcharge('BEDFRAME', facts, prices)).toEqual({ amount: 0, parts: [] })
+    const withSpecial = parseLineFacts('PC151-01 / DIVAN 10" + NO LEG / GAP 14" / T.Heights 24" / SPECIAL: Right Drawer')
+    expect(lineSurcharge('BEDFRAME', withSpecial, prices).amount).toBe(50)
   })
 
   it('a surcharge can take money off', () => {
@@ -332,6 +341,43 @@ describe('lineSurcharge — catalogue_line_surcharge', () => {
     const r = lineSurcharge('SOFA', { divan: null, leg: null, total: null, specials: ['A', 'B'] }, tenths)
     expect(r.amount).toBeCloseTo(0.3, 10)
     expect(roundCents(r.amount)).toBe(0.3)
+  })
+})
+
+describe('lineCharge — catalogue_line_charge', () => {
+  /** The dry run's prices (20261005010000): leg 6" RM 100, divan 12" RM 50, gap 12" RM 20, gap 4" FOC. */
+  const charged = new OptionPrices([
+    { pool: 'bedframe_leg_heights', value: '6"', price: 100 },
+    { pool: 'bedframe_divan_heights', value: '12"', price: 50 },
+    { pool: 'bedframe_gaps', value: '12"', price: 20 },
+    { pool: 'bedframe_gaps', value: '4"', price: 0 },
+    { pool: 'bedframe_specials', value: 'Right Drawer', price: 50 },
+  ])
+
+  it('a bed frame: divan, leg and gap priced above zero, in that order', () => {
+    const facts = parseLineFacts('NB-04 / DIVAN 12" + LEG 6" / GAP 12" / T.Heights 30"')
+    expect(lineCharge('BEDFRAME', facts, charged)).toEqual({
+      amount: 170,
+      parts: [
+        { pool: 'bedframe_divan_heights', value: '12"', price: 50 },
+        { pool: 'bedframe_leg_heights', value: '6"', price: 100 },
+        { pool: 'bedframe_gaps', value: '12"', price: 20 },
+      ],
+    })
+  })
+
+  it('an option nobody priced, or priced at 0, is FOC — it is not listed', () => {
+    expect(lineCharge('BEDFRAME', { divan: '10"', leg: 'No Leg', gap: '4"' }, charged)).toEqual({ amount: 0, parts: [] })
+  })
+
+  it('looks the value up by its folded spelling, as the SQL does', () => {
+    expect(lineCharge('bedframe', { divan: null, leg: '6”', gap: null }, charged).amount).toBe(100)
+  })
+
+  it('a special is never a charge, and nothing but a bed frame is charged', () => {
+    expect(lineCharge('BEDFRAME', { ...parseLineFacts('PC / SPECIAL: Right Drawer'), divan: null, leg: null, gap: null }, charged).amount).toBe(0)
+    expect(lineCharge('SOFA', { divan: '12"', leg: '6"', gap: '12"' }, charged)).toEqual({ amount: 0, parts: [] })
+    expect(lineCharge(null, { divan: '12"', leg: '6"', gap: '12"' }, charged)).toEqual({ amount: 0, parts: [] })
   })
 })
 

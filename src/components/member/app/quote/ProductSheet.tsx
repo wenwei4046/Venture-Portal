@@ -1,10 +1,13 @@
 "use client";
 
-import { tierLabel } from "@/lib/member/catalog";
+import { bedframeKey, tierLabel } from "@/lib/member/catalog";
+import type { FrameChoices } from "@/lib/member/build";
+import type { BedframeBuild, OptionCharge } from "@/lib/member/types";
+import { valueKey } from "@/lib/catalogue/keys";
 import { ICON, Svg } from "../icons";
 import { rm } from "../format";
 import {
-  SIZES, accAt, accOrder, firstFrame, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
+  SIZES, accAt, accOrder, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
   type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey,
 } from "./quote-model";
 import s from "./quote.module.css";
@@ -175,6 +178,10 @@ function FrameSections({ fv, catalog, memory, brandName, hasKpi, onPatch, onRece
   const frame = catalog.frames.find(f => f.key === fv.frame && f.sizes[fv.size]);
   const onSize = (size: SizeKey) => onPatch({ size, frame: catalog.frames.some(f => f.key === fv.frame && f.sizes[size]) ? fv.frame : firstFrame(catalog, size) });
   const kpiTotal = catalog.kpis.filter(k => fv.kpi.includes(k.key)).reduce((n, k) => n + k.price, 0);
+  // The frame's own divan, leg and gap (FOC or charged) and specials, numbered after the model.
+  const build = frame ? frameBuildFor(frame.choices, fv.build) : undefined;
+  const optionRows = frame ? frameOptionRows(frame.choices) : [];
+  const kpiNo = 3 + optionRows.length + (frame && frame.choices.specials.length ? 1 : 0);
   return (
     <>
       {recent.length > 0 && (
@@ -182,7 +189,7 @@ function FrameSections({ fv, catalog, memory, brandName, hasKpi, onPatch, onRece
           <p className={s.capsHead}>LAST USED · TAP USE, THEN SET THE QUANTITY BELOW</p>
           <div className={s.recentOpts}>
             {recent.map((r, i) => (
-              <RecentOpt key={i} label={frameMeta(r, catalog)} on={r.size === fv.size && r.frame === fv.frame && r.kpi.join() === fv.kpi.join()} onUse={() => onRecent(r)} />
+              <RecentOpt key={i} label={frameMeta(r, catalog)} on={r.size === fv.size && r.frame === fv.frame && r.kpi.join() === fv.kpi.join() && bedframeKey(r.build) === bedframeKey(fv.build)} onUse={() => onRecent(r)} />
             ))}
           </div>
         </div>
@@ -200,9 +207,10 @@ function FrameSections({ fv, catalog, memory, brandName, hasKpi, onPatch, onRece
           </button>
         </div>
       </div>
+      {frame && <FrameOptions rows={optionRows} specials={frame.choices.specials} build={build} start={3} onBuild={next => onPatch({ build: next })} />}
       {hasKpi && (
         <div>
-          <div className={s.rowHead}><p className={s.rowHeadTitle}>3 · KPI items</p><span className={s.rowHeadCap}>Fixed price · not in margin</span></div>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{kpiNo} · KPI items</p><span className={s.rowHeadCap}>Fixed price · not in margin</span></div>
           {catalog.kpis.map(k => {
             const on = fv.kpi.includes(k.key);
             return (
@@ -216,6 +224,80 @@ function FrameSections({ fv, catalog, memory, brandName, hasKpi, onPatch, onRece
           <p className={s.kpiNote}>{fv.kpi.length
             ? `${fv.kpi.length} ticked · ${rm(kpiTotal)} is added on top of your selling price and does not change the margin.`
             : "KPI items are added on top of your selling price and do not change the margin."}</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+type OptionRow = { key: "divan" | "leg" | "gap"; title: string; list: OptionCharge[] };
+
+/** The divan, leg and gap a frame may be CHARGED for — a row only where Maintenance charges something. */
+function frameOptionRows(c: FrameChoices): OptionRow[] {
+  const rows: OptionRow[] = [
+    { key: "divan", title: "Divan height", list: c.divans },
+    { key: "leg", title: "Leg height", list: c.legs },
+    { key: "gap", title: "Gap", list: c.gaps },
+  ];
+  return rows.filter(r => r.list.length > 0);
+}
+
+/**
+ * A bed frame's divan, leg and gap — FOC, or an option charged on top of the
+ * price, out of the margin — and its specials (user 2026-10-04: "only show a
+ * FOC 1 option and other with charges option").
+ */
+function FrameOptions({ rows, specials, build, start, onBuild }: {
+  rows: OptionRow[];
+  specials: string[];
+  build: BedframeBuild | undefined;
+  start: number;
+  onBuild: (build: BedframeBuild | undefined) => void;
+}) {
+  const write = (next: BedframeBuild) => onBuild(Object.keys(next).length ? next : undefined);
+  const set = (key: OptionRow["key"], value: string | undefined) => {
+    const next: BedframeBuild = { ...(build ?? {}) };
+    if (value) next[key] = value;
+    else delete next[key];
+    write(next);
+  };
+  const picked = build?.specials ?? [];
+  const toggle = (sp: string) => {
+    const on = picked.some(x => valueKey(x) === valueKey(sp));
+    const list = on ? picked.filter(x => valueKey(x) !== valueKey(sp)) : [...picked, sp];
+    const next: BedframeBuild = { ...(build ?? {}) };
+    if (list.length) next.specials = list;
+    else delete next.specials;
+    write(next);
+  };
+  let n = start - 1;
+  return (
+    <>
+      {rows.map(r => (
+        <div key={r.key}>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · {r.title}</p><span className={s.rowHeadCap}>Charged on top · not in margin</span></div>
+          <div className={s.chips} style={{ marginTop: 6 }}>
+            <button className={`${s.chip} ${!build?.[r.key] ? s.chipOn : ""}`} onClick={() => set(r.key, undefined)}>
+              <span className={s.chipLabel}>FOC</span><span className={s.chipSub}>Free of charge</span>
+            </button>
+            {r.list.map(o => (
+              <button key={o.value} className={`${s.chip} ${valueKey(build?.[r.key]) === valueKey(o.value) ? s.chipOn : ""}`} onClick={() => set(r.key, o.value)}>
+                <span className={s.chipLabel}>{o.value}</span><span className={s.chipSub}>+ {rm(o.charge)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      {specials.length > 0 && (
+        <div>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>Optional</span></div>
+          <div className={s.chips} style={{ marginTop: 6 }}>
+            {specials.map(sp => (
+              <button key={sp} className={`${s.chip} ${picked.some(x => valueKey(x) === valueKey(sp)) ? s.chipOn : ""}`} onClick={() => toggle(sp)}>
+                <span className={s.chipLabel}>{sp}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </>
@@ -269,11 +351,12 @@ function BedFrames({ bfs, catalog, onAdd, onEdit, onRemove }: {
           {bfs.map((b, i) => {
             const frame = catalog.frames.find(f => f.key === b.frame);
             const kpi = catalog.kpis.length ? [b.kpi.length ? `${b.kpi.length} KPI item${b.kpi.length > 1 ? "s" : ""}` : "No KPI items"] : [];
+            const opts = frame ? frameBuildMeta(frame.choices, frameBuildFor(frame.choices, b.build)) : "";
             return (
               <div key={i} className={s.bfRow}>
                 <button className={s.bfMain} onClick={() => onEdit(i)}>
                   <span className={s.bfName}>{frame?.name ?? "Bed frame"}</span>
-                  <span className={s.bfMeta}>{[sizeLabel(b.size), ...kpi, `×${b.qty}`].join(" · ")}</span>
+                  <span className={s.bfMeta}>{[sizeLabel(b.size), ...(opts ? [opts] : []), ...kpi, `×${b.qty}`].join(" · ")}</span>
                 </button>
                 <button className={s.bfEdit} onClick={() => onEdit(i)}>Edit</button>
                 <button className={s.bfX} aria-label="Remove bed frame" onClick={() => onRemove(i)}><Svg d={X} size={16} sw={2} /></button>

@@ -168,14 +168,14 @@ export function useQuote(args: UseQuoteArgs) {
     ? { ...s, fx: { ...s.bfs[i], kpi: [...s.bfs[i].kpi], drop: false, idx: i } } : s)), []);
   const removeBf = useCallback((i: number) => setSheet(s => (s?.mode === "model" ? { ...s, bfs: s.bfs.filter((_, j) => j !== i) } : s)), []);
   const backToMattress = useCallback(() => setSheet(s => (s?.mode === "model" ? { ...s, fx: null } : s)), []);
-  const applyFrame = useCallback((r: RecentFrame) => patchFrame({ size: r.size, frame: r.frame, kpi: [...r.kpi], drop: false }), [patchFrame]);
+  const applyFrame = useCallback((r: RecentFrame) => patchFrame({ size: r.size, frame: r.frame, kpi: [...r.kpi], build: r.build ? { ...r.build } : undefined, drop: false }), [patchFrame]);
 
   const addSheet = useCallback(() => {
     if (readOnly || !sheet || !catalog) return;
     if (sheet.mode === "model" && sheet.fx) {
       const fx = sheet.fx;
       if (!fx.frame) return;
-      const pick: BfPick = { size: fx.size, frame: fx.frame, kpi: [...fx.kpi], qty: fx.qty };
+      const pick: BfPick = { size: fx.size, frame: fx.frame, kpi: [...fx.kpi], qty: fx.qty, ...(fx.build ? { build: { ...fx.build } } : {}) };
       setSheet({ ...sheet, bfs: fx.idx >= 0 ? sheet.bfs.map((b, j) => (j === fx.idx ? pick : b)) : [...sheet.bfs, pick], fx: null });
       return;
     }
@@ -222,12 +222,18 @@ export function useQuote(args: UseQuoteArgs) {
   const brandBands = useMemo(() => bands.filter(b => b.brand === brand), [bands, brand]);
   const kpiLines = cart.filter(l => l.kind === "kpi");
   const kpiAmount = kpiLines.reduce((a, l) => a + (catalog?.kpis.find(k => k.key === l.key)?.price ?? 0) * l.qty, 0);
+  // The bed frames' charged divan, leg and gap (2026-10-05): the server's figure
+  // for the cart on screen, else the catalogue's own — the same charges.
+  const optionCharge = answer && answer.key === inputKey && answer.result?.optionCharge !== undefined
+    ? answer.result.optionCharge
+    : cart.reduce((a, l) => a + (l.charge ?? 0) * l.qty, 0);
   const vm: CalcVM = useMemo(() => calcVM({
     price, items, bands: brandBands, fee,
     result: answer && input ? answer.result : null,
     error: answer && input ? answer.error : null,
     kpi: { qty: kpiLines.reduce((a, l) => a + l.qty, 0), amount: kpiAmount },
-  }), [price, items, brandBands, fee, answer, input, kpiLines, kpiAmount]);
+    options: optionCharge,
+  }), [price, items, brandBands, fee, answer, input, kpiLines, kpiAmount, optionCharge]);
   /** The customer's quote, once the price on screen has been confirmed by the calculator. */
   const confirmed = answer && answer.key === inputKey && answer.result?.valid ? answer.result : null;
   const applyNext = useCallback(() => { if (vm.next) setPrice(vm.next.value.toFixed(2)); }, [vm.next]);

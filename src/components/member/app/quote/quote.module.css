@@ -196,6 +196,8 @@
 .chipOff { opacity: .4; }
 .chipLabel { font-size: 15px; font-weight: 650; color: var(--rv-ink); }
 .chipOn .chipLabel { color: var(--rv-accent); }
+.chipSub { font-size: 12px; color: var(--rv-sub); font-variant-numeric: tabular-nums; }
+.chipOn .chipSub { color: var(--rv-accent); }
 .recentOpts { display: flex; flex-direction: column; gap: 8px; }
 .ropt { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 6px 6px 12px; border-radius: 14px; border: 1px solid var(--rv-line); background: var(--rv-white); box-sizing: border-box; }
 .roptOn { border-color: var(--rv-accent); background: var(--rv-cream); }

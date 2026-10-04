@@ -182,6 +182,8 @@ export interface SalesLineRow {
   line_amount: Num
   brand_code: string | null
   cost_amount: Num
+  /** What its bed frame's divan, leg and gap were charged (2026-10-05). Absent in older fixtures. */
+  option_charge_amount?: Num
   /** The ERP's option summary and structured variants — where specials are read. */
   description2?: string | null
   variants?: unknown
@@ -404,6 +406,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         lineAmount: num(l.line_amount),
         brandCode: l.brand_code ?? undefined,
         costAmount: numOrNull(l.cost_amount) ?? undefined,
+        // Only when there is one: a line without a charge reads exactly as it always has.
+        ...(numOrNull(l.option_charge_amount) ? { optionCharge: numOrNull(l.option_charge_amount)! } : {}),
         ...lineSpecials(l),
       })),
     }))

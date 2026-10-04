@@ -435,7 +435,9 @@ export async function calculateMemberQuote(
       throw new Error(
         "Select products first. A quote can contain up to 30 product lines.",
       );
-    const lineKeys = input.lines.map((line) => {
+    // Each line as the calculator may read it: its own bed frame build (2026-10-05)
+    // checked for shape, anything else on the line dropped.
+    const lines: QuoteInput["lines"] = input.lines.map((line) => {
       uuid(line?.productId, "product");
       if (
         !Number.isInteger(line.quantity) ||
@@ -444,8 +446,10 @@ export async function calculateMemberQuote(
         typeof line.gift !== "boolean"
       )
         throw new Error("The product quantity is invalid.");
-      return quoteLineKey(line);
+      const bedframe = bedframeBuild(line.bedframe);
+      return { productId: line.productId, quantity: line.quantity, gift: line.gift, ...(bedframe ? { bedframe } : {}) };
     });
+    const lineKeys = lines.map((line) => quoteLineKey(line));
     if (new Set(lineKeys).size !== lineKeys.length)
       throw new Error(
         "Combine quantities of the same product and gift status in one cart line.",
@@ -520,7 +524,7 @@ export async function calculateMemberQuote(
       throw new Error(
         "A free gift size does not match a product in this cart. Please select a matching size.",
       );
-    const checked: QuoteInput = { ...input, build };
+    const checked: QuoteInput = { ...input, lines, build };
     const result = calculateQuote(
       checked,
       products,
@@ -578,24 +582,42 @@ function quoteBuild(raw: unknown): QuoteInput["build"] {
   if (leg) build.leg = leg;
   const specials = options(b.specials, "sofa specials");
   if (specials) build.specials = specials;
-  if (b.bedframe !== undefined && b.bedframe !== null) {
-    if (typeof b.bedframe !== "object" || Array.isArray(b.bedframe))
-      throw new Error("The bed frame build is invalid.");
-    const f = b.bedframe as Record<string, unknown>;
-    const frame: BedframeBuild = {};
-    const divan = option(f.divan, "divan height");
-    const frameLeg = option(f.leg, "bed frame leg height");
-    const total = option(f.total, "total height");
-    const gap = option(f.gap, "gap");
-    const frameSpecials = options(f.specials, "bed frame specials");
-    if (divan) frame.divan = divan;
-    if (frameLeg) frame.leg = frameLeg;
-    if (total) frame.total = total;
-    if (gap) frame.gap = gap;
-    if (frameSpecials) frame.specials = frameSpecials;
-    if (Object.keys(frame).length) build.bedframe = frame;
-  }
+  const frame = bedframeBuild(b.bedframe);
+  if (frame) build.bedframe = frame;
   return build;
+}
+
+const unsafeText = (s: string) =>
+  [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127 || ch === "<" || ch === ">");
+
+/**
+ * A bed frame build, validated for SHAPE — the cart's (legacy) or one line's
+ * own (2026-10-05). Whether its options are ones the model offers is the
+ * calculator's check. Empty = no build.
+ */
+function bedframeBuild(raw: unknown): BedframeBuild | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new Error("The bed frame build is invalid.");
+  const option = (value: unknown, label: string): string | undefined => {
+    if (value === undefined || value === null || value === "") return undefined;
+    if (typeof value !== "string" || value.length > 80 || unsafeText(value)) throw new Error(`The ${label} is invalid.`);
+    return value;
+  };
+  const f = raw as Record<string, unknown>;
+  const frame: BedframeBuild = {};
+  const divan = option(f.divan, "divan height");
+  const leg = option(f.leg, "bed frame leg height");
+  const total = option(f.total, "total height");
+  const gap = option(f.gap, "gap");
+  if (f.specials !== undefined && f.specials !== null && (!Array.isArray(f.specials) || f.specials.length > 20))
+    throw new Error("The bed frame specials are invalid.");
+  const specials = [...new Set(((f.specials as unknown[] | undefined) ?? []).map((v) => option(v, "bed frame special")).filter((v): v is string => !!v))];
+  if (divan) frame.divan = divan;
+  if (leg) frame.leg = leg;
+  if (total) frame.total = total;
+  if (gap) frame.gap = gap;
+  if (specials.length) frame.specials = specials;
+  return Object.keys(frame).length ? frame : undefined;
 }
 
 interface VerifiedInvoice {

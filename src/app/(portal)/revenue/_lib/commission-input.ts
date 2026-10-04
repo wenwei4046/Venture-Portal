@@ -96,7 +96,7 @@ export interface CommissionInputOptions {
    * card. Absent, they are read here when a director's incentive needs them,
    * so the close the server recomputes judges the same figure.
    */
-  monthOrders?: readonly { cancelled: boolean; marginRevenue: number }[]
+  monthOrders?: readonly { cancelled: boolean; commissionable: number }[]
 }
 
 /**
@@ -267,7 +267,7 @@ export async function loadCommissionInput(
   const [lines, openBillTags, shares, priorRuns] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
-        .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, description2, variants:raw->variants')
+        .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
         .in('order_id', chunk).order('id').range(from, to)),
     readByKeys<OpenBillTagRow>('Open Bill picks', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank')

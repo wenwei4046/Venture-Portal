@@ -27,9 +27,12 @@ export function ordinalSuffix(n: number): string {
   return ["th", "st", "nd", "rd"][n % 10] ?? "th";
 }
 
-/** `JT` for Jia Hui Tan — the first letters of the first two words. */
+/** `JT` for Jia Hui Tan — the first word's letter and the last's, as the prototype writes them; `PR` for one word. */
 export function initials(name: string): string {
-  return name.trim().split(/\s+/).map(word => word[0] ?? "").slice(0, 2).join("").toUpperCase();
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
 /** `Jia Hui` for Jia Hui Tan — the first two words (the prototype's `first`). */

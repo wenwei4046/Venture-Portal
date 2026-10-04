@@ -17,7 +17,7 @@ import {
   skuKeyOf,
   skuOptionLabel,
 } from './options'
-import { isPricedPool, POOLS } from './pricing'
+import { isPricedPool, poolPriceOf, POOLS } from './pricing'
 
 /**
  * calcCategoryOf and defaultGift are the twins of catalogue_calc_category and
@@ -53,11 +53,12 @@ describe('optionKeysOf', () => {
     ])
   })
 
-  it('a bed frame offers divan, leg and total heights, gaps and specials — its sizes are SKUs', () => {
-    const keys = optionKeysOf('BEDFRAME')
-    expect(keys.map(k => k.key).sort()).toEqual(['divan_heights', 'gaps', 'leg_heights', 'specials', 'total_heights'])
-    expect(keys.find(k => k.key === 'gaps')).toEqual({ key: 'gaps', pool: 'bedframe_gaps', label: 'Gap', priced: false })
-    expect(keys.find(k => k.key === 'divan_heights')?.pool).toBe('bedframe_divan_heights')
+  // 2026-10-05: its divan, leg and gap are offered by what Maintenance charges,
+  // not by a tick, and its total height is offered nowhere.
+  it('a bed frame ticks its specials only — its sizes are SKUs', () => {
+    expect(optionKeysOf('BEDFRAME')).toEqual([
+      { key: 'specials', pool: 'bedframe_specials', label: 'Specials', priced: true },
+    ])
   })
 
   it('is case-insensitive on the category', () => {
@@ -90,12 +91,6 @@ describe('optionKeysOf', () => {
     expect(Object.keys(saved.model.enabled).sort()).toEqual(Object.keys(enabled).sort())
   })
 
-  // Its doc says "in the ERP's own order". The ERP's Modular tab
-  // (ProductModelDetail.tsx) and MAINTENANCE_SECTIONS both list a bed frame's
-  // pools divan, total, gaps, leg, specials; optionKeysOf puts leg second.
-  it('lists a bed frame’s pools in the ERP’s Modular order', () => {
-    expect(optionKeysOf('BEDFRAME').map(k => k.key)).toEqual(['divan_heights', 'total_heights', 'gaps', 'leg_heights', 'specials'])
-  })
 })
 
 describe('MAINTENANCE_SECTIONS', () => {
@@ -112,8 +107,11 @@ describe('MAINTENANCE_SECTIONS', () => {
     expect([...pools].sort()).toEqual([...POOLS].sort())
   })
 
-  it('marks priced exactly where isPricedPool does', () => {
-    for (const p of MAINTENANCE_SECTIONS.flatMap(s => s.pools)) expect(p.priced).toBe(isPricedPool(p.pool))
+  it('marks priced exactly where isPricedPool does, and a charge exactly where poolPriceOf says so', () => {
+    for (const p of MAINTENANCE_SECTIONS.flatMap(s => s.pools)) {
+      expect(p.priced).toBe(isPricedPool(p.pool))
+      expect(p.charge).toBe(poolPriceOf(p.pool) === 'charge')
+    }
   })
 })
 

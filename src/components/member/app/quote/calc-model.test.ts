@@ -80,8 +80,20 @@ describe("step 2's card", () => {
   });
 
   it("adds KPI items on top of the price", () => {
-    expect(calcVM({ price: "1000", items: 3, bands: BANDS, result: result(40), error: null, kpi: { qty: 2, amount: 500 }, fee: "50" }).kpi)
-      .toEqual({ label: "2 KPI items", total: "RM 500", pay: "RM 1,550" });
+    const vm = calcVM({ price: "1000", items: 3, bands: BANDS, result: result(40), error: null, kpi: { qty: 2, amount: 500 }, fee: "50" });
+    expect(vm.kpi).toEqual({ label: "2 KPI items", total: "RM 500" });
+    expect(vm.options).toBeNull();
+    expect(vm.pay).toBe("RM 1,550");
+  });
+
+  // 2026-10-05: a bed frame's charged divan, leg and gap ride on top too.
+  it("adds the bed frames' option charges on top of the price, with the KPI items", () => {
+    const vm = calcVM({ price: "1000", items: 3, bands: BANDS, result: result(40), error: null, kpi: { qty: 2, amount: 500 }, options: 120, fee: "50" });
+    expect(vm.options).toEqual({ total: "RM 120" });
+    expect(vm.pay).toBe("RM 1,670");
+    const plain = calcVM({ price: "1000", items: 1, bands: BANDS, result: result(40), error: null, options: 0 });
+    expect(plain.options).toBeNull();
+    expect(plain.pay).toBeNull();
   });
 
   it("names the cost basis", () => {
@@ -104,5 +116,19 @@ describe("the preview's calculator", () => {
     expect(r.ok && r.data.margin?.toFixed(1)).toBe("34.6");
     expect(r.ok && r.data.nextPrice).toBe(5596.88);
     expect(r.ok && r.data.nextThreshold).toBe(36);
+  });
+});
+
+// 2026-10-05: one bed frame built two ways is two lines for the server.
+describe("quoteInput — a bed frame's own build", () => {
+  const line = (id: string, qty: number, bedframe?: { leg?: string }): CartLine =>
+    ({ id, kind: "frame", key: "m-cody", name: "CODY", size: "King", qty, productId: "cody-k", ...(bedframe ? { bedframe, charge: 100 } : {}) });
+
+  it("sends each build of one SKU as its own line, and merges the same build", () => {
+    const input = quoteInput("fair", [line("a", 1), line("b", 2, { leg: '6"' }), line("c", 1, { leg: '6"' })], "4000", "", { height: null, tier: null });
+    expect(input?.lines).toEqual([
+      { productId: "cody-k", quantity: 1, gift: false },
+      { productId: "cody-k", quantity: 3, gift: false, bedframe: { leg: '6"' } },
+    ]);
   });
 });

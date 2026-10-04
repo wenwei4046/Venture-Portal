@@ -4,9 +4,9 @@ import { checkDirectorPay, directorIncentiveEarned, monthCommissionableValue, ne
 describe('the month figure the incentive is judged on', () => {
   it('is Comm Cal’s Commissionable value card: every live bill, cancelled ones out', () => {
     expect(monthCommissionableValue([
-      { cancelled: false, marginRevenue: 1_000.005 },
-      { cancelled: false, marginRevenue: 2_500 },
-      { cancelled: true, marginRevenue: 99_999 },
+      { cancelled: false, commissionable: 1_000.005 },
+      { cancelled: false, commissionable: 2_500 },
+      { cancelled: true, commissionable: 99_999 },
     ])).toBe(3_500.01)
     expect(monthCommissionableValue([])).toBe(0)
   })

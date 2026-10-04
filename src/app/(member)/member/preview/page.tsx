@@ -45,6 +45,8 @@ export default async function MemberPreview({
     app?: string;
     brand?: string;
     sheet?: string;
+    /** `1`: the fixture's bed frames carry charged options (2026-10-05). */
+    charges?: string;
   }>;
 }) {
   if (process.env.NODE_ENV !== "development") {
@@ -57,7 +59,7 @@ export default async function MemberPreview({
   if (params.app === "proto") {
     const device = params.device === "android" || params.device === "desktop" ? params.device : "ios";
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
-    return <RevenueApp initialData={protoData()} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet })} />;
+    return <RevenueApp initialData={protoData()} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1" })} />;
   }
   if (params.design === "live") {
     const preview = memberDemo();

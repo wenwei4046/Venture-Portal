@@ -43,6 +43,7 @@ function scaleLine(line: SalesLine, pct: number): SalesLine {
     qty: line.qty * pct,
     lineAmount: round2(line.lineAmount * pct),
     costAmount: line.costAmount === undefined ? undefined : round2(line.costAmount * pct),
+    optionCharge: line.optionCharge === undefined ? undefined : round2(line.optionCharge * pct),
   }
 }
 
@@ -56,6 +57,8 @@ function remainderLine(line: SalesLine, parts: SalesLine[]): SalesLine {
     lineAmount: round2(line.lineAmount - sum(l => l.lineAmount)),
     costAmount:
       line.costAmount === undefined ? undefined : round2(line.costAmount - sum(l => l.costAmount)),
+    optionCharge:
+      line.optionCharge === undefined ? undefined : round2(line.optionCharge - sum(l => l.optionCharge)),
   }
 }
 

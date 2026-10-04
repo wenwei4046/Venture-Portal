@@ -244,8 +244,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   // ── Quote: one brand's catalogue, the cart, and the calculator ──
   const catalogs = useMemo<Record<string, QCatalog>>(() => {
     if (fixture?.quote) return fixture.quote.catalogs;
-    return Object.fromEntries(brands.map(b => [b.code, catalogFromProducts(data.products, b.code, b.name)]));
-  }, [fixture, brands, data.products]);
+    return Object.fromEntries(brands.map(b => [b.code, catalogFromProducts(data.products, b.code, b.name, [], data.catalogueModels ?? [])]));
+  }, [fixture, brands, data.products, data.catalogueModels]);
   const quoteCalc = useCallback((input: QuoteInput) => {
     const fx = fixture?.quote;
     if (!fx) return source.quote(input);

@@ -45,36 +45,41 @@ export function optionKeysOf(category: string | null): OptionKey[] {
       { key: 'specials', pool: 'sofa_specials', label: 'Specials', priced: true },
     ]
   }
+  // A bed frame's divan, leg and gap are no longer ticked here (2026-10-05):
+  // the Quote offers FOC and every one of them Maintenance CHARGES that the
+  // ERP lets the model take (`MemberCatalogueModel.charges`), and its total
+  // height is offered nowhere. Its specials still are ticked, and costed.
   if (c === 'BEDFRAME') {
     return [
-      { key: 'divan_heights', pool: 'bedframe_divan_heights', label: 'Divan height', priced: true },
-      { key: 'total_heights', pool: 'bedframe_total_heights', label: 'Total height', priced: true },
-      { key: 'gaps', pool: 'bedframe_gaps', label: 'Gap', priced: false },
-      { key: 'leg_heights', pool: 'bedframe_leg_heights', label: 'Leg height', priced: true },
       { key: 'specials', pool: 'bedframe_specials', label: 'Specials', priced: true },
     ]
   }
   return []
 }
 
-/** The Maintenance tab's rail, as the ERP draws it (the Products Maintenance pools are not mirrored). */
-export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: Array<{ pool: string; label: string; priced: boolean }> }> = [
+/**
+ * The Maintenance tab's rail, as the ERP draws it (the Products Maintenance
+ * pools are not mirrored). `charge`: the price is the customer's, out of the
+ * margin (a bed frame's divan, leg and gap); otherwise a priced pool's price
+ * is a cost surcharge.
+ */
+export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: Array<{ pool: string; label: string; priced: boolean; charge: boolean }> }> = [
   {
     section: 'Bedframe',
     pools: [
-      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true },
-      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true },
-      { pool: 'bedframe_gaps', label: 'Gaps', priced: false },
-      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true },
-      { pool: 'bedframe_specials', label: 'Specials', priced: true },
+      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true, charge: true },
+      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: false, charge: false },
+      { pool: 'bedframe_gaps', label: 'Gaps', priced: true, charge: true },
+      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true, charge: true },
+      { pool: 'bedframe_specials', label: 'Specials', priced: true, charge: false },
     ],
   },
   {
     section: 'Sofa',
     pools: [
-      { pool: 'sofa_sizes', label: 'Sizes', priced: false },
-      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true },
-      { pool: 'sofa_specials', label: 'Specials', priced: true },
+      { pool: 'sofa_sizes', label: 'Sizes', priced: false, charge: false },
+      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true, charge: false },
+      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: false },
     ],
   },
 ]

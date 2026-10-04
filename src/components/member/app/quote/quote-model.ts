@@ -1,6 +1,7 @@
-import type { MemberProduct } from "@/lib/member/types";
-import { categoryKey, compareHeights } from "@/lib/member/catalog";
-import { kindOf } from "@/lib/member/build";
+import type { BedframeBuild, MemberCatalogueModel, MemberProduct } from "@/lib/member/types";
+import { bedframeKey, categoryKey, compareHeights } from "@/lib/member/catalog";
+import { chargeIn, frameBuildText, frameChoicesOf, frameCharge, kindOf, type FrameChoices } from "@/lib/member/build";
+import { valueKey } from "@/lib/catalogue/keys";
 
 /**
  * Quote — the prototype's step 1 (Products) as data: a brand's catalogue, the
@@ -64,6 +65,47 @@ export interface QFrame {
   key: string;
   name: string;
   sizes: Partial<Record<SizeKey, string>>;
+  /**
+   * What it may be built with (user 2026-10-04): FOC or a divan, leg and gap
+   * Maintenance charges; the specials Modular ticked. Nothing = always FOC.
+   */
+  choices: FrameChoices;
+}
+
+const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], specials: [] };
+
+/** A frame build with only what this frame still offers; undefined = all FOC, no specials. */
+export function frameBuildFor(choices: FrameChoices, build: BedframeBuild | undefined): BedframeBuild | undefined {
+  if (!build) return undefined;
+  const keep = (v: string | undefined, list: { value: string }[]) =>
+    v && list.some(o => valueKey(o.value) === valueKey(v)) ? v : undefined;
+  const out: BedframeBuild = {};
+  const divan = keep(build.divan, choices.divans);
+  const leg = keep(build.leg, choices.legs);
+  const gap = keep(build.gap, choices.gaps);
+  const specials = (build.specials ?? []).filter(sp => choices.specials.some(c => valueKey(c) === valueKey(sp)));
+  if (divan) out.divan = divan;
+  if (leg) out.leg = leg;
+  if (gap) out.gap = gap;
+  if (specials.length) out.specials = specials;
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** `leg 6″ +RM 100 · gap 12″ +RM 20` — a frame build as a line says it, charges beside. */
+export function frameBuildMeta(choices: FrameChoices, build: BedframeBuild | undefined): string {
+  if (!build) return "";
+  const priced = (word: string, v: string | undefined, list: FrameChoices["divans"]) => (v ? `${word} ${v} +${rmShort(chargeIn(list, v))}` : null);
+  return [
+    priced("divan", build.divan, choices.divans),
+    priced("leg", build.leg, choices.legs),
+    priced("gap", build.gap, choices.gaps),
+    ...(build.specials ?? []),
+  ].filter(Boolean).join(" · ");
+}
+
+/** `RM 100` / `RM 99.50` — a charge, without needless decimals. */
+function rmShort(n: number): string {
+  return `RM ${Number.isInteger(n) ? n.toLocaleString("en-MY") : n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export interface QAcc {
@@ -108,6 +150,10 @@ export interface CartLine {
   size: string;
   qty: number;
   productId: string;
+  /** A bed frame's own build (2026-10-05): its charged divan / leg / gap and its specials. */
+  bedframe?: BedframeBuild;
+  /** What that build is charged per unit, RM — on top of the price, out of the margin. */
+  charge?: number;
 }
 
 /** One line can hold up to 100 units — the server's limit per product. */
@@ -190,7 +236,15 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
  * and follow the mattress or sofa's margin (user 2026-09-12). A rider marked
  * with ANOTHER brand stays out: a quote is one brand's.
  */
-export function catalogFromProducts(products: MemberProduct[], brand: string, name: string, kpis: QKpi[] = []): QCatalog {
+export function catalogFromProducts(
+  products: MemberProduct[],
+  brand: string,
+  name: string,
+  kpis: QKpi[] = [],
+  /** Each model's options (the snapshot's `catalogueModels`): a bed frame's charges and specials. */
+  catalogueModels: readonly MemberCatalogueModel[] = [],
+): QCatalog {
+  const modelsById = new Map(catalogueModels.map(m => [m.id, m]));
   const live = products.filter(p => p.available && (p.brand === brand || !p.brand));
   const models = new Map<string, QModel>();
   const frames = new Map<string, QFrame>();
@@ -218,7 +272,10 @@ export function catalogFromProducts(products: MemberProduct[], brand: string, na
       models.set(key, model);
     } else if (kind === "BEDFRAME") {
       const key = p.modelId ?? p.name;
-      const frame = frames.get(key) ?? { key, name: p.name, sizes: {} };
+      const frame = frames.get(key) ?? {
+        key, name: p.name, sizes: {},
+        choices: p.modelId ? frameChoicesOf(modelsById.get(p.modelId)) : NO_CHOICES,
+      };
       if (size && !frame.sizes[size]) frame.sizes[size] = p.id;
       frames.set(key, frame);
     } else {
@@ -272,6 +329,8 @@ export interface BfPick {
   frame: string;
   kpi: string[];
   qty: number;
+  /** Its divan, leg and gap — absent = FOC — and its specials (2026-10-05). */
+  build?: BedframeBuild;
 }
 
 export interface FrameEdit extends BfPick {
@@ -283,7 +342,7 @@ export interface FrameEdit extends BfPick {
 export type SheetState =
   | { mode: "model"; key: string; size: SizeKey; acc: Record<string, number>; qty: number; bfs: BfPick[]; fx: FrameEdit | null; accAll: boolean }
   | { mode: "sofa"; key: string; layout: string; mods: Record<string, number>; qty: number; kpi: string[]; height: string | null; tier: string | null }
-  | { mode: "frame"; size: SizeKey; frame: string; kpi: string[]; qty: number; drop: boolean }
+  | { mode: "frame"; size: SizeKey; frame: string; kpi: string[]; qty: number; drop: boolean; build?: BedframeBuild }
   | { mode: "acc"; size: SizeKey; acc: Record<string, number>; accAll: boolean };
 
 /** The first bed frame that comes in a size, A–Z; empty when none does. */
@@ -326,7 +385,15 @@ export function sheetLines(sh: SheetState, catalog: QCatalog): CartLine[] {
     const pid = frame?.sizes[bf.size];
     if (!frame || !pid) continue;
     const n = bf.qty * sets;
-    push(out, { id: `f-${frame.key}-${bf.size}`, kind: "frame", key: frame.key, name: frame.name, size: sizeLabel(bf.size), qty: n, productId: pid });
+    // One frame built two ways is two lines (2026-10-05); FOC is no build at all.
+    const build = frameBuildFor(frame.choices, bf.build);
+    const charge = frameCharge(frame.choices, build);
+    push(out, {
+      id: `f-${frame.key}-${bf.size}${build ? `-${bedframeKey(build)}` : ""}`,
+      kind: "frame", key: frame.key, name: frame.name, size: sizeLabel(bf.size), qty: n, productId: pid,
+      ...(build ? { bedframe: build } : {}),
+      ...(charge > 0 ? { charge } : {}),
+    });
     bf.kpi.forEach(k => kpiLine(k, n));
   }
   if (sh.mode === "model" || sh.mode === "acc") {
@@ -383,9 +450,22 @@ export const TAGS: Record<LineKind, { label: string; tone: "orange" | "sand" | "
   acc: { label: "ACC", tone: "amber" },
 };
 
-/** The cart sheet's meta line: `Queen · Akemi mattress`, `Follows Akemi margin`. */
+/**
+ * The cart sheet's meta line: `Queen · Akemi mattress`, `Follows Akemi
+ * margin` — and a bed frame's own build, its charges beside (2026-10-05).
+ */
 export function cartMeta(line: CartLine, brand: string): string {
-  return [line.size, line.kind === "mattress" ? `${brand} mattress` : riderText(line, brand)].filter(Boolean).join(" · ");
+  return [line.size, line.kind === "mattress" ? `${brand} mattress` : riderText(line, brand), buildNote(line)].filter(Boolean).join(" · ");
+}
+
+/** `leg 6" · +RM 100 each` — a bed frame line's own build and what it is charged. */
+function buildNote(line: CartLine): string {
+  return [line.bedframe ? frameBuildText(line.bedframe) : "", line.charge ? `+${rmShort(line.charge)} each` : ""].filter(Boolean).join(" · ");
+}
+
+/** Step 2's line note: the rider text, and a bed frame's own build with its charge — out of the margin. */
+export function lineNote(line: CartLine, brand: string): string {
+  return [riderText(line, brand), buildNote(line), line.charge ? "not in margin" : ""].filter(Boolean).join(" · ");
 }
 
 // ── last used ─────────────────────────────────────────────────────────────
@@ -398,6 +478,7 @@ export interface RecentFrame {
   size: SizeKey;
   frame: string;
   kpi: string[];
+  build?: BedframeBuild;
 }
 
 /** What a member reaches for again, per brand — kept on their phone. */
@@ -412,7 +493,8 @@ export interface QuoteMemory {
 
 export const EMPTY_MEMORY: QuoteMemory = { sets: {}, layouts: {}, frames: [], accs: {} };
 
-const sameFrame = (a: RecentFrame, b: RecentFrame) => a.size === b.size && a.frame === b.frame && a.kpi.join() === b.kpi.join();
+const sameFrame = (a: RecentFrame, b: RecentFrame) =>
+  a.size === b.size && a.frame === b.frame && a.kpi.join() === b.kpi.join() && bedframeKey(a.build) === bedframeKey(b.build);
 
 /** What adding a sheet teaches the memory (the prototype's `addSheet`). */
 export function remember(memory: QuoteMemory, sh: SheetState, brand: string): QuoteMemory {
@@ -430,7 +512,7 @@ export function remember(memory: QuoteMemory, sh: SheetState, brand: string): Qu
       ...sets.filter(r => !(r.kind === "mattress" && r.key === sh.key && r.size === sh.size && JSON.stringify(r.bfs) === bfs))].slice(0, 3);
   }
   if (sh.mode === "frame") {
-    const f: RecentFrame = { size: sh.size, frame: sh.frame, kpi: [...sh.kpi] };
+    const f: RecentFrame = { size: sh.size, frame: sh.frame, kpi: [...sh.kpi], ...(sh.build ? { build: { ...sh.build } } : {}) };
     next.frames = [f, ...memory.frames.filter(r => !sameFrame(r, f))].slice(0, 3);
   }
   if (sh.mode === "model" || sh.mode === "acc") {
@@ -477,7 +559,9 @@ export function setMeta(r: RecentSet, catalog: QCatalog): string {
 export function frameMeta(r: RecentFrame | BfPick, catalog: QCatalog): string {
   const frame = catalog.frames.find(f => f.key === r.frame);
   const kpis = r.kpi.length;
-  return [sizeLabel(r.size), frame?.name ?? "No bed frame", ...(catalog.kpis.length ? [kpis ? `${kpis} KPI item${kpis > 1 ? "s" : ""}` : "No KPI items"] : [])].join(" · ");
+  const build = frame ? frameBuildMeta(frame.choices, frameBuildFor(frame.choices, r.build)) : "";
+  return [sizeLabel(r.size), frame?.name ?? "No bed frame", ...(build ? [build] : []),
+    ...(catalog.kpis.length ? [kpis ? `${kpis} KPI item${kpis > 1 ? "s" : ""}` : "No KPI items"] : [])].join(" · ");
 }
 
 // ── the sofa build ────────────────────────────────────────────────────────

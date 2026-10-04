@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { ICON, Svg } from "../icons";
 import { TONES } from "../insight/ladder";
 import type { CalcVM } from "./calc-model";
-import { riderText, type CartLine } from "./quote-model";
+import { lineNote, type CartLine } from "./quote-model";
 import { rm } from "../format";
 import { Stepper } from "./QuoteProducts";
 import s from "./quote.module.css";
@@ -73,10 +73,11 @@ export default function QuoteCalc({ vm, brandName, cart, fee, basis, kpiEach, on
           </div>
         )}
         {vm.note && <div className={s.noteRow}>{vm.note}</div>}
-        {vm.kpi && (
+        {vm.pay && (
           <div className={s.kpiBox}>
-            <div className={s.kpiLine}><span><strong>{vm.kpi.label}</strong> · fixed, not in margin</span><span className={s.kpiAmt}>+ {vm.kpi.total}</span></div>
-            <div className={s.payLine}><span>Customer pays</span><span className={s.payAmt}>{vm.kpi.pay}</span></div>
+            {vm.kpi && <div className={s.kpiLine}><span><strong>{vm.kpi.label}</strong> · fixed, not in margin</span><span className={s.kpiAmt}>+ {vm.kpi.total}</span></div>}
+            {vm.options && <div className={s.kpiLine}><span><strong>Bed frame options</strong> · not in margin</span><span className={s.kpiAmt}>+ {vm.options.total}</span></div>}
+            <div className={s.payLine}><span>Customer pays</span><span className={s.payAmt}>{vm.pay}</span></div>
           </div>
         )}
       </section>
@@ -94,7 +95,7 @@ export default function QuoteCalc({ vm, brandName, cart, fee, basis, kpiEach, on
           <div key={l.id} className={s.inLine}>
             <span className={s.inText}>
               <span className={s.inName}>{l.name + (l.size ? " · " + l.size : "")}</span>
-              <span className={s.inNote}>{l.kind === "kpi" ? `KPI item · ${rm(kpiEach?.[l.key] ?? 0)} each · not in margin` : riderText(l, brandName)}</span>
+              <span className={s.inNote}>{l.kind === "kpi" ? `KPI item · ${rm(kpiEach?.[l.key] ?? 0)} each · not in margin` : lineNote(l, brandName)}</span>
             </span>
             <QtyStepper qty={l.qty} onMinus={() => onBump(l.id, -1)} onAdd={() => onBump(l.id, 1)} />
           </div>

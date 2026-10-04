@@ -5,7 +5,9 @@ import type {
   CostCell,
   CostOption,
   MemberCatalogueModel,
+  MemberModelCharges,
   MemberModelOptions,
+  OptionCharge,
   MemberProduct,
 } from "./types";
 
@@ -38,6 +40,19 @@ function optionList(v: unknown): string[] {
   });
 }
 
+const CHARGE_KEYS = ["divan_heights", "leg_heights", "gaps"] as const;
+
+/** `[{ value, charge }]`, each a short value and a charge above zero — anything else is dropped. */
+function chargeList(v: unknown): OptionCharge[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x) => {
+    if (!isRow(x)) return [];
+    const value = text(x.value, 80);
+    const charge = money(x.charge);
+    return value && value.trim() && charge !== null && charge > 0 ? [{ value, charge }] : [];
+  });
+}
+
 /** The model dropdowns, as the snapshot and the quote both carry them. */
 export function catalogueModelsOf(raw: unknown): MemberCatalogueModel[] {
   if (!Array.isArray(raw)) return [];
@@ -52,7 +67,14 @@ export function catalogueModelsOf(raw: unknown): MemberCatalogueModel[] {
       const list = optionList(src[key]);
       if (list.length) options[key] = list;
     }
-    return [{ id, kind, options }];
+    // A bed frame's chargeable divan, leg and gap (20261005010000).
+    const charges: MemberModelCharges = {};
+    const chargeSrc = kind === "BEDFRAME" && isRow(m.charges) ? m.charges : {};
+    for (const key of CHARGE_KEYS) {
+      const list = chargeList(chargeSrc[key]);
+      if (list.length) charges[key] = list;
+    }
+    return [Object.keys(charges).length ? { id, kind, options, charges } : { id, kind, options }];
   });
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { MemberProduct } from "@/lib/member/types";
+import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
-  EMPTY_MEMORY, accOrder, addLines, bump, catalogFromProducts, defaultSize, frameMeta, itemsText, layoutFits, liveSets, moduleInfo,
+  EMPTY_MEMORY, accOrder, addLines, bump, cartMeta, catalogFromProducts, defaultSize, frameMeta, itemsText, layoutFits, liveSets, moduleInfo,
   remember, setMeta, sheetLines, sizeKeyOf, sofaPick, sofaSeats, sofaText, type CartLine, type QCatalog, type SheetState,
 } from "./quote-model";
 
@@ -223,5 +223,49 @@ describe("a catalogue with nothing for a brand", () => {
     const c: QCatalog = catalogFromProducts([], "AKEMI", "Akemi");
     expect(c.models).toEqual([]);
     expect(c.accSummary).toBe("0 items");
+  });
+});
+
+// 2026-10-05: a bed frame's divan, leg and gap are FOC or charged on top; each frame built on its own.
+describe("a bed frame's own build", () => {
+  const MODELS = [
+    { id: "m-cody", kind: "BEDFRAME" as const, options: { specials: ["HB Straight"] },
+      charges: { leg_heights: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }] } },
+  ];
+  const withCharges = () => catalogFromProducts(PRODUCTS, "AKEMI", "Akemi", [], MODELS);
+  const frameSheet = (build?: BedframeBuild): SheetState =>
+    ({ mode: "frame", size: "K", frame: "m-cody", kpi: [], qty: 1, drop: false, ...(build ? { build } : {}) });
+
+  it("reads each frame's charges and specials from the catalogue's models; a frame with none is all FOC", () => {
+    const c = withCharges();
+    expect(c.frames.find(f => f.key === "m-cody")?.choices).toEqual({
+      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], specials: ["HB Straight"],
+    });
+    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], specials: [] });
+  });
+
+  it("adds a built frame as its own line, with what it is charged — FOC is no build at all", () => {
+    const c = withCharges();
+    const [foc] = sheetLines(frameSheet(), c);
+    expect(foc).toMatchObject({ id: "f-m-cody-K", productId: "cody-k" });
+    expect(foc.bedframe).toBeUndefined();
+    expect(foc.charge).toBeUndefined();
+    const [built] = sheetLines(frameSheet({ leg: '6"', gap: '12"' }), c);
+    expect(built.id).not.toBe(foc.id);
+    expect(built).toMatchObject({ productId: "cody-k", bedframe: { leg: '6"', gap: '12"' }, charge: 120 });
+    const cart = addLines(addLines([], [foc]), [built]);
+    expect(cart).toHaveLength(2);
+  });
+
+  it("drops a choice the frame no longer offers", () => {
+    const [line] = sheetLines(frameSheet({ leg: '9"', divan: '12"' }), withCharges());
+    expect(line.bedframe).toBeUndefined();
+  });
+
+  it("says the build and its charge on the cart sheet, and in a last-used frame", () => {
+    const c = withCharges();
+    const [line] = sheetLines(frameSheet({ leg: '6"' }), c);
+    expect(cartMeta(line, "Akemi")).toBe('King · Follows Akemi margin · leg 6" · +RM 100 each');
+    expect(frameMeta({ size: "K", frame: "m-cody", kpi: [], build: { leg: '6"' } }, c)).toBe('King · CODY · leg 6" +RM 100');
   });
 });

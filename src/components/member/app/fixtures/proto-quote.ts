@@ -7,6 +7,7 @@
  * Preview only.
  */
 import type { MemberBand } from "@/lib/member/types";
+import type { FrameChoices } from "@/lib/member/build";
 import type { QCatalog, QModel, QModule, QuoteMemory, SheetState, SizeKey, CartLine } from "../quote/quote-model";
 import type { QuoteInitial } from "../quote/useQuote";
 import type { PriceTable } from "../quote/table-calc";
@@ -98,7 +99,16 @@ const sp = (q: number, z: SizeKey) => Math.round((q * SIZE_M[z]) / 10) * 10;
 
 const sizes = (id: (z: SizeKey) => string) => Object.fromEntries(SIZE_KEYS.map(z => [z, id(z)])) as Record<SizeKey, string>;
 
-function catalog(brand: { code: string; name: string; sofa: boolean }): QCatalog {
+/** The prototype has no bed frame options; `?charges=1` shows what Maintenance charges would look like (2026-10-05). */
+const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], specials: [] };
+const DEMO_CHARGES: FrameChoices = {
+  divans: [{ value: '12"', charge: 50 }],
+  legs: [{ value: '6"', charge: 100 }, { value: '7"', charge: 120 }],
+  gaps: [{ value: '12"', charge: 20 }],
+  specials: [],
+};
+
+function catalog(brand: { code: string; name: string; sofa: boolean }, charges = false): QCatalog {
   const models: QModel[] = MODELS[brand.code].map(([key, name, desc]) => ({
     key,
     name,
@@ -113,7 +123,7 @@ function catalog(brand: { code: string; name: string; sofa: boolean }): QCatalog
     name: brand.name,
     sofa: brand.sofa,
     models: [...models].sort((a, b) => a.name.localeCompare(b.name)),
-    frames: FRAMES.map(([key, name]) => ({ key, name, sizes: sizes(z => `f:${key}:${z}`) })),
+    frames: FRAMES.map(([key, name]) => ({ key, name, sizes: sizes(z => `f:${key}:${z}`), choices: charges ? DEMO_CHARGES : NO_CHARGES })),
     accs: ACCS.map(([key, name, , sized]) => ({ key, name, any: sized ? null : `a:${key}:`, sizes: sized ? sizes(z => `a:${key}:${z}`) : {} })),
     kpis: KPIS.map(([key, name, price]) => ({ key, name, price, productId: `k:${key}` })),
     accSummary: "Pillow, protector, bolster",
@@ -208,9 +218,9 @@ export interface QuoteFixture {
   costDivisor: number;
 }
 
-export function protoQuote(opts: { brand?: string; sheet?: string } = {}): QuoteFixture {
+export function protoQuote(opts: { brand?: string; sheet?: string; charges?: boolean } = {}): QuoteFixture {
   const brand = QBRANDS.some(b => b.code === opts.brand) ? opts.brand! : "AKEMI";
-  const catalogs = Object.fromEntries(QBRANDS.map(b => [b.code, catalog(b)]));
+  const catalogs = Object.fromEntries(QBRANDS.map(b => [b.code, catalog(b, !!opts.charges)]));
   const ids = new Set<string>();
   for (const c of Object.values(catalogs)) {
     c.models.forEach(m => { Object.values(m.sizes).forEach(id => id && ids.add(id)); m.modules.forEach(x => ids.add(x.productId)); });

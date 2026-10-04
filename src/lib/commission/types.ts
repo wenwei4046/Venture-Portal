@@ -50,6 +50,15 @@ export interface SalesLine {
    */
   costAmount?: number
   /**
+   * What the customer paid for this bed frame's divan, leg and gap
+   * (`sales_order_lines.option_charge_amount`, 2026-10-05) — qty × each
+   * option's charge on Product List › Maintenance. In `lineAmount` and in the
+   * sales the rate is paid on; OUT of the margin on both sides (marginBase
+   * takes it off the revenue, and it was never in the cost); never KPI.
+   * Absent = 0.
+   */
+  optionCharge?: number
+  /**
    * The specials the line carries as printed (`parseLineFacts`: the ERP's
    * `raw.variants`, else its `description2` grammar) — how a bed frame's HB
    * Straight or a sofa's Wooden Arm is found as a KPI item. Loaded for bed

@@ -5,6 +5,7 @@ import type {
   MemberCatalogueModel,
   MemberModelOptions,
   MemberProduct,
+  OptionCharge,
   QuoteBuild,
 } from "./types";
 
@@ -164,6 +165,69 @@ export function pruneBuild(build: QuoteBuild | undefined, choices: BuildChoices)
     else delete next.bedframe;
   }
   return next;
+}
+
+/**
+ * What ONE bed frame may be built with (user 2026-10-04): its divan, leg and
+ * gap are FOC — no choice at all — or one of the options Maintenance charges
+ * that the ERP lets the model take (`charges`); its specials are what Modular
+ * ticked. Total height is offered nowhere.
+ */
+export interface FrameChoices {
+  divans: OptionCharge[];
+  legs: OptionCharge[];
+  gaps: OptionCharge[];
+  specials: string[];
+}
+
+export function frameChoicesOf(model: MemberCatalogueModel | undefined): FrameChoices {
+  return {
+    divans: model?.charges?.divan_heights ?? [],
+    legs: model?.charges?.leg_heights ?? [],
+    gaps: model?.charges?.gaps ?? [],
+    specials: model?.options.specials ?? [],
+  };
+}
+
+/** The charge an option carries on a model, RM; 0 = FOC (or not chosen). */
+export function chargeIn(list: readonly OptionCharge[], value: string | undefined): number {
+  const k = valueKey(value);
+  return k === null ? 0 : list.find((o) => valueKey(o.value) === k)?.charge ?? 0;
+}
+
+/** What one built bed frame is charged per unit, by the model's own list — the member's preview. */
+export function frameCharge(choices: FrameChoices, build: BedframeBuild | undefined): number {
+  return chargeIn(choices.divans, build?.divan) + chargeIn(choices.legs, build?.leg) + chargeIn(choices.gaps, build?.gap);
+}
+
+/** Why one bed frame's own build cannot be quoted, or null. */
+export function frameBuildError(
+  build: BedframeBuild,
+  product: MemberProduct,
+  catalogueModels: readonly MemberCatalogueModel[] | undefined,
+): string | null {
+  if (kindOf(product) !== "BEDFRAME") return "Only a bed frame is built with a divan, leg and gap. Choose the product again.";
+  if (build.total) return "A total height is not chosen on a quote. Choose the bed frame again.";
+  const c = frameChoicesOf((catalogueModels ?? []).find((m) => m.id === product.modelId));
+  const charged = (value: string | undefined, list: OptionCharge[]) =>
+    !value || list.some((o) => valueKey(o.value) === valueKey(value));
+  if (!charged(build.divan, c.divans)) return "That divan height is not offered for this bed frame. Choose FOC or another.";
+  if (!charged(build.leg, c.legs)) return "That leg height is not offered for this bed frame. Choose FOC or another.";
+  if (!charged(build.gap, c.gaps)) return "That gap is not offered for this bed frame. Choose FOC or another.";
+  if ((build.specials ?? []).some((sp) => !inList(sp, c.specials)))
+    return "A bed frame special is not offered for this bed frame. Choose again.";
+  return null;
+}
+
+/** `leg 6" · gap 12"` — one bed frame's own build as the customer's quote words it. */
+export function frameBuildText(build: BedframeBuild | undefined): string {
+  if (!build) return "";
+  const parts: string[] = [];
+  if (build.divan) parts.push(`divan ${build.divan}`);
+  if (build.leg) parts.push(`leg ${build.leg}`);
+  if (build.gap) parts.push(`gap ${build.gap}`);
+  if (build.specials?.length) parts.push(build.specials.join(", "));
+  return parts.join(" · ");
 }
 
 /** The order-independent identity of a build, for binding a result to its input. */

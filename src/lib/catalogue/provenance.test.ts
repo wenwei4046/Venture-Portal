@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { costProvenance } from './provenance'
+import { chargeText, costProvenance } from './provenance'
 
 describe('where a line’s cost came from', () => {
   it('names the Product List, and a sofa grid’s cell and options', () => {
@@ -30,5 +30,25 @@ describe('where a line’s cost came from', () => {
     // A cost from before provenance was recorded at all.
     expect(costProvenance(null, null, true)).toEqual({ label: 'Old cost chain — recost to re-price', missing: false })
     expect(costProvenance('manual', null, true).label).toBe('Keyed by hand')
+  })
+})
+
+describe('what a line’s bed frame options were charged for', () => {
+  it('names each charged option from cost_detail.charges (20261005010000)', () => {
+    const detail = {
+      how: 'price',
+      charges: [
+        { pool: 'bedframe_divan_heights', value: '12"', price: 50 },
+        { pool: 'bedframe_leg_heights', value: '6"', price: 100 },
+        { pool: 'bedframe_gaps', value: '12"', price: 20 },
+      ],
+    }
+    expect(chargeText(detail)).toBe('for divan 12" · leg 6" · gap 12"')
+  })
+
+  it('says so plainly when the line carries no explanation (a hand-costed line)', () => {
+    expect(chargeText(null)).toBe('for bed frame options')
+    expect(chargeText({ how: 'price' })).toBe('for bed frame options')
+    expect(chargeText({ charges: [{ pool: 'bedframe_specials', value: 'X' }, null, 'junk'] })).toBe('for bed frame options')
   })
 })
