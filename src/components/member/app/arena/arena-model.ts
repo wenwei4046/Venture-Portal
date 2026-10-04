@@ -312,6 +312,10 @@ export interface ArenaInput {
   kpiEnabled: boolean;
   /** Everybody in the window is closed: the places will not move again. */
   final: boolean;
+  /** The window's months still moving (the snapshot's `openMonths`). */
+  openMonths: readonly string[];
+  /** The current month, `YYYY-MM`. */
+  current: string;
 }
 
 /** The scheme's brands, in the prototype's order. */
@@ -340,9 +344,16 @@ function basisText(input: ArenaInput, isFair: boolean): string {
         : board === "margin"
           ? `Margin uses commissionable goods revenue against the ${subName} team cost (${divisorText(input.costDivisor)}). Anyone with an uncosted bill stays pending until it is costed.`
           : "Deposit-cleared, commissionable sales. Each order counts once, in its released commission month.";
-  if (input.final || input.period.kind !== "monthly") return base;
-  return `${base} ${monthName(input.period.from)} is still being closed, so places can still move.`;
+  if (input.final) return base;
+  // Until everybody on the boards is closed, a place is not final.
+  const ended = input.openMonths.filter(m => m < input.current);
+  const parts: string[] = [];
+  if (ended.length) parts.push(`${listOf(ended.map(monthName))} ${ended.length === 1 ? "is" : "are"} still being closed`);
+  if (input.period.through >= input.current) parts.push(`${monthName(input.current)} is still running`);
+  return parts.length ? `${base} ${parts.join(" and ")}, so places can still move.` : base;
 }
+
+const listOf = (items: readonly string[]) => (items.length > 1 ? `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}` : items[0] ?? "");
 
 function footSub(person: ArenaPerson | undefined, tiers: readonly ArenaTier[], period: InsightPeriod, names: Map<string, string>): string {
   if (period.kind !== "monthly") return "Paid month by month · see Insight";
@@ -391,6 +402,12 @@ export function boardModel(input: ArenaInput): BoardVM {
     const rows = enabled ? fromRankings(arenaRankings(people, metric, brand || undefined), board)
       : people.map(p => ({ id: p.id, name: p.name, self: p.self, position: null, value: null, pending: false, active: false }));
     rank = rankView(board, rows, count);
+    if (!enabled) {
+      // KPI switched off for the sub-department: nobody has a count to show.
+      rank.hero.value = "Not counted";
+      rank.hero.chase = "KPI items are not counted this period";
+      rank.rows = rank.rows.map(r => ({ ...r, value: "—" }));
+    }
   }
 
   return {

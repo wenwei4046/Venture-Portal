@@ -349,7 +349,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const arInput = useMemo(() => ({
     period: arPeriod, snapshot: arData.snapshot, history: arData.history, standings: arData.standings, selfId,
     subName: membership?.name ?? "", costDivisor: recent?.costDivisor ?? null, kpiEnabled: kpiRule.enabled,
-    final: arPeriod.kind !== "monthly" || !isLiveMonth(arPeriod.from, period, monthState),
+    // The whole sub-department closed (the snapshot says so); until it loads, the member's own closes.
+    final: arData.snapshot?.final ?? (arPeriod.kind !== "monthly" ? arPeriod.through < period : !isLiveMonth(arPeriod.from, period, monthState)),
+    openMonths: arData.snapshot?.openMonths ?? (isLiveMonth(arPeriod.from, period, monthState) ? [arPeriod.from] : []),
+    current: period,
   }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, recent?.costDivisor, kpiRule.enabled, period, monthState]);
   const hubVM = useMemo(() => fixture?.arena?.hub[arKind] ?? hubModel(arInput), [fixture, arKind, arInput]);
   const boardVM = useMemo(() => {

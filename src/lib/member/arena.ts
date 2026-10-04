@@ -43,6 +43,13 @@ export interface MemberArenaSnapshot {
   weekLocks?: ArenaWeekLock[];
   /** Empty until the scheme configures a ladder; the board then says so. */
   tiers: ArenaTier[];
+  /**
+   * The window's months still moving (mig 20261004040000): one not ended yet,
+   * or one with a bill of somebody on the board not closed for it.
+   */
+  openMonths?: string[];
+  /** The window has ended and everybody on its boards is closed. */
+  final?: boolean;
   /** Optional during the read-only Fair history rollout. Never replaced by fixtures. */
   history?: ArenaHistorySnapshot;
   historyError?: string;
