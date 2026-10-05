@@ -1,0 +1,30 @@
+/*
+ * /member while the server loads the member's data (`AppLoading`, 2026-10-06):
+ * the app's own frame from shell.module.css, one spinner where the page will be.
+ */
+
+/* The frame answers nothing yet: `inert` on a wrapper that adds no box of its own. */
+.inert { display: contents; }
+
+/* The phone header without its capsule keeps the capsule's 46px, so the wordmark
+   sits exactly where the app will draw it. */
+.headerHold { min-height: 46px; }
+
+.main { display: grid; place-items: center; }
+
+.spinner {
+  display: block;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 3px solid var(--rv-orange-bg);
+  border-top-color: var(--rv-accent);
+  animation: spin 800ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2400ms; }
+}
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

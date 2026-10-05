@@ -1326,6 +1326,9 @@ src/
 │   │                                  `UnrecognizedActionError`
 │   │                                  (`isStaleAppError`) RELOADS the page —
 │   │                                  never over a sheet or unsaved brand weeks.
+│   │                                  While /member loads, `loading.tsx` is the
+│   │                                  app's own frame + one spinner
+│   │                                  (`app/shell/AppLoading.tsx`, 2026-10-06).
 │   │                                  **My income** is Comm Cal's own engine
 │   │                                  run for the member's month
 │   │                                  (`loadMemberIncome`: the service role,
