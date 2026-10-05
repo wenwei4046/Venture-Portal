@@ -160,18 +160,49 @@ describe("teamVM", () => {
 });
 
 describe("the request forms' choices", () => {
+  const person = (id: string, orders: number, scoring: boolean, confirmed: boolean) => ({ id, name: id, sales: 0, held: 0, orders, scoring, confirmed });
+  const booth = (fairId: string, brand: string, week: string, venue: string, people: ReturnType<typeof person>[]) => ({
+    id: `${fairId}|${brand}`, fairId, brand, venue, organizer: venue === "HALL" ? "REX" : null, week, start: week, end: week.replace(/\d\d$/, d => String(Number(d) + 2).padStart(2, "0")),
+    periodMonth: week.slice(0, 7), people,
+  });
+  // ANTHONY's September as the Arena has it: Akemi picked for the 4th; the 11th not picked, so placed at the
+  // Zanotti booth where he opened the most bills (an Akemi bill there is off-week); Dunlopillo picked for the
+  // 18th but nothing written at its booths; nothing at all on the 25th.
   const sep = {
-    period: "2026-09",
-    brandWeeks: { weeks: 4, counts: { AKEMI: 1, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 }, picks: { "2026-09-04": "AKEMI" } },
-    history: { events: [{ id: "f1|AKEMI", venue: "HALL", organizer: "REX", start: "2026-09-04", end: "2026-09-06", periodMonth: "2026-09", week: "2026-09-04", brand: "AKEMI", people: [] }] },
+    period: "2026-09", selfId: "an",
+    brandWeeks: { weeks: 4, counts: { AKEMI: 1, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 1 }, picks: { "2026-09-04": "AKEMI", "2026-09-18": "DUNLOP" } },
+    history: { events: [
+      booth("f1", "AKEMI", "2026-09-04", "HALL", [person("an", 5, true, true)]),
+      booth("f2", "ZANOTTI", "2026-09-11", "MID VALLEY", [person("an", 3, true, false)]),
+      booth("f2", "AKEMI", "2026-09-11", "MID VALLEY", [person("an", 1, false, false)]),
+      booth("f3", "DUNLOP", "2026-09-18", "PENANG", [person("x", 2, true, true)]),
+      booth("f4", "DUNLOP", "2026-09-18", "IPOH", [person("y", 7, true, true)]),
+    ] },
   } as unknown as MemberArenaSnapshot;
+  const oct = { period: "2026-10", selfId: "an", brandWeeks: null, history: { events: [booth("f5", "ERGOTEX", "2026-10-02", "SICC", [person("an", 2, true, false)])] } } as unknown as MemberArenaSnapshot;
 
-  it("offers the fair weekends that have begun, each with the brand worked and the booth", () => {
-    const weeks = claimWeeks([sep, null, sep], "2026-09-12");
-    expect(weeks.map(w => [w.key, w.n, w.brandWeek, w.brand, w.dates, w.venue, w.org])).toEqual([
-      ["2026-09-04", "W1", "Akemi week", "AKEMI", "4–6 Sep", "HALL", "REX"],
-      ["2026-09-11", "W2", "Brand week not picked", null, "11–13 Sep", null, null],
+  it("offers each begun weekend at the booth of the member's own brand week, picked or placed (user 2026-10-06)", () => {
+    const weeks = claimWeeks([sep, null, sep], "2026-09-30");
+    expect(weeks.map(w => [w.key, w.month, w.n, w.brandWeek, w.brand, w.dates, w.venue, w.org, w.fairId, w.auto, w.claimable])).toEqual([
+      ["2026-09-25", "SEP", "W4", "No brand week", null, "25–27 Sep", null, null, null, false, false],
+      // Picked, nothing written there: that brand's booth with the most bills.
+      ["2026-09-18", "SEP", "W3", "Dunlopillo week", "DUNLOP", "18–20 Sep", "IPOH", null, "f4", false, true],
+      // Not picked: where the Arena placed him — never the off-week Akemi booth.
+      ["2026-09-11", "SEP", "W2", "Zanotti week", "ZANOTTI", "11–13 Sep", "MID VALLEY", null, "f2", true, true],
+      ["2026-09-04", "SEP", "W1", "Akemi week", "AKEMI", "4–6 Sep", "HALL", "REX", "f1", false, true],
     ]);
+  });
+
+  it("starts at the newest weekend, the month on each so October's W1 is not September's", () => {
+    const weeks = claimWeeks([sep, oct], "2026-10-06");
+    expect(weeks.slice(0, 2).map(w => [w.key, w.month, w.n, w.brandWeek, w.claimable])).toEqual([
+      ["2026-10-02", "OCT", "W1", "Ergotex week", true],
+      ["2026-09-25", "SEP", "W4", "No brand week", false],
+    ]);
+  });
+
+  it("leaves out a weekend that has not begun", () => {
+    expect(claimWeeks([sep], "2026-09-12").map(w => w.key)).toEqual(["2026-09-11", "2026-09-04"]);
   });
 
   it("lets a member replace only somebody in their own team below them", () => {

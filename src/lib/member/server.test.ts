@@ -269,18 +269,44 @@ describe('a member sends a request', () => {
       .mockResolvedValueOnce({ data: sent, error: null })
   })
 
-  it('an outstation claim: the brand week, its booth and the region — no amount, no invoice', async () => {
+  // 2026-10-06: the fair, its venue and its region are the database's — a region, place or brand the
+  // phone sends is not even passed on.
+  it('an outstation claim: only the weekend — no region, no place, no amount, no invoice', async () => {
     const result = await submitMemberRequest(form({
       kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02',
-      brand: 'AKEMI', location: 'MITC Melaka', notes: '', region,
+      brand: 'AKEMI', location: 'Sabah', notes: '', region,
     }))
     expect(result).toEqual({ ok: true, data: sent })
     expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', {
       p_kind: 'claim', p_sub_department: fair, p_idempotency: key, p_revision: null,
-      p_detail: { claimType: 'outstation', week: '2026-10-02', location: 'MITC Melaka', notes: '', brand: 'AKEMI', region },
+      p_detail: { claimType: 'outstation', week: '2026-10-02', notes: '' },
     })
     expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
     expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('a plane ticket: its price and its invoice, attested before it is sent', async () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])
+    const upload = vi.fn(async () => ({ error: null }))
+    const insert = vi.fn(async () => ({ error: null }))
+    const attachments = { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) }
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => attachments, storage: { from: () => ({ upload, remove: vi.fn() }) } })
+    mocks.adminClient.mockReturnValue({ from: () => ({ insert }) })
+    const data = form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02', notes: '', amount: '456.70' })
+    data.set('invoice', new File([pdf], 'flight.pdf', { type: 'application/pdf' }))
+    expect((await submitMemberRequest(data)).ok).toBe(true)
+    const prepared = mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }
+    expect(prepared.p_detail).toMatchObject({ claimType: 'outstation', week: '2026-10-02', amount: 456.7, invoiceName: 'flight.pdf' })
+    expect(prepared.p_detail.invoiceHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ request_id: requestId, mime_type: 'application/pdf', content_sha256: prepared.p_detail.invoiceHash }))
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+  })
+
+  it('refuses a plane ticket without a price it can read', async () => {
+    expect(await submitMemberRequest(form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02', notes: '', amount: '45.678' })))
+      .toEqual({ ok: false, error: 'Enter the plane ticket\'s price, as its invoice shows.' })
+    mocks.rpc.mockReset()
   })
 
   it('a replacement: leaving the sub-department is the database’s member_exit', async () => {

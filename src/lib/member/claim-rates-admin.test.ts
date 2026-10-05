@@ -3,51 +3,93 @@ import {
   claimRatesChanged, claimRatesDraft, claimRatesProblems, claimRatesToSave, readClaimRatesAdmin, validClaimRatesToSave,
 } from "./claim-rates-admin";
 
+const KL = "11111111-1111-4111-8111-111111111111";
+const PENANG = "22222222-2222-4222-8222-222222222222";
+const SABAH = "44444444-4444-4444-8444-444444444444";
 const raw = {
-  base: "Klang Valley", perSpot: 50, perPaxNight: 65, updatedAt: "2026-10-04T17:48:27Z", updatedBy: "HR",
+  base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null, updatedAt: "2026-10-04T17:48:27Z", updatedBy: "HR",
   regions: [
-    { id: "11111111-1111-4111-8111-111111111111", name: "KL", spots: 0, active: true },
-    { id: "22222222-2222-4222-8222-222222222222", name: "Penang", spots: 4, active: true },
-    { id: "33333333-3333-4333-8333-333333333333", name: "Old route", spots: 9, active: false },
+    { id: KL, name: "KL", spots: 0, active: true, planeTicket: false },
+    { id: PENANG, name: "Penang", spots: 4, active: true, planeTicket: false },
+    { id: SABAH, name: "Sabah", spots: 6, active: true, planeTicket: true },
+    { id: "33333333-3333-4333-8333-333333333333", name: "Old route", spots: 9, active: false, planeTicket: false },
+  ],
+  venues: [
+    { key: "SABAH INTERNATIONAL CONVENTION CENTRE", name: "SABAH INTERNATIONAL CONVENTION CENTRE", fairs: 1, lastFair: "2026-10-04", regionId: SABAH },
+    { key: "PENANG WATERFRONT CONVENTION CENTRE", name: "PENANG WATERFRONT CONVENTION CENTRE", fairs: 2, lastFair: "2026-09-27", regionId: PENANG },
+    { key: "MVEC SOUTHKEY", name: "MVEC SOUTHKEY", fairs: 5, lastFair: "2026-10-04", regionId: null },
   ],
 };
 
 describe("claim rates in the back office", () => {
   it("reads what the database keeps, and opens the form on the regions in use", () => {
     const saved = readClaimRatesAdmin(raw)!;
-    expect(saved).toMatchObject({ base: "Klang Valley", perSpot: 50, perPaxNight: 65, updatedBy: "HR" });
+    expect(saved).toMatchObject({ base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null, updatedBy: "HR" });
     const draft = claimRatesDraft(saved);
-    expect(draft).toMatchObject({ base: "Klang Valley", perSpot: "50", perPaxNight: "65" });
-    expect(draft.regions.map(g => [g.name, g.spots])).toEqual([["KL", "0"], ["Penang", "4"]]);
+    expect(draft).toMatchObject({ base: "Klang Valley", perSpot: "50", perPaxNight: "65", perThreePaxNight: "" });
+    expect(draft.regions.map(g => [g.name, g.spots, g.planeTicket])).toEqual([["KL", "0", false], ["Penang", "4", false], ["Sabah", "6", true]]);
     expect(claimRatesChanged(saved, draft)).toBe(false);
     expect(readClaimRatesAdmin(null)).toBeNull();
   });
 
   it("saves rates to the sen, a blank rate as not set, and each region with its spots", () => {
-    const draft = { ...claimRatesDraft(readClaimRatesAdmin(raw)!), perSpot: "52.50", perPaxNight: " " };
+    const draft = { ...claimRatesDraft(readClaimRatesAdmin(raw)!), perSpot: "52.50", perPaxNight: " ", perThreePaxNight: "220" };
     expect(claimRatesProblems(draft)).toEqual([]);
-    expect(claimRatesToSave(draft)).toEqual({
-      base: "Klang Valley", perSpot: 52.5, perPaxNight: null,
-      regions: [{ id: "11111111-1111-4111-8111-111111111111", name: "KL", spots: 0 }, { id: "22222222-2222-4222-8222-222222222222", name: "Penang", spots: 4 }],
+    expect(claimRatesToSave(draft)).toMatchObject({
+      base: "Klang Valley", perSpot: 52.5, perPaxNight: null, perThreePaxNight: 220,
+      regions: [{ id: KL, name: "KL", spots: 0, planeTicket: false }, { id: PENANG, name: "Penang", spots: 4, planeTicket: false }, { id: SABAH, name: "Sabah", spots: 6, planeTicket: true }],
     });
     expect(claimRatesChanged(readClaimRatesAdmin(raw)!, draft)).toBe(true);
   });
 
   it("refuses what the database would: no base, a bad amount, an unnamed or doubled region, odd spots", () => {
     const draft = claimRatesDraft(readClaimRatesAdmin(raw)!);
+    const region = (name: string, spots: string) => ({ key: "n", id: null, name, spots, planeTicket: false });
     expect(claimRatesProblems({ ...draft, base: " " })[0]).toMatch(/Name the base/);
     expect(claimRatesProblems({ ...draft, perSpot: "12.345" })[0]).toMatch(/rate per spot/);
     expect(claimRatesProblems({ ...draft, perPaxNight: "100001" })[0]).toMatch(/Airbnb rate/);
-    expect(claimRatesProblems({ ...draft, regions: [...draft.regions, { key: "n", id: null, name: "penang", spots: "3" }] })).toEqual(["Two regions are called penang."]);
-    expect(claimRatesProblems({ ...draft, regions: [{ key: "n", id: null, name: "", spots: "3" }] })).toEqual(["Region 1 needs a name (up to 40 letters)."]);
-    expect(claimRatesProblems({ ...draft, regions: [{ key: "n", id: null, name: "Sabah", spots: "2.5" }] })).toEqual(["Sabah: spots must be a whole number from 0 to 100."]);
+    expect(claimRatesProblems({ ...draft, perThreePaxNight: "two hundred" })[0]).toMatch(/three-person Airbnb rate/);
+    expect(claimRatesProblems({ ...draft, regions: [...draft.regions, region("penang", "3")] })).toEqual(["Two regions are called penang."]);
+    expect(claimRatesProblems({ ...draft, regions: [region("", "3")] })).toEqual(["Region 1 needs a name (up to 40 letters)."]);
+    expect(claimRatesProblems({ ...draft, regions: [region("Sarawak", "2.5")] })).toEqual(["Sarawak: spots must be a whole number from 0 to 100."]);
   });
 
   it("checks again on the server what the form sends", () => {
     const ok = claimRatesToSave(claimRatesDraft(readClaimRatesAdmin(raw)!));
     expect(validClaimRatesToSave(ok)).toBe(true);
     expect(validClaimRatesToSave({ ...ok, perSpot: -1 })).toBe(false);
-    expect(validClaimRatesToSave({ ...ok, regions: [{ id: null, name: "X", spots: 101 }] })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, perThreePaxNight: 100_001 })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, regions: [{ id: null, name: "X", spots: 101, planeTicket: false }] })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, regions: [{ id: null, name: "X", spots: 1 }] })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, venues: [{ key: "MVEC SOUTHKEY", region: "Mars" }] })).toBe(false);
     expect(validClaimRatesToSave("nope")).toBe(false);
+  });
+});
+
+// User 2026-10-06: every venue the ERP's fairs name gets a region here; an outstation claim's region is its venue's.
+describe("the venues' regions", () => {
+  it("opens each venue on the region it is in, and saves it by the region's name", () => {
+    const draft = claimRatesDraft(readClaimRatesAdmin(raw)!);
+    expect(draft.venues).toEqual({ "SABAH INTERNATIONAL CONVENTION CENTRE": SABAH, "PENANG WATERFRONT CONVENTION CENTRE": PENANG, "MVEC SOUTHKEY": "" });
+    expect(claimRatesToSave(draft).venues).toEqual([
+      { key: "SABAH INTERNATIONAL CONVENTION CENTRE", region: "Sabah" },
+      { key: "PENANG WATERFRONT CONVENTION CENTRE", region: "Penang" },
+      { key: "MVEC SOUTHKEY", region: null },
+    ]);
+  });
+
+  it("can put a venue in a region added in the same save", () => {
+    const base = claimRatesDraft(readClaimRatesAdmin(raw)!);
+    const draft = { ...base, regions: [...base.regions, { key: "new-1", id: null, name: " Johor ", spots: "3", planeTicket: false }],
+      venues: { ...base.venues, "MVEC SOUTHKEY": "new-1" } };
+    expect(claimRatesToSave(draft).venues[2]).toEqual({ key: "MVEC SOUTHKEY", region: "Johor" });
+    expect(validClaimRatesToSave(claimRatesToSave(draft))).toBe(true);
+    expect(claimRatesChanged(readClaimRatesAdmin(raw)!, draft)).toBe(true);
+  });
+
+  it("leaves a venue in no region when its region is removed", () => {
+    const base = claimRatesDraft(readClaimRatesAdmin(raw)!);
+    const draft = { ...base, regions: base.regions.filter(g => g.name !== "Penang") };
+    expect(claimRatesToSave(draft).venues[1]).toEqual({ key: "PENANG WATERFRONT CONVENTION CENTRE", region: null });
   });
 });

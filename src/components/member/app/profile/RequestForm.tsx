@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
 import { initials, rm2 } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
-import { claimAmount, nightsBetween } from "@/lib/member/claim-rules";
+import { claimAmount, fairRegion, nightsBetween } from "@/lib/member/claim-rules";
 import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
 const CAT_AIR = "M3 11 12 4l9 7v9h-6v-6H9v6H3v-9Z";
 const CAMERA = "M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z";
+const PLANE = "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z";
 const CLOSE = "M6 6l12 12M18 6 6 18";
 
 export type { ClaimWeek, FormOptions };
@@ -71,8 +72,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
 
   // ── claim ──
   const [cat, setCat] = useState<"outstation" | "airbnb">(str("claimType") === "airbnb" ? "airbnb" : "outstation");
-  const [week, setWeek] = useState(() => str("week") || options.weeks[0]?.key || "");
-  const [region, setRegion] = useState(() => str("region") || options.initial?.region || "");
+  // The newest weekend with a brand week until the member picks another (the list may arrive after the form opens).
+  const [weekPick, setWeek] = useState(() => str("week"));
+  const week = weekPick || options.weeks.find(w => w.claimable)?.key || "";
+  const [ticket, setTicket] = useState(() => (prior.planeTicket === true && typeof prior.amount === "number" ? String(prior.amount) : ""));
   const [male, setMale] = useState(() => Number(prior.male ?? options.initial?.male ?? 0));
   const [female, setFemale] = useState(() => Number(prior.female ?? options.initial?.female ?? 0));
   const [checkIn, setCheckIn] = useState(str("start"));
@@ -104,11 +107,18 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
   const [done, setDone] = useState<string | null>(null);
 
   const weekRow = options.weeks.find(w => w.key === week) ?? null;
-  const regionRow = options.rates.regions.find(r => r.id === region) ?? null;
+  // The region is the one HR set for the brand week's venue — never picked here (user 2026-10-06).
+  const fair = fairRegion(options.rates, weekRow?.fairId ?? null);
+  const regionRow = fair.region;
+  const venue = fair.venue ?? weekRow?.venue ?? "this fair";
+  const ticketValue = /^\d{1,9}(\.\d{1,2})?$/.test(ticket.trim()) ? Number(ticket.trim()) : null;
   const nights = nightsBetween(checkIn, checkOut);
+  const pax = male + female;
+  // By head count only; exactly three share HR's three-person rate a night when it is set (user 2026-10-06).
+  const three = pax === 3 && (options.rates.perThreePaxNight ?? 0) > 0;
   const amount = useMemo(() => claimAmount(options.rates, cat === "outstation"
-    ? { type: "outstation", regionId: region }
-    : { type: "airbnb", pax: male + female, nights: nights ?? 0 }), [options.rates, cat, region, male, female, nights]);
+    ? { type: "outstation", regionId: regionRow?.id ?? null, ticket: ticketValue }
+    : { type: "airbnb", pax, nights: nights ?? 0 }), [options.rates, cat, regionRow, ticketValue, pax, nights]);
   const department = options.departments.find(d => d.id === (kind === "waiting" ? target : options.departmentId));
 
   const submit = async () => {
@@ -120,16 +130,22 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
     form.set("idempotencyKey", idem.current);
     if (revising) form.set("requestId", revising.id);
     if (kind === "claim") {
-      if (!weekRow) return setError("Choose the brand week the claim is for.");
+      // The week is all that is sent: its fair, venue and region are the database's own records.
+      if (!weekRow?.claimable) return setError("Choose one of your brand weeks. A claim is only for your own brand week.");
       form.set("claimType", cat);
       form.set("week", weekRow.key);
-      if (weekRow.brand) form.set("brand", weekRow.brand);
-      form.set("location", weekRow.venue ?? weekRow.dates);
       form.set("notes", notes.trim());
       if (cat === "outstation") {
-        if (!regionRow) return setError("Choose the fair's region.");
-        if (!(amount > 0)) return setError(regionRow.spots > 0 ? "HR has not set the rate per spot yet." : `${options.rates.base} fairs are local, so there is no outstation claim.`);
-        form.set("region", regionRow.id);
+        if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
+        if (regionRow.planeTicket) {
+          if (!(amount > 0)) return setError("Enter the plane ticket's price, as its invoice shows.");
+          if (!file) return setError("Add the plane ticket's invoice.");
+          if (file.size > 3 * 1024 * 1024) return setError("The invoice must be 3 MB or smaller.");
+          form.set("amount", ticket.trim());
+          form.set("invoice", file);
+        } else if (!(amount > 0)) {
+          return setError(regionRow.spots > 0 ? "HR has not set the rate per spot yet." : `${venue} is local to ${options.rates.base}, so there is no outstation claim.`);
+        }
       } else {
         if (!checkIn || !checkOut || nights === null || nights < 1) return setError("Enter the check-in and check-out dates.");
         if (male + female < 1) return setError("Add who stayed.");
@@ -246,12 +262,14 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
                 {options.weeks.map(w => {
                   const on = w.key === week;
                   return (
-                    <button key={w.key} className={`${s.week} ${on ? s.weekOn : ""}`} onClick={() => setWeek(w.key)} aria-pressed={on}
-                      style={on ? { borderColor: w.color, background: w.tint } : undefined}>
-                      <span className={s.weekBadge} style={{ background: w.color }}>{w.n}</span>
+                    <button key={w.key} className={`${s.week} ${on ? s.weekOn : ""} ${w.claimable ? "" : s.weekOff}`} onClick={() => setWeek(w.key)} aria-pressed={on}
+                      disabled={!w.claimable} style={on ? { borderColor: w.color, background: w.tint } : undefined}>
+                      <span className={`${s.weekBadge} ${s.weekBadgeMonth}`} style={{ background: w.color }}><span className={s.weekMonth}>{w.month}</span>{w.n}</span>
                       <span className={s.weekText}>
                         <span className={s.weekTitle}>{w.brandWeek} · {w.dates}</span>
-                        <span className={s.weekWhere}>{[w.venue ?? "No fair on the calendar", w.org].filter(Boolean).join(" · ")}</span>
+                        <span className={s.weekWhere}>{w.claimable
+                          ? [w.venue, w.org, w.auto ? "auto-located" : null].filter(Boolean).join(" · ")
+                          : "Not picked, and nothing sold that weekend"}</span>
                       </span>
                     </button>
                   );
@@ -260,30 +278,49 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
               </div>
             </div>
             {cat === "outstation" ? (
-              <>
-                <div className={s.field}><span className={s.fieldLabel}>Fair region</span>
-                  <div className={s.regions}>
-                    {options.rates.regions.map(r => (
-                      <button key={r.id} className={`${s.region} ${r.id === region ? s.regionOn : ""}`} onClick={() => setRegion(r.id)} aria-pressed={r.id === region}>{r.name}</button>
-                    ))}
+              weekRow?.claimable ? (
+                <>
+                  <div className={s.field}><span className={s.fieldLabel}>Fair region</span>
+                    {regionRow ? (
+                      <div className={s.regionSet}>
+                        <span className={`${s.region} ${s.regionOn} ${s.regionChip}`}>{regionRow.name}</span>
+                        <span className={s.regionFrom}>Set by HR for {venue}</span>
+                      </div>
+                    ) : <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>}
                   </div>
-                </div>
-                {regionRow && regionRow.spots > 0 && (
-                  <>
-                    <div className={s.spots}>
-                      <span className={s.spotsN}>{regionRow.spots}</span>
-                      <span className={s.spotsText}><span className={s.spotsTitle}>spots, worked out for you</span><span className={s.spotsRoute}>{options.rates.base} → {regionRow.name} · return trip</span></span>
-                    </div>
-                    <div className={s.sum}>
-                      <div className={s.sumRow}><span className={s.sumLabel}>Spots for this route</span><span className={s.sumValue}>{regionRow.spots} spots</span></div>
-                      <div className={s.sumRow}><span className={s.sumLabel}>Rate per spot</span><span className={s.sumValue}>{options.rates.perSpot !== null ? rm2(options.rates.perSpot) : "Not set"}</span></div>
-                      <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(amount)}</span></div>
-                      <span className={s.sumNote}>Set by the fixed rate. You can&apos;t edit the amount.</span>
-                    </div>
-                  </>
-                )}
-                {regionRow && regionRow.spots === 0 && <p className={s.local}>{options.rates.base} fairs are local, so there is no outstation claim.</p>}
-              </>
+                  {regionRow?.planeTicket && (
+                    <>
+                      <div className={s.spots}>
+                        <span className={s.spotsN}><Svg d={PLANE} size={26} sw={1.9} /></span>
+                        <span className={s.spotsText}><span className={s.spotsTitle}>Plane ticket</span><span className={s.spotsRoute}>{options.rates.base} → {regionRow.name} · the price on its invoice</span></span>
+                      </div>
+                      <label className={s.field}><span className={s.fieldLabel}>Ticket price (RM)</span>
+                        <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 456.70" value={ticket} onChange={e => setTicket(e.target.value)} maxLength={12} />
+                      </label>
+                      <div className={s.sum}>
+                        <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(amount)}</span></div>
+                        <span className={s.sumNote}>HR checks it against the invoice.</span>
+                      </div>
+                      <Invoice file={file} fileRef={fileRef} onFile={setFile} />
+                    </>
+                  )}
+                  {regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
+                    <>
+                      <div className={s.spots}>
+                        <span className={s.spotsN}>{regionRow.spots}</span>
+                        <span className={s.spotsText}><span className={s.spotsTitle}>spots, worked out for you</span><span className={s.spotsRoute}>{options.rates.base} → {regionRow.name} · return trip</span></span>
+                      </div>
+                      <div className={s.sum}>
+                        <div className={s.sumRow}><span className={s.sumLabel}>Spots for this route</span><span className={s.sumValue}>{regionRow.spots} spots</span></div>
+                        <div className={s.sumRow}><span className={s.sumLabel}>Rate per spot</span><span className={s.sumValue}>{options.rates.perSpot !== null ? rm2(options.rates.perSpot) : "Not set"}</span></div>
+                        <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(amount)}</span></div>
+                        <span className={s.sumNote}>Set by the fixed rate. You can&apos;t edit the amount.</span>
+                      </div>
+                    </>
+                  )}
+                  {regionRow && !regionRow.planeTicket && regionRow.spots === 0 && <p className={s.local}>{venue} is local to {options.rates.base}, so there is no outstation claim.</p>}
+                </>
+              ) : null
             ) : (
               <>
                 <div className={s.two}>
@@ -297,20 +334,17 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
                   </div>
                 </div>
                 <div className={s.sum}>
-                  <div className={s.sumRow}><span className={s.sumLabel}>Total pax</span><span className={s.sumValue}>{male + female} pax · {male} male, {female} female</span></div>
+                  <div className={s.sumRow}><span className={s.sumLabel}>Total pax</span><span className={s.sumValue}>{pax} pax · {male} male, {female} female</span></div>
                   <div className={s.sumRow}><span className={s.sumLabel}>Nights</span><span className={s.sumValue}>{nights !== null && nights > 0 ? `${nights} night${nights === 1 ? "" : "s"}` : "—"}</span></div>
-                  <div className={s.sumRow}><span className={s.sumLabel}>Rate per pax per night</span><span className={s.sumValue}>{options.rates.perPaxNight !== null ? rm2(options.rates.perPaxNight) : "Not set"}</span></div>
+                  {three ? (
+                    <div className={s.sumRow}><span className={s.sumLabel}>Rate for 3 pax per night</span><span className={s.sumValue}>{rm2(options.rates.perThreePaxNight ?? 0)}</span></div>
+                  ) : (
+                    <div className={s.sumRow}><span className={s.sumLabel}>Rate per pax per night</span><span className={s.sumValue}>{options.rates.perPaxNight !== null ? rm2(options.rates.perPaxNight) : "Not set"}</span></div>
+                  )}
                   <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(amount)}</span></div>
                   <span className={s.sumNote}>Set by the fixed rate. You can&apos;t edit the amount.</span>
                 </div>
-                <div className={s.field}><span className={s.fieldLabel}>Invoice</span>
-                  <button className={s.upload} onClick={() => fileRef.current?.click()}>
-                    <Svg d={CAMERA} size={24} sw={1.8} stroke="var(--rv-accent)" />
-                    <span className={s.uploadTitle}>{file ? file.name : "Take a photo or choose a file"}</span>
-                    <span className={s.uploadSub}>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · tap to change` : "JPG, PNG or PDF, up to 3 MB"}</span>
-                  </button>
-                  <input ref={fileRef} type="file" accept="image/jpeg,image/png,application/pdf" hidden onChange={e => setFile(e.target.files?.[0] ?? null)} />
-                </div>
+                <Invoice file={file} fileRef={fileRef} onFile={setFile} />
               </>
             )}
             <label className={s.field}><span className={s.fieldLabel}>Notes (optional)</span><textarea rows={2} className={`${s.input} ${s.textarea}`} placeholder="Anything HR should know" value={notes} onChange={e => setNotes(e.target.value)} maxLength={1500} /></label>
@@ -438,6 +472,20 @@ function capacityText(d: { capacity: number | null; occupied: number } | undefin
   if (d.capacity === null) return `${d.occupied} · no limit`;
   const open = Math.max(d.capacity - d.occupied, 0);
   return `${d.occupied} / ${d.capacity} · ${open} open`;
+}
+
+/** The invoice: an Airbnb stay's, or a plane ticket's. */
+function Invoice({ file, fileRef, onFile }: { file: File | null; fileRef: RefObject<HTMLInputElement | null>; onFile: (file: File | null) => void }) {
+  return (
+    <div className={s.field}><span className={s.fieldLabel}>Invoice</span>
+      <button className={s.upload} onClick={() => fileRef.current?.click()}>
+        <Svg d={CAMERA} size={24} sw={1.8} stroke="var(--rv-accent)" />
+        <span className={s.uploadTitle}>{file ? file.name : "Take a photo or choose a file"}</span>
+        <span className={s.uploadSub}>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · tap to change` : "JPG, PNG or PDF, up to 3 MB"}</span>
+      </button>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,application/pdf" hidden onChange={e => onFile(e.target.files?.[0] ?? null)} />
+    </div>
+  );
 }
 
 function Counter({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {

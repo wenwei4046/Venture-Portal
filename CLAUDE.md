@@ -1417,6 +1417,25 @@ src/
 │   │                                  and send nothing — *Read-only while
 │   │                                  viewing as* (user 2026-10-06: 只能看，不能
 │   │                                  送出); only the member's own login sends.
+│   │                                  **A CLAIM IS FOR YOUR BRAND WEEK
+│   │                                  (2026-10-06, user):** the phone sends only
+│   │                                  the weekend; the fair is the booth the
+│   │                                  Arena scores the member at (their pick,
+│   │                                  else auto-located by most bills —
+│   │                                  `member_claim_brand_week`, the same boards
+│   │                                  `claimWeeks` reads), its region the one HR
+│   │                                  set for the VENUE
+│   │                                  (`member_claim_venue_regions`, every ERP
+│   │                                  venue listed on Claim rates; unmapped =
+│   │                                  cannot be claimed), the amount
+│   │                                  `member_claim_detail_for`'s. A region
+│   │                                  ticked *Plane ticket* (Sabah, Sarawak) is
+│   │                                  the ticket's typed price + its invoice, no
+│   │                                  cap. Airbnb is by head count; exactly three
+│   │                                  share `airbnb_three_pax_per_night` (e.g.
+│   │                                  RM 220) when set. The form opens on the
+│   │                                  newest brand week, months on the badges.
+│   │                                  Mig `20261006050000`.
 │   │                                  **My brand weeks** (Profile chip / Today's
 │   │                                  reminder; no prototype page) = this
 │   │                                  month's weekends then the month still
