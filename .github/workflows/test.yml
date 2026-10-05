@@ -47,6 +47,11 @@ jobs:
           # in Vercel project settings for actual deployments.
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          # The build outgrew Node's default ~2 GB heap (2026-10-06: "JavaScript
+          # heap out of memory" on main #204 and on PR #203, green on a rerun).
+          # The runner has 7 GB; 4 GB ends the coin toss without touching what
+          # Vercel builds.
+          NODE_OPTIONS: --max-old-space-size=4096
 
   worker:
     name: Cloudflare worker build + PDF smoke
@@ -88,3 +93,6 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          # Same 4 GB heap as the build check above: the worker build runs a full
+          # `next build` underneath and hit the same 2 GB wall (PR #203).
+          NODE_OPTIONS: --max-old-space-size=4096
