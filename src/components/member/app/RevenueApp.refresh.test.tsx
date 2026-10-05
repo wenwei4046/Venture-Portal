@@ -55,7 +55,10 @@ function source(make: () => MemberData, hold: { on: boolean }) {
   return {
     refresh: vi.fn(async () => ({ ok: true as const, data: make() })),
     insight: none, kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
-    submitRequest: none, cancelRequest: none, claimRates: none, income: none, honours: none, saveBrandWeeks: none,
+    submitRequest: none, cancelRequest: none, claimRates: none, honours: none, saveBrandWeeks: none,
+    // Today's month, worked out by the engine: mocks of their own, so their reads can be counted.
+    income: vi.fn(async (_sub: string, _period: string, _context?: MemberReadContext) => ({ ok: false as const, error: "not in this test" })),
+    departmentIncome: vi.fn(async (_sub: string, _period: string) => ({ ok: false as const, error: "not in this test" })),
     memoReceipts: vi.fn(async () => ({ ok: true as const, data: [] })),
     orderBook: vi.fn((_sub: string, from: string, until: string) => later({ ok: true as const, data: book(from, until) })),
     arena: vi.fn((membershipId: string, period: string, _window: string, context?: MemberReadContext) =>
@@ -83,7 +86,7 @@ async function refreshOnBrandWeeks(make: () => MemberData, search: string) {
   const live = source(make, hold);
   render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={live} />);
   expect(await screen.findByText("0 of 5 picked")).toBeInTheDocument();
-  const reads = { arena: live.arena.mock.calls.length, book: live.orderBook.mock.calls.length };
+  const reads = { arena: live.arena.mock.calls.length, book: live.orderBook.mock.calls.length, income: live.income.mock.calls.length };
   hold.on = true;
   expect(minute).toBeTypeOf("function");
   await act(async () => { minute!(); });
@@ -98,6 +101,9 @@ describe("RevenueApp's minute refresh", () => {
     expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
     expect(live.arena).toHaveBeenCalledTimes(reads.arena);
     expect(live.orderBook).toHaveBeenCalledTimes(reads.book);
+    // Today is the live month (2026-10-06): the viewed person's October, asked for by ids, once.
+    expect(live.income).toHaveBeenCalledWith("fair", "2026-10", { staffId: "anthony", subDepartmentId: "fair" });
+    expect(live.income).toHaveBeenCalledTimes(reads.income);
   });
 
   it("a member: the paid month's results are not read again", async () => {
@@ -106,5 +112,7 @@ describe("RevenueApp's minute refresh", () => {
     expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
     expect(live.arena).toHaveBeenCalledTimes(reads.arena);
     expect(live.orderBook).toHaveBeenCalledTimes(reads.book);
+    expect(live.income).toHaveBeenCalledWith("fair", "2026-10", undefined);
+    expect(live.income).toHaveBeenCalledTimes(reads.income);
   });
 });
