@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberData, loadMemberInsight, loadMemberOrgMap } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -220,6 +220,89 @@ describe('Principal Revenue View server boundary', () => {
   it('does not extend the Principal quote exception to personal member memo acknowledgements', async () => {
     expect((await acknowledgeMemberMemo(productId, true)).ok).toBe(false)
     expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// `member_claim_rates` is HR's table: asked for as a function it failed every
+// time, the claim form had no region and no rate, and nothing could be sent (2026-10-06).
+describe('the claim form reads HR’s rates', () => {
+  const rates = { base: 'Klang Valley', perSpot: 50, perPaxNight: 65, regions: [{ id: productId, name: 'Penang', spots: 4 }] }
+
+  it.each([
+    { who: 'a member', identity: { role: 'revenue_member' as const, permissions: ['member_portal', 'member_requests'] } },
+    { who: 'the Principal in View as', identity: { role: 'principal' as const } },
+  ])('through member_claim_settings, for $who', async ({ identity }) => {
+    mocks.getUser.mockResolvedValue(user(identity))
+    mocks.rpc.mockResolvedValueOnce({ data: rates, error: null })
+    expect(await loadMemberClaimRates()).toEqual({ ok: true, data: rates })
+    expect(mocks.rpc).toHaveBeenCalledTimes(1)
+    expect(mocks.rpc).toHaveBeenCalledWith('member_claim_settings', undefined)
+  })
+
+  it('asks nothing for an account without member access', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'finance', permissions: ['treasury'] }))
+    expect((await loadMemberClaimRates()).ok).toBe(false)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// What the Revenue app's three forms send (RequestForm's `submit`), as a member
+// sends it: prepared, then submitted, with nothing typed taken as money.
+describe('a member sends a request', () => {
+  const fair = '10000000-0000-4000-8000-000000000010'
+  const ir = '10000000-0000-4000-8000-000000000011'
+  const region = '10000000-0000-4000-8000-000000000020'
+  const yuny = '10000000-0000-4000-8000-000000000030'
+  const requestId = '10000000-0000-4000-8000-000000000040'
+  const key = '10000000-0000-4000-8000-000000000050'
+  const form = (fields: Record<string, string>) => {
+    const data = new FormData()
+    for (const [name, value] of Object.entries(fields)) data.set(name, value)
+    return data
+  }
+  const sent = { id: requestId, kind: 'claim', title: 'Outstation claim · MITC Melaka', status: 'submitted', createdAt: '', requestNo: 'RQ-2610-001', detail: {} }
+
+  beforeEach(() => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_requests'] }))
+    mocks.rpc
+      .mockResolvedValueOnce({ data: { id: requestId, userId, status: 'draft' }, error: null })
+      .mockResolvedValueOnce({ data: sent, error: null })
+  })
+
+  it('an outstation claim: the brand week, its booth and the region — no amount, no invoice', async () => {
+    const result = await submitMemberRequest(form({
+      kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02',
+      brand: 'AKEMI', location: 'MITC Melaka', notes: '', region,
+    }))
+    expect(result).toEqual({ ok: true, data: sent })
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', {
+      p_kind: 'claim', p_sub_department: fair, p_idempotency: key, p_revision: null,
+      p_detail: { claimType: 'outstation', week: '2026-10-02', location: 'MITC Melaka', notes: '', brand: 'AKEMI', region },
+    })
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('a replacement: leaving the sub-department is the database’s member_exit', async () => {
+    expect((await submitMemberRequest(form({
+      kind: 'replacement', subDepartmentId: fair, idempotencyKey: key, originalStaffId: yuny, destination: 'department_exit',
+      replacementSource: 'new', newPerson: 'Amelia Tan', effective: '2026-11-01', reason: 'Moving to Penang',
+    }))).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', expect.objectContaining({
+      p_kind: 'replacement', p_sub_department: fair,
+      p_detail: { newPerson: 'Amelia Tan', replacementSource: 'new', originalStaffId: yuny, destination: 'member_exit', effective: '2026-11-01', reason: 'Moving to Penang' },
+    }))
+  })
+
+  it('a waiting list goes to the sub-department it prefers, signed and consented', async () => {
+    expect((await submitMemberRequest(form({
+      kind: 'waiting', subDepartmentId: fair, idempotencyKey: key, newPerson: 'Amelia Tan', contact: '012-345 6789',
+      targetDepartmentId: ir, start: '2026-11-01', consent: 'true', signature: 'Jia En',
+    }))).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', expect.objectContaining({
+      p_kind: 'waiting', p_sub_department: ir,
+      p_detail: { newPerson: 'Amelia Tan', contact: '012-345 6789', start: '2026-11-01', signature: 'Jia En', consent: true },
+    }))
   })
 })
 

@@ -17,12 +17,13 @@ const FILTERS: { id: RequestFilter; label: string }[] = [
   { id: "all", label: "All" }, { id: "claim", label: "Claim" }, { id: "replacement", label: "Replacement" }, { id: "waiting", label: "Waiting list" },
 ];
 
-/** Requests (lines 1081–1108): three ways to start one, then everything sent and where it is. */
-export default function RequestsPage({ rows, filter, readOnly, onFilter, onBack, onNew, onOpen }: {
+/**
+ * Requests (lines 1081–1108): three ways to start one, then everything sent and where it is.
+ * Each opens its form, in View as too — the form is where read-only shows (it sends nothing).
+ */
+export default function RequestsPage({ rows, filter, onFilter, onBack, onNew, onOpen }: {
   rows: RequestRowVM[];
   filter: RequestFilter;
-  /** A Principal viewing somebody: nothing can be submitted for them. */
-  readOnly: boolean;
   onFilter: (filter: RequestFilter) => void;
   onBack: () => void;
   onNew: (kind: RequestKindVM) => void;
@@ -34,7 +35,7 @@ export default function RequestsPage({ rows, filter, readOnly, onFilter, onBack,
       <PageHead back="Profile" title="Requests" onBack={onBack} />
       <section className={s.newCard}>
         {NEW.map(n => (
-          <button key={n.kind} className={s.newRow} onClick={() => onNew(n.kind)} disabled={readOnly}>
+          <button key={n.kind} className={s.newRow} onClick={() => onNew(n.kind)}>
             <span className={`${s.newIcon} ${n.tone}`}><Svg d={n.d} size={20} sw={1.8} /></span>
             <span className={s.sheetMinW}><span className={s.newTitle}>{n.title}</span><span className={s.newSub}>{n.sub}</span></span>
             <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
