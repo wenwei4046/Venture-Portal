@@ -1388,25 +1388,36 @@ src/
 │   │                                  department's total, named as such
 │   │                                  (`loadDepartmentIncome`, the Principal's
 │   │                                  own session).
-│   │                                  **TODAY IS THE LIVE MONTH (2026-10-06,
+│   │                                  **THE APP IS THE LIVE MONTH (2026-10-06,
 │   │                                  user: "on live date, not showing last
-│   │                                  month"):** the hero, its Sales / Margin /
-│   │                                  KPI and Your Arena are the CURRENT month,
-│   │                                  even while last month is still being
-│   │                                  closed, and a tap opens Insight / the
-│   │                                  Arena on that month. Insight, Arena, My
-│   │                                  income and honours still open on the
-│   │                                  month being closed; brand weeks and the
-│   │                                  claim form still cover both months. The
-│   │                                  live figure carries what the member facts
-│   │                                  carry (`carriesInto`, the `carry` option
-│   │                                  of `loadCommissionInput`): a bill stays
-│   │                                  in its own month until that month is
-│   │                                  closed for its salesperson. Comm Cal's
-│   │                                  own carry (every bill no run released)
-│   │                                  made October count all 357 of
-│   │                                  September's bills again (KAR JUN RM
-│   │                                  17,568 instead of RM 5,674).
+│   │                                  month" / "也开在当月"):** Today (hero,
+│   │                                  Sales / Margin / KPI, Your Arena),
+│   │                                  Insight, the Arena and My income open on
+│   │                                  the CURRENT month even while last month
+│   │                                  is still being closed — that one is in
+│   │                                  the date sheet, marked Live. The bell's
+│   │                                  news of a settled month opens that
+│   │                                  month. Honours, Team, brand weeks and
+│   │                                  the claim form still read the month
+│   │                                  being closed (`working`).
+│   │                                  **A SALE'S MONTH IS ITS OWN (same day,
+│   │                                  user: by record it follows the date,
+│   │                                  never a close):** `member_order_facts`
+│   │                                  counts every bill in its `period_month`
+│   │                                  for good (mig `20261006130000`; it used
+│   │                                  to move a bill a close had not paid into
+│   │                                  the next open month). A close decides
+│   │                                  only when a bill is PAID: Comm Cal's
+│   │                                  carry (`lib/commission/carry.ts`, read
+│   │                                  inside `loadCommissionInput`) takes an
+│   │                                  earlier month's unpaid bill only once
+│   │                                  that month is closed for its
+│   │                                  salesperson. It used to take every bill
+│   │                                  no run released, so October's page
+│   │                                  counted all 357 September bills again
+│   │                                  (Fair RM 185,329 for RM 24,835; KAR JUN
+│   │                                  RM 17,568 for RM 5,674). A replayed run
+│   │                                  still shows the earlier bills it paid.
 │   │                                  **My honours** = every finish of a FINAL
 │   │                                  month — Sales / Margin / KPI total and by
 │   │                                  brand, Championship, and the weekly booth
