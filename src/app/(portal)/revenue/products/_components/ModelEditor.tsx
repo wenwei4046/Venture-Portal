@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { valueKey } from '@/lib/catalogue/keys'
-import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, optionKeysOf, RIDER, skuKeyOf, type OptionKey } from '@/lib/catalogue/options'
+import { CALC_CATEGORIES, calcCategoryOf, defaultGift, erpAllows, isRestricted, isRiderModel, needsBrandPick, optionKeysOf, RIDER, skuKeyOf, type OptionKey } from '@/lib/catalogue/options'
 import { saveModelSettings } from '../../catalogue-actions'
 import type { BrandRef, CatalogueModel, MaintenanceOption } from '../load'
 import { useProductDraftGuard } from './ProductWorkspace'
@@ -64,13 +64,18 @@ export default function ModelEditor({ model, brands, options, position, onClose,
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [guard, setGuard] = useState<Leave | null>(null)
+  // The margin ladder and the calculator section follow the ERP's branding,
+  // and a rider's margin follows the cart's brand: only a mattress or a sofa
+  // the system cannot place is asked (user 2026-10-06). Anything stored for
+  // the others is not read, and a save clears it.
+  const picks = needsBrandPick(model.category, model.derivedBrand)
   const [saved] = useState<Draft>(() => ({
     offered: model.offered,
     skuTicks: Object.fromEntries(model.skus.map(s => [s.erpId, s.offered])),
     enabled: { ...model.enabled },
     gift: model.giftOverride,
-    calc: model.calcOverride,
-    brand: model.brandOverride,
+    calc: picks ? model.calcOverride : null,
+    brand: picks ? model.brandOverride : null,
   }))
   const [offered, setOffered] = useState(saved.offered)
   const [skuTicks, setSkuTicks] = useState(saved.skuTicks)
@@ -85,7 +90,7 @@ export default function ModelEditor({ model, brands, options, position, onClose,
   useProductDraftGuard(dirty, saving)
   const derivedCalc = calcCategoryOf(model.category, model.name ?? model.code)
   const liveSkus = model.skus.filter(s => !s.removed && s.active)
-  const missingLadder = !isRiderModel(model.category, brand) && !(brand ?? model.derivedBrand)
+  const missingLadder = picks && !brand
   const hasPrev = !!position && position.index > 0
   const hasNext = !!position && position.index < position.total - 1
 
@@ -222,30 +227,34 @@ export default function ModelEditor({ model, brands, options, position, onClose,
           {note ? <p className="modular-win-note" role="status">{note}</p> : null}
           <fieldset disabled={saving} className="min-w-0">
             <legend className="sr-only">Model settings</legend>
-            <section className="modular-win-gates" aria-label="Calculator listing">
+            <section className="modular-win-gates" aria-label="Calculator listing" data-picks={picks || undefined}>
               <div className="modular-win-field">
                 <span className="modular-win-label">Revenue calculator</span>
                 <button type="button" role="switch" aria-checked={offered} aria-label="Offered in the Revenue calculator" className="modular-win-switch" onClick={() => turnOn(!offered)}>
                   <span className="modular-win-track" aria-hidden="true" /><span>{offered ? 'Offered' : 'Not offered'}</span>
                 </button>
               </div>
-              <label className="modular-win-field" data-bad={missingLadder || undefined}>
-                <span className="modular-win-label">Margin ladder</span>
-                <select aria-label="Margin ladder" value={brand ?? ''} onChange={e => setBrand(e.target.value || null)}>
-                  <option value="">{model.derivedBrand ? `${model.derivedBrand} (ERP default)` : isRiderModel(model.category, null) ? 'Rider (ERP default)' : 'Not assigned (ERP default)'}</option>
-                  {brand && brand !== RIDER && !brands.some(b => b.code === brand) ? <option value={brand}>{brand} (unavailable)</option> : null}
-                  {brands.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
-                  <option value={RIDER}>Rider — no brand of its own</option>
-                </select>
-                <span className="modular-win-help">{missingLadder ? `Required. A ${categoryName(model.category)} with no ladder cannot appear in the calculator.` : isRiderModel(model.category, brand) ? 'A rider joins any cart; the mattress or sofa decides the ladder.' : 'Margins on this model are measured on this ladder.'}</span>
-              </label>
-              <label className="modular-win-field">
-                <span className="modular-win-label">Calculator section</span>
-                <select aria-label="Calculator section" value={calc ?? ''} onChange={e => setCalc(e.target.value || null)}>
-                  <option value="">{derivedCalc} (ERP default)</option>
-                  {CALC_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </label>
+              {picks ? <>
+                <label className="modular-win-field" data-bad={missingLadder || undefined}>
+                  <span className="modular-win-label">Margin ladder</span>
+                  <select aria-label="Margin ladder" value={brand ?? ''} onChange={e => setBrand(e.target.value || null)}>
+                    <option value="">Not assigned</option>
+                    {brand && brand !== RIDER && !brands.some(b => b.code === brand) ? <option value={brand}>{brand} (unavailable)</option> : null}
+                    {brands.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                    <option value={RIDER}>Rider — no brand of its own</option>
+                  </select>
+                  <span className="modular-win-help">{missingLadder
+                    ? `Required. ${model.branding ? `The ERP branding ${model.branding} is not a brand the portal knows` : 'The ERP gives this model no branding'}, so the ${categoryName(model.category)} cannot appear in the calculator until a ladder is chosen.`
+                    : isRiderModel(model.category, brand) ? 'A rider joins any cart; the mattress or sofa decides the ladder.' : 'Margins on this model are measured on this ladder.'}</span>
+                </label>
+                <label className="modular-win-field">
+                  <span className="modular-win-label">Calculator section</span>
+                  <select aria-label="Calculator section" value={calc ?? ''} onChange={e => setCalc(e.target.value || null)}>
+                    <option value="">{derivedCalc} (ERP default)</option>
+                    {CALC_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+              </> : null}
               <label className="modular-win-field">
                 <span className="modular-win-label">Free gift</span>
                 <select aria-label="Free gift" value={gift === null ? '' : gift ? 'yes' : 'no'} onChange={e => setGift(e.target.value === '' ? null : e.target.value === 'yes')}>

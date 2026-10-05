@@ -11,8 +11,10 @@ import {
   isRestricted,
   isRiderModel,
   MAINTENANCE_SECTIONS,
+  needsBrandPick,
   optionKeysOf,
   RIDER,
+  sellsUnderBrand,
   sizeWordOf,
   skuKeyOf,
   skuOptionLabel,
@@ -191,18 +193,49 @@ describe('isRiderModel — who joins any cart', () => {
     ['MATTRESS', null, false],
     ['sofa', null, false],
     ['MATTRESS', RIDER, true],
-    ['BEDFRAME', 'AKEMI', false],
+    // A bed frame or an accessory is a rider whatever is stored (2026-10-06).
+    ['BEDFRAME', 'AKEMI', true],
     ['MATTRESS', 'AKEMI', false],
-  ])('%s with override %s → %s', (category, override, rider) => {
-    expect(isRiderModel(category, override)).toBe(rider)
+  ])('%s with pick %s → %s', (category, pick, rider) => {
+    expect(isRiderModel(category, pick)).toBe(rider)
   })
 
   it('is the rule member_catalogue applies', () => {
-    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260924040000_member_catalogue.sql'), 'utf8')
-    expect(sql).toContain("CASE WHEN cm.brand_code = 'RIDER' THEN NULL")
-    expect(sql).toContain("AND UPPER(COALESCE(m.category, e.category, '')) NOT IN ('MATTRESS', 'SOFA')),")
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261006170000_modular_asks_only_without_a_brand.sql'), 'utf8').replace(/\r\n/g, '\n')
+    expect(sql).toContain("(NOT erp.sells OR (erp.brand IS NULL AND COALESCE(cm.brand_code = 'RIDER', FALSE))) AS rider")
+    expect(sql).toContain("UPPER(BTRIM(COALESCE(m.category, e.category, ''))) IN ('MATTRESS', 'SOFA') AS sells")
     expect(sql).toContain('WHERE o.brand = ANY (p_brands) OR o.rider')
     expect(RIDER).toBe('RIDER')
+  })
+})
+
+describe('needsBrandPick — when Modular asks for a ladder and a section', () => {
+  it.each<[string | null, string | null, boolean]>([
+    // A mattress or a sofa the ERP gives no brand the portal knows (MYLATEX, none).
+    ['MATTRESS', null, true],
+    ['sofa', null, true],
+    [' SOFA ', null, true],
+    // Branded: the ERP's brand and section, nothing to ask.
+    ['MATTRESS', 'AKEMI', false],
+    ['SOFA', 'ZANOTTI', false],
+    // A rider's margin follows the cart's brand: never asked.
+    ['BEDFRAME', null, false],
+    ['ACCESSORY', null, false],
+    ['FABRIC_ACCESSORY', null, false],
+    [null, null, false],
+  ])('%j with ERP brand %j → %s', (category, derived, asked) => {
+    expect(needsBrandPick(category, derived)).toBe(asked)
+  })
+
+  it('only a mattress or a sofa sells under a brand', () => {
+    expect(['MATTRESS', 'SOFA', 'mattress'].map(sellsUnderBrand)).toEqual([true, true, true])
+    expect(['BEDFRAME', 'ACCESSORY', 'BEDLINES', 'SERVICE', '', null].map(sellsUnderBrand)).toEqual([false, false, false, false, false, false])
+  })
+
+  it('is the rule member_catalogue applies: a pick is read only where the ERP gives a mattress or a sofa no brand', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261006170000_modular_asks_only_without_a_brand.sql'), 'utf8').replace(/\r\n/g, '\n')
+    expect(sql).toContain('CASE WHEN erp.sells AND erp.brand IS NULL\n                    THEN COALESCE(cm.calc_category,')
+    expect(sql).toContain('CASE WHEN NOT erp.sells THEN NULL\n                    WHEN erp.brand IS NOT NULL THEN erp.brand')
   })
 })
 

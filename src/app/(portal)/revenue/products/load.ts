@@ -2,7 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { priceGridOf, type PriceCell } from '@/lib/catalogue/pricing'
-import { calcCategoryOf, defaultGift, skuOptionLabel } from '@/lib/catalogue/options'
+import { calcCategoryOf, defaultGift, needsBrandPick, sellsUnderBrand, skuOptionLabel } from '@/lib/catalogue/options'
 import { normaliseComboModules } from '@/lib/catalogue/combos'
 import { officeDate } from '@/lib/office-clock'
 
@@ -108,8 +108,7 @@ export function brandOf(
   skuBranding: string | null,
   brands: BrandRef[],
 ): string | null {
-  const c = (category ?? '').toUpperCase()
-  if (c !== 'MATTRESS' && c !== 'SOFA') return null
+  if (!sellsUnderBrand(category)) return null
   return brandByName(modelBranding, brands) ?? brandByName(skuBranding, brands)
 }
 
@@ -314,8 +313,10 @@ export interface CatalogueModel {
   gift: boolean
   giftOverride: boolean | null
   calcCategory: string
+  /** The section picked on Modular — only ever read while `needsBrandPick`; null otherwise. */
   calcOverride: string | null
   brand: string | null
+  /** The ladder picked on Modular (a brand code or RIDER) — only ever read while `needsBrandPick`; null otherwise. */
   brandOverride: string | null
   /** The brand the ERP branding alone gives — what "From the ERP branding" means. */
   derivedBrand: string | null
@@ -371,11 +372,14 @@ export async function loadModels(): Promise<{ models: CatalogueModel[]; brands: 
       const category = str(m.category)
       const skus = byModel.get(erpId) ?? []
       const derivedCalc = calcCategoryOf(category, str(m.name) ?? str(m.model_code))
-      const calcOverride = s ? str(s.calc_category) : null
+      const derivedBrand = brandOf(category, str(m.branding), skus.find(k => k.branding)?.branding ?? null, t.brands)
+      // The ERP's branding decides the ladder and the section; a pick counts
+      // only where it cannot — as member_catalogue reads it (2026-10-06).
+      const picks = needsBrandPick(category, derivedBrand)
+      const calcOverride = picks && s ? str(s.calc_category) : null
       const calc = calcOverride ?? derivedCalc
       const giftOverride = s && s.gift !== null && s.gift !== undefined ? s.gift === true : null
-      const brandOverride = s ? str(s.brand_code) : null
-      const derivedBrand = brandOf(category, str(m.branding), skus.find(k => k.branding)?.branding ?? null, t.brands)
+      const brandOverride = picks && s ? str(s.brand_code) : null
       return {
         erpId,
         code: String(m.model_code),

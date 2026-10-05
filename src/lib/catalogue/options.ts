@@ -129,18 +129,36 @@ export function erpAllows(allowed: unknown, key: string, pool: readonly string[]
 /** The brand override that marks a model a rider on Modular. */
 export const RIDER = 'RIDER'
 
+/** Only a mattress or a sofa sells under a brand (user 2026-09-12); everything else rides along. */
+export function sellsUnderBrand(category: string | null): boolean {
+  const c = (category ?? '').trim().toUpperCase()
+  return c === 'MATTRESS' || c === 'SOFA'
+}
+
+/**
+ * Whether Modular asks a person for the margin ladder and the calculator
+ * section (2026-10-06, user: 它是跟着 brand，而不是跟着我这里去选 … for those
+ * system can't detect the brand). Only a mattress or a sofa whose ERP branding
+ * names no brand the portal knows (MYLATEX, or none) — `derivedBrand` null.
+ * A branded one follows its brand, and a bed frame or an accessory is a rider
+ * whose margin follows the cart's brand: neither is asked, and a pick stored
+ * for one is not read. The twin of member_catalogue's (migration
+ * 20261006170000).
+ */
+export function needsBrandPick(category: string | null, derivedBrand: string | null): boolean {
+  return sellsUnderBrand(category) && !derivedBrand
+}
+
 /**
  * Whether a model's SKUs join any cart, the way `member_catalogue` reads it
- * (migration 20260924040000): marked Rider on Modular, or a bed frame or an
- * accessory nobody gave a brand. A mattress or a sofa decides the cart's
- * ladder, so it is never a rider by default — one whose ERP branding matches
- * no brand the portal knows is not offered until a ladder is chosen for it.
+ * (migration 20261006170000): a bed frame, an accessory or anything else that
+ * is not a mattress or a sofa, always — or a brandless mattress or sofa marked
+ * Rider on Modular. `brandPick` is the pick that counts: null wherever
+ * `needsBrandPick` is false.
  */
-export function isRiderModel(category: string | null, brandOverride: string | null): boolean {
-  if (brandOverride === RIDER) return true
-  if (brandOverride) return false
-  const c = (category ?? '').trim().toUpperCase()
-  return c !== 'MATTRESS' && c !== 'SOFA'
+export function isRiderModel(category: string | null, brandPick: string | null): boolean {
+  if (!sellsUnderBrand(category)) return true
+  return brandPick === RIDER
 }
 
 /** The calculator's section for a model — `catalogue_calc_category` in TypeScript. */
