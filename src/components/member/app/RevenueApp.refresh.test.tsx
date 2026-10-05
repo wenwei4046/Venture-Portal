@@ -54,7 +54,8 @@ function source(make: () => MemberData, hold: { on: boolean }) {
   const none = vi.fn(async () => ({ ok: false as const, error: "not in this test" }));
   return {
     refresh: vi.fn(async () => ({ ok: true as const, data: make() })),
-    insight: none, kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
+    insight: vi.fn(async (_period: string | undefined, _context?: MemberReadContext) => ({ ok: false as const, error: "not in this test" })),
+    kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
     submitRequest: none, cancelRequest: none, claimRates: none, honours: none, saveBrandWeeks: none,
     // Today's month, worked out by the engine: mocks of their own, so their reads can be counted.
     income: vi.fn(async (_sub: string, _period: string, _context?: MemberReadContext) => ({ ok: false as const, error: "not in this test" })),
@@ -114,5 +115,20 @@ describe("RevenueApp's minute refresh", () => {
     expect(live.orderBook).toHaveBeenCalledTimes(reads.book);
     expect(live.income).toHaveBeenCalledWith("fair", "2026-10", undefined);
     expect(live.income).toHaveBeenCalledTimes(reads.income);
+  });
+});
+
+// 2026-10-06, measured on prod: Server Actions run one at a time, and before the
+// month being worked was known Insight read the current month's bills, block and
+// KPI — three reads queued in front of Today's own, only to be read again.
+describe("Today's first load", () => {
+  it("reads this month's Insight block once, and no bills beyond the two-month book", async () => {
+    window.history.replaceState({}, "", "/member?department=fair");
+    const live = source(memberData, { on: false });
+    render(<RevenueApp initialData={memberData()} initialSearch="?department=fair" today="2026-10-05" source={live} />);
+    await vi.waitFor(() => expect(live.arena).toHaveBeenCalledWith("fair", "2026-10", "monthly", undefined));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+    expect(live.insight.mock.calls.filter(([period]) => period === "2026-10")).toHaveLength(1);
+    expect(live.orderBook.mock.calls.map(([, from, until]) => `${from}..${until}`)).toEqual(["2026-09..2026-10"]);
   });
 });
