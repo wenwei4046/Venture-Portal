@@ -1320,6 +1320,14 @@ VP's. The member C release above describes the screens this replaced.
   only*) instead of RM 0.00; a request HR sent back has *Update and send again*;
   Profile keeps *Install the app* where the browser can install (the prototype has
   no row for it); forms start empty where the prototype pre-picked an example.
+- **Directors stand side by side** — the prototype's family chart (Team &
+  capacity) drew ONE director above the line of uplines. A sub-department with
+  two (Fair: KRIS and PETER) is one level, labelled `DIRECTORS`: the cards in a
+  row 24px apart, a bar under them and one line down to the top of the tree —
+  the portal's director rail, in the app's tree colours. Stacked, they read as
+  one reporting to the other. When that row would start off a phone's screen,
+  the chart opens on its middle instead of its left edge; with one director it
+  is exactly the prototype.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
@@ -2441,6 +2449,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Revenue app · directors side by side)** — Team & capacity's *Your Revenue family* drew Fair's two directors one above the other (KRIS, then PETER, then the member), as if PETER reported to KRIS. A level now holds peers: `DIRECTORS` over KRIS and PETER in one row (`.peers` / `.peer`, 156px a card), joined under their cards by the same 2px bar the direct reports hang from, one line down to the next level. One director is drawn exactly as before. On a phone, a row that would start off-screen opens the chart on its middle. See *Directors stand side by side*.
 - **2026-10-05 (Revenue app · Profile finished)** — the two Profile chips the prototype left without a page now lead somewhere: **My brand weeks** is a page of the app's own parts (a block per month, a row per fair weekend: *Week N* and its days, four brand buttons — the picked one in the accent fill — and a note: *Open until 11 Oct* / *Closed 13 Sep · auto-located: Akemi* in amber, then the booth's venue), one *Save brand weeks* button; **Commission scheme** is a sheet built from the person sheet (avatar, *Rate · Fixed salary · Since* cells, then each brand's margin ladder as rows with the range on the right). My income on a claim-form month says *Claim form month · portal's working*. People › Member services gains **Claim rates**: three fields (base, rate per spot, Airbnb per person per night) over a ledger table of regions with their spots and what the route pays, *Add region*, Discard / Save.
 - **2026-10-05 (the Revenue app)** — `/member` is rebuilt to the Claude Design prototype (see *The Revenue app — built to the prototype*): Today, Insight, Quote (bed frame options as customer charges), Arena (Championship points, booth-by-booth Fair results) and Profile (My income live from Comm Cal until the close, Commission by order, My honours, Team & capacity, Requests with RQ numbers and claim forms, Memos, View as). Its own `--rv-*` palette under `[data-revenue-app]`; every rule number is VP's.
 - **2026-10-03 (brand weeks back office · Sep)** — People › Member services gains a **Brand weeks** tab after *Capacity & waiting list* (the portal page only, for whoever reviews member requests — HR and the Principal): a `.sheet-toolbar` (Department, Month, Refresh — locked while changes are unsaved, with a line saying so) over a `.table-frame` ledger table. **Member** first (name, title, *No member login*, *Saved 3 Oct · HR Manager* or *· by the member*), then one column per fair weekend (*Week 1* · *4–6 Sep* · *Closed 13 Sep* / *Open until 6 Oct*). Each cell is a brand `<select>` (*Not picked* · Akemi · Dunlopillo · Zanotti · Ergotex) over two 11px lines: what is stored — *Picked*, *Unconfirmed · ZANOTTI*, *Auto-located · AKEMI*, *No bills*, or *No DUNLOP booth this week — no place scores* — and the booths written at that week with their bills (*AKEMI 5 · ZANOTTI 2*), the one that earns the points bold over an orange underline, each booth's title giving venue, bills and sales. A changed cell takes the peach wash with an orange left edge and reads *Changed · not saved yet*; the frame's foot counts *N of M weeks picked · N changes not saved* beside **Discard** and the orange **Save N changes**, which saves every changed member at once and reads the month again. Every closed week stays settable here. Dates: a month is three letters everywhere (*Sep*, not *Sept*) — see "Date format".

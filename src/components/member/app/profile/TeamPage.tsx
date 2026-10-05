@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useLayoutEffect, useRef, type CSSProperties } from "react";
 import Sheet, { SheetHandle } from "../Sheet";
 import { PageHead } from "./IncomePages";
 import type { PersonSheetVM, TeamDot, TeamNodeVM, TeamVM } from "./profile-vm";
@@ -9,8 +9,29 @@ import s from "./profile.module.css";
 const DOT: Record<TeamDot, string> = { good: s.dotGood, wait: s.dotWait, up: s.dotUp };
 const INK = { ink: "", good: s.psGood, up: s.psUp, wait: s.psWait } as const;
 
+/** A director's place on a shared level (`.peer`): the 132px card and the 24px between two. */
+const PEER_W = 156;
+/**
+ * 580px holds four direct reports and three directors side by side, as drawn;
+ * more people on a row widen the chart, so no card overlaps and the swipe reaches them all.
+ */
+function chartStyle(vm: TeamVM): CSSProperties | undefined {
+  const width = Math.max(vm.kids.length > 4 ? vm.kids.length * 135 + 40 : 0, ...vm.ups.map(u => u.nodes.length * PEER_W + 40));
+  return width > 580 ? { width } : undefined;
+}
+
 /** Team & capacity (`team-style="b"`, lines 999–1080): the department's places, then the family chart. */
 export default function TeamPage({ vm, onBack, onPerson }: { vm: TeamVM | null; onBack: () => void; onPerson: (id: string) => void }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const meId = vm?.me.id;
+  const widest = vm ? Math.max(0, ...vm.ups.map(u => u.nodes.length)) * PEER_W : 0;
+  // The chart opens at its left edge, as drawn. On a phone that puts the middle
+  // column right of centre, and a second director would start half off-screen —
+  // then, and only then, it opens on the middle instead.
+  useLayoutEffect(() => {
+    const box = scroller.current;
+    if (box && widest > PEER_W && (box.scrollWidth + widest) / 2 > box.clientWidth) box.scrollLeft = (box.scrollWidth - box.clientWidth) / 2;
+  }, [meId, widest]);
   return (
     <div className={s.page}>
       <PageHead back="Profile" title="Team & capacity" lede={vm?.lede ?? ""} onBack={onBack} />
@@ -37,14 +58,35 @@ export default function TeamPage({ vm, onBack, onPerson }: { vm: TeamVM | null; 
                 <span key={label} className={s.legendItem}><span className={`${s.legendDot} ${[s.dotGood, s.dotWait, s.dotUp][i]}`} />{label}</span>
               ))}
             </div>
-            <div className={s.chartScroll}>
-              {/* 580px holds four direct reports, as drawn; more widen it so no card overlaps */}
-              <div className={s.chart} style={vm.kids.length > 4 ? { width: vm.kids.length * 135 + 40 } : undefined}>
+            <div ref={scroller} className={s.chartScroll}>
+              <div className={s.chart} style={chartStyle(vm)}>
                 {vm.ups.map(u => (
-                  <div key={u.id} className={s.upWrap}>
+                  <div key={u.nodes[0].id} className={s.upWrap}>
                     <span className={s.level}>{u.level}</span>
-                    <Node node={u} kind="up" onClick={() => onPerson(u.id)} />
-                    <span className={s.stem} style={{ height: 22 }} />
+                    {u.nodes.length === 1 ? (
+                      <>
+                        <Node node={u.nodes[0]} kind="up" onClick={() => onPerson(u.nodes[0].id)} />
+                        <span className={s.stem} style={{ height: 22 }} />
+                      </>
+                    ) : (
+                      <>
+                        {/* Peers: one bar under their cards, one line down from its middle — the same 22px as a single card */}
+                        <div className={s.peers}>
+                          {u.nodes.map((n, i) => (
+                            <div key={n.id} className={s.peer}>
+                              <Node node={n} kind="up" onClick={() => onPerson(n.id)} />
+                              <span className={s.stem} style={{ height: 10 }} />
+                              <div className={s.bus}>
+                                <span className={`${s.busHalf} ${i === 0 ? s.busGap : ""}`} />
+                                <span className={s.busMid} />
+                                <span className={`${s.busHalf} ${i === u.nodes.length - 1 ? s.busGap : ""}`} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <span className={s.stem} style={{ height: 10 }} />
+                      </>
+                    )}
                   </div>
                 ))}
                 <span className={s.level}>YOU</span>

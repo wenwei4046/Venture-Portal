@@ -3,7 +3,7 @@ import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberAren
 import { dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
   ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
-  TeamDot, TeamKidVM, TeamNodeVM, TeamUpVM, TeamVM, Tone, VaGroupVM,
+  TeamDot, TeamKidVM, TeamLevelVM, TeamNodeVM, TeamVM, Tone, VaGroupVM,
 } from "./profile-vm";
 
 /**
@@ -260,13 +260,21 @@ export function teamVM(input: TeamInput): TeamVM | null {
   const titleOf = (p: { staffId: string; title: string }) => [p.title, input.ranks.get(p.staffId)].filter(Boolean).join(" · ");
 
   // Up the line, then the department's directors above the top of the tree.
+  // The line is a chain, one person per level. The directors are not: each of
+  // them directs the whole sub-department and none reports to another (Fair has
+  // KRIS and PETER), so they share ONE level, side by side, as on the portal's
+  // director rail.
   const chain: typeof people = [];
   for (let p = me.parentId ? byNode.get(me.parentId) : undefined; p && !chain.includes(p); p = p.parentId ? byNode.get(p.parentId) : undefined) chain.push(p);
   const directors = (department?.directors ?? []).filter(d => d.id !== input.staffId);
-  const ups: TeamUpVM[] = [
-    ...directors.map(d => ({ id: `d:${d.id}`, name: d.name, title: "Revenue Director", ini: initials(d.name), dot: "up" as const, level: "DIRECTOR" })),
-    ...[...chain].reverse().map(p => ({ id: p.id, name: p.name, title: titleOf(p), ini: initials(p.name), dot: "up" as const, level: "UPLINE" })),
+  const ups: TeamLevelVM[] = [
+    ...(directors.length ? [{
+      level: directors.length > 1 ? "DIRECTORS" : "DIRECTOR",
+      nodes: directors.map(d => ({ id: `d:${d.id}`, name: d.name, title: "Revenue Director", ini: initials(d.name), dot: "up" as const })),
+    }] : []),
+    ...[...chain].reverse().map(p => ({ level: "UPLINE", nodes: [{ id: p.id, name: p.name, title: titleOf(p), ini: initials(p.name), dot: "up" as const }] })),
   ];
+  const above = directors.length + chain.length;
   const kids: TeamKidVM[] = childrenOf(me.id).map(k => ({
     id: k.id, name: k.name, title: k.title, ini: initials(k.name), dot: status(k.staffId)[1],
     kids: childrenOf(k.id).map(g => ({ id: g.id, name: g.name, title: g.title, ini: initials(g.name), dot: status(g.staffId)[1] })),
@@ -316,7 +324,7 @@ export function teamVM(input: TeamInput): TeamVM | null {
       full: open !== null && open <= 0,
       note: CAP_NOTE,
     },
-    count: `${ups.length} above · ${below} below`,
+    count: `${above} above · ${below} below`,
     legend: [input.kpi.enabled ? "KPI hit" : "Selling", "Pending", "Upline"],
     ups,
     me: meNode,
