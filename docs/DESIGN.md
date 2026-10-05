@@ -155,7 +155,15 @@ is not rewritten.
   models in the order they are drawn. The margin ladder chosen in a model's
   window never moves its card — the branding is the ERP's fact
   (`modular-board.ts`). A card opens the model in a floating one-sheet window
-  with fixed save/cancel controls; on phones the window fills the screen. Empty
+  with fixed save/cancel controls; on phones the window fills the screen. The
+  window's listing panel is the *Revenue calculator* switch and *Free gift*;
+  **Margin ladder** and **Calculator section** stand between them only for a
+  mattress or a sofa whose ERP branding names no brand the portal knows
+  (MYLATEX, or none — 2026-10-06), with *Required* under the ladder until one
+  is picked. A branded mattress or sofa follows its brand and its ERP section,
+  and a rider (bed frame, accessory …) the cart's brand, so neither is asked
+  (`needsBrandPick`; `.modular-win-gates[data-picks]` is the four-column
+  panel, the two-field one keeps the switch and Free gift at the same widths). Empty
   ERP allowlists are unrestricted; empty portal selections mean none. Keep
   inactive saved selections visible so they can be removed.
 - Maintenance keeps the ERP's Bedframe/Sofa pool order and values, with a separate
@@ -2548,6 +2556,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Product List · Modular window)** — a model's window no longer shows *Margin ladder* and *Calculator section* for a model whose brand the ERP already names, nor for a rider: a ZANOTTI sofa's panel is just *Revenue calculator* and *Free gift*. The two dropdowns come back, between those two, only for a mattress or a sofa whose ERP branding is no brand the portal knows (MYLATEX, or none), and there the ladder is *Required* (its help names the ERP's branding). See "Product List workspace".
 - **2026-10-06 (Revenue app · only priced specials)** — on the Quote, a bed frame's or sofa's *Specials* row shows only the specials Maintenance charges, each with its *+ RM x*; one turned ON on Modular with no price is not shown, and the captions are always *Charged on top · not in margin* / *Once per sofa · not in margin* (*Optional* and *For every sofa in this quote* are gone). The sofa's *Leg height* row — FOC + the charged legs — now shows on the live app too: the catalogue reader had kept only a bed frame's charges. Maintenance's *Specials* notes say a blank or 0 is not offered.
 - **2026-10-06 (Revenue app · when it cannot load)** — the Revenue app's error page is no longer the old *HOUZS VENTURE · Unable to load your workspace* page (same beige band): it is the same frame as the loading screen with, in the middle, a red alert circle, *Couldn't open the Revenue app*, *Try again* (a fresh load) and the error's *Ref* for the logs. See *While it loads, and when it cannot*.
 - **2026-10-06 (Revenue app · while it loads)** — opening or refreshing the Revenue app no longer shows the old *HOUZS VENTURE · Preparing your Revenue workspace…* page (with a beige band above it and a page that scrolled): it shows the app's own frame — the phone header on Today, the bottom bar lit on the tab being opened (the sidebar on a desktop) — and one orange spinner where the page will be. When the app lands, nothing in the frame moves. See *While it loads, and when it cannot*.

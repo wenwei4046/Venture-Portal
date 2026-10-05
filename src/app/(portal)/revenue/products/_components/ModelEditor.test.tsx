@@ -25,6 +25,8 @@ const options = [
   option('sofa_specials', 'No Side Panel', { price: -40 }),
 ]
 const brands = [{ code: 'ZANOTTI', name: 'Zanotti' }]
+/** A sofa whose ERP branding names no brand the portal knows — the one kind Modular asks about. */
+const brandless = { branding: null, brand: null, derivedBrand: null } satisfies Partial<CatalogueModel>
 
 beforeEach(() => { saveModelSettings.mockReset().mockResolvedValue({ saved: 5 }); refresh.mockReset() })
 afterEach(cleanup)
@@ -46,13 +48,46 @@ describe('Modular model workspace', () => {
   })
 
   it('does not replace deliberately empty selections on a configured model, and preserves explicit overrides', async () => {
-    render(<ModelEditor model={model({ configured: true, enabled: { sizes: [], leg_heights: [], specials: [] }, calcOverride: 'Sofa', giftOverride: false, brandOverride: 'RIDER' })} brands={brands} options={options} onClose={vi.fn()} />)
+    render(<ModelEditor model={model({ configured: true, enabled: { sizes: [], leg_heights: [], specials: [] }, ...brandless, calcOverride: 'Sofa', giftOverride: false, brandOverride: 'RIDER' })} brands={brands} options={options} onClose={vi.fn()} />)
     expect(screen.getByRole('combobox', { name: 'Calculator section' })).toHaveValue('Sofa')
     fireEvent.click(screen.getByRole('switch', { name: 'Offered in the Revenue calculator' }))
     expect(screen.getByRole('checkbox', { name: 'Offer SKU 2376-1S' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Seat height: 24' })).not.toBeChecked()
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith(expect.objectContaining({ enabled: { sizes: [], leg_heights: [], specials: [] }, calcCategory: 'Sofa', gift: false, brandCode: 'RIDER' })))
+  })
+
+  // User 2026-10-06: the ladder and the section follow the brand the ERP
+  // names; only a model the system cannot place is asked, and a rider (bed
+  // frame, accessory …) never is — its margin follows the cart's brand.
+  it('asks for a margin ladder and a calculator section only for a mattress or a sofa the ERP gives no brand', () => {
+    const asked = () => ['Margin ladder', 'Calculator section'].map(name => screen.queryByRole('combobox', { name }) !== null)
+
+    render(<ModelEditor model={model()} brands={brands} options={options} onClose={vi.fn()} />)
+    expect(asked()).toEqual([false, false])
+    expect(screen.getByRole('switch', { name: 'Offered in the Revenue calculator' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Free gift' })).toBeInTheDocument()
+    cleanup()
+
+    render(<ModelEditor model={model({ code: 'BOLSTER', category: 'ACCESSORY', branding: 'AKEMI', brand: null, derivedBrand: null, calcCategory: 'Accessory', skus: [] })} brands={brands} options={options} onClose={vi.fn()} />)
+    expect(asked()).toEqual([false, false])
+    cleanup()
+
+    render(<ModelEditor model={model({ code: 'AURORA', category: 'MATTRESS', branding: 'MYLATEX', brand: null, derivedBrand: null, calcCategory: 'Mattress', configured: true, offered: true, skus: [] })} brands={brands} options={options} onClose={vi.fn()} />)
+    expect(asked()).toEqual([true, true])
+    expect(screen.getByRole('combobox', { name: 'Margin ladder' })).toHaveValue('')
+    expect(screen.getByText(/The ERP branding MYLATEX is not a brand the portal knows/)).toBeInTheDocument()
+    expect(screen.getByText('Offered, but members will not see it until a margin ladder is chosen.')).toBeInTheDocument()
+    expect(within(screen.getByRole('combobox', { name: 'Calculator section' })).getByRole('option', { name: 'Mattress (ERP default)' })).toBeInTheDocument()
+  })
+
+  it('never sends back a pick the ERP now decides: opening is no change, and the next save clears it', async () => {
+    // The loader already reads none for a branded model; the window holds the line on its own too.
+    render(<ModelEditor model={model({ configured: true, calcOverride: 'Accessory', brandOverride: 'RIDER' })} brands={brands} options={options} onClose={vi.fn()} />)
+    expect(screen.getByRole('status')).toHaveTextContent('No unsaved changes')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Offer SKU 2376-1S' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith(expect.objectContaining({ calcCategory: null, brandCode: null })))
   })
 
   it('shows stale saved options without silently dropping them, then selects only currently allowed values', async () => {
@@ -146,7 +181,7 @@ describe('Modular model workspace', () => {
   })
 
   it('sends null defaults when clearing overrides and never writes prices with calculator settings', async () => {
-    render(<ModelEditor model={model({ configured: true, giftOverride: true, calcOverride: 'Accessory', brandOverride: 'RIDER' })} brands={brands} options={options} onClose={vi.fn()} />)
+    render(<ModelEditor model={model({ configured: true, ...brandless, giftOverride: true, calcOverride: 'Accessory', brandOverride: 'RIDER' })} brands={brands} options={options} onClose={vi.fn()} />)
     for (const name of ['Free gift', 'Calculator section', 'Margin ladder']) fireEvent.change(screen.getByRole('combobox', { name }), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(saveModelSettings).toHaveBeenCalledWith(expect.objectContaining({ gift: null, calcCategory: null, brandCode: null })))

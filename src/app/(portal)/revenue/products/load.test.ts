@@ -121,6 +121,30 @@ describe('Product List readers', () => {
     expect(models[2].skus[0].brand).toBeNull()
   })
 
+  // 2026-10-06: the ladder and the section are the ERP's wherever its branding
+  // names a brand, and a rider's margin follows the cart — a pick is read only
+  // for a mattress or a sofa the ERP gives no brand (member_catalogue alike).
+  it('reads a ladder or section picked on Modular only for a mattress or a sofa the ERP gives no brand', async () => {
+    tables.erp_product_models = [
+      model(0, { category: 'SOFA', branding: 'ZANOTTI' }),
+      model(1, { category: 'ACCESSORY', name: 'Latex Bolster', branding: 'AKEMI' }),
+      model(2, { category: 'MATTRESS', branding: 'MYLATEX' }),
+      model(3, { category: 'MATTRESS', branding: null }),
+    ]
+    tables.catalogue_models = [
+      { erp_model_id: 'model-00000', offered: true, brand_code: 'AKEMI', calc_category: 'Accessory' },
+      { erp_model_id: 'model-00001', offered: true, brand_code: 'AKEMI', calc_category: 'Pillow' },
+      { erp_model_id: 'model-00002', offered: true, brand_code: 'AKEMI', calc_category: 'Accessory' },
+      { erp_model_id: 'model-00003', offered: true, brand_code: 'RIDER', calc_category: null },
+    ]
+    tables.comm_brands = [{ id: 'z', code: 'ZANOTTI', name: 'Zanotti', is_active: true }, { id: 'a', code: 'AKEMI', name: 'Akemi', is_active: true }]
+    const { models } = await loadModels()
+    expect(models[0]).toMatchObject({ derivedBrand: 'ZANOTTI', brand: 'ZANOTTI', brandOverride: null, calcCategory: 'Sofa', calcOverride: null })
+    expect(models[1]).toMatchObject({ derivedBrand: null, brand: null, brandOverride: null, calcCategory: 'Accessory', calcOverride: null, gift: true })
+    expect(models[2]).toMatchObject({ derivedBrand: null, brand: 'AKEMI', brandOverride: 'AKEMI', calcCategory: 'Accessory', calcOverride: 'Accessory' })
+    expect(models[3]).toMatchObject({ derivedBrand: null, brand: 'RIDER', brandOverride: 'RIDER', calcCategory: 'Mattress', calcOverride: null })
+  })
+
   it('pages models and active brands and deterministically resolves duplicate model codes', async () => {
     tables.erp_product_models = Array.from({ length: 1002 }, (_, i) => model(i, { branding: i === 1001 ? 'Last brand' : null }))
     tables.catalogue_models = Array.from({ length: 1002 }, (_, i) => ({ erp_model_id: `model-${id(i)}`, offered: true }))
