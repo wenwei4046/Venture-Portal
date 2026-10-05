@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MemberInsightBlock, MemberReadContext } from "@/lib/member/types";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
-import type { RevenueSource } from "../source";
+import { untracked, type RevenueSource, type TrackRead } from "../source";
 import type { InsightPeriod } from "./period";
 
 export interface InsightData {
@@ -25,7 +25,7 @@ export function bookMonth(book: MemberOrderBook, month: string): MemberOrderBook
  * the app holds for Today (last month and this one) is cut from it, not read
  * again; a quarter or a year reads its own book and its team range.
  */
-export function useInsightData({ source, membershipId, schemeId, context, readable, period, recent, recentFrom }: {
+export function useInsightData({ source, membershipId, schemeId, context, readable, period, recent, recentFrom, gen = 0, track = untracked }: {
   source: RevenueSource;
   membershipId: string;
   schemeId: string;
@@ -36,6 +36,9 @@ export function useInsightData({ source, membershipId, schemeId, context, readab
   recent: MemberOrderBook | null;
   /** Its first month. */
   recentFrom: string;
+  /** Pull to refresh: a new number reads the period again, keeping what is on screen until it lands. */
+  gen?: number;
+  track?: TrackRead;
 }): InsightData {
   const [book, setBook] = useState<MemberOrderBook | null>(null);
   const [block, setBlock] = useState<MemberInsightBlock | null>(null);
@@ -49,27 +52,32 @@ export function useInsightData({ source, membershipId, schemeId, context, readab
   const fromRecent = !!recent && kind === "monthly" && !!from && from >= recentFrom && from <= recent.through;
   const key = [membershipId, context?.staffId ?? "", kind, from, through].join("|");
   const recentBook = useMemo(() => (fromRecent && recent && from ? bookMonth(recent, from) : null), [fromRecent, recent, from]);
+  const shown = useRef("");
 
   useEffect(() => {
     if (!membershipId || !readable || !kind || !from || !through) return;
     let stale = false;
-    setBlock(null); setRange(null); setKpi(null);
-    if (!fromRecent) setBook(null);
+    // Another period or person: what is on screen was theirs. The same one read again: it stays until the answers land.
+    if (shown.current !== key) {
+      setBlock(null); setRange(null); setKpi(null);
+      if (!fromRecent) setBook(null);
+    }
+    shown.current = key;
     const jobs: Promise<unknown>[] = [];
     if (!fromRecent) {
-      jobs.push(source.orderBook(membershipId, from, through, context).then(r => { if (!stale && r.ok) setBook(r.data); }));
+      jobs.push(track(gen, source.orderBook(membershipId, from, through, context)).then(r => { if (!stale && r.ok) setBook(r.data); }));
     }
     if (kind === "monthly") {
-      jobs.push(source.insight(from, context).then(r => {
+      jobs.push(track(gen, source.insight(from, context)).then(r => {
         if (!stale && r.ok) setBlock(r.data.blocks.find(b => b.membershipId === membershipId) ?? r.data.blocks[0] ?? null);
       }));
-      jobs.push(source.kpi(schemeId, context, from).then(r => { if (!stale && r.ok) setKpi(r.data); }));
+      jobs.push(track(gen, source.kpi(schemeId, context, from)).then(r => { if (!stale && r.ok) setKpi(r.data); }));
     } else {
-      jobs.push(source.insightRange(membershipId, from, through, context).then(r => { if (!stale && r.ok) setRange(r.data); }));
+      jobs.push(track(gen, source.insightRange(membershipId, from, through, context)).then(r => { if (!stale && r.ok) setRange(r.data); }));
     }
     void Promise.allSettled(jobs).then(() => { if (!stale) setDoneKey(key); });
     return () => { stale = true; };
-  }, [source, membershipId, schemeId, context, readable, kind, from, through, fromRecent, key]);
+  }, [source, membershipId, schemeId, context, readable, kind, from, through, fromRecent, key, gen, track]);
 
   return { book: recentBook ?? book, block, range, kpi, loading: doneKey !== key };
 }

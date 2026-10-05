@@ -1385,6 +1385,19 @@ VP's. The member C release above describes the screens this replaced.
   are drawn exactly as before) and fewer stay together under the member; a card's
   name and title wrap inside it; a dashed card under a direct report grows to its
   text from the prototype's 112px up to its column (137px) and wraps past that.
+- **Pull to refresh (2026-10-06)** — nothing on screen changes on its own. A
+  drag down from the top of the page past 64px (finger ÷ 2) and let go reads
+  everything again: a 38px white dot with the refresh arc comes out from under
+  the header, turns accent once armed, rests 52px down spinning while the reads
+  run, and the page underneath stays exactly as it was — no "Loading…" — until
+  the new data swaps in. A refresh that could not read leaves the page and says
+  *Couldn't refresh. Pull down to try again.* in a walnut pill for 4s. Coming
+  back after 10 minutes away refreshes once the same way. Not while a sheet is
+  open; the browser's own pull-to-reload is switched off on the app — so when
+  the server no longer knows the page's actions (a release went out since it
+  was opened), the pull loads the whole page again instead: the new app and
+  its data. Never over something unsaved (a form, brand weeks not saved); then
+  the pill asks for another pull.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
@@ -2506,6 +2519,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Revenue app · pull to refresh)** — the minute's background refresh is gone: the app changes only when pulled (or on return after 10 minutes away). The pull's dot, its armed and spinning states and the *Couldn't refresh* pill are under *Pull to refresh* in the Revenue app section.
 - **2026-10-06 (update prompt)** — every surface gains *A new version is ready* · Update · ×: an ink pill at the top centre when a release lands while the app is open (installed apps are resumed from memory, so a phone could keep last week's build — and its reads fail once a release replaces its Server Actions). In the Revenue app, after 30+ minutes away it reloads on return unless a form was being filled; the portal only ever offers it (a payroll grid may hold edits not yet saved). See *Update prompt*.
 - **2026-10-06 (Revenue app · phone type one step smaller)** — on a phone every text in the Revenue app is one step smaller than the prototype's: each font-size is the prototype's px times `--rv-type`, .92 on a phone (13px → 12, the greeting 28px → 25.8) and 1 on a desktop, which is unchanged. Spacing, icons, control heights and the 16px inputs stay as they were. One number tunes it (`.screen` in `app/shell.module.css`); `app/type-scale.test.ts` keeps every size on it. See *The Revenue app — built to the prototype*.
 - **2026-10-06 (Revenue app · family chart on a phone)** — Team & capacity on a phone put KAR JUN's two direct reports at the two edges of the screen, and MELVIN CHONG's *Senior Revenue Specialist* ran out of his card and off it: the chart was a fixed 580px with the reports spread across it, and the cards (buttons) never wrapped. The chart now takes the width of its widest row (never less than the screen), a report keeps a 145px column so fewer sit together under the member, card text wraps, and the dashed cards below grow to their text (112–137px). Four reports — the prototype — are drawn exactly as before; its dashed cards are a few px wider, because their text used to run past the border. See *The family chart fits real names*.

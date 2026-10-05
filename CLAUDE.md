@@ -1306,6 +1306,26 @@ src/
 │   │                                  var(--rv-type))`, .92 on the phone's
 │   │                                  `.screen`, 1 on a desktop;
 │   │                                  `app/type-scale.test.ts` refuses a plain px.
+│   │                                  **PULL TO REFRESH (2026-10-06):** nothing
+│   │                                  on screen changes on its own (user: 除非我
+│   │                                  拉下来 refresh，它才会直接变) — the minute's
+│   │                                  background refresh is GONE. A pull from the
+│   │                                  page's top (`shell/PullRefresh.tsx`), or a
+│   │                                  return after 10 min away, bumps `gen`:
+│   │                                  every read runs again and KEEPS what is on
+│   │                                  screen until its answer lands (clears only
+│   │                                  when the person/month changes); keyed page
+│   │                                  reads go through `useKeyedRead`. The dot
+│   │                                  spins until all `track`ed reads land, the
+│   │                                  snapshot (`refreshMemberData`) last. The
+│   │                                  client runs Server Actions ONE AT A TIME,
+│   │                                  so a pull costs the SUM of its reads.
+│   │                                  Every build renames the actions, and the
+│   │                                  browser's own pull-reload is off on the
+│   │                                  app: a pull refused as
+│   │                                  `UnrecognizedActionError`
+│   │                                  (`isStaleAppError`) RELOADS the page —
+│   │                                  never over a sheet or unsaved brand weeks.
 │   │                                  **My income** is Comm Cal's own engine
 │   │                                  run for the member's month
 │   │                                  (`loadMemberIncome`: the service role,

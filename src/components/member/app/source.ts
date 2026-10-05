@@ -13,6 +13,19 @@ import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions
 export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
+ * Pull to refresh: a read started for pull number `gen` is handed to the app,
+ * which spins until every one of them lands (and sees what threw). The caller
+ * gets it back through `settleRead`.
+ */
+export type TrackRead = <T extends { ok: boolean }>(gen: number, read: Promise<T>) => Promise<T>;
+
+/** A read that threw (offline, a newer release) answers as a failed read, so no caller is left with an unhandled rejection. */
+export function settleRead<T extends { ok: boolean }>(read: Promise<T>): Promise<T> {
+  return read.catch((error: unknown) => ({ ok: false, error: error instanceof Error ? error.message : "The read failed." }) as unknown as T);
+}
+export const untracked: TrackRead = (_gen, read) => settleRead(read);
+
+/**
  * Where the app's numbers come from. The live app reads the database through
  * the member server actions; the design preview hands the same shapes from
  * fixtures, so both run the very same screens and models.
