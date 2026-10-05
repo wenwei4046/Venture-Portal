@@ -674,6 +674,76 @@ h3.font-serif { font-size: 15px; font-weight: 500; font-style: normal; }
   opacity: 0.9;
 }
 
+/* A new version (2026-10-06): components/pwa/UpdatePrompt.tsx, docs/DESIGN.md ›
+   "Update prompt". One ink pill at the top of every surface — the portal, the
+   member app, the installed app — above the progress line, sheets and tab bars.
+   The button is the pill turned inside out (paper on ink), so it reads in the
+   dark theme too without a colour of its own. */
+.update-prompt {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  padding: 5px 5px 5px 16px;
+  border-radius: 999px;
+  background: rgb(var(--ink));
+  color: rgb(var(--paper));
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.3;
+  animation: update-prompt-in 220ms ease-out;
+}
+.update-prompt-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.update-prompt-go {
+  flex: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+  font-weight: 600;
+  cursor: pointer;
+}
+.update-prompt-later {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: rgb(var(--paper) / 0.7);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.update-prompt-later:hover {
+  color: rgb(var(--paper));
+}
+@keyframes update-prompt-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-prompt {
+    animation: none;
+  }
+}
+
 /* While a navigation has not committed yet (html[data-nav-pending], set by
    NavProgress) the page being left dims — after a beat, so a navigation that
    commits at once never shows it. */

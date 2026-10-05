@@ -1,6 +1,18 @@
 import type { NextConfig } from 'next'
 
+// The build's own name (2026-10-06). An installed app is resumed from memory,
+// not reloaded, so a phone could run last week's build for days — and Next
+// recalculates every Server Action's id per build, so that old copy's reads
+// start failing the moment a release lands. The name is baked into the
+// browser's bundle (NEXT_PUBLIC_APP_VERSION) and answered on /sw.js
+// (X-App-Version, below); components/pwa/UpdatePrompt compares the two and
+// offers the new one. Empty off Vercel: a local or CI build never prompts.
+const APP_VERSION = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || ''
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: APP_VERSION,
+  },
   experimental: {
     // Voucher attachments (transfer slips / invoices / scanned PDFs) are sent
     // through the Server Action body. The default cap is 1 MB — a scanned PDF
@@ -27,7 +39,9 @@ const nextConfig: NextConfig = {
   },
 
   // The service worker must never be served from a cache, or a fix to it
-  // reaches phones days late. (public/sw.js, the installable app.)
+  // reaches phones days late. (public/sw.js, the installable app.) It also
+  // says which build is live — never cached, and every deployment's own copy
+  // — which is what UpdatePrompt asks with a HEAD request.
   async headers() {
     return [
       {
@@ -35,6 +49,7 @@ const nextConfig: NextConfig = {
         headers: [
           { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
           { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          ...(APP_VERSION ? [{ key: 'X-App-Version', value: APP_VERSION }] : []),
         ],
       },
       {
