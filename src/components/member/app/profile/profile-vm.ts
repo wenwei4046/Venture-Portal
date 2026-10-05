@@ -255,13 +255,21 @@ export interface VaGroupVM {
 /** A fair weekend a claim can be for — the brand the member worked and the booth it was at. */
 export interface ClaimWeek {
   key: string;
+  /** `OCT` — on the badge, so October's W1 is not September's. */
+  month: string;
   n: string;
-  /** `Akemi week` — or `Brand week not picked`. */
+  /** `Akemi week` — or `No brand week`. */
   brandWeek: string;
   brand: string | null;
   dates: string;
   venue: string | null;
   org: string | null;
+  /** The brand week's fair: what the claim is for, and whose venue sets its region. */
+  fairId: string | null;
+  /** Not picked in My brand weeks: the Arena placed them at the brand they opened the most bills for. */
+  auto: boolean;
+  /** A claim is only ever for the member's own brand week's fair (user 2026-10-06). */
+  claimable: boolean;
   /** The brand's colours: the badge, and the card when picked. */
   color: string;
   tint: string;
@@ -279,5 +287,5 @@ export interface FormOptions {
   /** The member's waiting-list requests that HR approved — a replacement may use one. */
   waitingList: { id: string; name: string; sub: string; status: string; ok: boolean }[];
   /** First choices, as the design preview shows them. Live: nothing is chosen for the member. */
-  initial?: { region?: string; member?: string; male?: number; female?: number; department?: string };
+  initial?: { member?: string; male?: number; female?: number; department?: string };
 }

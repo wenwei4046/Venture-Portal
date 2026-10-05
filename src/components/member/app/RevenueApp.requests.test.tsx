@@ -39,15 +39,29 @@ function book(from: string, through: string): MemberOrderBook {
   return value;
 }
 
+// October's first weekend: Jia En and ANTHONY each scored at the Akemi booth of a Penang fair — their brand week.
+const seller = (id: string) => ({ id, name: id, sales: 0, held: 0, orders: 2, scoring: true, confirmed: false });
+const PENANG_BOOTH = {
+  id: "penang-fair|AKEMI", fairId: "penang-fair", brand: "AKEMI", venue: "PENANG WATERFRONT", start: "2026-10-02", end: "2026-10-04",
+  periodMonth: "2026-10", week: "2026-10-02", people: [seller("jia"), seller("anthony")],
+};
+
 function arena(membershipId: string, period: string, context?: MemberReadContext): MemberArenaSnapshot {
   return {
     principalView: !!context, viewedStaffId: context?.staffId, membershipId, department: "Fair", selfId: context ? "" : "jia",
     period, window: "monthly", from: `${period}-01`, through: `${period}-05`, asOf: "2026-10-05T04:00:00Z", live: true,
     people: [], brands: [], brandWeeks: null, weekLocks: [], tiers: [],
+    history: { asOf: "2026-10-05T04:00:00Z", provisional: true, events: period === "2026-10" ? [PENANG_BOOTH] : [], unassignedOrders: 0, unassignedSales: 0,
+      championship: { status: "pending", reason: "" } },
   };
 }
 
-const RATES = { base: "Klang Valley", perSpot: 50, perPaxNight: 65, regions: [{ id: "kl", name: "KL", spots: 0 }, { id: "penang", name: "Penang", spots: 4 }] };
+// HR's rates, and the region HR set for that fair's venue.
+const RATES = {
+  base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null,
+  regions: [{ id: "kl", name: "KL", spots: 0, planeTicket: false }, { id: "penang", name: "Penang", spots: 4, planeTicket: false }],
+  fairs: { "penang-fair": { venue: "PENANG WATERFRONT", regionId: "penang" } },
+};
 const SENT: MemberRequest = {
   id: "r1", kind: "claim", title: "Outstation claim", status: "submitted", createdAt: "2026-10-05T04:00:00Z",
   submittedAt: "2026-10-05T04:00:00Z", requestNo: "RQ-2610-001", staffId: "jia", detail: { claimType: "outstation", amount: 200 },
@@ -90,7 +104,9 @@ describe("Requests in View as (user 2026-10-06: the forms open, nothing is sent)
 
     fireEvent.click(screen.getByRole("button", { name: /Submit claim/ }));
     const claim = within(form("Submit claim"));
-    fireEvent.click(claim.getByRole("button", { name: "Penang" }));
+    // ANTHONY's brand week, at its fair, in the region HR set for the venue.
+    expect(claim.getByRole("button", { name: /Akemi week · 2–4 Oct/ })).toHaveAttribute("aria-pressed", "true");
+    expect(claim.getByText("Penang")).toBeInTheDocument();
     expect(claim.getByText("RM 200.00")).toBeInTheDocument();
     const cta = claim.getByRole("button", { name: "Read-only while viewing as" });
     expect(cta).toBeDisabled();
@@ -125,15 +141,17 @@ describe("a member's own request", () => {
     const live = await openRequests(memberData, "?page=account&view=requests&department=fair");
     fireEvent.click(screen.getByRole("button", { name: /Submit claim/ }));
     const claim = within(form("Submit claim"));
-    fireEvent.click(claim.getByRole("button", { name: "Penang" }));
+    expect(claim.getByText("Set by HR for PENANG WATERFRONT")).toBeInTheDocument();
     fireEvent.click(claim.getByRole("button", { name: "Review & submit claim" }));
     expect(await claim.findByText("Request submitted")).toBeInTheDocument();
     expect(claim.getByText("RQ-2610-001")).toBeInTheDocument();
     const sent = live.submitRequest.mock.calls[0][0];
     expect(sent.get("kind")).toBe("claim");
     expect(sent.get("claimType")).toBe("outstation");
-    expect(sent.get("region")).toBe("penang");
     expect(sent.get("week")).toBe("2026-10-02");
     expect(sent.get("subDepartmentId")).toBe("fair");
+    // The fair, the place and the region are the database's own: none is sent.
+    expect(sent.get("region")).toBeNull();
+    expect(sent.get("location")).toBeNull();
   });
 });

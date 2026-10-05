@@ -995,19 +995,29 @@ export async function submitMemberRequest(
     const claimType = kind === "claim" ? field(form, "claimType") : "";
     if (claimType) {
       // A fair claim (2026-10-05): its amount is the rate HR set, worked out by
-      // `member_prepare_request` — nothing typed here is money. Outstation goes
-      // by the route's spots and needs no invoice; Airbnb by people × nights.
+      // `member_prepare_request`. Only the weekend is the member's to say: the
+      // fair is their brand week's, its region the one HR set for the venue
+      // (2026-10-06). Outstation goes by the route's spots and needs no invoice
+      // — unless the region is flown to, when the ticket's price is typed with
+      // its invoice and HR checks one against the other; Airbnb by people × nights.
       if (claimType !== "outstation" && claimType !== "airbnb") throw new Error("Choose Outstation or Airbnb.");
       Object.assign(detail, {
         claimType,
         week: date(field(form, "week"), "brand week"),
-        location: field(form, "location", 150),
         notes: field(form, "notes", 1500),
       });
-      const brand = field(form, "brand", 20);
-      if (brand) detail.brand = brand;
       if (claimType === "outstation") {
-        detail.region = uuid(field(form, "region"), "region");
+        const price = field(form, "amount");
+        if (price) {
+          const amount = cents(price);
+          if (amount === null || amount < 1) throw new Error("Enter the plane ticket's price, as its invoice shows.");
+          verified = await invoice(form);
+          Object.assign(detail, {
+            amount: amount / 100,
+            invoiceName: verified.name,
+            invoiceHash: createHash("sha256").update(verified.bytes).digest("hex"),
+          });
+        }
       } else {
         const count = (name: string) => {
           const n = Number(field(form, name));

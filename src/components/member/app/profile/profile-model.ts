@@ -1,6 +1,6 @@
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
 import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberArenaSnapshot } from "@/lib/member/arena";
-import { dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
+import { MONTHS_SHORT, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
   ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
   TeamDot, TeamKidVM, TeamLevelVM, TeamNodeVM, TeamVM, Tone, VaGroupVM,
@@ -76,6 +76,7 @@ export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => stri
   if (r.kind === "claim") {
     const type = str(d.claimType);
     const where = str(d.location);
+    if (type === "outstation" && d.planeTicket === true) return `Plane ticket claim${where ? ` · ${where}` : ""}`;
     if (type === "outstation") return `Outstation claim${where ? ` · ${where}` : ""}`;
     if (type === "airbnb") return `Airbnb claim${where ? ` · ${where}` : ""}`;
     return r.title;
@@ -91,6 +92,7 @@ export function requestSummary(r: MemberRequest, nameOf: (staffId: string) => st
   const amount = num(d.amount);
   const money = Number.isFinite(amount) ? rm2(amount) : "";
   if (r.kind === "claim") {
+    if (str(d.claimType) === "outstation" && d.planeTicket === true) return [str(d.regionName), "plane ticket", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "outstation") return [str(d.regionName) || str(d.region), Number.isFinite(num(d.spots)) ? `${num(d.spots)} spots` : "", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "airbnb") {
       const pax = num(d.pax), nights = num(d.nights);
@@ -343,26 +345,39 @@ const WEEK_TONE: Record<string, [string, string]> = {
 };
 
 /**
- * The fair weekends a claim can be for: every weekend of the months the
- * member's Arena covers that has already begun, each with the brand they
- * worked it and the booth they were at.
+ * The fair weekends a claim can be for, newest first: every weekend of the
+ * months the member's Arena covers that has already begun. A claim is only for
+ * the member's own brand week (user 2026-10-06), and the fair is the booth the
+ * Arena scores them at that weekend — the brand they picked, else the one they
+ * opened the most bills for; picked but nothing written there, that brand's
+ * booth with the most bills. The database's `member_claim_brand_week` reads the
+ * same boards the same way. No brand week = nothing to claim that weekend.
  */
 export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | undefined)[], today: string): ClaimWeek[] {
   const out = new Map<string, ClaimWeek>();
+  const orders = (e: { people: { orders: number }[] }) => e.people.reduce((n, p) => n + (p.orders || 0), 0);
   for (const snap of snapshots) {
     if (!snap) continue;
+    const me = snap.selfId;
+    const events = snap.history?.events ?? [];
+    const month = (MONTHS_SHORT[Number(snap.period.slice(5, 7)) - 1] ?? "").toUpperCase();
     arenaMonthFridays(snap.period).forEach((friday, i) => {
       if (friday > today || out.has(friday)) return;
-      const pick = snap.brandWeeks?.picks?.[friday] ?? null;
-      const booth = pick ? snap.history?.events.find(e => e.week === friday && e.brand === pick) : undefined;
-      const [color, tint] = pick ? WEEK_TONE[pick] ?? ["var(--rv-brown)", "var(--rv-sand)"] : ["var(--rv-sub)", "var(--rv-sand)"];
+      const saved = snap.brandWeeks?.picks?.[friday] ?? null;
+      const scoring = me ? events.find(e => e.week === friday && e.people.some(p => p.id === me && p.scoring !== false)) : undefined;
+      const booth = scoring ?? (saved
+        ? events.filter(e => e.week === friday && e.brand === saved).sort((a, b) => orders(b) - orders(a) || a.id.localeCompare(b.id))[0]
+        : undefined);
+      const brand = booth?.brand ?? saved ?? null;
+      const [color, tint] = brand ? WEEK_TONE[brand] ?? ["var(--rv-brown)", "var(--rv-sand)"] : ["var(--rv-sub)", "var(--rv-sand)"];
       out.set(friday, {
-        key: friday, n: `W${i + 1}`, brandWeek: pick ? `${WEEK_BRAND[pick] ?? pick} week` : "Brand week not picked", brand: pick,
-        dates: booth ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null, color, tint,
+        key: friday, month, n: `W${i + 1}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
+        dates: booth ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
+        fairId: booth?.fairId ?? null, auto: !!booth && !saved, claimable: !!booth?.fairId, color, tint,
       });
     });
   }
-  return [...out.values()].sort((a, b) => a.key.localeCompare(b.key));
+  return [...out.values()].sort((a, b) => b.key.localeCompare(a.key));
 }
 
 /** Who the member may propose for a replacement: their own team in this sub-department. */

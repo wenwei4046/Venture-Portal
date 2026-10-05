@@ -44,6 +44,13 @@ const statusChips: Record<string, string> = {
 const detailLabels: Record<string, string> = {
   category: "Claim category",
   amount: "Claim amount",
+  // A fair claim (2026-10-06): the member's brand week, its fair and the region HR set for the venue.
+  week: "Brand week (Friday)",
+  brand: "Brand",
+  regionName: "Fair region",
+  spots: "Spots",
+  pax: "People",
+  nights: "Nights",
   location: "Location",
   start: "Start / joining date",
   end: "End date",

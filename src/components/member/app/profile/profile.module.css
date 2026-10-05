@@ -758,6 +758,14 @@
 .weekText { min-width: 0; flex: 1; }
 .weekTitle { display: block; font-size: calc(14px * var(--rv-type)); font-weight: 650; }
 .weekWhere { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A weekend with no brand week cannot be claimed (2026-10-06); the badge carries its month. */
+.weekOff { opacity: .5; cursor: default; }
+.weekBadgeMonth { align-content: center; grid-auto-rows: min-content; line-height: 1.05; }
+.weekMonth { font-size: calc(8.5px * var(--rv-type)); font-weight: 700; letter-spacing: .06em; opacity: .85; }
+/* The fair's region, as HR set it for the venue — shown, not picked. */
+.regionSet { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.regionChip { display: inline-grid; place-items: center; padding: 0 16px; }
+.regionFrom { min-width: 0; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 .regions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .region { height: 38px; padding: 0 4px; border-radius: 12px; border: 1px solid var(--rv-handle); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13px * var(--rv-type)); font-weight: 500; white-space: nowrap; }
 .regionOn { border-color: var(--rv-accent); background: var(--rv-accent); color: var(--rv-white); font-weight: 700; }

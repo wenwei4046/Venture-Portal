@@ -279,17 +279,20 @@ export function protoProfile(): ProfileFixture {
     },
     form: {
       subName: "Fair",
-      weeks: MY_FAIRS.map((f, i) => ({ key: `w${i}`, n: `W${i + 1}`, brandWeek: `${f.brand} week`, brand: f.brand.toUpperCase(), dates: f.dates, venue: f.venue, org: f.org, color: BRAND_TONE[f.brand][0], tint: BRAND_TONE[f.brand][1] })),
+      weeks: MY_FAIRS.map((f, i) => ({ key: `w${i}`, month: "SEP", n: `W${i + 1}`, brandWeek: `${f.brand} week`, brand: f.brand.toUpperCase(), dates: f.dates, venue: f.venue, org: f.org,
+        fairId: `f${i}`, auto: false, claimable: true, color: BRAND_TONE[f.brand][0], tint: BRAND_TONE[f.brand][1] })),
       rates: {
-        base: "Klang Valley", perSpot: 50, perPaxNight: 65,
-        regions: ([["KL", 0], ["Penang", 4], ["Ipoh", 2], ["Melaka", 2], ["Johor", 3], ["Pahang", 3], ["Sabah", 6], ["Sarawak", 6]] as const).map(([name, spots]) => ({ id: name, name, spots })),
+        base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null,
+        regions: ([["KL", 0], ["Penang", 4], ["Ipoh", 2], ["Melaka", 2], ["Johor", 3], ["Pahang", 3], ["Sabah", 6], ["Sarawak", 6]] as const).map(([name, spots]) => ({ id: name, name, spots, planeTicket: false })),
+        // Every fair in Penang: the region the prototype's form shows picked.
+        fairs: Object.fromEntries(MY_FAIRS.map((f, i) => [`f${i}`, { venue: f.venue, regionId: "Penang" }])),
       },
       members: ["Darren Ong", "Priya Nair", "Siti Aminah", "Jason Teh"].map(n => ({ id: n, name: n })),
       departments: [{ id: "fair-kv", name: "Fair · Klang Valley", capacity: 27, occupied: 26 }, { id: "fair-pg", name: "Fair · Penang", capacity: null, occupied: 0 }, { id: "showroom", name: "Showroom · Puchong", capacity: null, occupied: 0 }],
       departmentId: "fair-kv",
       waitingList: [["Amelia Tan", "RQ-2609-018 · start 1 Oct", "Approved", true], ["Nur Aisyah Hamid", "RQ-2609-022 · start 15 Oct", "Approved", true], ["Kenneth Loh", "RQ-2608-031 · start 1 Nov", "Approved", true], ["Wong Li Ying", "RQ-2610-002 · submitted 2 Oct", "Pending HR", false]]
         .map(([name, sub, status, ok]) => ({ id: String(name), name: String(name), sub: String(sub), status: String(status), ok: Boolean(ok) })),
-      initial: { region: "Penang", member: "Siti Aminah", male: 1, female: 1, department: "fair-kv" },
+      initial: { member: "Siti Aminah", male: 1, female: 1, department: "fair-kv" },
     },
   };
 }

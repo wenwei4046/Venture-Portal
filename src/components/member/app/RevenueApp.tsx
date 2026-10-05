@@ -738,7 +738,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     return {
       subName: membership?.name ?? "",
       weeks: claimWeeks([arena, arenaNow], today),
-      rates: claimRates ?? { base: "Klang Valley", perSpot: null, perPaxNight: null, regions: [] },
+      rates: claimRates ?? { base: "Klang Valley", perSpot: null, perPaxNight: null, perThreePaxNight: null, regions: [], fairs: {} },
       members: team,
       departments: data.departments ?? [],
       departmentId: membership?.id ?? "",
