@@ -150,8 +150,12 @@ export interface TeamNodeVM {
   ini: string;
   dot: TeamDot;
 }
-export interface TeamUpVM extends TeamNodeVM {
+/** One level above the member. */
+export interface TeamLevelVM {
+  /** `DIRECTOR`, `DIRECTORS` or `UPLINE`. */
   level: string;
+  /** Peers, drawn side by side: every director of the sub-department shares one level. */
+  nodes: TeamNodeVM[];
 }
 export interface TeamKidVM extends TeamNodeVM {
   kids: TeamNodeVM[];
@@ -177,7 +181,8 @@ export interface TeamVM {
   count: string;
   /** Green, amber and grey — `KPI hit · Pending · Upline` or the sales reading when KPI is off. */
   legend: [string, string, string];
-  ups: TeamUpVM[];
+  /** Top first: the directors' level, then the line of uplines — one person per level. */
+  ups: TeamLevelVM[];
   me: TeamNodeVM;
   kids: TeamKidVM[];
   sheets: Record<string, PersonSheetVM>;

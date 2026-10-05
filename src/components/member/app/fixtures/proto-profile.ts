@@ -204,7 +204,7 @@ function team(): TeamVM {
       reportsTo: p ? p[1] : kid ? "Reports to you" : `Reports to ${(KIDS.find(k => k[3].some(g => g[0] === name)) ?? ["you"])[0]}`,
     };
   };
-  const ups = UP.map(([n, t], i) => { sheets[n] = sheet(n, t); return { id: n, name: n, title: t, ini: ini(n), dot: "up" as const, level: i === 0 ? "DIRECTOR" : "UPLINE" }; });
+  const ups = UP.map(([n, t], i) => { sheets[n] = sheet(n, t); return { level: i === 0 ? "DIRECTOR" : "UPLINE", nodes: [{ id: n, name: n, title: t, ini: ini(n), dot: "up" as const }] }; });
   sheets["Jia Hui Tan"] = sheet("Jia Hui Tan", "You · Rank B");
   const kids = KIDS.map(([n, t, st, gk]) => {
     const title = t.split(" · ")[0];

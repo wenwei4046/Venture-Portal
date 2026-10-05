@@ -124,7 +124,7 @@ describe("teamVM", () => {
   it("draws the directors and the line above, the member, then two levels below", () => {
     const vm = teamVM({ map, departmentId: "fair", subName: "Fair", staffId: "me", people: [person("me", 1000), person("k1", 500, 1)],
       month: "2026-09", kpi: { enabled: false, threshold: null }, capacity: 27, occupied: 26, ranks: new Map([["me", "Rank B"]]) })!;
-    expect(vm.ups.map(u => [u.name, u.level])).toEqual([["PETER", "DIRECTOR"], ["MARCUS", "UPLINE"]]);
+    expect(vm.ups.map(u => [u.level, u.nodes.map(n => n.name)])).toEqual([["DIRECTOR", ["PETER"]], ["UPLINE", ["MARCUS"]]]);
     expect(vm.me).toMatchObject({ name: "JIA HUI", title: "You · Rank B", dot: "good" });
     expect(vm.kids).toMatchObject([{ name: "DARREN", dot: "wait", kids: [{ name: "KELVIN" }] }]);
     expect(vm.count).toBe("2 above · 2 below");
@@ -132,6 +132,26 @@ describe("teamVM", () => {
     expect(vm.legend).toEqual(["Selling", "Pending", "Upline"]);
     expect(vm.sheets["n-k1"]).toMatchObject({ reportsTo: "Reports to you", stats: [{ value: "RM 500" }, { value: "Cost pending" }, { value: "1 direct" }] });
     expect(vm.sheets["n-g1"].reportsTo).toBe("Reports to DARREN");
+  });
+  // Fair has two directors, KRIS and PETER. Neither reports to the other, so the
+  // chart must not stack them as if one did (it drew KRIS above PETER above ANTHONY).
+  const twoDirectors: MemberOrgMap = { ...map, departments: [{ ...map.departments[0], directors: [{ id: "d0", name: "KRIS" }, { id: "d1", name: "PETER" }] }] };
+  const fairTeam = (staffId: string) => teamVM({ map: twoDirectors, departmentId: "fair", subName: "Fair", staffId, people: [], month: "2026-09",
+    kpi: { enabled: false, threshold: null }, capacity: 27, occupied: 26, ranks: new Map() })!;
+  it("puts every director of the sub-department on one level, side by side", () => {
+    const top = fairTeam("top");
+    expect(top.ups).toEqual([{ level: "DIRECTORS", nodes: [
+      { id: "d:d0", name: "KRIS", title: "Revenue Director", ini: "KR", dot: "up" },
+      { id: "d:d1", name: "PETER", title: "Revenue Director", ini: "PE", dot: "up" },
+    ] }]);
+    expect(top.count).toBe("2 above · 2 below");
+    expect(top.sheets["n-top"].reportsTo).toBe("Reports to KRIS · PETER");
+    expect(top.sheets["d:d0"]).toMatchObject({ role: "Revenue Director", reportsTo: "Leads Fair" });
+  });
+  it("keeps the line of uplines a chain below the directors' level", () => {
+    const vm = fairTeam("k1");
+    expect(vm.ups.map(u => [u.level, u.nodes.map(n => n.name)])).toEqual([["DIRECTORS", ["KRIS", "PETER"]], ["UPLINE", ["MARCUS"]], ["UPLINE", ["JIA HUI"]]]);
+    expect(vm.count).toBe("4 above · 1 below");
   });
   it("is null for somebody not on the department's map", () => {
     expect(teamVM({ map, departmentId: "fair", subName: "Fair", staffId: "ghost", people: [], month: "2026-09",
