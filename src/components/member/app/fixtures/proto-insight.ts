@@ -140,7 +140,7 @@ function bills(): BillsVM {
       bills: g.bills.map(({ weekText: _w, wait: _x, ...b }) => b),
     }])),
     waitBills: groups.flatMap(g => g.bills).filter(b => b.wait).map(({ weekText, wait: _x, ...b }) => ({ ...b, sub: `${b.sub.split(" · ")[0]} · ${weekText}` })),
-    footnote: "Sales count once the deposit clears, in the bill's commission month. Margin uses team cost (cost ÷ 0.7); a bill without cost stays pending.",
+    footnote: "Sales count once the deposit clears, in the bill's commission month. A bill without cost stays pending.",
   };
 }
 
@@ -198,7 +198,7 @@ function brandPageFor(name: string): BrandPageVM {
       const ot = band(o.m);
       return { id: billId(o), no: o.no, meta: `${o.cust} · Week ${o.f + 1} · ${rm(o.amt)}`, pct: o.m == null ? "No cost" : o.m.toFixed(1) + "%", tier: o.m == null ? "Cost pending" : ot!.l, ink: o.m == null ? INK.warn : INK[ot!.tone] };
     }),
-    footnote: "Brand margin uses commissionable goods against team cost (cost ÷ 0.7). Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.",
+    footnote: "Brand margin uses commissionable goods. Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.",
   };
 }
 

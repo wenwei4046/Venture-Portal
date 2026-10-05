@@ -36,7 +36,6 @@ import { notifGroups, notifications, notifSummary, type NotifItem, type NotifTab
 import type { AppFixture } from "./fixtures/proto";
 import { useQuote } from "./quote/useQuote";
 import { catalogFromProducts, itemsText, type QCatalog } from "./quote/quote-model";
-import { costBasisNote } from "./quote/calc-model";
 import { tableCalc } from "./quote/table-calc";
 import QuoteProducts from "./quote/QuoteProducts";
 import QuoteCalc, { CalcDock, DeskCalc, ProductsDock, type CalcProps } from "./quote/QuoteCalc";
@@ -443,12 +442,12 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   });
   const arInput = useMemo(() => ({
     period: arPeriod, snapshot: arData.snapshot, history: arData.history, standings: arData.standings, selfId,
-    subName: membership?.name ?? "", costDivisor: recent?.costDivisor ?? null, kpiEnabled: kpiRule.enabled,
+    subName: membership?.name ?? "", kpiEnabled: kpiRule.enabled,
     // The whole sub-department closed (the snapshot says so); until it loads, the member's own closes.
     final: arData.snapshot?.final ?? (arPeriod.kind !== "monthly" ? arPeriod.through < period : !isLiveMonth(arPeriod.from, period, monthState)),
     openMonths: arData.snapshot?.openMonths ?? (isLiveMonth(arPeriod.from, period, monthState) ? [arPeriod.from] : []),
     current: period,
-  }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, recent?.costDivisor, kpiRule.enabled, period, monthState]);
+  }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, kpiRule.enabled, period, monthState]);
   const hubVM = useMemo(() => fixture?.arena?.hub[arKind] ?? hubModel(arInput), [fixture, arKind, arInput]);
   const boardVM = useMemo(() => {
     const fx = fixture?.arena;
@@ -741,7 +740,6 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     brandName: quote.catalog?.name ?? "",
     cart: quote.cart,
     fee: quote.fee,
-    basis: costBasisNote(membership?.name ?? "", fixture?.quote?.costDivisor ?? quote.divisor ?? recent?.costDivisor ?? null),
     kpiEach: Object.fromEntries((quote.catalog?.kpis ?? []).map(k => [k.key, k.price])),
     onPress: quote.press,
     onNext: quote.applyNext,

@@ -57,6 +57,6 @@ export function schemeVM(input: {
         value: r.range,
       })),
     })),
-    note: "Margin is measured on the Revenue Team's cost, brand by brand. Which of these a month pays — and what you earned — is on My income; your payslip confirms it.",
+    note: "Margin is measured brand by brand. Which of these a month pays — and what you earned — is on My income; your payslip confirms it.",
   };
 }

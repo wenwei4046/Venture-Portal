@@ -146,7 +146,7 @@ function Incentive({ person, tiers, readOnly, name }: { person?: ArenaPerson; ti
       </div>;
     })}
     <details className={s.basis}><summary>How the incentive is judged</summary>
-      <p>Each brand&apos;s margin is blended across the month&apos;s deposit-cleared, commissionable bills, on the Revenue Team cost basis — the same figure the commission run pays on, not the company&apos;s own margin.</p>
+      <p>Each brand&apos;s margin is blended across the month&apos;s deposit-cleared, commissionable bills — the same figure the commission run pays on.</p>
       <p>Thresholds follow the brand and are not the same for all of them. A tier counts only when <em>every</em> brand sold that month clears it, and the tiers earned stack. A brand with a bill that has no cost, or a bill with no brand at all, holds the whole incentive until it is fixed.</p>
     </details>
   </section>;

@@ -174,7 +174,7 @@ const BASIS = {
   fair: "Counts how often each person finished 1st, 2nd or 3rd in their own completed weekly fairs. Ranked by firsts, then seconds, then thirds. People with the same three counts share the place, and the next place is skipped.",
   champ: "Championship adds seven contributions: Sales by brand, Fair results, Total sales, Margin by brand, Total margin, KPI and Highest Fair Record. It is a points total, not an average.",
   kpi: "All eligible KPI quantities together, including eligible giveaway items. Shows actual quantities; KPI points sit in Championship.",
-  margin: "Margin uses commissionable goods revenue against the Fair team cost (cost ÷ 0.7). Anyone with an uncosted bill stays pending until it is costed.",
+  margin: "Margin uses commissionable goods revenue. Anyone with an uncosted bill stays pending until it is costed.",
   sales: "Deposit-cleared, commissionable sales. Each order counts once, in its released commission month.",
 };
 

@@ -7,7 +7,7 @@ import { isPrincipalAccount } from "@/lib/view-as";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { calculateQuote, cents, customerQuote } from "./calculator";
-import { quoteCostRatios, quoteKpiItems } from "./quote-rules";
+import { quoteCostRules, quoteKpiItems } from "./quote-rules";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
@@ -726,12 +726,7 @@ export async function calculateMemberQuote(
     const principalView = !!user && isPrincipalAccount(user);
     const build = quoteBuild(input.build);
     const client = await session("member_quote", principalView);
-    const context = await rpc<{
-      bands: MemberBand[];
-      costDivisor?: number | string | null;
-      costRatios?: unknown;
-      kpiItems?: unknown;
-    }>(
+    const context = await rpc<{ bands: MemberBand[]; kpiItems?: unknown }>(
       client,
       principalView ? "member_principal_quote_context" : "member_quote_context",
       { p_scheme: input.schemeId },
@@ -739,21 +734,26 @@ export async function calculateMemberQuote(
     const brands = [...new Set(context.bands.map((b) => b.brand))];
     if (!brands.length)
       throw new Error("Margin rules have not been configured for Fair.");
-    const costDivisor = Number(context.costDivisor ?? 1);
-    if (!Number.isFinite(costDivisor) || costDivisor <= 0)
-      throw new Error("The cost rule for this department is not configured.");
     // The portal's own prices (user 2026-09-24): the Product List's catalogue,
     // priced, for the cart's SKUs plus the pillows a gift suggestion may offer
-    // — never a whole price list. Service role only, after the member's own
-    // session has been authorised above; nothing priced leaves this module.
+    // — never a whole price list — and how the scheme works out the Revenue
+    // Team's cost (2026-10-05: the context a member's own login can call no
+    // longer carries it). Service role only, after the member's own session
+    // has been authorised above; nothing priced and no ratio leaves this module.
     const admin = adminClient() as unknown as SupabaseClient;
-    const { data: catalogue, error: catalogueError } = await admin.rpc("member_catalogue", {
-      p_brands: brands,
-      p_ids: ids,
-      p_priced: true,
-      p_suggest: 20,
-    });
+    const [{ data: catalogue, error: catalogueError }, { data: costRules, error: rulesError }] = await Promise.all([
+      admin.rpc("member_catalogue", {
+        p_brands: brands,
+        p_ids: ids,
+        p_priced: true,
+        p_suggest: 20,
+      }),
+      admin.rpc("member_quote_cost_rules", { p_scheme: input.schemeId }),
+    ]);
     if (catalogueError) throw new Error(catalogueError.message);
+    const rules = rulesError ? null : quoteCostRules(costRules);
+    if (!rules)
+      throw new Error("The margin rules for this department are not configured.");
     const { products, pricing } = pricedCatalogueOf(catalogue);
     for (const line of input.lines) {
       const product = products.find((p) => p.id === line.productId);
@@ -789,12 +789,14 @@ export async function calculateMemberQuote(
       checked,
       products,
       context.bands,
-      { costDivisor, costRatios: quoteCostRatios(context.costRatios), kpiItems: quoteKpiItems(context.kpiItems) },
+      { ...rules, kpiItems: quoteKpiItems(context.kpiItems) },
       pricing,
     );
     if (!result.valid)
       throw new Error(result.error ?? "The quote could not be calculated.");
-    return { ...result, costDivisor, customerText: customerQuote(checked, products, result) };
+    // The ratio stays here: the phone is told the margin, never how the cost
+    // behind it is made up (user 2026-10-05).
+    return { ...result, customerText: customerQuote(checked, products, result) };
   });
 }
 

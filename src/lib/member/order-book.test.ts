@@ -21,16 +21,19 @@ describe("readOrderBook", () => {
     expect(book.orders[0]).toMatchObject({ number: "HC-SO-2609-219", ref: "HC11523", margin: null, booth: "AKEMI" });
     expect(book.closedMonths).toEqual(["2026-08"]);
     expect(book.brandWeeks).toEqual({ "2026-09-11": "AKEMI" });
-    expect(book.costDivisor).toBe(0.7);
+  });
+  // 2026-10-05 (user): the RPC still hands back the scheme's cost ratio; the
+  // phone must never receive it.
+  it("keeps the cost ratio the RPC returns on the server", () => {
+    const book = readOrderBook(raw())!;
+    expect(book).not.toHaveProperty("costDivisor");
+    expect(JSON.stringify(book)).not.toContain("0.7");
   });
   it("refuses a shape it does not read", () => {
     const broken = raw();
     (broken.orders[0] as Record<string, unknown>).lines = null;
     expect(readOrderBook(broken)).toBeNull();
     expect(readOrderBook({ ...raw(), from: "Sep" })).toBeNull();
-  });
-  it("reads a missing or nonsense ratio as one", () => {
-    expect(readOrderBook({ ...raw(), costDivisor: 0 })!.costDivisor).toBe(1);
   });
 });
 

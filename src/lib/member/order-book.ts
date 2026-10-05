@@ -3,7 +3,9 @@
  * bills line by line (`member_order_book`) and their team over a quarter or a
  * year (`member_insight_range`). Read here field by field, so a key a future
  * migration adds to the RPC's JSON stays on the server — and nothing in either
- * shape is a cost: a bill carries its layer-2 margin percentage only.
+ * shape is a cost: a bill carries its layer-2 margin percentage only. The
+ * scheme's cost ratio the RPC still returns (`costDivisor`) stays here too: no
+ * screen says how the cost is made up (user 2026-10-05).
  */
 import type { MemberDownlineRow, MemberScore } from "./types";
 
@@ -64,8 +66,6 @@ export interface MemberOrderBook {
   paysFrom: string | null;
   /** Months closed for this member (a standing close, or the run applied). */
   closedMonths: string[];
-  /** The Revenue Team cost ratio (cost ÷ this). */
-  costDivisor: number;
   /** Stored brand-week picks: Friday → brand code. */
   brandWeeks: Record<string, string>;
   orders: MemberBookOrder[];
@@ -164,12 +164,10 @@ export function readOrderBook(value: unknown): MemberOrderBook | null {
       if (DAY.test(friday) && typeof brand === "string" && brand.trim()) brandWeeks[friday] = brand.trim().toUpperCase();
     }
   }
-  const divisor = num(value.costDivisor);
   return {
     from, through, asOf,
     paysFrom: paysFrom && MONTH.test(paysFrom) ? paysFrom : null,
     closedMonths,
-    costDivisor: divisor !== null && divisor > 0 ? divisor : 1,
     brandWeeks,
     orders,
   };

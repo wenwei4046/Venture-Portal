@@ -2,6 +2,8 @@
 
 All user-visible wording in the prototype. Static strings come from the template; dynamic strings come from the logic class (renderVals and data constants). Reproduce verbatim.
 
+> **2026-10-05 — never say how the cost is made up.** The prototype said it in four places (the note under *Additional fee*, Insight's bills and brand footnotes, the Arena's margin board: "team cost (cost ÷ 0.7)"). The user had them taken out — wording like that leaks the company's numbers — so the note under *Additional fee* is gone and the other three keep only the rest of their sentence. Never bring them back.
+
 ## Static template text (247)
 
 - HOUZS VENTURE
@@ -55,7 +57,6 @@ All user-visible wording in the prototype. Static strings come from the template
 - · fixed, not in margin
 - Customer pays
 - Additional fee
-- Fees such as delivery or disposal show on the customer quote and are excluded from margin. Margin uses the Fair team cost basis (cost ÷ 0.7).
 - Insight
 - T1 36%
 - T2 43%
@@ -65,7 +66,7 @@ All user-visible wording in the prototype. Static strings come from the template
 - All 7 margin tiers
 - Orders by margin
 - Lowest first
-- Brand margin uses commissionable goods against team cost (cost ÷ 0.7). Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.
+- Brand margin uses commissionable goods. Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.
 - KPI items
 - Eligible KPI items
 - Threshold hit
@@ -85,7 +86,7 @@ All user-visible wording in the prototype. Static strings come from the template
 - 2 orders · not counted yet
 - These orders count toward sales, margin and KPI once the deposit clears, in that commission month.
 - No bills match this filter.
-- Sales count once the deposit clears, in the bill's commission month. Margin uses team cost (cost ÷ 0.7); a bill without cost stays pending.
+- Sales count once the deposit clears, in the bill's commission month. A bill without cost stays pending.
 - Sales, margin and KPI in one place.
 - My sales
 - 83% of target

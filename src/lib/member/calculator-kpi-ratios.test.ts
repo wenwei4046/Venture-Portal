@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateQuote, type QuotePricing } from "./calculator";
-import { quoteCostRatios, quoteKpiItems } from "./quote-rules";
+import { quoteCostRatios, quoteCostRules, quoteKpiItems } from "./quote-rules";
 import type { MemberBand, MemberProduct, QuoteInput, QuoteRules } from "./types";
 
 /**
@@ -193,6 +193,17 @@ describe("the quote context's rules, read defensively", () => {
     ]);
     expect(quoteCostRatios(null)).toEqual([]);
     expect(quoteCostRatios([0.6])).toEqual([]);
+  });
+
+  // 2026-10-05: the cost rules arrive from member_quote_cost_rules (service role only).
+  it("reads the cost rules, and refuses an answer with no usable ratio", () => {
+    expect(quoteCostRules({ costDivisor: "0.7000", costRatios: { "Y04-(Q)": 0.6, bad: -1 } })).toEqual({
+      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }],
+    });
+    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [] });
+    for (const raw of [null, undefined, [], {}, { costDivisor: null }, { costDivisor: 0 }, { costDivisor: -0.7 }, { costDivisor: "abc" }, { costDivisor: "" }, { costDivisor: true }]) {
+      expect(quoteCostRules(raw)).toBeNull();
+    }
   });
 
   it("reads the KPI items the context sends, and nothing else", () => {
