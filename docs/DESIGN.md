@@ -1344,6 +1344,16 @@ VP's. The member C release above describes the screens this replaced.
   `calc(Npx * var(--rv-type))`; `app/type-scale.test.ts` fails on a plain px. The
   prototype comparison (`.design/revenue-app/tools/shoot-app.mjs`) draws the app
   at `--rv-type: 1`, so it still checks the layout against the prototype.
+- **While it loads** (2026-10-06, user: not the old *Preparing your Revenue
+  workspace…* page) — `/member`'s `loading.tsx` is the app's own frame
+  (`app/shell/AppLoading.tsx`): the phone header where the app has one (Today —
+  the wordmark alone, held at the capsule's 46px so nothing moves when the app
+  lands), the real bottom bar lit on the URL's tab, the sidebar and an empty top
+  bar on a desktop, and one 28px spinner (`--rv-accent` on `--rv-orange-bg`)
+  where the page will be. The frame is `inert`. The prototype has no loading
+  state; this is ours. (The old page's beige band and scroll were `.login`'s 8vh
+  margin collapsing through `.workspace`.) Held on screen at
+  `/member/preview?app=loading&page=…`.
 - **Directors stand side by side** — the prototype's family chart (Team &
   capacity) drew ONE director above the line of uplines. A sub-department with
   two (Fair: KRIS and PETER) is one level, labelled `DIRECTORS`: the cards in a
@@ -2528,6 +2538,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Revenue app · while it loads)** — opening or refreshing the Revenue app no longer shows the old *HOUZS VENTURE · Preparing your Revenue workspace…* page (with a beige band above it and a page that scrolled): it shows the app's own frame — the phone header on Today, the bottom bar lit on the tab being opened (the sidebar on a desktop) — and one orange spinner where the page will be. When the app lands, nothing in the frame moves. See *While it loads*.
 - **2026-10-06 (Revenue app · pull to refresh)** — the minute's background refresh is gone: the app changes only when pulled (or on return after 10 minutes away). The pull's dot, its armed and spinning states and the *Couldn't refresh* pill are under *Pull to refresh* in the Revenue app section.
 - **2026-10-06 (update prompt)** — every surface gains *A new version is ready* · Update · ×: an ink pill at the top centre when a release lands while the app is open (installed apps are resumed from memory, so a phone could keep last week's build — and its reads fail once a release replaces its Server Actions). In the Revenue app, after 30+ minutes away it reloads on return unless a form was being filled; the portal only ever offers it (a payroll grid may hold edits not yet saved). See *Update prompt*.
 - **2026-10-06 (Revenue app · phone type one step smaller)** — on a phone every text in the Revenue app is one step smaller than the prototype's: each font-size is the prototype's px times `--rv-type`, .92 on a phone (13px → 12, the greeting 28px → 25.8) and 1 on a desktop, which is unchanged. Spacing, icons, control heights and the 16px inputs stay as they were. One number tunes it (`.screen` in `app/shell.module.css`); `app/type-scale.test.ts` keeps every size on it. See *The Revenue app — built to the prototype*.

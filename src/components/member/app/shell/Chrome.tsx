@@ -105,7 +105,8 @@ export function DeskAside({ active, count, notifOpen, me, onGo, onQuote, onNotif
   active: Screen;
   count: number;
   notifOpen: boolean;
-  me: Me;
+  /** Absent while /member is still loading (`AppLoading`): no card at the foot. */
+  me?: Me;
   onGo: (screen: Screen) => void;
   onQuote: () => void;
   onNotif: () => void;
@@ -131,13 +132,15 @@ export function DeskAside({ active, count, notifOpen, me, onGo, onQuote, onNotif
         {count > 0 && <span className={s.asideCount}>{count}</span>}
       </button>
       <div className={s.asideSpacer} />
-      <button className={s.asideMe} onClick={onProfile}>
-        <span className={s.asideAvatar}>{me.ini}</span>
-        <span className={s.asideMeText}>
-          <span className={s.asideMeName}>{me.name}</span>
-          <span className={s.asideMeSub}>{me.title} · {me.rank}</span>
-        </span>
-      </button>
+      {me && (
+        <button className={s.asideMe} onClick={onProfile}>
+          <span className={s.asideAvatar}>{me.ini}</span>
+          <span className={s.asideMeText}>
+            <span className={s.asideMeName}>{me.name}</span>
+            <span className={s.asideMeSub}>{me.title} · {me.rank}</span>
+          </span>
+        </button>
+      )}
     </aside>
   );
 }
