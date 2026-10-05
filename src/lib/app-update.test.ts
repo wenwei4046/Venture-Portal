@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AWAY_RELOAD_MS, TYPING_GRACE_MS, isTypingField, readLiveVersion, updateStep, wasBusy } from './app-update'
+import { AWAY_RELOAD_MS, TYPING_GRACE_MS, isTypingField, mayReloadOn, readLiveVersion, updateStep, wasBusy } from './app-update'
 
 describe('updateStep', () => {
-  const base = { built: 'dpl_old', live: 'dpl_new', awayMs: 0, busy: false }
+  const base = { built: 'dpl_old', live: 'dpl_new', awayMs: 0, busy: false, mayReload: true }
 
   it('does nothing while the server runs the same build, cannot say, or the build has no name', () => {
     expect(updateStep({ ...base, live: 'dpl_old' })).toBe('none')
@@ -19,6 +19,25 @@ describe('updateStep', () => {
     expect(updateStep({ ...base, awayMs: AWAY_RELOAD_MS })).toBe('reload')
     expect(updateStep({ ...base, awayMs: 8 * 60 * 60_000 })).toBe('reload')
     expect(updateStep({ ...base, awayMs: AWAY_RELOAD_MS, busy: true })).toBe('prompt')
+  })
+
+  it('only ever offers it where a reload could cost unsaved work (the portal)', () => {
+    expect(updateStep({ ...base, awayMs: 8 * 60 * 60_000, mayReload: false })).toBe('prompt')
+  })
+})
+
+describe('mayReloadOn', () => {
+  it('is the Revenue app, whose screens hold nothing unsaved', () => {
+    expect(mayReloadOn('/member')).toBe(true)
+    expect(mayReloadOn('/member/preview')).toBe(true)
+  })
+
+  it('is never a portal page: HR › Payroll keeps edits until Save all', () => {
+    expect(mayReloadOn('/hr-costing/payroll/2026-10')).toBe(false)
+    expect(mayReloadOn('/dashboard')).toBe(false)
+    expect(mayReloadOn('/revenue/fair/2026-09')).toBe(false)
+    expect(mayReloadOn('/login')).toBe(false)
+    expect(mayReloadOn('/members')).toBe(false)
   })
 })
 

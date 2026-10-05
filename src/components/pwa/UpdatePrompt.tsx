@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CHECK_EVERY_MS, CHECK_GAP_MS, readLiveVersion, updateStep, wasBusy } from '@/lib/app-update'
+import { CHECK_EVERY_MS, CHECK_GAP_MS, mayReloadOn, readLiveVersion, updateStep, wasBusy } from '@/lib/app-update'
 
 // Module-level, so the defaults below are the same function on every render
 // and the effect keeps its listeners and its timer.
@@ -16,11 +16,13 @@ function reloadPage() {
  * page loads, every time the app comes back to the screen, when the network
  * returns, and every five minutes while it is in view.
  *
- * A newer build is OFFERED — the bar at the top, Update reloads — except after
- * thirty minutes or more away with nothing half-typed, when the app simply
- * loads it on return, so somebody reopening it in the morning never meets
- * yesterday's build. While it is on screen it never reloads by itself. A page
- * with unsaved changes that guards them (`beforeunload`) still asks first.
+ * A newer build is OFFERED — the bar at the top, Update reloads. In the Revenue
+ * app only, after thirty minutes or more away with nothing half-typed, it simply
+ * loads it on return, so a salesperson reopening the phone in the morning never
+ * meets yesterday's build. The portal is only ever offered it: its pages can
+ * hold edits nobody has saved (lib/app-update.ts › mayReloadOn). Nothing reloads
+ * by itself while it is on screen, and a page that guards unsaved changes
+ * (`beforeunload`) still asks first.
  */
 export default function UpdatePrompt({
   built = process.env.NEXT_PUBLIC_APP_VERSION ?? '',
@@ -49,7 +51,7 @@ export default function UpdatePrompt({
       askedAt.current = t
       const live = await readLive()
       if (!alive) return
-      const step = updateStep({ built, live, awayMs, busy })
+      const step = updateStep({ built, live, awayMs, busy, mayReload: mayReloadOn(window.location.pathname) })
       if (step === 'none') return
       // Shown under a reload too: a page guarding unsaved changes may keep it.
       setReady(true)

@@ -9,7 +9,7 @@
  * what it decides with the answer.
  */
 
-/** Away longer than this, a new version reloads the app on return — unless a form is being filled. */
+/** Away longer than this, a new version reloads the Revenue app on return — unless a form is being filled. */
 export const AWAY_RELOAD_MS = 30 * 60_000
 /** Typing this close to leaving counts as a form still being filled. */
 export const TYPING_GRACE_MS = 10 * 60_000
@@ -21,13 +21,25 @@ export const CHECK_GAP_MS = 10_000
 export type UpdateStep = 'none' | 'prompt' | 'reload'
 
 /**
- * What to do once the server has answered: nothing (same build, no answer, or a
- * build that does not know its own name), offer the new version, or — after a
- * long time away with nothing half-typed — simply load it.
+ * Where a long absence may end in a reload: the Revenue app (`/member`) only.
+ * Its screens are read from the server and its quote is kept in the tab's
+ * session storage, so a reload loses nothing. NOT the portal: a page like
+ * HR › Payroll holds edits until *Save all* without guarding them, and they
+ * may have been made long before anybody switched tabs — no check of typing or
+ * focus can see those. There a new build is only ever offered.
  */
-export function updateStep(input: { built: string; live: string | null; awayMs: number; busy: boolean }): UpdateStep {
+export function mayReloadOn(pathname: string): boolean {
+  return pathname === '/member' || pathname.startsWith('/member/')
+}
+
+/**
+ * What to do once the server has answered: nothing (same build, no answer, or a
+ * build that does not know its own name), offer the new version, or — in the
+ * Revenue app, after a long time away with nothing half-typed — simply load it.
+ */
+export function updateStep(input: { built: string; live: string | null; awayMs: number; busy: boolean; mayReload: boolean }): UpdateStep {
   if (!input.built || !input.live || input.live === input.built) return 'none'
-  return input.awayMs >= AWAY_RELOAD_MS && !input.busy ? 'reload' : 'prompt'
+  return input.mayReload && input.awayMs >= AWAY_RELOAD_MS && !input.busy ? 'reload' : 'prompt'
 }
 
 const NOT_TYPED = new Set(['button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file', 'image', 'hidden'])

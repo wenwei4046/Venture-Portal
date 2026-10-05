@@ -26,6 +26,8 @@ beforeEach(() => {
   visibility = 'visible'
   clock = 1_000 * MIN
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility })
+  // The Revenue app unless a test says otherwise: the one place a long absence may reload.
+  window.history.replaceState(null, '', '/member?page=today')
 })
 afterEach(() => {
   cleanup()
@@ -82,6 +84,19 @@ describe('UpdatePrompt', () => {
     goAway()
     await comeBack(31 * MIN)
     expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('never reloads a portal page, however long away: HR › Payroll may hold edits not yet saved', async () => {
+    window.history.replaceState(null, '', '/hr-costing/payroll/2026-10')
+    const readLive = vi.fn().mockResolvedValueOnce('dpl_old').mockResolvedValue('dpl_new')
+    const reload = vi.fn()
+    await act(async () => {
+      render(<UpdatePrompt built="dpl_old" readLive={readLive} reload={reload} now={now} />)
+    })
+    goAway()
+    await comeBack(8 * 60 * MIN)
+    expect(reload).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('A new version is ready.')
   })
 
   it('only offers it after a short time away', async () => {
