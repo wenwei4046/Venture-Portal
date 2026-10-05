@@ -2,6 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
@@ -136,7 +137,7 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
       ) : null}
 
       {activeTab === 'history' ? (
-        <HistoryTable deptId={dept.id} filter={historyFilter} />
+        <HistoryTable deptId={dept.id} filter={historyFilter} seesPayroll={canSeePayrollPayouts(user)} />
       ) : null}
 
       {activeTab === 'pnl' ? (

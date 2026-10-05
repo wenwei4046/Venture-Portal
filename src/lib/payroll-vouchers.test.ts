@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   filterLockedBatches,
+  foldPayrollPoolRows,
   isPayrollReference,
   lockPayrollBatches,
   payrollBatchLabel,
+  poolRowVoucherNo,
   type LedgerFilters,
   type PayrollVoucherLike,
+  type PoolRowLike,
 } from './payroll-vouchers'
 
 const pv = (over: Partial<PayrollVoucherLike>): PayrollVoucherLike => ({
@@ -116,6 +119,85 @@ describe('lockPayrollBatches', () => {
 
   it('nothing in, nothing out', () => {
     expect(lockPayrollBatches([])).toEqual([])
+  })
+})
+
+// 2026-10-05 (user: "department pool 她还是要看到的 … 不给她看 detail / history 罢了").
+describe('a department pool ledger, for an account without Payroll payouts', () => {
+  const row = (id: string, description: string, amount: number, created_at: string, over: Partial<PoolRowLike> = {}): PoolRowLike => ({
+    id, transaction_type: 'expense_out', amount, description, created_at, period_month: '2026-08-01', ...over,
+  })
+  const salary = (no: string): PayrollVoucherLike & { voucher_no: string } => ({
+    voucher_no: no, reference_type: 'payroll_disbursement', description: 'Payroll disbursement Aug 2026 — Someone (HR)',
+    voucher_type: 'other', status: 'paid', amount: 0, payment_date: '2026-09-09', created_at: '2026-09-05T03:00:00+00:00',
+  })
+  const vouchers = new Map<string, PayrollVoucherLike>([
+    ['HV-PV-202609-0286', salary('HV-PV-202609-0286')],
+    ['HV-PV-202609-0287', salary('HV-PV-202609-0287')],
+    ['HV-PV-202609-0290', { ...salary('HV-PV-202609-0290'), description: 'Director salary Aug 2026 — A Director' }],
+    ['HV-PV-202609-0300', { ...salary('HV-PV-202609-0300'), reference_type: null, description: 'Office rack' }],
+    ['HV-PV-202607-0100', { ...salary('HV-PV-202607-0100'), reference_type: 'payroll_payment_request', voucher_type: 'payroll_bank_transfer', description: 'Payroll bank transfer — Jun 2026 (partial)' }],
+  ])
+
+  it('reads the voucher number a pool row starts with', () => {
+    expect(poolRowVoucherNo('PV HV-PV-202609-0286: Payroll disbursement Aug 2026 — Aina (HR)')).toBe('HV-PV-202609-0286')
+    expect(poolRowVoucherNo('PV HV-OR-202608-0221: settle HV-INV-202607-0032 (finance)')).toBe('HV-OR-202608-0221')
+    expect(poolRowVoucherNo('VOID HV-PV-202607-0115: reverse expense_out')).toBeNull()
+    expect(poolRowVoucherNo('Opening balance')).toBeNull()
+    expect(poolRowVoucherNo(null)).toBeNull()
+  })
+
+  it('folds the rows of one batch on one day into one line, where the latest of them stood', () => {
+    const out = foldPayrollPoolRows([
+      row('r1', 'PV HV-PV-202609-0300: Office rack — Vivian', 165.14, '2026-09-10T02:00:00+00:00'),
+      row('r2', 'PV HV-PV-202609-0287: Payroll disbursement Aug 2026 — Bala (HR)', 4100.25, '2026-09-09T05:00:00+00:00'),
+      row('r3', 'PV HV-PV-202609-0290: Director salary Aug 2026 — A Director', 12000, '2026-09-09T04:30:00+00:00'),
+      row('r4', 'PV HV-PV-202609-0286: Payroll disbursement Aug 2026 — Aina (HR)', 3200.5, '2026-09-09T04:00:00+00:00'),
+      row('r5', 'VOID HV-PV-202607-0115: reverse expense_out', 2937.45, '2026-07-21T04:00:00+00:00', { transaction_type: 'void_in', period_month: null }),
+    ], vouchers)
+    expect(out.map((r) => [r.id, r.description, r.amount])).toEqual([
+      ['r1', 'PV HV-PV-202609-0300: Office rack — Vivian', 165.14],
+      ['locked-Payroll disbursement Aug 2026|2026-09-09|expense_out', 'Payroll disbursement Aug 2026 · 2 笔 · 只显示总数', 7300.75],
+      ['locked-Director salary Aug 2026|2026-09-09|expense_out', 'Director salary Aug 2026 · 1 笔 · 只显示总数', 12000],
+      ['r5', 'VOID HV-PV-202607-0115: reverse expense_out', 2937.45],
+    ])
+    const folded = out[1]
+    expect('locked' in folded && folded.locked).toBe(true)
+    expect(folded.created_at).toBe('2026-09-09T05:00:00+00:00')
+    expect(folded.period_month).toBe('2026-08-01')
+    for (const secret of ['Aina', 'Bala', 'A Director', 'HV-PV-202609-028']) {
+      expect(JSON.stringify(out)).not.toContain(secret)
+    }
+  })
+
+  it('keeps a day apart from the next, and money in apart from money out', () => {
+    const out = foldPayrollPoolRows([
+      row('a', 'PV HV-PV-202609-0286: Payroll disbursement Aug 2026 — Aina (HR)', 1, '2026-09-10T01:00:00+00:00'),
+      row('b', 'PV HV-PV-202609-0287: Payroll disbursement Aug 2026 — Bala (HR)', 2, '2026-09-09T01:00:00+00:00'),
+      row('c', 'PV HV-PV-202607-0100: payroll fund → HR custody', 3, '2026-09-09T00:30:00+00:00', { transaction_type: 'np_in' }),
+    ], vouchers)
+    expect(out.map((r) => [r.description, r.transaction_type, r.amount])).toEqual([
+      ['Payroll disbursement Aug 2026 · 1 笔 · 只显示总数', 'expense_out', 1],
+      ['Payroll disbursement Aug 2026 · 1 笔 · 只显示总数', 'expense_out', 2],
+      ['Payroll bank transfer Jun 2026 · 1 笔 · 只显示总数', 'np_in', 3],
+    ])
+  })
+
+  it('a salary line whose voucher is not at hand still folds — by what its own text says', () => {
+    const out = foldPayrollPoolRows([
+      row('x', 'PV HV-PV-202507-0001: Payroll disbursement Jun 2025 — Old Person (HR)', 900, '2025-07-05T01:00:00+00:00'),
+      row('y', 'PV HV-PV-202507-0002: Staff Payroll - Jun 2025', 5000, '2025-07-05T00:00:00+00:00'),
+    ], new Map())
+    expect(out.map((r) => r.description)).toEqual([
+      'Payroll disbursement Jun 2025 · 1 笔 · 只显示总数',
+      'PV HV-PV-202507-0002: Staff Payroll - Jun 2025', // a total typed by Finance, no person in it
+    ])
+  })
+
+  it('with nothing to fold, hands the rows back as they came', () => {
+    const rows = [row('r1', 'PV HV-PV-202609-0300: Office rack — Vivian', 165.14, '2026-09-10T02:00:00+00:00')]
+    expect(foldPayrollPoolRows(rows, vouchers)).toEqual(rows)
+    expect(foldPayrollPoolRows([], vouchers)).toEqual([])
   })
 })
 

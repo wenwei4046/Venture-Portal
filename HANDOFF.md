@@ -152,6 +152,33 @@ grant is personal. It is the way to look at the executive's view.
 Not built, not asked: the General Ledger and the other reports made safe for
 such an account (the user: "暂时不需要").
 
+### Dept Pool opened to the finance executive — History folds payroll (2026-10-05, same day, SHIPPED)
+
+User: "department pool 她还是要看到的 … 不给她看 detail / history 罢了不行？" → option A.
+Checked every Dept Pool screen: the index (By department, Per-bank breakdown), a
+department's Overview and P&L (its row list is inter-billing only) are totals;
+the one place that named people was a department's **History** (the HR pool:
+26 / 23 / 18 salary rows a month, "PV HV-PV-…: Payroll disbursement Aug 2026 —
+<person> (<dept>)"; the Director pool had 4 in Jul 2026), and the Marketing
+page's voucher history (4 statutory PVs — department level, which the user
+counts as detail).
+
+- `HistoryTable` takes `seesPayroll` (both callers pass `canSeePayrollPayouts(user)`). When
+  false it looks the rows' vouchers up by the number each row starts with
+  (`poolRowVoucherNo`) and folds payroll's rows with `foldPayrollPoolRows` (lib/payroll-
+  vouchers.ts): one locked line per batch per day per direction — "Payroll
+  disbursement Aug 2026 · 22 笔 · 只显示总数" — standing where its latest member
+  stood. A salary line whose voucher is not found still folds by its own text.
+  Verified on live data: all 71 per-person rows carry a voucher number that
+  resolves to a payroll voucher; 0 PV-prefixed rows resolve to nothing.
+- `MarketingPnlView` takes `seesPayroll` and shows payroll vouchers as locked batch totals.
+- So the Principal denies **three** for the executive: Reports, Department
+  reports, Reconciliation. Dept Pool stays. (The user's own account sees
+  everything as before: it holds payroll_payouts.)
+
+Not touched: the 150 dept_pools rows themselves (RLS treasury scope) — same
+API-level residual as the journal; the pages are the boundary.
+
 ### Found, NOT fixed — the user DECLINED the fix (2026-10-02: "不需要")
 
 **Role checks that let a caller with no role through.** `IF v_role NOT IN

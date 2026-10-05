@@ -156,6 +156,95 @@ export interface LedgerFilters {
  * locked batches, a status tab keeps a batch that has any voucher in that
  * status, and a search matches the batch's own name only.
  */
+// ── A department pool's ledger ──────────────────────────────────────────────
+//
+// Every pool row a voucher writes starts with its number — "PV HV-PV-202609-0286:
+// Payroll disbursement Aug 2026 — <person> (<dept>)" (adjustPool in
+// lib/voucher-paid-helpers.ts) — so the HR pool's History names each person
+// paid. For an account without Payroll payouts those rows fold into one line
+// per batch per day, the way Payments folds the vouchers (2026-10-05, user:
+// "department pool 她还是要看到的 … 不给她看 detail / history 罢了").
+
+export function poolRowVoucherNo(description: string | null | undefined): string | null {
+  const m = /^PV (HV-(?:PV|OR)-\d{6}-\d{4}):/.exec(description ?? '')
+  return m ? m[1] : null
+}
+
+export interface PoolRowLike {
+  id: string
+  transaction_type: string
+  amount: number | string
+  description: string | null
+  created_at: string
+  period_month: string | null
+}
+
+/** One line standing for the payroll rows of a batch on a day. */
+export interface LockedPoolRow {
+  id: string
+  transaction_type: string
+  amount: number
+  description: string
+  created_at: string
+  period_month: string | null
+  locked: true
+  count: number
+}
+
+/** A pool row whose voucher is not at hand, but whose text is a salary line. */
+const PER_PERSON_ROW = /^(?:PV \S+: )?((?:Payroll disbursement|Director salary) [A-Z][a-z]{2} \d{4}) — /
+
+/**
+ * Fold the payroll rows of a pool ledger for a viewer who may not see one
+ * person's pay. `vouchers` maps a voucher number to the voucher that wrote the
+ * row; a row whose voucher is not payroll's — or has no number at all, like a
+ * void or a manual JV — passes through as it is. Rows arrive newest first, and
+ * a folded line stands where its latest member stood.
+ */
+export function foldPayrollPoolRows<T extends PoolRowLike>(
+  rows: readonly T[],
+  vouchers: ReadonlyMap<string, PayrollVoucherLike>,
+): Array<T | LockedPoolRow> {
+  const out: Array<T | LockedPoolRow> = []
+  const groups = new Map<string, LockedPoolRow & { label: string }>()
+  for (const row of rows) {
+    const no = poolRowVoucherNo(row.description)
+    const voucher = no ? vouchers.get(no) : undefined
+    let label: string | null = null
+    if (voucher && isPayrollReference(voucher.reference_type)) label = payrollBatchLabel(voucher)
+    else if (!voucher) label = PER_PERSON_ROW.exec(row.description ?? '')?.[1] ?? null
+    if (!label) {
+      out.push(row)
+      continue
+    }
+    const key = `${label}|${row.created_at.slice(0, 10)}|${row.transaction_type}`
+    const group = groups.get(key)
+    if (group) {
+      group.amount = r2(group.amount + Number(row.amount))
+      group.count += 1
+      if (group.period_month !== row.period_month) group.period_month = null
+      continue
+    }
+    const folded: LockedPoolRow & { label: string } = {
+      id: `locked-${key}`,
+      transaction_type: row.transaction_type,
+      amount: r2(Number(row.amount)),
+      description: '',
+      created_at: row.created_at,
+      period_month: row.period_month,
+      locked: true,
+      count: 1,
+      label,
+    }
+    groups.set(key, folded)
+    out.push(folded)
+  }
+  for (const g of groups.values()) {
+    g.description = `${g.label} · ${g.count} 笔 · 只显示总数`
+  }
+  return out
+}
+
 export function filterLockedBatches(batches: LockedBatch[], f: LedgerFilters): LockedBatch[] {
   if (f.poolFilter || f.minFilter !== null || f.maxFilter !== null) return []
   return batches.filter((b) => {
