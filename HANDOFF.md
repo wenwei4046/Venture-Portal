@@ -1,5 +1,39 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-05 b (SHIPPED) — Salary / Allowance split of an InfoTech-imported row
+
+User, on HV-INV-202608-0051 (HC, Aug'26 HR adjustment, 8,082.33): "可以帮我检查为什么这样
+bill 吗？", then "拆成 salary/allowance/epf 等等拆对吗？", then "两个都做".
+
+Why the invoice exists: HR set an Aug'26 allocation for the HR department's four
+people on 10/1 18:08 (each 50% HC / 35% CONTS / 15% CAR — the first HR-dept
+allocation since the 2026-09-03 "HR payroll 用自己 pool" ruling); Finance ran
+对数补差 at 18:21 and the HR segment, billed 0, was topped up on HC / CONTS / CAR
+(0051–0053). Sep'26 has an HR allocation too (10/3, two people, 2990 / CAR /
+CONTS). Whether that is a policy change is the user's to say — not asked.
+
+Why the split was wrong (totals, EPF, SOCSO, EIS were right): the InfoTech
+import writes the file's basic, which InfoTech has already prorated for a
+mid-month joiner (4,000 × 22/31 = 2,838.71), keeps the file's gross verbatim,
+and the compute trigger records 22/31 from the hire date. `get_staff_billing_allocation`
+(and `get_staff_own_share_allocation`) multiplied that basic by 22/31 AGAIN, so
+824.14 of basic went out as "Allowance".
+
+- Migration `20261005100000_billing_allocation_imported_basic.sql` (applied
+  live): `source = 'imported'` → basic taken as is; other rows keep the ratio.
+  Verified: only the partial-month imported rows moved, Salary ↔ Allowance only.
+- Issued lines corrected in place, totals untouched, the matching 5050 journal
+  lines moved with them, one `access_log` row per invoice (`amend_invoice_lines`):
+  Aug HR adjustments 0051 HC (Salary 5,776.64 → 6,188.71 / Allowance 1,373.61 → 961.54),
+  0052 CONTS (4,043.64 → 4,332.09 / 961.53 → 673.08), 0053 CAR (1,732.99 → 1,856.61 /
+  412.08 → 288.46); Aug IT on 0035 (2990) and 0036 (CAR): Salary 1,969.04 → 2,104.84
+  and the 135.80 Allowance line removed (the generator writes no zero line, and
+  `invoice_lines.amount > 0`; lines renumbered); Sep Finance on 0046 (2990):
+  1,411.94 → 1,841.66 / 449.72 → 20.00. The Sep DO 3/30 row sits in HV's own
+  share (no own-share invoice for Sep yet), so no other Sep invoice changed.
+- Not touched: HR's payroll rows and the import (HR's), the Jun/Jul Marketing
+  partial-month rows (pool-borne, never invoiced).
+
 ## CHECKPOINT 2026-10-05 (SHIPPED) — a file can be added to a voucher after it is paid
 
 User, on two paid PVs (0451, 0452) showing 0 FILES: "这些本来就 attachment 的吗？帮我检查".
@@ -24,8 +58,9 @@ Offered two ways to add the receipts now; user: "做第 2 条":
   vouchers only — a receipt is paid the moment it is made).
 - Tests: `actions.attachments.test.ts`, `AttachmentList.test.tsx`, four cases on the page test.
 
-Also this session (2026-10-02 → 05): the finance executive's login is ON HOLD
-("先放着，到时我确定。别做东西"); see checkpoint d below for the steps.
+Also this session (2026-10-02 → 05): the finance executive's login was created by
+the Principal on 2026-10-05 and verified (denies Reports / Department reports /
+Reconciliation, no Payroll payouts); the steps are in checkpoint d below.
 
 ## CHECKPOINT 2026-10-02 d (SHIPPED) — 改日期, the office clock, and Payroll payouts
 
