@@ -36,7 +36,7 @@ function memberData(): MemberData {
 }
 
 function book(from: string, through: string): MemberOrderBook {
-  const value = { from, through, asOf: "2026-10-05T04:00:00Z", paysFrom: "2026-09", closedMonths: [], costDivisor: 0.7, brandWeeks: {}, orders: [] };
+  const value = { from, through, asOf: "2026-10-05T04:00:00Z", paysFrom: "2026-09", closedMonths: [], brandWeeks: {}, orders: [] };
   return value;
 }
 
