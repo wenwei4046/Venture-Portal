@@ -17,8 +17,6 @@ export interface CalcProps {
   brandName: string;
   cart: CartLine[];
   fee: string;
-  /** `Fees such as … (cost ÷ 0.7).` */
-  basis: string;
   /** A KPI item's fixed price, RM, by its key. */
   kpiEach?: Record<string, number>;
   onPress: (key: string) => void;
@@ -46,7 +44,7 @@ function useKeyboard(onPress: (key: string) => void) {
 }
 
 /** Step 2 — the price, its margin, the keypad and what is in the quote (328–382). */
-export default function QuoteCalc({ vm, brandName, cart, fee, basis, kpiEach, onPress, onNext, onBump, onFee, onProducts }: CalcProps) {
+export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, onNext, onBump, onFee, onProducts }: CalcProps) {
   useKeyboard(onPress);
   const tone = TONES[vm.tone];
   return (
@@ -107,7 +105,6 @@ export default function QuoteCalc({ vm, brandName, cart, fee, basis, kpiEach, on
             <input className={s.feeInput} inputMode="decimal" placeholder="0.00" value={fee} onChange={e => onFee(e.target.value)} />
           </span>
         </label>
-        <p className={s.basis}>{basis}</p>
       </section>
     </div>
   );

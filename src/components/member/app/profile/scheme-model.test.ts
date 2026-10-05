@@ -39,6 +39,13 @@ describe("schemeVM", () => {
     expect(vm.brands[0].rows[0].sub).toBe("Highest margin incentive · RM 1,500");
   });
 
+  // 2026-10-05 (user): the sheet never says what cost the margin is measured on.
+  it("says margin is measured brand by brand, never on whose cost", () => {
+    const vm = schemeVM({ ...who, membership, salary: 0, bands, hidden: false });
+    expect(vm.note).toMatch(/^Margin is measured brand by brand\./);
+    expect(vm.note).not.toMatch(/cost/i);
+  });
+
   it("keeps the salary out of a view that may not see it, and hides it on request", () => {
     expect(schemeVM({ ...who, membership, salary: undefined, bands: [], hidden: false }).stats[1].value).toBe("—");
     expect(schemeVM({ ...who, membership, salary: 3000, bands: [], hidden: true }).stats[1].value).toBe("RM ••••");

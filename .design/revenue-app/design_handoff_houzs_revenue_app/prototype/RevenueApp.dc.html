@@ -375,7 +375,6 @@ button{font-family:inherit;white-space:nowrap;cursor:pointer;-webkit-tap-highlig
 </div>
 </sc-for>
 <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0 4px;"><span style="font-size:14px;font-weight:650;color:#3F2B22;">Additional fee</span><span style="display:flex;align-items:center;gap:6px;width:150px;height:42px;padding:0 12px;border-radius:12px;border:1px solid #E2CFC1;background:#FFFFFF;box-sizing:border-box;"><span style="font-size:13px;font-weight:600;color:#806B60;">RM</span><input inputMode="decimal" placeholder="0.00" value="{{ chgFee }}" onChange="{{ onFee }}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:15px;font-weight:650;text-align:right;color:#3F2B22;font-variant-numeric:tabular-nums;"></input></span></label>
-<p style="margin:0;font-size:12px;color:#806B60;text-wrap:pretty;">Fees such as delivery or disposal show on the customer quote and are excluded from margin. Margin uses the Fair team cost basis (cost ÷ 0.7).</p>
 </section>
 </div>
 </sc-if>
@@ -450,7 +449,7 @@ button{font-family:inherit;white-space:nowrap;cursor:pointer;-webkit-tap-highlig
 </button>
 </sc-for>
 </section>
-<p style="margin:0;font-size:12px;line-height:1.6;color:#806B60;text-wrap:pretty;">Brand margin uses commissionable goods against team cost (cost ÷ 0.7). Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.</p>
+<p style="margin:0;font-size:12px;line-height:1.6;color:#806B60;text-wrap:pretty;">Brand margin uses commissionable goods. Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.</p>
 </div>
 </sc-if>
 <sc-if value="{{ isKpiPage }}" hint-placeholder-val="{{ false }}">
@@ -579,7 +578,7 @@ button{font-family:inherit;white-space:nowrap;cursor:pointer;-webkit-tap-highlig
 </sc-if>
 </sc-if>
 <sc-if value="{{ billsEmpty }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:14px;color:#806B60;text-align:center;padding:24px 0;">No bills match this filter.</p></sc-if>
-<p style="margin:0;font-size:12px;line-height:1.6;color:#806B60;text-wrap:pretty;">Sales count once the deposit clears, in the bill's commission month. Margin uses team cost (cost ÷ 0.7); a bill without cost stays pending.</p>
+<p style="margin:0;font-size:12px;line-height:1.6;color:#806B60;text-wrap:pretty;">Sales count once the deposit clears, in the bill's commission month. A bill without cost stays pending.</p>
 </div>
 </sc-if>
 <sc-if value="{{ isInsight }}" hint-placeholder-val="{{ false }}">
@@ -1451,7 +1450,6 @@ button{font-family:inherit;white-space:nowrap;cursor:pointer;-webkit-tap-highlig
 </div>
 </sc-for>
 <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0 4px;"><span style="font-size:14px;font-weight:650;color:#3F2B22;">Additional fee</span><span style="display:flex;align-items:center;gap:6px;width:150px;height:42px;padding:0 12px;border-radius:12px;border:1px solid #E2CFC1;background:#FFFFFF;box-sizing:border-box;"><span style="font-size:13px;font-weight:600;color:#806B60;">RM</span><input inputMode="decimal" placeholder="0.00" value="{{ chgFee }}" onChange="{{ onFee }}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:15px;font-weight:650;text-align:right;color:#3F2B22;font-variant-numeric:tabular-nums;"></input></span></label>
-<p style="margin:0;font-size:12px;color:#806B60;text-wrap:pretty;">Fees such as delivery or disposal show on the customer quote and are excluded from margin. Margin uses the Fair team cost basis (cost ÷ 0.7).</p>
 </section>
 </div>
 
@@ -2462,7 +2460,7 @@ class Component extends DCLogic {
       : s.board === 'kpi'
       ? 'All eligible KPI quantities together, including eligible giveaway items. Shows actual quantities; KPI points sit in Championship.'
       : s.board === 'margin'
-        ? 'Margin uses commissionable goods revenue against the Fair team cost (cost ÷ 0.7). Anyone with an uncosted bill stays pending until it is costed.'
+        ? 'Margin uses commissionable goods revenue. Anyone with an uncosted bill stays pending until it is costed.'
         : 'Deposit-cleared, commissionable sales. Each order counts once, in its released commission month.';
 
     // Today arena summary (monthly)

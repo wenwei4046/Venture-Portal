@@ -308,7 +308,6 @@ export interface ArenaInput {
   standings: ChampStanding[] | null;
   selfId: string;
   subName: string;
-  costDivisor: number | null;
   kpiEnabled: boolean;
   /** Everybody in the window is closed: the places will not move again. */
   final: boolean;
@@ -326,11 +325,6 @@ export function boardBrands(snapshot: MemberArenaSnapshot | null): { code: strin
     .map(code => ({ code, label: brandLabel(code, names) }));
 }
 
-function divisorText(d: number | null): string {
-  if (!d || !(d > 0)) return "cost ÷ 1";
-  return `cost ÷ ${Number(d.toFixed(4))}`;
-}
-
 function basisText(input: ArenaInput, isFair: boolean): string {
   const { board, subName } = input;
   const base = isFair
@@ -342,7 +336,8 @@ function basisText(input: ArenaInput, isFair: boolean): string {
           ? "All eligible KPI quantities together, including eligible giveaway items. Shows actual quantities; KPI points sit in Championship."
           : `KPI items are not counted in ${subName} for this period, so nobody is placed on this board.`
         : board === "margin"
-          ? `Margin uses commissionable goods revenue against the ${subName} team cost (${divisorText(input.costDivisor)}). Anyone with an uncosted bill stays pending until it is costed.`
+          // Never how the cost is made up (user 2026-10-05: that leaks our numbers).
+          ? "Margin uses commissionable goods revenue. Anyone with an uncosted bill stays pending until it is costed."
           : "Deposit-cleared, commissionable sales. Each order counts once, in its released commission month.";
   if (input.final) return base;
   // Until everybody on the boards is closed, a place is not final.

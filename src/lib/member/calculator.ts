@@ -295,7 +295,7 @@ export function calculateQuote(
   });
   const divisor = rules.costDivisor;
   if (!Number.isFinite(divisor) || divisor <= 0)
-    return invalid("The cost rule for this department is not configured.");
+    return invalid("The margin rules for this department are not configured.");
   // A SKU may carry its own ratio (Product List › Costing Setting).
   const basis = costBasisOf(divisor, rules.costRatios ?? []);
   const divisorOf = (product: MemberProduct) => costDivisorFor(product.code, basis);

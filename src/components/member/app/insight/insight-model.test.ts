@@ -20,7 +20,7 @@ const order = (o: Partial<MemberBookOrder> & Pick<MemberBookOrder, "id">): Membe
   depositNeeded: 300, lines: [{ name: "AKEMI MATT (Q)", code: "AK-Q", qty: 1, amount: 1000, goods: true, kpiQty: 0 }], ...o,
 });
 const book = (orders: MemberBookOrder[]): MemberOrderBook => ({
-  from: "2026-09", through: "2026-09", asOf: "2026-10-04T00:00:00Z", paysFrom: "2026-09", closedMonths: [], costDivisor: 0.7, brandWeeks: {}, orders,
+  from: "2026-09", through: "2026-09", asOf: "2026-10-04T00:00:00Z", paysFrom: "2026-09", closedMonths: [], brandWeeks: {}, orders,
 });
 const ORDERS = [
   order({ id: "1", revenue: 1000, margin: 40 }),
@@ -62,12 +62,13 @@ describe("Insight › My sales orders", () => {
   it("names each fair weekend by the month's Fridays, carried bills behind Earlier", () => {
     expect(billGroups(input()).map(g => [g.key, g.title, g.orders.length])).toEqual([["earlier", "Earlier", 1], ["2026-09-11", "Week 2", 3], ["2026-09-18", "Week 3", 1]]);
   });
-  it("reads the deposit still to collect, and the team-cost ratio from the scheme", () => {
+  it("reads the deposit still to collect, and never says how the cost is made up", () => {
     const vm = billsView(input());
     expect(vm.waiting).toEqual({ amount: "RM 800", sub: "1 order · not counted yet" });
     expect(vm.waitBills[0]).toMatchObject({ pill: "Due RM 140", amtMuted: true });
     expect(vm.weeks["2026-09-11"]).toMatchObject({ brandWeek: "Akemi week", total: "RM 1,500", place: "IOI CITY MALL · MEGAHOME", dates: "11–13 Sep", stats: "2 orders · 1 waiting" });
-    expect(vm.footnote).toContain("cost ÷ 0.7");
+    // 2026-10-05 (user): the footnote said "team cost (cost ÷ 0.7)" — gone.
+    expect(vm.footnote).toBe("Sales count once the deposit clears, in the bill's commission month. A bill without cost stays pending.");
   });
   it("lets a stored brand-week pick name the week", () => {
     const vm = billsView(input({ book: { ...book(ORDERS), brandWeeks: { "2026-09-11": "ZANOTTI" } } }));
@@ -91,6 +92,7 @@ describe("Insight › KPI, brand, the order sheet", () => {
     expect(zanotti).toMatchObject({ pct: "35.0%", tier: "Incentive Tier 1", nextTitle: "1.0% more to reach Incentive Tier 2", ladderCount: "All 6 margin tiers" });
     expect(zanotti.trio?.map(t => t.name)).toEqual(["Standard Margin", "Tier 1", "Tier 2"]);
     expect(brandPage(input(), "AKEMI")!.nextTitle).toBe("Waiting for supplier cost");
+    expect(zanotti.footnote).toBe("Brand margin uses commissionable goods. Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.");
   });
   it("opens one bill line by line, without a cost", () => {
     const vm = orderSheet(input(), "4")!;

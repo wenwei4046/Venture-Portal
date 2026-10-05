@@ -10,8 +10,9 @@ import type { InsightPeriod } from "./period";
  * Insight's screens as strings — every number is the backend's own: the bills
  * are `member_order_book`'s, the team `member_insight_snapshot` /
  * `member_insight_range`, the KPI threshold `member_kpi_summary`, each brand's
- * ladder its own `comm_margin_bands`, the team-cost ratio the scheme's. The
- * prototype's wording, verbatim, wherever the data allows it.
+ * ladder its own `comm_margin_bands`. The prototype's wording, verbatim,
+ * wherever the data allows it — except how the cost is made up, which no
+ * screen says (user 2026-10-05: that leaks our numbers).
  */
 
 export const BRAND_NAMES: Record<string, string> = { AKEMI: "Akemi", ERGOTEX: "Ergotex", DUNLOP: "Dunlopillo", ZANOTTI: "Zanotti", UNCLASSIFIED: "No brand" };
@@ -28,7 +29,6 @@ const KPI_SHADES = ["--rv-tier-deep", "--rv-tier-top", "--rv-green", "--rv-kpi-4
 export const brandName = (code: string) => BRAND_NAMES[code] ?? code.charAt(0) + code.slice(1).toLowerCase();
 export const brandColors = (code: string) => BRAND_COLORS[code] ?? NEUTRAL_BRAND;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const divisorText = (d: number) => String(Math.round(d * 1000) / 1000);
 
 export interface InsightInput {
   period: InsightPeriod;
@@ -417,7 +417,7 @@ export function billsView(input: InsightInput): BillsVM {
     waiting: { amount: rm(heldSum), sub: held.length ? `${plural(held.length, "order")} · not counted yet` : "Nothing waiting" },
     tabs, weeks,
     waitBills: [...held].sort((a, b) => a.date.localeCompare(b.date)).map(o => row(o, `${o.customer || "Walk-in"} · ${weekOf.get(o.id) ?? "—"}${o.venue ? ` · ${o.venue}` : ""}`)),
-    footnote: `Sales count once the deposit clears, in the bill's commission month. Margin uses team cost (cost ÷ ${divisorText(book?.costDivisor ?? 1)}); a bill without cost stays pending.`,
+    footnote: "Sales count once the deposit clears, in the bill's commission month. A bill without cost stays pending.",
   };
 }
 
@@ -605,7 +605,7 @@ export function brandPage(input: InsightInput, code: string): BrandPageVM | null
         ink: o.margin === null ? TONES.warn.ink : TONES[r?.tone ?? "neutral"].ink,
       };
     }),
-    footnote: `Brand margin uses commissionable goods against team cost (cost ÷ ${divisorText(input.book?.costDivisor ?? 1)}). Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.`,
+    footnote: "Brand margin uses commissionable goods. Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.",
   };
 }
 

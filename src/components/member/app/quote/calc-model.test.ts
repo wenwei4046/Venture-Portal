@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MemberBand, QuoteResult } from "@/lib/member/types";
-import { calcVM, costBasisNote, press, priceText, quoteInput } from "./calc-model";
+import { calcVM, press, priceText, quoteInput } from "./calc-model";
 import { tableCalc } from "./table-calc";
 import type { CartLine } from "./quote-model";
 
@@ -96,10 +96,11 @@ describe("step 2's card", () => {
     expect(plain.pay).toBeNull();
   });
 
-  it("names the cost basis", () => {
-    expect(costBasisNote("Fair", 0.7)).toMatch(/Margin uses the Fair team cost basis \(cost ÷ 0\.7\)\.$/);
-    expect(costBasisNote("IR", 1)).toMatch(/\(cost as keyed\)\.$/);
-    expect(costBasisNote("IR", null)).not.toMatch(/Margin uses/);
+  // 2026-10-05 (user): how the cost is made up is never shown — the note under
+  // Additional fee that said "team cost basis (cost ÷ 0.7)" is gone.
+  it("never says how the cost behind the margin is made up", () => {
+    const vm = calcVM({ price: "5000", items: 2, bands: BANDS, result: result(35.7), error: null, kpi: { qty: 1, amount: 100 }, options: 120, fee: "80" });
+    expect(JSON.stringify(vm)).not.toMatch(/÷|team cost|cost basis|divisor/i);
   });
 });
 

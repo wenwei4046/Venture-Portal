@@ -237,11 +237,9 @@ export function useQuote(args: UseQuoteArgs) {
   /** The customer's quote, once the price on screen has been confirmed by the calculator. */
   const confirmed = answer && answer.key === inputKey && answer.result?.valid ? answer.result : null;
   const applyNext = useCallback(() => { if (vm.next) setPrice(vm.next.value.toFixed(2)); }, [vm.next]);
-  /** The department's cost ratio, as the last answer stated it. */
-  const divisor = answer?.result?.costDivisor ?? null;
 
   return {
-    brand, catalog, cart, items, price, fee, build, sheet, cartOpen, allOpen, query, previewOpen, memory, vm, confirmed, readOnly, divisor,
+    brand, catalog, cart, items, price, fee, build, sheet, cartOpen, allOpen, query, previewOpen, memory, vm, confirmed, readOnly,
     setBrand, setFee: (v: string) => setFee(v.replace(/[^0-9.]/g, "")), setQuery, setAllOpen, setCartOpen, toggleCart, setPreviewOpen,
     openModel, applySet, openFrameOnly, openAccOnly, closeSheet, patch, patchFrame, openBf, editBf, removeBf, backToMattress, applyFrame, addSheet,
     bump, remove, clearCart, press, applyNext,

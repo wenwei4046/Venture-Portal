@@ -115,10 +115,3 @@ export function calcVM(args: {
     note: null,
   };
 }
-
-/** `Margin uses the Fair team cost basis (cost ÷ 0.7).` */
-export function costBasisNote(subName: string, divisor: number | null): string {
-  const fees = "Fees such as delivery or disposal show on the customer quote and are excluded from margin.";
-  if (divisor === null) return fees;
-  return `${fees} Margin uses the ${subName} team cost basis (${divisor === 1 ? "cost as keyed" : `cost ÷ ${divisor}`}).`;
-}

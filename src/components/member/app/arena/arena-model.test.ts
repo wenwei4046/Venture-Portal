@@ -33,7 +33,7 @@ const people = [
 ];
 const input = (over: Partial<ArenaInput> = {}): ArenaInput => ({
   board: "sales", sub: "total", brand: "", period, snapshot: snapshot(people), history, standings: null, selfId: "me",
-  subName: "Fair", costDivisor: 0.7, kpiEnabled: true, final: false, openMonths: ["2026-09"], current: "2026-10", ...over,
+  subName: "Fair", kpiEnabled: true, final: false, openMonths: ["2026-09"], current: "2026-10", ...over,
 });
 
 describe("chaseLine", () => {
@@ -60,11 +60,13 @@ describe("boardModel", () => {
     expect(vm.rank!.rows.find(r => r.name === "XAVIER LIM")!.tag).toBe("next");
   });
 
-  it("keeps an uncosted margin pending and reads the scheme's own divisor", () => {
-    const vm = boardModel(input({ board: "margin" }));
+  // 2026-10-05 (user): the board says what counts, never how the cost is made up.
+  it("keeps an uncosted margin pending and never names the cost basis", () => {
+    const vm = boardModel(input({ board: "margin", final: true, openMonths: [] }));
     expect(vm.rank!.rows.find(r => r.id === "x")!.value).toBe("Cost pending");
     expect(vm.rank!.hero).toMatchObject({ num: "1", value: "40.0%" });
-    expect(vm.basis).toContain("Fair team cost (cost ÷ 0.7)");
+    expect(vm.basis).toBe("Margin uses commissionable goods revenue. Anyone with an uncosted bill stays pending until it is costed.");
+    expect(vm.basis).not.toMatch(/÷|team cost|0\.7/);
   });
 
   it("says the month is still moving until everybody is closed", () => {
