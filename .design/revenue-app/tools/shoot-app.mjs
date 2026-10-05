@@ -24,7 +24,9 @@ try {
     const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: st.dpr || 1 });
     page.on('pageerror', e => console.log('pageerror', st.name, e.message));
     await page.goto(base + st.url, { waitUntil: 'networkidle', timeout: 120000 });
-    await page.addStyleTag({ content: 'html,body{background:#fff!important} nextjs-portal{display:none!important}' });
+    // The phone's type is a step under the prototype's (--rv-type .92, 2026-10-06);
+    // drawn at 1 here so the layout is still compared with the prototype's own.
+    await page.addStyleTag({ content: 'html,body{background:#fff!important} nextjs-portal{display:none!important} [data-revenue-app] [data-platform]{--rv-type:1!important}' });
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(800);
     for (const a of st.appActions || []) {

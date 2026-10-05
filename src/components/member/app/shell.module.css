@@ -26,8 +26,14 @@
 .frameAndroid { width: 410px; height: 884px; padding: 10px; border-radius: 46px; }
 .frameDesk { width: 1440px; height: 900px; padding: 0; border-radius: 14px; }
 
-/* the screen: a column of status bar, header, page, dock and bottom bar */
+/* the screen: a column of status bar, header, page, dock and bottom bar.
+   On a phone the type is one step under the prototype's (user 2026-10-06: the
+   text read a size too big on a phone) — every font-size is
+   `calc(Npx * var(--rv-type))`, so .92 turns 13px into 12 and 28px into 25.8.
+   The desktop keeps the prototype's own sizes (below). */
 .screen {
+  --rv-type: .92;
+  font-size: calc(16px * var(--rv-type));
   width: 100%;
   overflow: hidden;
   background: var(--rv-white);
@@ -61,7 +67,7 @@
   padding: 4px 28px 0 46px;
   box-sizing: border-box;
 }
-.statusIosTime { font-size: 16px; font-weight: 600; color: var(--rv-black); letter-spacing: -.01em; }
+.statusIosTime { font-size: calc(16px * var(--rv-type)); font-weight: 600; color: var(--rv-black); letter-spacing: -.01em; }
 .statusIosIsland { position: absolute; left: 50%; top: 11px; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 20px; background: var(--rv-black); }
 .statusIosIcons { display: flex; align-items: center; gap: 6px; }
 .statusIosBars { display: flex; align-items: flex-end; gap: 1.5px; height: 11px; }
@@ -85,7 +91,7 @@
   box-sizing: border-box;
 }
 .statusAndroidLeft { display: flex; align-items: center; gap: 8px; color: var(--rv-android-ink); }
-.statusAndroidTime { font-size: 14px; font-weight: 500; }
+.statusAndroidTime { font-size: calc(14px * var(--rv-type)); font-weight: 500; }
 .statusAndroidCam { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: 13px; height: 13px; border-radius: 50%; background: var(--rv-android-cam); }
 .statusAndroidRight { display: flex; align-items: center; gap: 7px; }
 .statusAndroidWifi { width: 11px; height: 11px; background: var(--rv-android-ink); border-radius: 100% 0 0 0; transform: rotate(45deg); margin-top: 4px; }
@@ -111,8 +117,8 @@
   box-sizing: border-box;
 }
 .asideLogo { padding: 0 10px 18px; border: 0; background: transparent; text-align: left; }
-.asideWord { display: block; font-size: 16px; font-weight: 700; letter-spacing: .14em; color: var(--rv-brown); line-height: 1.2; }
-.asideDept { display: block; font-size: 12.5px; font-weight: 600; color: var(--rv-accent); margin-top: 3px; }
+.asideWord { display: block; font-size: calc(16px * var(--rv-type)); font-weight: 700; letter-spacing: .14em; color: var(--rv-brown); line-height: 1.2; }
+.asideDept { display: block; font-size: calc(12.5px * var(--rv-type)); font-weight: 600; color: var(--rv-accent); margin-top: 3px; }
 .asideNav {
   display: flex;
   align-items: center;
@@ -123,7 +129,7 @@
   border: 0;
   background: transparent;
   color: var(--rv-brown);
-  font-size: 15px;
+  font-size: calc(15px * var(--rv-type));
   font-weight: 550;
   text-align: left;
 }
@@ -139,7 +145,7 @@
   border-radius: 10px;
   background: var(--rv-accent);
   color: var(--rv-white);
-  font-size: 11px;
+  font-size: calc(11px * var(--rv-type));
   font-weight: 700;
   line-height: 20px;
   text-align: center;
@@ -163,14 +169,14 @@
   border-radius: 50%;
   background: var(--rv-brown);
   color: var(--rv-white);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--rv-type));
   font-weight: 650;
   display: grid;
   place-items: center;
 }
 .asideMeText { min-width: 0; }
-.asideMeName { display: block; font-size: 14px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.asideMeSub { display: block; font-size: 12px; color: var(--rv-sub); }
+.asideMeName { display: block; font-size: calc(14px * var(--rv-type)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asideMeSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 
 .deskHeader {
   flex: 0 0 60px;
@@ -182,7 +188,7 @@
   border-bottom: 1px solid var(--rv-line);
   box-sizing: border-box;
 }
-.deskGreet { flex: 1; min-width: 0; font-size: 15px; color: var(--rv-ink); }
+.deskGreet { flex: 1; min-width: 0; font-size: calc(15px * var(--rv-type)); color: var(--rv-ink); }
 .deskGreetName { color: var(--rv-accent); font-weight: 650; }
 .deskSd {
   display: flex;
@@ -194,11 +200,11 @@
   border: 1px solid var(--rv-line-strong);
   background: var(--rv-white);
   color: var(--rv-brown);
-  font-size: 14px;
+  font-size: calc(14px * var(--rv-type));
   font-weight: 650;
 }
 .deskSdDot { width: 7px; height: 7px; border-radius: 50%; background: var(--rv-accent); }
-.deskDate { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--rv-sub); letter-spacing: .02em; white-space: nowrap; }
+.deskDate { font-family: ui-monospace, Menlo, monospace; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); letter-spacing: .02em; white-space: nowrap; }
 .deskBell {
   position: relative;
   width: 38px;
@@ -211,16 +217,16 @@
   place-items: center;
 }
 .deskBellDot { position: absolute; top: 5px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--rv-accent); box-shadow: 0 0 0 2px var(--rv-desk); }
-.deskSignOut { height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--rv-sub); font-size: 12.5px; font-weight: 650; letter-spacing: .1em; }
+.deskSignOut { height: 36px; padding: 0 4px; border: 0; background: transparent; color: var(--rv-sub); font-size: calc(12.5px * var(--rv-type)); font-weight: 650; letter-spacing: .1em; }
 
 /* ── Viewing as (a Principal, read-only) ── */
 .vaBar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 16px; background: var(--rv-ink); color: var(--rv-white); }
 .vaIcon { flex: 0 0 17px; }
-.vaText { flex: 1; min-width: 0; font-size: 13px; line-height: 1.3; }
+.vaText { flex: 1; min-width: 0; font-size: calc(13px * var(--rv-type)); line-height: 1.3; }
 .vaName { display: block; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vaSub { display: block; font-size: 11.5px; color: var(--rv-blush); }
-.vaSwitch { height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--rv-white-30); background: transparent; color: var(--rv-white); font-size: 12.5px; font-weight: 650; }
-.vaExit { height: 32px; padding: 0 10px; border-radius: 9px; border: 0; background: var(--rv-peach); color: var(--rv-ink); font-size: 12.5px; font-weight: 700; }
+.vaSub { display: block; font-size: calc(11.5px * var(--rv-type)); color: var(--rv-blush); }
+.vaSwitch { height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--rv-white-30); background: transparent; color: var(--rv-white); font-size: calc(12.5px * var(--rv-type)); font-weight: 650; }
+.vaExit { height: 32px; padding: 0 10px; border-radius: 9px; border: 0; background: var(--rv-peach); color: var(--rv-ink); font-size: calc(12.5px * var(--rv-type)); font-weight: 700; }
 
 /* ── the phone header (`header-style="d"`), on Today and Quote step 2 ── */
 .header {
@@ -235,10 +241,10 @@
   transition: border-color 160ms;
 }
 .headerRuled { border-bottom-color: var(--rv-line); }
-.headerBack { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--rv-accent); font-size: 15px; font-weight: 600; }
+.headerBack { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--rv-accent); font-size: calc(15px * var(--rv-type)); font-weight: 600; }
 .headerLogo { min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; }
-.headerWord { display: block; font-size: 15px; font-weight: 700; letter-spacing: .14em; color: var(--rv-brown); line-height: 1.2; white-space: nowrap; }
-.headerDept { display: block; font-size: 12px; font-weight: 600; color: var(--rv-accent); margin-top: 2px; }
+.headerWord { display: block; font-size: calc(15px * var(--rv-type)); font-weight: 700; letter-spacing: .14em; color: var(--rv-brown); line-height: 1.2; white-space: nowrap; }
+.headerDept { display: block; font-size: calc(12px * var(--rv-type)); font-weight: 600; color: var(--rv-accent); margin-top: 2px; }
 .capsule {
   display: flex;
   align-items: center;
@@ -250,7 +256,7 @@
   box-sizing: border-box;
   box-shadow: 0 2px 8px var(--rv-ink-06);
 }
-.capsuleSd { display: flex; align-items: center; gap: 3px; height: 44px; padding: 0 8px 0 14px; border: 0; background: transparent; color: var(--rv-brown); font-size: 14px; font-weight: 650; }
+.capsuleSd { display: flex; align-items: center; gap: 3px; height: 44px; padding: 0 8px 0 14px; border: 0; background: transparent; color: var(--rv-brown); font-size: calc(14px * var(--rv-type)); font-weight: 650; }
 .capsuleRule { width: 1px; height: 20px; background: var(--rv-line); }
 .capsuleBell {
   position: relative;
@@ -276,13 +282,13 @@
   border-radius: 8px;
   background: var(--rv-accent);
   color: var(--rv-white);
-  font-size: 10px;
+  font-size: calc(10px * var(--rv-type));
   font-weight: 700;
   line-height: 16px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--rv-white);
 }
-.capsuleAvatar { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 1px 6px; background: var(--rv-brown); color: var(--rv-white); font-size: 12px; font-weight: 650; }
+.capsuleAvatar { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 1px 6px; background: var(--rv-brown); color: var(--rv-white); font-size: calc(12px * var(--rv-type)); font-weight: 650; }
 
 /* ── the page ── */
 .main {
@@ -306,7 +312,7 @@
 .navItemOn { color: var(--rv-accent); }
 .navPill { width: 56px; height: 30px; border-radius: 16px; background: transparent; display: grid; place-items: center; }
 .navPillOn { background: var(--rv-orange-bg); }
-.navLabel { font-size: 11px; font-weight: 500; }
+.navLabel { font-size: calc(11px * var(--rv-type)); font-weight: 500; }
 .navLabelOn { font-weight: 650; }
 .navQuote { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 0 8px; border: 0; background: transparent; color: var(--rv-sub); }
 .navQuoteOn { color: var(--rv-accent); }
@@ -325,7 +331,7 @@
   display: grid;
   place-items: center;
 }
-.navQuoteLabel { font-size: 11px; font-weight: 650; }
+.navQuoteLabel { font-size: calc(11px * var(--rv-type)); font-weight: 650; }
 .homeIos { height: 26px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; box-sizing: border-box; }
 .homeIosBar { width: 134px; height: 5px; border-radius: 3px; background: var(--rv-black); }
 .homeAndroid { height: 18px; display: flex; align-items: center; justify-content: center; }
@@ -333,7 +339,7 @@
 
 /* ── desktop: sidebar, top bar, a 760px column, no bottom bar ── */
 @container rv (min-width: 1024px) {
-  .screen { padding-left: 240px; }
+  .screen { padding-left: 240px; --rv-type: 1; }
   .screenLive { padding-top: 0; }
   .aside { display: flex; }
   .deskHeader { display: flex; }

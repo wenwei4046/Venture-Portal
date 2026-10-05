@@ -957,5 +957,5 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
 
 /** Screens not rebuilt yet in this branch — replaced tab by tab. */
 function Pending({ screen }: { screen: Screen }) {
-  return <div style={{ padding: "24px 20px", color: "var(--rv-sub)", fontSize: 14 }}>{screen} — being rebuilt.</div>;
+  return <div style={{ padding: "24px 20px", color: "var(--rv-sub)", fontSize: "calc(14px * var(--rv-type))" }}>{screen} — being rebuilt.</div>;
 }

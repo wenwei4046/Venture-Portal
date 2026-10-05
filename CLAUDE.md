@@ -1300,6 +1300,12 @@ src/
 │   │                                  `preview/`; `?app=proto` renders the new
 │   │                                  app on the prototype's own data, which is
 │   │                                  what it is pixel-compared against.
+│   │                                  On a phone the type is ONE STEP SMALLER
+│   │                                  than the prototype's (user 2026-10-06):
+│   │                                  every font-size is `calc(Npx *
+│   │                                  var(--rv-type))`, .92 on the phone's
+│   │                                  `.screen`, 1 on a desktop;
+│   │                                  `app/type-scale.test.ts` refuses a plain px.
 │   │                                  **My income** is Comm Cal's own engine
 │   │                                  run for the member's month
 │   │                                  (`loadMemberIncome`: the service role,
