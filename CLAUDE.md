@@ -1326,7 +1326,28 @@ src/
 │   │                                  Today's income is the viewed person's own
 │   │                                  (`snapshotIncome`); a Principal viewing
 │   │                                  nobody sees "{Fair} commission" — the
-│   │                                  department's total, named as such.
+│   │                                  department's total, named as such
+│   │                                  (`loadDepartmentIncome`, the Principal's
+│   │                                  own session).
+│   │                                  **TODAY IS THE LIVE MONTH (2026-10-06,
+│   │                                  user: "on live date, not showing last
+│   │                                  month"):** the hero, its Sales / Margin /
+│   │                                  KPI and Your Arena are the CURRENT month,
+│   │                                  even while last month is still being
+│   │                                  closed, and a tap opens Insight / the
+│   │                                  Arena on that month. Insight, Arena, My
+│   │                                  income and honours still open on the
+│   │                                  month being closed; brand weeks and the
+│   │                                  claim form still cover both months. The
+│   │                                  live figure carries what the member facts
+│   │                                  carry (`carriesInto`, the `carry` option
+│   │                                  of `loadCommissionInput`): a bill stays
+│   │                                  in its own month until that month is
+│   │                                  closed for its salesperson. Comm Cal's
+│   │                                  own carry (every bill no run released)
+│   │                                  made October count all 357 of
+│   │                                  September's bills again (KAR JUN RM
+│   │                                  17,568 instead of RM 5,674).
 │   │                                  **My honours** = every finish of a FINAL
 │   │                                  month — Sales / Margin / KPI total and by
 │   │                                  brand, Championship, and the weekly booth

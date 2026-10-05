@@ -48,7 +48,7 @@ import { CommissionSheet, IncomeOrdersPage, IncomePage, PickSomebody } from "./p
 import { incomeOrdersVM, incomeVM } from "./profile/income-model";
 import { honourWindow, honoursVM } from "./profile/honours-model";
 import type { MemberHonours } from "@/lib/member/server";
-import { snapshotIncome, type IncomeMonth, type MemberIncome } from "@/lib/member/income";
+import { snapshotIncome, type DepartmentIncome, type IncomeMonth, type MemberIncome } from "@/lib/member/income";
 import HonoursPage, { HonourSheet } from "./profile/HonoursPage";
 import BrandWeeksPage from "./profile/BrandWeeksPage";
 import SchemeSheet from "./profile/SchemeSheet";
@@ -222,33 +222,54 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     return recentFailed || data.demo ? period : null;
   }, [fixture, recent, recentFailed, data.demo, period, monthState]);
   const workingPeriod = useMemo(() => (working ? monthPeriod(working, period) : null), [working, period]);
-  const work = useInsightData({ source, membershipId, schemeId, context, readable, period: workingPeriod, recent, recentFrom: prevMonth });
 
+  // ── Today: the CURRENT month, always (user 2026-10-06: "on live date, not showing last month") ──
+  // The other pages open on last month while it is still being closed; Today never does. Its income
+  // is Comm Cal's engine for this month, as on My income (live until HR closes them): the member's
+  // own, a Principal's view of somebody's, or — viewing nobody — the whole sub-department's, never
+  // last month's statement. The design preview keeps the statements its fixture carries.
+  // Server Actions run one at a time, so Today's reads are asked for first: the income, then this
+  // month's figures and Arena, and only then last month's for the pages that open on it.
+  const deptView = principal && !context;
+  const viewStaff = context?.staffId ?? "";
+  const todayKey = fixture || data.demo || !membershipId ? "" : `${membershipId}|${deptView ? "*" : viewStaff}|${period}`;
+  const [todayMonth, setTodayMonth] = useState<{ key: string; month?: IncomeMonth; dept?: DepartmentIncome; failed?: boolean } | null>(null);
+  useEffect(() => {
+    if (!todayKey) return;
+    let stale = false;
+    const done = (next: { month?: IncomeMonth; dept?: DepartmentIncome; failed?: boolean }) => { if (!stale) setTodayMonth({ key: todayKey, ...next }); };
+    // Ids, not the `context` object: a refresh rebuilds it every minute, and this runs the engine.
+    if (deptView) void source.departmentIncome(membershipId, period).then(r => done(r.ok ? { dept: r.data } : { failed: true }));
+    else void source.income(membershipId, period, viewStaff ? { staffId: viewStaff, subDepartmentId: membershipId } : undefined)
+      .then(r => done(r.ok ? { month: r.data.month } : { failed: true }));
+    return () => { stale = true; };
+  }, [todayKey, deptView, viewStaff, membershipId, period, source]);
+  // This month's Insight block, KPI and bills (last month's are `work` while it is being worked),
+  // and its Arena — the boards, this week's fair and the brand weeks still to save.
+  const nowPeriod = useMemo(() => (working && working !== period ? monthPeriod(period, period) : null), [working, period]);
+  const nowOwn = useInsightData({ source, membershipId, schemeId, context, readable, period: nowPeriod, recent, recentFrom: prevMonth });
   useEffect(() => {
     if (!membershipId || !readable || !working) return;
     let stale = false;
     setArena(null); setArenaNow(null);
-    void source.arena(membershipId, working, "monthly", context).then(r => { if (!stale && r.ok) setArena(viewedAs(r.data, context?.staffId)); });
     if (working !== period) {
       void source.arena(membershipId, period, "monthly", context).then(r => { if (!stale && r.ok) setArenaNow(viewedAs(r.data, context?.staffId)); });
     }
+    void source.arena(membershipId, working, "monthly", context).then(r => { if (!stale && r.ok) setArena(viewedAs(r.data, context?.staffId)); });
     return () => { stale = true; };
   }, [membershipId, working, period, readable, context, source]);
+  const work = useInsightData({ source, membershipId, schemeId, context, readable, period: workingPeriod, recent, recentFrom: prevMonth });
+  const now = working === period ? work : nowOwn;
+  const arenaToday = working === period ? arena : arenaNow;
 
   const incomes = useMemo(() => data.incomes.filter(i => i.schemeId === schemeId).sort((a, b) => b.period.localeCompare(a.period)), [data.incomes, schemeId]);
-  // A Principal viewing somebody: Today's income is that person's own month — Comm Cal's engine, as on
-  // My income — never the department's total the Principal's snapshot carries.
-  const viewKey = principal && context && working && !fixture ? `${membershipId}|${context.staffId}|${working}` : "";
-  const [viewedMonth, setViewedMonth] = useState<{ key: string; month: IncomeMonth } | null>(null);
-  useEffect(() => {
-    if (!viewKey || !working) return;
-    let stale = false;
-    void source.income(membershipId, working, context).then(r => { if (!stale && r.ok) setViewedMonth({ key: viewKey, month: r.data.month }); });
-    return () => { stale = true; };
-  }, [viewKey, membershipId, working, context, source]);
-  const viewedIncome = viewKey && viewedMonth?.key === viewKey ? viewedMonth.month : null;
-  const income = viewKey ? (viewedIncome ? snapshotIncome(viewedIncome, schemeId) : undefined) : incomes[0];
-  const todaySalary = viewKey ? viewedIncome?.basic ?? null : data.profile.salary;
+  const todayIncome = todayKey && todayMonth?.key === todayKey ? todayMonth : null;
+  const income = useMemo(() => (!todayKey ? incomes[0]
+    : todayIncome?.month ? snapshotIncome(todayIncome.month, schemeId)
+    : todayIncome?.dept ? { period: todayIncome.dept.period, status: "computed", total: todayIncome.dept.commission }
+    : undefined), [todayKey, incomes, todayIncome, schemeId]);
+  const incomeStatus = !todayKey ? undefined : !todayIncome ? "loading" as const : todayIncome.failed ? "failed" as const : undefined;
+  const todaySalary = todayIncome?.month ? todayIncome.month.basic : principal ? null : data.profile.salary;
   // The newest settled month, while it is news (the month just gone, or the one before it).
   const settled = useMemo(() => {
     const candidate = incomes.find(i => SETTLED.has(i.status));
@@ -374,20 +395,20 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     meta: i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
   }));
 
-  // ── the Championship of the working month, for Today's board ──
+  // ── this month's Championship, for Today's board ──
   const kpiRule = useMemo(() => ({ enabled: !!work.kpi?.enabled, threshold: work.kpi?.threshold ?? null }), [work.kpi?.enabled, work.kpi?.threshold]);
   const selfId = arena?.selfId || context?.staffId || "";
   const champRank = useMemo(() => {
-    if (!arena) return null;
-    const month = championshipMonth({ month: arena.period, people: arena.people, brands: arena.brands.map(b => b.code), tiers: arena.tiers, history: arena.history ?? null, kpi: kpiRule });
+    if (!arenaToday) return null;
+    const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
     return championshipStandings([month]).find(s => s.id === selfId)?.position ?? null;
-  }, [arena, kpiRule, selfId]);
+  }, [arenaToday, kpiRule, selfId]);
 
   const model = useMemo(() => todayModel({
-    today, first: me.first, title: me.title, rank: me.rank, income, salary: todaySalary, hidden,
+    today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, hidden,
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
-    insight: work.block ?? undefined, kpi: work.kpi, arena, arenaNow, book: work.book, bands: data.bands, memos, requests, requestCode,
-  }, champRank), [today, me, income, todaySalary, hidden, principal, viewed, fixture, membership?.name, work.block, work.kpi, arena, arenaNow, work.book, data.bands, memos, requests, champRank]);
+    insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
+  }, champRank), [today, me, income, incomeStatus, todaySalary, hidden, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book, data.bands, memos, requests, champRank]);
 
   // ── Insight: Month / Quarter / Year, opening on the working month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -401,8 +422,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [tiersOpen, setTiersOpen] = useState(false);
   const insPeriod = useMemo(() => periodOf(insKind, insFrom ?? working ?? period, period), [insKind, insFrom, working, period]);
   const sameAsWork = insPeriod.kind === "monthly" && insPeriod.from === working;
-  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: sameAsWork ? null : insPeriod, recent, recentFrom: prevMonth });
-  const ins = sameAsWork ? work : picked;
+  // This month is already read for Today (it is `work` itself once last month is closed).
+  const sameAsNow = !sameAsWork && !!nowPeriod && insPeriod.kind === "monthly" && insPeriod.from === period;
+  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: sameAsWork || sameAsNow ? null : insPeriod, recent, recentFrom: prevMonth });
+  const ins = sameAsWork ? work : sameAsNow ? now : picked;
   const insMonthly = insPeriod.kind === "monthly";
   const insightInput = useMemo<InsightInput>(() => ({
     period: insPeriod,
@@ -440,8 +463,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [champOpen, setChampOpen] = useState(false);
   const arPeriod = useMemo(() => periodOf(arKind, arFrom ?? fixture?.arena?.from[arKind] ?? working ?? period, period), [arKind, arFrom, fixture, working, period]);
   const markViewed = useCallback((snap: MemberArenaSnapshot) => viewedAs(snap, context?.staffId), [context?.staffId]);
+  // The month already held: this month's (Today's) when that is the one open, else the month being worked.
+  const knownArena = arPeriod.kind === "monthly" && arenaToday && arPeriod.from === arenaToday.period ? arenaToday : arena;
   const arData = useArenaData({
-    source, membershipId, context, readable, known: arena, kpi: kpiRule, mark: markViewed,
+    source, membershipId, context, readable, known: knownArena, kpi: kpiRule, mark: markViewed,
     period: route.screen === "arena" && !fixture?.arena ? arPeriod : null,
   });
   const arInput = useMemo(() => ({
@@ -761,13 +786,19 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
 
   let page: ReactNode;
   if (route.screen === "today") {
+    // Today's figures are this month's: a tap opens Insight and the Arena on this month too.
+    const insightThisMonth = (view: InsightView) => { setInsKind("monthly"); setInsFrom(period); setBillWeek(null); toInsight(view); };
+    const arenaThisMonth = (board?: Board) => {
+      setArKind("monthly"); setArFrom(period); setArSub("total");
+      goScreen("arena", board ? { arena: "board", board } : {});
+    };
     page = <Today model={todayVM} hidden={hidden} actions={{
       toggleHide: () => setHidden(!hidden),
-      openMetric: key => toInsight(key === "sales" ? "bills" : key === "margin" ? "brand" : "kpi"),
+      openMetric: key => insightThisMonth(key === "sales" ? "bills" : key === "margin" ? "brand" : "kpi"),
       openTodo: todo,
-      openOrders: () => toInsight("bills"),
-      openArena: () => goScreen("arena"),
-      openBoard,
+      openOrders: () => insightThisMonth("bills"),
+      openArena: () => arenaThisMonth(),
+      openBoard: board => arenaThisMonth(board),
     }} />;
   } else if (route.screen === "insight") {
     const back = () => toInsight("main");

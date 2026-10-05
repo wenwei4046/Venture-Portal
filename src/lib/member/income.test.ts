@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { WorkbenchPerson } from "@/lib/commission/workbench";
 import type { CloseSummary } from "@/lib/commission/closes";
 import type { StatementDto } from "@/lib/commission/run-payload";
-import { closedIncome, liveIncome, payLinesTotal, snapshotIncome, type OverrideFacts } from "./income";
+import { carriesInto, closedIncome, liveIncome, payLinesTotal, recognitionMonth, snapshotIncome, type OverrideFacts } from "./income";
 
 const extra = {
   period: "2026-09", asOf: "2026-10-05T02:00:00Z", basic: 0, payLines: [], payrollStatus: null, paidOn: null,
@@ -121,5 +121,49 @@ describe("snapshotIncome — one member's month for Today's hero", () => {
     expect(snapshotIncome(live, "s1")).toMatchObject({ schemeId: "s1", period: "2026-09", status: "computed", total: 7974.2, sales: 159484, deferred: 5388, rank: "Rank F", rate: 0.05 });
     expect(snapshotIncome({ ...live, state: "closed" }, "s1").status).toBe("locked");
     expect(snapshotIncome({ ...live, payrollStatus: "paid" }, "s1").status).toBe("locked");
+  });
+});
+
+// 2026-10-06: Today works out the CURRENT month while last month is still
+// being closed. Comm Cal carries every bill no run released into a month, so
+// on 6 October (nobody closed for September, no run applied) October's engine
+// counted all 358 of September's bills a second time. The member facts' rule
+// (member_order_facts, 20261004020000) is the one the app now carries by.
+describe("recognitionMonth — the month an unpaid bill counts in", () => {
+  it("stays in its own month while that month is open for its salesperson", () => {
+    expect(recognitionMonth("2026-09-01", null, null)).toBe("2026-09-01");
+    expect(recognitionMonth("2026-09-01", "2026-08-01", null)).toBe("2026-09-01");
+  });
+  it("moves to the month after a close of it — the salesperson's own, or the whole month's run", () => {
+    expect(recognitionMonth("2026-09-01", "2026-09-01", null)).toBe("2026-10-01");
+    expect(recognitionMonth("2026-09-01", null, "2026-09-01")).toBe("2026-10-01");
+    expect(recognitionMonth("2026-09-01", "2026-10-01", "2026-09-01")).toBe("2026-11-01");
+    expect(recognitionMonth("2026-12-01", "2026-12-01", null)).toBe("2027-01-01");
+  });
+});
+
+describe("carriesInto — which earlier bills ride into a month worked out live", () => {
+  const facts = { closes: [{ staffId: "ETHAN", periodMonth: "2026-09-01" }, { staffId: "KAR", periodMonth: "2026-08-01" }], appliedRuns: [] };
+  const into = carriesInto("2026-10-01", facts);
+  it("leaves a September bill in September until its salesperson is closed for September", () => {
+    expect(into({ staffId: "KAR", periodMonth: "2026-09-01" })).toBe(false);
+    expect(into({ staffId: "NOBODY_CLOSED", periodMonth: "2026-09-01" })).toBe(false);
+    expect(into({ staffId: null, periodMonth: "2026-09-01" })).toBe(false);
+  });
+  it("carries what a September close did not pay into October", () => {
+    expect(into({ staffId: "ETHAN", periodMonth: "2026-09-01" })).toBe(true);
+  });
+  it("carries everybody's once the whole month's run is applied", () => {
+    const run = carriesInto("2026-10-01", { closes: [], appliedRuns: ["2026-09-01"] });
+    expect(run({ staffId: "KAR", periodMonth: "2026-09-01" })).toBe(true);
+    expect(run({ staffId: "KAR", periodMonth: "2026-08-01" })).toBe(true);
+  });
+  it("never carries a bill into a month past the first one still open for its salesperson", () => {
+    // Closed for September only: an unpaid September bill belongs to October, not November.
+    expect(carriesInto("2026-11-01", facts)({ staffId: "ETHAN", periodMonth: "2026-09-01" })).toBe(false);
+  });
+  it("takes the latest standing close of each salesperson", () => {
+    const later = carriesInto("2026-11-01", { closes: [{ staffId: "ETHAN", periodMonth: "2026-10-01" }, { staffId: "ETHAN", periodMonth: "2026-09-01" }], appliedRuns: [] });
+    expect(later({ staffId: "ETHAN", periodMonth: "2026-09-01" })).toBe(true);
   });
 });

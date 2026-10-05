@@ -17,6 +17,7 @@ import {
   loadMemberClaimRates,
   loadPrincipalMemoReceipts,
   loadMemberIncome,
+  loadDepartmentIncome,
   loadMemberHonours,
   adminMemberAction as administer,
   type AdminMemberCommand,
@@ -71,6 +72,9 @@ export async function fetchPrincipalMemoReceipts(staffId: string) {
 }
 export async function fetchMemberIncome(subDepartmentId: string, period: string, context?: MemberReadContext) {
   return loadMemberIncome(subDepartmentId, period, context);
+}
+export async function fetchDepartmentIncome(subDepartmentId: string, period: string) {
+  return loadDepartmentIncome(subDepartmentId, period);
 }
 export async function fetchMemberHonours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
   return loadMemberHonours(subDepartmentId, from, until, context);

@@ -1362,6 +1362,12 @@ VP's. The member C release above describes the screens this replaced.
   build* line names them, a bed frame line carries its own build in brackets,
   and the card's **Total** is step 2's *Customer pays*: *Add-on items* and *Bed
   frame options* rows sit above the fee when there are any.
+- **Today is the live month (2026-10-06)** — the prototype's Today on 3 October
+  read *September · Estimated income*; the user wants the month on the calendar,
+  so the hero, its three figures and *Your Arena* are the current month, and a
+  tap opens Insight or the Arena on it. While the engine works the figure out the
+  hero reads *RM —* / *Working out October's commission…*, never the fixed
+  salary alone. Insight and the Arena still open on the month being closed.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 

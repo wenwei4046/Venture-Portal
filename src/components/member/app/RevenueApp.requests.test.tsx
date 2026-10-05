@@ -58,7 +58,7 @@ function source(make: () => MemberData) {
   return {
     refresh: vi.fn(async () => ({ ok: true as const, data: make() })),
     insight: none, kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
-    cancelRequest: none, income: none, honours: none, saveBrandWeeks: none,
+    cancelRequest: none, income: none, departmentIncome: none, honours: none, saveBrandWeeks: none,
     memoReceipts: vi.fn(async () => ({ ok: true as const, data: [] })),
     orderBook: vi.fn(async (_sub: string, from: string, until: string) => ({ ok: true as const, data: book(from, until) })),
     arena: vi.fn(async (membershipId: string, period: string, _window: string, context?: MemberReadContext) =>

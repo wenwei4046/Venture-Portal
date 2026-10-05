@@ -97,6 +97,14 @@ export interface CommissionInputOptions {
    * so the close the server recomputes judges the same figure.
    */
   monthOrders?: readonly { cancelled: boolean; commissionable: number }[]
+  /**
+   * Which bills of earlier months ride into this one. Absent, every bill no run
+   * released does — Comm Cal's carry, because HR closes month by month. The
+   * member app works a month out while the one before it is still being
+   * closed, and carries only what the member facts carry (`carriesInto`,
+   * lib/member/income.ts), so October never counts September's bills twice.
+   */
+  carry?: (order: { staffId: string | null; periodMonth: string }) => boolean
 }
 
 /**
@@ -260,7 +268,8 @@ export async function loadCommissionInput(
   // 2026-09-26): its bills never ride into a run — June to August 2026 would
   // otherwise all be paid again in September.
   const settledElsewhere = (order: SalesOrderRow) => cutover !== null && order.period_month < cutover
-  const orderRows = [...thisMonth, ...earlier.filter(order => !releasedSet.has(order.order_no) && !settledElsewhere(order))]
+  const carried = (order: SalesOrderRow) => options.carry?.({ staffId: order.staff_id, periodMonth: order.period_month }) ?? true
+  const orderRows = [...thisMonth, ...earlier.filter(order => !releasedSet.has(order.order_no) && !settledElsewhere(order) && carried(order))]
   const orderIds = orderRows.map(order => order.id)
   const lookBack = Math.max(0, ...ranks.map(rank => (rank.consecutive_months ?? 1) - 1))
   const priorPeriods = Array.from({ length: lookBack }, (_, index) => monthsBefore(period, index + 1))

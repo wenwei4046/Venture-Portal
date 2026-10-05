@@ -12,7 +12,7 @@ import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
 import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
-import { closedIncome, liveIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
+import { carriesInto, closedIncome, liveIncome, type DepartmentIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
 import { parseCloseSummary } from "@/lib/commission/closes";
 import { buildCommissionWorkbench } from "@/lib/commission/workbench";
 import type { StatementDto } from "@/lib/commission/run-payload";
@@ -507,25 +507,68 @@ export async function loadMemberIncome(
     }
 
     // Still open (or paid by hand): the engine's figure now, exactly as Comm Cal shows it.
-    const { data: run, error: runError } = await admin.from("comm_runs").select("id")
-      .eq("sub_department_id", subDepartmentId).eq("period_month", first).maybeSingle();
-    if (runError) throw new Error(runError.message);
-    let loaded: Awaited<ReturnType<typeof loadCommissionInput>>;
-    try {
-      loaded = await loadCommissionInput(first, subDepartmentId, admin, { replayRunId: (run as { id: string } | null)?.id });
-    } catch (error) {
-      const why = error instanceof Error ? error.message : "";
-      if (/Nothing has been imported/i.test(why)) return { month: empty("none", "No bills have arrived for this month yet."), past, cutover: firstPaid };
-      throw error;
-    }
-    const { input } = loaded;
-    const ids = [...new Set([...input.hierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId), staffId])];
-    const people = await fetchByKeys<{ id: string; employee_name: string }, string>(ids, keys =>
-      admin.from("hr_staff_costs").select("id, employee_name").in("id", keys));
-    const board = buildCommissionWorkbench(input, { people: people.map(p => ({ staffId: p.id, name: p.employee_name })) });
+    const board = await liveWorkbench(admin, subDepartmentId, first, staffId);
+    if (!board) return { month: empty("none", "No bills have arrived for this month yet."), past, cutover: firstPaid };
     const person = board.people.find(p => p.staffId === staffId) ?? null;
     const month = liveIncome(person, { ...extra, asOf: new Date().toISOString(), switches });
     return { month: byHand ? { ...month, state: "manual" } : month, past, cutover: firstPaid };
+  });
+}
+
+/**
+ * A month as Comm Cal's engine works it out now, for the whole sub-department
+ * — null when nothing has been imported for it yet. One difference from Comm
+ * Cal, and it is the member facts' rule: a bill of an earlier month rides in
+ * only once that month is closed for its salesperson (`carriesInto`). Comm Cal
+ * carries every bill no run released, because HR closes month by month; the
+ * app reads the live month while the one before it is still being closed, and
+ * would otherwise count every one of its bills twice.
+ */
+async function liveWorkbench(client: SupabaseClient, subDepartmentId: string, first: string, alsoStaffId?: string) {
+  const [run, closes, applied] = await Promise.all([
+    client.from("comm_runs").select("id").eq("sub_department_id", subDepartmentId).eq("period_month", first).maybeSingle(),
+    client.from("comm_salesperson_closes").select("staff_id, period_month").eq("sub_department_id", subDepartmentId).is("reopened_at", null),
+    client.from("comm_runs").select("period_month").eq("sub_department_id", subDepartmentId).in("status", ["applied", "locked"]),
+  ]);
+  for (const r of [run, closes, applied]) if (r.error) throw new Error(r.error.message);
+  const carry = carriesInto(first, {
+    closes: ((closes.data ?? []) as { staff_id: string; period_month: string }[]).map(c => ({ staffId: c.staff_id, periodMonth: c.period_month })),
+    appliedRuns: ((applied.data ?? []) as { period_month: string }[]).map(r => r.period_month),
+  });
+  let loaded: Awaited<ReturnType<typeof loadCommissionInput>>;
+  try {
+    loaded = await loadCommissionInput(first, subDepartmentId, client, { replayRunId: (run.data as { id: string } | null)?.id, carry });
+  } catch (error) {
+    if (/Nothing has been imported/i.test(error instanceof Error ? error.message : "")) return null;
+    throw error;
+  }
+  const { input } = loaded;
+  const ids = [...new Set([...input.hierarchy.map(n => n.staffId), ...input.orders.map(o => o.staffId), ...(alsoStaffId ? [alsoStaffId] : [])])];
+  const people = await fetchByKeys<{ id: string; employee_name: string }, string>(ids, keys =>
+    client.from("hr_staff_costs").select("id, employee_name").in("id", keys));
+  return buildCommissionWorkbench(input, { people: people.map(p => ({ staffId: p.id, name: p.employee_name })) });
+}
+
+/**
+ * Today for a Principal viewing nobody (2026-10-06): the sub-department's month
+ * as Comm Cal works it out now — everybody's commission, before salaries. Read
+ * with the Principal's own session: Comm Cal is theirs to read, so no service
+ * role is needed.
+ */
+export async function loadDepartmentIncome(subDepartmentId: string, period: string): Promise<MemberOutcome<DepartmentIncome>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active || !isPrincipalAccount(user)) throw new Error("Only Principal can see a whole department's commission.");
+    insightWindow(subDepartmentId, period, period);
+    const client = await session("member_insight", true);
+    const board = await liveWorkbench(client, subDepartmentId, `${period}-01`);
+    if (!board) return { period, state: "none", commission: 0, countedSales: 0 };
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    return {
+      period, state: "live",
+      commission: round2(board.people.reduce((a, p) => a + p.totalCommission, 0)),
+      countedSales: round2(board.people.reduce((a, p) => a + (p.statement?.productRevenue ?? 0), 0)),
+    };
   });
 }
 

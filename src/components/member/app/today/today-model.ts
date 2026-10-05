@@ -6,36 +6,37 @@ import { arenaIncentive, arenaMonthFridays, arenaRankings, type ArenaMetric, typ
 import { dayLabel, dayRange, monthName, ordinalSuffix, rm2, shortDay } from "../format";
 import { ICON } from "../icons";
 
-/** What Today is built from — every number is the backend's own. */
+/**
+ * What Today is built from — every number is the backend's own, and all of it
+ * is the CURRENT month (user 2026-10-06: "on live date, not showing last
+ * month"), even while the month just gone is still being closed.
+ */
 export interface TodayInput {
   /** Today in Kuala Lumpur, `YYYY-MM-DD`. */
   today: string;
   first: string;
   title: string;
   rank: string;
-  /** The latest commission statement of this sub-department, if any. */
-  income?: MemberIncome;
+  /**
+   * This month's income: Comm Cal's engine for the member (live until HR
+   * closes them), or — a Principal viewing nobody — the department's.
+   */
+  income?: Pick<MemberIncome, "period" | "status" | "total">;
+  /** The month's figure is still being worked out, or could not be. Absent: ready. */
+  incomeStatus?: "loading" | "failed";
   salary: number | null;
   /**
    * A Principal viewing nobody: `income` is the whole sub-department's
-   * commission (the Principal's snapshot), named so — it is nobody's income.
+   * commission, named so — it is nobody's income.
    */
   department?: string;
   hidden: boolean;
-  /**
-   * The working month's Insight block for this sub-department — the month still
-   * being closed (September until it closes, then October), as Insight opens on.
-   */
+  /** This month's Insight block for this sub-department. */
   insight?: MemberInsightBlock;
   kpi?: MemberKpiSummary | null;
-  /** The working month's Arena (monthly window) — the boards' ranks and the margin tier. */
+  /** This month's Arena (monthly window): the boards' ranks, this week's fair, the brand weeks to save. */
   arena?: MemberArenaSnapshot | null;
-  /**
-   * The current month's Arena, for this week's fair and the brand weeks still to
-   * save. Absent = `arena` (the working month IS the current month).
-   */
-  arenaNow?: MemberArenaSnapshot | null;
-  /** The working month's bills and the brands' ladders — the margin's tier. */
+  /** This month's bills and the brands' ladders — the margin's tier. */
   book?: MemberOrderBook | null;
   bands?: MemberBand[];
   memos: MemberMemo[];
@@ -138,7 +139,6 @@ function kpiMetric(input: TodayInput): TodayMetric {
 }
 
 function todos(input: TodayInput): TodayTodo[] {
-  const now = input.arenaNow ?? input.arena;
   const out: TodayTodo[] = [];
   const memos = input.memos.filter(m => m.requiresAck && !m.acknowledgedAt);
   if (memos.length) {
@@ -149,7 +149,7 @@ function todos(input: TodayInput): TodayTodo[] {
     out.push({ key: `rq-${request.id}`, tone: "request", icon: ICON.receipt, target: "requests",
       title: `${KIND[request.kind]} needs info`, sub: `${input.requestCode(request)} · HR returned it` });
   }
-  const arena = now;
+  const arena = input.arena;
   const period = input.today.slice(0, 7);
   if (arena && arena.period === period && arena.weekLocks?.length) {
     const picks = arena.brandWeeks?.picks ?? {};
@@ -163,7 +163,7 @@ function todos(input: TodayInput): TodayTodo[] {
 }
 
 function thisWeek(input: TodayInput): TodayWeek | null {
-  const arena = input.arenaNow ?? input.arena;
+  const arena = input.arena;
   if (!arena) return null;
   const friday = weekFriday(input.today);
   const fridays = arenaMonthFridays(friday.slice(0, 7));
@@ -203,12 +203,15 @@ export function todayModel(input: TodayInput, championRank: number | null = null
   const settled = income ? SETTLED.has(income.status) : false;
   const month = income ? monthName(income.period) : monthName(input.today.slice(0, 7));
   const dept = input.department;
+  const pending = input.incomeStatus;
   return {
     hello: `Hello, ${input.first}`,
     helloSub: [dayLabel(input.today), input.title, input.rank].filter(Boolean).join(" · "),
     heroLabel: dept ? `${month} · ${dept} commission` : `${month} · ${settled ? "Settled income" : "Estimated income"}`,
-    heroAmount: input.hidden ? "RM ••••••" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
+    heroAmount: input.hidden ? "RM ••••••" : pending ? "RM —" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
     heroSplit: input.hidden ? "Amounts hidden"
+      : pending === "loading" ? `Working out ${month}'s commission…`
+      : pending === "failed" ? `${month}'s commission is unavailable right now`
       : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`
       : commission === null ? `Fixed salary ${rm2(fixed)} · commission shows once ${month} is computed`
       : `Fixed salary ${rm2(fixed)} + commission ${rm2(commission)}`,
