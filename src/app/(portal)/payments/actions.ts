@@ -1836,6 +1836,12 @@ const ALLOWED_MIME = [
 ]
 const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', '.doc', '.csv']
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+// A file can be ADDED to a voucher until it is voided — including after it is
+// approved or paid (2026-10-05: two paid PVs had been made without their
+// receipts; user: "做第 2 条"). Nothing is ever REMOVED from a decided voucher:
+// the delete RPC and the storage DELETE policy both stop at pending_approval.
+const UPLOADABLE_STATUSES = ['draft', 'pending_approval', 'approved', 'paid']
+const UNDECIDED_STATUSES = ['draft', 'pending_approval']
 
 export async function uploadVoucherAttachment(formData: FormData): Promise<{ count: number }> {
   const user = await requirePermission('treasury')
@@ -1852,9 +1858,10 @@ export async function uploadVoucherAttachment(formData: FormData): Promise<{ cou
     .single()
 
   if (!voucher) throw new Error('Voucher not found')
-  if (!['draft', 'pending_approval'].includes(voucher.status)) {
+  if (!UPLOADABLE_STATUSES.includes(voucher.status)) {
     throw new Error(`Cannot upload attachments when voucher status is "${voucher.status}"`)
   }
+  const afterDecision = !UNDECIDED_STATUSES.includes(voucher.status)
 
   const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
   if (files.length === 0) throw new Error('No files provided')
@@ -1899,6 +1906,20 @@ export async function uploadVoucherAttachment(formData: FormData): Promise<{ cou
     }
 
     uploaded++
+  }
+
+  // Something added to a voucher that was already decided: the row says who
+  // and when, and this is the entry the Audit log reads. The files are in
+  // place either way, so a failure here is reported, not thrown.
+  if (afterDecision) {
+    const { error: logErr } = await supabase.from('access_log').insert({
+      user_id: user.id,
+      action: 'add_attachment',
+      resource_type: 'payment_voucher',
+      resource_id: voucherId,
+      metadata: { voucher_status: voucher.status, count: uploaded, files: files.map((f) => f.name) },
+    })
+    if (logErr) console.error('add_attachment audit row failed:', voucherId, logErr.message)
   }
 
   revalidatePath(`/payments/${voucherId}`)

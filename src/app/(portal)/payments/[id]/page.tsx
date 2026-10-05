@@ -104,6 +104,9 @@ export default async function PaymentDetailPage({ params }: Props) {
     if (bankData) bankBalance = Number(bankData.current_balance)
   }
 
+  // Attachments come and go freely only while the voucher is still being made.
+  const attachmentsOpen = voucher.status === 'draft' || voucher.status === 'pending_approval'
+
   const isPrincipal = canReadTreasury && user.role === 'principal'
   // Unified portal (2026-07-16): Principal gets the Finance-side voucher
   // actions too (copy / mark paid / void).
@@ -523,19 +526,23 @@ export default async function PaymentDetailPage({ params }: Props) {
               }
             >
               {/* Folded until it is wanted: the form to add one is four times the
-                  height of the line that says there are none. Once the voucher is
-                  approved it only says that attachments are locked. */}
-              {voucher.status === 'draft' || voucher.status === 'pending_approval' ? (
-                <DealMore summary="加附件 · Add attachments">
-                  <AttachmentUploader voucherId={voucher.id} voucherStatus={voucher.status} canUpload />
-                </DealMore>
-              ) : (
+                  height of the line that says there are none. A decided voucher
+                  (approved, paid) still takes a file — a receipt that was
+                  forgotten (2026-10-05) — but gives none back, and says so; only a
+                  voided one is closed. */}
+              {voucher.status === 'voided' ? (
                 <AttachmentUploader voucherId={voucher.id} voucherStatus={voucher.status} canUpload={false} />
+              ) : (
+                <DealMore summary={attachmentsOpen ? '加附件 · Add attachments' : '补附件 · Add attachments'}>
+                  <AttachmentUploader voucherId={voucher.id} voucherStatus={voucher.status} canUpload late={!attachmentsOpen} />
+                </DealMore>
               )}
               {(attachments ?? []).length > 0 ? (
                 <div className="mt-3"><AttachmentList
                   attachments={(attachments ?? []) as Parameters<typeof AttachmentList>[0]['attachments']}
-                  canDelete={voucher.status === 'draft' || voucher.status === 'pending_approval'}
+                  canDelete={attachmentsOpen}
+                  // A file that arrived after the Principal's decision is marked.
+                  lateAfter={voucher.direction === 'credit' ? null : voucher.approved_at}
                 /></div>
               ) : (
                 <p className="font-sans text-sm text-muted mt-2">还没有附件。</p>

@@ -8,17 +8,17 @@ vi.mock('../actions', () => ({ submitForApproval: vi.fn(), approveVoucher: vi.fn
 vi.mock('./_components/VoucherActions', () => ({ default: (props: { reversePaidPayment?: unknown }) => <div data-testid="voucher-actions" data-can-reverse={Boolean(props.reversePaidPayment)} /> }))
 vi.mock('./_components/CopyVoucherButton', () => ({ default: () => <div data-testid="copy-voucher" /> }))
 vi.mock('./_components/ReassignGlAccountButton', () => ({ default: () => <div data-testid="reassign-gl" /> }))
-vi.mock('./_components/AttachmentUploader', () => ({ default: () => <div data-testid="attachment-uploader" /> }))
+vi.mock('./_components/AttachmentUploader', () => ({ default: (p: { canUpload: boolean; late?: boolean }) => <div data-testid="attachment-uploader" data-can-upload={String(p.canUpload)} data-late={String(!!p.late)} /> }))
 vi.mock('../_components/AmendDateButton', () => ({ default: (p: { id: string; currentDate: string }) => <div data-testid="amend-date">{p.id} {p.currentDate}</div> }))
-vi.mock('@/components/voucher/AttachmentList', () => ({ default: () => <div data-testid="attachment-list" /> }))
+vi.mock('@/components/voucher/AttachmentList', () => ({ default: (p: { canDelete?: boolean; lateAfter?: string | null }) => <div data-testid="attachment-list" data-can-delete={String(!!p.canDelete)} data-late-after={p.lateAfter ?? ''} /> }))
 import PaymentDetailPage from './page'
 
-function database(referenceType = 'payroll_statutory', salaryLines: Record<string, unknown>[] = [], salaryError: object | null = null, invoices: Record<string, unknown>[] = []) {
+function database(referenceType = 'payroll_statutory', salaryLines: Record<string, unknown>[] = [], salaryError: object | null = null, invoices: Record<string, unknown>[] = [], attachments: Record<string, unknown>[] = []) {
   const voucher: Record<string, unknown> & { status: string } = { id: 'stat', voucher_no: 'TEST-STAT-PV', reference_type: referenceType, status: 'pending_approval', amount: 100.10, direction: 'debit', voucher_type: 'salary_payout', payee_name: 'KWSP', payee_company_id: null, bank_account_id: null, source_pool: null, target_pool: null, created_by: 'creator', approved_by: null, approved_at: null, created_at: '2026-09-11T00:00:00Z', updated_at: '2026-09-11T00:00:00Z', executed_at: null, payment_method: 'bank_transfer', description: 'Statutory fixture', notes: null }
   const filters: string[][] = []
   const from = vi.fn((table: string) => {
     let allowedReferences: string[] | null = null
-    const result = { data: table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : table === 'payroll_voucher_lines' ? salaryLines : table === 'invoices' ? invoices : [], error: table === 'payroll_voucher_lines' ? salaryError : null }
+    const result = { data: table === 'payroll_statutory_voucher_lines' ? [{ id: 'line', scope: 'staff', payroll_row_id: 'row', employee_name: 'Recorded Employee', employee_code: 'TEST001', department_name: 'Original Department', period_month: '2026-08-01', scheme: 'KWSP', amount: '100.10' }] : table === 'payroll_voucher_lines' ? salaryLines : table === 'invoices' ? invoices : table === 'payment_attachments' ? attachments : [], error: table === 'payroll_voucher_lines' ? salaryError : null }
     const query = {
       select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
       in: vi.fn((column: string, values: string[]) => { if (column === 'reference_type') { allowedReferences = values; filters.push(values) } return query }),
@@ -266,5 +266,53 @@ describe('a payroll voucher, for a treasury account without Payroll payouts', ()
     database('payroll_statutory')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(screen.getByRole('table', { name: 'Statutory contributions covered by this voucher' })).toHaveTextContent('Recorded Employee')
+  })
+})
+
+// 2026-10-05 (user: two paid PVs had been made without their receipts — "做第 2 条").
+describe('attachments on a voucher that is already decided', () => {
+  const asFinance = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  const file = (uploaded_at: string) => ({ id: 'f-' + uploaded_at, file_name: 'receipt.pdf', file_type: 'application/pdf', file_size: 1000, storage_path: 'x/receipt.pdf', description: null, uploaded_at, uploaded_by: 'creator' })
+
+  it('a paid voucher still takes a file, and says it is a late one; nothing can be removed', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment', [], null, [], [file('2026-10-05T02:00:00Z')])
+    Object.assign(voucher, { status: 'paid', approved_at: '2026-10-04T13:23:40Z', executed_at: '2026-10-04T13:23:40Z' })
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    const uploader = screen.getByTestId('attachment-uploader')
+    expect(uploader.dataset.canUpload).toBe('true')
+    expect(uploader.dataset.late).toBe('true')
+    expect(screen.getByText('补附件 · Add attachments')).toBeInTheDocument()
+    const list = screen.getByTestId('attachment-list')
+    expect(list.dataset.canDelete).toBe('false')
+    expect(list.dataset.lateAfter).toBe('2026-10-04T13:23:40Z') // the list marks what came after this
+  })
+
+  it('while it is still being made, files come and go as before', async () => {
+    asFinance()
+    database('ordinary_payment', [], null, [], [file('2026-09-11T01:00:00Z')]) // pending approval
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    const uploader = screen.getByTestId('attachment-uploader')
+    expect(uploader.dataset.canUpload).toBe('true')
+    expect(uploader.dataset.late).toBe('false')
+    expect(screen.getByText('加附件 · Add attachments')).toBeInTheDocument()
+    expect(screen.getByTestId('attachment-list').dataset.canDelete).toBe('true')
+  })
+
+  it('a receipt is paid the moment it is made, so nothing on it counts as late', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment', [], null, [], [file('2026-09-29T04:00:00Z')])
+    Object.assign(voucher, { direction: 'credit', status: 'paid', approved_at: '2026-09-29T03:54:53Z', executed_at: '2026-09-29T03:54:53Z' })
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByTestId('attachment-uploader').dataset.canUpload).toBe('true')
+    expect(screen.getByTestId('attachment-list').dataset.lateAfter).toBe('')
+  })
+
+  it('a voided voucher is closed', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    voucher.status = 'voided'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    expect(screen.getByTestId('attachment-uploader').dataset.canUpload).toBe('false')
   })
 })

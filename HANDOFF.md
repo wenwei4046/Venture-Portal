@@ -1,5 +1,32 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-05 (SHIPPED) — a file can be added to a voucher after it is paid
+
+User, on two paid PVs (0451, 0452) showing 0 FILES: "这些本来就 attachment 的吗？帮我检查".
+Checked: no `payment_attachments` row, no object in the `payment-attachments` bucket, no
+orphan, and the access log shows them created from /payments/new and never
+uploaded to — the receipts were simply never attached (the same morning's 0453
+got its two PDFs through the voucher page). Note for next time: the
+creation-time upload in `createPaymentVoucher` swallows a storage error silently
+(`if (!uploadError)`, no message); the voucher-page uploader does not.
+
+Offered two ways to add the receipts now; user: "做第 2 条":
+
+- `uploadVoucherAttachment` accepts draft / pending_approval / **approved / paid**
+  (not voided). For approved / paid it writes an `access_log` row
+  (`action add_attachment`, resource_type payment_voucher, metadata: status, count,
+  file names) — best-effort, logged if it fails. Nothing can be REMOVED from a
+  decided voucher: unchanged `delete_voucher_attachment` RPC and the storage DELETE
+  policy both stop at pending_approval, and the page offers no 删除 there.
+- Voucher page: the 附件 card folds the uploader for every status but voided
+  ("补附件" once decided), the uploader says 只能加、不能删、会记录, and
+  `AttachmentList` marks a file uploaded after `approved_at` as 事后补上 (debit
+  vouchers only — a receipt is paid the moment it is made).
+- Tests: `actions.attachments.test.ts`, `AttachmentList.test.tsx`, four cases on the page test.
+
+Also this session (2026-10-02 → 05): the finance executive's login is ON HOLD
+("先放着，到时我确定。别做东西"); see checkpoint d below for the steps.
+
 ## CHECKPOINT 2026-10-02 d (SHIPPED) — 改日期, the office clock, and Payroll payouts
 
 The user confirmed a three-part sample ("照这个做"). All three are on `main`. This supersedes the two

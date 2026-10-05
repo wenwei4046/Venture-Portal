@@ -24,6 +24,9 @@ interface Props {
   /** Show a 删除 action per file. The caller decides (Finance/Principal on a
    *  draft / pending_approval voucher); the RPC re-checks server-side. */
   canDelete?: boolean
+  /** When the voucher was decided (approved). A file uploaded after that was
+   *  added to a voucher already on its way, and is marked 事后补上 (2026-10-05). */
+  lateAfter?: string | null
 }
 
 type PreviewKind = 'image' | 'pdf'
@@ -35,7 +38,9 @@ function previewKind(fileType: string): PreviewKind | null {
   return null
 }
 
-export default function AttachmentList({ attachments, emptyMessage, canDelete = false }: Props) {
+export default function AttachmentList({ attachments, emptyMessage, canDelete = false, lateAfter = null }: Props) {
+  const decidedAt = lateAfter ? new Date(lateAfter).getTime() : null
+  const isLate = (uploadedAt: string) => decidedAt !== null && new Date(uploadedAt).getTime() > decidedAt
   const router = useRouter()
   const [pendingId, setPendingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -156,6 +161,9 @@ export default function AttachmentList({ attachments, emptyMessage, canDelete = 
                   <span className="font-mono text-xs text-muted hidden sm:block">
                     {dayjs(a.uploaded_at).format('D MMM HH:mm')}
                   </span>
+                  {isLate(a.uploaded_at) ? (
+                    <span className="font-serif italic text-xs text-alert" title="凭单批准之后才加的">事后补上</span>
+                  ) : null}
                   {kind && previewUrl ? (
                     <button
                       type="button"
