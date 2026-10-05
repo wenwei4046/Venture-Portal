@@ -280,7 +280,7 @@ export function protoProfile(): ProfileFixture {
     form: {
       subName: "Fair",
       weeks: MY_FAIRS.map((f, i) => ({ key: `w${i}`, month: "SEP", n: `W${i + 1}`, brandWeek: `${f.brand} week`, brand: f.brand.toUpperCase(), dates: f.dates, venue: f.venue, org: f.org,
-        fairId: `f${i}`, auto: false, claimable: true, color: BRAND_TONE[f.brand][0], tint: BRAND_TONE[f.brand][1] })),
+        fairId: `f${i}`, start: null, end: null, auto: false, claimable: true, color: BRAND_TONE[f.brand][0], tint: BRAND_TONE[f.brand][1] })),
       rates: {
         // No small-group cap: the prototype's Airbnb form is the per-person one.
         base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null,

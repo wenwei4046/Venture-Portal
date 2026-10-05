@@ -11,6 +11,8 @@
  *               cap a night × nights (user 2026-10-06: N = 3, RM 220, 2 nights,
  *               invoice RM 500 → RM 440); a bigger group is people × nights × the
  *               rate per person per night, nothing typed. Invoice required.
+ *               For an OUTSTATION fair only, and a stay of at most 7 nights that
+ *               covers the fair's days (user 2026-10-06).
  *
  * The claim is for the member's own brand week, and its region is the one HR
  * set for that fair's venue — never picked on the phone (2026-10-06).
@@ -72,6 +74,27 @@ export function fairRegion(rates: ClaimRates, fairId: string | null): { venue: s
   const fair = fairId ? rates.fairs[fairId] : undefined;
   if (!fair) return { venue: null, region: null };
   return { venue: fair.venue, region: rates.regions.find(r => r.id === fair.regionId) ?? null };
+}
+
+/** The most nights one Airbnb claim is for (user 2026-10-06: "date stay limit in 7 days"). */
+export const MAX_STAY_NIGHTS = 7;
+
+/** Away from the base: a route of spots, or flown to. Only such a fair has an Airbnb claim (user 2026-10-06). */
+export function isOutstation(region: ClaimRegion): boolean {
+  return region.planeTicket || region.spots > 0;
+}
+
+/**
+ * Why this stay cannot be claimed for its fair, or null: at most 7 nights, in on or before the fair's
+ * last day and out after its first (`member_claim_detail_for` refuses the same). `fairDays` names the
+ * fair's days in the message; a fair with no dates is not compared.
+ */
+export function stayProblem(checkIn: string, checkOut: string, fair: { start: string | null; end: string | null }, fairDays: string): string | null {
+  const nights = nightsBetween(checkIn, checkOut);
+  if (nights === null || nights < 1) return null;
+  if (nights > MAX_STAY_NIGHTS) return `A stay is at most ${MAX_STAY_NIGHTS} nights.`;
+  if (fair.start && fair.end && (checkIn > fair.end || checkOut <= fair.start)) return `The stay must cover the fair's days (${fairDays}).`;
+  return null;
 }
 
 /** A small group types its invoice's total (paid up to the cap); a bigger one is paid per person. */

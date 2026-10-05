@@ -5,7 +5,7 @@ import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
 import { initials, rm2 } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
-import { airbnbGroup, claimAmount, fairRegion, nightsBetween } from "@/lib/member/claim-rules";
+import { airbnbGroup, claimAmount, fairRegion, isOutstation, MAX_STAY_NIGHTS, nightsBetween, stayProblem } from "@/lib/member/claim-rules";
 import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
@@ -121,9 +121,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
   // Nobody counted yet reads as the smallest group, so the total's box does not jump in on the first +.
   const group = airbnbGroup(options.rates, Math.max(1, pax));
   const capPerNight = options.rates.groupCapPerNight ?? 0;
+  // Airbnb is for an outstation fair only, a stay of at most 7 nights covering its days (user 2026-10-06).
+  const stayIssue = weekRow ? stayProblem(checkIn, checkOut, weekRow, weekRow.dates) : null;
   const amount = useMemo(() => claimAmount(options.rates, cat === "outstation"
     ? { type: "outstation", regionId: regionRow?.id ?? null, ticket: ticketValue }
-    : { type: "airbnb", pax, nights: nights ?? 0, invoice: stayValue }), [options.rates, cat, regionRow, ticketValue, pax, nights, stayValue]);
+    : { type: "airbnb", pax, nights: stayIssue ? 0 : nights ?? 0, invoice: stayValue }), [options.rates, cat, regionRow, ticketValue, pax, nights, stayIssue, stayValue]);
   const department = options.departments.find(d => d.id === (kind === "waiting" ? target : options.departmentId));
 
   const submit = async () => {
@@ -152,7 +154,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
           return setError(regionRow.spots > 0 ? "HR has not set the rate per spot yet." : `${venue} is local to ${options.rates.base}, so there is no outstation claim.`);
         }
       } else {
+        if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
+        if (!isOutstation(regionRow)) return setError(`${venue} is local to ${options.rates.base}, so there is no Airbnb claim.`);
         if (!checkIn || !checkOut || nights === null || nights < 1) return setError("Enter the check-in and check-out dates.");
+        if (stayIssue) return setError(stayIssue);
         if (male + female < 1) return setError("Add who stayed.");
         if (group && !(stayValue && stayValue > 0)) return setError("Enter the stay's total from its invoice.");
         if (!(amount > 0)) return setError("HR has not set the Airbnb rate yet.");
@@ -328,12 +333,20 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
                   {regionRow && !regionRow.planeTicket && regionRow.spots === 0 && <p className={s.local}>{venue} is local to {options.rates.base}, so there is no outstation claim.</p>}
                 </>
               ) : null
+            ) : !weekRow?.claimable ? null : !regionRow ? (
+              <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>
+            ) : !isOutstation(regionRow) ? (
+              // Airbnb is for an outstation fair only (user 2026-10-06).
+              <p className={s.local}>{venue} is local to {options.rates.base}, so there is no Airbnb claim.</p>
             ) : (
               <>
                 <div className={s.two}>
                   <label className={s.field}><span className={s.fieldLabel}>Check-in</span><input type="date" className={s.input} value={checkIn} onChange={e => setCheckIn(e.target.value)} /></label>
                   <label className={s.field}><span className={s.fieldLabel}>Check-out</span><input type="date" className={s.input} value={checkOut} onChange={e => setCheckOut(e.target.value)} /></label>
                 </div>
+                {(stayIssue || (weekRow.start && weekRow.end)) && (
+                  <p className={stayIssue ? s.formError : s.formNote}>{stayIssue ?? `Up to ${MAX_STAY_NIGHTS} nights, covering the fair's days (${weekRow.dates}).`}</p>
+                )}
                 <div className={s.field}><span className={s.fieldLabel}>Who stayed</span>
                   <div className={s.pax}>
                     <Counter label="Male" value={male} onChange={setMale} />

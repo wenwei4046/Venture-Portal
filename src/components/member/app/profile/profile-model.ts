@@ -373,7 +373,7 @@ export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | und
       out.set(friday, {
         key: friday, month, n: `W${i + 1}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
         dates: booth ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
-        fairId: booth?.fairId ?? null, auto: !!booth && !saved, claimable: !!booth?.fairId, color, tint,
+        fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null, auto: !!booth && !saved, claimable: !!booth?.fairId, color, tint,
       });
     });
   }

@@ -191,6 +191,8 @@ describe("the request forms' choices", () => {
       ["2026-09-11", "SEP", "W2", "Zanotti week", "ZANOTTI", "11–13 Sep", "MID VALLEY", null, "f2", true, true],
       ["2026-09-04", "SEP", "W1", "Akemi week", "AKEMI", "4–6 Sep", "HALL", "REX", "f1", false, true],
     ]);
+    // The fair's own days, which an Airbnb stay must cover; none for a weekend with no brand week.
+    expect(weeks.map(w => [w.start, w.end])).toEqual([[null, null], ["2026-09-18", "2026-09-20"], ["2026-09-11", "2026-09-13"], ["2026-09-04", "2026-09-06"]]);
   });
 
   it("starts at the newest weekend, the month on each so October's W1 is not September's", () => {

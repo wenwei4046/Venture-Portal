@@ -266,6 +266,9 @@ export interface ClaimWeek {
   org: string | null;
   /** The brand week's fair: what the claim is for, and whose venue sets its region. */
   fairId: string | null;
+  /** That fair's first and last day (`YYYY-MM-DD`): an Airbnb stay must cover them. */
+  start: string | null;
+  end: string | null;
   /** Not picked in My brand weeks: the Arena placed them at the brand they opened the most bills for. */
   auto: boolean;
   /** A claim is only ever for the member's own brand week's fair (user 2026-10-06). */
