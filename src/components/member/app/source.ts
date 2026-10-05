@@ -6,9 +6,15 @@ import type { MemberHonours } from "@/lib/member/server";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
-import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchDepartmentIncome, fetchMemberClaimRates, fetchMemberHonours, fetchMemberIncome, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, fetchMemberRequestHistory, fetchPrincipalMemoReceipts, refreshMemberData, submitMemberRequest } from "@/app/(member)/member/actions";
-import { fetchMemberArena, saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
-import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
+import {
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, submitMemberRequest,
+  type fetchDepartmentIncome, type fetchMemberClaimRates, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight, type fetchMemberInsightRange,
+  type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts, type refreshMemberData,
+} from "@/app/(member)/member/actions";
+import { saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks, type fetchMemberArena } from "@/app/(member)/member/arena-actions";
+import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
+import { readMemberBatch } from "@/app/(member)/member/batch-actions";
+import { createReadBatcher } from "./read-batch";
 
 export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -73,33 +79,43 @@ export const demoSource: RevenueSource = {
   departmentIncome: nothing, saveBrandWeeks: nothing,
 };
 
+/** What a read action answers. */
+type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
+/**
+ * Reads asked for together leave together (`readMemberBatch`): the client runs Server Actions one at a time, and a
+ * screen's or a pull's reads one by one took the sum of their times. Writes and the quote's price go straight.
+ */
+const read = createReadBatcher(reads => readMemberBatch(reads));
+
 export const liveSource: RevenueSource = {
   async refresh() {
-    const result = await refreshMemberData();
+    const result = await read<Answer<typeof refreshMemberData>>({ kind: "refresh" });
     return result.ok ? { ok: true, data: result.data } : { ok: false, error: result.error };
   },
-  insight: (period, context) => fetchMemberInsight(period, context),
-  kpi: (schemeId, context, period) => fetchMemberKpiSummary(schemeId, context, period),
-  arena: (membershipId, period, window, context, options) => fetchMemberArena(membershipId, period, window, context, options),
-  orgMap: context => fetchMemberOrgMap(context),
-  orderBook: (subDepartmentId, from, until, context) => fetchMemberOrderBook(subDepartmentId, from, until, context),
-  insightRange: (subDepartmentId, from, until, context) => fetchMemberInsightRange(subDepartmentId, from, until, context),
+  insight: (period, context) => read<Answer<typeof fetchMemberInsight>>({ kind: "insight", period, context }),
+  kpi: (schemeId, context, period) => read<Answer<typeof fetchMemberKpiSummary>>({ kind: "kpi", schemeId, context, period }),
+  arena: (membershipId, period, window, context, options) =>
+    read<Answer<typeof fetchMemberArena>>({ kind: "arena", membershipId, period, window, context, options }),
+  orgMap: context => read<Answer<typeof fetchMemberOrgMap>>({ kind: "orgMap", context }),
+  orderBook: (subDepartmentId, from, until, context) => read<Answer<typeof fetchMemberOrderBook>>({ kind: "orderBook", subDepartmentId, from, until, context }),
+  insightRange: (subDepartmentId, from, until, context) =>
+    read<Answer<typeof fetchMemberInsightRange>>({ kind: "insightRange", subDepartmentId, from, until, context }),
   quote: input => calculateMemberQuote(input),
   async memo(id, ack) {
     const result = await acknowledgeMemberMemo(id, ack);
     return result.ok ? { ok: true, data: { acknowledgedAt: result.data.acknowledgedAt } } : result;
   },
-  requestHistory: id => fetchMemberRequestHistory(id),
+  requestHistory: id => read<Answer<typeof fetchMemberRequestHistory>>({ kind: "requestHistory", id }),
   submitRequest: form => submitMemberRequest(form),
   cancelRequest: id => cancelMemberRequest(id),
   async claimRates() {
-    const result = await fetchMemberClaimRates();
+    const result = await read<Answer<typeof fetchMemberClaimRates>>({ kind: "claimRates" });
     return result.ok ? { ok: true, data: readClaimRates(result.data) } : result;
   },
-  memoReceipts: staffId => fetchPrincipalMemoReceipts(staffId),
-  income: (subDepartmentId, period, context) => fetchMemberIncome(subDepartmentId, period, context),
-  departmentIncome: (subDepartmentId, period) => fetchDepartmentIncome(subDepartmentId, period),
-  honours: (subDepartmentId, from, until, context) => fetchMemberHonours(subDepartmentId, from, until, context),
+  memoReceipts: staffId => read<Answer<typeof fetchPrincipalMemoReceipts>>({ kind: "memoReceipts", staffId }),
+  income: (subDepartmentId, period, context) => read<Answer<typeof fetchMemberIncome>>({ kind: "income", subDepartmentId, period, context }),
+  departmentIncome: (subDepartmentId, period) => read<Answer<typeof fetchDepartmentIncome>>({ kind: "departmentIncome", subDepartmentId, period }),
+  honours: (subDepartmentId, from, until, context) => read<Answer<typeof fetchMemberHonours>>({ kind: "honours", subDepartmentId, from, until, context }),
   async saveBrandWeeks(subDepartmentId, period, picks, context) {
     const result = context
       ? await savePrincipalArenaBrandWeeks(subDepartmentId, period, picks, context)
