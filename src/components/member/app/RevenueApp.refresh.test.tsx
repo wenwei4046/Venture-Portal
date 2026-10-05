@@ -12,6 +12,7 @@ import RevenueApp from "./RevenueApp";
 vi.mock("@/app/(member)/member/actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
+vi.mock("@/app/(member)/member/batch-actions", () => ({}));
 
 class NoResize { observe() {} unobserve() {} disconnect() {} }
 

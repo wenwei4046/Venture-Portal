@@ -1340,9 +1340,7 @@ src/
 │   │                                  when the person/month changes); keyed page
 │   │                                  reads go through `useKeyedRead`. The dot
 │   │                                  spins until all `track`ed reads land, the
-│   │                                  snapshot (`refreshMemberData`) last. The
-│   │                                  client runs Server Actions ONE AT A TIME,
-│   │                                  so a pull costs the SUM of its reads.
+│   │                                  snapshot (`refreshMemberData`) last.
 │   │                                  Every build renames the actions, and the
 │   │                                  browser's own pull-reload is off on the
 │   │                                  app: a pull refused as
@@ -1352,6 +1350,21 @@ src/
 │   │                                  While /member loads, `loading.tsx` is the
 │   │                                  app's own frame + one spinner
 │   │                                  (`app/shell/AppLoading.tsx`, 2026-10-06).
+│   │                                  **ONE REQUEST FOR A MOMENT'S READS
+│   │                                  (2026-10-06):** the client runs Server
+│   │                                  Actions ONE AT A TIME, so a pull's eight
+│   │                                  reads cost the SUM of their times (dev
+│   │                                  11.7 s). `liveSource` now hands every
+│   │                                  read to `createReadBatcher`
+│   │                                  (`app/read-batch.ts`): reads asked in the
+│   │                                  same task leave as ONE action,
+│   │                                  `readMemberBatch` (`batch-actions.ts`,
+│   │                                  ≤16), which calls the very same read
+│   │                                  actions side by side — same checks, same
+│   │                                  session — so a pull costs its slowest
+│   │                                  read (dev 1.7 s) and a page opens in two
+│   │                                  requests, not 6–14. Writes and the
+│   │                                  quote's price still go straight.
 │   │                                  **My income** is Comm Cal's own engine
 │   │                                  run for the member's month
 │   │                                  (`loadMemberIncome`: the service role,
