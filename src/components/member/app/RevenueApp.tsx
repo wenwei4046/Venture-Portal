@@ -422,9 +422,12 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [tiersOpen, setTiersOpen] = useState(false);
   const insPeriod = useMemo(() => periodOf(insKind, insFrom ?? working ?? period, period), [insKind, insFrom, working, period]);
   const sameAsWork = insPeriod.kind === "monthly" && insPeriod.from === working;
-  // This month is already read for Today (it is `work` itself once last month is closed).
+  // This month is already read for Today (it is `work` itself once last month is closed). Nothing is
+  // read for Insight until the month being worked is known: before it, `insPeriod` is the current
+  // month by default, and those reads only queued in front of Today's own (Server Actions run one at
+  // a time) to be read again a moment later.
   const sameAsNow = !sameAsWork && !!nowPeriod && insPeriod.kind === "monthly" && insPeriod.from === period;
-  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: sameAsWork || sameAsNow ? null : insPeriod, recent, recentFrom: prevMonth });
+  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: !working || sameAsWork || sameAsNow ? null : insPeriod, recent, recentFrom: prevMonth });
   const ins = sameAsWork ? work : sameAsNow ? now : picked;
   const insMonthly = insPeriod.kind === "monthly";
   const insightInput = useMemo<InsightInput>(() => ({
