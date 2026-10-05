@@ -1393,7 +1393,11 @@ VP's. The member C release above describes the screens this replaced.
   the new data swaps in. A refresh that could not read leaves the page and says
   *Couldn't refresh. Pull down to try again.* in a walnut pill for 4s. Coming
   back after 10 minutes away refreshes once the same way. Not while a sheet is
-  open; the browser's own pull-to-reload is switched off on the app.
+  open; the browser's own pull-to-reload is switched off on the app — so when
+  the server no longer knows the page's actions (a release went out since it
+  was opened), the pull loads the whole page again instead: the new app and
+  its data. Never over something unsaved (a form, brand weeks not saved); then
+  the pill asks for another pull.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 

@@ -1320,6 +1320,12 @@ src/
 │   │                                  snapshot (`refreshMemberData`) last. The
 │   │                                  client runs Server Actions ONE AT A TIME,
 │   │                                  so a pull costs the SUM of its reads.
+│   │                                  Every build renames the actions, and the
+│   │                                  browser's own pull-reload is off on the
+│   │                                  app: a pull refused as
+│   │                                  `UnrecognizedActionError`
+│   │                                  (`isStaleAppError`) RELOADS the page —
+│   │                                  never over a sheet or unsaved brand weeks.
 │   │                                  **My income** is Comm Cal's own engine
 │   │                                  run for the member's month
 │   │                                  (`loadMemberIncome`: the service role,

@@ -21,6 +21,20 @@ export const PULL_SLOP = 8;
  */
 export const RETURN_REFRESH_MS = 10 * 60_000;
 
+/**
+ * A read refused because the server no longer knows this page's Server
+ * Actions: a newer release is live (every build renames them), and the page
+ * open since before it can read nothing more. Next names that error
+ * `UnrecognizedActionError` ("… was not found on the server").
+ */
+export function isStaleAppError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === "UnrecognizedActionError" || /was not found on the server|older or newer deployment/i.test(error.message);
+}
+
+/** Loading the page again — the new release and its data. An object, so a test can stand in for it. */
+export const reloader = { reload: () => window.location.reload() };
+
 /** Finger travel → dot travel: half the distance up to the arming point, then a quarter, never past PULL_MAX. */
 export function pullDistance(dy: number): number {
   if (!(dy > 0)) return 0;

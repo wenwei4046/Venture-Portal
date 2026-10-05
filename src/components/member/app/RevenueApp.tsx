@@ -23,11 +23,11 @@ import ArenaRecord from "./arena/ArenaRecord";
 import { ChampSheet, FairsSheet, boardThemeClass } from "./arena/ArenaSheets";
 import { arenaKey, boardModel, hubModel, recordModel, type ArenaSub } from "./arena/arena-model";
 import { useArenaData } from "./arena/useArenaData";
-import { demoSource, liveSource, type RevenueSource, type TrackRead } from "./source";
+import { demoSource, liveSource, settleRead, type RevenueSource, type TrackRead } from "./source";
 import { useKeyedRead } from "./useKeyedRead";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me } from "./shell/Chrome";
 import PullRefresh from "./shell/PullRefresh";
-import { RETURN_REFRESH_MS } from "./shell/pull-refresh";
+import { RETURN_REFRESH_MS, isStaleAppError, reloader } from "./shell/pull-refresh";
 import StatusBar from "./shell/StatusBar";
 import Today from "./today/Today";
 import { todayModel, type TodayTodo } from "./today/today-model";
@@ -182,7 +182,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const pulled = useRef<{ gen: number; reads: Promise<unknown>[] }>({ gen: 0, reads: [] });
   const track = useCallback<TrackRead>((forGen, read) => {
     if (forGen > 0 && pulled.current.gen === forGen) pulled.current.reads.push(read);
-    return read;
+    return settleRead(read);
   }, []);
   const pullRefresh = useCallback(() => {
     const next = gen + 1;
@@ -750,12 +750,17 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   // Every read above has started for this pull by now (effects run in order), so everybody's snapshot — the slowest
   // read, and the client runs one Server Action at a time — goes last, behind the screen's own reads. The dot spins
   // until all of them have landed.
+  const reloadable = useRef(false);
   useEffect(() => {
     if (!refreshing || pulled.current.gen !== gen) return;
     let stale = false, snapshotOk = true;
     const snapshot = source.refresh().then(r => { snapshotOk = r.ok; if (!stale && r.ok) setData(r.data); });
     void Promise.allSettled([...pulled.current.reads, snapshot]).then(results => {
       if (stale) return;
+      // A newer release is live: the server no longer knows this page's actions, so no pull can read again —
+      // load the new app (the browser's own pull-to-reload is off). Not over something unsaved: then the note
+      // asks for another pull, from a page with nothing open.
+      if (results.some(r => r.status === "rejected" && isStaleAppError(r.reason)) && reloadable.current) { reloader.reload(); return; }
       setRefreshing(false);
       // A read that threw (offline, a broken request) or no new snapshot: the page still shows the old data.
       // A read answering "not available" (KPI off, no payroll row) answered the same before — nothing went stale.
@@ -790,6 +795,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures.
   const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen;
+  // A reload for a newer release loses nothing: no sheet or form open, no brand weeks picked and not saved.
+  reloadable.current = pullable && !bwBusy && !bwMonths?.some(m => m.dirty);
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail).
   const rail = desk && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
   const showHeader = route.screen === "today" || route.screen === "calc";

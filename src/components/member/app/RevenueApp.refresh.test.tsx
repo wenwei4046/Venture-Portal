@@ -1,10 +1,11 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { memberDemo } from "@/lib/member/demo";
 import type { ArenaWeekPicks, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import type { MemberData, MemberReadContext } from "@/lib/member/types";
 import type { RevenueSource } from "./source";
+import { reloader } from "./shell/pull-refresh";
 import RevenueApp from "./RevenueApp";
 
 // The live source's server actions are never reached: the app is handed a source of its own.
@@ -55,18 +56,22 @@ function arena(membershipId: string, period: string, context: MemberReadContext 
  * page shows WHILE a refresh reads can be looked at. Answers are made at release: change `world` in between.
  */
 function fakeSource(make: () => MemberData) {
-  const world = { picks: {} as ArenaWeekPicks, failArena: false, offline: false };
+  // offline: every request fails to arrive; stale: a newer release is live and refuses this page's actions.
+  const world = { picks: {} as ArenaWeekPicks, failArena: false, offline: false, stale: false };
   const waiting: (() => void)[] = [];
   let holding = false;
   const answer = <T,>(value: () => T): Promise<T> => {
-    if (!holding) return Promise.resolve(value());
-    return new Promise<T>(resolve => { waiting.push(() => resolve(value())); });
+    const settle = (resolve: (v: T) => void, reject: (e: unknown) => void) => {
+      if (world.offline) reject(new TypeError("Failed to fetch"));
+      else if (world.stale) reject(Object.assign(new Error('Server Action "40ab" was not found on the server.'), { name: "UnrecognizedActionError" }));
+      else resolve(value());
+    };
+    if (!holding) return new Promise<T>(settle);
+    return new Promise<T>((resolve, reject) => { waiting.push(() => settle(resolve, reject)); });
   };
-  // Offline: the snapshot cannot be read (the other reads still answer, so nothing throws unhandled in a test).
-  const snapshot = () => (world.offline ? { ok: false as const, error: "Failed to fetch" } : { ok: true as const, data: make() });
   const none = vi.fn(async () => ({ ok: false as const, error: "not in this test" }));
   const api = {
-    refresh: vi.fn(() => answer(snapshot)),
+    refresh: vi.fn(() => answer(() => ({ ok: true as const, data: make() }))),
     insight: vi.fn(async (_period: string | undefined, _context?: MemberReadContext) => ({ ok: false as const, error: "not in this test" })),
     kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
     submitRequest: none, cancelRequest: none, claimRates: none, honours: none, saveBrandWeeks: none, departmentIncome: none,
@@ -112,9 +117,12 @@ function visibility(state: "hidden" | "visible") {
 }
 
 let intervals: number[] = [];
+let reload: Mock<() => void>;
 
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", NoResize);
+  reload = vi.fn<() => void>();
+  vi.spyOn(reloader, "reload").mockImplementation(reload);
   intervals = [];
   const real = window.setInterval.bind(window);
   vi.spyOn(window, "setInterval").mockImplementation(((fn: () => void, ms?: number) => {
@@ -174,17 +182,40 @@ describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
     expect(api.refresh).not.toHaveBeenCalled();
   });
 
-  it("a failed pull keeps what was on screen and says so", async () => {
+  it("offline, a pull keeps what was on screen and says so — no reload onto an offline page", async () => {
     const source = await open(principalData, VIEW_AS);
     source.hold();
     source.world.offline = true;
-    source.world.failArena = true;
     source.world.picks = { "2026-10-02": "AKEMI" };
     pull(300);
     await source.release();
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't refresh. Pull down to try again.");
     expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
     expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("after a new release, a pull loads the new app — this page's actions are gone", async () => {
+    const source = await open(principalData, VIEW_AS);
+    source.hold();
+    source.world.stale = true;
+    pull(300);
+    await source.release();
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("…but never over brand weeks picked and not saved: it says so instead", async () => {
+    const source = await open(principalData, VIEW_AS);
+    fireEvent.click(screen.getAllByRole("button", { name: "Akemi" })[0]);
+    expect(screen.getByText("1 of 5 picked")).toBeInTheDocument();
+    source.hold();
+    source.world.stale = true;
+    pull(300);
+    await source.release();
+    expect(reload).not.toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't refresh");
+    expect(screen.getByText("1 of 5 picked")).toBeInTheDocument();
   });
 
   it("a read answering \"not available\" (KPI off, no payroll row) is not a failed pull", async () => {

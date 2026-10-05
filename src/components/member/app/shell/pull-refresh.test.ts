@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { PULL_ARM, PULL_MAX, PULL_SLOP, pullDistance, pullStart } from "./pull-refresh";
+import { PULL_ARM, PULL_MAX, PULL_SLOP, isStaleAppError, pullDistance, pullStart } from "./pull-refresh";
+
+describe("isStaleAppError", () => {
+  it("knows Next's refusal of an action a newer release renamed", () => {
+    const err = new Error('Server Action "40ab" was not found on the server. \nRead more: https://nextjs.org/docs/messages/failed-to-find-server-action');
+    err.name = "UnrecognizedActionError";
+    expect(isStaleAppError(err)).toBe(true);
+    expect(isStaleAppError(new Error("Failed to find Server Action. This request might be from an older or newer deployment."))).toBe(true);
+  });
+  it("is not offline, a broken request, or anything that is not an error", () => {
+    expect(isStaleAppError(new TypeError("Failed to fetch"))).toBe(false);
+    expect(isStaleAppError(new Error("An unexpected response was received from the server."))).toBe(false);
+    expect(isStaleAppError("was not found on the server")).toBe(false);
+    expect(isStaleAppError(null)).toBe(false);
+  });
+});
 
 describe("pullDistance", () => {
   it("is nothing for no drag or a drag up", () => {
