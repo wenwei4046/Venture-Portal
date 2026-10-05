@@ -309,6 +309,38 @@ describe('a member sends a request', () => {
     mocks.rpc.mockReset()
   })
 
+  // User 2026-10-06: a small Airbnb group keys the invoice's total; the database caps it and says what is paid.
+  describe('an Airbnb stay', () => {
+    const airbnb = (fields: Record<string, string>) => {
+      const data = form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'airbnb', week: '2026-10-02', notes: '',
+        start: '2026-10-02', end: '2026-10-04', male: '1', female: '1', ...fields })
+      data.set('invoice', new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])], 'stay.pdf', { type: 'application/pdf' }))
+      return data
+    }
+    beforeEach(() => {
+      const attachments = { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) }
+      mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => attachments, storage: { from: () => ({ upload: vi.fn(async () => ({ error: null })), remove: vi.fn() }) } })
+      mocks.adminClient.mockReturnValue({ from: () => ({ insert: vi.fn(async () => ({ error: null })) }) })
+    })
+
+    it('passes the invoice total on as a figure for the database to cap', async () => {
+      expect((await submitMemberRequest(airbnb({ amount: '500' }))).ok).toBe(true)
+      const prepared = mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }
+      expect(prepared.p_detail).toMatchObject({ claimType: 'airbnb', start: '2026-10-02', end: '2026-10-04', male: 1, female: 1, invoiceAmount: 500, invoiceName: 'stay.pdf' })
+      expect(prepared.p_detail).not.toHaveProperty('amount')
+    })
+
+    it('a bigger group sends no total', async () => {
+      expect((await submitMemberRequest(airbnb({ male: '2', female: '2' }))).ok).toBe(true)
+      expect((mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }).p_detail).not.toHaveProperty('invoiceAmount')
+    })
+
+    it('refuses a total it cannot read', async () => {
+      expect(await submitMemberRequest(airbnb({ amount: '1,200' }))).toEqual({ ok: false, error: 'Enter the stay\'s total from its invoice.' })
+      mocks.rpc.mockReset()
+    })
+  })
+
   it('a replacement: leaving the sub-department is the database’s member_exit', async () => {
     expect((await submitMemberRequest(form({
       kind: 'replacement', subDepartmentId: fair, idempotencyKey: key, originalStaffId: yuny, destination: 'department_exit',

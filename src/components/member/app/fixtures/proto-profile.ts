@@ -282,7 +282,8 @@ export function protoProfile(): ProfileFixture {
       weeks: MY_FAIRS.map((f, i) => ({ key: `w${i}`, month: "SEP", n: `W${i + 1}`, brandWeek: `${f.brand} week`, brand: f.brand.toUpperCase(), dates: f.dates, venue: f.venue, org: f.org,
         fairId: `f${i}`, auto: false, claimable: true, color: BRAND_TONE[f.brand][0], tint: BRAND_TONE[f.brand][1] })),
       rates: {
-        base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null,
+        // No small-group cap: the prototype's Airbnb form is the per-person one.
+        base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null,
         regions: ([["KL", 0], ["Penang", 4], ["Ipoh", 2], ["Melaka", 2], ["Johor", 3], ["Pahang", 3], ["Sabah", 6], ["Sarawak", 6]] as const).map(([name, spots]) => ({ id: name, name, spots, planeTicket: false })),
         // Every fair in Penang: the region the prototype's form shows picked.
         fairs: Object.fromEntries(MY_FAIRS.map((f, i) => [`f${i}`, { venue: f.venue, regionId: "Penang" }])),

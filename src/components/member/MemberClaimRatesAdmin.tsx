@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchClaimRatesAdmin, saveClaimRatesAdmin } from "@/app/(portal)/member-admin/claim-rates-actions";
 import {
-  claimRatesChanged, claimRatesDraft, claimRatesProblems, claimRatesToSave,
+  airbnbExample, claimRatesChanged, claimRatesDraft, claimRatesProblems, claimRatesToSave,
   type ClaimRatesAdmin, type ClaimRatesDraft,
 } from "@/lib/member/claim-rates-admin";
 import { formatIntlDate, formatMoney } from "@/lib/utils";
@@ -17,8 +17,9 @@ const fairDay = (day: string) => formatIntlDate(new Date(`${day}T00:00:00Z`), { 
  * People › Member services › Claim rates (2026-10-05): what a member's fair
  * claim pays. The member's form shows these and cannot change the amount; it
  * is worked out in the database from them when the claim is sent. Since
- * 2026-10-06 a region may be flown to, three people share one Airbnb rate, and
- * every venue the ERP's fairs name is given its region here.
+ * 2026-10-06 a region may be flown to, a small Airbnb group claims its invoice
+ * up to a limit a night (HR sets how many people and the limit), and every
+ * venue the ERP's fairs name is given its region here.
  */
 export default function MemberClaimRatesAdmin() {
   const [saved, setSaved] = useState<ClaimRatesAdmin | null>(null);
@@ -73,7 +74,7 @@ export default function MemberClaimRatesAdmin() {
   return <section className={m.card} aria-labelledby="claim-rates-heading">
     <h2 id="claim-rates-heading">Claim rates</h2>
     <p className={m.sub}>
-      A member&apos;s fair claim is for their own brand week, and is worked out from these. <strong>Outstation</strong> pays the route&apos;s spots × the rate per spot, counted from the base, to the region set below for the fair&apos;s venue; no invoice — except a region ticked <strong>Plane ticket</strong>, where the member types the ticket&apos;s price and adds its invoice. <strong>Airbnb</strong> pays the rate × people × nights, with the invoice; exactly three people share the three-person rate a night. A claim keeps the amount it was sent with.
+      A member&apos;s fair claim is for their own brand week, and is worked out from these. <strong>Outstation</strong> pays the route&apos;s spots × the rate per spot, counted from the base, to the region set below for the fair&apos;s venue; no invoice — except a region ticked <strong>Plane ticket</strong>, where the member types the ticket&apos;s price and adds its invoice. <strong>Airbnb</strong> comes with its invoice: a small group types the invoice&apos;s total and is paid it, up to the limit a night; a bigger group is paid the rate × people × nights. A claim keeps the amount it was sent with.
     </p>
     {error && <p className="sheet-danger" role="alert">{error}</p>}
     {!draft && busy && <p className={m.sub}>Loading claim rates…</p>}
@@ -89,13 +90,18 @@ export default function MemberClaimRatesAdmin() {
         </label>
         <label><span>Airbnb · per person per night (RM)</span>
           <input inputMode="decimal" value={draft.perPaxNight} disabled={saving} onChange={e => edit({ perPaxNight: e.target.value })} aria-label="Airbnb rate per person per night" />
-          <small>× people × nights</small>
+          <small>× people × nights, for a group bigger than the small one</small>
         </label>
-        <label><span>Airbnb · three people per night (RM)</span>
-          <input inputMode="decimal" value={draft.perThreePaxNight} disabled={saving} onChange={e => edit({ perThreePaxNight: e.target.value })} aria-label="Airbnb rate for three people per night" />
-          <small>For exactly three, whoever they are; blank = 3 × the per-person rate</small>
+        <label><span>Airbnb · small group, up to (people)</span>
+          <input inputMode="numeric" value={draft.groupMaxPax} disabled={saving} onChange={e => edit({ groupMaxPax: e.target.value })} aria-label="Airbnb small group, up to this many people" />
+          <small>Up to this many claim their invoice&apos;s total, whoever they are</small>
+        </label>
+        <label><span>Airbnb · small group, up to a night (RM)</span>
+          <input inputMode="decimal" value={draft.groupCapPerNight} disabled={saving} onChange={e => edit({ groupCapPerNight: e.target.value })} aria-label="Airbnb small group, the most a night" />
+          <small>The invoice is paid up to this × nights; blank = every group per person</small>
         </label>
       </div>
+      {airbnbExample(draft) && <p className={m.caption}>{airbnbExample(draft)}</p>}
       <div className="table-frame">
         <div className="table-frame-scroll">
           <table className={`ledger-table ${s.regions}`} aria-label="Regions and their spots">

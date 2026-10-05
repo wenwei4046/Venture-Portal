@@ -8,8 +8,9 @@ import { readClaimRatesAdmin, validClaimRatesToSave, type ClaimRatesAdmin, type 
 /**
  * People › Member services › Claim rates (2026-10-05): the fair-claim rates
  * and the regions' spots that a member's claim is worked out from — and, since
- * 2026-10-06, which regions are flown to and the region of every venue the
- * ERP's fairs name. The same
+ * 2026-10-06, which regions are flown to, the region of every venue the
+ * ERP's fairs name and the Airbnb small group (how many people, the most a
+ * night). The same
  * gate as Request reviews and Brand weeks; the RPCs ask again
  * (member_is_manager).
  *
@@ -52,7 +53,7 @@ export async function saveClaimRatesAdmin(input: ClaimRatesToSave): Promise<{ ok
     const { data, error } = await db.rpc("member_admin_save_claim_settings", {
       p_base: input.base, p_per_spot: input.perSpot, p_per_pax_night: input.perPaxNight,
       p_regions: input.regions.map(g => ({ id: g.id, name: g.name, spots: g.spots, planeTicket: g.planeTicket })),
-      p_three_pax_night: input.perThreePaxNight,
+      p_group_max_pax: input.groupMaxPax, p_group_cap: input.groupCapPerNight,
       p_venues: input.venues,
     });
     if (error) throw new Error(error.message);

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { airbnbNightly, claimAmount, fairRegion, nightsBetween, readClaimRates, type ClaimRates } from "./claim-rules";
+import { airbnbGroup, claimAmount, fairRegion, nightsBetween, readClaimRates, type ClaimRates } from "./claim-rules";
 
 const rates: ClaimRates = {
   base: "Klang Valley",
   perSpot: 50,
   perPaxNight: 65,
-  perThreePaxNight: null,
+  groupMaxPax: 3,
+  groupCapPerNight: null,
   regions: [
     { id: "kl", name: "KL", spots: 0, planeTicket: false },
     { id: "pg", name: "Penang", spots: 4, planeTicket: false },
@@ -58,25 +59,39 @@ describe("a plane ticket", () => {
   });
 });
 
-// User 2026-10-06: by head count only; exactly three share the rate HR set (e.g. RM 220 a night);
-// more than three go back to RM 65 each.
-describe("Airbnb for three", () => {
-  const three: ClaimRates = { ...rates, perThreePaxNight: 220 };
+// User 2026-10-06: by head count only. Up to HR's small group (3, RM 220 a night) the invoice's
+// total is paid up to cap × nights — "2， claim 220*2=440"; more people go back to RM 65 each.
+describe("Airbnb: a small group claims its invoice, up to HR's cap a night", () => {
+  const capped: ClaimRates = { ...rates, groupCapPerNight: 220 };
 
-  it("pays three people HR's three-person rate a night, whoever they are", () => {
-    expect(airbnbNightly(three, 3)).toBe(220);
-    expect(claimAmount(three, { type: "airbnb", pax: 3, nights: 2 })).toBe(440);
+  it("pays one, two or three people their invoice, up to RM 220 × 2 nights", () => {
+    for (const pax of [1, 2, 3]) {
+      expect(claimAmount(capped, { type: "airbnb", pax, nights: 2, invoice: 500 })).toBe(440);
+      expect(claimAmount(capped, { type: "airbnb", pax, nights: 2, invoice: 380.5 })).toBe(380.5);
+    }
   });
 
-  it("pays everybody else per person", () => {
-    expect(claimAmount(three, { type: "airbnb", pax: 1, nights: 2 })).toBe(130);
-    expect(claimAmount(three, { type: "airbnb", pax: 2, nights: 2 })).toBe(260);
-    expect(claimAmount(three, { type: "airbnb", pax: 4, nights: 2 })).toBe(520);
+  it("pays four people per person, whatever the invoice says", () => {
+    expect(airbnbGroup(capped, 4)).toBe(false);
+    expect(claimAmount(capped, { type: "airbnb", pax: 4, nights: 2, invoice: 999 })).toBe(520);
+    expect(claimAmount(capped, { type: "airbnb", pax: 4, nights: 2 })).toBe(520);
   });
 
-  it("pays three per person while HR has not set the three-person rate", () => {
-    expect(airbnbNightly(rates, 3)).toBe(195);
-    expect(claimAmount({ ...rates, perThreePaxNight: 0 }, { type: "airbnb", pax: 3, nights: 2 })).toBe(390);
+  it("follows the head count HR sets", () => {
+    const two: ClaimRates = { ...capped, groupMaxPax: 2 };
+    expect(claimAmount(two, { type: "airbnb", pax: 2, nights: 2, invoice: 500 })).toBe(440);
+    expect(claimAmount(two, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
+  });
+
+  it("pays a small group nothing until its invoice total is typed", () => {
+    expect(claimAmount(capped, { type: "airbnb", pax: 2, nights: 2 })).toBe(0);
+    expect(claimAmount(capped, { type: "airbnb", pax: 2, nights: 2, invoice: 0 })).toBe(0);
+  });
+
+  it("pays everybody per person while HR has set no cap", () => {
+    expect(airbnbGroup(rates, 3)).toBe(false);
+    expect(claimAmount(rates, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
+    expect(claimAmount({ ...rates, groupCapPerNight: 0 }, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
   });
 });
 
@@ -108,17 +123,19 @@ describe("nightsBetween", () => {
 describe("readClaimRates", () => {
   it("reads the settings the database sends, numbers as text included", () => {
     expect(readClaimRates({
-      base: "Klang Valley", perSpot: "50.00", perPaxNight: 65, perThreePaxNight: "220.00",
+      base: "Klang Valley", perSpot: "50.00", perPaxNight: 65, groupMaxPax: 2, groupCapPerNight: "220.00",
       regions: [{ id: "a", name: "Penang", spots: 4 }, { id: "b", name: "Sabah", spots: 6, planeTicket: true }],
       fairs: [{ fairId: "f1", venue: "PENANG WATERFRONT CONVENTION CENTRE", regionId: "a" }, { fairId: "f2", venue: "MVEC SOUTHKEY", regionId: null }],
     })).toEqual({
-      base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: 220,
+      base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 2, groupCapPerNight: 220,
       regions: [{ id: "a", name: "Penang", spots: 4, planeTicket: false }, { id: "b", name: "Sabah", spots: 6, planeTicket: true }],
       fairs: { f1: { venue: "PENANG WATERFRONT CONVENTION CENTRE", regionId: "a" }, f2: { venue: "MVEC SOUTHKEY", regionId: null } },
     });
   });
   it("treats anything malformed as not set", () => {
-    expect(readClaimRates(null)).toEqual({ base: "Klang Valley", perSpot: null, perPaxNight: null, perThreePaxNight: null, regions: [], fairs: {} });
+    expect(readClaimRates(null)).toEqual({ base: "Klang Valley", perSpot: null, perPaxNight: null, groupMaxPax: 3, groupCapPerNight: null, regions: [], fairs: {} });
+    expect(readClaimRates({ groupMaxPax: 0 }).groupMaxPax).toBe(3);
+    expect(readClaimRates({ groupMaxPax: 2.5 }).groupMaxPax).toBe(3);
     expect(readClaimRates({ perSpot: -5, regions: [{ id: 1, name: "x", spots: 2 }, { id: "b", name: "Ipoh", spots: 1.5 }] }).regions).toEqual([]);
     expect(readClaimRates({ fairs: [{ fairId: 3, venue: "x" }, { venue: "no id" }] }).fairs).toEqual({});
   });

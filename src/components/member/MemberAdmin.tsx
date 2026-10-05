@@ -51,6 +51,9 @@ const detailLabels: Record<string, string> = {
   spots: "Spots",
   pax: "People",
   nights: "Nights",
+  // A small Airbnb group (2026-10-06): what the invoice says, and the most the stay could claim.
+  invoiceAmount: "Invoice total",
+  cap: "Most for the stay",
   location: "Location",
   start: "Start / joining date",
   end: "End date",
@@ -96,7 +99,7 @@ const categoryNames: Record<string, string> = {
 function displayDetail(key: string, value: unknown, data: AdminMemberData) {
   const raw = String(value);
   if (key === "category") return categoryNames[raw] ?? raw;
-  if (key === "amount")
+  if (key === "amount" || key === "invoiceAmount" || key === "cap")
     return Number.isFinite(Number(value))
       ? new Intl.NumberFormat("en-MY", {
           style: "currency",

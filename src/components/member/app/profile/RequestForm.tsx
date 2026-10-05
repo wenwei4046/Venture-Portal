@@ -5,7 +5,7 @@ import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
 import { initials, rm2 } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
-import { claimAmount, fairRegion, nightsBetween } from "@/lib/member/claim-rules";
+import { airbnbGroup, claimAmount, fairRegion, nightsBetween } from "@/lib/member/claim-rules";
 import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
@@ -76,6 +76,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
   const [weekPick, setWeek] = useState(() => str("week"));
   const week = weekPick || options.weeks.find(w => w.claimable)?.key || "";
   const [ticket, setTicket] = useState(() => (prior.planeTicket === true && typeof prior.amount === "number" ? String(prior.amount) : ""));
+  const [stay, setStay] = useState(() => (typeof prior.invoiceAmount === "number" ? String(prior.invoiceAmount) : ""));
   const [male, setMale] = useState(() => Number(prior.male ?? options.initial?.male ?? 0));
   const [female, setFemale] = useState(() => Number(prior.female ?? options.initial?.female ?? 0));
   const [checkIn, setCheckIn] = useState(str("start"));
@@ -111,14 +112,18 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
   const fair = fairRegion(options.rates, weekRow?.fairId ?? null);
   const regionRow = fair.region;
   const venue = fair.venue ?? weekRow?.venue ?? "this fair";
-  const ticketValue = /^\d{1,9}(\.\d{1,2})?$/.test(ticket.trim()) ? Number(ticket.trim()) : null;
+  const ticketValue = money(ticket);
+  const stayValue = money(stay);
   const nights = nightsBetween(checkIn, checkOut);
   const pax = male + female;
-  // By head count only; exactly three share HR's three-person rate a night when it is set (user 2026-10-06).
-  const three = pax === 3 && (options.rates.perThreePaxNight ?? 0) > 0;
+  // By head count only (user 2026-10-06): up to HR's small-group size the invoice's total is
+  // typed and paid up to HR's cap a night; more people are paid per person, nothing typed.
+  // Nobody counted yet reads as the smallest group, so the total's box does not jump in on the first +.
+  const group = airbnbGroup(options.rates, Math.max(1, pax));
+  const capPerNight = options.rates.groupCapPerNight ?? 0;
   const amount = useMemo(() => claimAmount(options.rates, cat === "outstation"
     ? { type: "outstation", regionId: regionRow?.id ?? null, ticket: ticketValue }
-    : { type: "airbnb", pax, nights: nights ?? 0 }), [options.rates, cat, regionRow, ticketValue, pax, nights]);
+    : { type: "airbnb", pax, nights: nights ?? 0, invoice: stayValue }), [options.rates, cat, regionRow, ticketValue, pax, nights, stayValue]);
   const department = options.departments.find(d => d.id === (kind === "waiting" ? target : options.departmentId));
 
   const submit = async () => {
@@ -149,6 +154,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
       } else {
         if (!checkIn || !checkOut || nights === null || nights < 1) return setError("Enter the check-in and check-out dates.");
         if (male + female < 1) return setError("Add who stayed.");
+        if (group && !(stayValue && stayValue > 0)) return setError("Enter the stay's total from its invoice.");
         if (!(amount > 0)) return setError("HR has not set the Airbnb rate yet.");
         if (!file) return setError("Add the invoice.");
         if (file.size > 3 * 1024 * 1024) return setError("The invoice must be 3 MB or smaller.");
@@ -156,6 +162,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
         form.set("end", checkOut);
         form.set("male", String(male));
         form.set("female", String(female));
+        if (group) form.set("amount", stay.trim());
         form.set("invoice", file);
       }
     } else if (kind === "replacement") {
@@ -333,16 +340,30 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
                     <Counter label="Female" value={female} onChange={setFemale} />
                   </div>
                 </div>
+                {group && (
+                  <label className={s.field}><span className={s.fieldLabel}>Invoice total (RM)</span>
+                    <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 380.00" value={stay} onChange={e => setStay(e.target.value)} maxLength={12} />
+                  </label>
+                )}
                 <div className={s.sum}>
                   <div className={s.sumRow}><span className={s.sumLabel}>Total pax</span><span className={s.sumValue}>{pax} pax · {male} male, {female} female</span></div>
                   <div className={s.sumRow}><span className={s.sumLabel}>Nights</span><span className={s.sumValue}>{nights !== null && nights > 0 ? `${nights} night${nights === 1 ? "" : "s"}` : "—"}</span></div>
-                  {three ? (
-                    <div className={s.sumRow}><span className={s.sumLabel}>Rate for 3 pax per night</span><span className={s.sumValue}>{rm2(options.rates.perThreePaxNight ?? 0)}</span></div>
+                  {group ? (
+                    <>
+                      <div className={s.sumRow}><span className={s.sumLabel}>Up to, per night</span><span className={s.sumValue}>{rm2(capPerNight)}</span></div>
+                      <div className={s.sumRow}><span className={s.sumLabel}>Most for this stay</span><span className={s.sumValue}>{nights !== null && nights > 0 ? rm2(capPerNight * nights) : "—"}</span></div>
+                    </>
                   ) : (
                     <div className={s.sumRow}><span className={s.sumLabel}>Rate per pax per night</span><span className={s.sumValue}>{options.rates.perPaxNight !== null ? rm2(options.rates.perPaxNight) : "Not set"}</span></div>
                   )}
                   <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(amount)}</span></div>
-                  <span className={s.sumNote}>Set by the fixed rate. You can&apos;t edit the amount.</span>
+                  <span className={s.sumNote}>{group
+                    ? (stayValue !== null && nights !== null && nights > 0 && stayValue > capPerNight * nights
+                      ? `The invoice is over the limit, so the claim is ${rm2(amount)}. HR checks it against the invoice.`
+                      : `Up to ${options.rates.groupMaxPax} pax claim the invoice's total, up to ${rm0(capPerNight)} a night. HR checks it against the invoice.`)
+                    : capPerNight > 0
+                      ? `More than ${options.rates.groupMaxPax} pax are paid the fixed rate per pax. You can't edit the amount.`
+                      : "Set by the fixed rate. You can't edit the amount."}</span>
                 </div>
                 <Invoice file={file} fileRef={fileRef} onFile={setFile} />
               </>
@@ -465,6 +486,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
 
 function rm0(n: number): string {
   return Number.isInteger(n) ? `RM ${n}` : rm2(n);
+}
+
+/** A typed amount in RM — up to two decimals, else nothing. */
+function money(typed: string): number | null {
+  return /^\d{1,9}(\.\d{1,2})?$/.test(typed.trim()) ? Number(typed.trim()) : null;
 }
 
 function capacityText(d: { capacity: number | null; occupied: number } | undefined): string {
