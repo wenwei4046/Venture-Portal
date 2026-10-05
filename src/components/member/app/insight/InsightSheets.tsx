@@ -78,7 +78,7 @@ export function TiersSheet({ open, vm, onClose }: { open: boolean; vm: BrandPage
 export function OrderSheet({ open, vm, onClose }: { open: boolean; vm: OrderSheetVM | null; onClose: () => void }) {
   const st = vm ? TONES[vm.statusTone] : TONES.none;
   return (
-    <Sheet open={open} onClose={onClose} z={22} dim="a" maxHeight="86%" scroll className={s.soPanel} label="Sales order">
+    <Sheet open={open} onClose={onClose} z={22} dim="a" maxHeight="86%" scroll peek className={s.soPanel} label="Sales order">
       <SheetHandle />
       {vm && (
         <>

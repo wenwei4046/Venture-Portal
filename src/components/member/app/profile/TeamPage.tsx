@@ -147,7 +147,7 @@ function Node({ node, kind, onClick }: { node: TeamNodeVM; kind: "up" | "me" | "
 /** A person on the chart (lines 1698–1711). */
 export function PersonSheet({ open, vm, onClose }: { open: boolean; vm: PersonSheetVM | null; onClose: () => void }) {
   return (
-    <Sheet open={open} onClose={onClose} z={22} className={`${s.sheetBody} ${s.sheetGap14}`} label={vm?.name ?? "Person"}>
+    <Sheet open={open} onClose={onClose} z={22} peek className={`${s.sheetBody} ${s.sheetGap14}`} label={vm?.name ?? "Person"}>
       <SheetHandle />
       {vm && (
         <>

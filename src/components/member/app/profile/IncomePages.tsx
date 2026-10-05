@@ -142,7 +142,7 @@ export function IncomeOrdersPage({ vm, tab, message, onTab, onBack, onPeriod, on
 /** One bill, line by line (lines 1730–1758). */
 export function CommissionSheet({ open, vm, onClose }: { open: boolean; vm: CoSheetVM | null; onClose: () => void }) {
   return (
-    <Sheet open={open} onClose={onClose} z={22} maxHeight="86%" scroll className={s.sheetBody} label={vm?.no ?? "Order"}>
+    <Sheet open={open} onClose={onClose} z={22} maxHeight="86%" scroll peek className={s.sheetBody} label={vm?.no ?? "Order"}>
       <SheetHandle />
       {vm && (
         <>
