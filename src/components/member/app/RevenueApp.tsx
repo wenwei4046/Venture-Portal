@@ -393,9 +393,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     if (view === "bills") setBillStatus(status);
     goScreen("insight", { ins: view });
   }, [goScreen]);
-  // A board from Today or the bell opens on its month, as the prototype's `go('arena', { period: 'monthly', sub: 'total' })`.
-  const openBoard = useCallback((board: Board) => {
-    setArKind("monthly"); setArFrom(null); setArSub("total");
+  // A board from Today or the bell opens on its month, as the prototype's `go('arena', { period: 'monthly', sub: 'total' })`:
+  // the bell's results on the settled month they are about, anything else on the current month.
+  const openBoard = useCallback((board: Board, month: string | null = null) => {
+    setArKind("monthly"); setArFrom(month); setArSub("total");
     goScreen("arena", { arena: "board", board });
   }, [goScreen]);
   const openNotif = useCallback(() => { setSheet(null); setNfOpen(true); }, []);
@@ -411,8 +412,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     setNfOpen(false);
     if (n.go.to === "memo") { goScreen("account", { pf: "memos" }); if (n.go.memoId) openMemo(n.go.memoId); }
     else if (n.go.to === "requests") goScreen("account", { pf: "requests" });
-    else if (n.go.to === "income") goScreen("account", { pf: "income" });
-    else openBoard("sales");
+    // A settled month's news opens on that month: the app itself opens on the current one.
+    else if (n.go.to === "income") { setIncPeriod(settled?.period ?? null); goScreen("account", { pf: "income" }); }
+    else openBoard("sales", settled?.period ?? null);
   };
 
   const subOptions: SubDeptOption[] = data.memberships.map((m, i) => ({
@@ -435,7 +437,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
   }, champRank), [today, me, income, incomeStatus, todaySalary, hidden, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book, data.bands, memos, requests, champRank]);
 
-  // ── Insight: Month / Quarter / Year, opening on the working month ──
+  // ── Insight: Month / Quarter / Year, opening on the current month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
   const [insFrom, setInsFrom] = useState<string | null>(null);
   const [insTab, setInsTab] = useState<InsightTab>("personal");
@@ -445,7 +447,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [dateOpen, setDateOpen] = useState(false);
   const [soPick, setSoPick] = useState<string | null>(null);
   const [tiersOpen, setTiersOpen] = useState(false);
-  const insPeriod = useMemo(() => periodOf(insKind, insFrom ?? working ?? period, period), [insKind, insFrom, working, period]);
+  // The current month unless another is picked (user 2026-10-06: "也开在当月") — the month still being
+  // closed is in the date sheet, marked Live.
+  const insPeriod = useMemo(() => periodOf(insKind, insFrom ?? period, period), [insKind, insFrom, period]);
   const sameAsWork = insPeriod.kind === "monthly" && insPeriod.from === working;
   // This month is already read for Today (it is `work` itself once last month is closed). Nothing is
   // read for Insight until the month being worked is known: before it, `insPeriod` is the current
@@ -483,14 +487,14 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const insDateLabel = fixture?.insight?.dateLabel ?? insPeriod.label;
   const dateOptions = useMemo(() => periodOptions(insKind, period, monthState), [insKind, period, monthState]);
 
-  // ── Arena: Monthly / Quarterly / Annual, opening on the working month ──
+  // ── Arena: Monthly / Quarterly / Annual, opening on the current month ──
   const [arKind, setArKind] = useState<PeriodKind>("monthly");
   const [arFrom, setArFrom] = useState<string | null>(null);
   const [arSub, setArSub] = useState<ArenaSub>("total");
   const [arBrand, setArBrand] = useState("");
   const [fairsOpen, setFairsOpen] = useState(false);
   const [champOpen, setChampOpen] = useState(false);
-  const arPeriod = useMemo(() => periodOf(arKind, arFrom ?? fixture?.arena?.from[arKind] ?? working ?? period, period), [arKind, arFrom, fixture, working, period]);
+  const arPeriod = useMemo(() => periodOf(arKind, arFrom ?? fixture?.arena?.from[arKind] ?? period, period), [arKind, arFrom, fixture, period]);
   const markViewed = useCallback((snap: MemberArenaSnapshot) => viewedAs(snap, context?.staffId), [context?.staffId]);
   // The month already held: this month's (Today's) when that is the one open, else the month being worked.
   const knownArena = arPeriod.kind === "monthly" && arenaToday && arPeriod.from === arenaToday.period ? arenaToday : arena;
@@ -655,8 +659,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const team = useMemo(() => replaceable(principal && viewed && membership
     ? { ...membership, people: membership.people.map(p => ({ ...p, self: p.id === viewed.id })) } : membership), [principal, viewed, membership]);
   const hasTeam = team.length > 0;
-  // My income: the month being worked unless another is picked — live until the close, fixed after.
-  const incMonth = incPeriod ?? working ?? period;
+  // My income: the current month unless another is picked — live until the close, fixed after.
+  const incMonth = incPeriod ?? period;
   const incKey = `${membershipId}|${context?.staffId ?? ""}|${incMonth}`;
   const onIncome = route.screen === "account" && (route.pf === "income" || route.pf === "incOrders");
   const inRecent = incMonth === prevMonth || incMonth === period;

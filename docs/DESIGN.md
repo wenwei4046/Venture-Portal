@@ -1387,12 +1387,14 @@ VP's. The member C release above describes the screens this replaced.
   own build in brackets, and the card's **Total** is step 2's *Customer pays*:
   *Add-on items* and *Option charges* rows sit above the fee when there are any
   (step 2's line reads *Option charges · not in margin*).
-- **Today is the live month (2026-10-06)** — the prototype's Today on 3 October
+- **The app is the live month (2026-10-06)** — the prototype's Today on 3 October
   read *September · Estimated income*; the user wants the month on the calendar,
-  so the hero, its three figures and *Your Arena* are the current month, and a
-  tap opens Insight or the Arena on it. While the engine works the figure out the
-  hero reads *RM —* / *Working out October's commission…*, never the fixed
-  salary alone. Insight and the Arena still open on the month being closed.
+  so Today (the hero, its three figures, *Your Arena*), Insight, the Arena and
+  My income all open on the current month, and a tap from Today opens Insight or
+  the Arena on it. The month still being closed is one tap away in the date
+  sheet, marked *Live*; the bell's news of a settled month opens that month.
+  While the engine works the figure out the hero reads *RM —* / *Working out
+  October's commission…*, never the fixed salary alone.
 - **The family chart fits real names** — the prototype's chart was a fixed
   580px with the direct reports spread across all of it, and its cards are
   buttons, which never wrap in this app (`button{white-space:nowrap}`, the

@@ -12,7 +12,7 @@ import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
 import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
-import { carriesInto, closedIncome, liveIncome, type DepartmentIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
+import { closedIncome, liveIncome, type DepartmentIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
 import { parseCloseSummary } from "@/lib/commission/closes";
 import { buildCommissionWorkbench } from "@/lib/commission/workbench";
 import type { StatementDto } from "@/lib/commission/run-payload";
@@ -517,27 +517,17 @@ export async function loadMemberIncome(
 
 /**
  * A month as Comm Cal's engine works it out now, for the whole sub-department
- * — null when nothing has been imported for it yet. One difference from Comm
- * Cal, and it is the member facts' rule: a bill of an earlier month rides in
- * only once that month is closed for its salesperson (`carriesInto`). Comm Cal
- * carries every bill no run released, because HR closes month by month; the
- * app reads the live month while the one before it is still being closed, and
- * would otherwise count every one of its bills twice.
+ * — null when nothing has been imported for it yet. It carries what Comm Cal
+ * carries (lib/commission/carry.ts): a bill of an earlier month only once that
+ * month is closed for its salesperson, so the live month never counts the one
+ * still being closed a second time.
  */
 async function liveWorkbench(client: SupabaseClient, subDepartmentId: string, first: string, alsoStaffId?: string) {
-  const [run, closes, applied] = await Promise.all([
-    client.from("comm_runs").select("id").eq("sub_department_id", subDepartmentId).eq("period_month", first).maybeSingle(),
-    client.from("comm_salesperson_closes").select("staff_id, period_month").eq("sub_department_id", subDepartmentId).is("reopened_at", null),
-    client.from("comm_runs").select("period_month").eq("sub_department_id", subDepartmentId).in("status", ["applied", "locked"]),
-  ]);
-  for (const r of [run, closes, applied]) if (r.error) throw new Error(r.error.message);
-  const carry = carriesInto(first, {
-    closes: ((closes.data ?? []) as { staff_id: string; period_month: string }[]).map(c => ({ staffId: c.staff_id, periodMonth: c.period_month })),
-    appliedRuns: ((applied.data ?? []) as { period_month: string }[]).map(r => r.period_month),
-  });
+  const run = await client.from("comm_runs").select("id").eq("sub_department_id", subDepartmentId).eq("period_month", first).maybeSingle();
+  if (run.error) throw new Error(run.error.message);
   let loaded: Awaited<ReturnType<typeof loadCommissionInput>>;
   try {
-    loaded = await loadCommissionInput(first, subDepartmentId, client, { replayRunId: (run.data as { id: string } | null)?.id, carry });
+    loaded = await loadCommissionInput(first, subDepartmentId, client, { replayRunId: (run.data as { id: string } | null)?.id });
   } catch (error) {
     if (/Nothing has been imported/i.test(error instanceof Error ? error.message : "")) return null;
     throw error;
