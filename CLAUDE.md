@@ -331,6 +331,23 @@ src/
 │   │   │                              calendar moves it. No fair → `so_date`, as
 │   │   │                              before. New documents still land in their
 │   │   │                              `so_date` month. Mig `20260924050000`.
+│   │   │                              **THE SALE DAY SETS THE MONTH (2026-10-06,
+│   │   │                              user: by record a sale follows its date; a
+│   │   │                              fair 30 Aug–1 Sep is August on the 30th and
+│   │   │                              31st, September on the 1st):** the ERP says
+│   │   │                              which day of its fair a bill was sold on
+│   │   │                              (`fair.fairDate`, since 2026-09-24). A NEW
+│   │   │                              document lands in that day's month when it
+│   │   │                              is one of the fair's days, else its
+│   │   │                              `so_date`'s (keyed up to 3 days late). The
+│   │   │                              calendar moves a bill to
+│   │   │                              `sales_order_sale_month()` — its sale
+│   │   │                              day's month, else its fair's — so a fair
+│   │   │                              across two months splits by day. A re-send
+│   │   │                              still keeps its month; a move is still a
+│   │   │                              click. Weekly boards are unchanged (a
+│   │   │                              fair's week is the week it opens in). Mig
+│   │   │                              `20261006140000`.
 │   │   │                              **A MONTH CLOSED TO THE FEED (2026-09-26):**
 │   │   │                              the month page's *Live from ERP* chip (click
 │   │   │                              or right-click) closes a month to the ERP
