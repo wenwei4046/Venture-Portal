@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { airbnbGroup, claimAmount, fairRegion, nightsBetween, readClaimRates, type ClaimRates } from "./claim-rules";
+import { airbnbGroup, claimAmount, fairRegion, isOutstation, nightsBetween, readClaimRates, stayProblem, type ClaimRates } from "./claim-rules";
 
 const rates: ClaimRates = {
   base: "Klang Valley",
@@ -92,6 +92,33 @@ describe("Airbnb: a small group claims its invoice, up to HR's cap a night", () 
     expect(airbnbGroup(rates, 3)).toBe(false);
     expect(claimAmount(rates, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
     expect(claimAmount({ ...rates, groupCapPerNight: 0 }, { type: "airbnb", pax: 3, nights: 2, invoice: 500 })).toBe(390);
+  });
+});
+
+// User 2026-10-06: "airbnb only allow claim outstation fair, then date stay limit in 7 days".
+describe("Airbnb: an outstation fair, a stay of up to 7 nights around it", () => {
+  it("is outstation when the route has spots or is flown to", () => {
+    expect(isOutstation({ id: "pg", name: "Penang", spots: 4, planeTicket: false })).toBe(true);
+    expect(isOutstation({ id: "sb", name: "Sabah", spots: 0, planeTicket: true })).toBe(true);
+    expect(isOutstation({ id: "kl", name: "KL", spots: 0, planeTicket: false })).toBe(false);
+  });
+
+  const fair = { start: "2026-09-25", end: "2026-09-27" };
+  it("takes a stay of up to 7 nights that covers a day of the fair", () => {
+    expect(stayProblem("2026-09-24", "2026-09-28", fair, "25–27 Sep")).toBeNull();
+    expect(stayProblem("2026-09-27", "2026-09-28", fair, "25–27 Sep")).toBeNull(); // the last night
+    expect(stayProblem("2026-09-21", "2026-09-28", fair, "25–27 Sep")).toBeNull(); // 7 nights
+  });
+
+  it("refuses an eighth night, and a stay that misses the fair", () => {
+    expect(stayProblem("2026-09-20", "2026-09-28", fair, "25–27 Sep")).toBe("A stay is at most 7 nights.");
+    expect(stayProblem("2026-09-23", "2026-09-25", fair, "25–27 Sep")).toBe("The stay must cover the fair's days (25–27 Sep).");
+    expect(stayProblem("2026-09-28", "2026-09-30", fair, "25–27 Sep")).toBe("The stay must cover the fair's days (25–27 Sep).");
+  });
+
+  it("says nothing until both dates are in, and does not compare a fair with no dates", () => {
+    expect(stayProblem("", "2026-09-28", fair, "25–27 Sep")).toBeNull();
+    expect(stayProblem("2026-09-01", "2026-09-03", { start: null, end: null }, "")).toBeNull();
   });
 });
 

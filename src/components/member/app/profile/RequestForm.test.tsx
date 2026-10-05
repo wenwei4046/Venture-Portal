@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 const week = (over: Partial<ClaimWeek>): ClaimWeek => ({
   key: "2026-10-02", month: "OCT", n: "W1", brandWeek: "Akemi week", brand: "AKEMI", dates: "2–4 Oct", venue: "PENANG WATERFRONT", org: "Homedec",
-  fairId: "penang-fair", auto: false, claimable: true, color: "red", tint: "pink", ...over,
+  fairId: "penang-fair", start: "2026-10-02", end: "2026-10-04", auto: false, claimable: true, color: "red", tint: "pink", ...over,
 });
 
 // Fair as HR set it: Penang is 4 spots at RM 50, Sabah is flown to, KL is local; Airbnb RM 65 a person a
@@ -16,10 +16,10 @@ const options: FormOptions = {
   subName: "Fair",
   weeks: [
     week({}),
-    week({ key: "2026-09-25", month: "SEP", n: "W4", brandWeek: "No brand week", brand: null, dates: "25–27 Sep", venue: null, org: null, fairId: null, claimable: false }),
-    week({ key: "2026-09-18", month: "SEP", n: "W3", brandWeek: "Zanotti week", brand: "ZANOTTI", dates: "18–20 Sep", venue: "SICC", fairId: "sabah-fair", auto: true }),
-    week({ key: "2026-09-11", month: "SEP", n: "W2", dates: "11–13 Sep", venue: "MID VALLEY", fairId: "kl-fair" }),
-    week({ key: "2026-09-04", month: "SEP", n: "W1", dates: "4–6 Sep", venue: "MVEC SOUTHKEY", fairId: "johor-fair" }),
+    week({ key: "2026-09-25", month: "SEP", n: "W4", brandWeek: "No brand week", brand: null, dates: "25–27 Sep", venue: null, org: null, fairId: null, start: null, end: null, claimable: false }),
+    week({ key: "2026-09-18", month: "SEP", n: "W3", brandWeek: "Zanotti week", brand: "ZANOTTI", dates: "18–20 Sep", venue: "SICC", fairId: "sabah-fair", start: "2026-09-18", end: "2026-09-20", auto: true }),
+    week({ key: "2026-09-11", month: "SEP", n: "W2", dates: "11–13 Sep", venue: "MID VALLEY", fairId: "kl-fair", start: "2026-09-11", end: "2026-09-13" }),
+    week({ key: "2026-09-04", month: "SEP", n: "W1", dates: "4–6 Sep", venue: "MVEC SOUTHKEY", fairId: "johor-fair", start: "2026-09-04", end: "2026-09-06" }),
   ],
   rates: {
     base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null,
@@ -198,6 +198,65 @@ describe("a member's own claim (user 2026-10-06)", () => {
       stay(2, 1);
       expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
       expect(claimed()).toBe("RM 390.00");
+    });
+
+    // User 2026-10-06: "airbnb only allow claim outstation fair, then date stay limit in 7 days".
+    it("is for an outstation fair only: a local one has no Airbnb claim, and sends nothing", () => {
+      const onSubmit = vi.fn();
+      claimForm(false, onSubmit, capped);
+      pick(/Airbnb accommodation/);
+      pick(/MID VALLEY/);
+      expect(screen.getByText("MID VALLEY is local to Klang Valley, so there is no Airbnb claim.")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Check-in")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("MID VALLEY is local to Klang Valley, so there is no Airbnb claim.");
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("waits for HR to set the venue's region, and a flown-to fair counts as outstation", () => {
+      claimForm(false, vi.fn(), capped);
+      pick(/Airbnb accommodation/);
+      pick(/MVEC SOUTHKEY/);
+      expect(screen.getByText("HR has not set the region for MVEC SOUTHKEY yet. It can be claimed once they have.")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Check-in")).not.toBeInTheDocument();
+      pick(/Zanotti week/);
+      expect(screen.getByLabelText("Check-in")).toBeInTheDocument();
+    });
+
+    it("takes a stay of up to 7 nights that covers the fair's days", () => {
+      claimForm(false, vi.fn(), capped);
+      pick(/Airbnb accommodation/);
+      expect(screen.getByText("Up to 7 nights, covering the fair's days (2–4 Oct).")).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-09-28" } });
+      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-05" } });
+      expect(screen.getByText("Nights").nextElementSibling).toHaveTextContent("7 nights");
+      expect(screen.getByText("Up to 7 nights, covering the fair's days (2–4 Oct).")).toBeInTheDocument();
+    });
+
+    it("refuses an eighth night, and pays nothing while it is there", () => {
+      const onSubmit = vi.fn();
+      claimForm(false, onSubmit, capped);
+      stay(1, 1);
+      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-09-27" } });
+      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-05" } });
+      fireEvent.change(screen.getByLabelText("Invoice total (RM)"), { target: { value: "500" } });
+      expect(screen.getByText("A stay is at most 7 nights.")).toBeInTheDocument();
+      expect(claimed()).toBe("RM 0.00");
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("A stay is at most 7 nights.");
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("refuses a stay that misses the fair", () => {
+      const onSubmit = vi.fn();
+      claimForm(false, onSubmit, capped);
+      stay(1, 1);
+      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-09-29" } });
+      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-02" } });
+      expect(screen.getByText("The stay must cover the fair's days (2–4 Oct).")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("The stay must cover the fair's days (2–4 Oct).");
+      expect(onSubmit).not.toHaveBeenCalled();
     });
 
     it("with no cap set, every stay is per person", () => {

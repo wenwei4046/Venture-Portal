@@ -1510,10 +1510,17 @@ src/
 │   │                                  people alike); more people = RM 65 × pax ×
 │   │                                  nights, nothing typed; no cap = everybody
 │   │                                  per person (`airbnbGroup` in
-│   │                                  `lib/member/claim-rules.ts`). The form opens
+│   │                                  `lib/member/claim-rules.ts`). Airbnb is for
+│   │                                  an OUTSTATION fair only — the venue's region
+│   │                                  has spots or is flown to (`isOutstation`);
+│   │                                  a local one (KL, 0 spots) has none — and a
+│   │                                  stay is at most 7 nights that covers the
+│   │                                  fair's days: in on or before its last day,
+│   │                                  out after its first (`stayProblem`; user
+│   │                                  2026-10-06). The form opens
 │   │                                  on the newest brand week, months on the
 │   │                                  badges. Migs `20261006050000` /
-│   │                                  `20261006150000`.
+│   │                                  `20261006150000` / `20261006160000`.
 │   │                                  **My brand weeks** (Profile chip / Today's
 │   │                                  reminder; no prototype page) = this
 │   │                                  month's weekends then the month still

@@ -74,7 +74,7 @@ export default function MemberClaimRatesAdmin() {
   return <section className={m.card} aria-labelledby="claim-rates-heading">
     <h2 id="claim-rates-heading">Claim rates</h2>
     <p className={m.sub}>
-      A member&apos;s fair claim is for their own brand week, and is worked out from these. <strong>Outstation</strong> pays the route&apos;s spots × the rate per spot, counted from the base, to the region set below for the fair&apos;s venue; no invoice — except a region ticked <strong>Plane ticket</strong>, where the member types the ticket&apos;s price and adds its invoice. <strong>Airbnb</strong> comes with its invoice: a small group types the invoice&apos;s total and is paid it, up to the limit a night; a bigger group is paid the rate × people × nights. A claim keeps the amount it was sent with.
+      A member&apos;s fair claim is for their own brand week, and is worked out from these. <strong>Outstation</strong> pays the route&apos;s spots × the rate per spot, counted from the base, to the region set below for the fair&apos;s venue; no invoice — except a region ticked <strong>Plane ticket</strong>, where the member types the ticket&apos;s price and adds its invoice. <strong>Airbnb</strong> is for an outstation fair only — a venue whose region has spots or is flown to — and comes with its invoice: a stay of up to 7 nights that covers the fair&apos;s days. A small group types the invoice&apos;s total and is paid it, up to the limit a night; a bigger group is paid the rate × people × nights. A claim keeps the amount it was sent with.
     </p>
     {error && <p className="sheet-danger" role="alert">{error}</p>}
     {!draft && busy && <p className={m.sub}>Loading claim rates…</p>}
