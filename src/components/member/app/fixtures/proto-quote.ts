@@ -103,19 +103,17 @@ const sizes = (id: (z: SizeKey) => string) => Object.fromEntries(SIZE_KEYS.map(z
  * The prototype has no bed frame or sofa options; `?charges=1` shows what
  * Modular's ticks and Maintenance's charges would look like (2026-10-05/06).
  */
-const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [], specialCharges: [] };
+const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
 const DEMO_CHARGES: FrameChoices = {
   divans: [{ value: '12"', charge: 50 }],
   legs: [{ value: '6"', charge: 100 }, { value: '7"', charge: 120 }],
   gaps: [{ value: '12"', charge: 20 }],
   totals: [],
-  specials: ["Hydraulic", "Divan Top Fully Cover", "HB Straight"],
-  specialCharges: [{ value: "Hydraulic", charge: 300 }],
+  specials: [{ value: "Hydraulic", charge: 300 }, { value: "Divan Top Fully Cover", charge: 80 }],
 };
 const DEMO_SOFA: QSofaChoices = {
   legs: [{ value: '4"', charge: 80 }, { value: '6"', charge: 100 }],
-  specials: ["Wooden Arm", "Seat Add 1ft", "Seat Base Fully Cover with no Leg"],
-  specialCharges: [{ value: "Seat Add 1ft", charge: 150 }],
+  specials: [{ value: "Wooden Arm", charge: 120 }, { value: "Seat Add 1ft", charge: 150 }],
 };
 
 function catalog(brand: { code: string; name: string; sofa: boolean }, charges = false): QCatalog {

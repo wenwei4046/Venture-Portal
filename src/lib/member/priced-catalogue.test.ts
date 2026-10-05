@@ -60,6 +60,25 @@ describe("reading the calculator's catalogue", () => {
         "junk",
       ]),
     ).toEqual([{ id: "m1", kind: "SOFA", options: { leg_heights: ['4"'] } }]);
+  });
+
+  // 2026-10-06: every Maintenance price is the customer's — a sofa's leg height and specials,
+  // a bed frame's specials too. Dropping them here hid the sofa's Leg height row and every
+  // special on the Quote (the snapshot and the quote read models through this one reader).
+  it("keeps what each kind is charged for, and only a charge above zero", () => {
+    expect(
+      catalogueModelsOf([
+        { id: "s1", kind: "SOFA", options: { leg_heights: ['4"'], specials: ["Wooden Arm"] },
+          charges: { leg_heights: [{ value: '4"', charge: 80 }], specials: [{ value: "Wooden Arm", charge: "120" }], divan_heights: [{ value: '8"', charge: 50 }] } },
+        { id: "f1", kind: "BEDFRAME", options: { specials: ["Hydraulic", "HB Straight"] },
+          charges: { leg_heights: [{ value: '6"', charge: 100 }], specials: [{ value: "Hydraulic", charge: 300 }, { value: "HB Straight", charge: 0 }, { value: "", charge: 5 }] } },
+      ]),
+    ).toEqual([
+      { id: "s1", kind: "SOFA", options: { leg_heights: ['4"'], specials: ["Wooden Arm"] },
+        charges: { leg_heights: [{ value: '4"', charge: 80 }], specials: [{ value: "Wooden Arm", charge: 120 }] } },
+      { id: "f1", kind: "BEDFRAME", options: { specials: ["Hydraulic", "HB Straight"] },
+        charges: { leg_heights: [{ value: '6"', charge: 100 }], specials: [{ value: "Hydraulic", charge: 300 }] } },
+    ]);
     expect(catalogueModelsOf(null)).toEqual([]);
   });
 

@@ -493,6 +493,32 @@ describe('the catalogue behind the member calculator', () => {
     expect(foc.error).toMatch(/leg height is not offered for this bed frame/)
   })
 
+  // 2026-10-06 (user): a special Maintenance leaves unpriced is not shown — nor taken.
+  it('takes a bed frame special only when Maintenance charges it', async () => {
+    const charged = models.map(m => m.id === frameModel
+      ? { ...m, options: { ...m.options, specials: ['Hydraulic', 'HB Straight'] }, charges: { specials: [{ value: 'Hydraulic', charge: 300 }] } }
+      : m)
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([bedFrame], {
+      models: charged, optionPrices: [...optionPrices, { pool: 'bedframe_specials', value: 'Hydraulic', price: 300 }],
+    })))
+    const priced = await calculateMemberQuote({
+      schemeId, price: '2000', delivery: '0',
+      lines: [{ productId: frame, quantity: 1, gift: false, bedframe: { specials: ['Hydraulic'] } }],
+    })
+    expect(priced.ok).toBe(true)
+    if (!priced.ok) throw new Error(priced.error)
+    expect(priced.data.optionCharge).toBe(300)
+
+    // Turned ON on Modular, no price on Maintenance: not a choice the server takes.
+    const unpriced = await calculateMemberQuote({
+      schemeId, price: '2000', delivery: '0',
+      lines: [{ productId: frame, quantity: 1, gift: false, bedframe: { specials: ['HB Straight'] } }],
+    })
+    expect(unpriced.ok).toBe(false)
+    if (unpriced.ok) throw new Error('expected a refusal')
+    expect(unpriced.error).toMatch(/special is not offered for this bed frame/)
+  })
+
   it('never lets a price or grid reach the snapshot, and keeps only well-formed dropdowns', async () => {
     mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_quote'] }))
     mocks.rpc.mockResolvedValue({

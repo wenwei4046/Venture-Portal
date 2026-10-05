@@ -85,10 +85,11 @@ export interface OptionCharge {
  * priced on Maintenance since 2026-10-06): turned ON on Modular, still allowed
  * by the ERP, priced on Product List › Maintenance above zero. A bed frame's
  * divan, leg, gap, total height and specials (per frame); a sofa's leg height
- * and specials (once per sofa). The Quote offers FOC plus the charged heights
- * and every special with its charge; a charge is out of the margin on both
- * sides and in the commission. A customer's price, not a cost, so the
- * member's own snapshot carries it.
+ * and specials (once per sofa). The Quote offers FOC plus the charged heights,
+ * and only the charged specials — one Maintenance leaves unpriced is not
+ * offered (user 2026-10-06); a charge is out of the margin on both sides and
+ * in the commission. A customer's price, not a cost, so the member's own
+ * snapshot carries it.
  */
 export interface MemberModelCharges {
   divan_heights?: OptionCharge[];
