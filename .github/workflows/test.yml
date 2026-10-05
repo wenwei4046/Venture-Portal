@@ -1,14 +1,52 @@
 name: Test
 
+# A change to the docs alone (*.md, docs/, the design handoff) cannot break a
+# build or a test — nothing reads them — so it does not wait on CI at all.
 on:
   push:
     branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', '.design/**']
   pull_request:
     branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', '.design/**']
 
+# FOUR JOBS SIDE BY SIDE (2026-10-06). The old single job ran install → unit
+# tests (5m14s) → the SQL checks (53s) → next build (3m34s) one after another,
+# ~10.5 min on every PR. Side by side the wait is the slowest job (~5 min); the
+# runner minutes stay about the same: each job installs on its own (34s, npm's
+# download cache), and the builds now reuse .next/cache.
 jobs:
-  test:
-    name: Unit tests + build check
+  unit:
+    # The suite (4,400+ tests) is split by file into two halves run at once.
+    name: Unit tests (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          # wrangler requires >=22 (engines). Every job stays on one version so
+          # the two `next build`s never run on different runtimes.
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:ci -- --shard=${{ matrix.shard }}/2
+
+  sql:
+    # Each SQL check is its own package (PGlite only) — the app's install is
+    # not needed here.
+    name: SQL checks (member + Revenue payroll)
     runs-on: ubuntu-latest
 
     steps:
@@ -18,16 +56,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          # wrangler requires >=22 (engines). Both jobs stay on one version so
-          # the two `next build`s never run on different runtimes.
           node-version: '22'
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run unit tests
-        run: npm run test:ci
+          cache-dependency-path: |
+            tests/member-sql/package-lock.json
+            tests/revenue-payroll-sql/package-lock.json
 
       - name: Verify member database permissions and workflows
         run: |
@@ -38,6 +71,34 @@ jobs:
         run: |
           npm ci --prefix tests/revenue-payroll-sql
           npm test --prefix tests/revenue-payroll-sql
+
+  build:
+    name: Next.js build check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Next's own compile cache: an exact hit when nothing under src/ changed,
+      # else the latest one for these dependencies, which still saves most of
+      # the work. A PR reads main's caches; main never reads a PR's.
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-build-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**', 'next.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-${{ hashFiles('package-lock.json') }}-
 
       - name: Next.js build check
         run: npm run build
@@ -57,12 +118,12 @@ jobs:
     name: Cloudflare worker build + PDF smoke
     runs-on: ubuntu-latest
 
-    # WHY THIS JOB IS SEPARATE FROM `test`
-    # -----------------------------------
-    # The `test` job above runs `next build`, which does NOT exercise the worker
+    # WHY THIS JOB IS SEPARATE FROM `build`
+    # ------------------------------------
+    # The `build` job above runs `next build`, which does NOT exercise the worker
     # bundle at all. yoga-layout compiles its flexbox engine from a base64 blob
     # with WebAssembly.instantiate(), which workerd forbids — so every PDF export
-    # route can be perfectly green here and return HTTP 500 once deployed to
+    # route can be perfectly green there and return HTTP 500 once deployed to
     # Cloudflare. Only `opennextjs-cloudflare build` produces the artifact where
     # that difference shows up, and only running it proves anything.
     steps:
@@ -72,8 +133,6 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          # wrangler requires >=22 (engines). Both jobs stay on one version so
-          # the two `next build`s never run on different runtimes.
           node-version: '22'
           cache: 'npm'
 
@@ -82,6 +141,16 @@ jobs:
       # would silently skip the very thing this job exists to verify.
       - name: Install dependencies
         run: npm ci
+
+      # The worker's `next build` keeps its own cache (OpenNext builds with its
+      # own settings, so it never shares the build job's).
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-worker-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**', 'next.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-next-worker-${{ hashFiles('package-lock.json') }}-
 
       # Builds the worker, then asserts the bundle carries the statically imported
       # WASM module, then starts the built worker in workerd and asks it for a real

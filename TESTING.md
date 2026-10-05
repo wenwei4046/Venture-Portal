@@ -74,11 +74,21 @@ test runner (so you don't forget it) without breaking CI. Examples:
 
 ## CI
 
-`.github/workflows/test.yml` runs on every push + PR against `main`:
+`.github/workflows/test.yml` runs on every push + PR against `main` — four jobs
+side by side (2026-10-06; one job in a row took ~10.5 min, side by side the wait is
+the slowest job, ~5 min):
 
-1. Install deps (`npm ci`)
-2. `npm run test:ci` — Vitest single run
-3. `npm run build` — Next.js production build check
+1. **Unit tests (1/2) and (2/2)** — `npm run test:ci -- --shard=N/2`: the Vitest
+   suite split by file into two halves run at once. A failure names its half;
+   run the same command locally to reproduce it.
+2. **SQL checks** — `tests/member-sql` and `tests/revenue-payroll-sql`, each its
+   own package (PGlite), so this job never installs the app.
+3. **Next.js build check** — `npm run build` (a 4 GB heap; it outgrew Node's 2 GB),
+   reusing `.next/cache` from earlier runs.
+4. **Cloudflare worker build + PDF smoke** — see below.
+
+A PR that changes only docs (`**/*.md`, `docs/`, `.design/`) runs none of them
+(`paths-ignore`): nothing reads the docs, so nothing can break.
 
 Build uses placeholder `NEXT_PUBLIC_SUPABASE_URL` and
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` values so compilation works without real
