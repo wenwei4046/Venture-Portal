@@ -1374,6 +1374,17 @@ VP's. The member C release above describes the screens this replaced.
   tap opens Insight or the Arena on it. While the engine works the figure out the
   hero reads *RM —* / *Working out October's commission…*, never the fixed
   salary alone. Insight and the Arena still open on the month being closed.
+- **The family chart fits real names** — the prototype's chart was a fixed
+  580px with the direct reports spread across all of it, and its cards are
+  buttons, which never wrap in this app (`button{white-space:nowrap}`, the
+  prototype's own rule). Its data never noticed; ours did: two people below sat
+  at the two edges of a phone and *Senior Revenue Specialist* ran out of its card
+  and off the screen. Now the chart is as wide as its widest row and never
+  narrower than the screen (`.chart` `width: max-content; min-width: 100%`), a
+  direct report keeps a 145px column (the prototype's 580 shared by four, so four
+  are drawn exactly as before) and fewer stay together under the member; a card's
+  name and title wrap inside it; a dashed card under a direct report grows to its
+  text from the prototype's 112px up to its column (137px) and wraps past that.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
@@ -2497,6 +2508,7 @@ If adding a new component to vocabulary, update this doc first.
 
 - **2026-10-06 (update prompt)** — every surface gains *A new version is ready* · Update · ×: an ink pill at the top centre when a release lands while the app is open (installed apps are resumed from memory, so a phone could keep last week's build — and its reads fail once a release replaces its Server Actions). In the Revenue app, after 30+ minutes away it reloads on return unless a form was being filled; the portal only ever offers it (a payroll grid may hold edits not yet saved). See *Update prompt*.
 - **2026-10-06 (Revenue app · phone type one step smaller)** — on a phone every text in the Revenue app is one step smaller than the prototype's: each font-size is the prototype's px times `--rv-type`, .92 on a phone (13px → 12, the greeting 28px → 25.8) and 1 on a desktop, which is unchanged. Spacing, icons, control heights and the 16px inputs stay as they were. One number tunes it (`.screen` in `app/shell.module.css`); `app/type-scale.test.ts` keeps every size on it. See *The Revenue app — built to the prototype*.
+- **2026-10-06 (Revenue app · family chart on a phone)** — Team & capacity on a phone put KAR JUN's two direct reports at the two edges of the screen, and MELVIN CHONG's *Senior Revenue Specialist* ran out of his card and off it: the chart was a fixed 580px with the reports spread across it, and the cards (buttons) never wrapped. The chart now takes the width of its widest row (never less than the screen), a report keeps a 145px column so fewer sit together under the member, card text wraps, and the dashed cards below grow to their text (112–137px). Four reports — the prototype — are drawn exactly as before; its dashed cards are a few px wider, because their text used to run past the border. See *The family chart fits real names*.
 - **2026-10-06 (Revenue app · sofa leg height & specials)** — the Quote's sofa sheet regains the old builder's *Leg height* and *Specials* (only what Modular turned ON for every sofa model in the cart), as chips after *Fabric*; specials' chips wrap their words (`.chipWords`, bed frame specials too). The customer quote names the sofa build and each bed frame's own build, and its Total now equals step 2's *Customer pays* (*Add-on items* / *Bed frame options* rows when present). See *A sofa's leg height and specials*.
 - **2026-10-06 (Revenue app · a row's sheet on a desktop)** — on a desktop, clicking another bill while one is open in the right-hand panel shows that bill at once; it used to take two clicks, the first only closing the panel. The same for every sheet that shows one row of the page beside it (Commission by order, My honours, Team & capacity, Requests, Memos). A click elsewhere on the page still closes the panel, and now also does what was clicked; the list scrolls under the mouse wheel while the panel is open. Pickers and phone sheets are unchanged (see *The Revenue app — built to the prototype*).
 - **2026-10-06 (Revenue app · directors side by side)** — Team & capacity's *Your Revenue family* drew Fair's two directors one above the other (KRIS, then PETER, then the member), as if PETER reported to KRIS. A level now holds peers: `DIRECTORS` over KRIS and PETER in one row (`.peers` / `.peer`, 156px a card), joined under their cards by the same 2px bar the direct reports hang from, one line down to the next level. One director is drawn exactly as before. On a phone, a row that would start off-screen opens the chart on its middle. See *Directors stand side by side*.

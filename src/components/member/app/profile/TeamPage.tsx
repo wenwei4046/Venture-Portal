@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useLayoutEffect, useRef, type CSSProperties } from "react";
+import { Fragment, useLayoutEffect, useRef } from "react";
 import Sheet, { SheetHandle } from "../Sheet";
 import { PageHead } from "./IncomePages";
 import type { PersonSheetVM, TeamDot, TeamNodeVM, TeamVM } from "./profile-vm";
@@ -11,14 +11,6 @@ const INK = { ink: "", good: s.psGood, up: s.psUp, wait: s.psWait } as const;
 
 /** A director's place on a shared level (`.peer`): the 132px card and the 24px between two. */
 const PEER_W = 156;
-/**
- * 580px holds four direct reports and three directors side by side, as drawn;
- * more people on a row widen the chart, so no card overlaps and the swipe reaches them all.
- */
-function chartStyle(vm: TeamVM): CSSProperties | undefined {
-  const width = Math.max(vm.kids.length > 4 ? vm.kids.length * 135 + 40 : 0, ...vm.ups.map(u => u.nodes.length * PEER_W + 40));
-  return width > 580 ? { width } : undefined;
-}
 
 /** Team & capacity (`team-style="b"`, lines 999–1080): the department's places, then the family chart. */
 export default function TeamPage({ vm, onBack, onPerson }: { vm: TeamVM | null; onBack: () => void; onPerson: (id: string) => void }) {
@@ -59,7 +51,7 @@ export default function TeamPage({ vm, onBack, onPerson }: { vm: TeamVM | null; 
               ))}
             </div>
             <div ref={scroller} className={s.chartScroll}>
-              <div className={s.chart} style={chartStyle(vm)}>
+              <div className={s.chart}>
                 {vm.ups.map(u => (
                   <div key={u.nodes[0].id} className={s.upWrap}>
                     <span className={s.level}>{u.level}</span>
