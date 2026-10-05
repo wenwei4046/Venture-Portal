@@ -1,7 +1,7 @@
 /* Switch sub-department — RevenueApp.dc.html 1251–1268 */
 .sdPanel { padding: 10px 20px 34px; display: flex; flex-direction: column; gap: 16px; }
-.sdTitle { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
-.sdSub { margin: 4px 0 0; font-size: 13px; color: var(--rv-sub); }
+.sdTitle { margin: 0; font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.sdSub { margin: 4px 0 0; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .sdList { display: flex; flex-direction: column; gap: 8px; }
 .sdRow {
   display: flex;
@@ -25,14 +25,14 @@
   color: var(--rv-brown);
   display: grid;
   place-items: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--rv-type));
   font-weight: 700;
   letter-spacing: .02em;
 }
 .sdRowOn .sdChip { background: var(--rv-brown); color: var(--rv-white); }
 .sdText { flex: 1; min-width: 0; }
-.sdName { display: block; font-size: 16px; font-weight: 650; }
-.sdMeta { display: block; font-size: 12.5px; color: var(--rv-sub); margin-top: 1px; }
+.sdName { display: block; font-size: calc(16px * var(--rv-type)); font-weight: 650; }
+.sdMeta { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; }
 .sdRadio {
   flex: 0 0 22px;
   width: 22px;
@@ -47,13 +47,13 @@
 .sdRowOn .sdRadio { border: 0; background: var(--rv-accent); }
 .sdTick { opacity: 0; }
 .sdRowOn .sdTick { opacity: 1; }
-.sdNote { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rv-sub); }
+.sdNote { margin: 0; font-size: calc(12.5px * var(--rv-type)); line-height: 1.5; color: var(--rv-sub); }
 
 /* Start a quote — 1321–1337 */
 .bpPanel { padding: 10px 20px 34px; display: flex; flex-direction: column; gap: 14px; }
 [data-platform="android"] .bpPanel { padding-bottom: 20px; }
-.bpTitle { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
-.bpSub { margin: 4px 0 0; font-size: 13px; color: var(--rv-sub); }
+.bpTitle { margin: 0; font-size: calc(21px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
+.bpSub { margin: 4px 0 0; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
 .bpList { display: flex; flex-direction: column; gap: 8px; }
 .bpRow {
   display: flex;
@@ -79,13 +79,13 @@
   color: var(--rv-brown);
   display: grid;
   place-items: center;
-  font-size: 14px;
+  font-size: calc(14px * var(--rv-type));
   font-weight: 700;
 }
 .bpChipCurrent { background: var(--rv-accent); color: var(--rv-white); }
 .bpText { flex: 1; min-width: 0; }
-.bpName { display: block; font-size: 16px; font-weight: 650; }
-.bpMeta { display: block; font-size: 12.5px; color: var(--rv-sub); margin-top: 1px; }
-.bpTag { font-size: 12.5px; font-weight: 650; color: var(--rv-green); }
-.bpWarn { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--rv-amber); background: var(--rv-amber-bg); border-radius: 12px; padding: 10px 12px; }
-.bpEmpty { margin: 0; font-size: 13px; line-height: 1.5; color: var(--rv-sub); }
+.bpName { display: block; font-size: calc(16px * var(--rv-type)); font-weight: 650; }
+.bpMeta { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; }
+.bpTag { font-size: calc(12.5px * var(--rv-type)); font-weight: 650; color: var(--rv-green); }
+.bpWarn { margin: 0; font-size: calc(12.5px * var(--rv-type)); line-height: 1.5; color: var(--rv-amber); background: var(--rv-amber-bg); border-radius: 12px; padding: 10px 12px; }
+.bpEmpty { margin: 0; font-size: calc(13px * var(--rv-type)); line-height: 1.5; color: var(--rv-sub); }

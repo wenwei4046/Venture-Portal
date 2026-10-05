@@ -1327,6 +1327,14 @@ VP's. The member C release above describes the screens this replaced.
   only*) instead of RM 0.00; a request HR sent back has *Update and send again*;
   Profile keeps *Install the app* where the browser can install (the prototype has
   no row for it); forms start empty where the prototype pre-picked an example.
+- **Phone type one step smaller** (2026-10-06, user: on a phone the text read a
+  size too big) — every font-size is the prototype's px times `--rv-type`: 1 on a
+  desktop, .92 on a phone (`.screen` in `app/shell.module.css`), so 13px reads 12
+  and *Hello, …* 25.8 instead of 28. Spacing, icons and control heights stay the
+  prototype's, and inputs stay 16px. A new size is written
+  `calc(Npx * var(--rv-type))`; `app/type-scale.test.ts` fails on a plain px. The
+  prototype comparison (`.design/revenue-app/tools/shoot-app.mjs`) draws the app
+  at `--rv-type: 1`, so it still checks the layout against the prototype.
 - **Directors stand side by side** — the prototype's family chart (Team &
   capacity) drew ONE director above the line of uplines. A sub-department with
   two (Fair: KRIS and PETER) is one level, labelled `DIRECTORS`: the cards in a
@@ -2475,6 +2483,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Revenue app · phone type one step smaller)** — on a phone every text in the Revenue app is one step smaller than the prototype's: each font-size is the prototype's px times `--rv-type`, .92 on a phone (13px → 12, the greeting 28px → 25.8) and 1 on a desktop, which is unchanged. Spacing, icons, control heights and the 16px inputs stay as they were. One number tunes it (`.screen` in `app/shell.module.css`); `app/type-scale.test.ts` keeps every size on it. See *The Revenue app — built to the prototype*.
 - **2026-10-06 (Revenue app · sofa leg height & specials)** — the Quote's sofa sheet regains the old builder's *Leg height* and *Specials* (only what Modular turned ON for every sofa model in the cart), as chips after *Fabric*; specials' chips wrap their words (`.chipWords`, bed frame specials too). The customer quote names the sofa build and each bed frame's own build, and its Total now equals step 2's *Customer pays* (*Add-on items* / *Bed frame options* rows when present). See *A sofa's leg height and specials*.
 - **2026-10-06 (Revenue app · a row's sheet on a desktop)** — on a desktop, clicking another bill while one is open in the right-hand panel shows that bill at once; it used to take two clicks, the first only closing the panel. The same for every sheet that shows one row of the page beside it (Commission by order, My honours, Team & capacity, Requests, Memos). A click elsewhere on the page still closes the panel, and now also does what was clicked; the list scrolls under the mouse wheel while the panel is open. Pickers and phone sheets are unchanged (see *The Revenue app — built to the prototype*).
 - **2026-10-06 (Revenue app · directors side by side)** — Team & capacity's *Your Revenue family* drew Fair's two directors one above the other (KRIS, then PETER, then the member), as if PETER reported to KRIS. A level now holds peers: `DIRECTORS` over KRIS and PETER in one row (`.peers` / `.peer`, 156px a card), joined under their cards by the same 2px bar the direct reports hang from, one line down to the next level. One director is drawn exactly as before. On a phone, a row that would start off-screen opens the chart on its middle. See *Directors stand side by side*.
