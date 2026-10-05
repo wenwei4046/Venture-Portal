@@ -8062,6 +8062,18 @@ export type Database = {
         }
         Returns: string
       }
+      post_journal_entry_as_caller: {
+        Args: {
+          p_created_by: string
+          p_description: string
+          p_lines: Json
+          p_reference_id: string
+          p_reference_type: string
+          p_segment?: Database["public"]["Enums"]["gl_segment"]
+          p_transaction_date: string
+        }
+        Returns: string
+      }
       provision_full_department: {
         Args: { p_department_id: string; p_segment_key: string }
         Returns: Json
