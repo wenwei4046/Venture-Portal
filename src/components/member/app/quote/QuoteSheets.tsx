@@ -105,7 +105,13 @@ export interface CustomerQuote {
   lines: { name: string; qty: number }[];
   build: string[];
   price: number;
+  /** The KPI items the customer buys, RM — on top of the selling price. */
+  addOns: number;
+  /** The bed frames' charged divan, leg, gap and total height, RM — on top of the selling price. */
+  options: number;
   fee: number;
+  /** What the customer pays: the price, what rides on top of it and the fee — step 2's *Customer pays*. */
+  total: number;
   /** The text the calculator confirmed — what Copy and Share send. */
   text: string;
 }
@@ -158,8 +164,10 @@ export function CustomerQuoteSheet({ open, quote, brandName, onClose }: {
             {quote.build.map((b, i) => <div key={i} className={s.cqBuild}>{b}</div>)}
             <div className={s.cqSums}>
               <div className={s.cqSum}><span>Selling price</span><span className={s.payAmt}>{rm2(quote.price)}</span></div>
+              {quote.addOns > 0 && <div className={s.cqSum}><span>Add-on items</span><span className={s.payAmt}>{rm2(quote.addOns)}</span></div>}
+              {quote.options > 0 && <div className={s.cqSum}><span>Bed frame options</span><span className={s.payAmt}>{rm2(quote.options)}</span></div>}
               <div className={s.cqSum}><span>Additional fee</span><span className={s.payAmt}>{rm2(quote.fee)}</span></div>
-              <div className={s.cqTotal}><span>Total</span><span className={s.payAmt}>{rm2(quote.price + quote.fee)}</span></div>
+              <div className={s.cqTotal}><span>Total</span><span className={s.payAmt}>{rm2(quote.total)}</span></div>
             </div>
           </div>
           <p className={s.cqTerms}>Tax and other service charges as stated in the confirmed order terms. Availability, delivery date and quote validity are subject to the final confirmed order.</p>

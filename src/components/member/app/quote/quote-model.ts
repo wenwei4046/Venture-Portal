@@ -1,6 +1,6 @@
 import type { BedframeBuild, MemberCatalogueModel, MemberProduct } from "@/lib/member/types";
 import { bedframeKey, categoryKey, compareHeights } from "@/lib/member/catalog";
-import { chargeIn, frameBuildText, frameChoicesOf, frameCharge, kindOf, type FrameChoices } from "@/lib/member/build";
+import { chargeIn, frameBuildText, frameChoicesOf, frameCharge, intersect, kindOf, type FrameChoices, type SofaChoices } from "@/lib/member/build";
 import { valueKey } from "@/lib/catalogue/keys";
 
 /**
@@ -59,7 +59,15 @@ export interface QModel {
   sizes: Partial<Record<SizeKey, string>>;
   /** A sofa: its modules, left-facing pieces first. */
   modules: QModule[];
+  /**
+   * A sofa: the leg heights and specials Product List › Modular turned ON for
+   * the model (that the ERP and Maintenance still allow). Nothing turned ON =
+   * nothing to choose. A mattress has none.
+   */
+  choices: SofaChoices;
 }
+
+export const NO_SOFA_CHOICES: SofaChoices = { legs: [], specials: [] };
 
 export interface QFrame {
   key: string;
@@ -73,6 +81,11 @@ export interface QFrame {
 }
 
 const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
+
+/** A sofa model's leg heights and specials, as the catalogue's models list them (Modular's ticks). */
+function sofaChoicesOf(model: MemberCatalogueModel | undefined): SofaChoices {
+  return { legs: model?.options.leg_heights ?? [], specials: model?.options.specials ?? [] };
+}
 
 /** A frame build with only what this frame still offers; undefined = all FOC, no specials. */
 export function frameBuildFor(choices: FrameChoices, build: BedframeBuild | undefined): BedframeBuild | undefined {
@@ -262,14 +275,14 @@ export function catalogFromProducts(
     if (kind === "SOFA") {
       sofa = true;
       const key = p.modelId ?? p.baseModel ?? p.name;
-      const model = models.get(key) ?? { key, name: p.name, desc: "", sizes: {}, modules: [] };
+      const model = models.get(key) ?? { key, name: p.name, desc: "", sizes: {}, modules: [], choices: sofaChoicesOf(p.modelId ? modelsById.get(p.modelId) : undefined) };
       const code = (p.moduleCode ?? p.size ?? "").trim() || p.code;
       const info = moduleInfo(code);
       model.modules.push({ code, desc: info.desc, seats: info.seats, chaise: info.chaise, productId: p.id, options: p.options ?? [] });
       models.set(key, model);
     } else if (mattress) {
       const key = p.modelId ?? p.name;
-      const model = models.get(key) ?? { key, name: p.name, desc: "", sizes: {}, modules: [] };
+      const model = models.get(key) ?? { key, name: p.name, desc: "", sizes: {}, modules: [], choices: NO_SOFA_CHOICES };
       if (size && !model.sizes[size]) model.sizes[size] = p.id;
       else if (!size && !Object.keys(model.sizes).length) model.sizes.Q = p.id;
       models.set(key, model);
@@ -344,7 +357,11 @@ export interface FrameEdit extends BfPick {
 
 export type SheetState =
   | { mode: "model"; key: string; size: SizeKey; acc: Record<string, number>; qty: number; bfs: BfPick[]; fx: FrameEdit | null; accAll: boolean }
-  | { mode: "sofa"; key: string; layout: string; mods: Record<string, number>; qty: number; kpi: string[]; height: string | null; tier: string | null }
+  | {
+      mode: "sofa"; key: string; layout: string; mods: Record<string, number>; qty: number; kpi: string[]; height: string | null; tier: string | null;
+      /** The cart's leg height and specials as the sheet opened on them, then as changed here (null = not chosen). */
+      leg: string | null; specials: string[];
+    }
   | { mode: "frame"; size: SizeKey; frame: string; kpi: string[]; qty: number; drop: boolean; build?: BedframeBuild }
   | { mode: "acc"; size: SizeKey; acc: Record<string, number>; accAll: boolean };
 
@@ -471,6 +488,17 @@ export function lineNote(line: CartLine, brand: string): string {
   return [riderText(line, brand), buildNote(line), line.charge ? "not in margin" : ""].filter(Boolean).join(" · ");
 }
 
+/**
+ * The customer quote's lines: `PEBBLE GREY · Queen (Hydraulic)` — a bed frame
+ * with its own build, as the shared text words it.
+ */
+export function customerLines(cart: CartLine[]): { name: string; qty: number }[] {
+  return cart.map(l => ({
+    name: [l.name, l.size].filter(Boolean).join(" · ") + (l.bedframe ? ` (${frameBuildText(l.bedframe)})` : ""),
+    qty: l.qty,
+  }));
+}
+
 // ── last used ─────────────────────────────────────────────────────────────
 
 export type RecentSet =
@@ -594,6 +622,70 @@ export function moduleOf(catalog: QCatalog, productId: string): QModule | undefi
   return undefined;
 }
 
+/**
+ * The cart's ONE sofa build (the calculator's `QuoteBuild`): the seat height
+ * and fabric tier its modules are costed in, and the leg height and specials
+ * every sofa in it is made with (user 2026-10-06 — they were the old
+ * builder's and the revamp left them out).
+ */
+export interface SofaBuild {
+  height: string | null;
+  tier: string | null;
+  /** null = not chosen. */
+  leg: string | null;
+  specials: string[];
+}
+
+export const NO_SOFA_BUILD: SofaBuild = { height: null, tier: null, leg: null, specials: [] };
+
+/** A build kept on the phone — one kept before 2026-10-06 has only the seat height and tier. */
+export function sofaBuildOf(raw: Partial<SofaBuild> | null | undefined): SofaBuild {
+  return {
+    height: typeof raw?.height === "string" ? raw.height : null,
+    tier: typeof raw?.tier === "string" ? raw.tier : null,
+    leg: typeof raw?.leg === "string" ? raw.leg : null,
+    specials: Array.isArray(raw?.specials) ? raw.specials.filter((v): v is string => typeof v === "string") : [],
+  };
+}
+
+/** The sofa models in the cart. */
+export function cartSofaKeys(cart: CartLine[]): string[] {
+  return [...new Set(cart.filter(l => l.kind === "sofa").map(l => l.key))];
+}
+
+/**
+ * The leg heights and specials EVERY sofa model named may take — one build
+ * makes every sofa in the cart, so a leg one model was turned ON for and
+ * another was not is not offered (the server's `buildChoicesFor`).
+ */
+export function sofaChoicesIn(catalog: QCatalog, modelKeys: Iterable<string>): SofaChoices {
+  const lists = [...new Set(modelKeys)].map(k => catalog.models.find(m => m.key === k)?.choices ?? NO_SOFA_CHOICES);
+  if (!lists.length) return NO_SOFA_CHOICES;
+  return { legs: intersect(lists.map(c => c.legs)), specials: intersect(lists.map(c => c.specials)) };
+}
+
+/** The value as the list spells it, while the list still has it; null = not chosen or no longer offered. */
+function offeredOne(value: string | null, list: string[]): string | null {
+  const k = valueKey(value);
+  return k === null ? null : list.find(v => valueKey(v) === k) ?? null;
+}
+
+/** The chosen values the list still has, in the list's order. */
+function offeredAll(values: string[], list: string[]): string[] {
+  const keys = new Set(values.map(v => valueKey(v)));
+  return list.filter(v => keys.has(valueKey(v)));
+}
+
+/**
+ * The build the server is asked to cost the cart's sofas with: its seat height
+ * and tier, and only the leg height and specials every sofa model in the cart
+ * still takes — one turned OFF on Modular since drops out.
+ */
+export function sofaBuildToSend(build: SofaBuild, catalog: QCatalog | null, cart: CartLine[]): SofaBuild {
+  const choices = catalog ? sofaChoicesIn(catalog, cartSofaKeys(cart)) : NO_SOFA_CHOICES;
+  return { ...build, leg: offeredOne(build.leg, choices.legs), specials: offeredAll(build.specials, choices.specials) };
+}
+
 export interface SofaBuildPick {
   /** False when the model's modules carry no cost grid (nothing to choose). */
   graded: boolean;
@@ -603,18 +695,25 @@ export interface SofaBuildPick {
   tier: string | null;
   /** Modules are chosen but no seat height costs all of them. */
   clash: boolean;
+  /** The leg heights and specials this model AND every sofa model already in the cart were turned ON for. */
+  legs: string[];
+  specials: string[];
+  /** The sheet's leg height and specials, as far as they are still offered. */
+  leg: string | null;
+  picked: string[];
 }
 
 /**
  * The seat height and fabric tier a sofa sheet would add with: the sheet's
  * own choice, else the cart's, else the lowest — among the cells every module
- * chosen here AND every sofa module already in the cart is costed in.
+ * chosen here AND every sofa module already in the cart is costed in. And the
+ * leg height and specials it may be made with.
  */
 export function sofaPick(
   sh: Extract<SheetState, { mode: "sofa" }>,
   catalog: QCatalog,
   cart: CartLine[],
-  build: { height: string | null; tier: string | null },
+  build: SofaBuild,
 ): SofaBuildPick {
   const model = catalog.models.find(m => m.key === sh.key);
   const chosen = model ? model.modules.filter(x => (sh.mods[x.code] ?? 0) > 0) : [];
@@ -626,5 +725,10 @@ export function sofaPick(
   const tiers = height ? choices.tiers(height) : [];
   const wantedTier = sh.tier ?? build.tier;
   const tier = wantedTier && tiers.includes(wantedTier) ? wantedTier : tiers[0] ?? null;
-  return { graded, heights: choices.heights, tiers, height, tier, clash: graded && chosen.length > 0 && !choices.heights.length };
+  const options = sofaChoicesIn(catalog, [sh.key, ...cartSofaKeys(cart)]);
+  return {
+    graded, heights: choices.heights, tiers, height, tier, clash: graded && chosen.length > 0 && !choices.heights.length,
+    legs: options.legs, specials: options.specials,
+    leg: offeredOne(sh.leg, options.legs), picked: offeredAll(sh.specials, options.specials),
+  };
 }

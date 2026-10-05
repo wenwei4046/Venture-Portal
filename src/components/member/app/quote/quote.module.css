@@ -197,6 +197,9 @@
 .chipOn .chipLabel { color: var(--rv-accent); }
 .chipSub { font-size: 12px; color: var(--rv-sub); font-variant-numeric: tabular-nums; }
 .chipOn .chipSub { color: var(--rv-accent); }
+/* A special is named in words (`Seat Base Fully Cover with no Leg`): the chip grows to them. */
+.chipWords { height: auto; min-height: 52px; padding: 9px 14px; white-space: normal; }
+.chipWords .chipLabel { font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
 .recentOpts { display: flex; flex-direction: column; gap: 8px; }
 .ropt { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 6px 6px 12px; border-radius: 14px; border: 1px solid var(--rv-line); background: var(--rv-white); box-sizing: border-box; }
 .roptOn { border-color: var(--rv-accent); background: var(--rv-cream); }

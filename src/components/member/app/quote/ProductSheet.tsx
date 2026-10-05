@@ -8,7 +8,7 @@ import { ICON, Svg } from "../icons";
 import { rm } from "../format";
 import {
   SIZES, accAt, accOrder, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
-  type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey,
+  type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
 import s from "./quote.module.css";
 
@@ -38,7 +38,7 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
   catalog: QCatalog;
   memory: QuoteMemory;
   cart: CartLine[];
-  build: { height: string | null; tier: string | null };
+  build: SofaBuild;
   readOnly: boolean;
   actions: ProductSheetActions;
 }) {
@@ -293,11 +293,14 @@ function FrameOptions({ rows, specials, build, start, onBuild }: {
         <div>
           <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>Optional</span></div>
           <div className={s.chips} style={{ marginTop: 6 }}>
-            {specials.map(sp => (
-              <button key={sp} className={`${s.chip} ${picked.some(x => valueKey(x) === valueKey(sp)) ? s.chipOn : ""}`} onClick={() => toggle(sp)}>
-                <span className={s.chipLabel}>{sp}</span>
-              </button>
-            ))}
+            {specials.map(sp => {
+              const on = picked.some(x => valueKey(x) === valueKey(sp));
+              return (
+                <button key={sp} className={`${s.chip} ${s.chipWords} ${on ? s.chipOn : ""}`} aria-pressed={on} onClick={() => toggle(sp)}>
+                  <span className={s.chipLabel}>{sp}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -509,6 +512,38 @@ function SofaSections({ sheet, catalog, memory, pick, hasKpi, onPatch }: {
                 <span className={s.chipLabel}>{tierLabel(t)}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+      {/* Only what Product List › Modular turned ON for this model and every sofa already in the cart. */}
+      {pick.legs.length > 0 && (
+        <div>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Leg height</p><span className={s.rowHeadCap}>For every sofa in this quote</span></div>
+          <div className={s.chips} style={{ marginTop: 6 }}>
+            <button className={`${s.chip} ${pick.leg === null ? s.chipOn : ""}`} onClick={() => onPatch({ leg: null })}>
+              <span className={s.chipLabel}>Not chosen</span>
+            </button>
+            {pick.legs.map(l => (
+              <button key={l} className={`${s.chip} ${l === pick.leg ? s.chipOn : ""}`} onClick={() => onPatch({ leg: l })}>
+                <span className={s.chipLabel}>{l}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {pick.specials.length > 0 && (
+        <div>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>For every sofa in this quote</span></div>
+          <div className={s.chips} style={{ marginTop: 6 }}>
+            {pick.specials.map(sp => {
+              const on = pick.picked.includes(sp);
+              return (
+                <button key={sp} className={`${s.chip} ${s.chipWords} ${on ? s.chipOn : ""}`} aria-pressed={on}
+                  onClick={() => onPatch({ specials: on ? pick.picked.filter(x => x !== sp) : [...pick.picked, sp] })}>
+                  <span className={s.chipLabel}>{sp}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

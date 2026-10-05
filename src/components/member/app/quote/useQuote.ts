@@ -5,8 +5,9 @@ import type { MemberBand, QuoteInput, QuoteResult } from "@/lib/member/types";
 import type { Outcome } from "../source";
 import { calcVM, press as pressKey, quoteInput, type CalcVM } from "./calc-model";
 import {
-  EMPTY_MEMORY, addLines, bump as bumpLine, defaultSize, firstFrame, itemCount, layoutFits, layoutKey, remember, sheetLines, sofaPick,
-  type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type RecentSet, type SheetState, type SizeKey,
+  EMPTY_MEMORY, NO_SOFA_BUILD, addLines, bump as bumpLine, defaultSize, firstFrame, itemCount, layoutFits, layoutKey, remember, sheetLines, sofaBuildOf,
+  sofaBuildToSend, sofaPick,
+  type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type RecentSet, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
 
 /** The design preview's starting point: the prototype's own cart, memory and open sheet. */
@@ -41,7 +42,7 @@ interface Kept {
   cart: CartLine[];
   price: string;
   fee: string;
-  build: { height: string | null; tier: string | null };
+  build: SofaBuild;
 }
 
 function read<T>(storage: () => Storage, key: string): T | null {
@@ -63,7 +64,7 @@ export function useQuote(args: UseQuoteArgs) {
   const [cart, setCart] = useState<CartLine[]>(initial?.cart ?? []);
   const [price, setPrice] = useState(initial?.price ?? "");
   const [fee, setFee] = useState("");
-  const [build, setBuild] = useState<Kept["build"]>({ height: null, tier: null });
+  const [build, setBuild] = useState<SofaBuild>(NO_SOFA_BUILD);
   const [sheet, setSheet] = useState<SheetState | null>(initial?.sheet ?? null);
   const [cartOpen, setCartOpen] = useState(false);
   const [allOpen, setAllOpen] = useState(false);
@@ -81,7 +82,7 @@ export function useQuote(args: UseQuoteArgs) {
       setCart(kept.cart);
       setPrice(typeof kept.price === "string" ? kept.price : "");
       setFee(typeof kept.fee === "string" ? kept.fee : "");
-      setBuild(kept.build ?? { height: null, tier: null });
+      setBuild(sofaBuildOf(kept.build));
     }
     const mem = read<QuoteMemory>(() => localStorage, `rv-quote-memory-${storeKey}`);
     if (mem && typeof mem === "object") setMemory({ ...EMPTY_MEMORY, ...mem });
@@ -116,7 +117,7 @@ export function useQuote(args: UseQuoteArgs) {
   const setBrand = useCallback((code: string) => {
     if (code === brand) return;
     setBrandState(code);
-    setCart([]); setPrice(""); setQuery(""); setCartOpen(false); setBuild({ height: null, tier: null }); setSheet(null);
+    setCart([]); setPrice(""); setQuery(""); setCartOpen(false); setBuild(NO_SOFA_BUILD); setSheet(null);
   }, [brand]);
 
   // ── sheets ──
@@ -125,26 +126,29 @@ export function useQuote(args: UseQuoteArgs) {
     return model ? (memory.layouts[brand] ?? []).filter(mods => layoutFits(model, mods)) : [];
   }, [catalog, memory.layouts, brand]);
 
+  // A sofa sheet opens on the cart's leg height and specials: one build makes every sofa in it.
   const openModel = useCallback((key: string) => {
     const model = catalog?.models.find(m => m.key === key);
     if (!model) return;
     setAllOpen(false);
     if (catalog?.sofa) {
       const first = layouts(key)[0];
-      setSheet({ mode: "sofa", key, layout: first ? "R0" : "C", mods: first ? { ...first } : {}, qty: 1, kpi: [], height: null, tier: null });
+      setSheet({ mode: "sofa", key, layout: first ? "R0" : "C", mods: first ? { ...first } : {}, qty: 1, kpi: [], height: null, tier: null,
+        leg: build.leg, specials: [...build.specials] });
     } else {
       setSheet({ mode: "model", key, size: defaultSize(model.sizes), acc: {}, qty: 1, bfs: [], fx: null, accAll: false });
     }
-  }, [catalog, layouts]);
+  }, [catalog, layouts, build.leg, build.specials]);
 
   const applySet = useCallback((r: RecentSet) => {
     if (r.kind === "sofa") {
       const i = layouts(r.key).findIndex(m => layoutKey(m) === layoutKey(r.mods));
-      setSheet({ mode: "sofa", key: r.key, layout: i >= 0 ? `R${i}` : "C", mods: { ...r.mods }, qty: 1, kpi: [...r.kpi], height: null, tier: null });
+      setSheet({ mode: "sofa", key: r.key, layout: i >= 0 ? `R${i}` : "C", mods: { ...r.mods }, qty: 1, kpi: [...r.kpi], height: null, tier: null,
+        leg: build.leg, specials: [...build.specials] });
     } else {
       setSheet({ mode: "model", key: r.key, size: r.size, acc: {}, qty: 1, bfs: r.bfs.map(b => ({ ...b, kpi: [...b.kpi] })), fx: null, accAll: false });
     }
-  }, [layouts]);
+  }, [layouts, build.leg, build.specials]);
 
   const openFrameOnly = useCallback(() => {
     if (!catalog) return;
@@ -181,10 +185,11 @@ export function useQuote(args: UseQuoteArgs) {
     }
     const lines = sheetLines(sheet, catalog);
     if (!lines.length) return;
-    if (sheet.mode === "sofa") {
-      const pick = sofaPick(sheet, catalog, cart, build);
-      if (pick.clash) return;
-      if (pick.graded) setBuild({ height: pick.height, tier: pick.tier });
+    const sofa = sheet.mode === "sofa" ? sofaPick(sheet, catalog, cart, build) : null;
+    if (sofa?.clash) return;
+    if (sofa) {
+      // The sheet's seat height, tier, leg height and specials become every sofa's in the cart.
+      setBuild(b => ({ ...(sofa.graded ? { height: sofa.height, tier: sofa.tier } : { height: b.height, tier: b.tier }), leg: sofa.leg, specials: sofa.picked }));
     }
     setCart(c => addLines(c, lines));
     setMemory(m => remember(m, sheet, brand));
@@ -200,7 +205,7 @@ export function useQuote(args: UseQuoteArgs) {
 
   // ── step 2 ──
   const press = useCallback((key: string) => setPrice(p => pressKey(p, key)), []);
-  const input = useMemo(() => quoteInput(schemeId, cart, price, fee, build), [schemeId, cart, price, fee, build]);
+  const input = useMemo(() => quoteInput(schemeId, cart, price, fee, sofaBuildToSend(build, catalog, cart)), [schemeId, cart, price, fee, build, catalog]);
   const inputKey = input ? JSON.stringify(input) : "";
   const [answer, setAnswer] = useState<{ key: string; result: QuoteResult | null; error: string | null } | null>(null);
   const latest = useRef(inputKey);
@@ -240,6 +245,8 @@ export function useQuote(args: UseQuoteArgs) {
 
   return {
     brand, catalog, cart, items, price, fee, build, sheet, cartOpen, allOpen, query, previewOpen, memory, vm, confirmed, readOnly,
+    /** The sofas' build the confirmed quote was costed with — what the customer's quote states. */
+    quotedBuild: confirmed ? input?.build : undefined,
     setBrand, setFee: (v: string) => setFee(v.replace(/[^0-9.]/g, "")), setQuery, setAllOpen, setCartOpen, toggleCart, setPreviewOpen,
     openModel, applySet, openFrameOnly, openAccOnly, closeSheet, patch, patchFrame, openBf, editBf, removeBf, backToMattress, applyFrame, addSheet,
     bump, remove, clearCart, press, applyNext,
