@@ -1383,11 +1383,13 @@ VP's. The member C release above describes the screens this replaced.
   *Leg height* is drawn as a bed frame's heights are: an *FOC · Free of charge*
   chip plus each leg turned ON on Modular that Maintenance charges (*6" · + RM
   100*), captioned *Once per sofa · not in margin*; no charged leg, no row.
-  *Specials* are toggle chips — one with a charge carries its *+ RM x* under the
-  name — captioned *Once per sofa · not in margin* when any is charged, else
-  *For every sofa in this quote*. One build makes every sofa in the cart, so
-  only what every sofa model in it was turned ON for is offered. A bed frame's
-  *Specials* row shows charges the same way (*Charged on top · not in margin*).
+  *Specials* are toggle chips, each with its *+ RM x* under the name, captioned
+  *Once per sofa · not in margin* — and only a special Maintenance charges is a
+  chip (user, same day: "if there is no price … just don't show it"): turned ON
+  with no price, it is not shown; none charged, no row. One build makes every
+  sofa in the cart, so only what every sofa model in it was turned ON for is
+  offered. A bed frame's *Specials* row is the same (*Charged on top · not in
+  margin*).
   A special is named in words, so its chip grows to them (`.chipWords`). The
   customer quote's *Sofa build* line names them, a bed frame line carries its
   own build in brackets, and the card's **Total** is step 2's *Customer pays*:
@@ -2546,6 +2548,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Revenue app · only priced specials)** — on the Quote, a bed frame's or sofa's *Specials* row shows only the specials Maintenance charges, each with its *+ RM x*; one turned ON on Modular with no price is not shown, and the captions are always *Charged on top · not in margin* / *Once per sofa · not in margin* (*Optional* and *For every sofa in this quote* are gone). The sofa's *Leg height* row — FOC + the charged legs — now shows on the live app too: the catalogue reader had kept only a bed frame's charges. Maintenance's *Specials* notes say a blank or 0 is not offered.
 - **2026-10-06 (Revenue app · when it cannot load)** — the Revenue app's error page is no longer the old *HOUZS VENTURE · Unable to load your workspace* page (same beige band): it is the same frame as the loading screen with, in the middle, a red alert circle, *Couldn't open the Revenue app*, *Try again* (a fresh load) and the error's *Ref* for the logs. See *While it loads, and when it cannot*.
 - **2026-10-06 (Revenue app · while it loads)** — opening or refreshing the Revenue app no longer shows the old *HOUZS VENTURE · Preparing your Revenue workspace…* page (with a beige band above it and a page that scrolled): it shows the app's own frame — the phone header on Today, the bottom bar lit on the tab being opened (the sidebar on a desktop) — and one orange spinner where the page will be. When the app lands, nothing in the frame moves. See *While it loads, and when it cannot*.
 - **2026-10-06 (Revenue app · pull to refresh)** — the minute's background refresh is gone: the app changes only when pulled (or on return after 10 minutes away). The pull's dot, its armed and spinning states and the *Couldn't refresh* pill are under *Pull to refresh* in the Revenue app section.

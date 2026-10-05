@@ -237,12 +237,21 @@ describe("a bed frame's own build", () => {
   const frameSheet = (build?: BedframeBuild): SheetState =>
     ({ mode: "frame", size: "K", frame: "m-cody", kpi: [], qty: 1, drop: false, ...(build ? { build } : {}) });
 
-  it("reads each frame's charges and specials from the catalogue's models; a frame with none is all FOC", () => {
+  it("reads each frame's charges from the catalogue's models; a frame with none is all FOC", () => {
     const c = withCharges();
     expect(c.frames.find(f => f.key === "m-cody")?.choices).toEqual({
-      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], totals: [], specials: ["HB Straight"], specialCharges: [],
+      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], totals: [], specials: [],
     });
-    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], totals: [], specials: [], specialCharges: [] });
+    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], totals: [], specials: [] });
+  });
+
+  // 2026-10-06 (user): "if there is no price written in Maintenance, then just don't show it".
+  it("offers a special only when Maintenance charges it — turned ON with no price, it is not shown and drops out", () => {
+    // CODY has HB Straight turned ON on Modular and no price for it.
+    expect(withCharges().frames.find(f => f.key === "m-cody")?.choices.specials).toEqual([]);
+    const [line] = sheetLines(frameSheet({ leg: '6"', specials: ["HB Straight"] }), withCharges());
+    expect(line).toMatchObject({ bedframe: { leg: '6"' }, charge: 100 });
+    expect(line.bedframe?.specials).toBeUndefined();
   });
 
   // 2026-10-06: a bed frame's special is charged on top too, when Maintenance prices it.
@@ -284,9 +293,10 @@ describe("a bed frame's own build", () => {
 
 // 2026-10-06 (user): a sofa's leg height and specials — the old builder's, left out by the
 // revamp; then "我要那些价钱是不会算进 margin 的": a leg height is offered as a bed frame's
-// is — FOC plus the ones Maintenance CHARGES — and a special with its charge. Only what
-// Modular turned ON, only what EVERY sofa model in the cart takes (one build makes every
-// sofa in it, the server's buildChoicesFor), charged once per sofa ("整组 sofa 只加一次").
+// is — FOC plus the ones Maintenance CHARGES — and a special only when Maintenance charges
+// it ("if there is no price … just don't show it"). Only what Modular turned ON, only what
+// EVERY sofa model in the cart takes (one build makes every sofa in it, the server's
+// buildChoicesFor), charged once per sofa ("整组 sofa 只加一次").
 describe("a sofa's leg height and specials", () => {
   const SOFAS: MemberProduct[] = [
     ...PRODUCTS,
@@ -295,35 +305,38 @@ describe("a sofa's leg height and specials", () => {
   ];
   const LEG4 = { value: '4"', charge: 80 };
   const LEG6 = { value: '6"', charge: 100 };
+  const ARM = { value: "Wooden Arm", charge: 120 };
   const SEAT = { value: "Seat Add 1ft", charge: 150 };
+  // Pillow Back is turned ON for 2376 with no price: never offered.
   const MODELS = [
-    { id: "m-2376", kind: "SOFA" as const, options: { leg_heights: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"] },
-      charges: { leg_heights: [LEG4, LEG6], specials: [SEAT] } },
+    { id: "m-2376", kind: "SOFA" as const, options: { leg_heights: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft", "Pillow Back"] },
+      charges: { leg_heights: [LEG4, LEG6], specials: [ARM, SEAT] } },
     { id: "m-810", kind: "SOFA" as const, options: { leg_heights: ['6"'], specials: ["Wooden Arm"] },
-      charges: { leg_heights: [LEG6] } },
+      charges: { leg_heights: [LEG6], specials: [ARM] } },
   ];
   const z = () => catalogFromProducts(SOFAS, "ZANOTTI", "Zanotti", [], MODELS);
   const sheet = (key: string, leg: string | null = null, specials: string[] = []): Extract<SheetState, { mode: "sofa" }> =>
     ({ mode: "sofa", key, layout: "C", mods: { "2S": 1 }, qty: 1, kpi: [], height: null, tier: null, leg, specials });
   const inCart = (key: string, productId: string, qty = 1): CartLine => ({ id: `s-${productId}`, kind: "sofa", key, name: key, size: "", qty, productId });
 
-  it("reads each sofa model's charged legs, its specials and their charges; a model with none offers nothing", () => {
-    expect(z().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [LEG4, LEG6], specials: ["Wooden Arm", "Seat Add 1ft"], specialCharges: [SEAT] });
-    expect(zanotti().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [], specials: [], specialCharges: [] });
+  it("reads each sofa model's charged legs and charged specials; a model with none offers nothing", () => {
+    expect(z().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [LEG4, LEG6], specials: [ARM, SEAT] });
+    expect(zanotti().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [], specials: [] });
     expect(sofaPick(sheet("m-2376"), zanotti(), [], NO_SOFA_BUILD)).toMatchObject({ legs: [], specials: [], leg: null, picked: [] });
   });
 
-  it("offers FOC plus the charged legs, every special with its charge, and keeps the sheet's choices", () => {
+  it("offers FOC plus the charged legs and only the charged specials, and keeps the sheet's choices", () => {
     expect(sofaPick(sheet("m-2376", '4"', ["Seat Add 1ft"]), z(), [], NO_SOFA_BUILD)).toMatchObject({
-      legs: [LEG4, LEG6], specials: ["Wooden Arm", "Seat Add 1ft"], specialCharges: [SEAT], leg: '4"', picked: ["Seat Add 1ft"],
+      legs: [LEG4, LEG6], specials: [ARM, SEAT], leg: '4"', picked: ["Seat Add 1ft"],
     });
-    // Turned ON but charged nothing: FOC, not a choice of its own.
+    // Turned ON but charged nothing: a leg is FOC, not a choice of its own; a special is not offered at all.
     expect(sofaPick(sheet("m-2376", "No Leg"), z(), [], NO_SOFA_BUILD).leg).toBeNull();
+    expect(sofaPick(sheet("m-2376", null, ["Pillow Back", "Wooden Arm"]), z(), [], NO_SOFA_BUILD).picked).toEqual(["Wooden Arm"]);
   });
 
   it("offers only what every sofa model in the cart takes, and drops a choice another model does not", () => {
     const pick = sofaPick(sheet("m-810", '4"', ["Seat Add 1ft", "Wooden Arm"]), z(), [inCart("m-2376", "2376-2s")], NO_SOFA_BUILD);
-    expect(pick).toMatchObject({ legs: [LEG6], specials: ["Wooden Arm"], specialCharges: [], leg: null, picked: ["Wooden Arm"] });
+    expect(pick).toMatchObject({ legs: [LEG6], specials: [ARM], leg: null, picked: ["Wooden Arm"] });
   });
 
   it("matches a value however the ERP spells it, and answers in the list's spelling", () => {
@@ -337,6 +350,7 @@ describe("a sofa's leg height and specials", () => {
       .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: ["Wooden Arm"] });
     // Turned OFF on Modular (or no longer charged) since: it drops out.
     expect(sofaBuildToSend(build, zanotti(), [inCart("m-2376", "2376-2s")])).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [] });
+    expect(sofaBuildToSend({ ...build, specials: ["Pillow Back", "Seat Add 1ft"] }, z(), [inCart("m-2376", "2376-2s")]).specials).toEqual(["Seat Add 1ft"]);
   });
 
   it("charges the cart's sofas once a sofa until the server says: two pieces of one model are one sofa", () => {

@@ -1456,10 +1456,20 @@ frame's specials: *"一样改成向客户加收"*.
   five-piece 8030 with Nylon Fabric at RM 50: RM 50 once, not RM 250.
 - **On the Quote.** A sofa's *Leg height* is offered as a bed frame's heights are:
   FOC plus the legs turned ON on Modular that Maintenance charges (*Once per sofa ·
-  not in margin*); every special turned ON is a chip with its "+ RM x". A bed
-  frame's specials show their charge the same way. Step 2 and the customer quote
+  not in margin*). A special — a sofa's or a bed frame's — is offered only when
+  Maintenance charges it, a chip with its "+ RM x" (user, the same day: *"if there
+  is no price written in Maintenance, then just don't show it, just show the one
+  have price"*): turned ON with no price, it is not on the Quote, and the server
+  refuses it on a bed frame (`frameBuildError`). Step 2 and the customer quote
   say *Option charges*; the calculator's twin is `sofaSetCharges`
   (lib/catalogue/pricing.ts) — the cart's one sofa build on every piece of a model.
+  A bill from the ERP is another matter: an unpriced special on it is simply free.
+- **One reader.** The snapshot and the quote both read the models through
+  `catalogueModelsOf` (lib/member/priced-catalogue.ts), which kept only a bed
+  frame's height charges until the same day — so the live sofa sheet never showed
+  its *Leg height* row (5030's 5" at RM 200 was priced and invisible). It keeps
+  each kind's charges now: a bed frame's heights and specials, a sofa's leg and
+  specials. The server charged correctly throughout (it prices from the pools).
 - **Nothing moved.** `catalogue_option_prices` was empty on 2026-10-06: a dry run
   re-priced every line since August (5,177) with no cost or charge moving. With
   test prices (sofa 6" leg RM 100, Nylon Fabric RM 50, bed frame HYDRAULIC RM 300)

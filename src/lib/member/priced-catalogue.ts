@@ -40,7 +40,15 @@ function optionList(v: unknown): string[] {
   });
 }
 
-const CHARGE_KEYS = ["divan_heights", "leg_heights", "gaps", "total_heights"] as const;
+/**
+ * What each kind may be charged for: a bed frame's divan, leg, gap and total
+ * height (20261005010000) and its specials, a sofa's leg height and specials
+ * (20261006050000 — every Maintenance price is the customer's).
+ */
+const CHARGE_KEYS = {
+  BEDFRAME: ["divan_heights", "leg_heights", "gaps", "total_heights", "specials"],
+  SOFA: ["leg_heights", "specials"],
+} as const;
 
 /** `[{ value, charge }]`, each a short value and a charge above zero — anything else is dropped. */
 function chargeList(v: unknown): OptionCharge[] {
@@ -67,10 +75,9 @@ export function catalogueModelsOf(raw: unknown): MemberCatalogueModel[] {
       const list = optionList(src[key]);
       if (list.length) options[key] = list;
     }
-    // A bed frame's chargeable divan, leg, gap and total height (20261005010000).
     const charges: MemberModelCharges = {};
-    const chargeSrc = kind === "BEDFRAME" && isRow(m.charges) ? m.charges : {};
-    for (const key of CHARGE_KEYS) {
+    const chargeSrc = isRow(m.charges) ? m.charges : {};
+    for (const key of CHARGE_KEYS[kind]) {
       const list = chargeList(chargeSrc[key]);
       if (list.length) charges[key] = list;
     }
