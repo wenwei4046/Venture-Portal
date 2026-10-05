@@ -1359,6 +1359,17 @@ src/
 │   │                                  `member-admin/claim-rates-actions.ts`,
 │   │                                  rules in `lib/member/claim-rates-admin.ts`
 │   │                                  = the RPC's; gate as Brand weeks).
+│   │                                  The form reads them through
+│   │                                  `member_claim_settings()` — it called
+│   │                                  `member_claim_rates`, the TABLE, so until
+│   │                                  2026-10-06 no claim could be sent;
+│   │                                  `lib/member/rpc-names.test.ts` now finds
+│   │                                  every RPC the member app calls among the
+│   │                                  migrations' functions. In View as the three
+│   │                                  forms open on the viewed person's choices
+│   │                                  and send nothing — *Read-only while
+│   │                                  viewing as* (user 2026-10-06: 只能看，不能
+│   │                                  送出); only the member's own login sends.
 │   │                                  **My brand weeks** (Profile chip / Today's
 │   │                                  reminder; no prototype page) = this
 │   │                                  month's weekends then the month still

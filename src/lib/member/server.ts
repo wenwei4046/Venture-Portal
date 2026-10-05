@@ -1185,12 +1185,17 @@ export async function cancelMemberRequest(id: string): Promise<MemberOutcome<Mem
   });
 }
 
-/** HR's claim rates: the base, the rate per spot, Airbnb per person per night, the regions' spots. */
+/**
+ * HR's claim rates: the base, the rate per spot, Airbnb per person per night, the regions' spots.
+ * The function is `member_claim_settings()`; `member_claim_rates` is HR's TABLE, and asking for it
+ * as a function failed every time — the form had no region and no rate, so no claim could be sent
+ * (found 2026-10-06).
+ */
 export async function loadMemberClaimRates(): Promise<MemberOutcome<unknown>> {
   return outcome(async () => {
     const user = await getMemberUser();
     const client = await session("member_portal", !!user && isPrincipalAccount(user));
-    return rpc<unknown>(client, "member_claim_rates");
+    return rpc<unknown>(client, "member_claim_settings");
   });
 }
 

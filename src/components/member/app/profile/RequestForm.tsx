@@ -39,6 +39,7 @@ export default function RequestForm({ kind, options, revising, readOnly, onSubmi
   options: FormOptions;
   /** HR returned this request: its details come back to be updated. */
   revising: { id: string; detail: Record<string, unknown> } | null;
+  /** A Principal viewing somebody: the form fills in with that person's choices, and sends nothing. */
   readOnly: boolean;
   onSubmit: (form: FormData) => Promise<SubmitOutcome>;
   onClose: () => void;
@@ -419,7 +420,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose }: {
         {error && <p className={s.formError} role="alert">{error}</p>}
       </div>
       <div className={s.rfFoot}>
-        <button className={s.rfCta} onClick={() => void submit()} disabled={busy || readOnly}>{busy ? "Sending…" : revising ? "Send the update" : cta}</button>
+        {/* View as: the form opens and fills in as the member's would, and sends nothing (the Quote's add button reads the same). */}
+        <button className={s.rfCta} onClick={() => void submit()} disabled={busy || readOnly}>
+          {readOnly ? "Read-only while viewing as" : busy ? "Sending…" : revising ? "Send the update" : cta}
+        </button>
       </div>
     </>
   );

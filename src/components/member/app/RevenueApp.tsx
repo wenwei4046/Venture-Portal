@@ -604,8 +604,12 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     });
   }, [fxp, orgMap, membership, viewed?.id, data.profile.id, arena?.people, working, period, kpiRule]);
 
+  // The member's own team here — in View as the viewed person's (the Principal's snapshot marks nobody
+  // `self`): whom a replacement may name, and whether My income has an overriding side.
+  const team = useMemo(() => replaceable(principal && viewed && membership
+    ? { ...membership, people: membership.people.map(p => ({ ...p, self: p.id === viewed.id })) } : membership), [principal, viewed, membership]);
+  const hasTeam = team.length > 0;
   // My income: the month being worked unless another is picked — live until the close, fixed after.
-  const hasTeam = useMemo(() => replaceable(principal && viewed ? membership && { ...membership, people: membership.people.map(p => ({ ...p, self: p.id === viewed.id })) } : membership).length > 0, [principal, viewed, membership]);
   const incMonth = incPeriod ?? working ?? period;
   const incKey = `${membershipId}|${context?.staffId ?? ""}|${incMonth}`;
   const [incomeByKey, setIncomeByKey] = useState<Record<string, MemberIncome>>({});
@@ -701,25 +705,26 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   };
 
   // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
+  // View as reads them too — the forms open on the viewed person's choices (and send nothing).
   const [claimRates, setClaimRates] = useState<ClaimRates | null>(null);
   useEffect(() => {
-    if (fxp || route.screen !== "account" || route.pf !== "requests" || claimRates || readOnlyView) return;
+    if (fxp || route.screen !== "account" || route.pf !== "requests" || claimRates || (principal && !viewed)) return;
     let stale = false;
     void source.claimRates().then(r => { if (!stale && r.ok) setClaimRates(r.data); });
     return () => { stale = true; };
-  }, [fxp, route.screen, route.pf, claimRates, readOnlyView, source]);
+  }, [fxp, route.screen, route.pf, claimRates, principal, viewed, source]);
   const formOptions: FormOptions = useMemo(() => {
     if (fxp) return fxp.form;
     return {
       subName: membership?.name ?? "",
       weeks: claimWeeks([arena, arenaNow], today),
       rates: claimRates ?? { base: "Klang Valley", perSpot: null, perPaxNight: null, regions: [] },
-      members: replaceable(membership),
+      members: team,
       departments: data.departments ?? [],
       departmentId: membership?.id ?? "",
       waitingList: waitingChoices(myRequests),
     };
-  }, [fxp, membership, arena, arenaNow, today, claimRates, data.departments, myRequests]);
+  }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests]);
 
   const signOut = () => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); };
 
@@ -837,7 +842,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     } else if (pf === "team") {
       page = <TeamPage vm={teamView} onBack={back} onPerson={setPersonPick} />;
     } else if (pf === "requests") {
-      page = <RequestsPage rows={reqRows} filter={reqFilter} readOnly={readOnlyView} onFilter={setReqFilter} onBack={back}
+      page = <RequestsPage rows={reqRows} filter={reqFilter} onFilter={setReqFilter} onBack={back}
         onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
