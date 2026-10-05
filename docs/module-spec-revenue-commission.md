@@ -1395,8 +1395,9 @@ comm"*); specials stay as they were.
   height priced on Product List › Maintenance above zero (the column reads
   *Charge (RM)* there; 0 or blank = FOC). It is the customer's price for the
   option, paid on top of the selling price. A bed frame's specials, and a sofa's
-  leg height and specials, are still a COST surcharge (*Surcharge (RM)*). A
-  sofa's seat size carries no price (CHECKs on `catalogue_option_prices`).
+  leg height and specials, were still a COST surcharge (*Surcharge (RM)*) until
+  2026-10-06 — now charges too (§4.18). A sofa's seat size carries no price
+  (CHECKs on `catalogue_option_prices`).
 - **On a sales line.** `option_charge_amount` = qty × Σ the line's divan, leg,
   gap and total height charges, read from its `raw.variants` / `description2` like every option
   (`catalogue_line_option_charge`), filled where the cost is: on every line that
@@ -1425,6 +1426,45 @@ Comm Cal's *Commissionable value* card and the director incentive threshold read
 price, so every cost, margin and commission stayed what it was — Fair August
 RM 193,427.45 and September RM 160,629.60, person by person, before = after
 (mig `20261005010000`).
+
+### 4.18 Every option price is a charge — a sofa's once per sofa (2026-10-06)
+
+Told that a bed frame's specials and a sofa's leg height and specials were still
+a cost, the user: *"我要那些价钱是不会算进 margin 的，加 100 就一定 default calculator
+100"*; asked how a sofa of three pieces is charged: *"整组 sofa 只加一次"*; and a bed
+frame's specials: *"一样改成向客户加收"*.
+
+- **Every priced pool is a charge.** Whatever Product List › Maintenance prices —
+  a bed frame's divan, leg, gap, total height and specials; a sofa's leg height
+  and specials — is what the customer pays on top: out of the margin on both
+  sides, in the commissionable sales, never KPI (§4.17's rule, for all of them).
+  No option adds to a line's cost any more (`catalogue_line_surcharge` answers
+  0), and no price is negative (CHECK `catalogue_option_prices_charge_not_negative`
+  on every pool — the ERP's "No Side Panel −RM 40" can no longer be keyed).
+- **A bed frame, per frame.** `option_charge_amount` = qty × (its divan, leg, gap,
+  total height and each distinct special), on its own line as it lands
+  (`catalogue_line_option_charge` → `catalogue_line_charge`, 7 arguments).
+- **A sofa, once per sofa.** The ERP writes one line per module, so a sofa line is
+  charged nothing as it lands; at commit, beside the combos
+  (`sales_order_lines_apply_combos` → `catalogue_apply_sofa_charges`), an
+  order's sofa lines are grouped by base model — the combos' grouping, one sofa a
+  model — every distinct leg height and special any piece names is charged once,
+  times the sets: the smallest line quantity (2A-LHF ×2 + CNR ×2 + 2A-RHF ×2 is two
+  sofas; ×1 / ×2 / ×1 is one sofa with two middle pieces). The set's total is
+  spread over its lines in proportion to their sales, the rounding to the dearest
+  (`cost_detail.charges` + `charge_set`); Recost does the same. RM 8,338 for a
+  five-piece 8030 with Nylon Fabric at RM 50: RM 50 once, not RM 250.
+- **On the Quote.** A sofa's *Leg height* is offered as a bed frame's heights are:
+  FOC plus the legs turned ON on Modular that Maintenance charges (*Once per sofa ·
+  not in margin*); every special turned ON is a chip with its "+ RM x". A bed
+  frame's specials show their charge the same way. Step 2 and the customer quote
+  say *Option charges*; the calculator's twin is `sofaSetCharges`
+  (lib/catalogue/pricing.ts) — the cart's one sofa build on every piece of a model.
+- **Nothing moved.** `catalogue_option_prices` was empty on 2026-10-06: a dry run
+  re-priced every line since August (5,177) with no cost or charge moving. With
+  test prices (sofa 6" leg RM 100, Nylon Fabric RM 50, bed frame HYDRAULIC RM 300)
+  September would have charged 7 bed frame lines and 42 of its 95 sofa bills,
+  RM 2,200 in all — rolled back. Mig `20261006050000`.
 
 ## 5. Tax — Withholding instead of PCB
 

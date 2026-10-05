@@ -33,7 +33,7 @@ describe('where a line’s cost came from', () => {
   })
 })
 
-describe('what a line’s bed frame options were charged for', () => {
+describe('what a line’s options were charged for', () => {
   it('names each charged option from cost_detail.charges (20261005010000)', () => {
     const detail = {
       how: 'price',
@@ -47,8 +47,25 @@ describe('what a line’s bed frame options were charged for', () => {
   })
 
   it('says so plainly when the line carries no explanation (a hand-costed line)', () => {
-    expect(chargeText(null)).toBe('for bed frame options')
-    expect(chargeText({ how: 'price' })).toBe('for bed frame options')
-    expect(chargeText({ charges: [{ pool: 'bedframe_specials', value: 'X' }, null, 'junk'] })).toBe('for bed frame options')
+    expect(chargeText(null)).toBe('for its options')
+    expect(chargeText({ how: 'price' })).toBe('for its options')
+    expect(chargeText({ charges: [{ pool: 'mattress_tags', value: 'X' }, null, 'junk'] })).toBe('for its options')
+  })
+
+  // 2026-10-06: a special is charged too, and a sofa once per sofa, spread over its pieces.
+  it('names a special by itself, and a sofa’s charge once for the sofa', () => {
+    expect(chargeText({ charges: [{ pool: 'bedframe_specials', value: 'Hydraulic', price: 300 }] })).toBe('for Hydraulic')
+    const sofa = {
+      charges: [
+        { pool: 'sofa_leg_heights', value: '6"', price: 100 },
+        { pool: 'sofa_specials', value: 'Nylon Fabric', price: 50 },
+      ],
+      charge_set: { unit: 150, sets: 1, total: 150, lines: 5 },
+    }
+    expect(chargeText(sofa)).toBe('for leg 6" · Nylon Fabric — RM 150.00 once for the sofa, spread over its 5 pieces')
+    expect(chargeText({ ...sofa, charge_set: { unit: 150, sets: 2, total: 300, lines: 3 } }))
+      .toBe('for leg 6" · Nylon Fabric — RM 300.00 for 2 sofas, spread over its 3 pieces')
+    expect(chargeText({ ...sofa, charge_set: { unit: 150, sets: 1, total: 150, lines: 1 } }))
+      .toBe('for leg 6" · Nylon Fabric — RM 150.00 once for the sofa')
   })
 })

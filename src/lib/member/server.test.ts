@@ -350,13 +350,17 @@ describe('the catalogue behind the member calculator', () => {
     )))
   })
 
-  it('adds the build options the model was ticked for, at the portal surcharges', async () => {
+  // 2026-10-06: an option priced on Maintenance is the customer's — once for the sofa, on top, out of the margin.
+  it('charges the options the model was ticked for once for the sofa, on top of the price', async () => {
     const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', leg: '4"', specials: ['Nylon Fabric'] }))
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
-    // (1,000 + 30 + 50) + (1,500 + 30 + 50) = 2,660 → (5,000 − 2,660) ÷ 5,000
-    expect(result.data.margin).toBeCloseTo(46.8, 10)
+    // 1,000 + 1,500 = 2,500 → (5,000 − 2,500) ÷ 5,000; the leg (30) and Nylon (50) once, on top.
+    expect(result.data.margin).toBeCloseTo(50, 10)
+    expect(result.data.optionCharge).toBe(80)
+    expect(result.data.customerPays).toBe(5080)
     expect(result.data.customerText).toContain('Sofa build: seat height 30 · Tier 2 fabric · leg 4" · Nylon Fabric')
+    expect(result.data.customerText).toContain('Option charges: RM 80.00')
   })
 
   it('refuses an option the model was not ticked for', async () => {
@@ -397,7 +401,7 @@ describe('the catalogue behind the member calculator', () => {
     expect(result.data.optionCharge).toBe(120)
     expect(result.data.customerPays).toBe(2120)
     expect(result.data.customerText).toContain('Bed frame build: divan 10" · leg 4" · gap 12"')
-    expect(result.data.customerText).toContain('Bed frame options: RM 120.00')
+    expect(result.data.customerText).toContain('Option charges: RM 120.00')
     expect(result.data.customerText).toContain('Total: RM 2120.00')
   })
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
   EMPTY_MEMORY, NO_SOFA_BUILD, accOrder, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
-  moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaPick, sofaSeats, sofaText,
+  moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
   type CartLine, type QCatalog, type SheetState,
 } from "./quote-model";
 
@@ -240,9 +240,20 @@ describe("a bed frame's own build", () => {
   it("reads each frame's charges and specials from the catalogue's models; a frame with none is all FOC", () => {
     const c = withCharges();
     expect(c.frames.find(f => f.key === "m-cody")?.choices).toEqual({
-      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], totals: [], specials: ["HB Straight"],
+      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], totals: [], specials: ["HB Straight"], specialCharges: [],
     });
-    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], totals: [], specials: [] });
+    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], totals: [], specials: [], specialCharges: [] });
+  });
+
+  // 2026-10-06: a bed frame's special is charged on top too, when Maintenance prices it.
+  it("charges a special Maintenance prices, per frame, and says so", () => {
+    const priced = catalogFromProducts(PRODUCTS, "AKEMI", "Akemi", [], [
+      { ...MODELS[0], charges: { ...MODELS[0].charges, specials: [{ value: "HB Straight", charge: 50 }] } },
+    ]);
+    const [line] = sheetLines(frameSheet({ leg: '6"', specials: ["HB Straight"] }), priced);
+    expect(line).toMatchObject({ bedframe: { leg: '6"', specials: ["HB Straight"] }, charge: 150 });
+    expect(cartMeta(line, "Akemi")).toBe('King · Follows Akemi margin · leg 6" · HB Straight · +RM 150 each');
+    expect(frameMeta({ size: "K", frame: "m-cody", kpi: [], build: { specials: ["HB Straight"] } }, priced)).toBe("King · CODY · HB Straight +RM 50");
   });
 
   it("adds a built frame as its own line, with what it is charged — FOC is no build at all", () => {
@@ -271,43 +282,52 @@ describe("a bed frame's own build", () => {
   });
 });
 
-// 2026-10-06 (user): a sofa's leg height and specials — the old builder's, left out by
-// the revamp. Only what Modular turned ON, and only what EVERY sofa model in the cart
-// takes: one build makes every sofa in it (the server's buildChoicesFor).
+// 2026-10-06 (user): a sofa's leg height and specials — the old builder's, left out by the
+// revamp; then "我要那些价钱是不会算进 margin 的": a leg height is offered as a bed frame's
+// is — FOC plus the ones Maintenance CHARGES — and a special with its charge. Only what
+// Modular turned ON, only what EVERY sofa model in the cart takes (one build makes every
+// sofa in it, the server's buildChoicesFor), charged once per sofa ("整组 sofa 只加一次").
 describe("a sofa's leg height and specials", () => {
   const SOFAS: MemberProduct[] = [
     ...PRODUCTS,
+    product({ id: "2376-2s-b", name: "2376", brand: "ZANOTTI", kind: "SOFA", category: "Sofa", size: "2NA", moduleCode: "2NA", modelId: "m-2376" }),
     product({ id: "810-2s", name: "810", brand: "ZANOTTI", kind: "SOFA", category: "Sofa", size: "2S", moduleCode: "2S", modelId: "m-810" }),
   ];
+  const LEG4 = { value: '4"', charge: 80 };
+  const LEG6 = { value: '6"', charge: 100 };
+  const SEAT = { value: "Seat Add 1ft", charge: 150 };
   const MODELS = [
-    { id: "m-2376", kind: "SOFA" as const, options: { leg_heights: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"] } },
-    { id: "m-810", kind: "SOFA" as const, options: { leg_heights: ['6"'], specials: ["Wooden Arm"] } },
+    { id: "m-2376", kind: "SOFA" as const, options: { leg_heights: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"] },
+      charges: { leg_heights: [LEG4, LEG6], specials: [SEAT] } },
+    { id: "m-810", kind: "SOFA" as const, options: { leg_heights: ['6"'], specials: ["Wooden Arm"] },
+      charges: { leg_heights: [LEG6] } },
   ];
   const z = () => catalogFromProducts(SOFAS, "ZANOTTI", "Zanotti", [], MODELS);
   const sheet = (key: string, leg: string | null = null, specials: string[] = []): Extract<SheetState, { mode: "sofa" }> =>
     ({ mode: "sofa", key, layout: "C", mods: { "2S": 1 }, qty: 1, kpi: [], height: null, tier: null, leg, specials });
-  const inCart = (key: string, productId: string): CartLine => ({ id: `s-${key}`, kind: "sofa", key, name: key, size: "", qty: 1, productId });
+  const inCart = (key: string, productId: string, qty = 1): CartLine => ({ id: `s-${productId}`, kind: "sofa", key, name: key, size: "", qty, productId });
 
-  it("reads each sofa model's turned-ON legs and specials; a model with none offers nothing", () => {
-    const c = z();
-    expect(c.models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"] });
-    expect(zanotti().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [], specials: [] });
+  it("reads each sofa model's charged legs, its specials and their charges; a model with none offers nothing", () => {
+    expect(z().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [LEG4, LEG6], specials: ["Wooden Arm", "Seat Add 1ft"], specialCharges: [SEAT] });
+    expect(zanotti().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [], specials: [], specialCharges: [] });
     expect(sofaPick(sheet("m-2376"), zanotti(), [], NO_SOFA_BUILD)).toMatchObject({ legs: [], specials: [], leg: null, picked: [] });
   });
 
-  it("offers this model's own on an empty cart, and keeps the sheet's choices", () => {
+  it("offers FOC plus the charged legs, every special with its charge, and keeps the sheet's choices", () => {
     expect(sofaPick(sheet("m-2376", '4"', ["Seat Add 1ft"]), z(), [], NO_SOFA_BUILD)).toMatchObject({
-      legs: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"], leg: '4"', picked: ["Seat Add 1ft"],
+      legs: [LEG4, LEG6], specials: ["Wooden Arm", "Seat Add 1ft"], specialCharges: [SEAT], leg: '4"', picked: ["Seat Add 1ft"],
     });
+    // Turned ON but charged nothing: FOC, not a choice of its own.
+    expect(sofaPick(sheet("m-2376", "No Leg"), z(), [], NO_SOFA_BUILD).leg).toBeNull();
   });
 
   it("offers only what every sofa model in the cart takes, and drops a choice another model does not", () => {
     const pick = sofaPick(sheet("m-810", '4"', ["Seat Add 1ft", "Wooden Arm"]), z(), [inCart("m-2376", "2376-2s")], NO_SOFA_BUILD);
-    expect(pick).toMatchObject({ legs: ['6"'], specials: ["Wooden Arm"], leg: null, picked: ["Wooden Arm"] });
+    expect(pick).toMatchObject({ legs: [LEG6], specials: ["Wooden Arm"], specialCharges: [], leg: null, picked: ["Wooden Arm"] });
   });
 
   it("matches a value however the ERP spells it, and answers in the list's spelling", () => {
-    expect(sofaPick(sheet("m-2376", "no leg", ["wooden  arm"]), z(), [], NO_SOFA_BUILD)).toMatchObject({ leg: "No Leg", picked: ["Wooden Arm"] });
+    expect(sofaPick(sheet("m-2376", '6”', ["seat  add 1FT"]), z(), [], NO_SOFA_BUILD)).toMatchObject({ leg: '6"', picked: ["Seat Add 1ft"] });
   });
 
   it("asks the server only for what every sofa in the cart still takes", () => {
@@ -315,8 +335,18 @@ describe("a sofa's leg height and specials", () => {
     expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s")])).toEqual(build);
     expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")]))
       .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: ["Wooden Arm"] });
-    // Turned OFF on Modular since: it drops out.
+    // Turned OFF on Modular (or no longer charged) since: it drops out.
     expect(sofaBuildToSend(build, zanotti(), [inCart("m-2376", "2376-2s")])).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [] });
+  });
+
+  it("charges the cart's sofas once a sofa until the server says: two pieces of one model are one sofa", () => {
+    const build = { height: null, tier: null, leg: '6"', specials: ["Seat Add 1ft"] };
+    expect(sofaCartCharge(z(), [inCart("m-2376", "2376-2s"), inCart("m-2376", "2376-2s-b")], build)).toBe(250);
+    expect(sofaCartCharge(z(), [inCart("m-2376", "2376-2s", 2), inCart("m-2376", "2376-2s-b", 2)], build)).toBe(500);
+    // Two models are two sofas — and the special 810 was not turned ON for is not offered on either.
+    expect(sofaCartCharge(z(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")], build)).toBe(200);
+    expect(sofaCartCharge(z(), [inCart("m-2376", "2376-2s")], NO_SOFA_BUILD)).toBe(0);
+    expect(sofaCartCharge(null, [inCart("m-2376", "2376-2s")], build)).toBe(0);
   });
 
   it("reads a build an older phone kept (seat height and tier only)", () => {

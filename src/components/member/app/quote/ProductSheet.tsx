@@ -1,7 +1,7 @@
 "use client";
 
 import { bedframeKey, tierLabel } from "@/lib/member/catalog";
-import type { FrameChoices } from "@/lib/member/build";
+import { chargeIn, type FrameChoices } from "@/lib/member/build";
 import type { BedframeBuild, OptionCharge } from "@/lib/member/types";
 import { valueKey } from "@/lib/catalogue/keys";
 import { ICON, Svg } from "../icons";
@@ -207,7 +207,7 @@ function FrameSections({ fv, catalog, memory, brandName, hasKpi, onPatch, onRece
           </button>
         </div>
       </div>
-      {frame && <FrameOptions rows={optionRows} specials={frame.choices.specials} build={build} start={3} onBuild={next => onPatch({ build: next })} />}
+      {frame && <FrameOptions rows={optionRows} specials={frame.choices.specials} specialCharges={frame.choices.specialCharges} build={build} start={3} onBuild={next => onPatch({ build: next })} />}
       {hasKpi && (
         <div>
           <div className={s.rowHead}><p className={s.rowHeadTitle}>{kpiNo} · KPI items</p><span className={s.rowHeadCap}>Fixed price · not in margin</span></div>
@@ -245,12 +245,14 @@ function frameOptionRows(c: FrameChoices): OptionRow[] {
 
 /**
  * A bed frame's divan, leg, gap and total height — FOC, or an option charged on top of the
- * price, out of the margin — and its specials (user 2026-10-04: "only show a
- * FOC 1 option and other with charges option").
+ * price, out of the margin — and its specials, each charged on top when Maintenance
+ * prices it (user 2026-10-04: "only show a FOC 1 option and other with charges
+ * option"; specials charged too since 2026-10-06).
  */
-function FrameOptions({ rows, specials, build, start, onBuild }: {
+function FrameOptions({ rows, specials, specialCharges, build, start, onBuild }: {
   rows: OptionRow[];
   specials: string[];
+  specialCharges: OptionCharge[];
   build: BedframeBuild | undefined;
   start: number;
   onBuild: (build: BedframeBuild | undefined) => void;
@@ -291,20 +293,34 @@ function FrameOptions({ rows, specials, build, start, onBuild }: {
       ))}
       {specials.length > 0 && (
         <div>
-          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>Optional</span></div>
-          <div className={s.chips} style={{ marginTop: 6 }}>
-            {specials.map(sp => {
-              const on = picked.some(x => valueKey(x) === valueKey(sp));
-              return (
-                <button key={sp} className={`${s.chip} ${s.chipWords} ${on ? s.chipOn : ""}`} aria-pressed={on} onClick={() => toggle(sp)}>
-                  <span className={s.chipLabel}>{sp}</span>
-                </button>
-              );
-            })}
-          </div>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>{specialCharges.length ? "Charged on top · not in margin" : "Optional"}</span></div>
+          <SpecialChips specials={specials} charges={specialCharges} picked={picked} onToggle={toggle} />
         </div>
       )}
     </>
+  );
+}
+
+/** Specials as chips that wrap their words, each with its charge when Maintenance prices it. */
+function SpecialChips({ specials, charges, picked, onToggle }: {
+  specials: string[];
+  charges: OptionCharge[];
+  picked: string[];
+  onToggle: (sp: string) => void;
+}) {
+  return (
+    <div className={s.chips} style={{ marginTop: 6 }}>
+      {specials.map(sp => {
+        const on = picked.some(x => valueKey(x) === valueKey(sp));
+        const charge = chargeIn(charges, sp);
+        return (
+          <button key={sp} className={`${s.chip} ${s.chipWords} ${on ? s.chipOn : ""}`} aria-pressed={on} onClick={() => onToggle(sp)}>
+            <span className={s.chipLabel}>{sp}</span>
+            {charge > 0 && <span className={s.chipSub}>+ {rm(charge)}</span>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -515,17 +531,18 @@ function SofaSections({ sheet, catalog, memory, pick, hasKpi, onPatch }: {
           </div>
         </div>
       )}
-      {/* Only what Product List › Modular turned ON for this model and every sofa already in the cart. */}
+      {/* Only what Product List › Modular turned ON for this model and every sofa already in the
+          cart; a leg height only when Maintenance charges it (FOC besides), as a bed frame's. */}
       {pick.legs.length > 0 && (
         <div>
-          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Leg height</p><span className={s.rowHeadCap}>For every sofa in this quote</span></div>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Leg height</p><span className={s.rowHeadCap}>Once per sofa · not in margin</span></div>
           <div className={s.chips} style={{ marginTop: 6 }}>
             <button className={`${s.chip} ${pick.leg === null ? s.chipOn : ""}`} onClick={() => onPatch({ leg: null })}>
-              <span className={s.chipLabel}>Not chosen</span>
+              <span className={s.chipLabel}>FOC</span><span className={s.chipSub}>Free of charge</span>
             </button>
-            {pick.legs.map(l => (
-              <button key={l} className={`${s.chip} ${l === pick.leg ? s.chipOn : ""}`} onClick={() => onPatch({ leg: l })}>
-                <span className={s.chipLabel}>{l}</span>
+            {pick.legs.map(o => (
+              <button key={o.value} className={`${s.chip} ${o.value === pick.leg ? s.chipOn : ""}`} onClick={() => onPatch({ leg: o.value })}>
+                <span className={s.chipLabel}>{o.value}</span><span className={s.chipSub}>+ {rm(o.charge)}</span>
               </button>
             ))}
           </div>
@@ -533,18 +550,9 @@ function SofaSections({ sheet, catalog, memory, pick, hasKpi, onPatch }: {
       )}
       {pick.specials.length > 0 && (
         <div>
-          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>For every sofa in this quote</span></div>
-          <div className={s.chips} style={{ marginTop: 6 }}>
-            {pick.specials.map(sp => {
-              const on = pick.picked.includes(sp);
-              return (
-                <button key={sp} className={`${s.chip} ${s.chipWords} ${on ? s.chipOn : ""}`} aria-pressed={on}
-                  onClick={() => onPatch({ specials: on ? pick.picked.filter(x => x !== sp) : [...pick.picked, sp] })}>
-                  <span className={s.chipLabel}>{sp}</span>
-                </button>
-              );
-            })}
-          </div>
+          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>{pick.specialCharges.length ? "Once per sofa · not in margin" : "For every sofa in this quote"}</span></div>
+          <SpecialChips specials={pick.specials} charges={pick.specialCharges} picked={pick.picked}
+            onToggle={sp => onPatch({ specials: pick.picked.includes(sp) ? pick.picked.filter(x => x !== sp) : [...pick.picked, sp] })} />
         </div>
       )}
       {hasKpi && (

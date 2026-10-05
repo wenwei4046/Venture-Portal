@@ -31,7 +31,7 @@ export interface OptionKey {
   /** The Maintenance pool its values come from and are priced in. */
   pool: string
   label: string
-  /** True when choosing it adds a surcharge. */
+  /** True when Maintenance may price it: the customer is then charged for it (2026-10-06). */
   priced: boolean
 }
 
@@ -45,10 +45,10 @@ export function optionKeysOf(category: string | null): OptionKey[] {
       { key: 'specials', pool: 'sofa_specials', label: 'Specials', priced: true },
     ]
   }
-  // A bed frame's divan, leg, gap and total height are offered on the Quote
-  // only when turned ON here (user 2026-10-05) — and then with their charge
-  // when Maintenance prices them, else as FOC (`MemberCatalogueModel.charges`,
-  // 20261005020000). Its specials are a cost, as ever.
+  // Every option is offered on the Quote only when turned ON here (user
+  // 2026-10-05) — and charged to the customer when Maintenance prices it
+  // (`MemberCatalogueModel.charges`; a bed frame per frame, a sofa once per
+  // sofa, 20261006050000). A height nobody priced is FOC; a special, free.
   if (c === 'BEDFRAME') {
     return [
       { key: 'divan_heights', pool: 'bedframe_divan_heights', label: 'Divan height', priced: true },
@@ -64,26 +64,26 @@ export function optionKeysOf(category: string | null): OptionKey[] {
 /**
  * The Maintenance tab's rail, as the ERP draws it (the Products Maintenance
  * pools are not mirrored). `charge`: the price is the customer's, out of the
- * margin (a bed frame's divan, leg, gap and total height); otherwise a priced
- * pool's price is a cost surcharge.
+ * margin — every priced pool since 2026-10-06 (`poolPriceOf`). `note`: what a
+ * price there does, under the table's toolbar.
  */
-export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: Array<{ pool: string; label: string; priced: boolean; charge: boolean }> }> = [
+export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: Array<{ pool: string; label: string; priced: boolean; charge: boolean; note: string }> }> = [
   {
     section: 'Bedframe',
     pools: [
-      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true, charge: true },
-      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true, charge: true },
-      { pool: 'bedframe_gaps', label: 'Gaps', priced: true, charge: true },
-      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true, charge: true },
-      { pool: 'bedframe_specials', label: 'Specials', priced: true, charge: false },
+      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
+      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
+      { pool: 'bedframe_gaps', label: 'Gaps', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
+      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
+      { pool: 'bedframe_specials', label: 'Specials', priced: true, charge: true, note: 'What the customer pays (RM) when a member ticks this special for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is free. The Quote offers every special the bed frame has turned on in Modular, with its charge.' },
     ],
   },
   {
     section: 'Sofa',
     pools: [
-      { pool: 'sofa_sizes', label: 'Sizes', priced: false, charge: false },
-      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true, charge: false },
-      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: false },
+      { pool: 'sofa_sizes', label: 'Sizes', priced: false, charge: false, note: 'ERP choices only. A seat height carries no price here — the price grid of the SKU does; model availability is set on Modular.' },
+      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: 'What the customer pays (RM) for this leg height on the Quote, ONCE per sofa however many pieces — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every leg height charged here that the sofa has turned on in Modular.' },
+      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: true, note: 'What the customer pays (RM) for this special on the Quote, ONCE per sofa however many pieces — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is free. The Quote offers every special the sofa has turned on in Modular, with its charge.' },
     ],
   },
 ]

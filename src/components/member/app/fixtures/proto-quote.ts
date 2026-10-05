@@ -7,8 +7,8 @@
  * Preview only.
  */
 import type { MemberBand } from "@/lib/member/types";
-import type { FrameChoices, SofaChoices } from "@/lib/member/build";
-import { NO_SOFA_CHOICES, type QCatalog, type QModel, type QModule, type QuoteMemory, type SheetState, type SizeKey, type CartLine } from "../quote/quote-model";
+import type { FrameChoices } from "@/lib/member/build";
+import { NO_SOFA_CHOICES, type QCatalog, type QModel, type QModule, type QSofaChoices, type QuoteMemory, type SheetState, type SizeKey, type CartLine } from "../quote/quote-model";
 import type { QuoteInitial } from "../quote/useQuote";
 import type { PriceTable } from "../quote/table-calc";
 
@@ -103,15 +103,20 @@ const sizes = (id: (z: SizeKey) => string) => Object.fromEntries(SIZE_KEYS.map(z
  * The prototype has no bed frame or sofa options; `?charges=1` shows what
  * Modular's ticks and Maintenance's charges would look like (2026-10-05/06).
  */
-const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
+const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [], specialCharges: [] };
 const DEMO_CHARGES: FrameChoices = {
   divans: [{ value: '12"', charge: 50 }],
   legs: [{ value: '6"', charge: 100 }, { value: '7"', charge: 120 }],
   gaps: [{ value: '12"', charge: 20 }],
   totals: [],
   specials: ["Hydraulic", "Divan Top Fully Cover", "HB Straight"],
+  specialCharges: [{ value: "Hydraulic", charge: 300 }],
 };
-const DEMO_SOFA: SofaChoices = { legs: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft", "Seat Base Fully Cover with no Leg"] };
+const DEMO_SOFA: QSofaChoices = {
+  legs: [{ value: '4"', charge: 80 }, { value: '6"', charge: 100 }],
+  specials: ["Wooden Arm", "Seat Add 1ft", "Seat Base Fully Cover with no Leg"],
+  specialCharges: [{ value: "Seat Add 1ft", charge: 150 }],
+};
 
 function catalog(brand: { code: string; name: string; sofa: boolean }, charges = false): QCatalog {
   const models: QModel[] = MODELS[brand.code].map(([key, name, desc]) => ({

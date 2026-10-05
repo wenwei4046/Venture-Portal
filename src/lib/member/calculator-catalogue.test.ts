@@ -5,8 +5,9 @@ import type { MemberBand, MemberProduct, QuoteInput } from "./types";
 /**
  * The calculator at the portal's own prices (user 2026-09-24) — the twin of
  * how the run costs the same sale (catalogue_line_cost + catalogue_apply_combos,
- * migration 20260924030000): SKU price at the build + option surcharges, and a
- * sofa's matched combo costed as the combo.
+ * migration 20260924030000): SKU price at the build, and a sofa's matched combo
+ * costed as the combo. Every option priced on Maintenance is CHARGED to the
+ * customer on top (2026-10-06) — never part of the cost.
  */
 
 const bands: MemberBand[] = [
@@ -63,12 +64,12 @@ const pricing = (over: Partial<QuotePricing> = {}): QuotePricing => ({
     { pool: "sofa_leg_heights", value: '4"', price: 30 },
     { pool: "sofa_specials", value: "Nylon Fabric", price: 50 },
     { pool: "bedframe_divan_heights", value: '10"', price: 100 },
-    { pool: "bedframe_specials", value: "No Side Panel", price: -40 },
+    { pool: "bedframe_specials", value: "Hydraulic", price: 300 },
   ],
   combos: [],
   models: [
     { id: "soffio", kind: "SOFA", options: { leg_heights: ["Default", '4"'], specials: ["Nylon Fabric", "Pillow Back"] } },
-    { id: "y04", kind: "BEDFRAME", options: { divan_heights: ['8"', '10"'], specials: ["No Side Panel"] } },
+    { id: "y04", kind: "BEDFRAME", options: { divan_heights: ['8"', '10"'], specials: ["Hydraulic", "HB Straight"] } },
   ],
   ...over,
 });
@@ -95,31 +96,45 @@ const one = (id: string, quantity = 1) => ({ productId: id, quantity, gift: fals
 const sofa = { height: "30", tier: "PRICE_2" };
 const margin = (cost: number, price = 5000) => ((price - cost) / price) * 100;
 
-describe("option surcharges", () => {
-  it("adds each chosen option's surcharge per unit, times quantity", () => {
+// 2026-10-06 (user): "我要那些价钱是不会算进 margin 的，加 100 就一定 default calculator 100" —
+// every price keyed on Maintenance is what the CUSTOMER pays, on top, out of the
+// margin; a sofa's "整组 sofa 只加一次" — once per sofa, however many pieces.
+describe("option charges", () => {
+  it("charges a sofa's leg and special once per sofa, on top of the price — two of a module are two sofas", () => {
     const r = calculateQuote(quote([one("a", 2)], { ...sofa, leg: '4"', specials: ["Nylon Fabric"] }), products, bands, undefined, pricing());
     expect(r.valid).toBe(true);
-    expect(r.margin).toBeCloseTo(margin(2 * (1000 + 30 + 50)), 10);
+    expect(r.margin).toBeCloseTo(margin(2 * 1000), 10);
+    expect(r.optionCharge).toBe(2 * (30 + 50));
+    expect(r.optionCharges).toEqual([{ label: '8030 SOFFIO · leg 4" · Nylon Fabric', qty: 2, amount: 160 }]);
+    expect(r.customerPays).toBe(5160);
   });
 
-  it("adds nothing for an option the portal has not priced", () => {
+  it("charges a three-piece sofa once, not once a piece", () => {
+    const r = calculateQuote(quote([one("a"), one("b"), one("c")], { ...sofa, leg: '4"', specials: ["Nylon Fabric"] }), products, bands, undefined, pricing());
+    expect(r.margin).toBeCloseTo(margin(1000 + 1500 + 400), 10);
+    expect(r.optionCharge).toBe(80);
+    expect(r.optionCharges).toEqual([{ label: '8030 SOFFIO · leg 4" · Nylon Fabric', qty: 1, amount: 80 }]);
+  });
+
+  it("charges nothing for an option the portal has not priced", () => {
     const r = calculateQuote(quote([one("a")], { ...sofa, leg: "Default", specials: ["Pillow Back"] }), products, bands, undefined, pricing());
     expect(r.margin).toBeCloseTo(margin(1000), 10);
+    expect(r.optionCharge).toBe(0);
   });
 
-  // 2026-10-05: a bed frame's divan is CHARGED to the customer, not costed —
-  // its RM 100 rides on top of the price, out of the margin; a special is still a cost.
-  it("lets a surcharge take money off (the ERP's No Side Panel), and charges the divan on top", () => {
+  // 2026-10-05: a bed frame's divan is CHARGED to the customer; since 2026-10-06 its special too.
+  it("charges a bed frame's divan and special on top of the price, out of the margin", () => {
     const r = calculateQuote(
-      quote([one("y04-q")], { bedframe: { divan: '10"', specials: ["No Side Panel"] } }, "2000"),
+      quote([one("y04-q")], { bedframe: { divan: '10"', specials: ["Hydraulic", "HB Straight"] } }, "2000"),
       products,
       bands,
       undefined,
       pricing(),
     );
-    expect(r.margin).toBeCloseTo(margin(800 - 40, 2000), 10);
-    expect(r.optionCharge).toBe(100);
-    expect(r.customerPays).toBe(2100);
+    expect(r.margin).toBeCloseTo(margin(800, 2000), 10);
+    expect(r.optionCharge).toBe(400);
+    expect(r.optionCharges).toEqual([{ label: 'Y04 · divan 10" · Hydraulic', qty: 1, amount: 400 }]);
+    expect(r.customerPays).toBe(2400);
   });
 
   it("refuses an option the cart's models were not ticked for", () => {
@@ -128,9 +143,10 @@ describe("option surcharges", () => {
     expect(r.error).toMatch(/leg height/);
   });
 
-  it("applies the cost divisor to the options too", () => {
+  it("leaves a charge out of the cost the divisor works on — it is the customer's price", () => {
     const r = calculateQuote(quote([one("a")], { ...sofa, leg: '4"' }), products, bands, { costDivisor: 0.5 }, pricing());
-    expect(r.margin).toBeCloseTo(margin((1000 + 30) / 0.5), 10);
+    expect(r.margin).toBeCloseTo(margin(1000 / 0.5), 10);
+    expect(r.optionCharge).toBe(30);
   });
 });
 

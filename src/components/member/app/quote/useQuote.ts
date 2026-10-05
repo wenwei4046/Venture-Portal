@@ -6,7 +6,7 @@ import type { Outcome } from "../source";
 import { calcVM, press as pressKey, quoteInput, type CalcVM } from "./calc-model";
 import {
   EMPTY_MEMORY, NO_SOFA_BUILD, addLines, bump as bumpLine, defaultSize, firstFrame, itemCount, layoutFits, layoutKey, remember, sheetLines, sofaBuildOf,
-  sofaBuildToSend, sofaPick,
+  sofaBuildToSend, sofaCartCharge, sofaPick,
   type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type RecentSet, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
 
@@ -227,11 +227,12 @@ export function useQuote(args: UseQuoteArgs) {
   const brandBands = useMemo(() => bands.filter(b => b.brand === brand), [bands, brand]);
   const kpiLines = cart.filter(l => l.kind === "kpi");
   const kpiAmount = kpiLines.reduce((a, l) => a + (catalog?.kpis.find(k => k.key === l.key)?.price ?? 0) * l.qty, 0);
-  // The bed frames' charged divan, leg, gap and total height (2026-10-05): the server's figure
-  // for the cart on screen, else the catalogue's own — the same charges.
+  // What the options are charged (2026-10-05; every option since 2026-10-06): the server's
+  // figure for the cart on screen, else the catalogue's own — the same charges: each bed
+  // frame's, and the sofas' once per sofa.
   const optionCharge = answer && answer.key === inputKey && answer.result?.optionCharge !== undefined
     ? answer.result.optionCharge
-    : cart.reduce((a, l) => a + (l.charge ?? 0) * l.qty, 0);
+    : cart.reduce((a, l) => a + (l.charge ?? 0) * l.qty, 0) + sofaCartCharge(catalog, cart, sofaBuildToSend(build, catalog, cart));
   const vm: CalcVM = useMemo(() => calcVM({
     price, items, bands: brandBands, fee,
     result: answer && input ? answer.result : null,

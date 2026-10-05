@@ -20,7 +20,7 @@ const options = [
   option({ value: 'DEFAULT', label: 'Standard', sortOrder: 10, price: 25 }),
   option(),
   option({ pool: 'sofa_leg_heights', label: '24 inch sofa leg', price: 30 }),
-  option({ pool: 'sofa_leg_heights', value: 'NO-LEG', label: 'No leg', sortOrder: 1, price: -10 }),
+  option({ pool: 'sofa_leg_heights', value: 'NO-LEG', label: 'No leg', sortOrder: 1, price: 10 }),
   option({ pool: 'bedframe_gaps', value: '5CM', label: '5 cm gap', price: null }),
   option({ pool: 'bedframe_total_heights', value: '30"', label: '30 inch total', price: null }),
   option({ pool: 'sofa_sizes', value: '25"', label: '25 inch seat', price: null }),
@@ -59,37 +59,53 @@ describe('Maintenance workspace', () => {
     expect(screen.getByText('30"')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit charges' })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'Charge (RM)' })).toBeInTheDocument()
+    // Every priced pool is the customer's since 2026-10-06: a special, a sofa's leg and special too.
     click('Specials')
-    expect(screen.getByRole('button', { name: 'Edit surcharges' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit charges' })).toBeInTheDocument()
+    expect(screen.getByText(/per frame — out of the margin/)).toBeInTheDocument()
     click('Sofa')
     expect(within(screen.getByRole('group', { name: 'Sofa option pools' })).getAllByRole('button').map(button => button.textContent))
       .toEqual(['Sizes', 'Leg Heights', 'Specials'])
     expect(screen.getByText('25"')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Edit surcharges' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit charges' })).not.toBeInTheDocument()
     click('Leg Heights')
-    expect(screen.getByRole('button', { name: 'Edit surcharges' })).toBeInTheDocument()
-    expect(screen.getByText('(RM 10.00)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit charges' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Charge (RM)' })).toBeInTheDocument()
+    expect(screen.getByText(/ONCE per sofa however many pieces/)).toBeInTheDocument()
+    expect(screen.getByText('RM 10.00')).toBeInTheDocument()
+    expect(screen.queryByText(/surcharge/i)).not.toBeInTheDocument()
   })
 
-  it('saves exact option keys across pools, preserving zero, blank and negative surcharges', async () => {
+  it('saves exact option keys across pools, preserving zero and blank charges', async () => {
     render(<MaintenanceTab options={options} fabrics={[]} />)
     click('Edit charges')
     changePrice('24 inch charge', '0')
     changePrice('Standard charge', '')
     sofaLegs()
-    changePrice('24 inch sofa leg surcharge', '-40')
+    changePrice('24 inch sofa leg charge', '40')
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch charge' })).toHaveValue('0')
     click('Save 3 prices')
     await waitFor(() => expect(saveOptionPrices).toHaveBeenCalledTimes(2))
     expect(saveOptionPrices).toHaveBeenNthCalledWith(1, 'bedframe_divan_heights', [{ value: '24"', price: '0' }, { value: 'DEFAULT', price: '' }])
-    expect(saveOptionPrices).toHaveBeenNthCalledWith(2, 'sofa_leg_heights', [{ value: '24"', price: '-40' }])
+    expect(saveOptionPrices).toHaveBeenNthCalledWith(2, 'sofa_leg_heights', [{ value: '24"', price: '40' }])
     expect(await screen.findByRole('status')).toHaveTextContent('3 prices saved.')
     expect(refresh).toHaveBeenCalledOnce()
     expect(screen.getByText('RM 0.00')).toBeInTheDocument()
     await saveSettled()
     sofaLegs()
-    expect(screen.getByText('(RM 40.00)')).toBeInTheDocument()
+    expect(screen.getByText('RM 40.00')).toBeInTheDocument()
+  })
+
+  // 2026-10-06: what the customer pays is never negative — on any pool.
+  it('refuses a negative charge before saving anything', () => {
+    render(<MaintenanceTab options={options} fabrics={[]} />)
+    sofaLegs()
+    click('Edit charges')
+    changePrice('24 inch sofa leg charge', '-40')
+    click('Save 1 price')
+    expect(screen.getByRole('alert')).toHaveTextContent('a price cannot be negative')
+    expect(saveOptionPrices).not.toHaveBeenCalled()
   })
 
   it('validates every edited pool before saving any of them and retains invalid drafts', () => {
@@ -97,11 +113,11 @@ describe('Maintenance workspace', () => {
     click('Edit charges')
     changePrice('24 inch charge', '100')
     sofaLegs()
-    changePrice('24 inch sofa leg surcharge', 'abc')
+    changePrice('24 inch sofa leg charge', 'abc')
     click('Save 2 prices')
     expect(screen.getByRole('alert')).toHaveTextContent('is not an amount')
     expect(saveOptionPrices).not.toHaveBeenCalled()
-    expect(screen.getByRole('textbox', { name: '24 inch sofa leg surcharge' })).toHaveValue('abc')
+    expect(screen.getByRole('textbox', { name: '24 inch sofa leg charge' })).toHaveValue('abc')
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch charge' })).toHaveValue('100')
   })
@@ -112,11 +128,11 @@ describe('Maintenance workspace', () => {
     click('Edit charges')
     changePrice('24 inch charge', '120')
     sofaLegs()
-    changePrice('24 inch sofa leg surcharge', '55')
+    changePrice('24 inch sofa leg charge', '55')
     click('Save 2 prices')
     expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost')
     expect(screen.getByRole('status')).toHaveTextContent('1 price saved. Remaining changes are kept for retry.')
-    expect(screen.getByRole('textbox', { name: '24 inch sofa leg surcharge' })).toHaveValue('55')
+    expect(screen.getByRole('textbox', { name: '24 inch sofa leg charge' })).toHaveValue('55')
     await saveSettled()
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch charge' })).toHaveValue('120')
@@ -141,10 +157,10 @@ describe('Maintenance workspace', () => {
     click('Edit charges')
     changePrice('24 inch charge', '999')
     sofaLegs()
-    changePrice('24 inch sofa leg surcharge', '888')
+    changePrice('24 inch sofa leg charge', '888')
     click('Cancel changes')
-    click('Edit surcharges')
-    expect(screen.getByRole('textbox', { name: '24 inch sofa leg surcharge' })).toHaveValue('30')
+    click('Edit charges')
+    expect(screen.getByRole('textbox', { name: '24 inch sofa leg charge' })).toHaveValue('30')
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch charge' })).toHaveValue('101')
   })
