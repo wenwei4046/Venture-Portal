@@ -12,6 +12,7 @@ import ArenaDesignReview from "@/components/member/design-preview/ArenaDesignRev
 import ArenaDesignPreview from "@/components/member/design-preview/ArenaDesignPreview";
 import type { AdminMemberData } from "@/lib/member/server";
 import RevenueApp from "@/components/member/app/RevenueApp";
+import AppError from "@/components/member/app/shell/AppError";
 import AppLoading from "@/components/member/app/shell/AppLoading";
 import { protoData, protoFixture } from "@/components/member/app/fixtures/proto";
 
@@ -44,7 +45,7 @@ export default async function MemberPreview({
     design?: string;
     view?: string;
     role?: string;
-    /** `proto`: the app on the prototype's data; `loading`: what /member shows while it loads. */
+    /** `proto`: the app on the prototype's data; `loading` / `error`: what /member shows while it loads / when it cannot. */
     app?: string;
     brand?: string;
     sheet?: string;
@@ -64,8 +65,10 @@ export default async function MemberPreview({
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
     return <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1" })} />;
   }
-  // What /member shows while it loads (loading.tsx), held on screen: `&page=` picks the tab.
+  // What /member shows while it loads (loading.tsx) or when it cannot (error.tsx), held on
+  // screen: `&page=` picks the tab.
   if (params.app === "loading") return <Suspense><AppLoading /></Suspense>;
+  if (params.app === "error") return <Suspense><AppError digest="1234567890" /></Suspense>;
   if (params.design === "live") {
     const preview = memberDemo();
     if (params.role === "principal") {

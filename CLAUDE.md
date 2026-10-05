@@ -1347,9 +1347,10 @@ src/
 │   │                                  `UnrecognizedActionError`
 │   │                                  (`isStaleAppError`) RELOADS the page —
 │   │                                  never over a sheet or unsaved brand weeks.
-│   │                                  While /member loads, `loading.tsx` is the
-│   │                                  app's own frame + one spinner
-│   │                                  (`app/shell/AppLoading.tsx`, 2026-10-06).
+│   │                                  While /member loads or cannot load,
+│   │                                  `loading.tsx` / `error.tsx` are the app's
+│   │                                  own frame (`app/shell/AppFrame.tsx`) + a
+│   │                                  spinner / *Try again* (2026-10-06).
 │   │                                  **ONE REQUEST FOR A MOMENT'S READS
 │   │                                  (2026-10-06):** the client runs Server
 │   │                                  Actions ONE AT A TIME, so a pull's eight

@@ -1,0 +1,56 @@
+/*
+ * /member before the app is up (2026-10-06): the app's own frame from
+ * shell.module.css (`AppFrame`) with, where the page will be, one spinner while
+ * it loads (`AppLoading`) or what went wrong and Try again (`AppError`).
+ */
+
+/* The frame answers nothing yet: `inert` on a wrapper that adds no box of its own. */
+.inert { display: contents; }
+
+/* The phone header without its capsule keeps the capsule's 46px, so the wordmark
+   sits exactly where the app will draw it. */
+.headerHold { min-height: 46px; }
+
+.main { display: grid; place-items: center; }
+
+/* ── loading ── */
+.spinner {
+  display: block;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 3px solid var(--rv-orange-bg);
+  border-top-color: var(--rv-accent);
+  animation: spin 800ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2400ms; }
+}
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ── could not load ── */
+.error { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 300px; padding: 0 20px; text-align: center; }
+.errorIcon { width: 52px; height: 52px; border-radius: 50%; background: var(--rv-red-bg); color: var(--rv-red); display: grid; place-items: center; }
+.errorTitle { margin: 0; font-size: calc(18px * var(--rv-type)); font-weight: 650; letter-spacing: -.01em; color: var(--rv-ink); }
+.errorText { margin: 6px 0 0; font-size: calc(14px * var(--rv-type)); line-height: 1.45; color: var(--rv-sub); }
+/* the app's primary button (profile.module.css `.primary`), with its refresh icon */
+.retry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 24px;
+  margin-top: 4px;
+  border-radius: 14px;
+  border: 0;
+  background: var(--rv-accent);
+  color: var(--rv-white);
+  font-size: calc(15.5px * var(--rv-type));
+  font-weight: 650;
+  box-shadow: 0 3px 9px var(--rv-accent-18);
+}
+.errorRef { font-size: calc(11.5px * var(--rv-type)); color: var(--rv-muted); font-variant-numeric: tabular-nums; }
