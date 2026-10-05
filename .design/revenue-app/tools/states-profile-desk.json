@@ -1,0 +1,17 @@
+[
+  { "name": "profile-desk", "attrs": { "platform": "desktop", "screen": "account" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account" },
+  { "name": "profile-desk-principal", "attrs": { "platform": "desktop", "screen": "account", "principal": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&role=principal" },
+  { "name": "profile-desk-va", "attrs": { "platform": "desktop", "screen": "account", "principal": "true", "vaOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&role=principal",
+    "appActions": [{ "click": "button:has-text('View as a team member')", "wait": 700 }] },
+  { "name": "income-desk", "attrs": { "platform": "desktop", "screen": "account", "pfView": "income" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&view=income" },
+  { "name": "incorders-desk-sheet", "attrs": { "platform": "desktop", "screen": "account", "pfView": "incOrders" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&view=incOrders",
+    "actions": [{ "click": "button:has-text('SO-2609-0121')" }], "appActions": [{ "click": "button:has-text('SO-2609-0121')" }] },
+  { "name": "honours-desk", "attrs": { "platform": "desktop", "screen": "account", "pfView": "honours" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&view=honours" },
+  { "name": "team-desk", "attrs": { "platform": "desktop", "screen": "account", "pfView": "team" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&view=team" },
+  { "name": "requests-desk-detail", "attrs": { "platform": "desktop", "screen": "account", "pfView": "requests" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&view=requests",
+    "actions": [{ "click": "button:has-text('Outstation claim · Ipoh fair')" }], "appActions": [{ "click": "button:has-text('Outstation claim · Ipoh fair')" }] },
+  { "name": "claim-desk", "attrs": { "platform": "desktop", "screen": "account", "pfView": "requests", "reqForm": "claim" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&view=requests",
+    "appActions": [{ "click": "button:has-text('Submit claim')", "wait": 700 }] },
+  { "name": "memos-desk", "attrs": { "platform": "desktop", "screen": "account", "pfView": "memos" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=account&view=memos" },
+  { "name": "profile-android", "attrs": { "platform": "android", "screen": "account" }, "w": 410, "h": 884, "url": "/member/preview?app=proto&device=android&page=account" }
+]

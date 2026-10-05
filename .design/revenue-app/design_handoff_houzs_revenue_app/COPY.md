@@ -1,0 +1,1400 @@
+# Copy inventory
+
+All user-visible wording in the prototype. Static strings come from the template; dynamic strings come from the logic class (renderVals and data constants). Reproduce verbatim.
+
+## Static template text (247)
+
+- HOUZS VENTURE
+- Revenue
+- Notifications
+- Sun 4 Oct 2026 · Q4 2026
+- SIGN OUT
+- Switch
+- Exit
+- Products
+- JT
+- HOUZS VENTURE · REVENUE
+- HOUZS
+- REVENUE
+- September · Estimated income
+- Needs your action
+- This week
+- My orders
+- Your Arena
+- All boards
+- To do
+- 1st
+- LATEST HONOUR
+- Fair win · Mid Valley Megamall
+- Akemi week · RM 24,860 · new personal record
+- Latest orders
+- All orders
+- of target
+- September sales
+- RM 57,930
+- RM 12,070 to RM 70,000
+- Next fair: IOI City Mall, 9–11 Oct
+- Your next wins
+- Arena ranks
+- Arena
+- QUOTE
+- Price &amp; margin
+- Last used sets
+- Tap Use to open the set, then adjust or set the quantity
+- Use
+- Your quick picks
+- Edit
+- OTHER MODELS
+- Buy separately
+- Selling price
+- RM
+- Margin
+- Reach
+- at
+- Use price
+- · fixed, not in margin
+- Customer pays
+- Additional fee
+- Fees such as delivery or disposal show on the customer quote and are excluded from margin. Margin uses the Fair team cost basis (cost ÷ 0.7).
+- Insight
+- T1 36%
+- T2 43%
+- You
+- Margin tiers
+- Margin tier
+- All 7 margin tiers
+- Orders by margin
+- Lowest first
+- Brand margin uses commissionable goods against team cost (cost ÷ 0.7). Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.
+- KPI items
+- Eligible KPI items
+- Threshold hit
+- 10 needed for the threshold
+- 17 above
+- How you reached 27
+- Threshold 10
+- 27 items
+- By week
+- Orders with KPI items
+- All eligible KPI quantities count together, including eligible giveaway items. Only deposit-cleared orders count.
+- My sales orders
+- Counted sales
+- 14 orders · 27 KPI items
+- Waiting for deposit
+- RM 8,280
+- 2 orders · not counted yet
+- These orders count toward sales, margin and KPI once the deposit clears, in that commission month.
+- No bills match this filter.
+- Sales count once the deposit clears, in the bill's commission month. Margin uses team cost (cost ÷ 0.7); a bill without cost stays pending.
+- Sales, margin and KPI in one place.
+- My sales
+- 83% of target
+- RM 12,070 to your RM 70,000 target
+- All bills
+- Hit · 10 needed
+- Pillows 20 · Protectors 7
+- Orders
+- Deposit cleared
+- 2 waiting for deposit
+- Margin by brand
+- 38.6% overall
+- Margin incentive held
+- Dunlopillo has 1 bill without cost. Every brand must clear a tier, so Incentive Tier 1 pays once that bill is costed.
+- Team sales
+- 84% of target
+- RM 201,620
+- RM 38,380 to the RM 240,000 team target
+- Members
+- You + 4 downlines
+- KPI hit
+- 3 of 5
+- 2 still pending
+- Team members
+- By sales
+- Your rank on every board · Updated 2:40 pm
+- Highest Fair Record
+- Everyone's best single fair, all time
+- Tap a board to open its full ranking.
+- HALL OF RECORDS
+- One fair only, never added together. A record stays until it is beaten.
+- Top 3
+- How your points add up
+- Breakdown
+- TOP 3 · MOST FAIR WINS
+- Your fairs
+- View
+- Most 1st, then 2nd, then 3rd
+- Profile
+- Sep 2026
+- My income
+- Estimated income · not settled
+- Settles after month-end costing. Check your official payslip for payment.
+- Total
+- Commission by order
+- Each order line by line, plus team override
+- 2 Dunlopillo orders are held.
+- Their commission is added once supplier cost is in.
+- Past months
+- Paid
+- My honours
+- HIGHLIGHT
+- Tap a place to see what each finish was for
+- Every finish counts, from Sales, Margin, KPI and Championship boards (total and by brand) and your weekly fairs. Joint places count for everyone tied.
+- Team & capacity
+- Fair · Klang Valley
+- Department capacity
+- 1 open place
+- of 27 places
+- Waiting-list matches use eligibility, start dates and open places. Direct-report capacity is checked separately.
+- Your family tree
+- Your Revenue family
+- Pending
+- Upline
+- YOU
+- Swipe sideways to see everyone · tap a person for details
+- Requests
+- My requests
+- Each submission gets a request ID. HR approval, execution and payment are tracked separately.
+- Memos &amp; notifications
+- You're all caught up.
+- Title
+- Rank
+- View as a team member
+- Pick anyone in Revenue · read-only
+- View as
+- Read-only · see exactly what they see
+- Browse
+- Your workspace
+- Privacy
+- Sign out
+- In this quote
+- Clear all
+- Set price
+- Preview customer quote
+- Quote
+- Switch sub-department
+- HOUZS Venture · Revenue · the sub-departments you work in
+- Sales, Arena boards, income and quotes follow the sub-department you choose. Only sub-departments you are a member of are listed.
+- Today
+- Mark all read
+- Decline
+- Approve
+- Read memo
+- Acknowledge
+- Nothing here right now.
+- Start a quote
+- Choose the brand you're selling
+- Viewing as · read-only · tap to switch
+- See the app exactly as this person sees it. Nothing can be changed while viewing.
+- SUB-DEPARTMENTS
+- CALCULATOR
+- Keep adding
+- Edit quick picks
+- Done
+- AUDIT HISTORY
+- Cancel request
+- Claim category
+- Brand week
+- Fair region
+- spots, worked out for you
+- Claim amount
+- Set by the fixed rate. You can't edit the amount.
+- Klang Valley fairs are local, so there is no outstation claim.
+- Check-in
+- Check-out
+- Who stayed
+- Male
+- Female
+- Invoice
+- Take a photo or choose a file
+- JPG, PNG or PDF, up to 3 MB
+- Notes (optional)
+- Original member
+- What happens to them
+- Receiving sub-department
+- Replacement
+- Choose from your waiting list
+- Only approved requests from your team can be used.
+- Replacement name or request ID
+- Planned effective date
+- Reason and arrangement
+- Transfers need the receiving department to confirm. Member and payroll records change after approval.
+- Fair · Klang Valley capacity
+- 26 / 27 · 1 open
+- New member name
+- Phone number
+- Preferred sub-department
+- Preferred start date
+- Your signature
+- Sign here with your finger
+- Request submitted
+- RQ-2610-004
+- Your name and time are recorded for HR.
+- Order amount
+- KPI pay
+- PRODUCT LINE
+- COMMISSION
+- KPI
+- You earn
+- PRODUCT LINES
+- Only your own completed weekly fairs count. A shared place counts for everyone tied.
+- Points are added together across the period. They are not an average.
+- Back
+- Choose bed frame
+- 1 · LAST USED · TAP USE, OR BUILD A CUSTOM ONE
+- 2 · Modules
+- Adjust to build any shape
+- 2 · Bed frame
+- Optional
+- Add bed frame
+- Size, model, KPI items and quantity
+- 3 · KPI items
+- Fixed price · not in margin
+- Same setting, several sets
+
+## Placeholders & accessible labels (26)
+
+- aria-label: Switch sub-department
+- aria-label: Notifications
+- aria-label: Profile
+- aria-label: Hide amounts
+- aria-label: My honours
+- aria-label: Clear
+- aria-label: Remove one
+- aria-label: Add one
+- placeholder: 0.00
+- aria-label: Remove
+- aria-label: Quote
+- aria-label: Exit view as
+- placeholder: Search name or title
+- aria-label: Close
+- placeholder: Search by name or type
+- aria-label: Fewer
+- aria-label: More
+- placeholder: Anything HR should know
+- placeholder: Optional if no replacement
+- placeholder: Why, and how the handover works
+- placeholder: Full name as per IC
+- placeholder: e.g. 012-345 6789
+- placeholder: Type your full name
+- aria-label: Less
+- aria-label: Add another bed frame
+- aria-label: Remove bed frame
+
+## Strings in logic & data (1113)
+
+Includes names, statuses, labels, notes and template literals (`${...}` = interpolated value).
+
+- Tan Mei Ling
+- Revenue Director
+- Leads Fair
+- Marcus Lim
+- Team Leader
+- Rank A
+- Jia Hui Tan
+- Senior Executive
+- Rank B
+- Wei Ling Chong
+- Executive
+- Aisyah Rahman
+- Rank C
+- Darren Ong
+- Priya Nair
+- Kelvin Chua
+- Siti Aminah
+- Junior Executive
+- Jason Teh
+- Kris Wong
+- Leads IR
+- Rachael Lim
+- Hafiz Omar
+- Grace Tan
+- ).map(w => w[0]).slice(0, 2).join(
+- ), first: name.split(
+- ).slice(0, 2).join(
+- , name: 
+- , title: 
+- Akemi
+- Ergotex
+- Zanotti
+- Dunlopillo
+- , label: 
+-  }, { id: 
+- Mid Valley Megamall
+- 4–6 Sep
+- Homedec Expo
+- IOI City Mall
+- 11–13 Sep
+- Mega Home Fair
+- Sunway Pyramid
+- 18–20 Sep
+- Furniture & Living Fair
+- 1 Utama
+- 25–27 Sep
+- Sleep & Living Expo
+- #BD4A19
+- #FFF0E4
+- #E8F3ED
+- #FFF4D9
+- #F5EBE3
+- SO-2609-0118
+- Mdm Lee
+- Serene Pocket · Queen
+- Haven Divan · Queen
+- Latex Contour Pillow
+- SO-2609-0121
+- Mr Tan
+- Cool Touch Hybrid · Queen
+- SO-2609-0124
+- Ms Chen
+- Orthocare Firm · King
+- Waterproof Protector · King
+- SO-2609-0127
+- Mr Gopal
+- Airflow Latex · Super Single
+- Bolster
+- SO-2609-0130
+- Mr Ong
+- Serene Pocket · Super Single
+- SO-2609-0133
+- Mdm Kaur
+- Orthocare Firm · Queen
+- Waterproof Protector · Queen
+- SO-2609-0136
+- Mdm Siew
+- 6 Oct
+- SO-2609-0142
+- Ms Wong
+- Ergo Balance · Queen
+- Contour Pillow
+- SO-2609-0147
+- Mdm Aziz
+- Ergo Spine Pro · Queen
+- SO-2609-0150
+- Ms Nadia
+- Ergo Cloud Plus · Single
+- Mattress Protector · Single
+- SO-2609-0153
+- Ms Lau
+- Ergo Spine Pro · Super Single
+- SO-2609-0156
+- Mr Yap
+- 4 Oct
+- SO-2609-0166
+- Mr Rajan
+- Milano 3-seater sofa
+- Fabric Guard Kit
+- SO-2609-0172
+- Mdm Ho
+- Verona L-shape sofa
+- Throw Pillow
+- SO-2609-0190
+- Mr Lim
+- Vogue · Queen
+- Latex Pillow
+- SO-2609-0194
+- Mr Daniel
+- Celestial · Single
+- Sales by brand
+- By brand
+- Your brand weeks share
+- Fair results
+- Mean of weekly fair finishes
+- Total sales
+- Total
+- Monthly rank ladder
+- Margin by brand
+- Includes brand margin tier
+- Total margin
+- Includes Incentive Tier
+- KPI
+- Quantity rank
+- Includes threshold award
+- Highest Fair Record
+- Monthly rank
+- Monthly closing rank
+- AKEMI
+- ERGOTEX
+- DUNLOP
+- ZANOTTI
+- 1A-LHF
+- 1-seat · left arm
+- 2A-LHF
+- 2-seat · left arm
+- CHS-LHF
+- Chaise · left
+- 1-seat · armless
+- CNR
+- Corner
+- 1A-RHF
+- 1-seat · right arm
+- 2A-RHF
+- 2-seat · right arm
+- CHS-RHF
+- Chaise · right
+- OTT
+- Ottoman
+- L-shape
+- 3-seater + chaise
+- Custom
+- ) + x.c).join(
+- Serene Pocket
+- Pocket spring · medium firm
+- Cool Touch Hybrid
+- Hybrid · cooling knit
+- Airflow Latex
+- Natural latex · soft
+- Orthocare Firm
+- Bonnell spring · firm
+- Dream Lux
+- Pocket spring · pillow top
+- Posture Plus
+- Zoned pocket · firm
+- Comfort Top
+- Euro top · medium
+- Eco Bamboo
+- Bamboo knit · medium
+- Kids Grow
+- Foam · medium firm
+- Hotel Classic
+- Pocket spring · plush
+- Silver Ion
+- Antibacterial knit · medium
+- Spine Align
+- Zoned latex · firm
+- Cloud Nine
+- Memory foam · plush
+- Harmony Zone
+- 7-zone pocket · medium
+- Pure Cotton
+- Organic cotton · medium
+- Firm Rest
+- Coir and foam · extra firm
+- Ergo Balance
+- Zoned pocket · medium
+- Ergo Cloud Plus
+- Ergo Spine Pro
+- Zoned support · firm
+- Ergo Flex
+- Hybrid · medium
+- Ergo Cool Gel
+- Gel foam · medium
+- Ergo Lite
+- Ergo Luxe
+- Ergo Rest
+- Ergo Air
+- Open-cell foam · soft
+- Ergo Duo
+- Dual comfort · two sides
+- Ergo Senior
+- Edge support · firm
+- Ergo Fold
+- Foldable foam · medium
+- Verona
+- Feather blend · linen
+- Milano
+- High-density foam · leather
+- Torino
+- Pocket coil seat · fabric
+- Siena
+- Low profile · boucle
+- Como
+- Deep seat · velvet
+- Lucca
+- Recliner modules · leather
+- Parma
+- Compact · fabric
+- Ravello
+- Feather top · linen
+- Amalfi
+- Outdoor-grade fabric
+- Bari
+- Sleeper option · fabric
+- Royal Latex
+- Talalay latex · medium
+- Vogue
+- Pocket spring · medium
+- Celestial
+- Latex hybrid · plush
+- Heritage
+- Latex · firm
+- Majestic
+- Essence
+- Latex foam · medium
+- Serenity
+- Hybrid · soft
+- Classic Firm
+- Pure Latex
+- Natural latex · medium
+- Junior
+- Latex foam · medium firm
+- Haven Divan
+- Linden Storage
+- Arden Headboard
+- Alto Platform
+- Bellini Upholstered
+- Cove Wingback
+- Dorset Panel
+- Elm Wooden
+- Fenwick Ottoman
+- Grove Slat
+- Hudson Tufted
+- Ivy Low Profile
+- Juno Storage Drawers
+- Kensington Royal
+- Mattress Protector
+- Pillow Set (2)
+- Comfort Topper
+- Fitted Sheet Set
+- Waterproof Protector
+- Incentive Tier 2
+- Incentive Tier 1
+- Standard
+- Low margin
+- Below Tier 1
+- Commission × 0.5
+- Below Tier 2
+- Commission × 0.25
+- Below Tier 3
+- No commission
+- #F7F3EF
+- #FFF0CC
+- #FAF7F4
+- Pavilion Bukit Jalil
+- 13–15 Mar 2026
+- 5–7 Dec 2025
+- 9–11 Jan 2026
+- 22–24 Aug 2025
+- 4–6 Sep 2026
+- Paradigm Mall
+- 6–8 Feb 2026
+- Setia City Mall
+- 17–19 Oct 2025
+- AEON Bukit Tinggi
+- 19–21 Jun 2026
+- #DAD5CC
+-  : r.name.split(
+- ${rm(above.amt - mine.amt + 10)} more in one fair beats ${above.name.split(' ')[0]}'s record
+- You hold the top record
+-  (you)
+- #FFFFFF
+- #FFF5EC
+- Sales
+- Margin
+- Fair Record
+- #BA855D
+- #F6E8DD
+- #F0DDCE
+- rgba(255,255,255,.14)
+- rgba(78,47,32,.18)
+- rgba(255,255,255,.35)
+- rgba(225,176,79,.28)
+- #D9EDE2
+- rgba(255,255,255,.16)
+- rgba(56,117,87,.18)
+- #FFE5CF
+- rgba(189,74,25,.20)
+- #F2F0EB
+- #B4AEA4
+- RM 
+- en-MY
+- ).map(x => x[0]).slice(0, 2).join(
+- Jan
+- Feb
+- Mar
+- Apr
+- May
+- Jun
+- Jul
+- Aug
+- Sep
+- ].map(q => ({ short: q + 
+- Cost pending
+- % margin
+-  KPI items
+-  pts
+- Waiting for complete cost data
+- You join the board once every bill is costed
+- ${gapT(board, above.v - me.v)} behind ${above.name.split(' ').slice(0, 2).join(' ')} (${ordinal(above.pos)})
+- One place from the top
+- Hold the top spot to month end
+- 0 1px 3px rgba(63,43,34,.14)
+- : 1 }, qty: 1, acc: {}, kpi: [
+- ] } : this.props.mattressSheet ? { mode: 
+- , key: 
+- , size: 
+- , frame: 
+-  ? 1 : 2, bfs: [{ size: 
+- , kpi: [
+- ], qty: 2 }, { size: 
+-  ? { size: 
+- ], qty: 1, frameDrop: false, idx: -1 } : null } : this.props.frameSheet ? { mode: 
+- , acc: {}, kpi: [
+- , vaRecent: [
+- : 1 }] }, qRecentM: { ZANOTTI: [{ key: 
+- , sofa: true, layout: 
+- : 1 } }, { key: 
+- : 1 } }], AKEMI: [{ key: 
+-  }, { key: 
+- , bfs: [{ size: 
+-  }] }, qRecent: [{ size: 
+- , kpi: [] }, { size: 
+- , nfOpen: !!this.props.notifOpen, nfTab: 
+- Queen
+- f-haven-Q
+-  + r.frame + 
+- ) { if (p.includes(
+- )) return null; p = (p || 
+- cartOpen
+- brandPick
+- sdOpen
+- qAll
+- qEdit
+- dateOpen
+- champOpen
+- fairsOpen
+- soPick
+- reqPick
+- reqForm
+- memoPick
+- personPick
+- coPick
+- vaOpen
+- vaPE
+- sdPE
+- bpPE
+- cartPE
+- allPE
+- edPE
+- soPE
+- tPE
+- dPE
+- fPE
+- cPE
+- cpPE
+- hsPE
+- psPE
+- rfPE
+- rdPE
+- mdPE
+- All
+- , of: `of ${r.length}`, value: fmtV(b.id, m.v), bg: on ? 
+- , border: on ? 
+- , ring: on ? 
+- , numBg: on ? 
+- , numInk: on ? 
+- , labelInk: on ? 
+- , onClick: () => this.setState({ board: b.id, sub: 
+- , ini: ini(r.name), name: r.name, value: fmtV(s.board, r.v), hasTag: mine || next, tag: mine ? 
+- , tagInk: mine ? 
+- , weight: mine ? 650 : 500, posInk: md ? md.deep : 
+- , posBg: md ? md.light : 
+- , rankNum: n ? String(n) : 
+- , rankSuf: n ? (n % 100 >= 11 && n % 100 <= 13 ? 
+-  · Fair results
+-  fairs
+- ${myF.ev - myF.g - myF.s - myF.b} finished 4th or lower
+- 4 fairs
+- ${r.ev - r.g - r.s - r.b} × 4th or lower
+- #C9B8AC
+- , weight: mine ? 650 : 500, avBg: mine ? 
+- , avInk: mine ? 
+- All eligible KPI quantities together, including eligible giveaway items. Shows actual quantities; KPI points sit in Championship.
+- Deposit-cleared, commissionable sales. Each order counts once, in its released commission month.
+- , sub: c.c1, onClick: () => this.go(
+- , { board: b.id, sub: 
+- , period: 
+- , arenaView: 
+- ).split(
+-  + dp : 
+- ${qb.name} sofa module
+- KPI item · fixed price
+- Follows ${qb.name} margin
+- BED FRAME FOR THIS MATTRESS
+- SOFA
+- MATTRESS
+- BED FRAME
+- ACCESSORIES
+- Add bed frame
+- Bed frame only
+- Accessories only
+- Back
+-  KPI item
+-  + (b.qty || 1)].join(
+- Counts in ${qb.name}'s margin
+- , sofaSeatsText: 
+-  + i, label: sofaSeats(mm) + 
+- , mods: mm })), { k: 
+- , useBorder: on ? 
+- , useBg: on ? 
+- , useInk: on ? 
+-  : sofaText(l.mods), bg: on ? 
+- , ink: on ? 
+- #EBDDD2
+- No modules yet
+-  seats
+- CHS
+- 3 · Accessories
+- Accessories
+- Size
+- 1 · Size
+- LAST USED · TAP USE, THEN SET THE QUANTITY BELOW
+- 4 · Quantity
+- Quantity
+-  : String(n), bg: on ? 
+-  + r.kpi.join()] || 0; return { useBorder: on ? 
+- , label: [SIZES.find(x => x.k === r.size).label, FRAMES.find(f => f.k === r.frame).name, r.kpi.length ? r.kpi.length + 
+-  + (r.kpi.length > 1 ? 
+- ].join(
+- ), action: on ? 
+- , bg: on ? 
+- No bed frame
+- , fdSheet: (this.props.frameDropStyle || 
+- , frameCount: FRAMES.length + 
+- , popS: v.frameDrop ? 
+- , popPE: v.frameDrop ? 
+- , pickY: v.frameDrop ? 
+- , frameDropRot: v.frameDrop ? 
+- , frameDropBorder: v.frameDrop ? 
+-  models
+- Optional · 
+- KPI items are added on top of your selling price and do not change the margin.
+- 2 · Bed frame
+- 2 · Model
+- ${z.label} · ${qb.name} margin
+- , dot: on ? 
+- , qty: n, border: n ? 
+- , bg: n ? 
+- , ink: n ? 
+- Read-only while viewing as
+- Save bed frame
+- Add ${v.qty} bed frames
+- Choose something to add
+- Add ${v.qty} sets to cart
+- Add to cart
+- , pkgNote: 
+- This set:
+- )] : [])].join(
+- , greet: 
+- , nfNavBg: s.nfOpen ? 
+- translateY
+- , shH: 
+- , deskCalc: false, pT: 
+- , pShadow: 
+- , dimA: 
+- , dimB: 
+- , dimC: 
+- , dimD: 
+- , shPR: 
+- , shPT: 
+- , pL: 
+- , pR: 
+- , pB: 
+- , pRad: 
+- , fpL: 
+- , fpR: 
+- , shAlign: 
+- , shW: 
+- , mainPL: 
+- , mainPR: 
+- , dockPL: 
+- , dockPR: 
+- , nfL: 
+- , nfR: 
+- , nfRule: 
+- , L = rail ? 
+- , Rr = rail ? 
+- calc((100% - 400px - 760px) / 2)
+- calc((100% - 400px - 760px) / 2 + 400px)
+- calc(${RL} + 20px)
+- calc(${RR} + 20px)
+- calc(240px + (100% - 240px - 400px - 760px) / 2)
+- calc((100% - 240px - 400px - 760px) / 2 + 400px)
+- calc(240px + (100% - 240px - 760px) / 2)
+- calc((100% - 240px - 760px) / 2)
+- translateX
+- 1px solid #EBDDD2
+- calc(100% - 400px)
+- , pT: 
+- , fpL: FL, fpR: FR, shAlign: 
+- calc(${L} + 20px)
+- calc(${Rr} + 20px)
+- Today
+- Insight
+- Quote
+- Arena
+- Profile
+- #FFF1E6
+-  : ios ? 
+- , frameR: desk ? 
+- , screenR: desk ? 
+- incOrders
+- , miniOp: s.compact ? 1 : 0, miniPE: s.compact ? 
+- Fair
+-  : va.name.split(
+- )[0], ini: va.ini, title: va.title, rank: va.rank, sub: 
+-  + SUBN[va.sub] } : pr ? { name: 
+- , first: 
+- , ini: 
+- , rank: 
+- , sub: 
+-  } : { name: 
+- , vaRecent: [id, ...(v.vaRecent || []).filter(x => x !== id)].slice(0, 3), screen: 
+-  && s.vaLevel ? [s.vaLevel] : [
+-  ? SUBN[g.sb].toUpperCase() + 
+-  + g.people.length : g.people.length + 
+- , people: g.people.map(p => { const on = s.viewAs === p.id; return { name: p.name, ini: p.ini, sub: p.title + 
+-  + p.rank, avBg: p.lv === 0 ? 
+-  : p.lv === 1 ? 
+- , avInk: p.lv <= 1 ? 
+- , action: on ? 
+- , actInk: on ? 
+-  && !s.sheet, vaPillB: 
+- , vaX: open ? 
+- , vaY: open ? 
+- , vaOp: open ? 1 : 0, vaPE: open ? 
+-  }), vaSheetTitle: s.vaLevel ? SUBN[s.vaLevel] : 
+- , name: SUBN[sb], sub: ps.length + 
+-  + (d ? d.name + 
+- ), onClick: () => this.setState({ vaLevel: sb, vaQuery: 
+- Home · Senior Executive · Rank B
+- Member · Executive
+- #FFF6EF
+- Approval
+- Memo
+- Results
+- Commission
+- Your request
+- , tab: 
+- , icon: IC.ok, time: 
+- , status: 
+- , statusInk: 
+- , icon: IC.memo, time: 
+- , icon: IC.cup, time: 
+- , big: [[
+- Champ pts
+- View Arena boards
+- , icon: IC.cash, time: 
+- , link: 
+- , go: goClose(() => this.go(
+- , { pfView: 
+- , icon: IC.back, time: 
+- , action: true, status: 
+- #FFFBF7
+- Read memo to acknowledge
+- Read and acknowledged
+- , doneInk: d ? 
+-  : n.statusInk || 
+- NEEDS YOU
+- SEPTEMBER RESULTS
+- REQUEST UPDATES
+- EARLIER
+-  waiting for you · September results are in
+- All caught up · September results are in
+- Requests
+- Memos
+- , bpPadB: ios ? 
+- Sofa
+- Mattress
+- Your cart has ${items} item${items === 1 ? '' : 's'} from ${qb.name}. Choosing another brand clears it.
+- ${b.sofa ? 'Sofa' : 'Mattress'} · ${MODELS[b.code].length} models
+- Current
+- , tagInk: 
+- , chipBg: s.qBrand === b.code ? 
+- , chipInk: s.qBrand === b.code ? 
+- , qQuery: 
+- , qDrop: false, cartOpen: false } : {}) }); } }; }), toCalc: () => { if (items && !s.viewAs) this.go(
+- #B7DBC7
+- 0 10px 24px rgba(78,47,32,.2)
+- rgba(189,74,25,.1)
+- rgba(255,255,255,.45)
+- rgba(63,43,34,.16)
+- 0 10px 24px rgba(232,116,59,.22)
+- linear-gradient(140deg,#F2995E 0%,#D9622A 55%,#B8461A 100%)
+- #FFE6D6
+- rgba(255,255,255,.2)
+- rgba(255,255,255,.24)
+- #DDF5E7
+- 0 12px 26px rgba(189,74,25,.3)
+- Acknowledge 2 memos
+- October brand weeks · Deposit rule
+- Replacement needs info
+- RQ-2609-004 · HR returned it
+- Save October brand weeks
+- Due 5 Oct
+- of RM 70k
+-  : vp.margin.toFixed(1) + 
+- , vp.margin >= 36 ? 
+- , HERO.good, goIns(
+- , String(vp.kpi), vp.kpi >= 20 ? 
+- Tier 1
+- Threshold hit
+- Week 2 · Ergotex week
+- 9–11 Oct
+- September income
+- RM ••••
+- RM 6,842.50
+- Not settled yet
+- rgba(78,47,32,.22)
+- Sales vs target
+- RM 12,070 to RM 70,000
+- rgba(189,74,25,.22)
+- KPI items
+- Threshold of 10 hit
+- rgba(56,117,87,.2)
+- Championship
+- Deposit due
+- , ink: b.wait || b.m == null ? 
+- Akemi to Incentive Tier 2
+- About RM 1,200 more margin on the same goods
+- RM 3,120
+- To pass Aisyah in Sales
+- You are 4th of 9 this month
+- KPI threshold hit
+- Every extra item still pays RM 25
+- RM ••••••
+- Amounts hidden
+- inset 0 0 0 1px #BD4A19
+- Zanotti sofas are built from modules, e.g. 3-seater = 1A-LHF + 2A-RHF.
+- Bed frames and accessories follow ${qb.name}'s margin.
+-  Switching brand clears the cart.
+- FRAME
+- ACC
+-  mattress
+- , cartOp: open ? 1 : 0, cartPE: open ? 
+- , cartSheetY: open ? 
+- , cartDrawerY: open ? 
+- , cartChev: open ? 
+- Nothing added yet
+- Hide
+- View or change
+- ${qb.name} mattresses
+- from 
+- In cart · 
+- ), border: inC.length ? 
+- , mods: { ...(r0 || {}) }, qty: 1, acc: {}, kpi: [] } }); } else this.openSheet(
+- ).trim().toLowerCase(), match = m => !q || (m.name + 
+- ${models.length} models · search or browse A–Z
+- , meta: [sofaSeats(r.mods) + 
+- , sofaText(r.mods)].join(
+- , meta: [SIZES.find(z => z.k === r.size).label, f ? f.name + (bl.length > 1 ? 
+-  + (bl.length - 1) : 
+- , ...(kn ? [kn + 
+-  + (kn > 1 ? 
+- ), onClick: () => this.setState({ sheet: { mode: 
+- , key: r.key, size: r.size, frame: 
+- #E2CFC1
+- Hide other models
+- Choose from ${rest.length} other models
+- , onQuery: e => this.setState({ qQuery: e.target.value }), clearQuery: () => this.setState({ qQuery: 
+- Search ${models.length} ${qb.name} models
+-  MATCH
+- , boxBg: on ? 
+- , boxBorder: on ? 
+- ), onClick: () => this.openSheet(
+- ${FRAMES.length} models · KPI items · ${qb.name} margin
+- Pillow, protector, bolster · ${qb.name} margin
+- Your cart is empty
+- Next: enter your selling price
+- Choose a model to continue
+-  : margin.toFixed(1) + 
+- Enter a price
+- Add products
+- ${next.l} (${next.p}%)
+- KPI item · ${rm(l.list)} each · not in margin
+-  orders
+-  order
+- , pct: Math.round(i.n / tot * 100) + 
+- , color: [
+- #A8CDB8
+- #CBE3D5
+- Waiting
+- Week 
+-  week
+- ${all.length} orders
+- Deposit due 
+- ${b.m.toFixed(1)}% margin
+- Due 
+- , amt: rm(b.amt), amtInk: b.wait ? 
+- KPI 0
+-  lines
+-  line
+- #FFFBF0
+-  + (i + 1), brand: g.brand, total: g.total, bg: on ? g.tint : 
+- , border: on ? g.color : 
+- , ink: 
+- , sub: on ? 
+-  + (i + 1), isOpen, rot: isOpen ? 
+-  : sb.m.toFixed(1) + 
+- , tier: sb.m == null ? 
+- Deposit cleared
+- Free
+-  + (i + 1), brand: g.brand, color: g.color, num: MY_FAIRS[i].sales, short: (MY_FAIRS[i].sales / 1000).toFixed(1) + 
+- , h: Math.round(MY_FAIRS[i].sales / maxW * 72) + 
+- rgba(255,255,255,.5)
+- Counted sales · Sep 2026
+- RM 57,930
+- 14 orders · KPI 27 · RM 8,280 waiting
+- All orders
+- Tap a bar to see one week
+- #FFF8E6
+- Personal
+- My team
+- ${rm(x.goods)} goods · ${x.orders} orders
+-  : x.m.toFixed(1) + 
+- , pill: x.m == null ? 
+- Highest margin incentive
+- Margin incentive
+- #6FAA8A
+- Normal commission
+- #C9BBAE
+- Normal commission · watch closely
+- 24% or lower
+- Waiting for supplier cost
+- ${x.orders} orders have no cost yet. Margin and tier show once every order is costed.
+- Top tier reached
+- You are ${(x.m - 43).toFixed(1)}% above Incentive Tier 2. Keep new orders at 43% or more to hold it.
+- About ${rm(Math.ceil(gap / 100 * x.goods / 10) * 10)} more margin on the same ${rm(x.goods)} goods, or sell new ${x.name} orders above ${tgt}%.
+- , op: i === selI ? 1 : 0.42, ring: i === selI ? 
+-  + dot : 
+- , labInk: i === selI ? 
+- Incentive 
+- Top tier
+- , range: j === 2 ? 
+- , bg: 
+- , border: 
+- , bw: 
+- , capInk: 
+-  · you
+-  goods
+- No cost
+- , tier: o.m == null ? 
+-  : ot.l, ink: o.m == null ? 
+- ].includes(id) ? 
+- , isHubB: (this.props.arenaStyle ?? 
+- , isBoardB: (this.props.boardStyle ?? 
+- Standings
+- Full ranking
+- Monthly
+- Quarterly
+- Annual
+- Month
+- Quarter
+- Year
+- Choose a month
+- Choose a quarter
+- Choose a year
+- Live
+- , bg: on ? solid : 
+- , border: on ? solid : 
+- , ink: on ? ink : 
+- , subInk: on ? subc : live ? 
+- Joint
+- , jointShort: r.joint ? 
+- , size: r.pos === 1 ? 
+- , h: r.pos === 1 ? 
+-  : r.pos === 2 ? 
+- Finish count
+- Everyone else
+- , _oldChase: ahead ? (ahead.g > myF.g ? `${ahead.g - myF.g} more 1st place${ahead.g - myF.g > 1 ? 
+- } to catch ${ahead.name.split(
+- )[0]}` : `More 2nd places to pass ${ahead.name.split(
+- ${myF.ev} fairs · tap for venues, dates and sales
+- ${ev.dates} · ${ev.of} sellers
+- , isChampB: (this.props.champStyle ?? 
+- MONTHLY
+- QUARTERLY
+- ANNUAL
+- My margin incentive
+- Incentive Tier 1 reached · held by 1 Dunlopillo bill without cost
+- Commission scheme
+- My brand weeks
+- Show income amounts
+- Hide income amounts
+- My income
+- Commission, KPI and incentive
+- My honours
+- Medals and Fair records
+- Team & capacity
+- Department map and your reporting tree
+- Claims, team changes and waiting lists
+- 1 pending
+- Memos & notifications
+- Read published team updates
+- 2 new
+- , ...r, rule: i === a.length - 1 ? 
+- , onClick: () => this.openPf([
+- RM ••
+- SO-2609-0211
+- SO-2609-0217
+- SO-2609-0225
+- SO-2609-0231
+- SO-2609-0240
+- SO-2609-0244
+- SO-2609-0252
+- SO-2609-0259
+- Held
+- Commission held
+- , meta: 
+- , tag: 
+- , tagBg: 
+- , amt: 
+- , comm: 
+- , commLabel: 
+- , kpiPay: 
+- , kpiSub: 
+- , lines: [], total: 
+- , note: 
+- , kpiPay: l.kpi ? money(l.kpi * KPI_RATE) : 
+- , kpiInk: l.kpi ? 
+- Commission is added once supplier cost is in. KPI items pay now.
+- Commission is shared across lines by line amount. Each eligible KPI item pays RM ${KPI_RATE}, including free giveaways.
+- Override
+- Order total
+- , kpiInk: 
+-  }], total: money(amt * 0.01), note: 
+- Commission + KPI pay
+- ${money(PERSONAL)} commission
+- ${money(kpiTotal)} KPI · 2 orders held
+- Tap an order to see each product line, its commission and its KPI pay.
+- Team override
+- s sales", tint: 
+- , rows: rowsOv, note: 
+- Fixed salary
+- Monthly base
+- Personal sales commission
+- RM 51,730 costed sales · 2 orders held
+- 4 direct reports
+- KPI pay
+- 27 items × RM 25
+- Open Bill bonus
+- 2 open bills closed
+- Akemi, Ergotex and Zanotti at Tier 1 or 2
+- August 2026
+- Paid 7 Sep
+- July 2026
+- Paid 7 Aug
+- June 2026
+- Paid 7 Jul
+- Sales · Akemi
+- Sales · Ergotex
+- Margin · Akemi
+- Margin · Ergotex
+- Fair · 
+- Week ${vi + 1} · ${mo} 2026
+- #E3D6CC
+- 7th+
+- 0 0 0 2px #FFFFFF, 0 0 0 4px 
+- , bg: n ? (md ? md.light : 
+- , ink: n ? (md ? md.deep : 
+- , weight: n ? 750 : 400, ring: on ? 
+-  places
+-  place
+- ${ordinal(hp)} place · ${list.filter(x => x.place === hp).length} times
+- radial-gradient(circle at 35% 30%,#FFF4CC,#E9BC57 55%,#B9862C)
+- radial-gradient(circle at 35% 30%,#FFFFFF,#CFCAC2 55%,#8F897F)
+- #E4E0DA
+- radial-gradient(circle at 35% 30%,#FBE3CF,#C98F65 55%,#8C5A3A)
+- GOLD
+- SILVER
+- BRONZE
+- SEP 2026
+- 2026 SO FAR
+-  · YOUR PODIUM
+- , hs, hsPE: open ? 
+- , hsOp: open ? 1 : 0, hsY: open ? 
+- ${list.length} finishes in ${{ monthly: 'Sep 2026', quarterly: 'Q3 2026', annual: '2026 so far' }[per]} · tap a place to see what for
+- Sep 2026
+- 2026 to date
+- Team Leader · Rank A
+- Executive · Rank C
+- KPI hit
+- Amelia Tan
+- Joined Sep
+- Nur Hidayah
+- KPI pending
+- Director
+- Your upline
+- , vBottom: 
+- , hW: 
+- Jia Hui Tan (you)
+- Senior Executive · Rank B
+- , avBg: 
+- , avInk: 
+- , weight: 750, indent: 
+- , guideW: 
+- , guideLeft: 
+- , vTop: 
+-  · ${kids.length} in team
+- ), ini: ini(name), tag: kids.length ? (isOpen ? st + 
+-  : st + 
+- ) : st, tagBg: tn[0], tagInk: tn[1], indent: 
+- , vBottom: last && !isOpen ? 
+-  : last ? 
+- Level 2
+- #F1E7DF
+- , role: 
+- , stats: [], reportsTo: 
+- 0 2px 6px rgba(63,43,34,.05)
+- Leads Fair · Klang Valley
+- 12 teams
+- Reports to Tan Mei Ling
+- RM 74,180
+- 6 direct
+- Reports to Marcus Lim
+- 4 direct
+- Upline
+- New member
+- Sales · Sep
+- Status
+- Team
+-  direct
+- None yet
+- Reports to you
+- Reports to 
+- ${UP.length} above · ${KIDS.length + KIDS.reduce((a, k) => a + k[3].length, 0)} below
+- DIRECTOR
+- UPLINE
+- You · Rank B
+- , dot: 
+- , style: { bw: 
+- , shadow: 
+- , av: 
+- #D9CABD
+- Submit claim
+- Outstation and Airbnb stays
+- Submit replacement
+- Replacements, transfers and exits
+- Submit waiting list
+- Joining requests and allocation
+- Outstation or Airbnb stay for a fair
+- Review & submit claim
+- HR will check your invoice. Payment is tracked in Requests.
+- Replace, transfer or release a team member
+- Review & submit
+- HR reviews it, and the receiving department confirms if it is a transfer.
+- Bring a new member into the team
+- HR matches the request to an open place by eligibility and start date.
+- Outstation
+- Fair · Klang Valley
+- Fixed by spots for the route
+- Airbnb
+- Airbnb accommodation
+- RM 65 per pax
+- Penang
+-  + (i + 1), brandWeek: f.brand + 
+- , dates: f.dates, venue: f.venue, org: f.org, color: bb[1], bw: on ? 
+- , border: on ? bb[1] : 
+- , bg: on ? bb[2] : 
+- Klang Valley → ${reg} · return trip
+- Spots for this route
+-  spots
+- Rate per spot
+- Total pax
+- ${pax} pax · ${male} male, ${female} female
+- Rate per pax
+- Leave this sub-department
+- Stays with the company
+- Transfer
+- Moves to another sub-department
+- Exit the company
+- Leaves Houzs
+- Fair · Penang
+- Showroom · Puchong
+- New member joining
+- Someone new takes the place
+- Existing member
+- Someone already in Houzs
+- From the waiting list
+- Use an approved waiting-list request
+- No replacement
+- Release the position
+- Type signature
+- Draw signature
+- RQ-2609-018 · start 1 Oct
+- Approved
+- Nur Aisyah Hamid
+- RQ-2609-022 · start 15 Oct
+- Kenneth Loh
+- RQ-2608-031 · start 1 Nov
+- Wong Li Ying
+- RQ-2610-002 · submitted 2 Oct
+- Pending HR
+- Outstation claim · Ipoh fair
+- 28 Sep · RQ-2609-031
+- Waiting list · Amelia Tan
+- 15 Sep · RQ-2609-018
+- Allocated
+- Replacement · Marcus Lim
+- 2 Sep · RQ-2609-004
+- Needs info
+- Airbnb claim · Penang fair
+- 20 Aug · RQ-2608-027
+- Paid
+- Submitted
+- You
+- 28 Sep, 10:42
+- Hotel Seri Malaysia Ipoh · 2 nights · RM 260.00
+- Received by HR
+- Nadia (HR)
+- 29 Sep, 09:15
+- 15 Sep, 14:03
+- Amelia Tan · preferred start 1 Oct
+- 17 Sep, 11:20
+- Revenue system
+- 18 Sep, 08:00
+- Place 26 of 27
+- 2 Sep, 16:30
+- Replace Marcus Lim · new member joining
+- Returned · needs info
+- Hafiz (HR)
+- 4 Sep, 10:05
+- s IC name.
+- 20 Aug, 18:11
+- Airbnb · Penang · 2 pax · RM 130.00
+- 22 Aug, 09:40
+- Finance
+- 7 Sep, 12:00
+- With August payroll
+- , id: 
+- Cancelled
+- Just now
+- Type
+- Claim
+- Waiting list
+- Replacement
+- Current step
+- HR · Revenue
+- 2 Oct
+- 2 Oct 2026, 9:00 am
+- October brand weeks are open
+- Please save your 4 brand weeks for October in Profile → My brand weeks by 5 Oct.
+- Changes after 5 Oct need HR approval. Brand week shares decide your Sales by brand and Margin by brand results for the month.
+- Mgmt
+- Management
+- 30 Sep
+- 30 Sep 2026, 6:15 pm
+- Deposit rule reminder
+- Orders count toward sales, margin and KPI only once the deposit clears.
+- Orders without a deposit by month end move to the next commission month. Please follow up with customers before 30 Sep.
+- Revenue team
+- 1 Oct
+- 1 Oct 2026, 10:00 am
+- Q3 Championship results
+- Final Q3 standings are now in Arena. Congratulations to everyone on the podium.
+- Ops
+- Fair operations
+- 24 Sep
+- 24 Sep 2026, 2:40 pm
+- Venue change · 1 Utama
+- The 25–27 Sep fair moved from Hall A to Hall C. Set-up time stays at 9:00 am on Friday.
+- 1 memo needs your acknowledgement
+-  memos need your acknowledgement
+- Acknowledged
+- Needs acknowledgement
+- You acknowledged this memo · just now
+- , whenFull: 
+- , paras: [], d: 
+- , icBg: 
+- , icInk: 
+- , needsAck: false, noAck: true, isAcked: false, ackText: 

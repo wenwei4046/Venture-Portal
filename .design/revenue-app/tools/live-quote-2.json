@@ -1,0 +1,225 @@
+[
+ {
+  "name": "quote-live-cart",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('All Akemi models')"
+   },
+   {
+    "click": "button:has-text('APEX')"
+   },
+   {
+    "eval": "(() => { const b = [...document.querySelectorAll('[data-sheet-body] button[aria-label=\"Add one\"]')]; b[1]?.click(); b[1]?.click(); })()"
+   },
+   {
+    "click": "button:has-text('Add to cart')"
+   },
+   {
+    "click": "button:has-text('View or change')"
+   }
+  ],
+  "dump": "[...document.querySelectorAll('[role=dialog][aria-label=\"In this quote\"]')].map(d => d.innerText).join(' || ') + ' ## ' + document.querySelector('main')?.innerText.slice(0, 500)"
+ },
+ {
+  "name": "quote-live-useprice",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('All Akemi models')"
+   },
+   {
+    "click": "button:has-text('APEX')"
+   },
+   {
+    "click": "button:has-text('Add to cart')"
+   },
+   {
+    "click": "button:has-text('Set price')"
+   },
+   {
+    "click": "button[aria-label='3']"
+   },
+   {
+    "click": "button[aria-label='0']"
+   },
+   {
+    "click": "button[aria-label='0']"
+   },
+   {
+    "click": "button[aria-label='0']",
+    "wait": 3500
+   }
+  ],
+  "dump": "document.querySelector('main')?.innerText.slice(0, 400)"
+ },
+ {
+  "name": "quote-live-useprice-2",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('All Akemi models')"
+   },
+   {
+    "click": "button:has-text('APEX')"
+   },
+   {
+    "click": "button:has-text('Add to cart')"
+   },
+   {
+    "click": "button:has-text('Set price')"
+   },
+   {
+    "click": "button[aria-label='2']"
+   },
+   {
+    "click": "button[aria-label='0']"
+   },
+   {
+    "click": "button[aria-label='0']"
+   },
+   {
+    "click": "button[aria-label='0']",
+    "wait": 3500
+   },
+   {
+    "click": "button:has-text('Use price')",
+    "wait": 3500
+   }
+  ],
+  "dump": "document.querySelector('main')?.innerText.slice(0, 400)"
+ },
+ {
+  "name": "quote-live-preview",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('All Akemi models')"
+   },
+   {
+    "click": "button:has-text('APEX')"
+   },
+   {
+    "click": "button:has-text('Add to cart')"
+   },
+   {
+    "click": "button:has-text('Set price')"
+   },
+   {
+    "click": "button[aria-label='5']"
+   },
+   {
+    "click": "button[aria-label='0']"
+   },
+   {
+    "click": "button[aria-label='0']"
+   },
+   {
+    "click": "button[aria-label='0']",
+    "wait": 3500
+   },
+   {
+    "click": "button:has-text('Preview customer quote')",
+    "wait": 1200
+   }
+  ],
+  "dump": "[...document.querySelectorAll('[role=dialog][aria-label=\"Customer quote\"]')].map(d => d.innerText).join(' || ')"
+ },
+ {
+  "name": "quote-live-recent",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('All Akemi models')"
+   },
+   {
+    "click": "button:has-text('ARISTOI')"
+   },
+   {
+    "click": "button:has-text('King')"
+   },
+   {
+    "click": "button:has-text('Add bed frame')"
+   },
+   {
+    "click": "button:has-text('Add bed frame') >> nth=-1"
+   },
+   {
+    "click": "button:has-text('Add to cart')"
+   }
+  ],
+  "dump": "document.querySelector('main')?.innerText.slice(0, 700)"
+ },
+ {
+  "name": "quote-live-frameonly",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('Bed frame only')"
+   },
+   {
+    "click": "button:has-text('King')"
+   }
+  ],
+  "dump": "document.querySelector('[data-sheet-body]')?.innerText.slice(0, 700)"
+ },
+ {
+  "name": "quote-live-frameonly-pick",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('Bed frame only')"
+   },
+   {
+    "click": "button:has-text('King')"
+   },
+   {
+    "click": "[class*=dropBtn]",
+    "wait": 900
+   }
+  ],
+  "dump": "[...document.querySelectorAll('[role=dialog][aria-label=\"Choose bed frame\"]')].map(d => d.innerText).join(' || ')"
+ },
+ {
+  "name": "quote-live-acconly",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('Accessories only')"
+   },
+   {
+    "click": "button:has-text('King')"
+   }
+  ],
+  "dump": "document.querySelector('[data-sheet-body]')?.innerText.slice(0, 900)"
+ },
+ {
+  "name": "quote-live-switch",
+  "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [
+   {
+    "click": "button:has-text('All Akemi models')"
+   },
+   {
+    "click": "button:has-text('APEX')"
+   },
+   {
+    "click": "button:has-text('Add to cart')"
+   },
+   {
+    "click": "button:has-text('Mattress')",
+    "wait": 900
+   }
+  ],
+  "dump": "[...document.querySelectorAll('[role=dialog][aria-label=\"Start a quote\"]')].map(d => d.innerText).join(' || ')"
+ }
+]

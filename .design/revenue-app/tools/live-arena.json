@@ -1,0 +1,16 @@
+[
+ { "name": "arena-ethan", "path": "/member?page=arena&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 9000,
+   "dump": "document.querySelector('main')?.innerText.slice(0, 1200)" },
+ { "name": "arena-ethan-sales", "path": "/member?page=arena&view=board&board=sales&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 9000,
+   "dump": "document.querySelector('main')?.innerText.slice(0, 1500)" },
+ { "name": "arena-ethan-margin", "path": "/member?page=arena&view=board&board=margin&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 9000,
+   "dump": "document.querySelector('main')?.innerText.slice(0, 1500)" },
+ { "name": "arena-ethan-champ", "path": "/member?page=arena&view=board&board=champ&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 9000,
+   "dump": "document.querySelector('main')?.innerText.slice(0, 1500)" },
+ { "name": "arena-ethan-fair", "path": "/member?page=arena&view=board&board=sales&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 9000,
+   "actions": [{ "click": "button:has-text('Fair results')" }], "dump": "document.querySelector('main')?.innerText.slice(0, 1800)" },
+ { "name": "arena-ethan-record", "path": "/member?page=arena&view=record&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 9000,
+   "dump": "document.querySelector('main')?.innerText.slice(0, 1500)" },
+ { "name": "arena-ethan-quarter", "path": "/member?page=arena&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 9000,
+   "actions": [{ "click": "button:has-text('Quarterly')", "wait": 9000 }], "dump": "document.querySelector('main')?.innerText.slice(0, 900)" }
+]

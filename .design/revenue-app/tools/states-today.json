@@ -1,0 +1,18 @@
+[
+  { "name": "today", "attrs": { "platform": "ios", "screen": "today" }, "url": "/member/preview?app=proto&device=ios" },
+  { "name": "today-scrolled", "attrs": { "platform": "ios", "screen": "today" }, "scrollTo": 600, "url": "/member/preview?app=proto&device=ios" },
+  { "name": "today-android", "attrs": { "platform": "android", "screen": "today" }, "w": 410, "h": 884, "url": "/member/preview?app=proto&device=android" },
+  { "name": "today-desk", "attrs": { "platform": "desktop", "screen": "today" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop" },
+  { "name": "today-desk-scrolled", "attrs": { "platform": "desktop", "screen": "today" }, "w": 1440, "h": 900, "scrollTo": 900, "url": "/member/preview?app=proto&device=desktop" },
+  { "name": "today-brandpick", "attrs": { "platform": "ios", "screen": "today", "brand-pick-open": "true" }, "url": "/member/preview?app=proto&device=ios",
+    "appActions": [{ "click": "nav button[aria-label='Quote']" }] },
+  { "name": "today-notif", "attrs": { "platform": "ios", "screen": "today", "notif-open": "true" }, "url": "/member/preview?app=proto&device=ios",
+    "appActions": [{ "click": "button[aria-label='Notifications']:visible" }] },
+  { "name": "today-notif-scrolled", "attrs": { "platform": "ios", "screen": "today", "notif-open": "true" }, "url": "/member/preview?app=proto&device=ios",
+    "actions": [{ "eval": "document.querySelectorAll('[data-rv-scroll]')[1].scrollTop = 520" }],
+    "appActions": [{ "click": "button[aria-label='Notifications']:visible" }, { "eval": "document.querySelector('[role=dialog][aria-label=Notifications] > div:last-child').scrollTop = 520" }] },
+  { "name": "today-subdept", "attrs": { "platform": "ios", "screen": "today", "sub-dept-open": "true" }, "url": "/member/preview?app=proto&device=ios",
+    "appActions": [{ "click": "button[aria-label='Switch sub-department']:visible" }] },
+  { "name": "today-desk-notif", "attrs": { "platform": "desktop", "screen": "today", "notif-open": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop",
+    "appActions": [{ "click": "aside button:has-text('Notifications')" }] }
+]
