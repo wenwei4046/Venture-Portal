@@ -1758,6 +1758,7 @@ See `TESTING.md` at repo root for full layer descriptions + how to add new tests
 Do NOT
 Do not hardcode any rates (interest, custom premium, penalty, saving %) — all from Settings/DB
 Do not skip RLS — every table must have policies matching Access Matrix
+Do not leave a SECURITY DEFINER function open to PUBLIC / anon unless it checks the caller itself (`auth.uid()`, `has_perm`, `has_scope` …) — it runs as its owner, so RLS never asks, and Postgres grants EXECUTE to PUBLIC by default: the publishable key every browser holds can call it. A helper only other DEFINER functions call: `REVOKE … FROM PUBLIC, anon, authenticated` + `GRANT … TO service_role`. 21 were open, writers and approvals included, until mig `20261006010000` (2026-10-06); signed-in callers handing in somebody else's user id (`p_user_id` / `p_approver`) is the next fix, not yet done.
 Do not let Finance access hr_staff_costs or director_payouts detail — use aggregate views
 Do not use localStorage for auth — use Supabase Auth sessions
 Do not create separate apps — single Next.js app, role-based routing
