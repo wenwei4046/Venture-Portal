@@ -34,6 +34,16 @@ and the compute trigger records 22/31 from the hire date. `get_staff_billing_all
 - Not touched: HR's payroll rows and the import (HR's), the Jun/Jul Marketing
   partial-month rows (pool-borne, never invoiced).
 
+Same day, a data correction the user asked for ("这边录错了，是 fund out 给 conts 的" →
+"改"): loan `aeb00ef6` (RM 30,000, 4%/mo, 1 month, disbursed 14 Sep, active) was
+recorded to Carres but is the fund out to The Cont. Changed in place:
+`loans.company_id`, HV-PV-202609-0372 payee name / company / description,
+JE-202609-0694 description and its Dr **3051 → 3053** (Amount due from - The
+Cont), the venture_pool fund_out description, the approval request description.
+Amounts, dates, rate, approval, bank: untouched. `access_log` action
+`amend_loan_borrower`. The same-day fund IN RM 30,000 @ 2%/mo from Carres (4053)
+is right (user confirmed).
+
 ## CHECKPOINT 2026-10-05 (SHIPPED) — a file can be added to a voucher after it is paid
 
 User, on two paid PVs (0451, 0452) showing 0 FILES: "这些本来就 attachment 的吗？帮我检查".
