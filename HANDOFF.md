@@ -179,6 +179,18 @@ counts as detail).
 Not touched: the 150 dept_pools rows themselves (RLS treasury scope) — same
 API-level residual as the journal; the pages are the boundary.
 
+### Edit draft PV: the pool list is Create payment's (2026-10-05, SHIPPED)
+
+User: a draft drawn on the Revenue Department pool opened in Edit with its pool
+blank and only the seven old pools to pick from ("只要我 Edit draft PV, 它就强制
+要再 select"). `EditPaymentForm` carried its own literal; Create payment had moved to
+`paymentPoolOptions(registryPoolOptions(deptRegistry))` on 2026-10-02. The edit page now
+loads the registry too and passes `extraPools`; the form also appends any pool a saved
+row names that the list lacks, so a saved choice is never shown blank. The two
+drafts (HV-PV-202610-0456 / 0457) were stored right all along; approving them was
+never at risk (adjustPool resolves `dept_pool_<segment_key>` from the registry).
+That was the last literal pool list noted in the 2026-10-02 handoff.
+
 ### Found, NOT fixed — the user DECLINED the fix (2026-10-02: "不需要")
 
 **Role checks that let a caller with no role through.** `IF v_role NOT IN

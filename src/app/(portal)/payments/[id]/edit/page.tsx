@@ -5,6 +5,8 @@ import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
 import EditPaymentForm from './_components/EditPaymentForm'
+import { fetchDeptRegistry } from '@/lib/dept-registry'
+import { registryPoolOptions } from '@/lib/payment-pools'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -60,6 +62,7 @@ export default async function EditPaymentPage({ params }: Props) {
     { data: bankAccounts },
     { data: glAccounts },
     { data: fundSourceRow },
+    deptRegistry,
   ] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
@@ -76,6 +79,9 @@ export default async function EditPaymentPage({ params }: Props) {
     voucher.fund_source_id
       ? supabase.from('fund_sources').select('account_code').eq('id', voucher.fund_source_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    // The departments beyond the core five have pools of their own; the form's
+    // list is built from this, as Create payment's is.
+    fetchDeptRegistry(supabase).catch(() => []),
   ])
 
   const sourceRows: SourceRow[] = (sources ?? []).map((s) => ({
@@ -135,6 +141,7 @@ export default async function EditPaymentPage({ params }: Props) {
           repayment_breakdown: voucher.repayment_breakdown as { principal: number; interest: number; penalty: number } | null,
         }}
         initialSources={sourceRows}
+        extraPools={registryPoolOptions(deptRegistry)}
         fundSourceAccount={(fundSourceRow as { account_code: string | null } | null)?.account_code ?? null}
         initialCreditAccountCode={initialCreditAccountCode}
         companies={companies ?? []}
