@@ -24,7 +24,7 @@ export interface CalcVM {
   next: { tier: string; price: string; value: number } | null;
   /** KPI items on top of the price: `2 KPI items` · `+ RM 500`. */
   kpi: { label: string; total: string } | null;
-  /** The bed frames' divan, leg, gap and total height charged on top (2026-10-05): `+ RM 120`. */
+  /** The options charged on top (2026-10-05; every option since 2026-10-06): `+ RM 120`. */
   options: { total: string } | null;
   /** Customer pays: the price, what rides on top of it, and the fee — once anything does. */
   pay: string | null;
@@ -48,8 +48,8 @@ export function priceText(price: string): string {
 
 /**
  * What the server is asked: the cart by SKU — a bed frame by SKU AND its own
- * build (2026-10-05) — and the selling price as typed. KPI items and the bed
- * frames' option charges ride on top of it, out of the margin; the server
+ * build (2026-10-05) — and the selling price as typed. KPI items and the
+ * option charges ride on top of it, out of the margin; the server
  * works both out itself. The sofas' one build (seat height, tier, leg height,
  * specials) goes only with a sofa in the cart.
  */
@@ -76,8 +76,8 @@ export function quoteInput(schemeId: string, cart: CartLine[], price: string, fe
 /**
  * What the customer is shown once the calculator confirmed the price on screen:
  * the lines (a bed frame with its own build), the sofas' one build, and a total
- * that is step 2's *Customer pays* — the KPI items bought and the bed frames'
- * option charges ride on top of the price, as the shared text says.
+ * that is step 2's *Customer pays* — the KPI items bought and the option
+ * charges ride on top of the price, as the shared text says.
  */
 export function customerQuote(cart: CartLine[], result: QuoteResult, build: QuoteBuild | undefined): CustomerQuote {
   const addOns = result.addOnAmount ?? 0;
@@ -113,7 +113,7 @@ export function calcVM(args: {
   error: string | null;
   /** The cart's KPI items: count and amount, RM. */
   kpi?: { qty: number; amount: number };
-  /** What the cart's bed frames' options are charged, RM. */
+  /** What the cart's options are charged, RM. */
   options?: number;
   fee?: string;
 }): CalcVM {

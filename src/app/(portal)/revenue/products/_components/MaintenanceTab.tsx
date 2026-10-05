@@ -15,7 +15,7 @@ const PAGE_SIZE = 300
 type Drafts = Map<string, Map<string, string>>
 type Prices = Map<string, Map<string, number | null>>
 
-/** ERP option values and fabric mappings stay read-only; only the portal's prices — a surcharge, or a bed frame option's charge — are editable. */
+/** ERP option values and fabric mappings stay read-only; only the portal's prices — what the customer is charged for an option — are editable. */
 export default function MaintenanceTab({ options, fabrics }: { options: MaintenanceOption[]; fabrics: FabricRow[] }) {
   const router = useRouter()
   const [pool, setPool] = useState('bedframe_divan_heights')
@@ -193,15 +193,13 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
               {saving ? 'Saving…' : dirty === 0 ? 'Save changes' : `Save ${dirty} price${dirty === 1 ? '' : 's'}`}
             </button>
           </> : meta?.priced ? (
-            <button type="button" className="sku-primary-button" onClick={() => { setEditing(true); setNotice(null) }}>{meta.charge ? 'Edit charges' : 'Edit surcharges'}</button>
+            <button type="button" className="sku-primary-button" onClick={() => { setEditing(true); setNotice(null) }}>Edit charges</button>
           ) : null}
         </div>
       </div>
       <p className="sku-edit-note">
         {fabricView ? 'Sofa and Bedframe mappings override the shared ERP tier independently. With neither mapping nor shared tier, P2 is used.' :
-          meta?.charge ? 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' :
-          meta?.priced ? 'Portal surcharge (RM) added to the cost when this option is chosen. Blank adds nothing; 0 is a zero surcharge.' :
-            'ERP choices only. This pool has no surcharge; model availability is set on Modular.'}
+          meta?.note ?? 'ERP choices only; model availability is set on Modular.'}
         {editing && dirty > 0 ? ` ${dirty} unsaved change${dirty === 1 ? '' : 's'} across ${dirtyPools} pool${dirtyPools === 1 ? '' : 's'}; Save includes them all.` : ''}
       </p>
       {error ? <p className="sku-notice" data-tone="error" role="alert">{error}</p> : null}
@@ -228,7 +226,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
             <table className="ledger-table sku-table">
               <thead><tr>
                 <th scope="col" className="sku-code-column">Option value</th><th scope="col">Description</th>
-                {meta?.priced ? <th scope="col" className="num">{meta.charge ? 'Charge (RM)' : 'Surcharge (RM)'}</th> : null}<th scope="col">Status</th>
+                {meta?.priced ? <th scope="col" className="num">Charge (RM)</th> : null}<th scope="col">Status</th>
               </tr></thead>
               <tbody>
                 {rows.slice(0, limit).map(o => {
@@ -238,8 +236,8 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
                     {meta?.priced ? <td className="num">
                       {editing ? <input value={drafts.get(pool)?.get(o.value) ?? (price === null ? '' : String(price))}
                         onChange={e => touch(o.value, e.target.value)} disabled={saving} inputMode="decimal"
-                        aria-label={`${o.label} ${meta.charge ? 'charge' : 'surcharge'}`} className="sku-price-input" /> :
-                        price === null ? <span title={meta.charge ? 'No charge keyed — FOC' : 'No surcharge keyed — adds nothing'}>—</span> :
+                        aria-label={`${o.label} charge`} className="sku-price-input" /> :
+                        price === null ? <span title="No charge keyed — FOC">—</span> :
                           price < 0 ? `(${formatMoney(Math.abs(price))})` : formatMoney(price)}
                     </td> : null}
                     <td className="sku-status">{statusLabel(o)}{o.isNew ? ' · New' : ''}</td>

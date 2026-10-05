@@ -171,7 +171,8 @@ export function pruneBuild(build: QuoteBuild | undefined, choices: BuildChoices)
  * What ONE bed frame may be built with (user 2026-10-04): its divan, leg, gap
  * and total height are FOC — no choice at all — or one of the options
  * Maintenance charges that the ERP lets the model take (`charges`); its
- * specials are what Modular ticked.
+ * specials are what Modular ticked, each charged on top when Maintenance
+ * prices it (2026-10-06, `specialCharges`).
  */
 export interface FrameChoices {
   divans: OptionCharge[];
@@ -179,6 +180,8 @@ export interface FrameChoices {
   gaps: OptionCharge[];
   totals: OptionCharge[];
   specials: string[];
+  /** The specials Maintenance charges, with what; one not here is free. */
+  specialCharges: OptionCharge[];
 }
 
 export function frameChoicesOf(model: MemberCatalogueModel | undefined): FrameChoices {
@@ -188,6 +191,7 @@ export function frameChoicesOf(model: MemberCatalogueModel | undefined): FrameCh
     gaps: model?.charges?.gaps ?? [],
     totals: model?.charges?.total_heights ?? [],
     specials: model?.options.specials ?? [],
+    specialCharges: model?.charges?.specials ?? [],
   };
 }
 
@@ -197,9 +201,23 @@ export function chargeIn(list: readonly OptionCharge[], value: string | undefine
   return k === null ? 0 : list.find((o) => valueKey(o.value) === k)?.charge ?? 0;
 }
 
+/** Each special once, by what the list charges for it (a value spelled twice is one special). */
+export function specialsCharge(list: readonly OptionCharge[], specials: readonly string[] | undefined): number {
+  const seen = new Set<string>();
+  let sum = 0;
+  for (const sp of specials ?? []) {
+    const k = valueKey(sp);
+    if (k === null || seen.has(k)) continue;
+    seen.add(k);
+    sum += chargeIn(list, sp);
+  }
+  return sum;
+}
+
 /** What one built bed frame is charged per unit, by the model's own list — the member's preview. */
 export function frameCharge(choices: FrameChoices, build: BedframeBuild | undefined): number {
-  return chargeIn(choices.divans, build?.divan) + chargeIn(choices.legs, build?.leg) + chargeIn(choices.gaps, build?.gap) + chargeIn(choices.totals, build?.total);
+  return chargeIn(choices.divans, build?.divan) + chargeIn(choices.legs, build?.leg) + chargeIn(choices.gaps, build?.gap) + chargeIn(choices.totals, build?.total)
+    + specialsCharge(choices.specialCharges, build?.specials);
 }
 
 /** Why one bed frame's own build cannot be quoted, or null. */

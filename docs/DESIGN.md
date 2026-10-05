@@ -163,7 +163,10 @@ is not rewritten.
   values and the ERP's Maintenance lists have none; the fabric view keeps its
   search and tier filters. Fabrics expose both category tiers, using the shared
   tier and then P2 when a category mapping is absent. All rows remain reachable
-  with Load more.
+  with Load more. Every priced pool reads *Charge (RM)* with an *Edit charges*
+  button (2026-10-06: a price there is the customer's, never a cost), and the
+  note under the toolbar says what a price in that pool does — per frame for a
+  bed frame, ONCE per sofa for a sofa; blank or 0 is FOC (free for a special).
 - Combo Pricing retains module slots, alternatives, repeated modules, tiers and
   effective dates. Match equivalent size keys without losing their raw labels or
   historical price columns. A blank clears a price; zero remains a stored zero.
@@ -1359,15 +1362,21 @@ VP's. The member C release above describes the screens this replaced.
   bar). Pickers (month, sub-department, brand) keep the covering dim; a phone keeps
   the dim for every sheet.
 - **A sofa's leg height and specials** (2026-10-06, user: the revamp had left
-  them out) — the sofa sheet adds *Leg height* (*Not chosen* + each leg turned
-  ON on Modular) and *Specials* (toggle chips) after *Fabric*, both captioned
-  *For every sofa in this quote*: one build makes every sofa in the cart, so
-  only what every sofa model in it was turned ON for is offered, and nothing
-  turned ON means no row. A special is named in words, so its chip grows to them
-  (`.chipWords` — the bed frame's specials too). The customer quote's *Sofa
-  build* line names them, a bed frame line carries its own build in brackets,
-  and the card's **Total** is step 2's *Customer pays*: *Add-on items* and *Bed
-  frame options* rows sit above the fee when there are any.
+  them out) — the sofa sheet adds *Leg height* and *Specials* after *Fabric*.
+  The same day every option priced on Maintenance became the customer's, so
+  *Leg height* is drawn as a bed frame's heights are: an *FOC · Free of charge*
+  chip plus each leg turned ON on Modular that Maintenance charges (*6" · + RM
+  100*), captioned *Once per sofa · not in margin*; no charged leg, no row.
+  *Specials* are toggle chips — one with a charge carries its *+ RM x* under the
+  name — captioned *Once per sofa · not in margin* when any is charged, else
+  *For every sofa in this quote*. One build makes every sofa in the cart, so
+  only what every sofa model in it was turned ON for is offered. A bed frame's
+  *Specials* row shows charges the same way (*Charged on top · not in margin*).
+  A special is named in words, so its chip grows to them (`.chipWords`). The
+  customer quote's *Sofa build* line names them, a bed frame line carries its
+  own build in brackets, and the card's **Total** is step 2's *Customer pays*:
+  *Add-on items* and *Option charges* rows sit above the fee when there are any
+  (step 2's line reads *Option charges · not in margin*).
 - **Today is the live month (2026-10-06)** — the prototype's Today on 3 October
   read *September · Estimated income*; the user wants the month on the calendar,
   so the hero, its three figures and *Your Arena* are the current month, and a
@@ -2508,6 +2517,7 @@ If adding a new component to vocabulary, update this doc first.
 
 - **2026-10-06 (update prompt)** — every surface gains *A new version is ready* · Update · ×: an ink pill at the top centre when a release lands while the app is open (installed apps are resumed from memory, so a phone could keep last week's build — and its reads fail once a release replaces its Server Actions). In the Revenue app, after 30+ minutes away it reloads on return unless a form was being filled; the portal only ever offers it (a payroll grid may hold edits not yet saved). See *Update prompt*.
 - **2026-10-06 (Revenue app · phone type one step smaller)** — on a phone every text in the Revenue app is one step smaller than the prototype's: each font-size is the prototype's px times `--rv-type`, .92 on a phone (13px → 12, the greeting 28px → 25.8) and 1 on a desktop, which is unchanged. Spacing, icons, control heights and the 16px inputs stay as they were. One number tunes it (`.screen` in `app/shell.module.css`); `app/type-scale.test.ts` keeps every size on it. See *The Revenue app — built to the prototype*.
+- **2026-10-06 (every option price is a charge)** — Product List › Maintenance: every priced pool reads *Charge (RM)* / *Edit charges*, with a note per pool (per frame, or once per sofa); a negative price is refused. The Quote: a sofa's *Leg height* is FOC + the charged legs (*Once per sofa · not in margin*), every special chip carries its *+ RM x*, and step 2 / the customer quote say *Option charges*. Comm Cal's bill page says a sofa line's share: *incl. RM 10.00 for Nylon Fabric — RM 50.00 once for the sofa, spread over its 5 pieces*.
 - **2026-10-06 (Revenue app · family chart on a phone)** — Team & capacity on a phone put KAR JUN's two direct reports at the two edges of the screen, and MELVIN CHONG's *Senior Revenue Specialist* ran out of his card and off it: the chart was a fixed 580px with the reports spread across it, and the cards (buttons) never wrapped. The chart now takes the width of its widest row (never less than the screen), a report keeps a 145px column so fewer sit together under the member, card text wraps, and the dashed cards below grow to their text (112–137px). Four reports — the prototype — are drawn exactly as before; its dashed cards are a few px wider, because their text used to run past the border. See *The family chart fits real names*.
 - **2026-10-06 (Revenue app · sofa leg height & specials)** — the Quote's sofa sheet regains the old builder's *Leg height* and *Specials* (only what Modular turned ON for every sofa model in the cart), as chips after *Fabric*; specials' chips wrap their words (`.chipWords`, bed frame specials too). The customer quote names the sofa build and each bed frame's own build, and its Total now equals step 2's *Customer pays* (*Add-on items* / *Bed frame options* rows when present). See *A sofa's leg height and specials*.
 - **2026-10-06 (Revenue app · a row's sheet on a desktop)** — on a desktop, clicking another bill while one is open in the right-hand panel shows that bill at once; it used to take two clicks, the first only closing the panel. The same for every sheet that shows one row of the page beside it (Commission by order, My honours, Team & capacity, Requests, Memos). A click elsewhere on the page still closes the panel, and now also does what was clicked; the list scrolls under the mouse wheel while the panel is open. Pickers and phone sheets are unchanged (see *The Revenue app — built to the prototype*).

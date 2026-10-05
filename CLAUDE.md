@@ -614,9 +614,9 @@ src/
 │   │   │                              `catalogue_line_cost()` = the SKU's portal
 │   │   │                              price (a sofa module's grid cell at the
 │   │   │                              line's seat height × fabric tier, else its
-│   │   │                              one figure) + each Maintenance option's
-│   │   │                              portal surcharge (none priced = adds
-│   │   │                              nothing), × qty; the options read from the
+│   │   │                              one figure) × qty — no option adds to it
+│   │   │                              since 2026-10-06 (every option priced on
+│   │   │                              Maintenance is a CHARGE, below); the options read from the
 │   │   │                              line's `raw.variants` when the feed carries
 │   │   │                              them, else parsed from the ERP's own
 │   │   │                              `description2` grammar
@@ -665,6 +665,29 @@ src/
 │   │   │                              a SKU or model not ON is never offered.
 │   │   │                              `lineCharge` (`lib/catalogue/pricing.ts`),
 │   │   │                              migs `20261005010000` / `020000`.
+│   │   │                              **EVERY OPTION PRICE IS A CHARGE
+│   │   │                              (2026-10-06):** "我要那些价钱是不会算进 margin
+│   │   │                              的，加 100 就一定 default calculator 100" — a
+│   │   │                              bed frame's SPECIALS and a sofa's LEG HEIGHT
+│   │   │                              and SPECIALS priced on Maintenance are the
+│   │   │                              customer's too, out of the margin, in the
+│   │   │                              commission, never KPI; nothing is a cost
+│   │   │                              surcharge any more (`catalogue_line_surcharge`
+│   │   │                              answers 0; a price is never negative). A bed
+│   │   │                              frame per frame, on its line. A SOFA ONCE PER
+│   │   │                              SOFA ("整组 sofa 只加一次"): at commit, beside
+│   │   │                              the combos, `catalogue_apply_sofa_charges`
+│   │   │                              groups an order's sofa lines by base model,
+│   │   │                              charges each distinct leg / special any piece
+│   │   │                              names once × sets (the smallest line qty: ×2
+│   │   │                              everywhere = two sofas) and spreads it over
+│   │   │                              the pieces by their sales (`cost_detail.
+│   │   │                              charge_set`); Recost does the same. The Quote:
+│   │   │                              a sofa's leg = FOC + the charged legs, as a
+│   │   │                              bed frame's; specials show "+ RM x"; step 2
+│   │   │                              and the customer quote say *Option charges*.
+│   │   │                              `sofaSetCharges` is the twin. Mig
+│   │   │                              `20261006050000`.
 │   │   │                              The ERP pushes the catalogue to
 │   │   │                              `POST /api/erp/v1/products` (contract §9,
 │   │   │                              v2) on the sales-order feed's key, whole,
@@ -1758,7 +1781,7 @@ Finance CANNOT access the Director Salary module or Director Pool at all. (Direc
 HR CAN access Director Pool v2 (standalone calculator — full per-director detail; granted by user 2026-07-21)
 Only HR and Principal can see individual salary details
 Member catalogue & margin cost basis (2026-09-12, catalogue 2026-09-24)
-The member Quote page sells from the Product List, not a list of its own: `member_catalogue()` (mig `20260924040000`) answers every SKU ticked on **Product List › Modular** (`catalogue_skus.offered`, and its model's `catalogue_models.offered`), still ACTIVE in the ERP, under a brand the member's calculator scheme sells — "10 SKUs, 7 ticked → the calculator offers 7" (user 2026-09-24). Both snapshots read it UNPRICED (names, sizes, the sofa grid's height × tier choices, each sofa / bed frame model's dropdowns = the portal's ticks ∩ what the ERP still allows ∩ the live Maintenance pool) and return `catalogueModels`; the quote reads it PRICED through the service role only (`lib/member/server.ts`, after `member_quote_context` authorised the session) — no price ever reaches a browser. The cart carries ONE sofa build (seat height, tier, leg, specials — the Revenue app's sofa sheet offers the leg and specials again since 2026-10-06, only what Modular turned ON for EVERY sofa model in the cart; the revamp had left them out: `sofaPick` / `sofaBuildToSend` in `components/member/app/quote/quote-model.ts`); since 2026-10-05 EACH bed frame line carries its own build (`QuoteLine.bedframe`): its divan, leg, gap and total height are FOC or one of the options turned ON for the model on Modular that Maintenance CHARGES and the ERP still allows (`MemberCatalogueModel.charges` — a customer's price, so the unpriced snapshot carries it), its specials what Modular ticked; one frame built two ways is two lines (`frameBuildError`, `lib/member/build.ts`), and the server refuses anything else. The keypad is the SELLING price: bought KPI items and the option charges ride on top, out of the margin (a FREE KPI item comes off the price), and `QuoteResult.customerPays` says the total. The calculator costs the way the run does (`lib/member/calculator.ts` `costLines` over `lib/catalogue/*`): SKU price at the build + option surcharges, a matched priced combo costed as the combo. People › Member Services › Product options is now a pointer to Modular (`comm_products` / `member_product_options` are no longer read by the member app). **Riders**: bed frames and accessories carry NO brand — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (in the run: the bill's own brand, the ERP's Branding — `SalesOrder.brandCode` into `marginBase`, 2026-09-27) — and so does anything marked *Rider* on Modular (`catalogue_models.brand_code = 'RIDER'`, read as no brand, never as one). A mattress or sofa is never a rider by default: one whose ERP branding matches no brand (MYLATEX, or none — 170 SKUs on 2026-09-24) is not offered until a Margin ladder is chosen for it, and Modular says so (`isRiderModel`, `lib/catalogue/options.ts`). A model's dropdown with an EMPTY ERP list is the whole Maintenance pool — the ERP's own "no restriction" (`erpAllows`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
+The member Quote page sells from the Product List, not a list of its own: `member_catalogue()` (mig `20260924040000`) answers every SKU ticked on **Product List › Modular** (`catalogue_skus.offered`, and its model's `catalogue_models.offered`), still ACTIVE in the ERP, under a brand the member's calculator scheme sells — "10 SKUs, 7 ticked → the calculator offers 7" (user 2026-09-24). Both snapshots read it UNPRICED (names, sizes, the sofa grid's height × tier choices, each sofa / bed frame model's dropdowns = the portal's ticks ∩ what the ERP still allows ∩ the live Maintenance pool) and return `catalogueModels`; the quote reads it PRICED through the service role only (`lib/member/server.ts`, after `member_quote_context` authorised the session) — no price ever reaches a browser. The cart carries ONE sofa build (seat height, tier, leg, specials — the Revenue app's sofa sheet offers the leg and specials again since 2026-10-06, only what Modular turned ON for EVERY sofa model in the cart; the revamp had left them out: `sofaPick` / `sofaBuildToSend` in `components/member/app/quote/quote-model.ts`); since 2026-10-05 EACH bed frame line carries its own build (`QuoteLine.bedframe`): its divan, leg, gap and total height are FOC or one of the options turned ON for the model on Modular that Maintenance CHARGES and the ERP still allows (`MemberCatalogueModel.charges` — a customer's price, so the unpriced snapshot carries it), its specials what Modular ticked; one frame built two ways is two lines (`frameBuildError`, `lib/member/build.ts`), and the server refuses anything else. The keypad is the SELLING price: bought KPI items and the option charges ride on top, out of the margin (a FREE KPI item comes off the price), and `QuoteResult.customerPays` says the total. The calculator costs the way the run does (`lib/member/calculator.ts` `costLines` over `lib/catalogue/*`): SKU price at the build, a matched priced combo costed as the combo; every option priced on Maintenance is CHARGED on top instead (a bed frame's per frame, a sofa's once per sofa — `sofaSetCharges`, 2026-10-06). People › Member Services › Product options is now a pointer to Modular (`comm_products` / `member_product_options` are no longer read by the member app). **Riders**: bed frames and accessories carry NO brand — they join any cart, their cost counts in the one margin, and the mattress or sofa's brand decides the ladder (in the run: the bill's own brand, the ERP's Branding — `SalesOrder.brandCode` into `marginBase`, 2026-09-27) — and so does anything marked *Rider* on Modular (`catalogue_models.brand_code = 'RIDER'`, read as no brand, never as one). A mattress or sofa is never a rider by default: one whose ERP branding matches no brand (MYLATEX, or none — 170 SKUs on 2026-09-24) is not offered until a Margin ladder is chosen for it, and Modular says so (`isRiderModel`, `lib/catalogue/options.ts`). A model's dropdown with an EMPTY ERP list is the whole Maintenance pool — the ERP's own "no restriction" (`erpAllows`). **Cost basis**: Revenue Team cost = cost ÷ `comm_schemes.revenue_cost_divisor` (Fair 0.7; Rules › Scheme rules) in the calculator, the snapshot order margins and the run alike. Margin = (price − cost) ÷ price; the price for threshold t is cost ÷ (1 − t), never cost × (1 + t). Mig `20260915060000`.
 Development Phases
 Phase 1 (✅ Shipped 2026-04-10): Treasury Core
 Dashboard (dashboard_summary RPC), Fund IN, Fund OUT, Overdue & Netting,

@@ -16,8 +16,8 @@ import {
 } from "./catalog";
 import {
   lineCharge,
-  lineSurcharge,
   OptionPrices,
+  sofaSetCharges,
   unitPrice,
   type ChargePart,
   type OptionPrice,
@@ -44,7 +44,7 @@ export function teamCostCents(unitCost: number, costDivisor: number): number {
 /**
  * What the portal charges beyond each SKU's own price — server-only, read
  * from the Product List with the SKUs (`member_catalogue`, priced): the
- * Maintenance surcharges, the combos a sofa build may match, and each model's
+ * Maintenance option charges, the combos a sofa build may match, and each model's
  * dropdowns so a choice outside them is refused. Absent (the demo) = no
  * options, no combos, no check.
  */
@@ -72,11 +72,9 @@ function quoteInputKey(input: QuoteInput): string {
 interface CostedLine {
   line: QuoteLine;
   product: MemberProduct;
-  /** The SKU's own price at the build (grid cell or flat), RM; null = unpriced. */
+  /** The SKU's own price at the build (grid cell or flat), RM; null = unpriced. No option adds to it (2026-10-06). */
   unit: number | null;
-  /** What the build's options add per unit to the COST, RM. */
-  surcharge: number;
-  /** What a bed frame's divan, leg, gap and total height are CHARGED per unit, RM — out of the margin. */
+  /** What a bed frame's options are CHARGED per unit, RM — out of the margin. A sofa is charged per set, not here. */
   charge: number;
   chargeParts: ChargePart[];
   /** A grid SKU whose grid does not come in the build's seat height. */
@@ -90,12 +88,22 @@ function chargeOf(c: { amount: number; parts: ChargePart[] } | null): { charge: 
   return c ? { charge: c.amount, chargeParts: c.parts } : { charge: 0, chargeParts: [] };
 }
 
+/** `leg 6"` / `Hydraulic` — an option charged, as the quote's breakdown says it. */
 const CHARGE_WORD: Record<ChargePart["pool"], string> = {
-  bedframe_divan_heights: "divan",
-  bedframe_leg_heights: "leg",
-  bedframe_gaps: "gap",
-  bedframe_total_heights: "total height",
+  bedframe_divan_heights: "divan ",
+  bedframe_leg_heights: "leg ",
+  bedframe_gaps: "gap ",
+  bedframe_total_heights: "total height ",
+  bedframe_specials: "",
+  sofa_leg_heights: "leg ",
+  sofa_specials: "",
 };
+const chargeWord = (p: ChargePart) => `${CHARGE_WORD[p.pool]}${p.value}`;
+
+/** The sofa a module belongs to — its base model, as the combos and the run group a bill's sofa lines. */
+function sofaGroupOf(product: MemberProduct): string {
+  return (product.baseModel ?? product.code.split("-")[0] ?? "").trim().toUpperCase() || product.id;
+}
 
 /** A bed frame line's build: its own (2026-10-05), else the cart's. */
 function frameBuildOf(line: QuoteLine, build: QuoteBuild | undefined) {
@@ -109,8 +117,9 @@ function gridOf(product: MemberProduct): PriceCell[] {
 /**
  * Every line at the portal's prices, the way the run costs a sales line
  * (catalogue_line_cost + catalogue_apply_combos, migration 20260924030000):
- * the SKU's price at the build's seat height and tier, plus its options'
- * surcharges, times quantity; then each sofa's modules that cover one of its
+ * the SKU's price at the build's seat height and tier, times quantity — no
+ * option adds to a cost any more (2026-10-06: every option priced on
+ * Maintenance is CHARGED to the customer); then each sofa's modules that cover one of its
  * model's priced combos are costed at the combo's price instead, spread over
  * the matched lines in proportion to their own costs — the ERP's rule, where
  * the combo always wins and mixed quantities keep their own costs.
@@ -130,24 +139,17 @@ function costLines(
     );
     const kind = kindOf(product);
     const frame = kind === "BEDFRAME" ? frameBuildOf(line, build) : undefined;
-    const facts =
-      kind === "SOFA"
-        ? { leg: build?.leg ?? null, divan: null, total: null, specials: build?.specials ?? [] }
-        : kind === "BEDFRAME"
-          ? {
-              leg: frame?.leg ?? null,
-              divan: frame?.divan ?? null,
-              total: frame?.total ?? null,
-              specials: frame?.specials ?? [],
-            }
-          : null;
     return {
       line,
       product,
       unit: priced.price,
-      // A bed frame's specials only — its divan, leg, gap and total height are charged, not costed.
-      surcharge: facts && pricing ? lineSurcharge(kind, facts, prices).amount : 0,
-      ...chargeOf(kind === "BEDFRAME" && pricing ? lineCharge(kind, { divan: frame?.divan ?? null, leg: frame?.leg ?? null, gap: frame?.gap ?? null, total: frame?.total ?? null }, prices) : null),
+      // A bed frame's divan, leg, gap, total height and specials are charged per frame.
+      ...chargeOf(kind === "BEDFRAME" && pricing
+        ? lineCharge(kind, {
+            divan: frame?.divan ?? null, leg: frame?.leg ?? null, gap: frame?.gap ?? null,
+            total: frame?.total ?? null, specials: frame?.specials ?? [],
+          }, prices)
+        : null),
       noHeight: grid.length > 0 && priced.how !== "grid",
       comboCents: null,
     };
@@ -178,7 +180,7 @@ function costLines(
     const sets = [...quantities][0];
     const own = matched.map((i) => {
       const l = lines[i];
-      return l.unit === null ? 0 : Math.round((l.unit + l.surcharge) * 100) * l.line.quantity;
+      return l.unit === null ? 0 : Math.round(l.unit * 100) * l.line.quantity;
     });
     const shares = spreadComboTotal(own, Math.round(hit.price * 100) * sets);
     matched.forEach((i, k) => {
@@ -257,8 +259,10 @@ function cartKpiLines(
  * TOP of it, out of the margin, and the run reads the bill the same way:
  *   - the KPI items the customer buys (2026-09-27), paid flat as KPI — the
  *     bill's sales are price + K and its main sales, the margin's, price;
- *   - what the bed frames' divan, leg, gap and total height are CHARGED (user 2026-10-04),
- *     paid the ordinary rate — in the commission, out of the margin.
+ *   - what the options are CHARGED (user 2026-10-04; every option priced on
+ *     Maintenance since 2026-10-06): a bed frame's per frame, a sofa's ONCE
+ *     PER SOFA however many pieces — paid the ordinary rate, in the
+ *     commission, out of the margin.
  * A KPI item given FREE is not on top: the customer pays nothing for it, so
  * its amount comes off the price — margin = (price − Kgift − cost) ÷
  * (price − Kgift), and the price that reaches t is Kgift + cost ÷ (1 − t).
@@ -266,8 +270,8 @@ function cartKpiLines(
  *
  * A line's cost is the portal's own price for it (user 2026-09-24: every
  * margin is measured against the Product List's prices): the SKU's price at
- * the build's seat height and fabric tier, plus what the build's options add,
- * with a sofa's matched combo costed as the combo — `costLines`, the twin of
+ * the build's seat height and fabric tier — no option adds to it — with a
+ * sofa's matched combo costed as the combo — `costLines`, the twin of
  * how the run costs the same sale once the ERP books it.
  */
 export function calculateQuote(
@@ -411,7 +415,7 @@ export function calculateQuote(
     costed.some(
       (l) =>
         l.comboCents === null &&
-        (l.unit == null || !Number.isFinite(l.unit) || l.unit < 0 || l.unit + l.surcharge < 0),
+        (l.unit == null || !Number.isFinite(l.unit) || l.unit < 0),
     )
   )
     return invalid(
@@ -422,7 +426,7 @@ export function calculateQuote(
       sum +
       (l.comboCents !== null
         ? Math.round(l.comboCents / divisorOf(l.product))
-        : teamCostCents(l.unit! + l.surcharge, divisorOf(l.product)) * l.line.quantity),
+        : teamCostCents(l.unit!, divisorOf(l.product)) * l.line.quantity),
     0,
   );
   if (!Number.isSafeInteger(cost))
@@ -444,10 +448,28 @@ export function calculateQuote(
     return invalid(
       `The free KPI items (RM ${(kpiGift / 100).toFixed(2)}) take the whole price. Raise it to see a margin.`,
     );
-  // What the bed frames' divan, leg, gap and total height are charged (user 2026-10-04): on
-  // top of the price, in the commission, out of the margin on both sides.
+  // What the options are charged (user 2026-10-04, every option since 2026-10-06): on
+  // top of the price, in the commission, out of the margin on both sides — a bed
+  // frame's per frame, a sofa's once per sofa (the cart's one sofa build on every
+  // piece; the pieces of one base model are one sofa, as the run groups a bill).
   const charged = costed.filter((l) => l.charge > 0);
-  const charge = charged.reduce((sum, l) => sum + Math.round(l.charge * 100) * l.line.quantity, 0);
+  const sofaSets = pricing
+    ? sofaSetCharges(
+        costed
+          .filter((l) => kindOf(l.product) === "SOFA")
+          .map((l) => ({
+            group: sofaGroupOf(l.product),
+            qty: l.line.quantity,
+            leg: input.build?.leg ?? null,
+            specials: input.build?.specials ?? [],
+          })),
+        new OptionPrices(pricing.options),
+      )
+    : [];
+  const sofaNames = new Map(costed.map((l) => [sofaGroupOf(l.product), l.product.name] as const));
+  const charge =
+    charged.reduce((sum, l) => sum + Math.round(l.charge * 100) * l.line.quantity, 0) +
+    sofaSets.reduce((sum, s) => sum + Math.round(s.total * 100), 0);
   const margin = ((main - cost) / main) * 100,
     band = brand
       ? bandFor(margin, bands)
@@ -515,11 +537,19 @@ export function calculateQuote(
     kpiItems: kpiHits.map((hit) => ({ label: kpiItemLabel(hit.item), qty: hit.qty, amount: hit.amount })),
     addOnAmount: kpiOnTop / 100,
     optionCharge: charge / 100,
-    optionCharges: charged.map((l) => ({
-      label: [l.product.name, ...l.chargeParts.map((p) => `${CHARGE_WORD[p.pool]} ${p.value}`)].join(" · "),
-      qty: l.line.quantity,
-      amount: (Math.round(l.charge * 100) * l.line.quantity) / 100,
-    })),
+    optionCharges: [
+      ...charged.map((l) => ({
+        label: [l.product.name, ...l.chargeParts.map(chargeWord)].join(" · "),
+        qty: l.line.quantity,
+        amount: (Math.round(l.charge * 100) * l.line.quantity) / 100,
+      })),
+      // A sofa once per sofa: qty = how many sofas.
+      ...sofaSets.map((s) => ({
+        label: [sofaNames.get(s.group) ?? s.group, ...s.parts.map(chargeWord)].join(" · "),
+        qty: s.sets,
+        amount: s.total,
+      })),
+    ],
     customerPays: (price + kpiOnTop + charge + delivery) / 100,
     version: productVersions(selected.map(({ product }) => product!)),
     inputKey: quoteInputKey(input),
@@ -569,7 +599,7 @@ export function customerQuote(
     ...build,
     `Selling price: RM ${result.price.toFixed(2)}`,
     ...(addOns > 0 ? [`Add-on items: RM ${addOns.toFixed(2)}`] : []),
-    ...(options > 0 ? [`Bed frame options: RM ${options.toFixed(2)}`] : []),
+    ...(options > 0 ? [`Option charges: RM ${options.toFixed(2)}`] : []),
     `Additional charges: RM ${result.delivery.toFixed(2)}`,
     `Total: RM ${total.toFixed(2)}`,
     "Tax and other service charges: as stated in the confirmed order terms.",

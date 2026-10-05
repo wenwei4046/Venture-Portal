@@ -74,7 +74,7 @@ export default function QuoteCalc({ vm, brandName, cart, fee, kpiEach, onPress, 
         {vm.pay && (
           <div className={s.kpiBox}>
             {vm.kpi && <div className={s.kpiLine}><span><strong>{vm.kpi.label}</strong> · fixed, not in margin</span><span className={s.kpiAmt}>+ {vm.kpi.total}</span></div>}
-            {vm.options && <div className={s.kpiLine}><span><strong>Bed frame options</strong> · not in margin</span><span className={s.kpiAmt}>+ {vm.options.total}</span></div>}
+            {vm.options && <div className={s.kpiLine}><span><strong>Option charges</strong> · not in margin</span><span className={s.kpiAmt}>+ {vm.options.total}</span></div>}
             <div className={s.payLine}><span>Customer pays</span><span className={s.payAmt}>{vm.pay}</span></div>
           </div>
         )}

@@ -128,8 +128,11 @@ describe("KPI items in the cart — paid flat as KPI, on top of the price, outsi
       pricing,
     );
     expect(r.kpiAmount).toBe(150);
-    // Cost: 1,000 + 1,500 plus Nylon's RM 50 surcharge on each module.
-    expect(r.margin).toBeCloseTo(((6000 - 2600) / 6000) * 100, 10);
+    // Cost: 1,000 + 1,500. Nylon's RM 50 on Maintenance is the customer's (2026-10-06),
+    // charged once for the sofa — not a cost on each module.
+    expect(r.margin).toBeCloseTo(((6000 - 2500) / 6000) * 100, 10);
+    expect(r.optionCharge).toBe(50);
+    expect(r.customerPays).toBe(6000 + 150 + 50);
   });
 
   it("prices the next tier as cost ÷ (1 − t) — the selling price, the add-on still on top", () => {
@@ -140,12 +143,13 @@ describe("KPI items in the cart — paid flat as KPI, on top of the price, outsi
       { costDivisor: 1, kpiItems: [NYLON] },
       pricing,
     );
-    // 1,250 of selling price against 1,050 of cost: 16%, below the 20% bar.
-    expect(r.margin).toBeCloseTo(16, 10);
+    // 1,250 of selling price against 1,000 of cost: 20%, on the 20% bar. Nylon's RM 50
+    // rides on top with the KPI item — the customer's, not a cost (2026-10-06).
+    expect(r.margin).toBeCloseTo(20, 10);
     expect(r.multiplier).toBe(0.5);
     expect(r.nextThreshold).toBe(30);
-    expect(r.nextPrice).toBe(1500); // 1,050 ÷ 0.70
-    expect(r.customerPays).toBe(1400);
+    expect(r.nextPrice).toBe(1428.58); // 1,000 ÷ 0.70, up to the cent
+    expect(r.customerPays).toBe(1250 + 150 + 50);
   });
 
   it("finds a KPI SKU by its code", () => {

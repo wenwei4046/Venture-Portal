@@ -107,7 +107,7 @@ export interface CustomerQuote {
   price: number;
   /** The KPI items the customer buys, RM — on top of the selling price. */
   addOns: number;
-  /** The bed frames' charged divan, leg, gap and total height, RM — on top of the selling price. */
+  /** What the options are charged (a bed frame's per frame, a sofa's once per sofa), RM — on top of the selling price. */
   options: number;
   fee: number;
   /** What the customer pays: the price, what rides on top of it and the fee — step 2's *Customer pays*. */
@@ -165,7 +165,7 @@ export function CustomerQuoteSheet({ open, quote, brandName, onClose }: {
             <div className={s.cqSums}>
               <div className={s.cqSum}><span>Selling price</span><span className={s.payAmt}>{rm2(quote.price)}</span></div>
               {quote.addOns > 0 && <div className={s.cqSum}><span>Add-on items</span><span className={s.payAmt}>{rm2(quote.addOns)}</span></div>}
-              {quote.options > 0 && <div className={s.cqSum}><span>Bed frame options</span><span className={s.payAmt}>{rm2(quote.options)}</span></div>}
+              {quote.options > 0 && <div className={s.cqSum}><span>Option charges</span><span className={s.payAmt}>{rm2(quote.options)}</span></div>}
               <div className={s.cqSum}><span>Additional fee</span><span className={s.payAmt}>{rm2(quote.fee)}</span></div>
               <div className={s.cqTotal}><span>Total</span><span className={s.payAmt}>{rm2(quote.total)}</span></div>
             </div>

@@ -75,29 +75,33 @@ export interface MemberModelOptions {
   total_heights?: string[];
   gaps?: string[];
 }
-/** A bed frame option the customer may be CHARGED for, and what (RM, always above zero). */
+/** An option the customer may be CHARGED for, and what (RM, always above zero). */
 export interface OptionCharge {
   value: string;
   charge: number;
 }
 /**
- * A bed frame model's divan, leg, gap and total height the customer may pay for (user
- * 2026-10-04): what the ERP lets the model take, priced on Product List ›
- * Maintenance above zero. The Quote offers FOC plus these; a charge is out of
- * the margin on both sides and in the commission. A customer's price, not a
- * cost, so the member's own snapshot carries it.
+ * What a model's options charge the customer (user 2026-10-04; every option
+ * priced on Maintenance since 2026-10-06): turned ON on Modular, still allowed
+ * by the ERP, priced on Product List › Maintenance above zero. A bed frame's
+ * divan, leg, gap, total height and specials (per frame); a sofa's leg height
+ * and specials (once per sofa). The Quote offers FOC plus the charged heights
+ * and every special with its charge; a charge is out of the margin on both
+ * sides and in the commission. A customer's price, not a cost, so the
+ * member's own snapshot carries it.
  */
 export interface MemberModelCharges {
   divan_heights?: OptionCharge[];
   leg_heights?: OptionCharge[];
   gaps?: OptionCharge[];
   total_heights?: OptionCharge[];
+  specials?: OptionCharge[];
 }
 export interface MemberCatalogueModel {
   id: string;
   kind: "SOFA" | "BEDFRAME";
   options: MemberModelOptions;
-  /** A bed frame's chargeable options; absent = every option is FOC. */
+  /** The model's chargeable options; absent or empty = every option is FOC. */
   charges?: MemberModelCharges;
 }
 export interface MemberBand {

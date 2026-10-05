@@ -332,9 +332,18 @@ describe('validateOptionPrices', () => {
     })
   })
 
-  it('a surcharge may be negative — the ERP’s No Side Panel takes RM 40 off', () => {
-    expect(validateOptionPrices('bedframe_specials', [{ value: 'No Side Panel', price: '-40' }]).upserts).toEqual([
-      { pool: 'bedframe_specials', value: 'No Side Panel', price: -40 },
+  // 2026-10-06: every price on Maintenance is what the customer pays — never negative,
+  // a special or a sofa's leg as much as a bed frame's divan.
+  it.each(['bedframe_specials', 'sofa_leg_heights', 'sofa_specials'])('refuses a negative price on %s — a charge is never negative', pool => {
+    expect(() => validateOptionPrices(pool, [{ value: 'No Side Panel', price: '-40' }])).toThrow('a price cannot be negative')
+  })
+
+  it('prices a special and a sofa’s leg — what the customer pays for them', () => {
+    expect(validateOptionPrices('bedframe_specials', [{ value: 'Hydraulic', price: '300' }]).upserts).toEqual([
+      { pool: 'bedframe_specials', value: 'Hydraulic', price: 300 },
+    ])
+    expect(validateOptionPrices('sofa_leg_heights', [{ value: '6"', price: '100' }]).upserts).toEqual([
+      { pool: 'sofa_leg_heights', value: '6"', price: 100 },
     ])
   })
 
@@ -360,8 +369,8 @@ describe('validateOptionPrices', () => {
     },
   )
 
-  it('checks a pool’s shape only — the foreign key to erp_maintenance_options refuses one that does not exist', () => {
-    expect(validateOptionPrices('sofa_armrests', [{ value: 'x', price: '1' }]).upserts).toHaveLength(1)
+  it('refuses a pool it does not know — only the priced pools carry a price', () => {
+    expect(() => validateOptionPrices('sofa_armrests', [{ value: 'x', price: '1' }])).toThrow('That list carries no price')
   })
 
   it('refuses an option with no value', () => {

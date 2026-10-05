@@ -138,10 +138,10 @@ export interface OptionPriceEdit {
 }
 
 /**
- * A cost surcharge may be negative — the ERP's own "No Side Panel" takes RM 40
- * off. A charge may not: it is what the customer pays for a bed frame's divan,
- * leg, gap or total height (2026-10-05). A sofa's seat size carries no price at
- * all (CHECK catalogue_option_prices_unpriced_pools).
+ * A price on Maintenance is what the CUSTOMER pays for the option (2026-10-05,
+ * every priced pool since 2026-10-06), so it is never negative (CHECK
+ * catalogue_option_prices_charge_not_negative). A sofa's seat size carries no
+ * price at all (CHECK catalogue_option_prices_unpriced_pools).
  */
 export function validateOptionPrices(pool: string, edits: readonly OptionPriceEdit[]): {
   upserts: Array<{ pool: string; value: string; price: number }>
@@ -159,7 +159,7 @@ export function validateOptionPrices(pool: string, edits: readonly OptionPriceEd
     const k = valueKey(value)!
     if (seen.has(k)) throw new EditError(`${value} appears twice`)
     seen.add(k)
-    const price = parseMoney(e.price, value, kind === 'cost')
+    const price = parseMoney(e.price, value)
     if (price === null) clears.push(value)
     else upserts.push({ pool, value, price })
   }

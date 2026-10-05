@@ -6,7 +6,7 @@ import type { QuoteInput } from "./types";
 
 // The preview is where the member calculator is seen before a deploy, so its
 // demo has to exercise what the live one does: Modular ticks narrowing the
-// dropdowns, option surcharges, and a sofa combo replacing its modules' prices.
+// dropdowns, option charges, and a sofa combo replacing its modules' prices.
 
 const quote = (lines: [string, number][], build: QuoteInput["build"], price = "3000"): QuoteInput => ({
   schemeId: "fair-scheme",
@@ -40,7 +40,8 @@ describe("member preview demo catalogue", () => {
     expect(r.margin).toBeCloseTo(50, 2);
   });
 
-  it("adds the build's option surcharges to every sofa line it prices", () => {
+  // 2026-10-06: an option priced on Maintenance is the customer's — once for the sofa, out of the margin.
+  it("charges the build's options once for the sofa, on top — not into any line's cost", () => {
     const r = calculateQuote(
       quote([["arc-2na", 1], ["arc-l-lhf", 1]], {
         height: "70cm", tier: "PRICE_1", leg: '6"', specials: ["Nylon Fabric"],
@@ -48,8 +49,9 @@ describe("member preview demo catalogue", () => {
       demoProducts, demoBands, undefined, demoPricing,
     );
     expect(r.valid).toBe(true);
-    // (900 + 40 + 80) + (980 + 40 + 80) = 2,120 against 3,000.
-    expect(r.margin).toBeCloseTo(29.33, 2);
+    // 900 + 980 = 1,880 against 3,000; the leg (RM 40) and Nylon (RM 80) once for the sofa.
+    expect(r.margin).toBeCloseTo(37.33, 2);
+    expect(r.optionCharge).toBe(120);
   });
 
   it("refuses a choice one of the cart's sofas was not ticked for", () => {

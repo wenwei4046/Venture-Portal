@@ -1,6 +1,6 @@
-import type { BedframeBuild, MemberCatalogueModel, MemberProduct } from "@/lib/member/types";
+import type { BedframeBuild, MemberCatalogueModel, MemberProduct, OptionCharge } from "@/lib/member/types";
 import { bedframeKey, categoryKey, compareHeights } from "@/lib/member/catalog";
-import { chargeIn, frameBuildText, frameChoicesOf, frameCharge, intersect, kindOf, type FrameChoices, type SofaChoices } from "@/lib/member/build";
+import { chargeIn, frameBuildText, frameChoicesOf, frameCharge, intersect, kindOf, specialsCharge, type FrameChoices } from "@/lib/member/build";
 import { valueKey } from "@/lib/catalogue/keys";
 
 /**
@@ -59,15 +59,25 @@ export interface QModel {
   sizes: Partial<Record<SizeKey, string>>;
   /** A sofa: its modules, left-facing pieces first. */
   modules: QModule[];
-  /**
-   * A sofa: the leg heights and specials Product List › Modular turned ON for
-   * the model (that the ERP and Maintenance still allow). Nothing turned ON =
-   * nothing to choose. A mattress has none.
-   */
-  choices: SofaChoices;
+  /** A sofa: its leg heights and specials (Product List › Modular, priced on Maintenance). A mattress has none. */
+  choices: QSofaChoices;
 }
 
-export const NO_SOFA_CHOICES: SofaChoices = { legs: [], specials: [] };
+/**
+ * What a sofa may be built with on the Quote (user 2026-10-06): FOC or a leg
+ * height Maintenance CHARGES that Modular turned ON — the bed frame's rule —
+ * and every special Modular turned ON, charged when Maintenance prices it.
+ * Charged ONCE PER SOFA however many pieces, on top, out of the margin.
+ * Nothing turned ON = nothing to choose.
+ */
+export interface QSofaChoices {
+  legs: OptionCharge[];
+  specials: string[];
+  /** The specials Maintenance charges, with what; one not here is free. */
+  specialCharges: OptionCharge[];
+}
+
+export const NO_SOFA_CHOICES: QSofaChoices = { legs: [], specials: [], specialCharges: [] };
 
 export interface QFrame {
   key: string;
@@ -80,11 +90,15 @@ export interface QFrame {
   choices: FrameChoices;
 }
 
-const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
+const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [], specialCharges: [] };
 
-/** A sofa model's leg heights and specials, as the catalogue's models list them (Modular's ticks). */
-function sofaChoicesOf(model: MemberCatalogueModel | undefined): SofaChoices {
-  return { legs: model?.options.leg_heights ?? [], specials: model?.options.specials ?? [] };
+/** A sofa model's charged leg heights, its specials and their charges, as the catalogue's models list them. */
+function sofaChoicesOf(model: MemberCatalogueModel | undefined): QSofaChoices {
+  return {
+    legs: model?.charges?.leg_heights ?? [],
+    specials: model?.options.specials ?? [],
+    specialCharges: model?.charges?.specials ?? [],
+  };
 }
 
 /** A frame build with only what this frame still offers; undefined = all FOC, no specials. */
@@ -106,7 +120,7 @@ export function frameBuildFor(choices: FrameChoices, build: BedframeBuild | unde
   return Object.keys(out).length ? out : undefined;
 }
 
-/** `leg 6″ +RM 100 · gap 12″ +RM 20` — a frame build as a line says it, charges beside. */
+/** `leg 6″ +RM 100 · gap 12″ +RM 20 · Hydraulic +RM 300` — a frame build as a line says it, charges beside. */
 export function frameBuildMeta(choices: FrameChoices, build: BedframeBuild | undefined): string {
   if (!build) return "";
   const priced = (word: string, v: string | undefined, list: FrameChoices["divans"]) => (v ? `${word} ${v} +${rmShort(chargeIn(list, v))}` : null);
@@ -115,7 +129,10 @@ export function frameBuildMeta(choices: FrameChoices, build: BedframeBuild | und
     priced("leg", build.leg, choices.legs),
     priced("gap", build.gap, choices.gaps),
     priced("total height", build.total, choices.totals),
-    ...(build.specials ?? []),
+    ...(build.specials ?? []).map(sp => {
+      const c = chargeIn(choices.specialCharges, sp);
+      return c > 0 ? `${sp} +${rmShort(c)}` : sp;
+    }),
   ].filter(Boolean).join(" · ");
 }
 
@@ -656,12 +673,38 @@ export function cartSofaKeys(cart: CartLine[]): string[] {
 /**
  * The leg heights and specials EVERY sofa model named may take — one build
  * makes every sofa in the cart, so a leg one model was turned ON for and
- * another was not is not offered (the server's `buildChoicesFor`).
+ * another was not is not offered (the server's `buildChoicesFor`). A price is
+ * the value's own, whichever model lists it (Maintenance prices a value, not a model).
  */
-export function sofaChoicesIn(catalog: QCatalog, modelKeys: Iterable<string>): SofaChoices {
+export function sofaChoicesIn(catalog: QCatalog, modelKeys: Iterable<string>): QSofaChoices {
   const lists = [...new Set(modelKeys)].map(k => catalog.models.find(m => m.key === k)?.choices ?? NO_SOFA_CHOICES);
   if (!lists.length) return NO_SOFA_CHOICES;
-  return { legs: intersect(lists.map(c => c.legs)), specials: intersect(lists.map(c => c.specials)) };
+  const [first, ...rest] = lists;
+  const legs = first.legs.filter(o => rest.every(c => c.legs.some(x => valueKey(x.value) === valueKey(o.value))));
+  const specials = intersect(lists.map(c => c.specials));
+  const charged = lists.flatMap(c => c.specialCharges);
+  const specialCharges = specials.flatMap(sp => {
+    const hit = charged.find(o => valueKey(o.value) === valueKey(sp));
+    return hit ? [{ value: sp, charge: hit.charge }] : [];
+  });
+  return { legs, specials, specialCharges };
+}
+
+/**
+ * What the cart's sofas are charged for their options until the server says —
+ * ONCE PER SOFA (the twin of `sofaSetCharges`): each model in the cart is a
+ * sofa, as many as the fewest of its pieces.
+ */
+export function sofaCartCharge(catalog: QCatalog | null, cart: CartLine[], build: SofaBuild): number {
+  if (!catalog) return 0;
+  const keys = cartSofaKeys(cart);
+  const choices = sofaChoicesIn(catalog, keys);
+  const unit = chargeIn(choices.legs, build.leg ?? undefined) + specialsCharge(choices.specialCharges, build.specials);
+  if (!(unit > 0)) return 0;
+  return keys.reduce((sum, key) => {
+    const pieces = cart.filter(l => l.kind === "sofa" && l.key === key).map(l => l.qty);
+    return sum + unit * Math.max(1, Math.floor(Math.min(...pieces)));
+  }, 0);
 }
 
 /** The value as the list spells it, while the list still has it; null = not chosen or no longer offered. */
@@ -679,11 +722,12 @@ function offeredAll(values: string[], list: string[]): string[] {
 /**
  * The build the server is asked to cost the cart's sofas with: its seat height
  * and tier, and only the leg height and specials every sofa model in the cart
- * still takes — one turned OFF on Modular since drops out.
+ * still takes — one turned OFF on Modular (or a leg no longer charged) since
+ * drops out.
  */
 export function sofaBuildToSend(build: SofaBuild, catalog: QCatalog | null, cart: CartLine[]): SofaBuild {
   const choices = catalog ? sofaChoicesIn(catalog, cartSofaKeys(cart)) : NO_SOFA_CHOICES;
-  return { ...build, leg: offeredOne(build.leg, choices.legs), specials: offeredAll(build.specials, choices.specials) };
+  return { ...build, leg: offeredOne(build.leg, choices.legs.map(o => o.value)), specials: offeredAll(build.specials, choices.specials) };
 }
 
 export interface SofaBuildPick {
@@ -695,9 +739,10 @@ export interface SofaBuildPick {
   tier: string | null;
   /** Modules are chosen but no seat height costs all of them. */
   clash: boolean;
-  /** The leg heights and specials this model AND every sofa model already in the cart were turned ON for. */
-  legs: string[];
+  /** What this model AND every sofa model already in the cart may take: the charged legs (FOC besides), the specials and their charges. */
+  legs: OptionCharge[];
   specials: string[];
+  specialCharges: OptionCharge[];
   /** The sheet's leg height and specials, as far as they are still offered. */
   leg: string | null;
   picked: string[];
@@ -728,7 +773,7 @@ export function sofaPick(
   const options = sofaChoicesIn(catalog, [sh.key, ...cartSofaKeys(cart)]);
   return {
     graded, heights: choices.heights, tiers, height, tier, clash: graded && chosen.length > 0 && !choices.heights.length,
-    legs: options.legs, specials: options.specials,
-    leg: offeredOne(sh.leg, options.legs), picked: offeredAll(sh.specials, options.specials),
+    legs: options.legs, specials: options.specials, specialCharges: options.specialCharges,
+    leg: offeredOne(sh.leg, options.legs.map(o => o.value)), picked: offeredAll(sh.specials, options.specials),
   };
 }
