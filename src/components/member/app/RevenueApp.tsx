@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { MemberData, MemberMembership, MemberOrgMap, MemberReadContext, QuoteInput } from "@/lib/member/types";
-import { tierLabel } from "@/lib/member/catalog";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type ArenaWeekBrand, type ArenaWeekPicks, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
@@ -36,6 +35,7 @@ import { notifGroups, notifications, notifSummary, type NotifItem, type NotifTab
 import type { AppFixture } from "./fixtures/proto";
 import { useQuote } from "./quote/useQuote";
 import { catalogFromProducts, itemsText, type QCatalog } from "./quote/quote-model";
+import { customerQuote } from "./quote/calc-model";
 import { tableCalc } from "./quote/table-calc";
 import QuoteProducts from "./quote/QuoteProducts";
 import QuoteCalc, { CalcDock, DeskCalc, ProductsDock, type CalcProps } from "./quote/QuoteCalc";
@@ -751,14 +751,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     onFee: quote.setFee,
     onProducts: () => goScreen("quote"),
   };
-  const customer: CustomerQuote | null = quote.confirmed ? {
-    lines: quote.cart.map(l => ({ name: [l.name, l.size].filter(Boolean).join(" · "), qty: l.qty })),
-    build: quote.cart.some(l => l.kind === "sofa") && quote.build.height && quote.build.tier
-      ? [`Sofa build: seat height ${quote.build.height} · ${tierLabel(quote.build.tier)} fabric`] : [],
-    price: quote.confirmed.price,
-    fee: quote.confirmed.delivery,
-    text: quote.confirmed.customerText ?? "",
-  } : null;
+  const customer: CustomerQuote | null = quote.confirmed ? customerQuote(quote.cart, quote.confirmed, quote.quotedBuild) : null;
   const onQuote = route.screen === "quote" || route.screen === "calc";
 
   let page: ReactNode;

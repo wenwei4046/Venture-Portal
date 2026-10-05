@@ -17,13 +17,17 @@ export function tableCalc(input: QuoteInput, table: PriceTable, divisor: number,
   const next = [...incentives].sort((a, b) => a - b).find(p => p > margin + 1e-9) ?? null;
   const nextPrice = next !== null ? Math.ceil((teamCost / (1 - next / 100)) * 100) / 100 : null;
   const delivery = Number(input.delivery) || 0;
+  // KPI items the customer buys ride on top of the price, as the live calculator's do.
+  const addOns = lines.filter(l => l.kpi).reduce((a, l) => a + l.list * l.qty, 0);
+  const pays = price + addOns + delivery;
   const text = ["HOUZS VENTURE · Product quotation", ...lines.map(l => `Product · ${l.name} × ${l.qty}`),
-    `Selling price: RM ${price.toFixed(2)}`, `Additional charges: RM ${delivery.toFixed(2)}`, `Total: RM ${(price + delivery).toFixed(2)}`].join("\n");
+    `Selling price: RM ${price.toFixed(2)}`, ...(addOns > 0 ? [`Add-on items: RM ${addOns.toFixed(2)}`] : []),
+    `Additional charges: RM ${delivery.toFixed(2)}`, `Total: RM ${pays.toFixed(2)}`].join("\n");
   return {
     ok: true,
     data: {
       valid: true, price, delivery, margin, label: "", tone: "neutral", multiplier: 1, nextPrice, nextThreshold: next, boundary: null,
-      kpiAmount: 0, version: "", inputKey: "", suggestions: [], customerText: text,
+      kpiAmount: 0, addOnAmount: addOns, customerPays: pays, version: "", inputKey: "", suggestions: [], customerText: text,
     },
   };
 }

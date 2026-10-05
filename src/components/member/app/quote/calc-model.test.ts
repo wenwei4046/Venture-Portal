@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MemberBand, QuoteResult } from "@/lib/member/types";
-import { calcVM, press, priceText, quoteInput } from "./calc-model";
+import { calcVM, customerQuote, press, priceText, quoteInput } from "./calc-model";
 import { tableCalc } from "./table-calc";
 import type { CartLine } from "./quote-model";
 
@@ -41,17 +41,17 @@ describe("the keypad", () => {
 describe("what the server is asked", () => {
   it("sums a SKU over its lines, sends the price and fee in sen, and the seat height only with a sofa", () => {
     const cart = [line("a", "p1", 1), line("b", "p1", 2), line("c", "p2", 1, "frame")];
-    expect(quoteInput("scheme", cart, "5480", "12.5", { height: "60cm", tier: "PRICE_1" })).toEqual({
+    expect(quoteInput("scheme", cart, "5480", "12.5", { height: "60cm", tier: "PRICE_1", leg: null, specials: [] })).toEqual({
       schemeId: "scheme", price: "5480.00", delivery: "12.50", build: undefined,
       lines: [{ productId: "p1", quantity: 3, gift: false }, { productId: "p2", quantity: 1, gift: false }],
     });
-    expect(quoteInput("scheme", [line("s", "p3", 1, "sofa")], "100", "", { height: "60cm", tier: "PRICE_1" })?.build).toEqual({ height: "60cm", tier: "PRICE_1" });
+    expect(quoteInput("scheme", [line("s", "p3", 1, "sofa")], "100", "", { height: "60cm", tier: "PRICE_1", leg: null, specials: [] })?.build).toEqual({ height: "60cm", tier: "PRICE_1" });
   });
 
   it("asks nothing without a cart or a price", () => {
-    expect(quoteInput("scheme", [], "100", "", { height: null, tier: null })).toBeNull();
-    expect(quoteInput("scheme", [line("a", "p1", 1)], "", "", { height: null, tier: null })).toBeNull();
-    expect(quoteInput("scheme", [line("a", "p1", 1)], "0.", "", { height: null, tier: null })).toBeNull();
+    expect(quoteInput("scheme", [], "100", "", { height: null, tier: null, leg: null, specials: [] })).toBeNull();
+    expect(quoteInput("scheme", [line("a", "p1", 1)], "", "", { height: null, tier: null, leg: null, specials: [] })).toBeNull();
+    expect(quoteInput("scheme", [line("a", "p1", 1)], "0.", "", { height: null, tier: null, leg: null, specials: [] })).toBeNull();
   });
 });
 
@@ -126,10 +126,56 @@ describe("quoteInput — a bed frame's own build", () => {
     ({ id, kind: "frame", key: "m-cody", name: "CODY", size: "King", qty, productId: "cody-k", ...(bedframe ? { bedframe, charge: 100 } : {}) });
 
   it("sends each build of one SKU as its own line, and merges the same build", () => {
-    const input = quoteInput("fair", [line("a", 1), line("b", 2, { leg: '6"' }), line("c", 1, { leg: '6"' })], "4000", "", { height: null, tier: null });
+    const input = quoteInput("fair", [line("a", 1), line("b", 2, { leg: '6"' }), line("c", 1, { leg: '6"' })], "4000", "", { height: null, tier: null, leg: null, specials: [] });
     expect(input?.lines).toEqual([
       { productId: "cody-k", quantity: 1, gift: false },
       { productId: "cody-k", quantity: 3, gift: false, bedframe: { leg: '6"' } },
     ]);
+  });
+});
+
+// 2026-10-06: the sofas' one build carries its leg height and specials too — only with a sofa in the cart.
+describe("quoteInput — the sofas' leg height and specials", () => {
+  const sofa = line("s", "2376-2s", 1, "sofa");
+  const build = { height: "60cm", tier: "PRICE_1", leg: '6"', specials: ["Wooden Arm"] };
+
+  it("sends them with the seat height and tier", () => {
+    expect(quoteInput("fair", [sofa], "3000", "", build)?.build).toEqual({ height: "60cm", tier: "PRICE_1", leg: '6"', specials: ["Wooden Arm"] });
+  });
+
+  it("sends a leg or specials even when the modules have no seat-height grid, and nothing when nothing is chosen", () => {
+    expect(quoteInput("fair", [sofa], "3000", "", { height: null, tier: null, leg: '6"', specials: [] })?.build).toEqual({ leg: '6"' });
+    expect(quoteInput("fair", [sofa], "3000", "", { height: null, tier: null, leg: null, specials: [] })?.build).toBeUndefined();
+  });
+
+  it("sends no sofa build without a sofa in the cart", () => {
+    expect(quoteInput("fair", [line("m", "apex-q", 1)], "3000", "", build)?.build).toBeUndefined();
+  });
+});
+
+// 2026-10-06: the customer quote's Total is step 2's Customer pays — it had left out the
+// KPI items bought and the bed frames' option charges that the shared text includes.
+describe("the customer quote", () => {
+  const confirmed = (over: Partial<QuoteResult> = {}): QuoteResult =>
+    ({ ...result(40), price: 5000, delivery: 80, customerText: "text", ...over });
+  const frame: CartLine = { id: "f", kind: "frame", key: "m-pebble", name: "PEBBLE GREY", size: "Queen", qty: 1, productId: "pebble-q",
+    bedframe: { leg: '16"', specials: ["Hydraulic"] }, charge: 100 };
+  const sofa: CartLine = { id: "s", kind: "sofa", key: "m-810", name: "810 2S", size: "2-seater · both arms", qty: 1, productId: "810-2s" };
+
+  it("totals what the customer pays: the price, the add-ons, the bed frame options and the fee", () => {
+    const q = customerQuote([frame], confirmed({ addOnAmount: 250, optionCharge: 100, customerPays: 5430 }), undefined);
+    expect(q).toMatchObject({ price: 5000, addOns: 250, options: 100, fee: 80, total: 5430, text: "text" });
+    expect(q.lines).toEqual([{ name: 'PEBBLE GREY · Queen (leg 16" · Hydraulic)', qty: 1 }]);
+    expect(q.build).toEqual([]);
+  });
+
+  it("adds them up itself when the calculator did not say", () => {
+    expect(customerQuote([frame], confirmed({ addOnAmount: 250, optionCharge: 100 }), undefined).total).toBe(5430);
+    expect(customerQuote([frame], confirmed(), undefined)).toMatchObject({ addOns: 0, options: 0, total: 5080 });
+  });
+
+  it("states the sofas' one build as it was costed", () => {
+    const q = customerQuote([sofa], confirmed(), { height: "32", tier: "PRICE_3", leg: '6"', specials: ["Wooden Arm"] });
+    expect(q.build).toEqual(['Sofa build: seat height 32 · Tier 3 fabric · leg 6" · Wooden Arm']);
   });
 });

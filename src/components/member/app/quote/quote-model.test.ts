@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
-  EMPTY_MEMORY, accOrder, addLines, bump, cartMeta, catalogFromProducts, defaultSize, frameMeta, itemsText, layoutFits, liveSets, moduleInfo,
-  remember, setMeta, sheetLines, sizeKeyOf, sofaPick, sofaSeats, sofaText, type CartLine, type QCatalog, type SheetState,
+  EMPTY_MEMORY, NO_SOFA_BUILD, accOrder, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
+  moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaPick, sofaSeats, sofaText,
+  type CartLine, type QCatalog, type SheetState,
 } from "./quote-model";
 
 const product = (p: Partial<MemberProduct> & Pick<MemberProduct, "id" | "name">): MemberProduct => ({
@@ -125,7 +126,7 @@ describe("sheetLines — what a sheet adds", () => {
   });
 
   it("a sofa: each module times its count times the sets", () => {
-    const sh: SheetState = { mode: "sofa", key: "m-2376", layout: "C", mods: { "L(LHF)": 1, "2S": 2 }, qty: 2, kpi: [], height: null, tier: null };
+    const sh: SheetState = { mode: "sofa", key: "m-2376", layout: "C", mods: { "L(LHF)": 1, "2S": 2 }, qty: 2, kpi: [], height: null, tier: null, leg: null, specials: [] };
     const lines = sheetLines(sh, zanotti());
     expect(lines.map(l => [l.name, l.size, l.qty])).toEqual([["2376 L(LHF)", "Chaise · left", 2], ["2376 2S", "2-seater · both arms", 4]]);
   });
@@ -160,8 +161,8 @@ describe("last used", () => {
       m = remember(m, { mode: "model", key: "m-apex", size, qty: 1, acc: {}, bfs: [], fx: null, accAll: false }, "AKEMI");
     }
     expect(m.sets.AKEMI.map(r => (r.kind === "mattress" ? r.size : ""))).toEqual(["K", "Q", "SS"]);
-    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "2S": 1, "L(LHF)": 1 }, qty: 1, kpi: [], height: null, tier: null }, "ZANOTTI");
-    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "L(LHF)": 1, "2S": 1 }, qty: 1, kpi: [], height: null, tier: null }, "ZANOTTI");
+    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "2S": 1, "L(LHF)": 1 }, qty: 1, kpi: [], height: null, tier: null, leg: null, specials: [] }, "ZANOTTI");
+    m = remember(m, { mode: "sofa", key: "m-2376", layout: "C", mods: { "L(LHF)": 1, "2S": 1 }, qty: 1, kpi: [], height: null, tier: null, leg: null, specials: [] }, "ZANOTTI");
     expect(m.layouts.ZANOTTI).toHaveLength(1);
     expect(m.sets.ZANOTTI).toHaveLength(1);
   });
@@ -191,24 +192,24 @@ describe("the sofa build", () => {
   const z = zanotti();
   const model = z.models[0];
   const sofa = (mods: Record<string, number>, height: string | null = null): Extract<SheetState, { mode: "sofa" }> =>
-    ({ mode: "sofa", key: "m-2376", layout: "C", mods, qty: 1, kpi: [], height, tier: null });
+    ({ mode: "sofa", key: "m-2376", layout: "C", mods, qty: 1, kpi: [], height, tier: null, leg: null, specials: [] });
 
   it("offers only the seat heights and tiers every chosen module is costed in", () => {
-    const pick = sofaPick(sofa({ "2S": 1, "L(LHF)": 1 }), z, [], { height: null, tier: null });
+    const pick = sofaPick(sofa({ "2S": 1, "L(LHF)": 1 }), z, [], { height: null, tier: null, leg: null, specials: [] });
     expect(pick).toMatchObject({ graded: true, heights: ["60cm"], height: "60cm", tiers: ["PRICE_1", "PRICE_2"], tier: "PRICE_1", clash: false });
   });
 
   it("keeps the cart's own choice when it still fits", () => {
-    expect(sofaPick(sofa({ "2S": 1 }), z, [], { height: "75cm", tier: "PRICE_1" })).toMatchObject({ height: "75cm", tier: "PRICE_1" });
+    expect(sofaPick(sofa({ "2S": 1 }), z, [], { height: "75cm", tier: "PRICE_1", leg: null, specials: [] })).toMatchObject({ height: "75cm", tier: "PRICE_1", leg: null, specials: [] });
   });
 
   it("says so when no seat height costs every module", () => {
-    expect(sofaPick(sofa({ "L(LHF)": 1, Console: 1 }), z, [], { height: null, tier: null }).clash).toBe(true);
+    expect(sofaPick(sofa({ "L(LHF)": 1, Console: 1 }), z, [], { height: null, tier: null, leg: null, specials: [] }).clash).toBe(true);
   });
 
   it("counts the sofa modules already in the cart too", () => {
     const inCart: CartLine[] = [{ id: "s-l", kind: "sofa", key: "m-2376", name: "2376 L(LHF)", size: "", qty: 1, productId: "2376-l" }];
-    expect(sofaPick(sofa({ "2S": 1 }), z, inCart, { height: "75cm", tier: null }).height).toBe("60cm");
+    expect(sofaPick(sofa({ "2S": 1 }), z, inCart, { height: "75cm", tier: null, leg: null, specials: [] }).height).toBe("60cm");
   });
 
   it("reads a layout", () => {
@@ -267,5 +268,71 @@ describe("a bed frame's own build", () => {
     const [line] = sheetLines(frameSheet({ leg: '6"' }), c);
     expect(cartMeta(line, "Akemi")).toBe('King · Follows Akemi margin · leg 6" · +RM 100 each');
     expect(frameMeta({ size: "K", frame: "m-cody", kpi: [], build: { leg: '6"' } }, c)).toBe('King · CODY · leg 6" +RM 100');
+  });
+});
+
+// 2026-10-06 (user): a sofa's leg height and specials — the old builder's, left out by
+// the revamp. Only what Modular turned ON, and only what EVERY sofa model in the cart
+// takes: one build makes every sofa in it (the server's buildChoicesFor).
+describe("a sofa's leg height and specials", () => {
+  const SOFAS: MemberProduct[] = [
+    ...PRODUCTS,
+    product({ id: "810-2s", name: "810", brand: "ZANOTTI", kind: "SOFA", category: "Sofa", size: "2S", moduleCode: "2S", modelId: "m-810" }),
+  ];
+  const MODELS = [
+    { id: "m-2376", kind: "SOFA" as const, options: { leg_heights: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"] } },
+    { id: "m-810", kind: "SOFA" as const, options: { leg_heights: ['6"'], specials: ["Wooden Arm"] } },
+  ];
+  const z = () => catalogFromProducts(SOFAS, "ZANOTTI", "Zanotti", [], MODELS);
+  const sheet = (key: string, leg: string | null = null, specials: string[] = []): Extract<SheetState, { mode: "sofa" }> =>
+    ({ mode: "sofa", key, layout: "C", mods: { "2S": 1 }, qty: 1, kpi: [], height: null, tier: null, leg, specials });
+  const inCart = (key: string, productId: string): CartLine => ({ id: `s-${key}`, kind: "sofa", key, name: key, size: "", qty: 1, productId });
+
+  it("reads each sofa model's turned-ON legs and specials; a model with none offers nothing", () => {
+    const c = z();
+    expect(c.models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"] });
+    expect(zanotti().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [], specials: [] });
+    expect(sofaPick(sheet("m-2376"), zanotti(), [], NO_SOFA_BUILD)).toMatchObject({ legs: [], specials: [], leg: null, picked: [] });
+  });
+
+  it("offers this model's own on an empty cart, and keeps the sheet's choices", () => {
+    expect(sofaPick(sheet("m-2376", '4"', ["Seat Add 1ft"]), z(), [], NO_SOFA_BUILD)).toMatchObject({
+      legs: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft"], leg: '4"', picked: ["Seat Add 1ft"],
+    });
+  });
+
+  it("offers only what every sofa model in the cart takes, and drops a choice another model does not", () => {
+    const pick = sofaPick(sheet("m-810", '4"', ["Seat Add 1ft", "Wooden Arm"]), z(), [inCart("m-2376", "2376-2s")], NO_SOFA_BUILD);
+    expect(pick).toMatchObject({ legs: ['6"'], specials: ["Wooden Arm"], leg: null, picked: ["Wooden Arm"] });
+  });
+
+  it("matches a value however the ERP spells it, and answers in the list's spelling", () => {
+    expect(sofaPick(sheet("m-2376", "no leg", ["wooden  arm"]), z(), [], NO_SOFA_BUILD)).toMatchObject({ leg: "No Leg", picked: ["Wooden Arm"] });
+  });
+
+  it("asks the server only for what every sofa in the cart still takes", () => {
+    const build = { height: "60cm", tier: "PRICE_1", leg: '4"', specials: ["Wooden Arm", "Seat Add 1ft"] };
+    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s")])).toEqual(build);
+    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")]))
+      .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: ["Wooden Arm"] });
+    // Turned OFF on Modular since: it drops out.
+    expect(sofaBuildToSend(build, zanotti(), [inCart("m-2376", "2376-2s")])).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [] });
+  });
+
+  it("reads a build an older phone kept (seat height and tier only)", () => {
+    expect(sofaBuildOf({ height: "60cm", tier: "PRICE_1" })).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [] });
+    expect(sofaBuildOf(undefined)).toEqual(NO_SOFA_BUILD);
+    expect(sofaBuildOf({ leg: '6"', specials: ["Wooden Arm", 3 as unknown as string] })).toEqual({ height: null, tier: null, leg: '6"', specials: ["Wooden Arm"] });
+  });
+});
+
+describe("the customer quote's lines", () => {
+  it("names each line, a bed frame with its own build", () => {
+    const frame: CartLine = { id: "f", kind: "frame", key: "m-pebble", name: "PEBBLE GREY", size: "Queen", qty: 1, productId: "pebble-q", bedframe: { specials: ["Hydraulic"] } };
+    const sofa: CartLine = { id: "s", kind: "sofa", key: "m-2376", name: "2376 2S", size: "2-seater · both arms", qty: 2, productId: "2376-2s" };
+    expect(customerLines([frame, sofa])).toEqual([
+      { name: "PEBBLE GREY · Queen (Hydraulic)", qty: 1 },
+      { name: "2376 2S · 2-seater · both arms", qty: 2 },
+    ]);
   });
 });

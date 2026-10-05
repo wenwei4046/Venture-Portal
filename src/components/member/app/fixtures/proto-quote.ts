@@ -7,8 +7,8 @@
  * Preview only.
  */
 import type { MemberBand } from "@/lib/member/types";
-import type { FrameChoices } from "@/lib/member/build";
-import type { QCatalog, QModel, QModule, QuoteMemory, SheetState, SizeKey, CartLine } from "../quote/quote-model";
+import type { FrameChoices, SofaChoices } from "@/lib/member/build";
+import { NO_SOFA_CHOICES, type QCatalog, type QModel, type QModule, type QuoteMemory, type SheetState, type SizeKey, type CartLine } from "../quote/quote-model";
 import type { QuoteInitial } from "../quote/useQuote";
 import type { PriceTable } from "../quote/table-calc";
 
@@ -99,15 +99,19 @@ const sp = (q: number, z: SizeKey) => Math.round((q * SIZE_M[z]) / 10) * 10;
 
 const sizes = (id: (z: SizeKey) => string) => Object.fromEntries(SIZE_KEYS.map(z => [z, id(z)])) as Record<SizeKey, string>;
 
-/** The prototype has no bed frame options; `?charges=1` shows what Maintenance charges would look like (2026-10-05). */
+/**
+ * The prototype has no bed frame or sofa options; `?charges=1` shows what
+ * Modular's ticks and Maintenance's charges would look like (2026-10-05/06).
+ */
 const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
 const DEMO_CHARGES: FrameChoices = {
   divans: [{ value: '12"', charge: 50 }],
   legs: [{ value: '6"', charge: 100 }, { value: '7"', charge: 120 }],
   gaps: [{ value: '12"', charge: 20 }],
   totals: [],
-  specials: [],
+  specials: ["Hydraulic", "Divan Top Fully Cover", "HB Straight"],
 };
+const DEMO_SOFA: SofaChoices = { legs: ["No Leg", '4"', '6"'], specials: ["Wooden Arm", "Seat Add 1ft", "Seat Base Fully Cover with no Leg"] };
 
 function catalog(brand: { code: string; name: string; sofa: boolean }, charges = false): QCatalog {
   const models: QModel[] = MODELS[brand.code].map(([key, name, desc]) => ({
@@ -118,6 +122,7 @@ function catalog(brand: { code: string; name: string; sofa: boolean }, charges =
     modules: brand.sofa
       ? SOFA_MODS.map(([code, desc, seats]): QModule => ({ code, desc, seats, chaise: code.startsWith("CHS"), productId: `s:${brand.code}:${key}:${code}`, options: [] }))
       : [],
+    choices: brand.sofa && charges ? DEMO_SOFA : NO_SOFA_CHOICES,
   }));
   return {
     brand: brand.code,
@@ -201,7 +206,7 @@ function openSheet(name: string | undefined): SheetState | null {
     fx: name === "mattress-frame" ? { size: "K", frame: "linden", kpi: ["protector"], qty: 1, drop: false, idx: -1 } : null,
   });
   switch (name) {
-    case "sofa": return { mode: "sofa", key: "verona", layout: "R1", mods: { "2A-LHF": 1, CNR: 1, "2A-RHF": 1 }, qty: 1, kpi: ["protector"], height: null, tier: null };
+    case "sofa": return { mode: "sofa", key: "verona", layout: "R1", mods: { "2A-LHF": 1, CNR: 1, "2A-RHF": 1 }, qty: 1, kpi: ["protector"], height: null, tier: null, leg: null, specials: [] };
     case "mattress": return mattress(2);
     case "mattress-frame": return mattress(1);
     case "frame": return { mode: "frame", size: "Q", frame: "linden", kpi: ["protector", "pillowset"], qty: 2, drop: false };

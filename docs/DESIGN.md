@@ -1344,6 +1344,16 @@ VP's. The member C release above describes the screens this replaced.
   click on another bill only closed the panel (user: 点一次它其实是先关掉右边的
   bar). Pickers (month, sub-department, brand) keep the covering dim; a phone keeps
   the dim for every sheet.
+- **A sofa's leg height and specials** (2026-10-06, user: the revamp had left
+  them out) — the sofa sheet adds *Leg height* (*Not chosen* + each leg turned
+  ON on Modular) and *Specials* (toggle chips) after *Fabric*, both captioned
+  *For every sofa in this quote*: one build makes every sofa in the cart, so
+  only what every sofa model in it was turned ON for is offered, and nothing
+  turned ON means no row. A special is named in words, so its chip grows to them
+  (`.chipWords` — the bed frame's specials too). The customer quote's *Sofa
+  build* line names them, a bed frame line carries its own build in brackets,
+  and the card's **Total** is step 2's *Customer pays*: *Add-on items* and *Bed
+  frame options* rows sit above the fee when there are any.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
@@ -2465,6 +2475,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Revenue app · sofa leg height & specials)** — the Quote's sofa sheet regains the old builder's *Leg height* and *Specials* (only what Modular turned ON for every sofa model in the cart), as chips after *Fabric*; specials' chips wrap their words (`.chipWords`, bed frame specials too). The customer quote names the sofa build and each bed frame's own build, and its Total now equals step 2's *Customer pays* (*Add-on items* / *Bed frame options* rows when present). See *A sofa's leg height and specials*.
 - **2026-10-06 (Revenue app · a row's sheet on a desktop)** — on a desktop, clicking another bill while one is open in the right-hand panel shows that bill at once; it used to take two clicks, the first only closing the panel. The same for every sheet that shows one row of the page beside it (Commission by order, My honours, Team & capacity, Requests, Memos). A click elsewhere on the page still closes the panel, and now also does what was clicked; the list scrolls under the mouse wheel while the panel is open. Pickers and phone sheets are unchanged (see *The Revenue app — built to the prototype*).
 - **2026-10-06 (Revenue app · directors side by side)** — Team & capacity's *Your Revenue family* drew Fair's two directors one above the other (KRIS, then PETER, then the member), as if PETER reported to KRIS. A level now holds peers: `DIRECTORS` over KRIS and PETER in one row (`.peers` / `.peer`, 156px a card), joined under their cards by the same 2px bar the direct reports hang from, one line down to the next level. One director is drawn exactly as before. On a phone, a row that would start off-screen opens the chart on its middle. See *Directors stand side by side*.
 - **2026-10-05 (Revenue app · no cost basis)** — the quote's step 2 ends at the *Additional fee* field: the grey note under it ("Fees such as delivery or disposal … Margin uses the Fair team cost basis (cost ÷ 0.7).") is gone. Insight's bills footnote, its brand footnote, the Arena's margin-board basis and the Commission scheme sheet's note lose only their "team cost (cost ÷ 0.7)" / "Revenue Team's cost" clause. See *Never says how the cost is made up*.

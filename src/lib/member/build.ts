@@ -51,7 +51,7 @@ export interface BuildChoices {
 }
 
 /** The values every list shares, in the first list's order. */
-function intersect(lists: string[][]): string[] {
+export function intersect(lists: string[][]): string[] {
   if (lists.length === 0) return [];
   const [first, ...rest] = lists;
   const keys = rest.map((list) => new Set(list.map((v) => valueKey(v))));
