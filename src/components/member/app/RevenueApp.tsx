@@ -23,8 +23,11 @@ import ArenaRecord from "./arena/ArenaRecord";
 import { ChampSheet, FairsSheet, boardThemeClass } from "./arena/ArenaSheets";
 import { arenaKey, boardModel, hubModel, recordModel, type ArenaSub } from "./arena/arena-model";
 import { useArenaData } from "./arena/useArenaData";
-import { demoSource, liveSource, type RevenueSource } from "./source";
+import { demoSource, liveSource, type RevenueSource, type TrackRead } from "./source";
+import { useKeyedRead } from "./useKeyedRead";
 import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me } from "./shell/Chrome";
+import PullRefresh from "./shell/PullRefresh";
+import { RETURN_REFRESH_MS } from "./shell/pull-refresh";
 import StatusBar from "./shell/StatusBar";
 import Today from "./today/Today";
 import { todayModel, type TodayTodo } from "./today/today-model";
@@ -170,20 +173,35 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     if (live && /Android/i.test(navigator.userAgent)) setAndroid(true);
   }, [live]);
 
-  // A minute's refresh keeps memos, requests and statements current, as before.
+  // ── pull to refresh (user 2026-10-06: 除非我拉下来 refresh，它才会直接变) ──
+  // Nothing on screen changes on its own — the minute's refresh is gone. A pull moves `gen`: every read below runs
+  // again and keeps what is on screen until its answer lands, and the dot spins until all of them have.
+  const [gen, setGen] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const pulled = useRef<{ gen: number; reads: Promise<unknown>[] }>({ gen: 0, reads: [] });
+  const track = useCallback<TrackRead>((forGen, read) => {
+    if (forGen > 0 && pulled.current.gen === forGen) pulled.current.reads.push(read);
+    return read;
+  }, []);
+  const pullRefresh = useCallback(() => {
+    const next = gen + 1;
+    pulled.current = { gen: next, reads: [] };
+    setRefreshFailed(false);
+    setRefreshing(true);
+    setGen(next);
+  }, [gen]);
   useEffect(() => {
-    if (data.demo) return;
-    const timer = window.setInterval(() => {
-      void source.refresh().then(result => { if (result.ok) setData(result.data); });
-    }, 60_000);
-    return () => window.clearInterval(timer);
-  }, [data.demo, source]);
+    if (!refreshFailed) return;
+    const timer = window.setTimeout(() => setRefreshFailed(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [refreshFailed]);
 
   const principal = data.principalView === true;
   const membership: MemberMembership | undefined = data.memberships.find(m => m.id === route.department) ?? data.memberships[0];
   const membershipId = membership?.id ?? "";
-  // Keyed on the ids, never the membership object: the minute's refresh hands back a new `data`, and a new
-  // context would start every read below over — View as went back to "Loading…" every minute (2026-10-05).
+  // Keyed on the ids, never the membership object: a refresh hands back a new `data`, and a new context would
+  // start every read below over — View as went back to "Loading…" every minute until 2026-10-05.
   const context = useMemo<MemberReadContext | undefined>(() => (principal && route.staff && membershipId
     ? { staffId: route.staff, subDepartmentId: membershipId } : undefined), [principal, route.staff, membershipId]);
   const viewed = principal && route.staff ? membership?.people.find(p => p.id === route.staff) : undefined;
@@ -205,16 +223,21 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   // Last month's and this month's bills: which months are closed, which hold bills.
   const [recent, setRecent] = useState<MemberOrderBook | null>(null);
   const [recentFailed, setRecentFailed] = useState(false);
+  const recentKey = `${membershipId}|${context?.staffId ?? ""}|${prevMonth}|${period}`;
+  const recentShown = useRef("");
   useEffect(() => {
     if (!membershipId || !readable) return;
     let stale = false;
-    setRecent(null); setRecentFailed(false);
-    void source.orderBook(membershipId, prevMonth, period, context).then(r => {
+    // Somebody else's or another month's book goes; a pull keeps this one up until the new one lands.
+    const again = recentShown.current === recentKey;
+    recentShown.current = recentKey;
+    if (!again) { setRecent(null); setRecentFailed(false); }
+    void track(gen, source.orderBook(membershipId, prevMonth, period, context)).then(r => {
       if (stale) return;
-      if (r.ok) setRecent(r.data); else setRecentFailed(true);
+      if (r.ok) { setRecent(r.data); setRecentFailed(false); } else if (!again) setRecentFailed(true);
     });
     return () => { stale = true; };
-  }, [membershipId, prevMonth, period, readable, context, source]);
+  }, [membershipId, prevMonth, period, readable, context, source, recentKey, gen, track]);
   const monthState = useMemo<MonthState>(() => ({ paysFrom: recent?.paysFrom ?? null, closed: recent?.closedMonths ?? [] }), [recent]);
   const working = useMemo(() => {
     if (fixture?.insight) return fixture.insight.month;
@@ -233,37 +256,39 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const deptView = principal && !context;
   const viewStaff = context?.staffId ?? "";
   const todayKey = fixture || data.demo || !membershipId ? "" : `${membershipId}|${deptView ? "*" : viewStaff}|${period}`;
-  const [todayMonth, setTodayMonth] = useState<{ key: string; month?: IncomeMonth; dept?: DepartmentIncome; failed?: boolean } | null>(null);
-  useEffect(() => {
-    if (!todayKey) return;
-    let stale = false;
-    const done = (next: { month?: IncomeMonth; dept?: DepartmentIncome; failed?: boolean }) => { if (!stale) setTodayMonth({ key: todayKey, ...next }); };
-    // Ids, not the `context` object: a refresh rebuilds it every minute, and this runs the engine.
-    if (deptView) void source.departmentIncome(membershipId, period).then(r => done(r.ok ? { dept: r.data } : { failed: true }));
-    else void source.income(membershipId, period, viewStaff ? { staffId: viewStaff, subDepartmentId: membershipId } : undefined)
-      .then(r => done(r.ok ? { month: r.data.month } : { failed: true }));
-    return () => { stale = true; };
-  }, [todayKey, deptView, viewStaff, membershipId, period, source]);
+  // Ids, not the `context` object: a refresh rebuilds it, and this runs the engine. A pull reads it again and
+  // keeps the figure on screen until the new one lands.
+  const todayDept = useKeyedRead<DepartmentIncome>(todayKey, !!todayKey && deptView, gen, () => source.departmentIncome(membershipId, period), track);
+  const todayOwn = useKeyedRead<MemberIncome>(todayKey, !!todayKey && !deptView, gen,
+    () => source.income(membershipId, period, viewStaff ? { staffId: viewStaff, subDepartmentId: membershipId } : undefined), track);
+  const todayIncome = useMemo<{ month?: IncomeMonth; dept?: DepartmentIncome; failed?: boolean } | null>(() => {
+    if (!todayKey) return null;
+    if (deptView) return todayDept.value ? { dept: todayDept.value } : todayDept.error ? { failed: true } : null;
+    return todayOwn.value ? { month: todayOwn.value.month } : todayOwn.error ? { failed: true } : null;
+  }, [todayKey, deptView, todayDept.value, todayDept.error, todayOwn.value, todayOwn.error]);
   // This month's Insight block, KPI and bills (last month's are `work` while it is being worked),
   // and its Arena — the boards, this week's fair and the brand weeks still to save.
   const nowPeriod = useMemo(() => (working && working !== period ? monthPeriod(period, period) : null), [working, period]);
-  const nowOwn = useInsightData({ source, membershipId, schemeId, context, readable, period: nowPeriod, recent, recentFrom: prevMonth });
+  const nowOwn = useInsightData({ source, membershipId, schemeId, context, readable, period: nowPeriod, recent, recentFrom: prevMonth, gen, track });
+  const arenaReadKey = `${membershipId}|${context?.staffId ?? ""}|${working ?? ""}|${period}`;
+  const arenaShown = useRef("");
   useEffect(() => {
     if (!membershipId || !readable || !working) return;
     let stale = false;
-    setArena(null); setArenaNow(null);
+    // Another person or month: the boards were theirs. A pull: they stay until the new ones land.
+    if (arenaShown.current !== arenaReadKey) { setArena(null); setArenaNow(null); }
+    arenaShown.current = arenaReadKey;
     if (working !== period) {
-      void source.arena(membershipId, period, "monthly", context).then(r => { if (!stale && r.ok) setArenaNow(viewedAs(r.data, context?.staffId)); });
+      void track(gen, source.arena(membershipId, period, "monthly", context)).then(r => { if (!stale && r.ok) setArenaNow(viewedAs(r.data, context?.staffId)); });
     }
-    void source.arena(membershipId, working, "monthly", context).then(r => { if (!stale && r.ok) setArena(viewedAs(r.data, context?.staffId)); });
+    void track(gen, source.arena(membershipId, working, "monthly", context)).then(r => { if (!stale && r.ok) setArena(viewedAs(r.data, context?.staffId)); });
     return () => { stale = true; };
-  }, [membershipId, working, period, readable, context, source]);
-  const work = useInsightData({ source, membershipId, schemeId, context, readable, period: workingPeriod, recent, recentFrom: prevMonth });
+  }, [membershipId, working, period, readable, context, source, arenaReadKey, gen, track]);
+  const work = useInsightData({ source, membershipId, schemeId, context, readable, period: workingPeriod, recent, recentFrom: prevMonth, gen, track });
   const now = working === period ? work : nowOwn;
   const arenaToday = working === period ? arena : arenaNow;
 
   const incomes = useMemo(() => data.incomes.filter(i => i.schemeId === schemeId).sort((a, b) => b.period.localeCompare(a.period)), [data.incomes, schemeId]);
-  const todayIncome = todayKey && todayMonth?.key === todayKey ? todayMonth : null;
   const income = useMemo(() => (!todayKey ? incomes[0]
     : todayIncome?.month ? snapshotIncome(todayIncome.month, schemeId)
     : todayIncome?.dept ? { period: todayIncome.dept.period, status: "computed", total: todayIncome.dept.commission }
@@ -284,9 +309,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   useEffect(() => {
     if (!settledPeriod || !membershipId || !readable) { setSettledArena(null); return; }
     let stale = false;
-    void source.arena(membershipId, settledPeriod, "monthly", context).then(r => { if (!stale && r.ok) setSettledArena(viewedAs(r.data, context?.staffId)); });
+    void track(gen, source.arena(membershipId, settledPeriod, "monthly", context)).then(r => { if (!stale && r.ok) setSettledArena(viewedAs(r.data, context?.staffId)); });
     return () => { stale = true; };
-  }, [settledPeriod, membershipId, readable, context, source]);
+  }, [settledPeriod, membershipId, readable, context, source, gen, track]);
 
   const memos = useMemo(() => data.memos.filter(m => !m.departments.length || m.departments.includes(membership?.name ?? "")), [data.memos, membership?.name]);
   const requests = data.requests;
@@ -427,7 +452,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   // month by default, and those reads only queued in front of Today's own (Server Actions run one at
   // a time) to be read again a moment later.
   const sameAsNow = !sameAsWork && !!nowPeriod && insPeriod.kind === "monthly" && insPeriod.from === period;
-  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: !working || sameAsWork || sameAsNow ? null : insPeriod, recent, recentFrom: prevMonth });
+  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: !working || sameAsWork || sameAsNow ? null : insPeriod,
+    recent, recentFrom: prevMonth, gen, track });
   const ins = sameAsWork ? work : sameAsNow ? now : picked;
   const insMonthly = insPeriod.kind === "monthly";
   const insightInput = useMemo<InsightInput>(() => ({
@@ -470,7 +496,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const knownArena = arPeriod.kind === "monthly" && arenaToday && arPeriod.from === arenaToday.period ? arenaToday : arena;
   const arData = useArenaData({
     source, membershipId, context, readable, known: knownArena, kpi: kpiRule, mark: markViewed,
-    period: route.screen === "arena" && !fixture?.arena ? arPeriod : null,
+    period: route.screen === "arena" && !fixture?.arena ? arPeriod : null, gen, track,
   });
   const arInput = useMemo(() => ({
     period: arPeriod, snapshot: arData.snapshot, history: arData.history, standings: arData.standings, selfId,
@@ -509,15 +535,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   // The viewed person's requests (a Principal's snapshot holds everybody's).
   const myRequests = useMemo(() => (principal ? (viewed ? requests.filter(r => r.staffId === viewed.id) : []) : requests), [principal, viewed, requests]);
   // View as: the memos read as the viewed person read them — their receipts, not the Principal's.
-  const [viewedReceipts, setViewedReceipts] = useState<{ staffId: string; byMemo: Map<string, { readAt: string | null; acknowledgedAt: string | null }> } | null>(null);
-  useEffect(() => {
-    if (fxp || !principal || !viewed || viewedReceipts?.staffId === viewed.id) return;
-    let stale = false;
-    void source.memoReceipts(viewed.id).then(res => {
-      if (!stale && res.ok) setViewedReceipts({ staffId: viewed.id, byMemo: new Map(res.data.map(x => [x.memoId, x])) });
-    });
-    return () => { stale = true; };
-  }, [fxp, principal, viewed, viewedReceipts?.staffId, source]);
+  const viewedId = viewed?.id ?? "";
+  const receiptsRead = useKeyedRead(viewedId, !fxp && principal && !!viewedId, gen, () => source.memoReceipts(viewedId), track);
+  const viewedReceipts = useMemo(() => (viewedId && receiptsRead.value
+    ? { staffId: viewedId, byMemo: new Map(receiptsRead.value.map(x => [x.memoId, x])) } : null), [viewedId, receiptsRead.value]);
   const memoVMs: MemoVM[] = useMemo(() => {
     if (fxp) return fxp.memos.map(m => ({ ...m, read: m.read || memoRead.has(m.id) || memoAcked.has(m.id), acked: m.acked || memoAcked.has(m.id) }));
     if (principal) {
@@ -537,7 +558,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     const rows = fxp ? fxp.requests.rows : requestRowsVM(myRequests, nameOf);
     return rows.map(r => (cancelled.has(r.id) ? { ...r, status: "Cancelled", tone: "none" as const } : r));
   }, [fxp, myRequests, nameOf, cancelled]);
-  const [history, setHistory] = useState<Record<string, RequestEvent[]>>({});
+  // A request's history, and the pull it was read at — opened again after a pull, it is read again.
+  const [history, setHistory] = useState<Record<string, { gen: number; events: RequestEvent[] }>>({});
   const reqDetail = useMemo(() => {
     if (!reqPick) return null;
     if (fxp) {
@@ -547,7 +569,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
         log: [...d.log.map(e => ({ ...e, dot: "past" as const })), { what: "Cancelled", who: "You", when: "Just now", note: "", dot: "bad" as const }] };
     }
     const r = myRequests.find(x => x.id === reqPick);
-    return r ? requestDetailVM(r, history[r.id] ?? null, { nameOf, readOnly: readOnlyView }) : null;
+    return r ? requestDetailVM(r, history[r.id]?.events ?? null, { nameOf, readOnly: readOnlyView }) : null;
   }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView]);
   const vaGroups = useMemo(() => (fxp
     ? protoVaGroups(fxp.va.people, fxp.va.departments, vaQuery, viewed?.id ?? "")
@@ -581,9 +603,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const openRequest = useCallback((id: string) => {
     setReqError(null);
     setReqPick(id);
-    if (fxp || history[id]) return;
-    void source.requestHistory(id).then(r => { if (r.ok) setHistory(prev => ({ ...prev, [id]: r.data })); });
-  }, [fxp, history, source]);
+    if (fxp || history[id]?.gen === gen) return;
+    void source.requestHistory(id).then(r => { if (r.ok) setHistory(prev => ({ ...prev, [id]: { gen, events: r.data } })); });
+  }, [fxp, history, source, gen]);
   const submitRequest = useCallback(async (form: FormData): Promise<SubmitOutcome> => {
     if (fxp) { await new Promise(r => setTimeout(r, 250)); return { ok: true, code: "RQ-2610-004" }; }
     const result = await source.submitRequest(form);
@@ -602,8 +624,8 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     setHistory(prev => { const next = { ...prev }; delete next[reqPick]; return next; });
     const refreshed = await source.refresh();
     if (refreshed.ok) setData(refreshed.data);
-    void source.requestHistory(reqPick).then(r => { if (r.ok) setHistory(prev => ({ ...prev, [reqPick]: r.data })); });
-  }, [reqPick, readOnlyView, fxp, source]);
+    void source.requestHistory(reqPick).then(r => { if (r.ok) setHistory(prev => ({ ...prev, [reqPick]: { gen, events: r.data } })); });
+  }, [reqPick, readOnlyView, fxp, source, gen]);
   const updateRequest = useCallback(() => {
     const r = myRequests.find(x => x.id === reqPick);
     if (!r) return;
@@ -613,13 +635,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   }, [myRequests, reqPick]);
 
   // Team & capacity: the department's map, read when the page opens.
-  const [orgMap, setOrgMap] = useState<MemberOrgMap | null>(null);
-  useEffect(() => {
-    if (fxp || route.screen !== "account" || route.pf !== "team" || orgMap || !readable) return;
-    let stale = false;
-    void source.orgMap(context ? { subDepartmentId: context.subDepartmentId } : undefined).then(r => { if (!stale && r.ok) setOrgMap(r.data); });
-    return () => { stale = true; };
-  }, [fxp, route.screen, route.pf, orgMap, readable, context, source]);
+  const orgRead = useKeyedRead<MemberOrgMap>(context?.subDepartmentId ?? "mine", !fxp && route.screen === "account" && route.pf === "team" && readable, gen,
+    () => source.orgMap(context ? { subDepartmentId: context.subDepartmentId } : undefined), track);
+  const orgMap = orgRead.value;
   const teamView = useMemo(() => {
     if (fxp) return fxp.team;
     if (!orgMap || !membership) return null;
@@ -640,26 +658,14 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   // My income: the month being worked unless another is picked — live until the close, fixed after.
   const incMonth = incPeriod ?? working ?? period;
   const incKey = `${membershipId}|${context?.staffId ?? ""}|${incMonth}`;
-  const [incomeByKey, setIncomeByKey] = useState<Record<string, MemberIncome>>({});
-  const [incBooks, setIncBooks] = useState<Record<string, MemberOrderBook>>({});
-  const [incError, setIncError] = useState<Record<string, string>>({});
   const onIncome = route.screen === "account" && (route.pf === "income" || route.pf === "incOrders");
   const inRecent = incMonth === prevMonth || incMonth === period;
-  useEffect(() => {
-    if (fxp || !onIncome || !membershipId || !readable || incomeByKey[incKey]) return;
-    let stale = false;
-    void source.income(membershipId, incMonth, context).then(r => {
-      if (stale) return;
-      if (r.ok) setIncomeByKey(prev => ({ ...prev, [incKey]: r.data }));
-      else setIncError(prev => ({ ...prev, [incKey]: r.error }));
-    });
-    if (!inRecent && !incBooks[incKey]) {
-      void source.orderBook(membershipId, incMonth, incMonth, context).then(r => { if (!stale && r.ok) setIncBooks(prev => ({ ...prev, [incKey]: r.data })); });
-    }
-    return () => { stale = true; };
-  }, [fxp, onIncome, membershipId, readable, incomeByKey, incBooks, incKey, incMonth, inRecent, context, source]);
-  const incData = incomeByKey[incKey] ?? null;
-  const incBook = inRecent ? recent : incBooks[incKey] ?? null;
+  const incNeed = !fxp && onIncome && !!membershipId && readable;
+  const incomeRead = useKeyedRead<MemberIncome>(incKey, incNeed, gen, () => source.income(membershipId, incMonth, context), track);
+  // A month outside the two the app holds reads its own bills for Commission by order.
+  const incBookRead = useKeyedRead<MemberOrderBook>(incKey, incNeed && !inRecent, gen, () => source.orderBook(membershipId, incMonth, incMonth, context), track);
+  const incData = incomeRead.value;
+  const incBook = inRecent ? recent : incBookRead.value;
   const incomeView = useMemo(() => (fxp ? (hidden ? fxp.income.hidden : fxp.income.shown) : incData ? incomeVM(incData, hidden, hasTeam) : null), [fxp, hidden, incData, hasTeam]);
   const ordersView = useMemo(() => (fxp ? (hidden ? fxp.orders.hidden : fxp.orders.shown)
     : incData ? incomeOrdersVM(incData, incBook, data.bands, hidden) : null), [fxp, hidden, incData, incBook, data.bands]);
@@ -672,21 +678,11 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     return all.length ? { from: all[0], until: all[all.length - 1] } : null;
   }, [honWin, period]);
   const honKey = honRange ? `${membershipId}|${context?.staffId ?? ""}|${honRange.from}|${honRange.until}` : "";
-  const [honByKey, setHonByKey] = useState<Record<string, MemberHonours>>({});
-  const [honError, setHonError] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (fxp || route.screen !== "account" || route.pf !== "honours" || !honRange || !membershipId || !readable || honByKey[honKey]) return;
-    let stale = false;
-    void source.honours(membershipId, honRange.from, honRange.until, context).then(r => {
-      if (stale) return;
-      if (r.ok) setHonByKey(prev => ({ ...prev, [honKey]: r.data }));
-      else setHonError(prev => ({ ...prev, [honKey]: r.error }));
-    });
-    return () => { stale = true; };
-  }, [fxp, route.screen, route.pf, honRange, membershipId, readable, honByKey, honKey, context, source]);
+  const honRead = useKeyedRead<MemberHonours>(honKey, !fxp && route.screen === "account" && route.pf === "honours" && !!honRange && !!membershipId && readable, gen,
+    () => source.honours(membershipId, honRange?.from ?? period, honRange?.until ?? period, context), track);
   const honoursView = useMemo(() => (fxp ? fxp.honours[honKind]
-    : honByKey[honKey] ? honoursVM(honByKey[honKey], honKind, honStart, period, membership?.name ?? "your sub-department") : null),
-    [fxp, honKind, honByKey, honKey, honStart, period, membership?.name]);
+    : honRead.value ? honoursVM(honRead.value, honKind, honStart, period, membership?.name ?? "your sub-department") : null),
+    [fxp, honKind, honRead.value, honStart, period, membership?.name]);
 
   // Commission scheme: the member's place in it and each brand's ladder. A Principal's view has the viewed
   // person's title and rank, the engine's rate once My income read it, and never their salary.
@@ -734,13 +730,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
 
   // The claim form's choices: the member's fair weekends, HR's rates, their team, the departments.
   // View as reads them too — the forms open on the viewed person's choices (and send nothing).
-  const [claimRates, setClaimRates] = useState<ClaimRates | null>(null);
-  useEffect(() => {
-    if (fxp || route.screen !== "account" || route.pf !== "requests" || claimRates || (principal && !viewed)) return;
-    let stale = false;
-    void source.claimRates().then(r => { if (!stale && r.ok) setClaimRates(r.data); });
-    return () => { stale = true; };
-  }, [fxp, route.screen, route.pf, claimRates, principal, viewed, source]);
+  const ratesRead = useKeyedRead<ClaimRates>("rates", !fxp && route.screen === "account" && route.pf === "requests" && !(principal && !viewed), gen,
+    () => source.claimRates(), track);
+  const claimRates = ratesRead.value;
   const formOptions: FormOptions = useMemo(() => {
     if (fxp) return fxp.form;
     return {
@@ -754,12 +746,50 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     };
   }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests]);
 
+  // ── pull to refresh: the end of it ──
+  // Every read above has started for this pull by now (effects run in order), so everybody's snapshot — the slowest
+  // read, and the client runs one Server Action at a time — goes last, behind the screen's own reads. The dot spins
+  // until all of them have landed.
+  useEffect(() => {
+    if (!refreshing || pulled.current.gen !== gen) return;
+    let stale = false, snapshotOk = true;
+    const snapshot = source.refresh().then(r => { snapshotOk = r.ok; if (!stale && r.ok) setData(r.data); });
+    void Promise.allSettled([...pulled.current.reads, snapshot]).then(results => {
+      if (stale) return;
+      setRefreshing(false);
+      // A read that threw (offline, a broken request) or no new snapshot: the page still shows the old data.
+      // A read answering "not available" (KPI off, no payroll row) answered the same before — nothing went stale.
+      setRefreshFailed(!snapshotOk || results.some(r => r.status === "rejected"));
+    });
+    return () => { stale = true; };
+  }, [refreshing, gen, source]);
+
+  // Back after a while away (2026-10-06): an app left open overnight is read again once on its return, as a pull
+  // would. While somebody is looking at it, nothing changes on its own.
+  const latestPull = useRef({ pullRefresh, refreshing });
+  latestPull.current = { pullRefresh, refreshing };
+  useEffect(() => {
+    if (data.demo || fixture) return;
+    let hiddenAt: number | null = null;
+    const back = () => {
+      if (hiddenAt !== null && Date.now() - hiddenAt >= RETURN_REFRESH_MS && !latestPull.current.refreshing) latestPull.current.pullRefresh();
+      hiddenAt = null;
+    };
+    const visibility = () => { if (document.visibilityState === "hidden") hiddenAt = Date.now(); else back(); };
+    const shown = (e: PageTransitionEvent) => { if (e.persisted) back(); };
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("pageshow", shown);
+    return () => { document.removeEventListener("visibilitychange", visibility); window.removeEventListener("pageshow", shown); };
+  }, [data.demo, fixture]);
+
   const signOut = () => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); };
 
   // ── layout ──
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
   const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen);
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
+  // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures.
+  const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen;
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail).
   const rail = desk && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
   const showHeader = route.screen === "today" || route.screen === "calc";
@@ -858,13 +888,13 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
       page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : "Requests"}
         onBack={back} onViewAs={() => setVaOpen(true)} />;
     } else if (pf === "income") {
-      page = <IncomePage vm={incomeView} hidden={hidden} message={incError[incKey] ?? null} onBack={back} onPeriod={() => setPfDateOpen(true)} onToggleHide={() => setHidden(!hidden)}
+      page = <IncomePage vm={incomeView} hidden={hidden} message={incomeRead.error} onBack={back} onPeriod={() => setPfDateOpen(true)} onToggleHide={() => setHidden(!hidden)}
         onOrders={() => goScreen("account", { pf: "incOrders" })} onMonth={p => { setIncPeriod(p); if (mainRef.current) mainRef.current.scrollTop = 0; }} />;
     } else if (pf === "incOrders") {
-      page = <IncomeOrdersPage vm={ordersView} tab={coTab} message={incError[incKey] ?? null} onTab={t => { setCoTab(t); setCoPick(null); }} onBack={() => goScreen("account", { pf: "income" })}
+      page = <IncomeOrdersPage vm={ordersView} tab={coTab} message={incomeRead.error} onTab={t => { setCoTab(t); setCoPick(null); }} onBack={() => goScreen("account", { pf: "income" })}
         onPeriod={() => setPfDateOpen(true)} onRow={setCoPick} />;
     } else if (pf === "honours") {
-      page = <HonoursPage vm={honoursView} kind={honKind} message={honError[honKey] ?? null} onKind={k => { setHonKind(k); setHonFrom(null); setHonPlace(null); }} onBack={back}
+      page = <HonoursPage vm={honoursView} kind={honKind} message={honRead.error} onKind={k => { setHonKind(k); setHonFrom(null); setHonPlace(null); }} onBack={back}
         onPeriod={() => setPfDateOpen(true)} onPlace={setHonPlace} />;
     } else if (pf === "team") {
       page = <TeamPage vm={teamView} onBack={back} onPerson={setPersonPick} />;
@@ -904,6 +934,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
           onLogo={() => goScreen("today")} onBack={() => goScreen("quote")} onSubDept={() => openSheet("sd")} onBell={openNotif}
           onProfile={() => goScreen("account")} />
       )}
+      <PullRefresh target={mainRef} enabled={pullable} refreshing={refreshing} failed={refreshFailed} onRefresh={pullRefresh} />
       <main ref={mainRef} className={s.main} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
         {page}
       </main>

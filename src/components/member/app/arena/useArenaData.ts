@@ -5,7 +5,7 @@ import type { MemberReadContext } from "@/lib/member/types";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { ArenaHistorySnapshot } from "@/lib/member/arena-history";
 import { championshipMonth, championshipStandings, type ChampMonth, type ChampStanding } from "@/lib/member/championship";
-import type { Outcome, RevenueSource } from "../source";
+import { untracked, type Outcome, type RevenueSource, type TrackRead } from "../source";
 import { addMonths, type InsightPeriod } from "../insight/period";
 
 export interface ArenaData {
@@ -31,6 +31,9 @@ interface Args {
   kpi: { enabled: boolean; threshold: number | null };
   /** A Principal views as somebody: mark them as "you". */
   mark: (snapshot: MemberArenaSnapshot) => MemberArenaSnapshot;
+  /** Pull to refresh: a new number empties the cache and reads the window again, the boards staying meanwhile. */
+  gen?: number;
+  track?: TrackRead;
 }
 
 /** The months of a window, first to last (never past `through`). */
@@ -45,21 +48,22 @@ export function windowMonths(period: InsightPeriod): string[] {
  * months. A month already read is not read again while the app is open —
  * switching Monthly → Quarterly → back costs nothing.
  */
-export function useArenaData({ source, membershipId, context, readable, period, known, kpi, mark }: Args): ArenaData {
+export function useArenaData({ source, membershipId, context, readable, period, known, kpi, mark, gen = 0, track = untracked }: Args): ArenaData {
   const cache = useRef(new Map<string, Promise<Outcome<MemberArenaSnapshot>>>());
   const [snapshot, setSnapshot] = useState<MemberArenaSnapshot | null>(null);
   const [monthSnaps, setMonthSnaps] = useState<MemberArenaSnapshot[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const viewer = context?.staffId ?? "";
+  const shown = useRef("");
 
-  // A different person or department is a different cache.
-  useEffect(() => { cache.current.clear(); }, [viewer, membershipId]);
+  // A different person or department is a different cache; a pull empties it, so every month is read again.
+  useEffect(() => { cache.current.clear(); }, [viewer, membershipId, gen]);
 
   const read = (month: string, window: ArenaWindow, history: boolean) => {
     const key = `${viewer}|${membershipId}|${window}|${month}|${history ? "h" : ""}`;
     let hit = cache.current.get(key);
     if (!hit) {
-      hit = source.arena(membershipId, month, window, context, { history });
+      hit = track(gen, source.arena(membershipId, month, window, context, { history }));
       cache.current.set(key, hit);
       // A failed read is tried again next time.
       void hit.then(r => { if (!r.ok) cache.current.delete(key); });
@@ -75,31 +79,35 @@ export function useArenaData({ source, membershipId, context, readable, period, 
   useEffect(() => {
     if (!period || !membershipId || !readable) return;
     let stale = false;
+    // Another window or person: the boards on screen were theirs. The same one read again (a pull): they stay.
+    const id = [viewer, membershipId, kind, from, through].join("|");
+    const again = shown.current === id;
+    shown.current = id;
     setFailed(null);
     // The window: the working month is already here; anything else is read.
     if (kind === "monthly" && from === knownMonth && known) {
       setSnapshot(known);
     } else {
-      setSnapshot(null);
+      if (!again) setSnapshot(null);
       void read(from, kind, !known?.history).then(r => {
         if (stale) return;
-        if (r.ok) setSnapshot(mark(r.data)); else setFailed(r.error);
+        if (r.ok) setSnapshot(mark(r.data)); else if (!again) setFailed(r.error);
       });
     }
     // The Championship: each month of the window.
-    setMonthSnaps(null);
+    if (!again) setMonthSnaps(null);
     const months = windowMonths(period);
     void Promise.all(months.map(m => (m === knownMonth && known ? Promise.resolve({ ok: true as const, data: known }) : read(m, "monthly", false))))
       .then(results => {
         if (stale) return;
         const bad = results.find(r => !r.ok);
-        if (bad && !bad.ok) { setFailed(bad.error); return; }
+        if (bad && !bad.ok) { if (!again) setFailed(bad.error); return; }
         setMonthSnaps(results.map(r => (r.ok ? r.data : null)).filter((x): x is MemberArenaSnapshot => !!x));
       });
     return () => { stale = true; };
     // `read` and `mark` are stable in effect: they close over the same keys.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [membershipId, readable, kind, from, through, knownMonth, known, viewer]);
+  }, [membershipId, readable, kind, from, through, knownMonth, known, viewer, gen]);
 
   const history = known?.history ?? snapshot?.history ?? null;
   const champ = useMemo(() => {

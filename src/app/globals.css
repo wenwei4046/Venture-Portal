@@ -309,6 +309,8 @@
   --rv-android-ink: #1D1B1A;
   --rv-android-cam: #111111;
 }
+/* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
+html:has([data-revenue-app]) { overscroll-behavior-y: none; }
 
 /* Real devices supply these insets; simulated device chrome lives outside the iframe. */
 [data-arena-design] > [data-arena-chrome] {

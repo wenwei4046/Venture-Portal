@@ -1,7 +1,7 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { memberDemo } from "@/lib/member/demo";
-import type { MemberArenaSnapshot } from "@/lib/member/arena";
+import type { ArenaWeekPicks, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import type { MemberData, MemberReadContext } from "@/lib/member/types";
 import type { RevenueSource } from "./source";
@@ -14,9 +14,10 @@ vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
 
 class NoResize { observe() {} unobserve() {} disconnect() {} }
 
-const never = <T,>() => new Promise<T>(() => {});
+const VIEW_AS = "?page=account&view=brandWeeks&department=fair&staff=anthony";
+const MEMBER = "?page=account&view=brandWeeks&department=fair";
 
-/** The Principal viewing ANTHONY — the refresh hands back everybody's snapshot, as `loadMemberData` does. */
+/** The Principal viewing ANTHONY — a refresh hands back everybody's snapshot, as `loadMemberData` does. */
 function principalData(): MemberData {
   const demo = memberDemo();
   return {
@@ -40,95 +41,203 @@ function book(from: string, through: string): MemberOrderBook {
   return value;
 }
 
-function arena(membershipId: string, period: string, context?: MemberReadContext): MemberArenaSnapshot {
+function arena(membershipId: string, period: string, context: MemberReadContext | undefined, picks: ArenaWeekPicks): MemberArenaSnapshot {
   return {
     principalView: !!context, viewedStaffId: context?.staffId, membershipId, department: "Fair", selfId: context ? "" : "jia",
     period, window: "monthly", from: `${period}-01`, through: `${period}-05`, asOf: "2026-10-05T04:00:00Z", live: true,
-    people: [], brands: [], brandWeeks: null, weekLocks: [], tiers: [],
+    people: [], brands: [], weekLocks: [], tiers: [],
+    brandWeeks: { weeks: 5, counts: { AKEMI: 0, ERGOTEX: 0, ZANOTTI: 0, DUNLOP: 0 }, picks },
   };
 }
 
-/** Reads answer until `hold` is set, and never after — so a read repeated after the first load shows. */
-function source(make: () => MemberData, hold: { on: boolean }) {
-  const later = <T,>(value: T) => (hold.on ? never<T>() : Promise.resolve(value));
+/**
+ * A source that answers at once until `hold()`, then keeps every answer until `release()` — so what the
+ * page shows WHILE a refresh reads can be looked at. Answers are made at release: change `world` in between.
+ */
+function fakeSource(make: () => MemberData) {
+  const world = { picks: {} as ArenaWeekPicks, failArena: false, offline: false };
+  const waiting: (() => void)[] = [];
+  let holding = false;
+  const answer = <T,>(value: () => T): Promise<T> => {
+    if (!holding) return Promise.resolve(value());
+    return new Promise<T>(resolve => { waiting.push(() => resolve(value())); });
+  };
+  // Offline: the snapshot cannot be read (the other reads still answer, so nothing throws unhandled in a test).
+  const snapshot = () => (world.offline ? { ok: false as const, error: "Failed to fetch" } : { ok: true as const, data: make() });
   const none = vi.fn(async () => ({ ok: false as const, error: "not in this test" }));
-  return {
-    refresh: vi.fn(async () => ({ ok: true as const, data: make() })),
+  const api = {
+    refresh: vi.fn(() => answer(snapshot)),
     insight: vi.fn(async (_period: string | undefined, _context?: MemberReadContext) => ({ ok: false as const, error: "not in this test" })),
     kpi: none, orgMap: none, insightRange: none, quote: none, memo: none, requestHistory: none,
-    submitRequest: none, cancelRequest: none, claimRates: none, honours: none, saveBrandWeeks: none,
-    // Today's month, worked out by the engine: mocks of their own, so their reads can be counted.
-    income: vi.fn(async (_sub: string, _period: string, _context?: MemberReadContext) => ({ ok: false as const, error: "not in this test" })),
-    departmentIncome: vi.fn(async (_sub: string, _period: string) => ({ ok: false as const, error: "not in this test" })),
-    memoReceipts: vi.fn(async () => ({ ok: true as const, data: [] })),
-    orderBook: vi.fn((_sub: string, from: string, until: string) => later({ ok: true as const, data: book(from, until) })),
-    arena: vi.fn((membershipId: string, period: string, _window: string, context?: MemberReadContext) =>
-      later({ ok: true as const, data: arena(membershipId, period, context) })),
+    submitRequest: none, cancelRequest: none, claimRates: none, honours: none, saveBrandWeeks: none, departmentIncome: none,
+    // Today's income: Comm Cal's engine for the live month (#195), asked for by ids.
+    income: vi.fn(async () => ({ ok: false as const, error: "not in this test" })),
+    memoReceipts: vi.fn(() => answer(() => ({ ok: true as const, data: [] }))),
+    orderBook: vi.fn((_sub: string, from: string, until: string) => answer(() => ({ ok: true as const, data: book(from, until) }))),
+    arena: vi.fn((membershipId: string, period: string, _window: string, context?: MemberReadContext) => answer(() => (world.failArena
+      ? { ok: false as const, error: "Arena could not be loaded." }
+      : { ok: true as const, data: arena(membershipId, period, context, world.picks) }))),
   } satisfies RevenueSource;
+  return {
+    api, world,
+    hold() { holding = true; },
+    async release() { holding = false; await act(async () => { while (waiting.length) waiting.shift()!(); }); },
+  };
 }
 
-let minute: (() => void) | null = null;
+async function open(make: () => MemberData, search: string) {
+  window.history.replaceState({}, "", `/member${search}`);
+  const source = fakeSource(make);
+  render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={source.api} />);
+  expect(await screen.findByText("0 of 5 picked")).toBeInTheDocument();
+  return source;
+}
+
+/** A finger dragged down `distance` px from near the top of the page, then lifted. */
+function pull(distance: number) {
+  const main = screen.getByRole("main");
+  fireEvent.touchStart(main, { touches: [{ clientX: 120, clientY: 100 }] });
+  fireEvent.touchMove(main, { touches: [{ clientX: 122, clientY: 100 + distance / 2 }] });
+  fireEvent.touchMove(main, { touches: [{ clientX: 122, clientY: 100 + distance }] });
+  fireEvent.touchEnd(main, { touches: [] });
+}
+
+function calls(fn: { mock: { calls: unknown[][] } }, period?: string) {
+  return fn.mock.calls.filter(c => period === undefined || c[1] === period).length;
+}
+
+function visibility(state: "hidden" | "visible") {
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+  act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+}
+
+let intervals: number[] = [];
 
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", NoResize);
-  // The app's minute refresh, run by hand; every other timer stays real.
+  intervals = [];
   const real = window.setInterval.bind(window);
   vi.spyOn(window, "setInterval").mockImplementation(((fn: () => void, ms?: number) => {
-    if (ms === 60_000) { minute = fn; return 0; }
+    intervals.push(ms ?? 0);
     return real(fn, ms);
   }) as unknown as typeof window.setInterval);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); minute = null; });
+afterEach(() => {
+  cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals();
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+});
 
-/** Open Brand weeks, wait for it, then run the minute's refresh with every further read held. */
-async function refreshOnBrandWeeks(make: () => MemberData, search: string) {
-  window.history.replaceState({}, "", `/member${search}`);
-  const hold = { on: false };
-  const live = source(make, hold);
-  render(<RevenueApp initialData={make()} initialSearch={search} today="2026-10-05" source={live} />);
-  expect(await screen.findByText("0 of 5 picked")).toBeInTheDocument();
-  const reads = { arena: live.arena.mock.calls.length, book: live.orderBook.mock.calls.length, income: live.income.mock.calls.length };
-  hold.on = true;
-  expect(minute).toBeTypeOf("function");
-  await act(async () => { minute!(); });
-  expect(live.refresh).toHaveBeenCalledTimes(1);
-  return { live, reads };
-}
-
-describe("RevenueApp's minute refresh", () => {
-  it("View as: Brand weeks stays on screen and nothing is read again", async () => {
-    const { live, reads } = await refreshOnBrandWeeks(principalData, "?page=account&view=brandWeeks&department=fair&staff=anthony");
-    expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
-    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
-    expect(live.arena).toHaveBeenCalledTimes(reads.arena);
-    expect(live.orderBook).toHaveBeenCalledTimes(reads.book);
-    // Today is the live month (2026-10-06): the viewed person's October, asked for by ids, once.
-    expect(live.income).toHaveBeenCalledWith("fair", "2026-10", { staffId: "anthony", subDepartmentId: "fair" });
-    expect(live.income).toHaveBeenCalledTimes(reads.income);
+describe("RevenueApp refreshes only when pulled (2026-10-06)", () => {
+  it("changes nothing on its own: no minute timer, and nothing read after the first load", async () => {
+    const { api } = await open(principalData, VIEW_AS);
+    const reads = { arena: calls(api.arena), book: calls(api.orderBook), income: calls(api.income) };
+    await act(async () => { await new Promise(r => setTimeout(r, 50)); });
+    expect(intervals).not.toContain(60_000);
+    expect(api.refresh).not.toHaveBeenCalled();
+    expect(calls(api.arena)).toBe(reads.arena);
+    expect(calls(api.orderBook)).toBe(reads.book);
+    expect(calls(api.income)).toBe(reads.income);
   });
 
-  it("a member: the paid month's results are not read again", async () => {
-    const { live, reads } = await refreshOnBrandWeeks(memberData, "?page=account&view=brandWeeks&department=fair");
-    expect(live.arena).toHaveBeenCalledWith("fair", "2026-09", "monthly", undefined);
+  it("a pull keeps the page up while it reads, then swaps the new data in", async () => {
+    const source = await open(principalData, VIEW_AS);
+    const { api } = source;
+    // Today's income is the live month's, asked for by ids (#195).
+    expect(api.income).toHaveBeenCalledWith("fair", "2026-10", { staffId: "anthony", subDepartmentId: "fair" });
+    const reads = { arena: calls(api.arena), book: calls(api.orderBook), income: calls(api.income) };
+    source.hold();
+    source.world.picks = { "2026-10-02": "AKEMI" };
+
+    pull(300);
+
+    expect(screen.getByText("Refreshing…")).toBeInTheDocument();
+    expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
     expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
-    expect(live.arena).toHaveBeenCalledTimes(reads.arena);
-    expect(live.orderBook).toHaveBeenCalledTimes(reads.book);
-    expect(live.income).toHaveBeenCalledWith("fair", "2026-10", undefined);
-    expect(live.income).toHaveBeenCalledTimes(reads.income);
+    expect(calls(api.arena)).toBe(reads.arena + 1);
+    expect(calls(api.orderBook)).toBe(reads.book + 1);
+    expect(calls(api.income)).toBe(reads.income + 1);
+    expect(api.refresh).toHaveBeenCalledTimes(1);
+
+    await source.release();
+    expect(await screen.findByText("1 of 5 picked")).toBeInTheDocument();
+    expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("a short drag, or one that starts with the page scrolled down, is not a pull", async () => {
+    const { api } = await open(principalData, VIEW_AS);
+    pull(60);
+    expect(api.refresh).not.toHaveBeenCalled();
+
+    Object.defineProperty(screen.getByRole("main"), "scrollTop", { configurable: true, value: 140 });
+    pull(300);
+    expect(api.refresh).not.toHaveBeenCalled();
+  });
+
+  it("a failed pull keeps what was on screen and says so", async () => {
+    const source = await open(principalData, VIEW_AS);
+    source.hold();
+    source.world.offline = true;
+    source.world.failArena = true;
+    source.world.picks = { "2026-10-02": "AKEMI" };
+    pull(300);
+    await source.release();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't refresh. Pull down to try again.");
+    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
+    expect(screen.queryByText("Loading your fair weekends…")).not.toBeInTheDocument();
+  });
+
+  it("a read answering \"not available\" (KPI off, no payroll row) is not a failed pull", async () => {
+    const source = await open(principalData, VIEW_AS);
+    source.hold();
+    source.world.failArena = true;
+    pull(300);
+    await source.release();
+    expect(screen.queryByText("Refreshing…")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
+  });
+
+  it("back after ten minutes away it reads everything again once; after two, nothing", async () => {
+    const { api } = await open(principalData, VIEW_AS);
+    const now = vi.spyOn(Date, "now");
+    now.mockReturnValue(1_000_000);
+    visibility("hidden");
+    now.mockReturnValue(1_000_000 + 2 * 60_000);
+    visibility("visible");
+    expect(api.refresh).not.toHaveBeenCalled();
+
+    visibility("hidden");
+    now.mockReturnValue(1_000_000 + 13 * 60_000);
+    visibility("visible");
+    await act(async () => {});
+    expect(api.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("a member's paid month is read once for the pull, not again when the new data lands", async () => {
+    const source = await open(memberData, MEMBER);
+    const { api } = source;
+    expect(calls(api.arena, "2026-09")).toBe(1);
+    source.hold();
+    pull(300);
+    await source.release();
+    expect(api.refresh).toHaveBeenCalledTimes(1);
+    expect(calls(api.arena, "2026-09")).toBe(2);
+    expect(screen.getByText("0 of 5 picked")).toBeInTheDocument();
   });
 });
 
-// 2026-10-06, measured on prod: Server Actions run one at a time, and before the
+// 2026-10-06, measured on prod (#206): Server Actions run one at a time, and before the
 // month being worked was known Insight read the current month's bills, block and
 // KPI — three reads queued in front of Today's own, only to be read again.
 describe("Today's first load", () => {
   it("reads this month's Insight block once, and no bills beyond the two-month book", async () => {
     window.history.replaceState({}, "", "/member?department=fair");
-    const live = source(memberData, { on: false });
-    render(<RevenueApp initialData={memberData()} initialSearch="?department=fair" today="2026-10-05" source={live} />);
-    await vi.waitFor(() => expect(live.arena).toHaveBeenCalledWith("fair", "2026-10", "monthly", undefined));
+    const { api } = fakeSource(memberData);
+    render(<RevenueApp initialData={memberData()} initialSearch="?department=fair" today="2026-10-05" source={api} />);
+    await vi.waitFor(() => expect(api.arena).toHaveBeenCalledWith("fair", "2026-10", "monthly", undefined));
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
-    expect(live.insight.mock.calls.filter(([period]) => period === "2026-10")).toHaveLength(1);
-    expect(live.orderBook.mock.calls.map(([, from, until]) => `${from}..${until}`)).toEqual(["2026-09..2026-10"]);
+    expect(api.insight.mock.calls.filter(([period]) => period === "2026-10")).toHaveLength(1);
+    expect(api.orderBook.mock.calls.map(([, from, until]) => `${from}..${until}`)).toEqual(["2026-09..2026-10"]);
   });
 });

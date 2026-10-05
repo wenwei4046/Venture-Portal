@@ -13,6 +13,13 @@ import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions
 export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
+ * Pull to refresh: a read started for pull number `gen` is handed to the app,
+ * which spins until every one of them lands. Returns the read unchanged.
+ */
+export type TrackRead = <T>(gen: number, read: Promise<T>) => Promise<T>;
+export const untracked: TrackRead = (_gen, read) => read;
+
+/**
  * Where the app's numbers come from. The live app reads the database through
  * the member server actions; the design preview hands the same shapes from
  * fixtures, so both run the very same screens and models.
