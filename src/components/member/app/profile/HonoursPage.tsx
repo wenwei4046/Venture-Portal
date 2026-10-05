@@ -100,7 +100,7 @@ export function HonourSheet({ open, place, vm, periodLabel, onClose }: {
 }) {
   const sheet = place !== null ? vm?.sheets[place] : undefined;
   return (
-    <Sheet open={open} onClose={onClose} z={22} maxHeight="84%" scroll className={`${s.sheetBody} ${s.sheetGap12}`} label="Finishes">
+    <Sheet open={open} onClose={onClose} z={22} maxHeight="84%" scroll peek className={`${s.sheetBody} ${s.sheetGap12}`} label="Finishes">
       <SheetHandle />
       {sheet && place !== null && (
         <>

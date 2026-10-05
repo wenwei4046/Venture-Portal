@@ -73,7 +73,7 @@ export function RequestSheet({ open, vm, busy, error, onCancel, onUpdate, onClos
   onClose: () => void;
 }) {
   return (
-    <Sheet open={open} onClose={onClose} z={22} maxHeight="86%" scroll className={s.sheetBody} label={vm?.title ?? "Request"}>
+    <Sheet open={open} onClose={onClose} z={22} maxHeight="86%" scroll peek className={s.sheetBody} label={vm?.title ?? "Request"}>
       <SheetHandle />
       {vm && (
         <>

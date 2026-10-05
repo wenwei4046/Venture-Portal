@@ -69,7 +69,7 @@ export function MemoSheet({ open, memo, busy, readOnly, error, onAck, onClose }:
   const c = memo ? MEMO_CAT[memo.cat] : null;
   const needs = !!memo && memo.needsAck && !memo.acked;
   return (
-    <Sheet open={open} onClose={onClose} z={22} maxHeight="88%" className={s.mdPanel} label={memo?.title ?? "Memo"}>
+    <Sheet open={open} onClose={onClose} z={22} maxHeight="88%" peek className={s.mdPanel} label={memo?.title ?? "Memo"}>
       {memo && c && (
         <>
           <div className={s.mdScroll}>

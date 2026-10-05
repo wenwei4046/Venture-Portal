@@ -1335,6 +1335,15 @@ VP's. The member C release above describes the screens this replaced.
   one reporting to the other. When that row would start off a phone's screen,
   the chart opens on its middle instead of its left edge; with one director it
   is exactly the prototype.
+- **A row's sheet on a desktop is a peek** (2026-10-06) — the sheets that show one
+  row of the page behind them (a bill on Insight, an order's commission, a finish,
+  a person on Team, a request, a memo — `peek` on `Sheet`) leave that page live
+  beside the rail: clicking another row swaps what the panel shows in one click,
+  and any other click on the page still closes it and does what it says. The
+  prototype's desktop dim was transparent but still covered the page, so the first
+  click on another bill only closed the panel (user: 点一次它其实是先关掉右边的
+  bar). Pickers (month, sub-department, brand) keep the covering dim; a phone keeps
+  the dim for every sheet.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
@@ -2456,6 +2465,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-06 (Revenue app · a row's sheet on a desktop)** — on a desktop, clicking another bill while one is open in the right-hand panel shows that bill at once; it used to take two clicks, the first only closing the panel. The same for every sheet that shows one row of the page beside it (Commission by order, My honours, Team & capacity, Requests, Memos). A click elsewhere on the page still closes the panel, and now also does what was clicked; the list scrolls under the mouse wheel while the panel is open. Pickers and phone sheets are unchanged (see *The Revenue app — built to the prototype*).
 - **2026-10-06 (Revenue app · directors side by side)** — Team & capacity's *Your Revenue family* drew Fair's two directors one above the other (KRIS, then PETER, then the member), as if PETER reported to KRIS. A level now holds peers: `DIRECTORS` over KRIS and PETER in one row (`.peers` / `.peer`, 156px a card), joined under their cards by the same 2px bar the direct reports hang from, one line down to the next level. One director is drawn exactly as before. On a phone, a row that would start off-screen opens the chart on its middle. See *Directors stand side by side*.
 - **2026-10-05 (Revenue app · no cost basis)** — the quote's step 2 ends at the *Additional fee* field: the grey note under it ("Fees such as delivery or disposal … Margin uses the Fair team cost basis (cost ÷ 0.7).") is gone. Insight's bills footnote, its brand footnote, the Arena's margin-board basis and the Commission scheme sheet's note lose only their "team cost (cost ÷ 0.7)" / "Revenue Team's cost" clause. See *Never says how the cost is made up*.
 - **2026-10-05 (Revenue app · Profile finished)** — the two Profile chips the prototype left without a page now lead somewhere: **My brand weeks** is a page of the app's own parts (a block per month, a row per fair weekend: *Week N* and its days, four brand buttons — the picked one in the accent fill — and a note: *Open until 11 Oct* / *Closed 13 Sep · auto-located: Akemi* in amber, then the booth's venue), one *Save brand weeks* button; **Commission scheme** is a sheet built from the person sheet (avatar, *Rate · Fixed salary · Since* cells, then each brand's margin ladder as rows with the range on the right). My income on a claim-form month says *Claim form month · portal's working*. People › Member services gains **Claim rates**: three fields (base, rate per spot, Airbnb per person per night) over a ledger table of regions with their spots and what the route pays, *Add region*, Discard / Save.

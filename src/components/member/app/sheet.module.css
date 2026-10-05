@@ -51,4 +51,7 @@
     transform: translateX(105%);
   }
   .panelOpen { transform: translateX(0); }
+  /* A peek (Sheet.tsx) lets the page beside it take clicks: only its panel catches them. */
+  .layer.peek { pointer-events: none; }
+  .peek .panelOpen { pointer-events: auto; }
 }
