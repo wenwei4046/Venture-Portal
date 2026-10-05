@@ -182,8 +182,11 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
 
   const principal = data.principalView === true;
   const membership: MemberMembership | undefined = data.memberships.find(m => m.id === route.department) ?? data.memberships[0];
-  const context = useMemo<MemberReadContext | undefined>(() => (principal && route.staff && membership
-    ? { staffId: route.staff, subDepartmentId: membership.id } : undefined), [principal, route.staff, membership]);
+  const membershipId = membership?.id ?? "";
+  // Keyed on the ids, never the membership object: the minute's refresh hands back a new `data`, and a new
+  // context would start every read below over — View as went back to "Loading…" every minute (2026-10-05).
+  const context = useMemo<MemberReadContext | undefined>(() => (principal && route.staff && membershipId
+    ? { staffId: route.staff, subDepartmentId: membershipId } : undefined), [principal, route.staff, membershipId]);
   const viewed = principal && route.staff ? membership?.people.find(p => p.id === route.staff) : undefined;
 
   const me: Me = useMemo(() => {
@@ -197,7 +200,6 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const [arenaNow, setArenaNow] = useState<MemberArenaSnapshot | null>(null);
   const [settledArena, setSettledArena] = useState<MemberArenaSnapshot | null>(null);
   const readable = !principal || !!context;
-  const membershipId = membership?.id ?? "";
   const schemeId = membership?.schemeId ?? "";
   const prevMonth = addMonths(period, -1);
 
@@ -257,12 +259,14 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     return candidate.period === prev(1) || candidate.period === prev(2) ? candidate : undefined;
   }, [incomes, period]);
 
+  // Keyed on the month: each refresh rebuilds `settled`, and the same month is not read again.
+  const settledPeriod = settled?.period ?? null;
   useEffect(() => {
-    if (!settled || !membershipId || !readable) { setSettledArena(null); return; }
+    if (!settledPeriod || !membershipId || !readable) { setSettledArena(null); return; }
     let stale = false;
-    void source.arena(membershipId, settled.period, "monthly", context).then(r => { if (!stale && r.ok) setSettledArena(viewedAs(r.data, context?.staffId)); });
+    void source.arena(membershipId, settledPeriod, "monthly", context).then(r => { if (!stale && r.ok) setSettledArena(viewedAs(r.data, context?.staffId)); });
     return () => { stale = true; };
-  }, [settled, membershipId, readable, context, source]);
+  }, [settledPeriod, membershipId, readable, context, source]);
 
   const memos = useMemo(() => data.memos.filter(m => !m.departments.length || m.departments.includes(membership?.name ?? "")), [data.memos, membership?.name]);
   const requests = data.requests;
