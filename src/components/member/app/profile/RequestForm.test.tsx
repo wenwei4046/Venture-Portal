@@ -22,7 +22,7 @@ const options: FormOptions = {
     week({ key: "2026-09-04", month: "SEP", n: "W1", dates: "4–6 Sep", venue: "MVEC SOUTHKEY", fairId: "johor-fair" }),
   ],
   rates: {
-    base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null,
+    base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null,
     regions: [
       { id: "kl", name: "KL", spots: 0, planeTicket: false },
       { id: "penang", name: "Penang", spots: 4, planeTicket: false },
@@ -140,18 +140,72 @@ describe("a member's own claim (user 2026-10-06)", () => {
     expect(fields).toEqual({ kind: "claim", subDepartmentId: "fair", claimType: "outstation", week: "2026-09-18", notes: "", amount: "456.70" });
   });
 
-  it("pays three people HR's three-person rate a night, whoever they are", () => {
-    claimForm(false, vi.fn(), { ...options, rates: { ...options.rates, perThreePaxNight: 220 } });
-    pick(/Airbnb accommodation/);
-    fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-10-02" } });
-    fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-04" } });
-    fireEvent.click(screen.getByRole("button", { name: "More male" }));
-    fireEvent.click(screen.getByRole("button", { name: "More male" }));
-    fireEvent.click(screen.getByRole("button", { name: "More female" }));
-    expect(screen.getByText("Rate for 3 pax per night")).toBeInTheDocument();
-    expect(screen.getByText("RM 440.00")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "More female" }));
-    expect(screen.getByText("Rate per pax per night")).toBeInTheDocument();
-    expect(screen.getByText("RM 520.00")).toBeInTheDocument();
+  // User 2026-10-06: up to HR's small group (3, RM 220 a night) the member keys the invoice and is
+  // paid it up to cap × nights — "2， claim 220*2=440"; four or more are RM 65 each, nothing typed.
+  describe("an Airbnb stay", () => {
+    const capped: FormOptions = { ...options, rates: { ...options.rates, groupCapPerNight: 220 } };
+    const stay = (male: number, female: number) => {
+      pick(/Airbnb accommodation/);
+      fireEvent.change(screen.getByLabelText("Check-in"), { target: { value: "2026-10-02" } });
+      fireEvent.change(screen.getByLabelText("Check-out"), { target: { value: "2026-10-04" } });
+      for (let i = 0; i < male; i++) fireEvent.click(screen.getByRole("button", { name: "More male" }));
+      for (let i = 0; i < female; i++) fireEvent.click(screen.getByRole("button", { name: "More female" }));
+    };
+    const claimed = () => screen.getByText("Claim amount").nextElementSibling?.textContent;
+
+    it("a small group keys the invoice's total and is paid it, up to the cap a night", async () => {
+      const onSubmit = vi.fn(async (form: FormData) => { void form; return { ok: true as const, code: "RQ-2610-003" }; });
+      const { container } = claimForm(false, onSubmit, capped);
+      stay(1, 1);
+      expect(screen.getByText("Up to, per night").nextElementSibling).toHaveTextContent("RM 220.00");
+      expect(screen.getByText("Most for this stay").nextElementSibling).toHaveTextContent("RM 440.00");
+      fireEvent.change(screen.getByLabelText("Invoice total (RM)"), { target: { value: "380.50" } });
+      expect(claimed()).toBe("RM 380.50");
+      fireEvent.change(screen.getByLabelText("Invoice total (RM)"), { target: { value: "500" } });
+      expect(claimed()).toBe("RM 440.00");
+      expect(screen.getByText("The invoice is over the limit, so the claim is RM 440.00. HR checks it against the invoice.")).toBeInTheDocument();
+      const invoice = new File(["%PDF-1.7"], "stay.pdf", { type: "application/pdf" });
+      fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [invoice] } });
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(await screen.findByText("RQ-2610-003")).toBeInTheDocument();
+      const { invoice: file, ...fields } = sent(onSubmit);
+      expect((file as File).name).toBe("stay.pdf");
+      expect(fields).toEqual({ kind: "claim", subDepartmentId: "fair", claimType: "airbnb", week: "2026-10-02", notes: "",
+        start: "2026-10-02", end: "2026-10-04", male: "1", female: "1", amount: "500" });
+    });
+
+    it("one person is a small group too, and nothing goes without the invoice's total", () => {
+      const onSubmit = vi.fn();
+      claimForm(false, onSubmit, capped);
+      stay(0, 1);
+      expect(screen.getByLabelText("Invoice total (RM)")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+      expect(screen.getByRole("alert")).toHaveTextContent("Enter the stay's total from its invoice.");
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("more than the small group is paid per person, and there is nothing to key", () => {
+      claimForm(false, vi.fn(), capped);
+      stay(2, 2);
+      expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
+      expect(screen.getByText("Rate per pax per night").nextElementSibling).toHaveTextContent("RM 65.00");
+      expect(claimed()).toBe("RM 520.00");
+      expect(screen.getByText("More than 3 pax are paid the fixed rate per pax. You can't edit the amount.")).toBeInTheDocument();
+    });
+
+    it("follows the head count HR sets", () => {
+      claimForm(false, vi.fn(), { ...capped, rates: { ...capped.rates, groupMaxPax: 2 } });
+      stay(2, 1);
+      expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
+      expect(claimed()).toBe("RM 390.00");
+    });
+
+    it("with no cap set, every stay is per person", () => {
+      claimForm(false, vi.fn());
+      stay(1, 1);
+      expect(screen.queryByLabelText("Invoice total (RM)")).not.toBeInTheDocument();
+      expect(claimed()).toBe("RM 260.00");
+      expect(screen.getByText("Set by the fixed rate. You can't edit the amount.")).toBeInTheDocument();
+    });
   });
 });

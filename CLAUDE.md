@@ -1493,17 +1493,27 @@ src/
 │   │                                  `member_claim_brand_week`, the same boards
 │   │                                  `claimWeeks` reads), its region the one HR
 │   │                                  set for the VENUE
-│   │                                  (`member_claim_venue_regions`, every ERP
-│   │                                  venue listed on Claim rates; unmapped =
-│   │                                  cannot be claimed), the amount
+│   │                                  (`member_claim_venue_regions`; Claim rates
+│   │                                  lists only venues an ERP fair names —
+│   │                                  `source = 'erp'` — not the hand-typed
+│   │                                  June–August calendar's other spellings;
+│   │                                  unmapped = cannot be claimed), the amount
 │   │                                  `member_claim_detail_for`'s. A region
 │   │                                  ticked *Plane ticket* (Sabah, Sarawak) is
 │   │                                  the ticket's typed price + its invoice, no
-│   │                                  cap. Airbnb is by head count; exactly three
-│   │                                  share `airbnb_three_pax_per_night` (e.g.
-│   │                                  RM 220) when set. The form opens on the
-│   │                                  newest brand week, months on the badges.
-│   │                                  Mig `20261006050000`.
+│   │                                  cap. **Airbnb is by head count:** up to
+│   │                                  `airbnb_group_max_pax` (HR, 3 to start)
+│   │                                  the member keys the INVOICE TOTAL and is
+│   │                                  paid it up to `airbnb_group_cap_per_night`
+│   │                                  × nights (user: 3 / RM 220 / 2 nights /
+│   │                                  invoice RM 500 → RM 440, for 1, 2 or 3
+│   │                                  people alike); more people = RM 65 × pax ×
+│   │                                  nights, nothing typed; no cap = everybody
+│   │                                  per person (`airbnbGroup` in
+│   │                                  `lib/member/claim-rules.ts`). The form opens
+│   │                                  on the newest brand week, months on the
+│   │                                  badges. Migs `20261006050000` /
+│   │                                  `20261006150000`.
 │   │                                  **My brand weeks** (Profile chip / Today's
 │   │                                  reminder; no prototype page) = this
 │   │                                  month's weekends then the month still

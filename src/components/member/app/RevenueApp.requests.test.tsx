@@ -58,7 +58,7 @@ function arena(membershipId: string, period: string, context?: MemberReadContext
 
 // HR's rates, and the region HR set for that fair's venue.
 const RATES = {
-  base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null,
+  base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null,
   regions: [{ id: "kl", name: "KL", spots: 0, planeTicket: false }, { id: "penang", name: "Penang", spots: 4, planeTicket: false }],
   fairs: { "penang-fair": { venue: "PENANG WATERFRONT", regionId: "penang" } },
 };

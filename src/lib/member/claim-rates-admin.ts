@@ -8,11 +8,15 @@
  * `member_admin_save_claim_settings`, which checks them again.
  *
  * 2026-10-06 (user): a region may be flown to (Sabah, Sarawak) — the claim is
- * then the plane ticket's price with its invoice; exactly three people share
- * one Airbnb rate a night; and every venue the ERP's fairs name is listed here
- * to be given its region, because an outstation claim's region is its fair's
- * venue's, never the member's pick.
+ * then the plane ticket's price with its invoice; and every venue the ERP's
+ * fairs name is listed here to be given its region, because an outstation
+ * claim's region is its fair's venue's, never the member's pick. Airbnb has a
+ * small group — up to `groupMaxPax` people (3 to start) claim their invoice's
+ * total, up to `groupCapPerNight` a night; more people are paid per person.
+ * HR sets both (user: 我可以改人数，同时也可以改那个上限).
  */
+
+import { formatMoney } from "@/lib/utils";
 
 export interface ClaimRegionAdmin { id: string | null; name: string; spots: number; active: boolean; planeTicket: boolean }
 
@@ -23,7 +27,8 @@ export interface ClaimRatesAdmin {
   base: string;
   perSpot: number | null;
   perPaxNight: number | null;
-  perThreePaxNight: number | null;
+  groupMaxPax: number;
+  groupCapPerNight: number | null;
   updatedAt: string | null;
   updatedBy: string | null;
   regions: ClaimRegionAdmin[];
@@ -35,7 +40,8 @@ export interface ClaimRatesDraft {
   base: string;
   perSpot: string;
   perPaxNight: string;
-  perThreePaxNight: string;
+  groupMaxPax: string;
+  groupCapPerNight: string;
   regions: { key: string; id: string | null; name: string; spots: string; planeTicket: boolean }[];
   /** Venue key → the draft region's `key` it is in; "" = none. In the order the venues are listed. */
   venues: Record<string, string>;
@@ -45,13 +51,15 @@ export interface ClaimRatesToSave {
   base: string;
   perSpot: number | null;
   perPaxNight: number | null;
-  perThreePaxNight: number | null;
+  groupMaxPax: number;
+  groupCapPerNight: number | null;
   regions: { id: string | null; name: string; spots: number; planeTicket: boolean }[];
   /** Each venue's region by its name (a region added in the same save has no id yet); null = none. */
   venues: { key: string; region: string | null }[];
 }
 
 const MAX_RATE = 100_000;
+const MAX_GROUP = 40;
 const num = (v: unknown): number | null => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
 
 export function readClaimRatesAdmin(raw: unknown): ClaimRatesAdmin | null {
@@ -62,7 +70,8 @@ export function readClaimRatesAdmin(raw: unknown): ClaimRatesAdmin | null {
     base: typeof r.base === "string" && r.base.trim() ? r.base : "Klang Valley",
     perSpot: num(r.perSpot),
     perPaxNight: num(r.perPaxNight),
-    perThreePaxNight: num(r.perThreePaxNight),
+    groupMaxPax: Number.isInteger(r.groupMaxPax) && Number(r.groupMaxPax) >= 1 ? Number(r.groupMaxPax) : 3,
+    groupCapPerNight: num(r.groupCapPerNight),
     updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : null,
     updatedBy: typeof r.updatedBy === "string" ? r.updatedBy : null,
     regions: (r.regions as Record<string, unknown>[]).filter(g => g && typeof g.name === "string").map(g => ({
@@ -83,7 +92,8 @@ const money = (n: number | null) => (n === null ? "" : String(n));
 export function claimRatesDraft(s: ClaimRatesAdmin): ClaimRatesDraft {
   const regions = s.regions.filter(g => g.active).map((g, i) => ({ key: g.id ?? `r${i}`, id: g.id, name: g.name, spots: String(g.spots), planeTicket: g.planeTicket }));
   return {
-    base: s.base, perSpot: money(s.perSpot), perPaxNight: money(s.perPaxNight), perThreePaxNight: money(s.perThreePaxNight),
+    base: s.base, perSpot: money(s.perSpot), perPaxNight: money(s.perPaxNight),
+    groupMaxPax: String(s.groupMaxPax), groupCapPerNight: money(s.groupCapPerNight),
     regions,
     venues: Object.fromEntries(s.venues.map(v => [v.key, regions.find(g => g.id === v.regionId)?.key ?? ""])),
   };
@@ -102,7 +112,9 @@ export function claimRatesProblems(d: ClaimRatesDraft): string[] {
   const base = d.base.trim();
   if (!base || base.length > 60) out.push("Name the base every route starts from (up to 60 letters).");
   for (const p of [rate(d.perSpot, "The rate per spot").problem, rate(d.perPaxNight, "The Airbnb rate").problem,
-    rate(d.perThreePaxNight, "The three-person Airbnb rate").problem]) if (p) out.push(p);
+    rate(d.groupCapPerNight, "The small group's limit a night").problem]) if (p) out.push(p);
+  if (!/^\d{1,2}$/.test(d.groupMaxPax.trim()) || Number(d.groupMaxPax) < 1 || Number(d.groupMaxPax) > MAX_GROUP)
+    out.push(`A small group is a whole number of people from 1 to ${MAX_GROUP}.`);
   if (d.regions.length > 60) out.push("Keep it to 60 regions.");
   const seen = new Set<string>();
   d.regions.forEach((g, i) => {
@@ -121,11 +133,24 @@ export function claimRatesToSave(d: ClaimRatesDraft): ClaimRatesToSave {
     base: d.base.trim(),
     perSpot: rate(d.perSpot, "").value,
     perPaxNight: rate(d.perPaxNight, "").value,
-    perThreePaxNight: rate(d.perThreePaxNight, "").value,
+    groupMaxPax: Number(d.groupMaxPax.trim()),
+    groupCapPerNight: rate(d.groupCapPerNight, "").value,
     regions: d.regions.map(g => ({ id: g.id, name: g.name.trim(), spots: Number(g.spots.trim()), planeTicket: g.planeTicket })),
     // A venue whose region was removed from the list is in none.
     venues: Object.entries(d.venues).map(([key, region]) => ({ key, region: byKey.get(region) || null })),
   };
+}
+
+/** Two nights under the Airbnb figures as typed — the example under HR's fields; null while there is no rate. */
+export function airbnbExample(d: ClaimRatesDraft): string | null {
+  const per = rate(d.perPaxNight, "").value;
+  const cap = rate(d.groupCapPerNight, "").value;
+  const n = /^\d{1,2}$/.test(d.groupMaxPax.trim()) && Number(d.groupMaxPax) >= 1 && Number(d.groupMaxPax) <= MAX_GROUP ? Number(d.groupMaxPax) : 0;
+  const bigger = per ? `${n + 1} people claim ${formatMoney((n + 1) * per * 2)} (${n + 1} × ${formatMoney(per)} × 2), nothing to type` : null;
+  if (cap && n) {
+    return `Two nights, for example: up to ${n} ${n === 1 ? "person claims" : "people claim"} the invoice's total, up to ${formatMoney(cap * 2)} (${formatMoney(cap)} a night × 2)${bigger ? `; ${bigger}` : ""}.`;
+  }
+  return per ? `Two nights, for example: 3 people claim ${formatMoney(3 * per * 2)} (3 × ${formatMoney(per)} × 2). No small-group limit is set, so every stay is paid per person.` : null;
 }
 
 /** Anything typed that the saved settings do not already say. */
@@ -140,7 +165,8 @@ export function validClaimRatesToSave(v: unknown): v is ClaimRatesToSave {
   const r = v as Record<string, unknown>;
   if (typeof r.base !== "string" || !Array.isArray(r.regions) || !Array.isArray(r.venues) || r.venues.length > 1000) return false;
   const okRate = (x: unknown) => x === null || (typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= MAX_RATE);
-  if (!okRate(r.perSpot) || !okRate(r.perPaxNight) || !okRate(r.perThreePaxNight)) return false;
+  if (!okRate(r.perSpot) || !okRate(r.perPaxNight) || !okRate(r.groupCapPerNight)) return false;
+  if (typeof r.groupMaxPax !== "number" || !Number.isInteger(r.groupMaxPax) || r.groupMaxPax < 1 || r.groupMaxPax > MAX_GROUP) return false;
   if ((r.regions as unknown[]).some(g => typeof (g as Record<string, unknown> | null)?.planeTicket !== "boolean")) return false;
   const names = new Set((r.regions as Record<string, unknown>[]).map(g => String(g?.name ?? "").trim().toLowerCase()));
   if ((r.venues as unknown[]).some(x => {
@@ -150,7 +176,7 @@ export function validClaimRatesToSave(v: unknown): v is ClaimRatesToSave {
   })) return false;
   const draft: ClaimRatesDraft = {
     base: r.base, perSpot: r.perSpot === null ? "" : String(r.perSpot), perPaxNight: r.perPaxNight === null ? "" : String(r.perPaxNight),
-    perThreePaxNight: r.perThreePaxNight === null ? "" : String(r.perThreePaxNight),
+    groupMaxPax: String(r.groupMaxPax), groupCapPerNight: r.groupCapPerNight === null ? "" : String(r.groupCapPerNight),
     regions: (r.regions as unknown[]).map((g, i) => {
       const x = (g ?? {}) as Record<string, unknown>;
       return { key: String(i), id: typeof x.id === "string" ? x.id : null, name: typeof x.name === "string" ? x.name : "", spots: typeof x.spots === "number" ? String(x.spots) : "x", planeTicket: x.planeTicket === true };

@@ -6,17 +6,19 @@
  *               — KL is 0 spots: a Klang Valley fair is local. No invoice.
  *               A region HR ticked `planeTicket` (Sabah, Sarawak) is flown to: the
  *               claim is the ticket's price as its invoice shows, no cap (2026-10-06).
- *   Airbnb      people who stayed × nights × rate per person per night, by head
- *               count only; exactly three share HR's three-person rate a night when
- *               it is set (2026-10-06). Invoice required.
+ *   Airbnb      by head count only. Up to HR's small-group size (3 to start) the
+ *               member types the invoice's total and the claim is that, up to HR's
+ *               cap a night × nights (user 2026-10-06: N = 3, RM 220, 2 nights,
+ *               invoice RM 500 → RM 440); a bigger group is people × nights × the
+ *               rate per person per night, nothing typed. Invoice required.
  *
  * The claim is for the member's own brand week, and its region is the one HR
  * set for that fair's venue — never picked on the phone (2026-10-06).
  *
  * The form shows this figure; `member_prepare_request` works it out again
  * (`member_claim_detail_for`) and stores ITS answer, so a figure sent from a
- * browser is never the one that is paid — only a plane ticket's price is typed,
- * and HR checks it against the invoice.
+ * browser is never the one that is paid — only a plane ticket's price and a
+ * small group's invoice total are typed, and HR checks both against the invoice.
  */
 
 export interface ClaimRegion {
@@ -41,8 +43,10 @@ export interface ClaimRates {
   perSpot: number | null;
   /** RM per person per night; null until HR sets it. */
   perPaxNight: number | null;
-  /** RM a night for exactly three people together; null = they are paid per person. */
-  perThreePaxNight: number | null;
+  /** Up to this many people are a small group (HR sets it; 3 to start). */
+  groupMaxPax: number;
+  /** A small group's invoice is paid up to this a night; null = every group is paid per person. */
+  groupCapPerNight: number | null;
   regions: ClaimRegion[];
   /** This month's and last month's fairs, by fair id. */
   fairs: Record<string, ClaimFair>;
@@ -50,7 +54,7 @@ export interface ClaimRates {
 
 export type ClaimInput =
   | { type: "outstation"; regionId: string | null; ticket?: number | null }
-  | { type: "airbnb"; pax: number; nights: number };
+  | { type: "airbnb"; pax: number; nights: number; invoice?: number | null };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -70,13 +74,12 @@ export function fairRegion(rates: ClaimRates, fairId: string | null): { venue: s
   return { venue: fair.venue, region: rates.regions.find(r => r.id === fair.regionId) ?? null };
 }
 
-/** What a night costs for this many people: three share the three-person rate when HR set one. */
-export function airbnbNightly(rates: ClaimRates, pax: number): number | null {
-  if (pax === 3 && rates.perThreePaxNight !== null && rates.perThreePaxNight > 0) return rates.perThreePaxNight;
-  return rates.perPaxNight === null ? null : pax * rates.perPaxNight;
+/** A small group types its invoice's total (paid up to the cap); a bigger one is paid per person. */
+export function airbnbGroup(rates: ClaimRates, pax: number): boolean {
+  return pax >= 1 && pax <= rates.groupMaxPax && rates.groupCapPerNight !== null && rates.groupCapPerNight > 0;
 }
 
-/** The claim's amount, RM — 0 when it cannot be worked out (no rate, local, no nights, no price). */
+/** The claim's amount, RM — 0 when it cannot be worked out (no rate, local, no nights, nothing typed). */
 export function claimAmount(rates: ClaimRates, input: ClaimInput): number {
   if (input.type === "outstation") {
     const region = rates.regions.find(r => r.id === input.regionId);
@@ -86,8 +89,11 @@ export function claimAmount(rates: ClaimRates, input: ClaimInput): number {
     return round2(region.spots * rates.perSpot);
   }
   if (input.pax < 1 || input.nights < 1) return 0;
-  const nightly = airbnbNightly(rates, input.pax);
-  return nightly === null ? 0 : round2(nightly * input.nights);
+  if (airbnbGroup(rates, input.pax)) {
+    const invoice = input.invoice && input.invoice > 0 ? round2(input.invoice) : 0;
+    return Math.min(invoice, round2(input.nights * (rates.groupCapPerNight ?? 0)));
+  }
+  return rates.perPaxNight === null ? 0 : round2(input.pax * input.nights * rates.perPaxNight);
 }
 
 /** Rates read defensively from the database's JSON — anything malformed reads as not set. */
@@ -109,7 +115,8 @@ export function readClaimRates(raw: unknown): ClaimRates {
     base: typeof o.base === "string" && o.base ? o.base : "Klang Valley",
     perSpot: money(o.perSpot),
     perPaxNight: money(o.perPaxNight),
-    perThreePaxNight: money(o.perThreePaxNight),
+    groupMaxPax: Number.isInteger(Number(o.groupMaxPax)) && Number(o.groupMaxPax) >= 1 ? Number(o.groupMaxPax) : 3,
+    groupCapPerNight: money(o.groupCapPerNight),
     regions: regions.flatMap(r => {
       const x = r && typeof r === "object" ? (r as Record<string, unknown>) : null;
       const spots = x ? Number(x.spots) : NaN;

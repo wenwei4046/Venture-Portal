@@ -989,7 +989,9 @@ export async function submitMemberRequest(
       // fair is their brand week's, its region the one HR set for the venue
       // (2026-10-06). Outstation goes by the route's spots and needs no invoice
       // — unless the region is flown to, when the ticket's price is typed with
-      // its invoice and HR checks one against the other; Airbnb by people × nights.
+      // its invoice and HR checks one against the other. Airbnb by head count:
+      // a small group types the invoice's total (paid up to HR's cap a night),
+      // a bigger one is people × nights × the rate.
       if (claimType !== "outstation" && claimType !== "airbnb") throw new Error("Choose Outstation or Airbnb.");
       Object.assign(detail, {
         claimType,
@@ -1025,6 +1027,13 @@ export async function submitMemberRequest(
         });
         if (detail.end <= detail.start) throw new Error("Check-out must be after check-in.");
         if (Number(detail.male) + Number(detail.female) < 1) throw new Error("Add who stayed.");
+        // Whether the group is small enough to need it is the database's to say.
+        const total = field(form, "amount");
+        if (total) {
+          const amount = cents(total);
+          if (amount === null || amount < 1) throw new Error("Enter the stay's total from its invoice.");
+          detail.invoiceAmount = amount / 100;
+        }
       }
     } else if (kind === "claim") {
       const amount = cents(field(form, "amount"));

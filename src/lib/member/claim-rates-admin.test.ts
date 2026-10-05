@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  claimRatesChanged, claimRatesDraft, claimRatesProblems, claimRatesToSave, readClaimRatesAdmin, validClaimRatesToSave,
+  airbnbExample, claimRatesChanged, claimRatesDraft, claimRatesProblems, claimRatesToSave, readClaimRatesAdmin, validClaimRatesToSave,
 } from "./claim-rates-admin";
 
 const KL = "11111111-1111-4111-8111-111111111111";
 const PENANG = "22222222-2222-4222-8222-222222222222";
 const SABAH = "44444444-4444-4444-8444-444444444444";
 const raw = {
-  base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null, updatedAt: "2026-10-04T17:48:27Z", updatedBy: "HR",
+  base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null, updatedAt: "2026-10-04T17:48:27Z", updatedBy: "HR",
   regions: [
     { id: KL, name: "KL", spots: 0, active: true, planeTicket: false },
     { id: PENANG, name: "Penang", spots: 4, active: true, planeTicket: false },
@@ -24,19 +24,19 @@ const raw = {
 describe("claim rates in the back office", () => {
   it("reads what the database keeps, and opens the form on the regions in use", () => {
     const saved = readClaimRatesAdmin(raw)!;
-    expect(saved).toMatchObject({ base: "Klang Valley", perSpot: 50, perPaxNight: 65, perThreePaxNight: null, updatedBy: "HR" });
+    expect(saved).toMatchObject({ base: "Klang Valley", perSpot: 50, perPaxNight: 65, groupMaxPax: 3, groupCapPerNight: null, updatedBy: "HR" });
     const draft = claimRatesDraft(saved);
-    expect(draft).toMatchObject({ base: "Klang Valley", perSpot: "50", perPaxNight: "65", perThreePaxNight: "" });
+    expect(draft).toMatchObject({ base: "Klang Valley", perSpot: "50", perPaxNight: "65", groupMaxPax: "3", groupCapPerNight: "" });
     expect(draft.regions.map(g => [g.name, g.spots, g.planeTicket])).toEqual([["KL", "0", false], ["Penang", "4", false], ["Sabah", "6", true]]);
     expect(claimRatesChanged(saved, draft)).toBe(false);
     expect(readClaimRatesAdmin(null)).toBeNull();
   });
 
   it("saves rates to the sen, a blank rate as not set, and each region with its spots", () => {
-    const draft = { ...claimRatesDraft(readClaimRatesAdmin(raw)!), perSpot: "52.50", perPaxNight: " ", perThreePaxNight: "220" };
+    const draft = { ...claimRatesDraft(readClaimRatesAdmin(raw)!), perSpot: "52.50", perPaxNight: " ", groupMaxPax: " 2 ", groupCapPerNight: "220" };
     expect(claimRatesProblems(draft)).toEqual([]);
     expect(claimRatesToSave(draft)).toMatchObject({
-      base: "Klang Valley", perSpot: 52.5, perPaxNight: null, perThreePaxNight: 220,
+      base: "Klang Valley", perSpot: 52.5, perPaxNight: null, groupMaxPax: 2, groupCapPerNight: 220,
       regions: [{ id: KL, name: "KL", spots: 0, planeTicket: false }, { id: PENANG, name: "Penang", spots: 4, planeTicket: false }, { id: SABAH, name: "Sabah", spots: 6, planeTicket: true }],
     });
     expect(claimRatesChanged(readClaimRatesAdmin(raw)!, draft)).toBe(true);
@@ -48,7 +48,8 @@ describe("claim rates in the back office", () => {
     expect(claimRatesProblems({ ...draft, base: " " })[0]).toMatch(/Name the base/);
     expect(claimRatesProblems({ ...draft, perSpot: "12.345" })[0]).toMatch(/rate per spot/);
     expect(claimRatesProblems({ ...draft, perPaxNight: "100001" })[0]).toMatch(/Airbnb rate/);
-    expect(claimRatesProblems({ ...draft, perThreePaxNight: "two hundred" })[0]).toMatch(/three-person Airbnb rate/);
+    expect(claimRatesProblems({ ...draft, groupCapPerNight: "two hundred" })[0]).toMatch(/small group's limit a night/);
+    for (const n of ["", "0", "41", "2.5", "three"]) expect(claimRatesProblems({ ...draft, groupMaxPax: n })[0]).toMatch(/small group is a whole number of people from 1 to 40/);
     expect(claimRatesProblems({ ...draft, regions: [...draft.regions, region("penang", "3")] })).toEqual(["Two regions are called penang."]);
     expect(claimRatesProblems({ ...draft, regions: [region("", "3")] })).toEqual(["Region 1 needs a name (up to 40 letters)."]);
     expect(claimRatesProblems({ ...draft, regions: [region("Sarawak", "2.5")] })).toEqual(["Sarawak: spots must be a whole number from 0 to 100."]);
@@ -58,11 +59,37 @@ describe("claim rates in the back office", () => {
     const ok = claimRatesToSave(claimRatesDraft(readClaimRatesAdmin(raw)!));
     expect(validClaimRatesToSave(ok)).toBe(true);
     expect(validClaimRatesToSave({ ...ok, perSpot: -1 })).toBe(false);
-    expect(validClaimRatesToSave({ ...ok, perThreePaxNight: 100_001 })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, groupCapPerNight: 100_001 })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, groupMaxPax: 0 })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, groupMaxPax: 41 })).toBe(false);
+    expect(validClaimRatesToSave({ ...ok, groupMaxPax: "3" })).toBe(false);
     expect(validClaimRatesToSave({ ...ok, regions: [{ id: null, name: "X", spots: 101, planeTicket: false }] })).toBe(false);
     expect(validClaimRatesToSave({ ...ok, regions: [{ id: null, name: "X", spots: 1 }] })).toBe(false);
     expect(validClaimRatesToSave({ ...ok, venues: [{ key: "MVEC SOUTHKEY", region: "Mars" }] })).toBe(false);
     expect(validClaimRatesToSave("nope")).toBe(false);
+  });
+});
+
+// User 2026-10-06: 我可以改人数，同时也可以改那个上限 — and HR reads what two nights would pay.
+describe("the Airbnb small group", () => {
+  const draft = { ...claimRatesDraft(readClaimRatesAdmin(raw)!), groupCapPerNight: "220" };
+
+  it("spells out two nights in ringgit", () => {
+    expect(airbnbExample(draft)).toBe(
+      "Two nights, for example: up to 3 people claim the invoice's total, up to RM 440.00 (RM 220.00 a night × 2); 4 people claim RM 520.00 (4 × RM 65.00 × 2), nothing to type.");
+    expect(airbnbExample({ ...draft, groupMaxPax: "1" })).toMatch(/^Two nights, for example: up to 1 person claims the invoice's total/);
+  });
+
+  it("says so when there is no cap, and nothing while there is no rate", () => {
+    expect(airbnbExample({ ...draft, groupCapPerNight: "" })).toBe(
+      "Two nights, for example: 3 people claim RM 390.00 (3 × RM 65.00 × 2). No small-group limit is set, so every stay is paid per person.");
+    expect(airbnbExample({ ...draft, groupCapPerNight: "", perPaxNight: "" })).toBeNull();
+  });
+
+  it("is saved through the server's check", () => {
+    const toSave = claimRatesToSave({ ...draft, groupMaxPax: "4" });
+    expect(toSave).toMatchObject({ groupMaxPax: 4, groupCapPerNight: 220 });
+    expect(validClaimRatesToSave(toSave)).toBe(true);
   });
 });
 
