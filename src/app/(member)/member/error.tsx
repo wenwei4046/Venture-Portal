@@ -1,18 +1,15 @@
 "use client";
-import s from "@/components/member/member.module.css";
-export default function MemberError({ reset }: { reset: () => void }) {
+
+import { Suspense } from "react";
+import AppError from "@/components/member/app/shell/AppError";
+
+// When /member cannot load (2026-10-06): the app's own frame, what went wrong and
+// Try again — a fresh load rather than `reset`, which would re-render the same
+// failed server answer. The Suspense is for AppFrame's read of the URL.
+export default function MemberError({ error }: { error: Error & { digest?: string } }) {
   return (
-    <div className={s.workspace}>
-      <main className={s.login}>
-        <div className={s.wordmark}>HOUZS VENTURE</div>
-        <h1>Unable to load your workspace</h1>
-        <p className={s.sub} style={{ margin: "16px 0 24px" }}>
-          Please try again. Reloading will not submit an existing request again.
-        </p>
-        <button className={`${s.button} ${s.primary}`} onClick={reset}>
-          Reload
-        </button>
-      </main>
-    </div>
+    <Suspense>
+      <AppError digest={error.digest} />
+    </Suspense>
   );
 }

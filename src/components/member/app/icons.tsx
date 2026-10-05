@@ -34,6 +34,8 @@ export const ICON = {
   viewing: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
   /* pull to refresh — not in the prototype */
   refresh: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8M21 3v5h-5",
+  /* the page that could not load (`AppError`) — not in the prototype */
+  alert: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01",
   /* the notification icons (`IC`) */
   nOk: "M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
   nMemo: "M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4",
