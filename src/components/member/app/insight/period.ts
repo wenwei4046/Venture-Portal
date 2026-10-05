@@ -8,7 +8,9 @@ import { MONTHS_SHORT } from "../format";
  * closed, so on 4 October September is still moving. The app opens on the
  * month just gone while it is still open and the member has bills in it — the
  * prototype's "today is 3 Oct, September is Live" — and on the current month
- * once it is closed (or for a member with nothing in it).
+ * once it is closed (or for a member with nothing in it). Today is the
+ * exception: it is always the current month (user 2026-10-06), and a tap on
+ * it opens Insight or the Arena on that month.
  */
 export type PeriodKind = "monthly" | "quarterly" | "annual";
 

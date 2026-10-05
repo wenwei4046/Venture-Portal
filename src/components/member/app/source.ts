@@ -1,12 +1,12 @@
 import type { MemberData, MemberInsight, MemberOrgMap, MemberReadContext, MemberRequest, QuoteInput, QuoteResult } from "@/lib/member/types";
 import type { RequestEvent } from "./profile/profile-model";
 import { readClaimRates, type ClaimRates } from "@/lib/member/claim-rules";
-import type { MemberIncome } from "@/lib/member/income";
+import type { DepartmentIncome, MemberIncome } from "@/lib/member/income";
 import type { MemberHonours } from "@/lib/member/server";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
-import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberClaimRates, fetchMemberHonours, fetchMemberIncome, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, fetchMemberRequestHistory, fetchPrincipalMemoReceipts, refreshMemberData, submitMemberRequest } from "@/app/(member)/member/actions";
+import { acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchDepartmentIncome, fetchMemberClaimRates, fetchMemberHonours, fetchMemberIncome, fetchMemberInsight, fetchMemberInsightRange, fetchMemberOrderBook, fetchMemberOrgMap, fetchMemberRequestHistory, fetchPrincipalMemoReceipts, refreshMemberData, submitMemberRequest } from "@/app/(member)/member/actions";
 import { fetchMemberArena, saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks } from "@/app/(member)/member/arena-actions";
 import { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 
@@ -42,6 +42,8 @@ export interface RevenueSource {
   claimRates(): Promise<Outcome<ClaimRates>>;
   /** My income: one month as Comm Cal works it out (live until the close), and the months paid. */
   income(subDepartmentId: string, period: string, context?: MemberReadContext): Promise<Outcome<MemberIncome>>;
+  /** Today for a Principal viewing nobody: the sub-department's commission this month, before salaries. */
+  departmentIncome(subDepartmentId: string, period: string): Promise<Outcome<DepartmentIncome>>;
   /** My honours: the member's finishes over a window of months, and which months are final. */
   honours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberHonours>>;
   /** View as: the viewed person's memo receipts. */
@@ -55,7 +57,7 @@ const nothing = async () => ({ ok: false as const, error: "Preview data only." }
 export const demoSource: RevenueSource = {
   refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing, quote: nothing,
   memo: nothing, requestHistory: nothing, submitRequest: nothing, cancelRequest: nothing, claimRates: nothing, memoReceipts: nothing, income: nothing, honours: nothing,
-  saveBrandWeeks: nothing,
+  departmentIncome: nothing, saveBrandWeeks: nothing,
 };
 
 export const liveSource: RevenueSource = {
@@ -83,6 +85,7 @@ export const liveSource: RevenueSource = {
   },
   memoReceipts: staffId => fetchPrincipalMemoReceipts(staffId),
   income: (subDepartmentId, period, context) => fetchMemberIncome(subDepartmentId, period, context),
+  departmentIncome: (subDepartmentId, period) => fetchDepartmentIncome(subDepartmentId, period),
   honours: (subDepartmentId, from, until, context) => fetchMemberHonours(subDepartmentId, from, until, context),
   async saveBrandWeeks(subDepartmentId, period, picks, context) {
     const result = context

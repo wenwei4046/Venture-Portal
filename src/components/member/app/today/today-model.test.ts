@@ -43,20 +43,35 @@ describe("small spellings", () => {
 });
 
 describe("the income hero", () => {
-  it("adds fixed salary to an unsettled month's commission", () => {
-    const m = todayModel({ ...base, income: { schemeId: "s", period: "2026-09", status: "computed", personal: 0, override: 0, kpi: 0, openBill: 0, incentive: 0, group: 0, total: 4342.5, sales: 0, groupSales: 0, deferred: 0, rank: "", rate: 0, kpis: [], brands: [] } });
-    expect(m.heroLabel).toBe("September · Estimated income");
+  it("adds fixed salary to the month's commission so far", () => {
+    const m = todayModel({ ...base, income: { period: "2026-10", status: "computed", total: 4342.5 } });
+    expect(m.heroLabel).toBe("October · Estimated income");
     expect(m.heroAmount).toBe("RM 6,842.50");
     expect(m.heroSplit).toBe("Fixed salary RM 2,500.00 + commission RM 4,342.50");
   });
   it("calls a locked or applied month settled", () => {
-    const m = todayModel({ ...base, income: { schemeId: "s", period: "2026-08", status: "locked", personal: 0, override: 0, kpi: 0, openBill: 0, incentive: 0, group: 0, total: 100, sales: 0, groupSales: 0, deferred: 0, rank: "", rate: 0, kpis: [], brands: [] } });
+    const m = todayModel({ ...base, income: { period: "2026-08", status: "locked", total: 100 } });
     expect(m.heroLabel).toBe("August · Settled income");
   });
   it("hides every amount when asked", () => {
     const m = todayModel({ ...base, hidden: true });
     expect(m.heroAmount).toBe("RM ••••••");
     expect(m.heroSplit).toBe("Amounts hidden");
+  });
+  // 2026-10-06 (user: "on live date, not showing last month"): Today is the
+  // current month, worked out live — and never shows a salary-only figure
+  // while that is still happening.
+  it("names the current month while its commission is still being worked out", () => {
+    const m = todayModel({ ...base, today: "2026-10-06", incomeStatus: "loading" });
+    expect(m.heroLabel).toBe("October · Estimated income");
+    expect(m.heroAmount).toBe("RM —");
+    expect(m.heroSplit).toBe("Working out October's commission…");
+    expect(todayModel({ ...base, today: "2026-10-06", incomeStatus: "loading", hidden: true }).heroAmount).toBe("RM ••••••");
+  });
+  it("says so when the month could not be worked out, rather than showing the salary alone", () => {
+    const m = todayModel({ ...base, today: "2026-10-06", incomeStatus: "failed" });
+    expect(m.heroAmount).toBe("RM —");
+    expect(m.heroSplit).toBe("October's commission is unavailable right now");
   });
 });
 
@@ -135,12 +150,11 @@ describe("This week and Your Arena", () => {
 
 describe("todayModel — a Principal viewing nobody", () => {
   it("names the department's commission as the department's, not as somebody's income", () => {
-    const income = { schemeId: "s", period: "2026-09", status: "computed", personal: 0, override: 0, kpi: 0, openBill: 0, incentive: 0, group: 0,
-      total: 89460.99, sales: 0, groupSales: 0, deferred: 0, rank: "", rate: 0, kpis: [], brands: [] };
+    const income = { period: "2026-10", status: "computed", total: 89460.99 };
     const m = todayModel({ ...base, first: "Principal", salary: 0, income, department: "Fair" });
-    expect(m.heroLabel).toBe("September · Fair commission");
+    expect(m.heroLabel).toBe("October · Fair commission");
     expect(m.heroAmount).toBe("RM 89,460.99");
     expect(m.heroSplit).toBe("Everybody in Fair, before salaries · View as a member for their own");
-    expect(todayModel({ ...base, income }).heroLabel).toBe("September · Estimated income");
+    expect(todayModel({ ...base, income }).heroLabel).toBe("October · Estimated income");
   });
 });
