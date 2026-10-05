@@ -1,0 +1,8 @@
+[
+ { "name": "prod-profile-principal", "path": "/member?page=account", "settle": 8000, "dump": "document.querySelector('main')?.innerText.slice(0, 700)" },
+ { "name": "prod-profile-ethan", "path": "/member?page=account&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 8000, "dump": "document.querySelector('main')?.innerText.slice(0, 700)" },
+ { "name": "prod-income-ethan", "path": "/member?page=account&view=income&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 20000, "dump": "document.querySelector('main')?.innerText.slice(0, 900)" },
+ { "name": "prod-honours-ethan-q", "path": "/member?page=account&view=honours&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 15000, "actions": [{ "click": "main button:has-text('Quarterly')", "wait": 15000 }], "dump": "document.querySelector('main')?.innerText.slice(0, 700)" },
+ { "name": "prod-today-ethan", "path": "/member?staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 12000, "dump": "document.querySelector('main')?.innerText.slice(0, 700)" },
+ { "name": "prod-arena-ethan", "path": "/member?page=arena&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 12000, "dump": "document.querySelector('main')?.innerText.slice(0, 500)" }
+]

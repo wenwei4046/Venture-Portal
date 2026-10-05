@@ -1,0 +1,8 @@
+[
+ { "name": "prod2-today-ethan", "path": "/member?staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 25000, "dump": "document.querySelector('main')?.innerText.slice(0, 220)" },
+ { "name": "prod2-today-principal", "path": "/member", "settle": 12000, "dump": "document.querySelector('main')?.innerText.slice(0, 200)" },
+ { "name": "prod2-brandweeks-ethan", "path": "/member?page=account&view=brandWeeks&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 15000, "dump": "document.querySelector('main')?.innerText.slice(0, 500)" },
+ { "name": "prod2-scheme-ethan", "path": "/member?page=account&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 8000, "actions": [{ "click": "button:has-text('Commission scheme')", "wait": 1500 }], "dump": "[...document.querySelectorAll('[role=dialog]')].map(d => d.getAttribute('aria-label') + ': ' + d.innerText.slice(0, 160)).filter(t => t.startsWith('Commission scheme')).join(' | ')" },
+ { "name": "prod2-income-aug", "path": "/member?page=account&view=income&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 15000, "actions": [{ "click": "main button:has-text('2026')", "wait": 1200 }, { "click": "[role=dialog] button:has-text('Aug')", "wait": 15000 }], "dump": "document.querySelector('main')?.innerText.slice(0, 500)" },
+ { "name": "prod2-hr-claim-rates", "path": "/member-admin", "w": 1440, "h": 1100, "settle": 8000, "actions": [{ "click": "button:has-text('Claim rates')", "wait": 6000 }], "dump": "document.querySelector('main')?.innerText.slice(0, 400)" }
+]

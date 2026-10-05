@@ -1,0 +1,14 @@
+[
+  { "name": "arena-desk", "attrs": { "platform": "desktop", "screen": "arena" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=arena" },
+  { "name": "arena-desk-record", "attrs": { "platform": "desktop", "screen": "arena", "arenaView": "record" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=arena&view=record" },
+  { "name": "arena-desk-sales", "attrs": { "platform": "desktop", "screen": "arena", "board": "sales" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=arena&view=board&board=sales" },
+  { "name": "arena-desk-fair", "attrs": { "platform": "desktop", "screen": "arena", "board": "sales", "subView": "fair" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=arena&view=board&board=sales",
+    "appActions": [{ "click": "button:has-text('Fair results')" }] },
+  { "name": "arena-desk-fairs-sheet", "attrs": { "platform": "desktop", "screen": "arena", "board": "sales", "subView": "fair", "fairsOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=arena&view=board&board=sales",
+    "appActions": [{ "click": "button:has-text('Fair results')" }, { "click": "button:has-text('Your fairs')" }] },
+  { "name": "arena-desk-date", "attrs": { "platform": "desktop", "screen": "arena", "board": "margin", "dateOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=arena&view=board&board=margin",
+    "appActions": [{ "click": "main button:has-text('Sep 2026')" }] },
+  { "name": "arena-desk-champ-sheet", "attrs": { "platform": "desktop", "screen": "arena", "board": "champ", "champOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=arena&view=board&board=champ",
+    "appActions": [{ "click": "button:has-text('How your points add up')" }] },
+  { "name": "arena-android", "attrs": { "platform": "android", "screen": "arena" }, "w": 410, "h": 884, "url": "/member/preview?app=proto&device=android&page=arena" }
+]

@@ -1,0 +1,12 @@
+[
+  { "name": "charges-frame", "url": "/member/preview?app=proto&device=ios&page=quote&sheet=frame&charges=1",
+    "appActions": [{ "eval": "document.querySelector('[data-sheet-body]').scrollTop = 330" }] },
+  { "name": "charges-frame-picked", "url": "/member/preview?app=proto&device=ios&page=quote&sheet=frame&charges=1",
+    "appActions": [{ "click": "button:has-text('+ RM 100')" }, { "click": "button:has-text('+ RM 20')" }, { "eval": "document.querySelector('[data-sheet-body]').scrollTop = 330" }] },
+  { "name": "charges-cart", "url": "/member/preview?app=proto&device=ios&page=quote&sheet=frame&charges=1",
+    "appActions": [{ "click": "button:has-text('+ RM 100')" }, { "click": "button:has-text('+ RM 20')" }, { "click": "button:has-text('to cart')" }, { "click": "button:has-text('View or change')" }] },
+  { "name": "charges-calc", "url": "/member/preview?app=proto&device=ios&page=quote&sheet=frame&charges=1",
+    "appActions": [{ "click": "button:has-text('+ RM 100')" }, { "click": "button:has-text('+ RM 20')" }, { "click": "button:has-text('to cart')" }, { "click": "button:has-text('Set price')", "wait": 1200 }] },
+  { "name": "charges-calc-scrolled", "url": "/member/preview?app=proto&device=ios&page=quote&sheet=frame&charges=1", "scrollTo": 420,
+    "appActions": [{ "click": "button:has-text('+ RM 100')" }, { "click": "button:has-text('+ RM 20')" }, { "click": "button:has-text('to cart')" }, { "click": "button:has-text('Set price')", "wait": 1200 }] }
+]

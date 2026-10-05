@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F3F1;font-family:Inter,system-ui,sans-serif;color:#3F2B22}
+a{color:#BD4A19}a:hover{color:#4E2F20}
+</style>
+</helmet>
+<section id="turn-25" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">DESKTOP · 1440 · TWO OPTIONS</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Desktop, running the same app</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Desktop runs the same logic as mobile. The page stays in the middle; everything that was a bottom sheet on mobile now floats as a panel on the right, and the page slides left to make room. On Quote, the right panel is the price &amp; margin calculator next to the product list; opening a product swaps it for the product panel. <a href="#25a">25a</a> keeps the right side empty until something opens. <a href="#25b">25b</a> keeps notifications there by default.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="25a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">25a</span><span style="font-size:15px;font-weight:600;">Centred column · Today</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" screen="today" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">25a · Quote · product panel on the right</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" screen="quote" mattress-sheet="true" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">25a · Price & margin</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" screen="quote" hint-size="1440px,900px"></dc-import>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="25b" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">25b</span><span style="font-size:15px;font-weight:600;">Notifications rail · Today</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="b" screen="today" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">25b · Quote · cart panel on the right</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="b" screen="quote" cart-open="true" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">25b · Arena</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="b" screen="arena" hint-size="1440px,900px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-24" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">PRINCIPAL · VIEW AS · TWO OPTIONS</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">See the app as any person in Revenue</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">The Principal starts View as from Profile and picks a specific person. The app then shows that person's name, title and numbers, read-only: Set price and Add to cart are disabled. <a href="#24a">24a</a> opens a full page with search, Recent and everyone grouped by sub-department, and keeps a dark "Viewing as" bar at the top of every screen. <a href="#24b">24b</a> shows a View as card with Recent people on Profile, browses Revenue → sub-department → person in a sheet, and keeps a floating pill above the bottom bar.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="24a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">24a</span><span style="font-size:15px;font-weight:600;">Full page · top bar</span></div>
+<dc-import name="RevenueApp" platform="ios" principal="true" va-style="a" screen="account" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">24a · View as page</span></div>
+<dc-import name="RevenueApp" platform="ios" principal="true" va-style="a" screen="account" va-open="true" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">24a · viewing as Marcus Lim</span></div>
+<dc-import name="RevenueApp" platform="ios" principal="true" va-style="a" screen="today" view-as="ml" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="24b" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">24b</span><span style="font-size:15px;font-weight:600;">Profile card · drill-down sheet · pill</span></div>
+<dc-import name="RevenueApp" platform="ios" principal="true" va-style="b" screen="account" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">24b · Revenue › Fair</span></div>
+<dc-import name="RevenueApp" platform="ios" principal="true" va-style="b" screen="account" va-open="true" va-level="fair" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">24b · viewing as Marcus Lim</span></div>
+<dc-import name="RevenueApp" platform="ios" principal="true" va-style="b" screen="today" view-as="ml" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-23" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">QUOTE · BRAND PICKER</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Pick the brand from the Quote button</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Tapping Quote in the bottom bar opens "Start a quote" with the four brands. Choosing one opens the Quote page for it. The brand grid is gone from the page; the brand name is now the page title, and tapping it reopens the picker. If the cart has items, the picker warns that switching clears them.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Tap Quote from Today</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" brand-pick-open="true" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Quote page · brand as title</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-brand="ZANOTTI" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-22" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">QUOTE · ZANOTTI · SOFAS FROM MODULES</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Zanotti: pick a sofa, then its layout and modules</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Same flow as mattresses: Last used sets, All Zanotti models, then a panel. The panel starts with the three last used layouts plus Custom, the module list below can change any count, then KPI items can be ticked. The strip on top draws the sofa from its modules. Quantity still counts whole sofas.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Zanotti selected</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-brand="ZANOTTI" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Sofa panel · L-shape</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-brand="ZANOTTI" sofa-sheet="true" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-21" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">QUOTE · VIEW AND CHANGE THE CART · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">See what's added, fix mistakes</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">The bottom bar now has a bag with the item count and "View or change". Each line has − / + and a bin. Tapping it opens the cart as a sheet with Keep adding and Set price. In the mattress panel, quantity counts whole sets: 2 sets of a mattress with Linden ×2 and Haven ×1 adds 2 mattresses, 4 Linden and 2 Haven.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="21a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">21a</span><span style="font-size:15px;font-weight:600;">Cart sheet</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" cart-style="a" cart-open="true" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Bar closed</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-20" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">QUOTE · QUANTITY · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Add the same setting two or three times in one go</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Tap Use on a Last used row to fill in size, model and KPI items, adjust anything, then set the quantity with − / + beside Add to cart. With more than one, the button reads "Add 2 sets to cart".</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="20a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">20a</span><span style="font-size:15px;font-weight:600;">Steppers</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" frame-sheet="true" qty-style="a" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Mattress · 2 sets with two bed frames</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" mattress-sheet="true" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Mattress → Add bed frame · same steps as Bed frame only</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" mattress-sheet="frame" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-19" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">QUOTE · BED FRAME · MODEL PICKER · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Choosing a bed frame model without pushing the panel</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">A second sheet slides up with the full model list and a Back button, and closes as soon as a model is picked. Last used keeps up to three settings.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="19b" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">19b</span><span style="font-size:15px;font-weight:600;">Picker sheet</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" frame-sheet="drop" frame-drop-style="b" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-18" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">QUOTE · STEP 1 · QUICK PICKS + OTHER MODELS</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Four quick picks first, the rest one tap away</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Each salesperson sets their own 4 quick picks per brand with Edit. The other models stay out of the scroll. No retail prices are shown: the salesperson enters the selling price in step 2 and the margin tier is worked out from cost. <a href="#18a">18a</a> shows quick picks as cards and opens the rest in a searchable sheet. <a href="#18b">18b</a> uses compact cards and an inline dropdown that scrolls inside itself. <a href="#18c">18c</a> puts search on top, with quick picks as a ranked list and the rest behind a dropdown.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="18a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">18a</span><span style="font-size:15px;font-weight:600;">Cards · search sheet</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">18a · other models sheet</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" quote-all-open="true" hint-size="414px,868px"></dc-import>
+</div>
+<div id="18b" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">18b</span><span style="font-size:15px;font-weight:600;">Compact cards · inline dropdown (open)</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="b" quote-drop-open="true" hint-size="414px,868px"></dc-import>
+</div>
+<div id="18c" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">18c</span><span style="font-size:15px;font-weight:600;">Search first · ranked list</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="c" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Bed frame only · last used · size · model · KPI items</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" frame-sheet="true" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Edit quick picks · all options</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="quote" quote-style="a" quote-edit-open="true" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-17" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">TODAY · SETTLED</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Today, final</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Command-centre layout, HOUZS Venture · Revenue header with the merged Fair, bell and profile capsule, and the orange gradient income card.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="17c" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">17c</span><span style="font-size:15px;font-weight:600;">Orange gradient</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" hero-style="grad" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-16" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">TODAY · HEADER BUTTONS · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Fair, bell and profile in one capsule</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">The bell opens the notifications page: memos to acknowledge and returned requests first, then the settled month's rankings and commission, then status updates on your own requests.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="16a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">16a</span><span style="font-size:15px;font-weight:600;">Merged capsule</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" today-style="a" header-style="d" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Notifications · opens from the bell</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" today-style="a" header-style="d" notif-open="true" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-15" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">TODAY · HEADER BAR · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">HOUZS Venture · Revenue · Fair</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">HOUZS Venture is the company, Revenue the department, Fair the sub-department. The Fair switch opens a sheet to move to another sub-department you belong to, such as IR. Notifications and profile now sit as their own round buttons beside it.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="15a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">15a</span><span style="font-size:15px;font-weight:600;">Fair switch · bell · profile</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" today-style="a" header-style="b" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Switch sheet</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" today-style="a" header-style="b" sub-dept-open="true" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-14" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">TODAY · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Today, rebuilt on everything since</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Every tile opens the page it summarises: My income, sales orders, KPI items, brand margin, Arena boards, memos and requests.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="14a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">14a</span><span style="font-size:15px;font-weight:600;">Command centre · income with Sales / Margin / KPI</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" today-style="a" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-13" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">PROFILE · TEAM &amp; CAPACITY · BUILT ON 13B</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">See your whole line, up and down</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">A top-down chart of your whole line: Director, upline, you, your team and their team. Swipe sideways to see everyone and tap a person for their details.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="13b" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">13b</span><span style="font-size:15px;font-weight:600;">Org chart · swipe sideways</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="account" pf-view="team" team-style="b" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-12" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">PROFILE · MY HONOURS · SIMPLIFIED</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">How many times each place</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">One row per place with a big count. Tap a row to see which boards and fairs it came from.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="12c" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">12c</span><span style="font-size:15px;font-weight:600;">Place rows · details on tap</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="account" pf-view="honours" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-11" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">INSIGHT · BRAND MARGIN · MARGIN TIER · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Your tier, the one below and the next one</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Each card shows only the tier name and its range. Tap "All 7 margin tiers" for the full list with commission effects.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="11c" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">11c</span><span style="font-size:15px;font-weight:600;">Below · you · next</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="brand" brand="Akemi" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-10" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">INSIGHT · KPI ITEMS · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">One bar against the threshold</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Every item is stacked into one bar from 0 to 27, with the 10-item threshold marked.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="10b" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">10b</span><span style="font-size:15px;font-weight:600;">Stacked bar · threshold at 10</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="kpi" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-9" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">INSIGHT · MY SALES ORDERS · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Week tabs</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Pick a week from four tabs to see its brand week, venue, organizer and orders. Tap an order for its product lines, margin and KPI items.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="8a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">8a</span><span style="font-size:15px;font-weight:600;">Week tabs · one brand week on screen</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="bills" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-7" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">SALES · FAIR RESULTS · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Your result in the hero, details on tap</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">The hero now shows your Fair results place and your 1st / 2nd / 3rd counts. The finishes card and your fair list leave the page and open on tap, like the Championship breakdown. This phone opens with the sheet showing; tap Done to see the board.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="7a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">7a</span><span style="font-size:15px;font-weight:600;">One "Your fairs" card · bottom sheet with counts and every fair</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="arena" board="sales" arena-view="board" sub-view="fair" fairs-style="a" fairs-open="true" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-5" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">CHOOSE A MONTH, QUARTER OR YEAR</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Look back at past periods, in Arena and Insight</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">The calendar button opens a picker. In Arena it follows the Monthly / Quarterly / Annual tab; in Insight the sheet has its own Month / Quarter / Year switch.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="5a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">5a</span><span style="font-size:15px;font-weight:600;">Arena board · calendar picker</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="arena" board="sales" arena-view="board" date-open="true" hint-size="414px,868px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;">Insight · same picker</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="insight" insight-tab="personal" date-open="true" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-4" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">CHAMPIONSHIP POINTS · CHOSEN</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">The breakdown opens on tap</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">The seven contributions no longer sit inline above Standings. The board shows a points bar; tapping it opens a bottom sheet with all seven lines. This phone opens with the sheet showing; tap Done to see the board.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="4a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">4a</span><span style="font-size:15px;font-weight:600;">Points bar + bottom sheet with all seven lines</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="arena" board="champ" arena-view="board" champ-style="a" champ-open="true" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-3" style="padding:56px 64px 0;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">ARENA · CHOSEN DIRECTION</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Colour tiles, then a colour hero inside each board</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">Arena opens on four coloured boards plus Highest Fair Record. Inside a board, your rank sits in a hero that matches the board colour.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;">Arena · opening page</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="arena" arena-view="hub" hint-size="414px,868px"></dc-import>
+</div>
+<div id="3a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">3a</span><span style="font-size:15px;font-weight:600;">Colour hero · your rank first</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="arena" board="sales" arena-view="board" board-style="a" hint-size="414px,868px"></dc-import>
+</div>
+</div>
+</section>
+<section id="turn-1" style="padding:56px 64px 80px;display:flex;flex-direction:column;gap:48px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">HOUZS REVENUE · MOBILE COORDINATION PASS</p>
+<h1 style="margin:0;font-size:34px;font-weight:700;letter-spacing:-.03em;">Find it in one look</h1>
+<div style="margin-top:16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 32px;font-size:14px;line-height:1.55;">
+<p style="margin:0;"><strong>One orange action per screen.</strong> Filled orange is used only for the income hero, Quote, and the next step. All other buttons are outline or text.</p>
+<p style="margin:0;"><strong>Quote is the raised centre tab.</strong> It has two numbered steps: Products, then Price &amp; margin. The margin and its tier sit next to the price.</p>
+<p style="margin:0;"><strong>Arena opens on four boards:</strong> Sales (Total, By brand, Fair results), Margin (Total, By brand), KPI and Championship. Tap one to open its own page.</p>
+<p style="margin:0;"><strong>Each tab names itself.</strong> Insight, Arena and Quote open with a large title at the top left; only Today and Quote step 2 keep the HOUZS header bar. Profile has a warm orange band behind the status bar and a floating profile card. My brand weeks moved to Profile.</p>
+</div>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="1a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">1a</span><span style="font-size:15px;font-weight:600;">iPhone · interactive</span></div>
+<dc-import name="RevenueApp" platform="ios" screen="today" hint-size="414px,868px"></dc-import>
+</div>
+<div id="1b" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">1b</span><span style="font-size:15px;font-weight:600;">Android · interactive</span></div>
+<dc-import name="RevenueApp" platform="android" screen="today" hint-size="410px,884px"></dc-import>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:20px;">
+<div><h2 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em;">Every screen</h2><p style="margin:4px 0 0;font-size:14px;color:#806B60;">The same app opened on each destination. Every screen is live, so you can tap into it.</p></div>
+<div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;">
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Today</span><dc-import name="RevenueApp" platform="ios" screen="today" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Quote · 1 Products</span><dc-import name="RevenueApp" platform="ios" screen="quote" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Quote · 2 Price &amp; margin</span><dc-import name="RevenueApp" platform="android" screen="calc" hint-size="410px,884px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Insight · Personal</span><dc-import name="RevenueApp" platform="ios" screen="insight" insight-tab="personal" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Insight · My bills</span><dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="bills" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Insight · KPI items</span><dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="kpi" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Insight · Orders waiting for deposit</span><dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="bills" so-status="waiting" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Insight · Brand margin (Akemi)</span><dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="brand" brand="Akemi" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Insight · Brand margin (Dunlopillo, cost pending)</span><dc-import name="RevenueApp" platform="ios" screen="insight" insight-view="brand" brand="Dunlopillo" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Insight · My team</span><dc-import name="RevenueApp" platform="android" screen="insight" insight-tab="team" hint-size="410px,884px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Arena · 1 Sales</span><dc-import name="RevenueApp" platform="ios" screen="arena" board="sales" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Arena · 2 Margin</span><dc-import name="RevenueApp" platform="ios" screen="arena" board="margin" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Arena · 4 Championship</span><dc-import name="RevenueApp" platform="android" screen="arena" board="champ" hint-size="410px,884px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Profile</span><dc-import name="RevenueApp" platform="ios" screen="account" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Profile · My income</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="income" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Profile · Commission by order</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="incOrders" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Profile · My honours</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="honours" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Profile · Team & capacity</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="team" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Profile · Requests</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="requests" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Requests · Submit claim</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="requests" req-form="claim" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Requests · Submit replacement</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="requests" req-form="replacement" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Requests · Submit waiting list</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="requests" req-form="waiting" hint-size="414px,868px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:10px;"><span style="font-size:14px;font-weight:600;">Profile · Memos & notifications</span><dc-import name="RevenueApp" platform="ios" screen="account" pf-view="memos" hint-size="414px,868px"></dc-import></div>
+</div>
+</div>
+</section>
+</x-dc>
+</body>
+</html>

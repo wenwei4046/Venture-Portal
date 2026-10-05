@@ -1,0 +1,41 @@
+[
+  { "name": "quote-live", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "dump": "document.querySelector('main')?.innerText.slice(0, 800)" },
+  { "name": "quote-live-all", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "actions": [{ "click": "button:has-text('All Akemi models')" }],
+    "dump": "[...document.querySelectorAll('[role=dialog]')].map(d => d.innerText.slice(0, 600)).join(' || ')" },
+  { "name": "quote-live-mattress", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "actions": [{ "click": "button:has-text('All Akemi models')" }, { "click": "button:has-text('APEX')" }],
+    "dump": "document.querySelector('[data-sheet-body]')?.innerText.slice(0, 900)" },
+  { "name": "quote-live-frame", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "actions": [{ "click": "button:has-text('All Akemi models')" }, { "click": "button:has-text('APEX')" }, { "click": "button:has-text('Add bed frame')" }],
+    "dump": "document.querySelector('[data-sheet-body]')?.innerText.slice(0, 900)" },
+  { "name": "quote-live-calc", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "actions": [
+      { "click": "button:has-text('All Akemi models')" }, { "click": "button:has-text('APEX')" },
+      { "click": "button:has-text('Add bed frame')" }, { "click": "button:has-text('Add bed frame') >> nth=-1" },
+      { "click": "button:has-text('Add to cart')" },
+      { "click": "button:has-text('Set price')" },
+      { "click": "button[aria-label='4']" }, { "click": "button[aria-label='0']" }, { "click": "button[aria-label='0']" }, { "click": "button[aria-label='0']", "wait": 3500 }
+    ],
+    "dump": "document.querySelector('main')?.innerText.slice(0, 900)" },
+  { "name": "quote-live-sofa", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "actions": [
+      { "click": "button:has-text('Mattress')" }, { "click": "button:has-text('Zanotti')" },
+      { "click": "button:has-text('All Zanotti models')" }, { "click": "button:has-text('2376')" },
+      { "eval": "(() => { const rows = [...document.querySelectorAll('[data-sheet-body] button[aria-label=More]')]; rows[0]?.click(); })()" },
+      { "eval": "(() => { const rows = [...document.querySelectorAll('[data-sheet-body] button[aria-label=More]')]; rows[3]?.click(); })()" }
+    ],
+    "dump": "document.querySelector('[data-sheet-body]')?.innerText.slice(0, 1200)" },
+  { "name": "quote-live-sofa-calc", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "actions": [
+      { "click": "button:has-text('Mattress')" }, { "click": "button:has-text('Zanotti')" },
+      { "click": "button:has-text('All Zanotti models')" }, { "click": "button:has-text('2376')" },
+      { "eval": "(() => { const rows = [...document.querySelectorAll('[data-sheet-body] button[aria-label=More]')]; rows[0]?.click(); })()" },
+      { "eval": "(() => { const rows = [...document.querySelectorAll('[data-sheet-body] button[aria-label=More]')]; rows[3]?.click(); })()" },
+      { "click": "button:has-text('Add to cart')" },
+      { "click": "button:has-text('Set price')" },
+      { "click": "button[aria-label='5']" }, { "click": "button[aria-label='0']" }, { "click": "button[aria-label='0']" }, { "click": "button[aria-label='0']", "wait": 3500 }
+    ],
+    "dump": "document.querySelector('main')?.innerText.slice(0, 900)" }
+]
