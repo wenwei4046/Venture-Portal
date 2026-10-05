@@ -27,6 +27,11 @@ export interface PostJournalEntryInput {
  * Posts a balanced double-entry journal entry via the post_journal_entry RPC.
  * Strict 0.00 balance enforcement — debit and credit totals must match exactly
  * at 2-decimal precision. TS-side shape check fails fast before hitting the DB.
+ *
+ * Through `post_journal_entry_as_caller` (2026-10-06): the DB posts only in the
+ * signed-in user's own name (`createdBy` must be them) and only for a treasury,
+ * admin or hr scope — `post_journal_entry` itself is not a signed-in user's to
+ * call, or anybody's browser could write the general ledger.
  */
 export async function postJournalEntry(
   supabase: SupabaseClient,
@@ -71,7 +76,7 @@ export async function postJournalEntry(
     })),
   }
   if (segment) rpcArgs.p_segment = segment
-  const { data, error } = await supabase.rpc('post_journal_entry', rpcArgs as never)
+  const { data, error } = await supabase.rpc('post_journal_entry_as_caller', rpcArgs as never)
 
   if (error) {
     throw new Error(`Failed to post journal entry: ${error.message}`)
