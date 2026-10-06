@@ -1,5 +1,36 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-06 (SHIPPED) — the director CTC invoice is itemised
+
+User: "director 要 bill back 的我要拆 detail 可以吗？" → "可以". HR keys each
+subsidiary's director CTC in components (`director_ctc`: basic, KPI, allowance,
+employer EPF / SOCSO / EIS; `get_director_ctc_by_company` sums them per
+company), but Create Invoice → Subsidiary → Director attribution billed the
+total as ONE line (`createManualInvoice` per subsidiary). Note: the old
+`generate_monthly_invoices` RPC no longer makes director invoices — only
+marketing_project; the director batch comes from that modal.
+
+- `lib/director-ctc-lines.ts` — `directorCtcInvoiceLines(components, amount,
+  period, category)`: Salary (basic) / KPI / Allowance / EPF / SOCSO / EIS,
+  zero lines out, "<Label> - Sep'26" like the payroll invoice; null when
+  `amount` is not the components' sum to the sen (Finance changed the figure,
+  or a multi-pool template sliced it) — that invoice stays one line.
+- `fetchDirectorCtcByCompany` now returns the components (`DirectorCtcRow`);
+  `CreateInvoiceButton` keeps them from the auto-fill and calls
+  `createMultiLineInvoice` (header category NULL, lines carry the category)
+  when the split reads, else `createManualInvoice` as before. The auto-fill
+  note says so. Aggregate per company, never per director (HC = 2 heads, one
+  set of lines). Issue / settle / Director pool routing unchanged: lines have
+  no segment, so `lineAttributions` falls back to the mode's segment
+  (`director`).
+- Tests: `director-ctc-lines.test.ts`, `CreateInvoiceButton.director-split.test.tsx`
+  (first component test of that modal — mocks AccountPicker as a plain select).
+- Data: the five Sep'26 director drafts the user made that morning
+  (HV-INV-202609-0055 … 0059, 2990 / CONTS / DC / HC / HK) got their lines
+  in place from `director_ctc` (totals untouched, header category → NULL,
+  `access_log amend_invoice_lines`). Aug'26 and earlier (paid, one line)
+  were left alone.
+
 ## CHECKPOINT 2026-10-05 b (SHIPPED) — Salary / Allowance split of an InfoTech-imported row
 
 User, on HV-INV-202608-0051 (HC, Aug'26 HR adjustment, 8,082.33): "可以帮我检查为什么这样

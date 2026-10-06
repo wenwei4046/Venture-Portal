@@ -6,12 +6,15 @@ import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import {
   createManualInvoice,
+  createMultiLineInvoice,
   fetchDirectorCtcByCompany,
   fetchStaffAllocationByCompany,
   type BillableToKind,
   type CreateInvoiceMode,
+  type DirectorCtcRow,
 } from '../actions'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
+import { directorCtcInvoiceLines } from '@/lib/director-ctc-lines'
 import type { AccountType } from '@/lib/coa'
 
 interface Company {
@@ -188,6 +191,9 @@ function CreateInvoiceButtonBody({
   const [subRows, setSubRows] = useState<SubRow[]>([newSubRow()])
   const [autoFillNote, setAutoFillNote] = useState<string | null>(null)
   const autoFilledKey = useRef<string | null>(null)
+  // HR's director CTC per subsidiary, kept from the auto-fill so each director
+  // invoice goes out itemised the way HR keyed it (2026-10-06).
+  const [directorCtc, setDirectorCtc] = useState<Map<string, DirectorCtcRow>>(() => new Map())
 
   const remaining = Math.round((targetAmount - alreadyInvoiced) * 100) / 100
   const hasTarget = targetAmount > 0.005
@@ -237,6 +243,7 @@ function CreateInvoiceButtonBody({
     setSubRows([newSubRow()])
     setError(null)
     setAutoFillNote(null)
+    setDirectorCtc(new Map())
     autoFilledKey.current = null
   }
 
@@ -305,6 +312,7 @@ function CreateInvoiceButtonBody({
     }
 
     setAutoFillNote('Loading director CTC from HR…')
+    setDirectorCtc(new Map())
     fetchDirectorCtcByCompany(periodIso)
       .then((ctcRows) => {
         if (ctcRows.length === 0) {
@@ -320,8 +328,9 @@ function CreateInvoiceButtonBody({
             amount: r.totalCtc.toFixed(2),
           })),
         )
+        setDirectorCtc(new Map(ctcRows.map((r) => [r.companyId, r])))
         setAutoFillNote(
-          `Auto-filled ${ctcRows.length} subsidiary ${ctcRows.length === 1 ? 'row' : 'rows'} from HR's director CTC for ${monthLabel}. Edit amounts as needed.`,
+          `Auto-filled ${ctcRows.length} subsidiary ${ctcRows.length === 1 ? 'row' : 'rows'} from HR's director CTC for ${monthLabel}. Each invoice is itemised as Salary / KPI / Allowance / EPF / SOCSO / EIS the way HR keyed it; change an amount and that invoice goes out as one line.`,
         )
         if (!description.trim()) {
           setDescription(`Director salary CTC — ${dayjs(period + '-01').format('MMMM YYYY')}`)
@@ -498,14 +507,33 @@ function CreateInvoiceButtonBody({
           const slice = Math.round((subAmount * Number(pool.amount) / ratioSum) * 100) / 100
           if (slice <= 0) continue
           const poolLabel = poolOptions.find((o) => o.value === pool.mode)?.label ?? String(pool.mode)
+          // Director attribution: HR keyed the CTC in components, so the
+          // invoice lists them (2026-10-06). An amount Finance changed, or a
+          // slice of a multi-pool template, is not that total — one line.
+          const ctc = pool.mode === 'director_attribution' ? directorCtc.get(sub.companyId) : undefined
+          const lines = ctc ? directorCtcInvoiceLines(ctc, slice, period, pool.categoryCode) : null
           try {
-            await submitInvoice({
-              billableType: 'subsidiary',
-              mode: pool.mode as CreateInvoiceMode,
-              categoryCode: pool.categoryCode,
-              companyId: sub.companyId,
-              amount: slice,
-            })
+            if (lines && lines.length >= 2) {
+              await createMultiLineInvoice({
+                billableType: 'subsidiary',
+                billingMode: pool.mode as CreateInvoiceMode,
+                period,
+                invoiceDate,
+                dueDate,
+                referenceNo: referenceNo.trim(),
+                headerDescription: description.trim(),
+                companyId: sub.companyId,
+                lines,
+              })
+            } else {
+              await submitInvoice({
+                billableType: 'subsidiary',
+                mode: pool.mode as CreateInvoiceMode,
+                categoryCode: pool.categoryCode,
+                companyId: sub.companyId,
+                amount: slice,
+              })
+            }
             created += 1
           } catch (err) {
             failures.push({

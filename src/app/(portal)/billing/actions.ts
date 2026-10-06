@@ -478,6 +478,14 @@ export interface DirectorCtcRow {
   shortCode: string
   name: string
   totalCtc: number
+  /** The same total the way HR keyed it — the invoice's lines (2026-10-06,
+   *  lib/director-ctc-lines). Per company, never per director. */
+  basic: number
+  kpi: number
+  allowance: number
+  epf: number
+  socso: number
+  eis: number
 }
 
 export async function fetchDirectorCtcByCompany(
@@ -499,6 +507,12 @@ export async function fetchDirectorCtcByCompany(
     shortCode: r.company_short_code,
     name: r.company_name,
     totalCtc: Number(r.total_ctc),
+    basic: Number(r.basic),
+    kpi: Number(r.kpi),
+    allowance: Number(r.allowance),
+    epf: Number(r.epf_er),
+    socso: Number(r.socso_er),
+    eis: Number(r.eis_er),
   }))
 }
 
