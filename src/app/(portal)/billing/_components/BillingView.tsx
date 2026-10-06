@@ -7,6 +7,7 @@ import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
+import { directorBillingTarget } from '@/lib/billing'
 import type { CreateInvoiceMode } from '../actions'
 import type { AccountType } from '@/lib/coa'
 import PeriodSelector from './PeriodSelector'
@@ -392,8 +393,11 @@ export default async function BillingView({ searchParams }: Props) {
     .eq('period_month', period)
     .maybeSingle()
   const directorSubmitted = !!directorSubmission
+  // What Finance bills for director salary is the submission's per-company
+  // CTC, not its payroll gross (2026-10-06: the card read "over RM 19,396.25"
+  // against five drafts that matched the submission to the sen).
   const directorFromPayroll = directorSubmitted
-    ? Number(directorSubmission?.total_gross ?? 0)
+    ? directorBillingTarget(directorSubmission)
     : payrollSubmitted
       ? Number(payrollRun?.director_salary_total ?? 0)
       : 0
@@ -653,7 +657,8 @@ export default async function BillingView({ searchParams }: Props) {
           <div className="font-mono text-xs text-muted mb-4">
             Submitted {directorSubmission?.submitted_at ? officeTime(directorSubmission.submitted_at).format('D MMM YYYY HH:mm') : ''} ·{' '}
             {Number(directorSubmission?.director_count ?? 0)} director{Number(directorSubmission?.director_count ?? 0) === 1 ? '' : 's'} ·{' '}
-            total {formatMoney(Number(directorSubmission?.total_gross ?? 0))}
+            payroll gross {formatMoney(Number(directorSubmission?.total_gross ?? 0))} · billed as CTC{' '}
+            {formatMoney(directorBillingTarget(directorSubmission))}
           </div>
           <div className="overflow-x-auto">
             <table className="ledger-table">

@@ -9,6 +9,7 @@ import {
   fallbackRevenueGlCode,
   BILLING_MODES,
   AUTO_GENERATED_BILLING_MODES,
+  directorBillingTarget,
 } from './billing'
 
 describe('normalizeToFirstOfMonth', () => {
@@ -137,5 +138,28 @@ describe('deptNameToSegment', () => {
   it('returns undefined for unknown names (JE falls back to derived segment)', () => {
     expect(deptNameToSegment('Ops')).toBeUndefined()
     expect(deptNameToSegment(null)).toBeUndefined()
+  })
+})
+
+// 2026-10-06: the Director OPEX card read "over RM 19,396.25" against five
+// correct drafts because it compared CTC invoices with the submission's
+// total_gross — basic only, no employer statutory, no CTC allowance.
+describe('directorBillingTarget', () => {
+  it('is the sum of the per-company CTC the submission carries — what Finance bills', () => {
+    expect(
+      directorBillingTarget({
+        total_gross: 57600,
+        by_company: [{ total_ctc: '9642.13' }, { total_ctc: 15817.92 }, { total_ctc: 14452.05 }, { total_ctc: 25768.1 }, { total_ctc: 11316.05 }],
+      }),
+    ).toBe(76996.25)
+  })
+
+  it('falls back to the payroll gross for a legacy snapshot without per-company rows', () => {
+    expect(directorBillingTarget({ total_gross: '57600', by_company: null })).toBe(57600)
+    expect(directorBillingTarget({ total_gross: 57600, by_company: [] })).toBe(57600)
+  })
+
+  it('is zero with no submission', () => {
+    expect(directorBillingTarget(null)).toBe(0)
   })
 })

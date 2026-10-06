@@ -30,6 +30,15 @@ marketing_project; the director batch comes from that modal.
   in place from `director_ctc` (totals untouched, header category → NULL,
   `access_log amend_invoice_lines`). Aug'26 and earlier (paid, one line)
   were left alone.
+- Follow-up the same day ("对吗？… 确定要 bill 出去的多少？" → "做第 1 条"): the
+  Director OPEX card on Service Billing compared the CTC invoices with the
+  submission's `total_gross` (basic only — no employer statutory, no CTC
+  allowance) and read "5 invoices · over RM 19,396.25" against drafts that
+  matched the submission to the sen (Aug read "over 19,319.15" the same way).
+  `directorBillingTarget(submission)` (lib/billing) = Σ by_company total_ctc,
+  payroll gross only for a legacy snapshot without rows; the card and the
+  summary header use it, and the submission section says "payroll gross X ·
+  billed as CTC Y". The user bills the CTC — same basis as Aug.
 
 ## CHECKPOINT 2026-10-05 b (SHIPPED) — Salary / Allowance split of an InfoTech-imported row
 

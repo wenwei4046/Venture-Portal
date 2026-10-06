@@ -170,3 +170,20 @@ export function deptNameToSegment(
       return name ? extra?.[name] ?? primedNameToSegment()[name] : undefined
   }
 }
+
+/** What Finance bills for director salary in a period: the sum of the
+ *  Director Salary Submission's per-company CTC (basic + KPI + allowance +
+ *  employer EPF / SOCSO / EIS, as HR keyed it). A legacy snapshot without
+ *  per-company rows only carries the payroll gross, so that is the fallback.
+ *  2026-10-06: the Director OPEX card compared the CTC invoices with
+ *  `total_gross` — basic only — and read "over RM 19,396.25" against five
+ *  drafts that matched the submission to the sen. */
+export function directorBillingTarget(
+  submission: { total_gross: number | string | null; by_company?: unknown } | null | undefined,
+): number {
+  if (!submission) return 0
+  const rows = Array.isArray(submission.by_company) ? (submission.by_company as Array<{ total_ctc?: number | string | null }>) : []
+  if (rows.length === 0) return Number(submission.total_gross ?? 0)
+  const cents = rows.reduce((sum, r) => sum + Math.round(Number(r.total_ctc ?? 0) * 100), 0)
+  return cents / 100
+}
