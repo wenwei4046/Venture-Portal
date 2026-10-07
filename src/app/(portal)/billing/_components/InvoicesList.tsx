@@ -11,6 +11,7 @@ import CreateCreditNoteButton from './CreateCreditNoteButton'
 import ReassignInvoiceGlButton from './ReassignInvoiceGlButton'
 import InvoiceDetailButton from './InvoiceDetailButton'
 import SortableTable from '@/components/SortableTable'
+import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
 import type { AccountType } from '@/lib/coa'
 import { copyInvoice, deleteDraftInvoice, settleInvoicesConsolidated, voidIssuedInvoices } from '../actions'
@@ -131,11 +132,16 @@ interface Props {
   cnDetailByInvoice?: Record<string, Array<{ cnNo: string | null; amount: number; status: string; reason: string | null }>>
   /** Dynamically provisioned dept modes — forwarded to the CN modal. */
   extraModes?: Array<{ value: string; label: string }>
+  /** invoice_id → the account names its lines post to ("Design Income + Social
+   *  Media"), the sheet's Category column (2026-10-07). */
+  categoryByInvoice?: Record<string, string>
+  /** The viewer may keep the arrangement on show as everyone's default. */
+  canSetDefault?: boolean
 }
 
 // Invoices for the selected period. Populated by Step 5's generate_monthly_invoices
 // RPC. Until Step 5 ships, this section shows the empty state with an explanation.
-export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [], receiptsByInvoice = {}, cnDetailByInvoice = {} }: Props) {
+export default function InvoicesList({ invoices, companyMap, departmentMap, period, categories = [], bankAccounts = [], invoiceLines = {}, paidByInvoice = {}, cnByInvoice = {}, extraOpenInvoices = [], extraModes = [], receiptsByInvoice = {}, cnDetailByInvoice = {}, categoryByInvoice = {}, canSetDefault = false }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -167,6 +173,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   const catLabelByCode: Record<string, string> = Object.fromEntries(
     categories.map((c) => [c.code, c.label]),
   )
+  const categoryOf = (inv: Invoice): string | null =>
+    categoryByInvoice[inv.id] ?? (inv.category_code ? (catLabelByCode[inv.category_code] ?? inv.category_code) : null)
   /** What the detail popup shows for an invoice. Its number in the Invoice #
    *  cell and a double-click anywhere on its row open the same thing. */
   const detailOf = (inv: Invoice) => {
@@ -202,6 +210,13 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   // 跨月: reveal other periods' unsettled invoices in the same list.
   const [showAllOpen, setShowAllOpen] = useState(false)
   const displayRows = showAllOpen ? [...invoices, ...extraOpenInvoices] : invoices
+  // The sheet's tabs by status (2026-10-07). 'paid' takes paid_via_netting too.
+  type StatusTab = 'all' | 'issued' | 'paid' | 'draft' | 'voided'
+  const [statusTab, setStatusTab] = useState<StatusTab>('all')
+  const inTab = (inv: Invoice, tab: StatusTab) =>
+    tab === 'all' ? true : tab === 'paid' ? inv.status === 'paid' || inv.status === 'paid_via_netting' : inv.status === tab
+  const tabRows = displayRows.filter((inv) => inTab(inv, statusTab))
+  const tabCount = (tab: StatusTab) => invoices.filter((inv) => inTab(inv, tab)).length
   const [showSettleModal, setShowSettleModal] = useState(false)
   const [settleBank, setSettleBank] = useState<string>('')
   const [settleDate, setSettleDate] = useState<string>(dayjs().format('YYYY-MM-DD'))
@@ -354,20 +369,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
       }
     })
   }
-  const totalsByMode = new Map<string, number>()
-  const totalsByCompany = new Map<string, number>()
-  let grandTotal = 0
-  let draftCount = 0
-  for (const inv of invoices) {
-    const amt = Number(inv.total_amount)
-    grandTotal += amt
-    totalsByMode.set(inv.billing_mode, (totalsByMode.get(inv.billing_mode) ?? 0) + amt)
-    // Item 5: company_id is null for non-subsidiary invoices. Bucket those
-    // under the freetext / dept name instead so totals don't crash.
-    const bucketKey = inv.company_id ?? `__${inv.billable_to_type ?? 'unknown'}__`
-    totalsByCompany.set(bucketKey, (totalsByCompany.get(bucketKey) ?? 0) + amt)
-    if (inv.status === 'draft') draftCount++
-  }
+  const draftCount = invoices.filter((inv) => inv.status === 'draft').length
 
   // ─── The row menu (2026-10-02) ────────────────────────────────────────────
   // An issued invoice had six links in its Action cell, wrapping onto two
@@ -497,7 +499,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   }, [])
 
   return (
-    <section className="border-t border-hairline pt-8 mb-12">
+    <section className="fin-queue invoices-sheet mb-12">
       {rowError ? (
         <div className="mb-4 flex items-baseline justify-between gap-3 bg-danger-bg border border-danger text-danger rounded-md px-3 py-2">
           <span className="font-sans text-sm">{rowError}</span>
@@ -518,18 +520,13 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           </button>
         </div>
       ) : null}
-      <div className="flex items-baseline justify-between mb-4 gap-4 flex-wrap">
-        <h2 className="font-serif text-xl text-ink">Invoices</h2>
-        <div className="flex items-baseline gap-4">
-          <div className="font-mono text-xs text-muted">
-            {dayjs(period).format('MMMM YYYY')} · {invoices.length}{' '}
-            {invoices.length === 1 ? 'invoice' : 'invoices'}
-            {draftCount > 0 ? ` · ${draftCount} draft` : ''}
-          </div>
-          {draftCount > 0 ? (
-            <BulkIssueInvoicesButton period={period} count={draftCount} />
-          ) : null}
-        </div>
+      <div className="sect-head">
+        <h2>Invoices</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">
+          {invoices.length} {invoices.length === 1 ? 'INVOICE' : 'INVOICES'} · {dayjs(period).format('MMMM YYYY').toUpperCase()}
+          {selectedIds.size > 0 ? ` · ${selectedIds.size} SELECTED` : ''}
+        </span>
       </div>
 
       {invoices.length === 0 && extraOpenInvoices.length === 0 ? (
@@ -542,38 +539,46 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-6 pb-6 border-b border-hairline">
-            <div className="lg:col-span-7">
-              <div className="font-serif italic text-accent text-base mb-1">
-                Total for {dayjs(period).format('MMMM YYYY')}
-              </div>
-              <div className="statement-amount text-ink">
-                {formatMoney(grandTotal)}
-              </div>
-            </div>
-            <div className="lg:col-span-5 space-y-1.5">
-              {Array.from(totalsByMode.entries()).map(([mode, total]) => (
-                <div
-                  key={mode}
-                  className="flex items-baseline justify-between font-mono text-sm"
-                >
-                  <em className="font-serif text-graphite text-sm">{formatBillingMode(mode)}</em>
-                  <span className="text-graphite tabular">{formatMoney(total)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <SlidingTabs
+            variant="control"
+            items={[
+              { key: 'all', label: 'All', count: tabCount('all') },
+              { key: 'issued', label: 'Issued', count: tabCount('issued') },
+              { key: 'paid', label: 'Paid', count: tabCount('paid') },
+              { key: 'draft', label: 'Draft', count: tabCount('draft') },
+              { key: 'voided', label: 'Voided', count: tabCount('voided') },
+            ]}
+            active={statusTab}
+            onTabChange={(key) => setStatusTab(key as StatusTab)}
+          />
 
           <div className="overflow-x-auto">
             <SortableTable<Invoice>
               layoutId="billing.invoices"
               layoutTitle="Invoices"
+              canSetDefault={canSetDefault}
+              openLabel="Open the invoice →"
+              rowClassName={(inv) =>
+                [selectedIds.has(inv.id) ? 'st-selected' : '', inv.status === 'voided' ? 'inv-void' : ''].filter(Boolean).join(' ') || undefined
+              }
+              footer={(visible) => (
+                <tr>
+                  <td colSpan={1000} className="q-foot">
+                    <span>
+                      {visible.length} {visible.length === 1 ? 'invoice' : 'invoices'} · voided left out of the total
+                    </span>
+                    <span className="num">
+                      {formatMoney(visible.filter((inv) => inv.status !== 'voided').reduce((t, inv) => t + Number(inv.total_amount), 0))}
+                    </span>
+                  </td>
+                </tr>
+              )}
               onRowOpen={(inv) => openDialog('detail', inv)}
               onRowContextMenu={(inv, e) => {
                 e.preventDefault()
                 setMenu({ invoice: inv, anchor: { x: e.clientX, y: e.clientY } })
               }}
-              rows={displayRows}
+              rows={tabRows}
               getRowKey={(inv) => inv.id}
               defaultSort={{ key: 'invoice_no', dir: 'desc' }}
               searchKeys={['invoice_no', 'company', 'billing_mode', 'description']}
@@ -581,50 +586,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               toolbarRight={
                 displayRows.some(isBatchSettleable) || displayRows.some(isVoidable) || extraOpenInvoices.length > 0 ? (
                   <>
-                    {/* Selection summary + batch actions — inline in the toolbar
-                        (between search and 全选), not a floating bar (user 2026-06-11). */}
-                    {selectedIds.size > 0 && !showSettleModal ? (
-                      <div className="flex items-center gap-2.5 bg-paper border border-hairline rounded-md px-3 py-1">
-                        <span className="font-mono text-xs text-ink whitespace-nowrap">
-                          {selectedIds.size} 张 ·{' '}
-                          <span className="font-semibold">
-                            RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={clearSelection}
-                          className="text-xs font-sans text-muted hover:text-ink"
-                        >
-                          清除
-                        </button>
-                        <button
-                          type="button"
-                          onClick={printSelected}
-                          className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-xs font-sans px-3 py-1 rounded-md transition-colors whitespace-nowrap"
-                        >
-                          打印所选 {selectedIds.size} 张
-                        </button>
-                        <button
-                          type="button"
-                          onClick={openSettleModal}
-                          disabled={selectedInvoices.length === 0 || crossCompany}
-                          title={crossCompany ? '一张收据只能结同一家公司的单' : undefined}
-                          className="bg-accent hover:bg-accent-hover text-white text-xs font-sans px-3 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                          {crossCompany ? '不同公司不能合并' : `合并结算 ${selectedInvoices.length} 张 → 生成收据`}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openVoidModal(selectedVoidable.map((i) => i.id))}
-                          disabled={selectedVoidable.length === 0 || isPending}
-                          title="作废所选：只对还没收钱、没 credit note 的 issued 发票"
-                          className="bg-surface hover:bg-danger/10 border border-hairline text-danger text-xs font-sans px-3 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                          作废所选 {selectedVoidable.length} 张
-                        </button>
-                      </div>
-                    ) : null}
+                    {draftCount > 0 ? <BulkIssueInvoicesButton period={period} count={draftCount} /> : null}
                     {extraOpenInvoices.length > 0 ? (
                       <button
                         type="button"
@@ -656,18 +618,23 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   sortable: false,
                   pinned: 'start',
                   resizable: false,
+                  mobile: 'keep',
+                  cellClassName: 'st-tick-cell',
                   render: (inv) => {
                     const settleable = isBatchSettleable(inv)
                     const selectable = settleable || isVoidable(inv)
                     return (
-                      <input
-                        type="checkbox"
-                        disabled={!selectable || isPending}
-                        checked={selectedIds.has(inv.id)}
-                        onChange={() => toggle(inv.id)}
-                        className="accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
-                        aria-label={selectable ? `Select ${inv.invoice_no ?? 'invoice'}` : 'Not selectable'}
-                      />
+                      // The whole cell is the tap target, not the 18px box.
+                      <label className="st-tick">
+                        <input
+                          type="checkbox"
+                          disabled={!selectable || isPending}
+                          checked={selectedIds.has(inv.id)}
+                          onChange={() => toggle(inv.id)}
+                          className="accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                          aria-label={selectable ? `Select ${inv.invoice_no ?? 'invoice'}` : 'Not selectable'}
+                        />
+                      </label>
                     )
                   },
                 },
@@ -675,6 +642,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: 'invoice_no',
                   group: '基本',
                   label: 'Invoice #',
+                  // The phone's small print under Bill to carries the number.
+                  mobile: 'drop',
                   render: (inv) => <InvoiceDetailButton {...detailOf(inv)} />,
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
                 },
@@ -685,6 +654,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: 'invoice_date',
                   group: '日期',
                   label: 'Date',
+                  mobile: 'detail',
                   render: (inv) =>
                     inv.invoice_date ? dayjs(inv.invoice_date).format('D MMM YYYY') : <span className="text-muted">—</span>,
                   sortValue: (inv) => (inv.invoice_date ? new Date(inv.invoice_date) : null),
@@ -693,13 +663,32 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                 {
                   key: 'company',
                   group: '基本',
-                  label: 'Company',
+                  label: 'Bill to',
+                  mobile: 'keep',
                   render: (inv) => {
                     const labels = resolvePartyLabel(inv, companyMap, departmentMap)
+                    // A subsidiary by its code, its name under it (the sheet, 2026-10-07).
+                    const code = inv.company_id ? labels.sub : null
+                    const firstLine = (inv.description ?? '').trim().split(/\r?\n/)[0]
                     return (
                       <>
-                        <div className="font-serif text-md text-ink">{labels.primary}</div>
-                        <div className="font-mono text-xs text-muted">{labels.sub}</div>
+                        <div className="font-serif text-md text-ink">
+                          <span>{code ?? labels.primary}</span>
+                          {firstLine ? (
+                            <span className="md:hidden text-graphite">{` · ${firstLine.length > 40 ? `${firstLine.slice(0, 40)}…` : firstLine}`}</span>
+                          ) : null}
+                        </div>
+                        <div className="font-mono text-xs text-muted">{code ? labels.primary : labels.sub}</div>
+                        {/* The phone's small print: the number, then the status and the date. */}
+                        <span className="q-sub md:hidden">
+                          {inv.invoice_no ? <span className="q-sub-no">{inv.invoice_no}</span> : null}
+                          <span className="q-sub-by">
+                            <span className="by">
+                              <InvoiceStatus status={inv.status} />
+                            </span>
+                            <span className="on">{inv.invoice_date ? dayjs(inv.invoice_date).format('D MMM') : ''}</span>
+                          </span>
+                        </span>
                       </>
                     )
                   },
@@ -711,6 +700,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: 'description',
                   group: '基本',
                   label: 'Description',
+                  mobile: 'detail',
                   render: (inv) => {
                     const d = inv.description?.trim()
                     if (!d) return <span className="text-muted">—</span>
@@ -724,9 +714,23 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   cellClassName: 'font-serif italic text-graphite text-sm',
                 },
                 {
+                  // What the lines post to (2026-10-07): the account names, or
+                  // the header's category for an invoice without lines.
+                  key: 'category',
+                  group: '入账',
+                  label: 'Category',
+                  mobile: 'detail',
+                  filterable: true,
+                  render: (inv) => categoryOf(inv) ?? <span className="text-muted">—</span>,
+                  sortValue: (inv) => categoryOf(inv) ?? '',
+                  filterValue: (inv) => categoryOf(inv) ?? '',
+                  cellClassName: 'font-serif italic text-graphite text-sm',
+                },
+                {
                   key: 'billing_mode',
                   group: '入账',
                   label: 'Mode',
+                  mobile: 'detail',
                   render: (inv) => formatBillingMode(inv.billing_mode),
                   sortValue: (inv) => formatBillingMode(inv.billing_mode),
                   filterable: true,
@@ -737,6 +741,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   group: '金额',
                   label: 'Amount',
                   align: 'right',
+                  mobile: 'keep',
                   render: (inv) => {
                     const paid = paidByInvoice[inv.id] ?? 0
                     const credited = cnByInvoice[inv.id] ?? 0
@@ -761,6 +766,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   key: 'status',
                   group: '基本',
                   label: 'Status',
+                  // The phone's small print carries the chip.
+                  mobile: 'drop',
                   render: (inv) => <InvoiceStatus status={inv.status} />,
                   sortValue: (inv) => inv.status,
                   filterable: true,
@@ -771,6 +778,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   sortable: false,
                   align: 'right',
                   pinned: 'end',
+                  // On a phone the opened row offers the same Settle and ⋯.
+                  mobile: 'detail',
                   render: (inv) => (
                     <div className="flex items-center justify-end gap-2">
                       {/* The one action this row is usually opened for. */}
@@ -783,7 +792,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                           <button
                             type="button"
                             onClick={() => settleOne(inv)}
-                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                            className="inv-settle text-xs text-accent hover:text-accent-hover font-serif italic"
                             title="就地开收据,不用离开 Billing"
                           >
                             Settle →
@@ -791,7 +800,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                         ) : (
                           <Link
                             href={`/payments/new?invoice_id=${inv.id}&return_to=/billing`}
-                            className="text-xs text-accent hover:text-accent-hover font-serif italic"
+                            className="inv-settle text-xs text-accent hover:text-accent-hover font-serif italic"
                             title="部门间结算走冲账凭单,开好会带你回来"
                           >
                             Settle →
@@ -817,6 +826,46 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               ]}
             />
           </div>
+
+          {/* What is ticked, and what to do with it (2026-10-07): the bar the
+              Approvals queue has, instead of a summary squeezed into the toolbar. */}
+          {selectedIds.size > 0 && !showSettleModal ? (
+            <div className="bulk-bar" role="region" aria-label="Decision on what is ticked">
+              <div className="bulk-bar-l">
+                <b>{selectedIds.size}</b> selected · <b>RM {selectedTotal.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</b>
+                <small>
+                  {' · '}
+                  {crossCompany ? '一张收据只能结同一家公司的单' : 'one receipt covers them all — same payer only'}
+                </small>
+              </div>
+              <div className="bulk-bar-r">
+                <button type="button" onClick={clearSelection} className="bulk-quiet font-sans text-sm">
+                  Clear
+                </button>
+                <button type="button" onClick={printSelected} className="bulk-sec font-serif italic text-sm">
+                  Print selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openVoidModal(selectedVoidable.map((i) => i.id))}
+                  disabled={selectedVoidable.length === 0 || isPending}
+                  title="作废所选：只对还没收钱、没 credit note 的 issued 发票"
+                  className="bulk-danger font-serif italic text-sm"
+                >
+                  作废所选 {selectedVoidable.length}
+                </button>
+                <button
+                  type="button"
+                  onClick={openSettleModal}
+                  disabled={selectedInvoices.length === 0 || crossCompany}
+                  title={crossCompany ? '一张收据只能结同一家公司的单' : '合并结算，生成一张收据'}
+                  className="bulk-pri font-serif italic text-sm"
+                >
+                  {crossCompany ? '不同公司不能合并' : `Settle ${selectedInvoices.length} →`}
+                </button>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
 
@@ -1105,12 +1154,13 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 }
 
 function InvoiceStatus({ status }: { status: string }) {
-  if (status === 'draft') return <em className="font-serif text-graphite text-sm">draft</em>
-  if (status === 'issued') return <em className="font-serif text-alert text-sm">issued</em>
-  if (status === 'paid') return <em className="font-serif text-ledger text-sm">paid</em>
-  if (status === 'paid_via_netting')
-    return <em className="font-serif text-ledger text-sm">paid via netting</em>
-  if (status === 'voided')
-    return <em className="font-serif text-muted text-sm line-through">voided</em>
-  return <em className="font-serif text-muted text-sm">{status}</em>
+  // The sheet's chip (2026-10-07): issued waits, paid is done, the rest is quiet.
+  const tone = status === 'issued' ? ' alert' : status === 'paid' || status === 'paid_via_netting' ? ' ledger' : ''
+  return (
+    <span className={`chip${tone}`}>
+      <i className="dot" />
+      {status === 'paid_via_netting' ? 'paid via netting' : status}
+    </span>
+  )
 }
+

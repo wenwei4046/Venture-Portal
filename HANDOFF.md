@@ -1,5 +1,62 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-07 f (SHIPPED) — Invoice / Statements on the sheet (batch 1, pages 3–4)
+
+The sample (`docs/samples/2026-10-07-invoice-sheet-sample.html`, v1–v6) went
+through: every head control visible but re-planned (the month with the
+title, the actions in a captioned band From payroll / Create / Export); no
+"Billing progress" table (its figures ride the folded Payroll basis line);
+the payroll basis folded but ABOVE the invoices; the phone's Settle an orange
+pill like the Principal's Approve; the phone tab bar in English; the phone's
+fold unboxed so its tables fit; the opened row's labels in the card-label
+face, not the mono. Then "照这个做".
+
+Discovery: sidebar **Invoice** = `/statements` = `BillingView` (`/billing`
+redirects there), so Invoice and Service Billing are ONE page; the monthly
+list is `/statements/monthly` (sidebar Statements).
+
+- `lib/billing-sheet.ts` (tested): `invoiceSummary` (invoiced without the
+  voided, outstanding after part-payments and CNs, received = paid + part
+  payments), `payrollBillingLines` (each department's payroll cost vs what its
+  invoices bill — the consolidated invoices' lines counted by segment, plus
+  the attribution modes), `payrollBasisSummary` ("HR 4,057 / 5,797 · Director
+  76,996 ✓"), `statementsSummary`.
+- `BillingView`: head = title + `PeriodSelector`; `.act-band` with the three
+  groups (export links moved here from `statements/page.tsx`, which is now
+  just the view); four StatCards (Invoiced · Month primary / Outstanding alert
+  / Received / Payroll basis Submitted·Partly·Pending with HR and Director
+  dates); `<details class="fin-fold">` with the summary line around the
+  Director Salary Submission + Staff Billing Allocation sections; the figure
+  strip, `StatRow` and the five `DeptCostCard`s are gone; `categoryByInvoice`
+  (line accounts joined with +) and `canSetDefault` go to the list.
+  `BillingView.test.tsx` mocks the whole data layer.
+- `InvoicesList`: `.fin-queue` section with a `.sect-head` ("54 INVOICES ·
+  SEPTEMBER 2026 · 2 SELECTED"), `SlidingTabs` by status (All / Issued / Paid
+  / Draft / Voided, counts from the period), `rowClassName` (`st-selected`,
+  `inv-void` struck through), Bill to = code over name (phone small print:
+  number, status chip, date), new Category column, `InvoiceStatus` as a chip,
+  the action column in the phone panel (Settle = `.inv-settle`, a pill on
+  phones), a footer total without the voided, and the `.bulk-bar` under the
+  table (Clear / Print selected / 作废所选 n / Settle n →) replacing the
+  toolbar summary. `invoiceSummary` is not used here (the footer sums).
+- `StatementsPeriodTable`: code over name, status chip, Open → column,
+  footer totals (Invoice · Contra · Net), phone keep = company + net,
+  `openLabel` "Open the statement →", `canSetDefault`. `statements/monthly/
+  page.tsx`: eyebrow II. FUND IN / OUT, Generate + Excel + PDF, four cards,
+  per-month `.sect-head` with the status mix ("ALL DRAFT" / "1 ISSUED · 1
+  PAID"); `page.test.tsx`.
+- `nav-config` `TABS_BY_ROLE`: finance and principal labels in English
+  (Overview / Approvals / Payments / Receipts / Invoices); `moreTabLabel(role)`
+  → More for them, 更多 for HR and dept managers (`BottomTabBar`).
+- CSS: `.approvals-queue` rules renamed `.fin-queue` (the Approvals sections
+  carry both classes); `.inv-void`, `.act-band`/`.act-group`,
+  `.btn-quiet-sheet`, `details.fin-fold` (unboxed on phones), phone-only
+  `.fin-queue .lt-detail-list dt` in the card-label face and `.inv-settle`
+  as an orange pill. `CreditNotesList` / `MarketingProjectList` /
+  `NonBillableList` got `.sect-head` heads.
+- Next in batch 1: Billing Allocator → Invoice Pool (sample first each);
+  then batches 2–4.
+
 ## CHECKPOINT 2026-10-07 e (SHIPPED) — An issued invoice is edited in place
 
 User, on an issued Service Billing row (HV-INV-202610-0013, free text,

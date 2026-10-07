@@ -444,18 +444,18 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
   // The daily money loop. Invoice / Fund In-Out / reports / settings are all
   // one tap away under More.
   principal: [
-    { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/approvals', label: '审批', icon: 'approve', badge: true },
-    { href: '/payments', label: '付款', icon: 'out', notPaths: ['/payments/new'] },
-    { href: '/receipts', label: '收款', icon: 'in' },
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
+    { href: '/approvals', label: 'Approvals', icon: 'approve', badge: true },
+    { href: '/payments', label: 'Payments', icon: 'out', notPaths: ['/payments/new'] },
+    { href: '/receipts', label: 'Receipts', icon: 'in' },
   ],
   // Finance cannot approve, so the freed slot goes to Invoice — the thing
   // they open next after posting a payment or receipt.
   finance: [
-    { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/payments', label: '付款', icon: 'out', notPaths: ['/payments/new'] },
-    { href: '/receipts', label: '收款', icon: 'in' },
-    { href: '/statements', label: '发票', icon: 'invoice', exact: true },
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
+    { href: '/payments', label: 'Payments', icon: 'out', notPaths: ['/payments/new'] },
+    { href: '/receipts', label: 'Receipts', icon: 'in' },
+    { href: '/statements', label: 'Invoices', icon: 'invoice', exact: true },
   ],
   // HR never touches the treasury ledgers; their loop is payroll → staff →
   // director salary.
@@ -477,6 +477,12 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
 
 export function tabsForRole(role: UserRole): TabDef[] {
   return TABS_BY_ROLE[role] ?? TABS_BY_ROLE.dept_manager
+}
+
+/** The fifth tab's label. Finance's and the Principal's bar reads in English
+ *  (2026-10-07, user: "下面还是华语字体"); HR's and a department manager's as it was. */
+export function moreTabLabel(role: UserRole): string {
+  return role === 'finance' || role === 'principal' ? 'More' : '更多'
 }
 
 /** Path prefixes already reachable from the tab bar — the More sheet dims

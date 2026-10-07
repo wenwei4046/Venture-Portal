@@ -43,7 +43,14 @@ pending queue and the recent decisions as `SortableTable`s with one decision
 bar under the queue for what is ticked; on a phone a row is Description +
 Amount with the number and who / when as small print, and the arrow opens
 Type / Pool / Category / Payee / Pay by / Attachments (thumbnails) / Submitted
-and the voucher). The user compared a Harbour-blue accent for
+and the voucher); Service Billing = Invoice (`BillingView`, 2026-10-07 — the
+month beside the title, every control in a captioned action band, four cards,
+the payroll basis folded above the invoices with its figures on the fold, the
+invoices as a tabbed `SortableTable` with a decision bar) and the monthly
+Statements (four cards, a section per month). On a phone the `.fin-queue`
+pages set the opened row's labels in the card-label face and the row's one
+action (Settle) as an orange pill; Finance's and the Principal's tab bar reads
+in English. The user compared a Harbour-blue accent for
 Finance's sheet with the orange and kept the orange ("我发现橘色比较好看"): the
 sheet has one accent for every department.
 

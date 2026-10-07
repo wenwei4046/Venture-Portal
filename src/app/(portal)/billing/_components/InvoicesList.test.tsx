@@ -94,16 +94,16 @@ describe('InvoicesList selection across periods', () => {
     const sep = invoice('inv-sep', 'INV-SEP-1', '2026-09-01')
     const { rerender } = render(list('2026-09-01', [sep]))
     fireEvent.click(screen.getByLabelText('Select INV-SEP-1'))
-    expect(screen.getByText(/^1 张/)).toBeInTheDocument()
+    expect(document.querySelector('.bulk-bar')).toHaveTextContent(/^1 selected/)
 
     // router.refresh() after an action re-renders the same month: keep it.
     rerender(list('2026-09-01', [sep]))
-    expect(screen.getByText(/^1 张/)).toBeInTheDocument()
+    expect(document.querySelector('.bulk-bar')).toHaveTextContent(/^1 selected/)
     expect(screen.getByLabelText('Select INV-SEP-1')).toBeChecked()
 
     // › to October: nothing selected there.
     rerender(list('2026-10-01', [invoice('inv-oct', 'INV-OCT-1', '2026-10-01')]))
-    expect(screen.queryByText(/^1 张/)).toBeNull()
+    expect(document.querySelector('.bulk-bar')).toBeNull()
     expect(screen.getByLabelText('Select INV-OCT-1')).not.toBeChecked()
   })
 })
@@ -305,5 +305,84 @@ describe('the invoice date', () => {
     render(list('2026-09-01', [invoice('inv-3', 'INV-3', '2026-09-01')]))
     const row = screen.getByLabelText('Select INV-3').closest('tr')!
     expect(row.querySelectorAll('td')[2].textContent).toBe('—')
+  })
+})
+
+// 2026-10-07 — the list on the sheet (the approved Invoice / Statements
+// sample, v6): a section head that counts, tabs by status, the status as a
+// chip, a Category column from the lines, the period's total in the footer,
+// and one bar under the table for what is ticked.
+describe('the invoices table on the sheet', () => {
+  const issued = { ...invoice('inv-1', 'INV-1', '2026-09-01'), total_amount: 1000 }
+  const paid = { ...invoice('inv-p', 'INV-P', '2026-09-01'), status: 'paid', total_amount: 250 }
+  const voided = { ...invoice('inv-v', 'INV-V', '2026-09-01'), status: 'voided', total_amount: 9999 }
+  const sheet = () =>
+    render(
+      <InvoicesList
+        invoices={[issued, paid, voided]}
+        companyMap={companyMap}
+        departmentMap={departmentMap}
+        period="2026-09-01"
+        bankAccounts={banks}
+        categoryByInvoice={{ 'inv-1': 'Design Income', 'inv-p': 'Rental Income' }}
+      />,
+    )
+  const tab = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) })
+  const rowOf = (no: string) => screen.getByText(no).closest('tr') as HTMLElement
+
+  it('heads the section with the month and the count, and tabs the statuses with their counts', () => {
+    sheet()
+    expect(document.querySelector('.sect-head h2')).toHaveTextContent('Invoices')
+    expect(document.querySelector('.sect-head .count')).toHaveTextContent('3 INVOICES · SEPTEMBER 2026')
+    expect(['All', 'Issued', 'Paid', 'Draft', 'Voided'].map((t) => tab(t).querySelector('[data-tab-count]')?.textContent)).toEqual(['3', '1', '1', '0', '1'])
+    fireEvent.click(tab('Paid'))
+    expect(screen.queryByText('INV-1')).toBeNull()
+    expect(screen.getByText('INV-P')).toBeInTheDocument()
+    fireEvent.click(tab('All'))
+    expect(screen.getByText('INV-1')).toBeInTheDocument()
+  })
+
+  it('shows the bill-to code over the name, the category from the lines, the status as a chip, and totals without the voided', () => {
+    sheet()
+    expect(screen.getByText('Category')).toBeInTheDocument()
+    expect(rowOf('INV-1')).toHaveTextContent('Design Income')
+    expect(within(rowOf('INV-1')).getByText('HC')).toBeInTheDocument()
+    expect(within(rowOf('INV-1')).getByText('HOUZS Century')).toBeInTheDocument()
+    expect(within(rowOf('INV-1')).getAllByText('issued')[0]).toHaveClass('chip', 'alert')
+    expect(within(rowOf('INV-P')).getAllByText('paid')[0]).toHaveClass('chip', 'ledger')
+    expect(rowOf('INV-V')).toHaveClass('inv-void')
+    expect(document.querySelector('tfoot')).toHaveTextContent('3 invoices')
+    expect(document.querySelector('tfoot')).toHaveTextContent('RM 1,250.00')
+  })
+
+  it('ticking a row puts the decision in a bar under the table, and the count in the head', () => {
+    sheet()
+    expect(document.querySelector('.bulk-bar')).toBeNull()
+    fireEvent.click(screen.getByLabelText('Select INV-1'))
+    expect(document.querySelector('.sect-head .count')).toHaveTextContent('1 SELECTED')
+    expect(rowOf('INV-1')).toHaveClass('st-selected')
+    const bar = document.querySelector('.bulk-bar') as HTMLElement
+    expect(bar).toHaveTextContent('1 selected')
+    expect(bar).toHaveTextContent('RM 1,000.00')
+    expect(within(bar).getByRole('button', { name: 'Print selected' })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: /作废所选/ })).toBeInTheDocument()
+    fireEvent.click(within(bar).getByRole('button', { name: 'Settle 1 →' }))
+    expect(screen.getByText(/1 张发票/)).toBeInTheDocument() // the same dialog as before
+  })
+
+  it('on a phone the row is the bill-to with the number and status as small print, and the panel settles', () => {
+    window.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia
+    sheet()
+    const row = rowOf('INV-1')
+    const billTo = within(row).getByText('HC').closest('td') as HTMLElement
+    expect(billTo).toHaveTextContent('INV-1')
+    expect(billTo.querySelector('.q-sub')).toHaveClass('md:hidden')
+    fireEvent.click(within(row).getByRole('button', { name: '展开明细' }))
+    const panel = document.querySelector('tr.lt-detail') as HTMLElement
+    expect(panel).toHaveTextContent('Category')
+    expect(panel).toHaveTextContent('Design Income')
+    expect(within(panel).getByTitle('就地开收据,不用离开 Billing')).toHaveClass('inv-settle')
+    fireEvent.click(within(panel).getByText('Open the invoice →'))
+    expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · issued')
   })
 })

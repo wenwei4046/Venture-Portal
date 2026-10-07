@@ -7,7 +7,7 @@ import type { UserRole } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { canApprove } from '@/lib/roles'
 import { warmRoute } from '@/lib/nav-warm'
-import { tabsForRole, type NavViewer, type TabDef } from './nav-config'
+import { moreTabLabel, tabsForRole, type NavViewer, type TabDef } from './nav-config'
 
 // Mobile navigation (2026-08-31). Replaces the hamburger + off-canvas drawer:
 // the user asked for a bottom tab bar, the shape every phone app uses, so the
@@ -252,7 +252,7 @@ export default function BottomTabBar({ role, viewer, moreOpen, onMoreClick }: Pr
               }`}
             />
             <TabIcon name="more" />
-            <span className="text-[10px] leading-none tracking-wide">更多</span>
+            <span className="text-[10px] leading-none tracking-wide">{moreTabLabel(role)}</span>
           </button>
         </li>
       </ul>

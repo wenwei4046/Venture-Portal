@@ -21,8 +21,21 @@ const statement: StatementRow = {
   netAmount: 3800,
   status: 'issued',
 }
+const negative: StatementRow = { id: 'st-2', companyName: '2990', companyCode: '2990', totalInvoice: 0, totalContra: 4400, netAmount: -4400, status: 'draft' }
 
-beforeEach(() => vi.clearAllMocks())
+function desktop(matches: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches,
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })) as unknown as typeof window.matchMedia
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  desktop(true)
+})
 
 // 2026-10-02 (user: "view … 可以 remove,我希望双击点开").
 describe('StatementsPeriodTable', () => {
@@ -39,5 +52,40 @@ describe('StatementsPeriodTable', () => {
     fireEvent.contextMenu(screen.getByText('Carres').closest('tr')!)
     const menu = screen.getByRole('menu', { name: 'Actions for Carres · issued' })
     expect(within(menu).getAllByRole('menuitem').map((b) => b.firstChild?.textContent)).toEqual(['打开', '在新分页打开'])
+  })
+})
+
+// 2026-10-07 — on the sheet (the approved Invoice / Statements sample): the
+// company's code with its name under it, the decision as a chip, an Open →
+// at the end, the period's totals in the footer; on a phone the row is the
+// company and the net, the small print the chip and the code.
+describe('the statements table on the sheet', () => {
+  it('shows the code over the name, the status as a chip, Open → at the end, and totals the period', () => {
+    render(<StatementsPeriodTable rows={[statement, negative]} />)
+    expect(Array.from(document.querySelectorAll('thead th[data-col]')).map((th) => (th as HTMLElement).dataset.col)).toEqual([
+      'companyName', 'totalInvoice', 'totalContra', 'netAmount', 'status', 'open',
+    ])
+    const first = screen.getByText('Carres').closest('tr') as HTMLElement
+    expect(within(first).getByText('CAR')).toBeInTheDocument()
+    expect(within(first.querySelectorAll('td')[4] as HTMLElement).getByText('issued')).toHaveClass('chip', 'alert')
+    expect(within(first).getByRole('link', { name: 'Open →' })).toHaveAttribute('href', '/statements/st-1')
+    expect(document.querySelector('tfoot')).toHaveTextContent('2 companies')
+    expect(document.querySelector('tfoot')).toHaveTextContent('RM 5,000.00')
+    expect(document.querySelector('tfoot')).toHaveTextContent('Net RM (600.00)') // 3,800 − 4,400
+  })
+
+  it('on a phone the row is the company and the net; the arrow opens the rest, and the statement', () => {
+    desktop(false)
+    render(<StatementsPeriodTable rows={[statement]} />)
+    const row = screen.getByText('Carres').closest('tr') as HTMLElement
+    // The status column stays in the DOM (hidden by CSS); the small print carries the chip too.
+    expect(within(row).getAllByText('issued')[0]).toHaveClass('chip')
+    fireEvent.click(within(row).getByRole('button', { name: '展开明细' }))
+    const panel = document.querySelector('tr.lt-detail') as HTMLElement
+    expect(panel).toHaveTextContent('Invoice')
+    expect(panel).toHaveTextContent('RM 5,000.00')
+    expect(panel).toHaveTextContent('Contra')
+    fireEvent.click(within(panel).getByText('Open the statement →'))
+    expect(push).toHaveBeenCalledWith('/statements/st-1')
   })
 })

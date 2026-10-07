@@ -282,7 +282,7 @@ export default function PendingApprovals({ rows, canSetDefault = false }: { rows
   ]
 
   return (
-    <section className="approvals-queue mb-12">
+    <section className="approvals-queue fin-queue mb-12">
       <div className="sect-head">
         <h2>Pending</h2>
         <span className="rule" aria-hidden />

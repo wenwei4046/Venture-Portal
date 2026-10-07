@@ -114,7 +114,7 @@ export default function RecentDecisions({ rows, canSetDefault = false }: { rows:
   ]
 
   return (
-    <section className="approvals-queue">
+    <section className="approvals-queue fin-queue">
       <div className="sect-head">
         <h2>Recent decisions</h2>
         <span className="rule" aria-hidden />
