@@ -1,5 +1,25 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-07 (SHIPPED) — Finance's pages on the white sheet (option A)
+
+User, with the Principal's Overview open: "finance 的整体 background 可以换成和
+principal 和 hr 一样 · 先确定". The difference was the Sheet theme
+(`lib/sheet-routes.ts`, DESIGN.md v3.9–3.11): HR's view and every role's
+Overview sit on the white sheet; Finance's routes were never listed, so they
+still drew on the plaster. Offered A (list the routes — sheet, black lettering,
+orange buttons and sheet tables come through the `:where(.sheet-theme)`
+overrides; page anatomy untouched) or B (rebuild each page's head into summary
+cards like HR's — 67 pages, several batches). User: "做 A 先".
+
+- `SHEET_ROUTE_PREFIXES` gained every remaining portal root (Approvals …
+  Settings, plus the dept manager's My Billing / OPEX); the Product List keeps
+  its workspace. `sheet-routes.test.ts` lists them; DESIGN.md is v3.12.
+- Known on the sheet until a page is converted: the walnut heroes on Fund IN /
+  Fund OUT / Venture Pool / Dept Pool stay dark (allowed — the one dark
+  object); the Reports' `.cf-report` keeps its own palette; figure strips are
+  not summary cards. The user will say which pages to rebuild (B) after
+  looking.
+
 ## CHECKPOINT 2026-10-06 (SHIPPED) — the director CTC invoice is itemised
 
 User: "director 要 bill back 的我要拆 detail 可以吗？" → "可以". HR keys each

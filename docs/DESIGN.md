@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-09-27
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.11 (Sheet theme on HR's whole view — Overview and People included / Walnut shell / approved Product List workspace, with its two settings tabs) — single source of truth for all UI work
+**Status:** v3.12 (Sheet theme on Finance's view as well — every portal route but the Product List / Walnut shell / approved Product List workspace, with its two settings tabs) — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -26,6 +26,17 @@ every person / account page and form under it, Member Services, Hierarchy,
 Roles, Permissions). `lib/sheet-routes.ts` lists the prefixes; extending the
 tone to the rest of the portal is adding a prefix there and converting the
 page (below).
+
+**v3.12 (2026-10-07) — Finance's view, by prefix only.** The user asked for
+Finance's background to match the Principal's and HR's ("做 A 先"), so every
+remaining portal route moved onto the sheet: Approvals, Payments, Receipt,
+Invoice / Statements, Service Billing, Billing Allocator, Invoice Pool, Daily
+Bank, Fund IN / OUT, Bank BA, Overdue, Repayment Schedule, Dept Pool, Venture
+Pool, OPEX, My Billing, Reports, Reconciliation, Journal Entries, Audit Log,
+Settings. The sheet, its lettering, buttons and tables apply through the
+overrides; those pages' anatomy is not yet rebuilt — a walnut hero or a figure
+strip stays until the page is converted per the steps below, one page at a
+time as the user picks them.
 
 **What it is.** PortalFrame draws, for those routes, the content column inset
 10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline
