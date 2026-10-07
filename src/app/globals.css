@@ -4609,6 +4609,47 @@ label.rule-pick-row { grid-template-columns: 18px minmax(120px, 0.8fr) minmax(0,
 .fin-queue .bulk-quiet:hover:not(:disabled) { color: rgb(var(--ink)); }
 .fin-queue :is(.bulk-pri, .bulk-sec, .bulk-danger, .bulk-quiet):disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* The Billing Allocator's records (2026-10-07; the user picked 每家一栏): the
+   split as one column per company with HV's own share — kept, never billed —
+   as the last column in grey; the batch as a chip; a strip above the table
+   for what still has to be billed, with the one button that bills it; and a
+   second line under a description or a bill-to on the desktop. */
+.alloc-sheet .gen-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid rgb(var(--accent));
+  border-radius: 10px;
+  background: rgb(var(--accent-bg));
+  font-size: 13px;
+}
+.alloc-sheet .gen-strip b {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.alloc-sheet .gen-strip small { color: rgb(var(--graphite)); font-size: 12px; }
+.alloc-sheet table.ledger-table :is(th, td).own,
+.alloc-sheet table.ledger-table tbody tr.own > td { color: rgb(var(--graphite)); }
+.alloc-sheet .q-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgb(var(--graphite));
+}
+.alloc-sheet table.ledger-table .chip { white-space: nowrap; }
+.alloc-sheet a.chip { text-decoration: none; }
+.alloc-sheet a.chip:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 767px) {
+  .alloc-sheet .q-meta { display: none; }
+  .alloc-sheet .gen-strip { padding: 10px 12px; font-size: 12px; }
+  .alloc-sheet .gen-strip small { display: none; }
+}
 /* An invoice list's extras: a voided row struck through, Settle as a text
    link on the desktop and an orange pill on a phone (user: the phone's Settle
    orange, like the Principal's Approve). */

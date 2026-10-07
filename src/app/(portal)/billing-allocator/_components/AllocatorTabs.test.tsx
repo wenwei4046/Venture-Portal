@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import AllocatorTabs from './AllocatorTabs'
-import type { AllocatorData, TxnRow } from './types'
+import type { AllocatorData, StaffRow, TemplateRow, TxnRow } from './types'
 
 /**
  * The allocator's month input navigates by ?period= only, which keeps this
@@ -25,8 +25,8 @@ vi.mock('./RecordsTab', () => ({
     <button onClick={() => onEdit(data.txns[0])}>correct first record</button>
   ),
 }))
-vi.mock('./StaffTab', () => ({ default: () => <div>Staff</div> }))
-vi.mock('./SetupTab', () => ({ default: () => <div>Setup</div> }))
+vi.mock('./StaffTab', () => ({ default: () => <div>Staff list</div> }))
+vi.mock('./SetupTab', () => ({ default: () => <div>Setup list</div> }))
 
 const txn: TxnRow = {
   id: 't1',
@@ -42,7 +42,10 @@ const txn: TxnRow = {
   details: [],
 }
 
-function data(period: string, txns: TxnRow[]): AllocatorData {
+const person = (id: string, status: StaffRow['status']): StaffRow => ({ id, name: id, status, department: '', createdAt: '', splits: [] })
+const template = (id: string): TemplateRow => ({ id, name: id, method: 'headcount', amount: 0, categoryId: null, status: 'active', splits: [] })
+
+function data(period: string, txns: TxnRow[], over: Partial<AllocatorData> = {}): AllocatorData {
   return {
     period,
     companies: [],
@@ -57,6 +60,7 @@ function data(period: string, txns: TxnRow[]): AllocatorData {
     templates: [],
     txns,
     invoices: [],
+    ...over,
   }
 }
 
@@ -73,5 +77,34 @@ describe('AllocatorTabs across periods', () => {
     rerender(<AllocatorTabs data={data('2026-09', [])} />)
     expect(screen.getByText('Calculate — fresh')).toBeVisible()
     expect(screen.queryByText(/correcting/)).toBeNull()
+  })
+})
+
+// 2026-10-07 — the tabs on the sheet (the user approved the allocator sample):
+// a counted rail in English — Records by the month's records, Staff by the
+// active people, Setup by the templates — and the month picker in the page
+// head, not here.
+describe('the allocator’s tabs on the sheet', () => {
+  it('counts what each tab holds and lands on the month’s records', () => {
+    render(
+      <AllocatorTabs
+        data={data('2026-09', [txn, { ...txn, id: 't2' }], {
+          staff: [person('a', 'active'), person('b', 'active'), person('c', 'inactive')],
+          templates: [template('Office Rental'), template('Utilities')],
+        })}
+      />,
+    )
+    const tab = (name: RegExp) => screen.getByRole('button', { name })
+    const count = (name: RegExp) => tab(name).querySelector('[data-tab-count]')?.textContent
+    expect(count(/^Records/)).toBe('2')
+    expect(count(/^Staff/)).toBe('2')
+    expect(count(/^Setup/)).toBe('2')
+    expect(tab(/^Calculate/).querySelector('[data-tab-count]')).toBeNull()
+    expect(tab(/^Records/)).toHaveAttribute('data-active')
+    expect(document.querySelector('input[type="month"]')).toBeNull()
+
+    fireEvent.click(tab(/^Staff/))
+    expect(screen.getByText('Staff list')).toBeVisible()
+    expect(tab(/^Staff/)).toHaveAttribute('data-active')
   })
 })

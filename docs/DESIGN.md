@@ -47,7 +47,13 @@ and the voucher); Service Billing = Invoice (`BillingView`, 2026-10-07 — the
 month beside the title, every control in a captioned action band, four cards,
 the payroll basis folded above the invoices with its figures on the fold, the
 invoices as a tabbed `SortableTable` with a decision bar) and the monthly
-Statements (four cards, a section per month). On a phone the `.fin-queue`
+Statements (four cards, a section per month); the Billing Allocator
+(2026-10-07 — the month beside the title, four cards Allocated / To bill /
+Billed / HV own share, a counted rail Calculate · Records · Staff · Setup,
+the records as a `SortableTable` with the split as one column per company —
+the user's pick over chips — HV's own share the last column in grey and the
+batch as a chip, a By company table with each target's share / billed / to
+bill / invoices, Calculate's preview as a table). On a phone the `.fin-queue`
 pages set the opened row's labels in the card-label face and the row's one
 action (Settle) as an orange pill; Finance's and the Principal's tab bar reads
 in English. The user compared a Harbour-blue accent for

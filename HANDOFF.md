@@ -1,5 +1,54 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-07 g (SHIPPED) — Billing Allocator on the sheet (batch 1, page 5)
+
+The sample (`docs/samples/2026-10-07-allocator-sheet-sample.html`, September
+2026's live figures) offered the split as chips (as before) or as one column
+per company; the user picked **每家一栏** and said 照这个做. No Chinese intro
+paragraph; the tabs in English with counts; Staff and Setup untouched
+(already on the sheet as they were).
+
+- `lib/allocator-sheet.ts` (tested): `allocatorSummary` (allocated, to bill =
+  the unbilled allocations' billable share, billed = the locked ones', HV own,
+  batches = distinct live refs, invoices), `matrixColumns` (one column per
+  target the month allocates to — companies in picker order, departments
+  after, HV own last; none for a company the month never touched),
+  `byCompanyRows` (share / billed / to bill / invoices per target, largest
+  first, HV own at the end; "(dept)" stripped, `dept` flag), `batchLabel`.
+- `page.tsx`: eyebrow "I. BILLING · ALLOCATOR", the month picker
+  (`AllocatorPeriod`, new) beside the title, four StatCards (Allocated ·
+  Month primary / To bill — alert while anything is unbilled / Billed / HV
+  own share). `page.test.tsx` mocks the whole data layer.
+- `AllocatorTabs`: `SlidingTabs` control rail Calculate · Records n · Staff
+  n (active) · Setup n (templates); the month input left for the page head.
+- `RecordsTab` (rewritten, `.alloc-sheet.fin-queue`): a `.gen-strip` above
+  the table for what is unbilled ("1 expense not yet billed · RM 1,289.52 to
+  2 companies" + Generate draft invoices →), the records as a `SortableTable`
+  (layoutId `billing-allocator.records`): Txn / Description (second line
+  method · category · HC month) / Amount / one column per company (key
+  `t:<id>`, HV own last, grey) / Batch chip (ledger with the ref, alert "not
+  billed") / Edit · Delete pinned at the end (locked while the batch is
+  live); phone: Description + Amount, small print number · method, batch
+  chip · n shares, the panel carries Split chips, Category, Batch, Edit /
+  Delete. Then a By company `SortableTable` (`billing-allocator.by-company`):
+  Bill to (subsidiary / dept pool / not billed) / Share / Billed / To bill /
+  Invoices as chips linking to invoice-doc (paid ledger, issued alert), footer
+  Billable · billed · to bill · n invoices. The old banner, the chip row and
+  the 各家合计 box are gone.
+- `CalculateTab`: same engine and save path; the headcount source in a
+  `.sheet-toolbar` ("Current list · n active" / "Month snapshot", a warning
+  when another month's list is used), every field labelled (Template /
+  Description / Amount RM / Method / Category), the preview as a table Bill
+  to / Basis / Share with "Billable total · HV own left out" in the foot and
+  "n EXPENSES · HEADCOUNT x.xx" on the section head, Save allocation /
+  Overwrite ALC-…; "+ Add another expense" as a quiet button.
+- CSS (`globals.css`, under the fin-queue block): `.alloc-sheet` rules —
+  `.gen-strip`, `.own` columns in graphite (upright: the sheet has no
+  italics), `.q-meta` second line (hidden on phones), nowrap chips, `a.chip`.
+- Gates: allocator tests 20, full vitest, tsc (the 9 known), next build.
+
+Next: Invoice Pool (sample first), then batches 2–4.
+
 ## CHECKPOINT 2026-10-07 f (SHIPPED) — Invoice / Statements on the sheet (batch 1, pages 3–4)
 
 The sample (`docs/samples/2026-10-07-invoice-sheet-sample.html`, v1–v6) went
