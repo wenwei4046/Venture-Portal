@@ -477,13 +477,16 @@ export default async function BillingView({ searchParams }: Props) {
   return (
     <div>
       <div className="page-head sticky top-0 z-20 bg-paper pt-2">
-        <div>
+        <div className="shrink-0">
           <div className="page-eyebrow">
             <em>I.</em> BILLING · SERVICE INVOICES
           </div>
           <h1 className="page-title">Service Billing</h1>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Six controls do not fit beside the title on the sheet (user
+            2026-10-07: "超过格子了"): they wrap onto a second line rather than
+            run past the sheet's edge. */}
+        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
           <PeriodSelector currentPeriod={period} />
           {canFinanceCreate && (
             <>

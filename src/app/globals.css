@@ -4576,13 +4576,16 @@ label.rule-pick-row { grid-template-columns: 18px minmax(120px, 0.8fr) minmax(0,
   /* The row is the description, with the number and who / when as small
      print, and the amount; the arrow opens the rest. */
   .approvals-queue .q-desc { font-size: 13px; line-height: 1.3; }
+  /* In the body face, not the mono: at 10px on a phone the mono read as a
+     typewriter / "华语字体" and the date looked odd (user 2026-10-07). */
   .approvals-queue .q-sub {
     display: block;
     margin-top: 4px;
-    font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
-    font-size: 10px;
-    line-height: 1.35;
+    font-family: var(--font-sans), Inter, system-ui, -apple-system, sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
     color: rgb(var(--graphite));
+    font-variant-numeric: tabular-nums;
   }
   .approvals-queue .q-sub-no { display: block; }
   .approvals-queue .q-sub-by { display: flex; justify-content: space-between; gap: 8px; }
