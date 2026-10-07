@@ -1182,6 +1182,157 @@ export async function updateDraftInvoiceFull(payload: {
   revalidatePath('/statements')
 }
 
+// ─── Full ISSUED-invoice edit (Finance, 2026-10-07) ─────────────────────────
+// User: "invoice edit 我要全部都可以改". The same form as a draft's edit, for an
+// invoice that is already issued. Its AR-accrual entry, posted at issue, is
+// corrected IN PLACE — same entry_no — by amend_issued_invoice, which also
+// owns the guards: money already received fixes the amount, the payer and
+// the period; approved credit notes cap the total; the entry's month before
+// and after must be open; the entry must balance. This side resolves the
+// entry's accounts exactly as the issue did (the customer's receivable
+// account, each line's revenue account) and refuses the shapes that post more
+// than one entry — a department recharge (inter-billing expense as well) and
+// a consolidated payroll invoice (one entry per segment) — which keep 改
+// account, a credit note, or void and re-issue.
+export async function updateIssuedInvoiceFull(payload: {
+  id: string
+  billableType: BillableToKind
+  billingMode: CreateInvoiceMode
+  period: string // YYYY-MM
+  invoiceDate: string
+  dueDate: string
+  referenceNo: string
+  headerDescription: string
+  companyId?: string
+  departmentId?: string
+  freetextName?: string
+  freetextAddress?: string
+  freetextPhone?: string
+  freetextEmail?: string
+  lines: InvoiceLineInput[]
+  /** Goes on the audit trail and the entry's description. */
+  reason: string
+}): Promise<{ entryNo: string | null }> {
+  await requirePermission('billing')
+  const supabase = await createClient()
+
+  const reason = (payload.reason ?? '').trim()
+  if (!reason) throw new Error('A reason is required (it goes on the audit trail)')
+  if (!payload.id) throw new Error('Invoice id is required')
+  if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
+    throw new Error(`Unsupported billable_to_type: ${payload.billableType}`)
+  }
+  if (payload.billableType === 'dept_pool') {
+    throw new Error('A department recharge posts an inter-billing expense entry as well — change it with 改 account, a credit note, or void and re-issue')
+  }
+  // Not a CreateInvoiceMode, but a generated invoice could still arrive here.
+  if ((payload.billingMode as string) === 'payroll_consolidated') {
+    throw new Error('A consolidated payroll invoice posts one entry per department — change it with 改 account, a credit note, or void and re-issue')
+  }
+  if (payload.billableType === 'subsidiary' && !payload.companyId) throw new Error('Subsidiary is required')
+  if (
+    (payload.billableType === 'director' || payload.billableType === 'freetext') &&
+    !payload.freetextName?.trim()
+  ) {
+    throw new Error('Billable party name is required')
+  }
+  if (!payload.period) throw new Error('Period is required')
+  if (!payload.lines || payload.lines.length === 0) {
+    throw new Error('At least one line item is required')
+  }
+  for (let i = 0; i < payload.lines.length; i++) {
+    const ln = payload.lines[i]
+    if (!Number.isFinite(ln.amount) || ln.amount <= 0) {
+      throw new Error(`Line ${i + 1}: amount must be a positive number`)
+    }
+    if (payload.lines.length >= 2 && !ln.description.trim()) {
+      throw new Error(`Line ${i + 1}: description is required (with 2+ lines)`)
+    }
+  }
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, invoice_no, status, period_month, total_amount, billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, settlement_voucher_id, invoice_date')
+    .eq('id', payload.id)
+    .single()
+  if (!inv) throw new Error('Invoice not found')
+  if (!['issued', 'paid', 'paid_via_netting'].includes(inv.status)) {
+    throw new Error(`Invoice ${inv.invoice_no ?? inv.id} is ${inv.status} — a draft is edited normally`)
+  }
+  if (inv.billable_to_type === 'dept_pool') {
+    throw new Error('A department recharge posts an inter-billing expense entry as well — change it with 改 account, a credit note, or void and re-issue')
+  }
+  const { data: oldLines } = await supabase.from('invoice_lines').select('segment').eq('invoice_id', payload.id)
+  if (inv.billing_mode === 'payroll_consolidated' || (oldLines ?? []).some((l) => (l as { segment?: string | null }).segment)) {
+    throw new Error('A consolidated payroll invoice posts one entry per department — change it with 改 account, a credit note, or void and re-issue')
+  }
+
+  await assertBillingModeSupported(supabase, payload.billingMode)
+  await assertPeriodOpen(supabase, inv.period_month)
+  const period = dayjs(payload.period).startOf('month').format('YYYY-MM-DD')
+  if (period !== inv.period_month) await assertPeriodOpen(supabase, period)
+
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const lines = payload.lines.map((l, i) => ({
+    line_no: i + 1,
+    description: l.description.trim(),
+    amount: r2(Number(l.amount)),
+    category_code: l.categoryCode.trim() || null,
+  }))
+  const total = r2(lines.reduce((s, l) => s + l.amount, 0))
+  const isParty = payload.billableType === 'director' || payload.billableType === 'freetext'
+  const header = {
+    period_month: period,
+    billing_mode: payload.billingMode,
+    total_amount: total,
+    invoice_date: payload.invoiceDate || null,
+    due_date: payload.dueDate || null,
+    description: payload.headerDescription.trim() || null,
+    reference_no: payload.referenceNo.trim() || null,
+    billable_to_type: payload.billableType,
+    company_id: payload.billableType === 'subsidiary' ? (payload.companyId ?? null) : null,
+    billable_to_department_id: null,
+    billable_to_freetext_name: isParty ? (payload.freetextName?.trim() ?? null) : null,
+    billable_to_freetext_address: payload.billableType === 'freetext' ? payload.freetextAddress?.trim() || null : null,
+    billable_to_freetext_phone: payload.billableType === 'freetext' ? payload.freetextPhone?.trim() || null : null,
+    billable_to_freetext_email: payload.billableType === 'freetext' ? payload.freetextEmail?.trim() || null : null,
+  }
+
+  // The entry as the issue would post it today: dated by the invoice, Dr the
+  // customer's receivable account for the total, Cr each line's account.
+  const jeDate = invoiceJeDate(header.invoice_date, period, dayjs().format('YYYY-MM-DD'))
+  const arCode = await resolveArGlCode(supabase, {
+    companyId: header.company_id,
+    departmentId: null,
+    freetext: header.billable_to_freetext_name,
+  })
+  const journalLines: Array<{ account_code: string; debit: number | null; credit: number | null; description: string }> = [
+    { account_code: arCode, debit: total, credit: null, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+  ]
+  for (const l of lines) {
+    journalLines.push({
+      account_code: await resolveRevenueGlCode(supabase, l.category_code, payload.billingMode),
+      debit: null,
+      credit: l.amount,
+      description: l.description || 'Line item',
+    })
+  }
+
+  const { data, error } = await supabase.rpc('amend_issued_invoice' as never, {
+    p_invoice_id: payload.id,
+    p_header: header,
+    p_lines: lines,
+    p_journal: { transaction_date: jeDate, lines: journalLines },
+    p_reason: reason,
+  } as never)
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  revalidatePath('/reports')
+  return { entryNo: (data as { entry_no?: string | null } | null)?.entry_no ?? null }
+}
+
 // ─── Consolidated invoice settlement (Finance) ─────────────────────────────
 // Settle N issued invoices of the SAME payer into ONE Official Receipt voucher.
 // Cross-payer selections are rejected (one receipt = one company). Replaces the

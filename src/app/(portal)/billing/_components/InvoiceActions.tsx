@@ -9,6 +9,7 @@ import {
   approveInvoicesForPeriod,
   deleteDraftInvoice,
   updateDraftInvoiceFull,
+  updateIssuedInvoiceFull,
   type BillableToKind,
   type CreateInvoiceMode,
 } from '../actions'
@@ -134,11 +135,19 @@ export function EditInvoiceButton({
   departments = [],
   autoOpen = false,
   hideTrigger = false,
+  status = 'draft',
+  settled = false,
 }: {
   /** Opened from the row menu (2026-10-02): the dialog starts open and the
    *  component draws no trigger of its own. */
   autoOpen?: boolean
   hideTrigger?: boolean
+  /** The invoice's status. An issued (or paid) invoice is edited with the same
+   *  form (2026-10-07, user: "invoice edit 我要全部都可以改"), with a reason, and
+   *  the entry posted at issue is corrected in place. */
+  status?: string
+  /** Money has come in against it: the amount, the payer and the period are fixed. */
+  settled?: boolean
   id: string
   invoiceNo: string | null
   initial: {
@@ -167,6 +176,9 @@ export function EditInvoiceButton({
   const [open, setOpen] = useState(autoOpen)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const issued = status !== 'draft'
+  const locked = issued && settled
+  const [reason, setReason] = useState('')
 
   // Dynamic departments (2026-08-24): an invoice on a provisioned dept's own
   // billing mode keeps that mode visible in the edit select.
@@ -246,6 +258,7 @@ export function EditInvoiceButton({
 
   function handleSubmit() {
     setError(null)
+    if (issued && !reason.trim()) return setError('Give a reason — it goes on the audit trail.')
     if (billableType === 'subsidiary' && !companyId) return setError('Pick a subsidiary')
     if (billableType === 'dept_pool' && !deptId) return setError('Pick a department')
     if ((billableType === 'director' || billableType === 'freetext') && !freetextName.trim()) {
@@ -261,7 +274,7 @@ export function EditInvoiceButton({
 
     startTransition(async () => {
       try {
-        await updateDraftInvoiceFull({
+        const body = {
           id,
           billableType,
           billingMode,
@@ -282,7 +295,9 @@ export function EditInvoiceButton({
             amount: Number(l.amount),
             categoryCode: l.categoryCode.trim(),
           })),
-        })
+        }
+        if (issued) await updateIssuedInvoiceFull({ ...body, reason: reason.trim() })
+        else await updateDraftInvoiceFull(body)
         setOpen(false)
         router.refresh()
       } catch (err) {
@@ -302,10 +317,20 @@ export function EditInvoiceButton({
       >
         <div className="flex items-baseline justify-between px-6 py-4 border-b border-hairline shrink-0">
           <div>
-            <h2 className="font-serif text-2xl text-ink">Edit draft invoice</h2>
+            <h2 className="font-serif text-2xl text-ink">{issued ? 'Edit issued invoice' : 'Edit draft invoice'}</h2>
             <p className="font-serif italic text-graphite text-xs mt-1">
-              {invoiceNo ?? id.slice(0, 8)} · drafts are fully editable — nothing posts
-              until approve &amp; issue. 2+ lines saves as a multi-line invoice.
+              {issued ? (
+                <>
+                  {invoiceNo ?? id.slice(0, 8)} · the journal entry posted at issue is corrected in place, under the
+                  same number; the reason goes on the audit trail.
+                  {locked ? ' Money has been received against this invoice, so the amount, the payer and the period are fixed.' : ''}
+                </>
+              ) : (
+                <>
+                  {invoiceNo ?? id.slice(0, 8)} · drafts are fully editable — nothing posts
+                  until approve &amp; issue. 2+ lines saves as a multi-line invoice.
+                </>
+              )}
             </p>
           </div>
           <button
@@ -330,7 +355,7 @@ export function EditInvoiceButton({
                   key={opt.value}
                   type="button"
                   onClick={() => setBillableType(opt.value)}
-                  disabled={isPending}
+                  disabled={isPending || locked}
                   className={
                     billableType === opt.value
                       ? 'px-4 py-2 bg-accent-bg text-accent font-serif italic text-sm'
@@ -348,7 +373,7 @@ export function EditInvoiceButton({
               <select
                 value={companyId}
                 onChange={(e) => setCompanyId(e.target.value)}
-                disabled={isPending}
+                disabled={isPending || locked}
                 className={inputCls}
               >
                 <option value="">Select subsidiary…</option>
@@ -362,7 +387,7 @@ export function EditInvoiceButton({
               <select
                 value={deptId}
                 onChange={(e) => setDeptId(e.target.value)}
-                disabled={isPending}
+                disabled={isPending || locked}
                 className={inputCls}
               >
                 <option value="">Select a department…</option>
@@ -380,7 +405,7 @@ export function EditInvoiceButton({
                 type="text"
                 value={freetextName}
                 onChange={(e) => setFreetextName(e.target.value)}
-                disabled={isPending}
+                disabled={isPending || locked}
                 maxLength={120}
                 className={inputCls}
               />
@@ -444,7 +469,7 @@ export function EditInvoiceButton({
                 type="month"
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
-                disabled={isPending}
+                disabled={isPending || locked}
                 className={`${inputCls} font-mono`}
               />
             </Field>
@@ -468,7 +493,7 @@ export function EditInvoiceButton({
                     <div className="text-xs font-mono uppercase tracking-wide text-muted">Line {idx + 1}</div>
                     <button
                       onClick={() => removeLine(l.uid)}
-                      disabled={isPending || lines.length === 1}
+                      disabled={isPending || locked || lines.length === 1}
                       className="text-muted hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
                       aria-label="Remove line"
                       type="button"
@@ -505,7 +530,7 @@ export function EditInvoiceButton({
                           value={l.amount}
                           onChange={(e) => updateLine(l.uid, { amount: e.target.value.replace(/[^\d.]/g, '') })}
                           placeholder="0.00"
-                          disabled={isPending}
+                          disabled={isPending || locked}
                           className={`${inputCls} font-mono tabular text-right`}
                         />
                       </Field>
@@ -517,7 +542,7 @@ export function EditInvoiceButton({
 
             <button
               onClick={addLine}
-              disabled={isPending}
+              disabled={isPending || locked}
               className="mt-3 text-xs font-sans text-accent hover:text-accent-hover underline-offset-2 hover:underline"
               type="button"
             >
@@ -568,6 +593,20 @@ export function EditInvoiceButton({
               className={inputCls}
             />
           </Field>
+
+          {issued ? (
+            <Field label="Reason for the change" required hint="Goes on the audit trail and on the journal entry.">
+              <textarea
+                aria-label="Reason for the change"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                disabled={isPending}
+                placeholder="e.g. wrong month on the line; fee agreed at 2,500"
+                className={`${inputCls} resize-y`}
+              />
+            </Field>
+          ) : null}
 
           {error ? (
             <div className="bg-danger/10 border border-danger/30 text-danger rounded-md px-3 py-2 text-sm font-sans">

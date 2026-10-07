@@ -10,7 +10,7 @@ import InvoicesList from './InvoicesList'
  */
 // The three dialogs are stand-ins that say which invoice they were opened for,
 // and whether they arrived open and without a trigger of their own.
-type DialogProps = { invoiceNo?: string | null; autoOpen?: boolean; hideTrigger?: boolean }
+type DialogProps = { invoiceNo?: string | null; autoOpen?: boolean; hideTrigger?: boolean; status?: string; settled?: boolean }
 const { push, refresh, copyInvoice, deleteDraftInvoice, dialog } = vi.hoisted(() => ({
   push: vi.fn(),
   refresh: vi.fn(),
@@ -19,7 +19,7 @@ const { push, refresh, copyInvoice, deleteDraftInvoice, dialog } = vi.hoisted(()
   dialog: (name: string) =>
     function Dialog(p: DialogProps) {
       return (
-        <div data-testid={name} data-auto={String(!!p.autoOpen)} data-hide={String(!!p.hideTrigger)}>
+        <div data-testid={name} data-auto={String(!!p.autoOpen)} data-hide={String(!!p.hideTrigger)} data-status={p.status ?? ''} data-settled={String(!!p.settled)}>
           {p.invoiceNo}
         </div>
       )
@@ -152,7 +152,7 @@ describe('the row menu', () => {
     render(list('2026-09-01', [issued]))
     fireEvent.contextMenu(row('INV-1'))
     expect(screen.getByRole('menu', { name: 'Actions for INV-1 · issued' })).toBeInTheDocument()
-    expect(menuLabels()).toEqual(['打开', 'Settle', 'PDF', 'Copy', '+ Credit note', '改 account', '作废'])
+    expect(menuLabels()).toEqual(['打开', 'Settle', 'Edit', 'PDF', 'Copy', '+ Credit note', '改 account', '作废'])
   })
 
   it('…a draft', () => {
@@ -164,7 +164,7 @@ describe('the row menu', () => {
   it('…and a paid one', () => {
     render(list('2026-09-01', [paid]))
     fireEvent.contextMenu(firstRow())
-    expect(menuLabels()).toEqual(['打开', 'PDF', 'Copy', 'Refund', '+ Credit note', '改 account'])
+    expect(menuLabels()).toEqual(['打开', 'Edit', 'PDF', 'Copy', 'Refund', '+ Credit note', '改 account'])
   })
 
   it('the ⋯ opens the same menu', () => {
@@ -188,6 +188,24 @@ describe('the row menu', () => {
     fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /改 account/ }))
     expect(screen.getByTestId('dialog-gl')).toHaveTextContent('INV-1')
     expect(screen.queryByTestId('dialog-cn')).toBeNull()
+  })
+
+  // 2026-10-07 (user: "invoice edit 我要全部都可以改"): an issued invoice is edited
+  // too, and the dialog is told once money has come in against the invoice.
+  it('Edit on an issued invoice opens the dialog for it, saying whether money has come in', () => {
+    const { unmount } = render(list('2026-09-01', [issued]))
+    fireEvent.contextMenu(row('INV-1'))
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Edit/ }))
+    const edit = screen.getByTestId('dialog-edit')
+    expect(edit).toHaveTextContent('INV-1')
+    expect(edit.dataset.status).toBe('issued')
+    expect(edit.dataset.settled).toBe('false')
+    unmount()
+    // A paid one has no tick box to find it by, so it is the only row.
+    render(list('2026-09-01', [paid]))
+    fireEvent.contextMenu(firstRow())
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: /Edit/ }))
+    expect(screen.getByTestId('dialog-edit').dataset.settled).toBe('true')
   })
 
   it('Delete asks first and only then deletes', async () => {

@@ -1,5 +1,42 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-07 e (SHIPPED) — An issued invoice is edited in place
+
+User, on an issued Service Billing row (HV-INV-202610-0013, free text,
+marketing project): "invoice edit 我要全部都可以改". Edit was offered for drafts
+only; an issued invoice had 改 account / credit note / void. Agreed ("做"):
+the same full form for issued invoices, the AR-accrual entry corrected IN
+PLACE (user's standing rule: 要直接更改，不是开 JE 补), with a reason.
+
+- Migration `20261007140000_amend_issued_invoice.sql` (applied):
+  `amend_issued_invoice(p_invoice_id, p_header, p_lines, p_journal, p_reason)`
+  — finance/principal; status issued / paid / paid_via_netting; exactly ONE
+  live `journal_entries` row for the invoice (a dept_pool recharge or a
+  consolidated payroll invoice posts more and is refused); rewrites the
+  invoice header, replaces `invoice_lines`, deletes and re-inserts the
+  entry's `journal_lines`, moves the entry's date / period / segment
+  (`derive_journal_segment`) / total and appends `[amended d: reason]` to its
+  description — same id, same entry_no; guards: money received (paid status,
+  `settlement_voucher_id`, or credit vouchers on `invoice_id`) fixes the
+  total, the payer and the period; approved credit notes cap the total;
+  period locks on the entry's old and new month; the entry must balance and
+  equal the total; files `access_log` (`amend_issued_invoice`, before / after
+  / lines / journal). Dry-run on the live invoice inside a rolled-back
+  transaction behaved exactly so.
+- `billing/actions.ts updateIssuedInvoiceFull(payload + reason)`: the draft
+  action's validation, refuses dept_pool (old or new) and
+  payroll_consolidated / segmented lines, both months open, then builds the
+  entry as the issue would — `resolveArGlCode({companyId, freetext})` for the
+  Dr, `resolveRevenueGlCode(category, mode)` per line for the Cr, dated by
+  `invoiceJeDate` — and calls the function. Returns `{ entryNo }`.
+- `EditInvoiceButton` gains `status` and `settled`: "Edit issued invoice", a
+  required Reason field, and with `settled` the bill-to, period, line amounts
+  and add / remove line are disabled (words stay editable). `InvoicesList`
+  offers Edit for issued / paid rows (hint 整张改，JE 原地改) and passes
+  `settled` from the status and `paidByInvoice`.
+- Tests: `actions.amend-issued.test.ts` (8), `InvoiceActions.edit-issued.test.tsx`
+  (5), `InvoicesList.test.tsx` (+1, menus updated).
+
 ## CHECKPOINT 2026-10-07 d (SHIPPED) — Approvals on the sheet (batch 1, second page)
 
 The Approvals sample (`docs/samples/2026-10-07-approvals-sheet-sample.html`)

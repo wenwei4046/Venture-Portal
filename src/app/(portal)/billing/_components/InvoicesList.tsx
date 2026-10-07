@@ -435,6 +435,11 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           isBatchSettleable(inv) ? settleOne(inv) : router.push(`/payments/new?invoice_id=${inv.id}&return_to=/billing`),
       })
     }
+    if (inv.status === 'issued' || inv.status === 'paid' || inv.status === 'paid_via_netting') {
+      // 2026-10-07 (user: "invoice edit 我要全部都可以改"): an issued invoice is
+      // edited with the same form as a draft; its entry is corrected in place.
+      items.push({ key: 'edit', label: 'Edit', hint: '整张改，JE 原地改', onSelect: () => openDialog('edit', inv) })
+    }
     items.push({
       key: 'pdf',
       label: 'PDF',
@@ -841,6 +846,9 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
           hideTrigger
           id={dialog.invoice.id}
           invoiceNo={dialog.invoice.invoice_no}
+          status={dialog.invoice.status}
+          // Money in against it — a settlement, or part-payments on an issued one.
+          settled={dialog.invoice.status === 'paid' || dialog.invoice.status === 'paid_via_netting' || (paidByInvoice[dialog.invoice.id] ?? 0) > 0}
           initial={{
             total_amount: Number(dialog.invoice.total_amount),
             category_code: dialog.invoice.category_code ?? null,
