@@ -1,5 +1,55 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-07 d (SHIPPED) — Approvals on the sheet (batch 1, second page)
+
+The Approvals sample (`docs/samples/2026-10-07-approvals-sheet-sample.html`)
+went through eleven cuts on the user's feedback — English, Voucher # and
+Description as two columns, the phone led by Description + Amount ("手机版本我
+注重是看 amount，description 这些，而且这个是 principal 会 approve 吧"), the
+fixed-390px phone frame, the chevron glyph, the two-line small print — until
+"显示没有问题了". The expand is by the ▾ arrow only (confirmed), the tick and the
+arrow are whole-cell tap targets, and the user asked that only Finance's view
+change ("别碰到其他的 view"): the page's CSS hangs off `.approvals-queue`,
+and the shared table gained opt-in props only. Then "照这个做看看".
+
+- `lib/approval-queue.ts` (pure, tested): `splitVoucherTitle` ("HV-PV-…: text"
+  → number + text, lines joined with ·), `requestTypeLabel`, `buildQueueRows`
+  (a group_id → ONE row: lead voucher's number, `Combined · n`, "approved
+  together with" the loan, amount = the vouchers only — the loan duplicates
+  its disbursement), `queueSummary` (total, items, combined, oldest wait in
+  days, a submitter set's share), `executiveSubmitterIds` (HR's title levels:
+  a login whose staff title sits at a level named Executive or under it),
+  `recentDecisionRows`.
+- `approvals/page.tsx`: four StatCards — Pending · to approve (primary,
+  PV-deduped total), Oldest waiting (alert from 3 days), Submitted by the
+  executive (needs `hr_staff_costs.user_id` → `titles.level_id` →
+  `title_levels`; empty under RLS = "0 of the n"), Decided · 30 days (two head
+  counts). `payment_voucher_sources` is read for the waiting vouchers so the
+  phone's panel can say Pool / Category.
+- `PendingApprovals.tsx` rewritten: `SortableTable` (`approvals.queue`,
+  `canSetDefault` for principal/finance) with a select-all header, a Combined
+  tag, Open → (a group opens `BatchDetailsModal`; read-only when a loan rides
+  along), the bar under the table — Approve n → (confirm + notes + overdraw)
+  and Reject… (reason required) → NEW `rejectRequestsBulk` in actions.ts.
+  `performRejection` / `performGroupRejection` were extracted from
+  `rejectRequest` / `rejectRequestGroup` (same side effects, no redirect
+  inside); the single reject's "use the combined card" message now says to
+  tick the row. `CombinedApprovalCard.tsx` is no longer imported (left in place).
+- `RecentDecisions.tsx` new (`approvals.decisions`): chip per decision, By,
+  Decided, Amount; the phone's small print carries the number and the chip.
+- `SortableTable`: `header` (a node in place of the label), `mobile:
+  'detail-only'` (phone panel only, never a grid column, not in the Columns
+  panel), `rowClassName`, `openLabel`. All opt-in; existing tables unchanged.
+- CSS: `.approvals-queue …` — `.type-tag`, `.combo-tag`, `tr.st-selected`,
+  `.st-tick` (44px tap zone), `.q-sub` small print (phone only), `.bulk-bar`
+  (sticky; on a phone it sits above the 54px tab bar), the arrow button at
+  44px tall on a phone.
+- Tests: `lib/approval-queue.test.ts` (15), `SortableTable.test.tsx` (+5),
+  `actions.reject-bulk.test.ts` (4), `PendingApprovals.test.tsx` (7),
+  `RecentDecisions.test.tsx` (3), `approvals/page.test.tsx` (4).
+- Next in batch 1: Invoice / Statements → Service Billing → Billing Allocator →
+  Invoice Pool, a sample first for each; then batches 2–4.
+
 ## CHECKPOINT 2026-10-07 (SHIPPED) — Finance's pages on the white sheet (option A)
 
 User, with the Principal's Overview open: "finance 的整体 background 可以换成和

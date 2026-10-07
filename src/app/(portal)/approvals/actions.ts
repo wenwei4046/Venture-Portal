@@ -522,9 +522,32 @@ export async function rejectRequest(formData: FormData) {
 
   // Phase 7 Step 9: grouped approvals must go through rejectRequestGroup
   if (approval.group_id) {
-    throw new Error('This request is part of a combined approval — use the combined card to reject both together.')
+    throw new Error('This request is part of a combined approval — tick its row in the queue to reject the group together.')
   }
 
+  await performRejection(supabase, user, approval, notes)
+
+  revalidatePath('/approvals')
+  revalidatePath('/fund-in')
+  revalidatePath('/fund-out')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
+  redirect('/approvals')
+}
+
+// The rejection of ONE non-grouped request: the decision on the row, then
+// undoing what the request holds (a voucher voided, a loan or fund source
+// cancelled, a dept request handed back). Shared by the request's own page
+// (rejectRequest) and the queue's Reject… sweep (rejectRequestsBulk,
+// 2026-10-07), so the side effects live here exactly once. Callers own the
+// revalidate and any redirect.
+async function performRejection(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; name: string },
+  approval: ApprovalRecord,
+  notes: string,
+) {
+  const id = approval.id
   const now = new Date().toISOString()
 
   const { error: approvalError } = await supabase
@@ -594,13 +617,79 @@ export async function rejectRequest(formData: FormData) {
     // PR #4: flip dept_payment_request to rejected_expense (no pool debit).
     await supabase.rpc('reject_dept_payment_request', { p_approval_id: id })
   }
+}
+
+// ─── Reject several at once (Principal) — the queue's Reject… bar ─────────────
+// 2026-10-07: the queue is a table with one bar under it for what is ticked.
+// Single requests are rejected one by one through performRejection; a ticked
+// combined approval is rejected whole through performGroupRejection. One
+// failure is reported and the sweep goes on, as approveRequestsBulk does.
+
+export interface BulkRejectResult {
+  rejected: number
+  failed: Array<{ id: string; description: string; error: string }>
+}
+
+export async function rejectRequestsBulk(args: {
+  ids: string[]
+  groupIds?: string[]
+  notes: string
+}): Promise<BulkRejectResult> {
+  const user = await requirePermission('approvals')
+  const supabase = await createClient()
+
+  const notes = (args.notes ?? '').trim()
+  if (!notes) throw new Error('Rejection reason is required')
+  const ids = Array.from(new Set((args.ids ?? []).filter(Boolean)))
+  const groupIds = Array.from(new Set((args.groupIds ?? []).filter(Boolean)))
+  if (ids.length === 0 && groupIds.length === 0) throw new Error('No approvals selected')
+
+  const result: BulkRejectResult = { rejected: 0, failed: [] }
+
+  if (ids.length > 0) {
+    const { data: rows } = await supabase
+      .from('approval_requests')
+      .select('*')
+      .in('id', ids)
+      .eq('status', 'pending')
+    const byId = new Map(((rows ?? []) as ApprovalRecord[]).map((r) => [r.id, r]))
+
+    for (const id of ids) {
+      const approval = byId.get(id)
+      if (!approval) {
+        result.failed.push({ id, description: '—', error: 'Not found or already processed' })
+        continue
+      }
+      const label = approval.description ?? approval.request_type.replace(/_/g, ' ')
+      if (approval.group_id) {
+        result.failed.push({ id, description: label, error: 'Part of a combined approval — tick its row to reject the group' })
+        continue
+      }
+      try {
+        await performRejection(supabase, user, approval, notes)
+        result.rejected++
+      } catch (e) {
+        result.failed.push({ id, description: label, error: e instanceof Error ? e.message : 'Unknown error' })
+      }
+    }
+  }
+
+  for (const gid of groupIds) {
+    try {
+      result.rejected += await performGroupRejection(supabase, user, gid, notes)
+    } catch (e) {
+      result.failed.push({ id: gid, description: 'Combined approval', error: e instanceof Error ? e.message : 'Unknown error' })
+    }
+  }
 
   revalidatePath('/approvals')
   revalidatePath('/fund-in')
   revalidatePath('/fund-out')
   revalidatePath('/payments')
   revalidatePath('/dashboard')
-  redirect('/approvals')
+  revalidatePath('/hr-costing/payment')
+
+  return result
 }
 
 // ─── Approve combined group (Principal) — Phase 7 Step 9 ─────────────────────
@@ -889,6 +978,25 @@ export async function rejectRequestGroup(formData: FormData) {
   if (!groupId) throw new Error('group_id is required')
   if (!notes) throw new Error('Rejection reason is required')
 
+  await performGroupRejection(supabase, user, groupId, notes)
+
+  revalidatePath('/approvals')
+  revalidatePath('/fund-out')
+  revalidatePath('/payments')
+  revalidatePath('/dashboard')
+  revalidatePath('/hr-costing/payment')
+  redirect('/approvals')
+}
+
+// Core of the combined-group rejection, shared by rejectRequestGroup and the
+// queue's rejectRequestsBulk (2026-10-07). Returns the number of requests
+// rejected. Callers own the revalidate and any redirect.
+async function performGroupRejection(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; name: string },
+  groupId: string,
+  notes: string,
+): Promise<number> {
   const { data: group, error: fetchError } = await supabase
     .from('approval_requests')
     .select('*')
@@ -943,12 +1051,7 @@ export async function rejectRequestGroup(formData: FormData) {
       .eq('status', 'pending_approval')
   }
 
-  revalidatePath('/approvals')
-  revalidatePath('/fund-out')
-  revalidatePath('/payments')
-  revalidatePath('/dashboard')
-  revalidatePath('/hr-costing/payment')
-  redirect('/approvals')
+  return group.length
 }
 
 // ─── Partial batch approval (Principal) — P1-1 ────────────────────────────

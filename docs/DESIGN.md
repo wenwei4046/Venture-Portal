@@ -38,7 +38,11 @@ overrides; those pages' anatomy is not yet rebuilt — a walnut hero or a figure
 strip stays until the page is converted per the steps below, one page at a
 time as the user picks them. **Converted so far:** Payments and Receipts
 (`VoucherLedger`, 2026-10-07 — four summary cards, counted tabs, one toolbar,
-a section head over the table). The user compared a Harbour-blue accent for
+a section head over the table); Approvals (2026-10-07 — four cards, the
+pending queue and the recent decisions as `SortableTable`s with one decision
+bar under the queue for what is ticked; on a phone a row is Description +
+Amount with the number and who / when as small print, and the arrow opens
+Type / Pool / Category / Submitted and the voucher). The user compared a Harbour-blue accent for
 Finance's sheet with the orange and kept the orange ("我发现橘色比较好看"): the
 sheet has one accent for every department.
 

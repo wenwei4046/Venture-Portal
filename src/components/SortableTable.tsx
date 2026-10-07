@@ -47,6 +47,9 @@ export interface SortableColumn<T> {
   key: string
   /** Header label shown in the UI. */
   label: string
+  /** What the header cell shows instead of the label — a select-all box over a
+   *  tick-box column. The label still names the column in the Columns panel. */
+  header?: ReactNode
   /**
    * Cell renderer. Receives the row and returns a ReactNode (string,
    * number, JSX). Used for both display and (if `sortValue` is omitted)
@@ -90,8 +93,12 @@ export interface SortableColumn<T> {
    *
    * `'drop'` removes the column from mobile entirely, detail panel included.
    * Use it for action links that the row's own tap target already covers.
+   *
+   * `'detail-only'` is a fact the phone's panel carries that the desktop table
+   * does not show at all (a voucher's pool on the approvals queue): never a
+   * column of the grid, at any width, and not in the Columns panel.
    */
-  mobile?: 'keep' | 'detail' | 'drop'
+  mobile?: 'keep' | 'detail' | 'drop' | 'detail-only'
   /**
    * With `layoutId`: this column stays at its edge and cannot be dragged to
    * another place — a tick-box column at the start, a row menu at the end.
@@ -168,6 +175,10 @@ interface Props<T> {
    * a row takes no double-click, no right-click, no Tab stop and no 打开 →.
    */
   rowOpens?: (row: T) => boolean
+  /** What the phone's open button says; '打开 →' unless the page has its own words. */
+  openLabel?: string
+  /** A class for a data row — the queue highlights the rows that are ticked. */
+  rowClassName?: (row: T) => string | undefined
 }
 
 const ROW_CONTROLS = 'a, button, input, select, textarea, label'
@@ -215,6 +226,8 @@ export default function SortableTable<T>({
   onRowContextMenu: onAnyRowContextMenu,
   onRowOpen: onAnyRowOpen,
   rowOpens,
+  openLabel = '打开 →',
+  rowClassName,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState(defaultSort.key)
   const [sortDir, setSortDir] = useState<SortDir>(defaultSort.dir)
@@ -248,6 +261,9 @@ export default function SortableTable<T>({
     for (const c of columns) m.set(c.key, c)
     return m
   }, [columns])
+  // The columns of the grid itself; a detail-only column lives in the phone's
+  // panel and nowhere else.
+  const gridColumns = useMemo(() => columns.filter((c) => c.mobile !== 'detail-only'), [columns])
 
   // ─── Column layout: order + widths, per person ───────────────────────────
   // 2026-10-02 (user: "我希望可以左右拉 … 甚至我希望我可以自己排顺序"). Nothing
@@ -315,8 +331,8 @@ export default function SortableTable<T>({
   const layoutOn = !!layoutId && isDesktop
   const effective = useMemo(() => effectiveLayout(layout, defaults), [layout, defaults])
   const orderedColumns = useMemo(
-    () => (layoutOn ? applyOrder(columns, effective.order) : columns),
-    [layoutOn, columns, effective.order],
+    () => (layoutOn ? applyOrder(gridColumns, effective.order) : gridColumns),
+    [layoutOn, gridColumns, effective.order],
   )
   // What the Columns panel has left on show. The panel lists the hideable
   // columns in the order the CODE declares them, so a group never reshuffles
@@ -325,7 +341,7 @@ export default function SortableTable<T>({
     () => (layoutOn ? visibleColumns(orderedColumns, effective.hidden) : orderedColumns),
     [layoutOn, orderedColumns, effective.hidden],
   )
-  const hideableColumns = useMemo(() => columns.filter((c) => !c.pinned && c.hideable !== false && c.label), [columns])
+  const hideableColumns = useMemo(() => gridColumns.filter((c) => !c.pinned && c.hideable !== false && c.label), [gridColumns])
   const [columnsOpen, setColumnsOpen] = useState(false)
   // Fixed layout only once somebody has dragged a width; until then the
   // browser sizes the columns exactly as it always has.
@@ -420,11 +436,11 @@ export default function SortableTable<T>({
   // fallback picks the identifier (first column) and the figure (first
   // right-aligned column), which is what makes a row recognisable.
   const { mobileKeep, mobileDetail } = useMemo(() => {
-    const explicit = columns.filter((c) => c.mobile === 'keep')
+    const explicit = gridColumns.filter((c) => c.mobile === 'keep')
     let keep = explicit
     if (keep.length === 0) {
-      const first = columns[0]
-      const amount = columns.find((c) => c.align === 'right' && c.key !== first?.key)
+      const first = gridColumns[0]
+      const amount = gridColumns.find((c) => c.align === 'right' && c.key !== first?.key)
       keep = [first, amount].filter(Boolean) as SortableColumn<T>[]
     }
     const keepKeys = new Set(keep.map((c) => c.key))
@@ -432,7 +448,7 @@ export default function SortableTable<T>({
       mobileKeep: keepKeys,
       mobileDetail: columns.filter((c) => !keepKeys.has(c.key) && c.mobile !== 'drop'),
     }
-  }, [columns])
+  }, [columns, gridColumns])
 
   function toggleExpanded(key: string) {
     setExpanded((prev) => {
@@ -709,7 +725,7 @@ export default function SortableTable<T>({
                       onClick={sortable ? () => toggleSort(c.key) : undefined}
                       className={`inline-flex items-baseline gap-1 ${sortable ? 'cursor-pointer select-none hover:text-ink' : ''}`}
                     >
-                      {c.label}
+                      {c.header ?? c.label}
                       {sortable ? (
                         <span
                           className={`font-mono text-[10px] ${isActive ? 'text-accent' : 'text-muted'}`}
@@ -773,6 +789,7 @@ export default function SortableTable<T>({
               return (
                 <Fragment key={rowKey}>
                   <tr
+                    className={rowClassName?.(row)}
                     onContextMenu={onRowContextMenu ? (e) => pressOnRow(e) && onRowContextMenu(row, e) : undefined}
                     onDoubleClick={onRowOpen ? (e) => pressOnRow(e, true) && onRowOpen(row) : undefined}
                     // The second press of a double-click would otherwise select the word under it.
@@ -841,7 +858,7 @@ export default function SortableTable<T>({
                                   onClick={() => onRowOpen(row)}
                                   className="text-sm text-accent hover:text-accent-hover font-serif italic"
                                 >
-                                  打开 →
+                                  {openLabel}
                                 </button>
                               ) : null}
                               {onRowContextMenu && !hasPinnedEnd ? (

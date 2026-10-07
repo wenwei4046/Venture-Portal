@@ -593,3 +593,60 @@ describe("a table's default arrangement", () => {
     expect(within(panel()).queryByRole('button', { name: /设为预设/ })).toBeNull()
   })
 })
+
+// 2026-10-07: the Approvals queue is a table with a tick-box column headed by a
+// select-all box, facts that only a phone's detail panel carries (the voucher's
+// pool and category, which the desktop table does not show), a highlighted row
+// for what is ticked, and the panel's open button in the page's own words.
+describe('a queue table', () => {
+  const queue: SortableColumn<Row>[] = [
+    { key: '_select', label: 'Select', header: <input type="checkbox" aria-label="Select all" />, sortable: false, pinned: 'start', resizable: false, mobile: 'keep', render: () => '☐' },
+    { key: 'no', label: 'Invoice #', mobile: 'keep', render: (r) => r.no },
+    { key: 'company', label: 'Company', render: (r) => r.company },
+    { key: 'pool', label: 'Pool', mobile: 'detail-only', render: () => 'Venture Pool' },
+    { key: 'amount', label: 'Amount', align: 'right', mobile: 'keep', render: (r) => r.amount, sortValue: (r) => r.amount },
+  ]
+
+  it('heads a column with what it is given instead of its label', () => {
+    table({ columns: queue })
+    expect(within(th('_select')).getByRole('checkbox', { name: 'Select all' })).toBeInTheDocument()
+    expect(th('_select')).not.toHaveTextContent('Select')
+  })
+
+  it('a detail-only column is nowhere in the grid, but in the phone panel', async () => {
+    desktop(false)
+    table({ columns: queue })
+    await settle()
+    expect(headers()).toEqual(['_select', 'no', 'company', 'amount'])
+    expect(firstRowCells()).toEqual(['☐', 'INV-1', 'Carres', '100'])
+    fireEvent.click(screen.getAllByRole('button', { name: '展开明细' })[0])
+    const panel = document.querySelector('tr.lt-detail') as HTMLElement
+    expect(within(panel).getByText('Pool')).toBeInTheDocument()
+    expect(within(panel).getByText('Venture Pool')).toBeInTheDocument()
+    expect(within(panel).getByText('Company')).toBeInTheDocument()
+  })
+
+  it('…and the Columns panel does not offer it', async () => {
+    desktop(true)
+    table({ columns: queue })
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: /Columns/ }))
+    const panel = screen.getByRole('dialog', { name: 'Columns' })
+    expect(within(panel).queryByText('Pool')).toBeNull()
+    expect(within(panel).getByText('Company')).toBeInTheDocument()
+  })
+
+  it('marks the rows the caller names', () => {
+    table({ columns: queue, rowClassName: (r) => (r.id === '2' ? 'st-selected' : undefined) })
+    expect(bodyRows()[0]).not.toHaveClass('st-selected')
+    expect(bodyRows()[1]).toHaveClass('st-selected')
+  })
+
+  it("opens a row on the phone in the page's own words", () => {
+    desktop(false)
+    table({ columns: queue, onRowOpen: vi.fn(), openLabel: 'Open the voucher →' })
+    fireEvent.click(screen.getAllByRole('button', { name: '展开明细' })[0])
+    expect(screen.getByText('Open the voucher →')).toBeInTheDocument()
+    expect(screen.queryByText('打开 →')).toBeNull()
+  })
+})
