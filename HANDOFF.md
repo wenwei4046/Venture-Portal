@@ -20,6 +20,21 @@ cards like HR's — 67 pages, several batches). User: "做 A 先".
   not summary cards. The user will say which pages to rebuild (B) after
   looking.
 
+## CHECKPOINT 2026-10-07 b (SHIPPED) — the tick-box's "…" and a line to pull on
+
+Seen on the Invoice list once it was on the sheet. (1) "这个三个点是什么？": the
+user had dragged a width, so the table is fixed-layout and a cell that does
+not fit is cut with an ellipsis; the sheet's 14px cell padding (12px before)
+left the frozen tick-box column no room for the box, and an "…" stood in for
+it. A column with `resizable: false` now carries `st-nocut` on its th / td and
+is never cut (`SortableTable.test.tsx`). (2) "可以 header 之间有个线条吗？": the
+resize handle only drew its line on hover, so nobody could see where to pull.
+On the sheet the handle's line is always there — 1px in the header band's
+rule colour, orange and 2px while the handle is under the pointer — and only
+where a column can be resized. (The base `.st-resize:hover::after` rule is
+outranked by the th-hover rule and never showed orange; the sheet's hover
+rules are written at the th-hover specificity.)
+
 ## CHECKPOINT 2026-10-06 (SHIPPED) — the director CTC invoice is itemised
 
 User: "director 要 bill back 的我要拆 detail 可以吗？" → "可以". HR keys each

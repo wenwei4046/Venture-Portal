@@ -522,3 +522,20 @@ describe('SortableTable opening a row', () => {
     expect(screen.queryByText('更多 ⋯')).toBeNull()
   })
 })
+
+// 2026-10-07: once a width has been dragged the table is fixed-layout and a
+// cell that does not fit is cut with an ellipsis — which put a "…" after the
+// tick-box when the sheet's wider cell padding ate the column's slack (user:
+// "这个三个点是什么？"). A column whose width cannot be dragged is never cut.
+describe('a column that cannot be resized', () => {
+  it('marks its header and cells st-nocut, so the fixed layout never cuts them', () => {
+    render(
+      <SortableTable rows={rows} columns={columns} defaultSort={{ key: 'no', dir: 'asc' }} getRowKey={(r) => r.id} />,
+    )
+    expect(document.querySelector('th[data-col="_select"]')).toHaveClass('st-nocut')
+    expect(document.querySelector('th[data-col="no"]')).not.toHaveClass('st-nocut')
+    const cells = document.querySelectorAll('tbody tr')[0].querySelectorAll('td')
+    expect(cells[0]).toHaveClass('st-nocut')
+    expect(cells[1]).not.toHaveClass('st-nocut')
+  })
+})

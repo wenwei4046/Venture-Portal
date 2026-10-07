@@ -5001,6 +5001,34 @@ table.ledger-table.st-fixed td {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A column whose width cannot be dragged (a tick-box, a row menu) is never
+   cut: with the sheet's wider cell padding the frozen width left the box no
+   room and an ellipsis stood in for it (user 2026-10-07: "这个三个点是什么？"). */
+table.ledger-table.st-fixed :is(th, td).st-nocut {
+  overflow: visible;
+  text-overflow: clip;
+}
+/* On the sheet the handle's line is always there, so the eye finds where to
+   pull (user 2026-10-07: "可以 header 之间有个线条吗？"): a 1px rule in the
+   header band's rule colour; orange and 2px while the handle itself is under
+   the pointer. The th-hover rule above outranks `.st-resize:hover::after`,
+   so the sheet's handle-hover rules are written at that specificity. */
+:where(.sheet-theme) .st-resize::after {
+  top: 24%;
+  right: 4px;
+  width: 1px;
+  height: 52%;
+  border-radius: 0;
+  background: rgb(var(--sheet-table-rule));
+}
+:where(.sheet-theme) th.st-th:hover .st-resize::after { background: rgb(var(--sheet-table-rule)); }
+:where(.sheet-theme) th.st-th .st-resize:hover::after,
+:where(.sheet-theme) th.st-th .st-resize:active::after {
+  right: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgb(var(--accent));
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    Voucher page (2026-10-02)

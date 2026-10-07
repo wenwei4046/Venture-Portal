@@ -627,7 +627,7 @@ export default function SortableTable<T>({
                     mobileKeep.has(c.key) ? '' : 'm-hide'
                   }${layoutOn ? ' st-th' : ''}${dragKey === c.key ? ' st-dragging' : ''}${
                     hint ? ` st-drop-${hint}` : ''
-                  }`}
+                  }${c.resizable === false ? ' st-nocut' : ''}`}
                   scope="col"
                   draggable={movable || undefined}
                   onDragStart={
@@ -744,9 +744,11 @@ export default function SortableTable<T>({
                     {shownColumns.map((c) => (
                       <td
                         key={c.key}
+                        // st-nocut: a column whose width cannot be dragged is
+                        // never cut with an ellipsis once the layout is fixed.
                         className={`${c.cellClassName ?? ''} ${c.align === 'right' ? 'text-right num' : ''} ${
                           mobileKeep.has(c.key) ? '' : 'm-hide'
-                        }`}
+                        }${c.resizable === false ? ' st-nocut' : ''}`}
                       >
                         {c.render(row)}
                       </td>
