@@ -20,6 +20,34 @@ cards like HR's — 67 pages, several batches). User: "做 A 先".
   not summary cards. The user will say which pages to rebuild (B) after
   looking.
 
+## CHECKPOINT 2026-10-07 c (SHIPPED) — Payments on the sheet (batch 1, first page) and a table's default arrangement
+
+Option B for Finance's pages, agreed as four batches (Daily Operations → Fund
+In / Out → Departments → Reports & Admin), one before / after sample per batch
+first. The Payments sample (`docs/samples/2026-10-07-payments-sheet-sample.html`, both views and
+an orange / Harbour-blue toggle) was approved as "改版" in ORANGE — the user
+tried a Finance-blue cut and said "我发现橘色比较好看", so the sheet keeps one
+accent for every department; do not build a blue variant.
+
+- `VoucherLedger` (Payments and Receipts alike): the serif figure strip became
+  four `StatCard`s — Total paid / received (primary), Pending approval (alert
+  while anything waits; draft + pending), Approved · to pay / receive (decided,
+  not yet moved), All vouchers / receipts (voided in the note) — the tabs carry
+  counts (`PaymentTabs counts`), the filters are one `.sheet-toolbar`
+  (`PaymentFilters`), and a `.sect-head` ("Payment vouchers" / "Official
+  receipts" · "n of m vouchers") heads the table. Page head, buttons and the
+  table unchanged. Tests in `VoucherLedger.test.tsx`.
+- "我要能定这个 as default": a table can carry a DEFAULT arrangement for everyone.
+  `table_layout_defaults` (migration `20261007110000`, one row per table, read by
+  all, set by principal / finance / hr), `lib/table-layout` (`effectiveLayout`,
+  `fetchDefaultLayout`, `saveDefaultLayout`, a cached copy like the own one),
+  `SortableTable` draws `effective = own ?? default`; Reset drops the own row
+  (back to the default, not the code); the Columns panel offers 设为预设 when
+  `canSetDefault` is passed — `VouchersTable` passes it for finance / principal.
+  Other tables with a layoutId get the button as their pages are converted.
+- Next: the rest of batch 1 — Approvals, Receipt (done with Payments), Invoice /
+  Statements, Service Billing, Billing Allocator, Invoice Pool — sample first.
+
 ## CHECKPOINT 2026-10-07 b (SHIPPED) — the tick-box's "…" and a line to pull on
 
 Seen on the Invoice list once it was on the sheet. (1) "这个三个点是什么？": the

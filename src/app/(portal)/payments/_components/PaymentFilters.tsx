@@ -26,6 +26,11 @@ const POOLS = [
   { value: 'invoice_payout_pool', label: 'Invoice Payout' },
 ]
 
+// On the sheet the toolbar's own CSS sizes the fields (DESIGN.md › Sheet
+// theme, `.sheet-toolbar`); these only set a label over its field.
+const fieldCls = 'flex flex-col gap-1 text-[10px] font-medium uppercase tracking-[0.06em] text-graphite'
+const inputCls = 'text-ink focus:outline-none'
+
 export default function PaymentFilters() {
   const router = useRouter()
   const pathname = usePathname()
@@ -75,112 +80,82 @@ export default function PaymentFilters() {
   const hasAny = q || type || pool || from || to || min || max
 
   return (
-    <div className="mb-6 border border-hairline rounded-md bg-surface p-4">
-      <form
-        onSubmit={(e) => { e.preventDefault(); applyAll() }}
-        className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end"
-      >
-        {/* Search */}
-        <div className="md:col-span-4">
-          <label className="block text-xs uppercase tracking-wide text-muted font-sans mb-1.5">Search</label>
+    <form
+      onSubmit={(e) => { e.preventDefault(); applyAll() }}
+      className="sheet-toolbar"
+      aria-label="Filters"
+    >
+      <label className={fieldCls + ' min-w-[220px] flex-[2]'}>
+        Search
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="voucher #, description, payee…"
+          className={inputCls}
+        />
+      </label>
+      <label className={fieldCls}>
+        Type
+        <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls}>
+          {VOUCHER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+      </label>
+      <label className={fieldCls}>
+        Pool
+        <select value={pool} onChange={(e) => setPool(e.target.value)} className={inputCls}>
+          {POOLS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+      </label>
+      <label className={fieldCls}>
+        From
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls + ' font-mono'} />
+      </label>
+      <label className={fieldCls}>
+        To
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls + ' font-mono'} />
+      </label>
+      <label className={fieldCls}>
+        Amount (RM)
+        <span className="flex items-center gap-1.5">
           <input
-            type="text"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="voucher #, description, payee…"
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+            type="number"
+            step="0.01"
+            min="0"
+            value={min}
+            onChange={(e) => setMin(e.target.value)}
+            placeholder="min"
+            className={inputCls + ' w-24 font-mono tabular'}
           />
-        </div>
-
-        {/* Type */}
-        <div className="md:col-span-2">
-          <label className="block text-xs uppercase tracking-wide text-muted font-sans mb-1.5">Type</label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            {VOUCHER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </div>
-
-        {/* Pool */}
-        <div className="md:col-span-2">
-          <label className="block text-xs uppercase tracking-wide text-muted font-sans mb-1.5">Pool</label>
-          <select
-            value={pool}
-            onChange={(e) => setPool(e.target.value)}
-            className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-          >
-            {POOLS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
-        </div>
-
-        {/* Date range */}
-        <div className="md:col-span-2">
-          <label className="block text-xs uppercase tracking-wide text-muted font-sans mb-1.5">From</label>
+          <span className="text-muted text-xs">–</span>
           <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="w-full px-2 py-2 bg-paper border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-accent-border"
+            type="number"
+            step="0.01"
+            min="0"
+            value={max}
+            onChange={(e) => setMax(e.target.value)}
+            placeholder="max"
+            className={inputCls + ' w-24 font-mono tabular'}
           />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-xs uppercase tracking-wide text-muted font-sans mb-1.5">To</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="w-full px-2 py-2 bg-paper border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-        </div>
-
-        {/* Amount range */}
-        <div className="md:col-span-3">
-          <label className="block text-xs uppercase tracking-wide text-muted font-sans mb-1.5">Amount (RM)</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={min}
-              onChange={(e) => setMin(e.target.value)}
-              placeholder="min"
-              className="w-full px-2 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
-            />
-            <span className="text-muted text-xs">–</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={max}
-              onChange={(e) => setMax(e.target.value)}
-              placeholder="max"
-              className="w-full px-2 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border"
-            />
-          </div>
-        </div>
-
-        {/* Apply / Clear */}
-        <div className="md:col-span-3 flex items-center gap-3">
+        </span>
+      </label>
+      <span className="flex items-center gap-3 self-end pb-0.5">
+        <button
+          type="submit"
+          className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-1.5 rounded-md transition-colors"
+        >
+          Apply
+        </button>
+        {hasAny ? (
           <button
-            type="submit"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            type="button"
+            onClick={clearAll}
+            className="text-sm text-graphite hover:text-ink font-serif italic"
           >
-            Apply
+            Clear
           </button>
-          {hasAny ? (
-            <button
-              type="button"
-              onClick={clearAll}
-              className="text-sm text-graphite hover:text-ink font-serif italic"
-            >
-              Clear
-            </button>
-          ) : null}
-        </div>
-      </form>
-    </div>
+        ) : null}
+      </span>
+    </form>
   )
 }

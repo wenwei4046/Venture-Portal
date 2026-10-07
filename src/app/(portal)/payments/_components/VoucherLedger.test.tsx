@@ -14,7 +14,9 @@ vi.mock('@/lib/receipt-extras', async (original) => ({
   fetchReceiptExtras: vi.fn(async () => []),
 }))
 vi.mock('@/lib/payment-extras', () => ({ fetchPaymentExtras: vi.fn(async () => []) }))
-vi.mock('./PaymentTabs', () => ({ default: () => null }))
+vi.mock('./PaymentTabs', () => ({
+  default: (props: { counts?: Record<string, number> }) => <pre data-testid="tabs">{JSON.stringify(props.counts ?? null)}</pre>,
+}))
 vi.mock('./PaymentFilters', () => ({ default: () => null }))
 vi.mock('./BackToTop', () => ({ default: () => null }))
 // The table is a client component: its props are exactly what the server sends
@@ -132,5 +134,44 @@ describe('Payments, for a treasury account without Payroll payouts', () => {
     render(await VoucherLedger({ direction: 'debit', params: { min: '4000' } }))
     expect(screen.queryByTestId('sent')).toBeNull() // TNB is under 4,000 and no batch is offered
     expect(screen.getByText('0 of 5 vouchers')).toBeVisible()
+  })
+})
+
+// 2026-10-07: Payments and Receipts on the sheet the way HR Costing is (user
+// approved the Payments sample, orange): summary cards instead of the figure
+// strip, the tabs counted, one toolbar of filters, a section head over the table.
+describe('the ledger on the sheet', () => {
+  const card = (name: string) => screen.getByRole('group', { name })
+
+  it('opens on four summary cards — paid, waiting, approved, all — with the paid one as the primary', async () => {
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(card('Total paid')).toHaveTextContent('RM 9,514.75')
+    expect(card('Total paid')).toHaveAttribute('data-tone', 'primary')
+    expect(card('Pending approval')).toHaveTextContent('RM 4,225.00')
+    expect(card('Pending approval')).toHaveAttribute('data-tone', 'alert')
+    expect(card('Pending approval')).toHaveTextContent('0 draft · 1 pending')
+    expect(card('Approved · to pay')).toHaveTextContent('RM 0.00')
+    expect(card('All vouchers')).toHaveTextContent('5')
+    expect(card('All vouchers')).toHaveTextContent('0 voided')
+    expect(document.querySelector('.statement-amount')).toBeNull()
+  })
+
+  it('counts every tab, and heads the table with what is on show', async () => {
+    database()
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(JSON.parse(screen.getByTestId('tabs').textContent ?? 'null')).toEqual({ all: 5, draft: 0, pending_approval: 1, approved: 0, paid: 4, voided: 0 })
+    const head = document.querySelector('.sect-head')
+    expect(head).toHaveTextContent('Payment vouchers')
+    expect(head).toHaveTextContent('5 of 5 vouchers')
+  })
+
+  it('says Total received and Approved · to receive on the receipt side', async () => {
+    database()
+    mocks.fetchAllRows.mockResolvedValue(VOUCHERS.map((v) => ({ ...v, direction: 'credit' })))
+    render(await VoucherLedger({ direction: 'credit', params: {} }))
+    expect(card('Total received')).toHaveAttribute('data-tone', 'primary')
+    expect(card('Approved · to receive')).toBeInTheDocument()
+    expect(document.querySelector('.sect-head')).toHaveTextContent('Official receipts')
   })
 })

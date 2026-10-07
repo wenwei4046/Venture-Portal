@@ -9,6 +9,7 @@ import { fetchPaymentExtras } from '@/lib/payment-extras'
 import { formatMoney } from '@/lib/utils'
 import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 import PaymentTabs from './PaymentTabs'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import PaymentFilters from './PaymentFilters'
 import BackToTop from './BackToTop'
 import VouchersTable, { type VoucherRow } from './VouchersTable'
@@ -185,8 +186,13 @@ export default async function VoucherLedger({
     .filter((v) => v.status === 'paid')
     .reduce((sum, v) => sum + Number(v.amount), 0) + extraTotal
 
+  // Waiting for a decision (draft + pending) and decided but not yet moved
+  // (approved) are two different questions for Finance, so two cards (2026-10-07).
   const pendingAmount = all
-    .filter((v) => ['draft', 'pending_approval', 'approved'].includes(v.status))
+    .filter((v) => ['draft', 'pending_approval'].includes(v.status))
+    .reduce((sum, v) => sum + Number(v.amount), 0)
+  const approvedAmount = all
+    .filter((v) => v.status === 'approved')
     .reduce((sum, v) => sum + Number(v.amount), 0)
 
   const noun = isReceipts ? 'receipt' : 'voucher'
@@ -272,38 +278,43 @@ export default async function VoucherLedger({
         </div>
       </div>
 
-      {/* ───────── Summary ───────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12 pb-12 border-b border-hairline">
-        <div>
-          <div className="font-serif italic text-accent text-sm mb-1">
-            {isReceipts ? 'Total received' : 'Total paid'}
-          </div>
-          <div className="statement-amount text-num-ink">{formatMoney(totalPaid)}</div>
-          <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
-            {extraRows.length > 0
+      {/* ───────── Summary cards (DESIGN.md › Sheet theme; user approved the
+          Payments sample 2026-10-07). The paid total is the page's one primary;
+          what is waiting reads as a warning only while something waits. ───────── */}
+      <StatCards label={isReceipts ? 'Receipts' : 'Payments'}>
+        <StatCard
+          tone="primary"
+          label={isReceipts ? 'Total received' : 'Total paid'}
+          value={formatMoney(totalPaid)}
+          icon={isReceipts ? 'receipt' : 'bank'}
+          note={
+            extraRows.length > 0
               ? isReceipts
-                ? `${counts.paid} RECEIPTS · ${nRepayments} LOAN RPY · ${nFundIn} FUND IN`
-                : `${counts.paid} PVS · ${nFsRepay} 还款 · ${nLoanOut} LOAN OUT`
-              : `${counts.paid} ${noun.toUpperCase()}${counts.paid === 1 ? '' : 'S'} EXECUTED`}
-          </div>
-        </div>
-        <div>
-          <div className="font-serif italic text-alert text-sm mb-1">Pending pipeline</div>
-          <div className="statement-amount text-num-ink">{formatMoney(pendingAmount)}</div>
-          <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
-            {counts.draft} DRAFT · {counts.pending_approval} PENDING · {counts.approved} APPROVED
-          </div>
-        </div>
-        <div>
-          <div className="font-serif italic text-graphite text-sm mb-1">
-            All {noun}s
-          </div>
-          <div className="statement-amount text-num-ink">{counts.all}</div>
-          <div className="font-mono text-[11.5px] text-graphite mt-1.5 tracking-[0.02em] font-medium">
-            {counts.voided} VOIDED
-          </div>
-        </div>
-      </div>
+                ? `${counts.paid} receipts · ${nRepayments} loan rpy · ${nFundIn} fund in`
+                : `${counts.paid} PVs · ${nFsRepay} 还款 · ${nLoanOut} loan out`
+              : `${counts.paid} ${noun}${counts.paid === 1 ? '' : 's'} executed`
+          }
+        />
+        <StatCard
+          tone={counts.draft + counts.pending_approval > 0 ? 'alert' : 'default'}
+          label="Pending approval"
+          value={formatMoney(pendingAmount)}
+          icon="clock"
+          note={`${counts.draft} draft · ${counts.pending_approval} pending`}
+        />
+        <StatCard
+          label={isReceipts ? 'Approved · to receive' : 'Approved · to pay'}
+          value={formatMoney(approvedAmount)}
+          icon="check"
+          note={`${counts.approved} approved, not yet ${isReceipts ? 'received' : 'paid'}`}
+        />
+        <StatCard
+          label={`All ${noun}s`}
+          value={String(counts.all)}
+          icon="layers"
+          note={`${counts.voided} voided`}
+        />
+      </StatCards>
 
       {/* ───────── Tabs + list ───────── */}
       {all.length === 0 && extraRows.length === 0 ? (
@@ -321,18 +332,22 @@ export default async function VoucherLedger({
       ) : (
         <section>
           <Suspense fallback={null}>
-            <PaymentTabs />
+            <PaymentTabs counts={counts} />
           </Suspense>
 
           <Suspense fallback={null}>
             <PaymentFilters />
           </Suspense>
 
-          <p className="font-serif italic text-graphite text-sm mb-4">
-            {filtered.length + lockedCount + extraFiltered.length} of {all.length + extraRows.length} {noun}
-            {all.length + extraRows.length === 1 ? '' : 's'}
-            {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
-          </p>
+          <div className="sect-head">
+            <h2>{isReceipts ? 'Official receipts' : 'Payment vouchers'}</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {filtered.length + lockedCount + extraFiltered.length} of {all.length + extraRows.length} {noun}
+              {all.length + extraRows.length === 1 ? '' : 's'}
+              {tab !== 'all' ? ` · ${tab.replace('_', ' ')}` : ''}
+            </span>
+          </div>
 
           {filtered.length + lockedCount + extraFiltered.length === 0 ? (
             <div className="border border-hairline rounded-md bg-surface p-8 text-center">
@@ -345,6 +360,7 @@ export default async function VoucherLedger({
               <VouchersTable
                 layoutId={isReceipts ? 'receipts.vouchers' : 'payments.vouchers'}
                 layoutTitle={isReceipts ? 'Receipts' : 'Payments'}
+                canSetDefault={user.role === 'finance' || user.role === 'principal'}
                 rows={[...filtered.map<VoucherRow>((v) => {
                   const cats = categoriesByVoucher.get(v.id) ?? []
                   // 还款 · prefix keeps repayment PVs recognizable (and
