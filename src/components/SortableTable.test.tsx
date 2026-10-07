@@ -1,33 +1,41 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-// The account's copy of a layout. `saved` is what the "database" answers with;
-// `save` records what the table asks to store.
+// The account's copy of a layout and the table's default. `saved` / `defaults`
+// are what the "database" answers with; `save` records what the table asks to
+// store, and for which of the two tables ('-default' for the shared one).
 const store = vi.hoisted(() => ({
   saved: null as unknown,
+  defaults: null as unknown,
   failing: false,
   save: vi.fn(),
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () =>
-            store.failing ? { data: null, error: { message: 'offline' } } : { data: store.saved ? { layout: store.saved } : null, error: null },
+    from: (table: string) => {
+      const tag = table === 'table_layout_defaults' ? '-default' : ''
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => {
+              if (store.failing) return { data: null, error: { message: 'offline' } }
+              const row = tag ? store.defaults : store.saved
+              return { data: row ? { layout: row } : null, error: null }
+            },
+          }),
         }),
-      }),
-      upsert: (row: { layout: unknown }) => {
-        store.save('upsert', row.layout)
-        return Promise.resolve({ error: null })
-      },
-      delete: () => ({
-        eq: () => {
-          store.save('delete')
+        upsert: (row: { layout: unknown }) => {
+          store.save('upsert' + tag, row.layout)
           return Promise.resolve({ error: null })
         },
-      }),
-    }),
+        delete: () => ({
+          eq: () => {
+            store.save('delete' + tag)
+            return Promise.resolve({ error: null })
+          },
+        }),
+      }
+    },
   }),
 }))
 
@@ -94,6 +102,7 @@ function drag(type: 'dragstart' | 'dragover' | 'drop' | 'dragend', el: HTMLEleme
 beforeEach(() => {
   vi.clearAllMocks()
   store.saved = null
+  store.defaults = null
   store.failing = false
   window.localStorage.clear()
   desktop(true)
@@ -537,5 +546,50 @@ describe('a column that cannot be resized', () => {
     const cells = document.querySelectorAll('tbody tr')[0].querySelectorAll('td')
     expect(cells[0]).toHaveClass('st-nocut')
     expect(cells[1]).not.toHaveClass('st-nocut')
+  })
+})
+
+// 2026-10-07 (user: "我要能定这个 as default"): a table can carry a default
+// arrangement for everyone. The account's own arrangement still wins; Reset
+// goes back to the table's default rather than the code's.
+describe("a table's default arrangement", () => {
+  const panel = () => screen.getByRole('dialog', { name: 'Columns' })
+  const openColumns = () => fireEvent.click(screen.getByRole('button', { name: /Columns/ }))
+
+  it('opens in it when the account has none of its own, with nothing to reset', async () => {
+    store.defaults = { order: ['amount', 'no', 'company'], widths: {}, hidden: ['company'] }
+    table()
+    await waitFor(() => expect(headers()).toEqual(['_select', 'amount', 'no', 'action']))
+    expect(screen.queryByTitle(/Reset columns to default/)).toBeNull()
+  })
+
+  it("the account's own arrangement wins, and Reset goes back to the table's default", async () => {
+    store.defaults = { order: ['amount', 'no', 'company'], widths: {}, hidden: [] }
+    store.saved = { order: ['company', 'no', 'amount'], widths: {}, hidden: [] }
+    table()
+    await waitFor(() => expect(headers()).toEqual(['_select', 'company', 'no', 'amount', 'action']))
+    openColumns()
+    fireEvent.click(within(panel()).getByText('Reset'))
+    expect(headers()).toEqual(['_select', 'amount', 'no', 'company', 'action'])
+    expect(store.save).toHaveBeenLastCalledWith('delete')
+  })
+
+  it('Set as default keeps the arrangement on show for everyone, and the account follows it from then on', async () => {
+    store.saved = { order: ['company', 'no', 'amount'], widths: { no: 220 }, hidden: [] }
+    table({ canSetDefault: true })
+    await waitFor(() => expect(headers()).toEqual(['_select', 'company', 'no', 'amount', 'action']))
+    openColumns()
+    fireEvent.click(within(panel()).getByRole('button', { name: /设为预设/ }))
+    await waitFor(() => expect(store.save).toHaveBeenCalledWith('upsert-default', { order: ['company', 'no', 'amount'], widths: { no: 220 }, hidden: [] }))
+    await waitFor(() => expect(store.save).toHaveBeenLastCalledWith('delete'))
+    expect(headers()).toEqual(['_select', 'company', 'no', 'amount', 'action'])
+    expect(within(panel()).getByText(/已设为预设/)).toBeInTheDocument()
+  })
+
+  it('offers Set as default only to an account that may', async () => {
+    table()
+    await settle()
+    openColumns()
+    expect(within(panel()).queryByRole('button', { name: /设为预设/ })).toBeNull()
   })
 })

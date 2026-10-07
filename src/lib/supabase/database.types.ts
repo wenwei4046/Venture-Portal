@@ -7145,6 +7145,35 @@ export type Database = {
           },
         ]
       }
+      table_layout_defaults: {
+        Row: {
+          layout: Json
+          set_at: string
+          set_by: string | null
+          table_id: string
+        }
+        Insert: {
+          layout: Json
+          set_at?: string
+          set_by?: string | null
+          table_id: string
+        }
+        Update: {
+          layout?: Json
+          set_at?: string
+          set_by?: string | null
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "table_layout_defaults_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_table_layouts: {
         Row: {
           layout: Json

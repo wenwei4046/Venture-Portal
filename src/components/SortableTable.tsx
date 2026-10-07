@@ -19,17 +19,22 @@ import {
   announceLayout,
   applyOrder,
   clampWidth,
+  effectiveLayout,
+  fetchDefaultLayout,
   fetchSavedLayout,
   isCustomised,
   groupColumns,
   moveColumn,
   onLayoutAnnounced,
+  readCachedDefault,
   readCachedLayout,
   sameLayout,
+  saveDefaultLayout,
   saveLayout,
   storedWidth,
   toggleHidden,
   visibleColumns,
+  writeCachedDefault,
   writeCachedLayout,
   type TableLayout,
 } from '@/lib/table-layout'
@@ -141,6 +146,10 @@ interface Props<T> {
   layoutId?: string
   /** What the Columns panel calls this table, e.g. 'Receipts'. */
   layoutTitle?: string
+  /** The account may keep the arrangement on show as this table's default for
+   *  everyone (2026-10-07, user: "我要能定这个 as default") — Principal, Finance
+   *  and HR, each for the tables they run. */
+  canSetDefault?: boolean
   /** Right-click on a data row — for a row menu. The caller owns the menu. On
    *  a phone, where there is no right-click, the opened row offers 更多 ⋯ for
    *  it unless the table already ends in a pinned menu column. */
@@ -202,6 +211,7 @@ export default function SortableTable<T>({
   footer,
   layoutId,
   layoutTitle,
+  canSetDefault = false,
   onRowContextMenu: onAnyRowContextMenu,
   onRowOpen: onAnyRowOpen,
   rowOpens,
@@ -243,6 +253,10 @@ export default function SortableTable<T>({
   // 2026-10-02 (user: "我希望可以左右拉 … 甚至我希望我可以自己排顺序"). Nothing
   // here runs without a layoutId, and nothing applies below 768px.
   const [layout, setLayout] = useState<TableLayout>(EMPTY_LAYOUT)
+  // The table's default for everyone (2026-10-07); `layout` is this account's
+  // own, which wins over it. What is drawn is `effective`, below.
+  const [defaults, setDefaults] = useState<TableLayout>(EMPTY_LAYOUT)
+  const [defaultNote, setDefaultNote] = useState<string | null>(null)
   const [isDesktop, setIsDesktop] = useState(false)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dropHint, setDropHint] = useState<{ key: string; side: 'before' | 'after' } | null>(null)
@@ -264,11 +278,17 @@ export default function SortableTable<T>({
   useLayoutEffect(() => {
     if (!layoutId) return
     setLayout(readCachedLayout(layoutId))
+    setDefaults(readCachedDefault(layoutId))
     let cancelled = false
     fetchSavedLayout(layoutId).then((saved) => {
       if (cancelled || !saved) return
       setLayout((cur) => (sameLayout(cur, saved) ? cur : saved))
       writeCachedLayout(layoutId, saved)
+    })
+    fetchDefaultLayout(layoutId).then((shared) => {
+      if (cancelled || !shared) return
+      setDefaults((cur) => (sameLayout(cur, shared) ? cur : shared))
+      writeCachedDefault(layoutId, shared)
     })
     return () => {
       cancelled = true
@@ -293,23 +313,24 @@ export default function SortableTable<T>({
   )
 
   const layoutOn = !!layoutId && isDesktop
+  const effective = useMemo(() => effectiveLayout(layout, defaults), [layout, defaults])
   const orderedColumns = useMemo(
-    () => (layoutOn ? applyOrder(columns, layout.order) : columns),
-    [layoutOn, columns, layout.order],
+    () => (layoutOn ? applyOrder(columns, effective.order) : columns),
+    [layoutOn, columns, effective.order],
   )
   // What the Columns panel has left on show. The panel lists the hideable
   // columns in the order the CODE declares them, so a group never reshuffles
   // under the pointer while its columns are being dragged about in the header.
   const shownColumns = useMemo(
-    () => (layoutOn ? visibleColumns(orderedColumns, layout.hidden) : orderedColumns),
-    [layoutOn, orderedColumns, layout.hidden],
+    () => (layoutOn ? visibleColumns(orderedColumns, effective.hidden) : orderedColumns),
+    [layoutOn, orderedColumns, effective.hidden],
   )
   const hideableColumns = useMemo(() => columns.filter((c) => !c.pinned && c.hideable !== false && c.label), [columns])
   const [columnsOpen, setColumnsOpen] = useState(false)
   // Fixed layout only once somebody has dragged a width; until then the
   // browser sizes the columns exactly as it always has.
-  const widthsOn = layoutOn && shownColumns.some((c) => layout.widths[c.key] != null)
-  const widthOf = (key: string) => layout.widths[key] ?? 140
+  const widthsOn = layoutOn && shownColumns.some((c) => effective.widths[c.key] != null)
+  const widthOf = (key: string) => effective.widths[key] ?? 140
   const tableWidth = widthsOn ? shownColumns.reduce((sum, c) => sum + widthOf(c.key), 0) : undefined
 
   function startResize(key: string, e: ReactPointerEvent<HTMLSpanElement>) {
@@ -326,10 +347,12 @@ export default function SortableTable<T>({
     const startX = e.clientX
     const startW = base[key] ?? widthOf(key)
     const others = Object.entries(base).reduce((sum, [k, w]) => (k === key ? sum : sum + w), 0)
-    const order = layout.order
+    const order = effective.order
     let width = startW
     resizing.current = true
-    setLayout((cur) => ({ ...cur, widths: { ...cur.widths, ...base } }))
+    // From the arrangement on show — the table's default when this account has
+    // none of its own — so the first drag keeps everything else where it was.
+    setLayout({ ...effective, widths: { ...effective.widths, ...base } })
 
     // While dragging, the <col> and the table are sized directly: a state
     // update per pointer move would re-render every row of a long ledger.
@@ -344,7 +367,7 @@ export default function SortableTable<T>({
       document.removeEventListener('pointerup', up)
       document.removeEventListener('pointercancel', up)
       resizing.current = false
-      commitLayout({ ...layout, order, widths: { ...layout.widths, ...base, [key]: width } })
+      commitLayout({ ...effective, order, widths: { ...effective.widths, ...base, [key]: width } })
     }
     document.addEventListener('pointermove', move)
     document.addEventListener('pointerup', up)
@@ -362,17 +385,33 @@ export default function SortableTable<T>({
   function dropColumn(target: string, side: 'before' | 'after') {
     if (!dragKey || dragKey === target) return endDrag()
     const movable = orderedColumns.filter((c) => !c.pinned).map((c) => c.key)
-    commitLayout({ ...layout, order: moveColumn(movable, dragKey, target, side) })
+    commitLayout({ ...effective, order: moveColumn(movable, dragKey, target, side) })
     endDrag()
   }
   const showReset = layoutOn && isCustomised(layout)
   const hasPinnedEnd = columns.some((c) => c.pinned === 'end')
   function setColumnShown(key: string, show: boolean) {
-    const hidden = toggleHidden(layout.hidden, key, show, hideableColumns.map((c) => c.key))
-    if (hidden === layout.hidden) return
+    const hidden = toggleHidden(effective.hidden, key, show, hideableColumns.map((c) => c.key))
+    if (hidden === effective.hidden) return
     // A column that is not on show must not go on filtering the rows unseen.
     if (!show) clearColumnFilter(key)
-    commitLayout({ ...layout, hidden })
+    commitLayout({ ...effective, hidden })
+  }
+
+  // The arrangement on show becomes the table's default for everyone; this
+  // account's own row is dropped, so it follows the default from here on.
+  async function setAsDefault() {
+    if (!layoutId) return
+    const shared = effective
+    const ok = await saveDefaultLayout(layoutId, shared)
+    if (!ok) {
+      setDefaultNote('没存到预设，请再试一次。')
+      return
+    }
+    setDefaults(shared)
+    writeCachedDefault(layoutId, shared)
+    commitLayout(EMPTY_LAYOUT)
+    setDefaultNote('已设为预设：没自己排过的人打开就是这个排法，Reset 也回到这里。')
   }
 
   // ─── Mobile column split ────────────────────────────────────────────────
@@ -833,11 +872,17 @@ export default function SortableTable<T>({
         <ColumnsPanel
           title={layoutTitle}
           columns={hideableColumns.map((c) => ({ key: c.key, label: c.label, group: c.group }))}
-          hidden={layout.hidden}
+          hidden={effective.hidden}
           onToggle={setColumnShown}
-          onShowAll={() => commitLayout({ ...layout, hidden: [] })}
+          onShowAll={() => commitLayout({ ...effective, hidden: [] })}
           onReset={() => commitLayout(EMPTY_LAYOUT)}
-          onClose={() => setColumnsOpen(false)}
+          canSetDefault={canSetDefault}
+          onSetDefault={() => void setAsDefault()}
+          defaultNote={defaultNote}
+          onClose={() => {
+            setColumnsOpen(false)
+            setDefaultNote(null)
+          }}
         />
       ) : null}
 
@@ -937,6 +982,9 @@ function ColumnsPanel({
   onToggle,
   onShowAll,
   onReset,
+  canSetDefault = false,
+  onSetDefault,
+  defaultNote,
   onClose,
 }: {
   title?: string
@@ -945,6 +993,10 @@ function ColumnsPanel({
   onToggle: (key: string, show: boolean) => void
   onShowAll: () => void
   onReset: () => void
+  /** 设为预设 (2026-10-07): the arrangement on show becomes everyone's default. */
+  canSetDefault?: boolean
+  onSetDefault?: () => void
+  defaultNote?: string | null
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
@@ -1032,17 +1084,32 @@ function ColumnsPanel({
             ))
           )}
         </div>
+        {defaultNote ? (
+          <p className="border-t border-hairline px-4 py-2 text-xs text-graphite">{defaultNote}</p>
+        ) : null}
         <div className="flex items-center justify-between gap-3 border-t border-hairline bg-surface px-4 py-3">
           <span className="text-xs text-muted">
             {shownCount} of {columns.length} shown
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md bg-accent px-4 py-1.5 font-serif italic text-sm text-white hover:bg-accent-hover"
-          >
-            Done
-          </button>
+          <span className="flex items-center gap-4">
+            {canSetDefault ? (
+              <button
+                type="button"
+                onClick={onSetDefault}
+                className="text-xs font-semibold text-ink hover:text-accent"
+                title="把现在的显示、宽度和顺序定为这张表所有人的预设 · Set as default for everyone"
+              >
+                设为预设
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md bg-accent px-4 py-1.5 font-serif italic text-sm text-white hover:bg-accent-hover"
+            >
+              Done
+            </button>
+          </span>
         </div>
       </aside>
     </div>,

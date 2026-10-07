@@ -95,9 +95,12 @@ export default function VouchersTable({
   collapseBatches = true,
   layoutId = 'payments.vouchers',
   layoutTitle = 'Payments',
+  canSetDefault = false,
 }: {
   /** What the Columns panel calls this table. */
   layoutTitle?: string
+  /** The viewer may set the arrangement on show as everyone's default (2026-10-07). */
+  canSetDefault?: boolean
   /** Names the table for the saved column layout — Payments and Receipts
    *  are arranged separately. */
   layoutId?: string
@@ -177,6 +180,7 @@ export default function VouchersTable({
         <SortableTable<VoucherRow>
       layoutId={layoutId}
       layoutTitle={layoutTitle}
+      canSetDefault={canSetDefault}
       onRowOpen={links.onRowOpen}
       onRowContextMenu={links.onRowContextMenu}
       rowOpens={(v) => !v.locked}

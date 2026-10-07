@@ -255,3 +255,70 @@ export function saveLayout(tableId: string, layout: TableLayout): void {
     // Swallowed on purpose.
   }
 }
+
+// ─── The table's default (2026-10-07) ────────────────────────────────────────
+// user: "我要能定这个 as default". A table can carry one arrangement for
+// everyone (table_layout_defaults — one row per table, set by Principal, Finance
+// or HR for the tables they run). An account's own row still wins; without one
+// the default shows, and Reset drops the own row — back to the default, not to
+// the code's arrangement.
+
+/** The arrangement on show: the account's own if it has one, else the table's default. */
+export function effectiveLayout(own: TableLayout, fallback: TableLayout): TableLayout {
+  return isCustomised(own) ? own : fallback
+}
+
+const defaultCacheKey = (tableId: string) => `table-layout-default:${tableId}`
+
+export function readCachedDefault(tableId: string): TableLayout {
+  try {
+    const raw = window.localStorage.getItem(defaultCacheKey(tableId))
+    return raw ? sanitizeLayout(JSON.parse(raw)) : EMPTY_LAYOUT
+  } catch {
+    return EMPTY_LAYOUT
+  }
+}
+
+export function writeCachedDefault(tableId: string, layout: TableLayout): void {
+  try {
+    if (isCustomised(layout)) window.localStorage.setItem(defaultCacheKey(tableId), JSON.stringify(layout))
+    else window.localStorage.removeItem(defaultCacheKey(tableId))
+  } catch {
+    // Private mode, quota — the shared copy still holds it.
+  }
+}
+
+/** The table's default. No row means the code's arrangement (the empty
+ *  layout); null only when it could not be read just now. */
+export async function fetchDefaultLayout(tableId: string): Promise<TableLayout | null> {
+  try {
+    const { data, error } = await createClient()
+      .from('table_layout_defaults')
+      .select('layout')
+      .eq('table_id', tableId)
+      .maybeSingle()
+    if (error) return null
+    return data ? sanitizeLayout(data.layout) : EMPTY_LAYOUT
+  } catch {
+    return null
+  }
+}
+
+/** Set (or, for the code's arrangement, clear) the table's default. Resolves
+ *  false when the write did not happen, so the panel can say so. */
+export async function saveDefaultLayout(tableId: string, layout: TableLayout): Promise<boolean> {
+  try {
+    const supabase = createClient()
+    const { error } = isCustomised(layout)
+      ? await supabase
+          .from('table_layout_defaults')
+          .upsert(
+            { table_id: tableId, layout: layout as unknown as Json, set_at: new Date().toISOString() },
+            { onConflict: 'table_id' },
+          )
+      : await supabase.from('table_layout_defaults').delete().eq('table_id', tableId)
+    return !error
+  } catch {
+    return false
+  }
+}

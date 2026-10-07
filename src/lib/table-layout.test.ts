@@ -215,3 +215,21 @@ describe('announcing a layout', () => {
     expect(mine).toHaveBeenCalledTimes(2)
   })
 })
+
+import { effectiveLayout, EMPTY_LAYOUT as NO_LAYOUT } from './table-layout'
+
+// 2026-10-07 (user: "我要能定这个 as default"): a table can carry a default
+// arrangement for everyone; the account's own still wins.
+describe('effectiveLayout', () => {
+  const own = { order: ['b', 'a'], widths: {}, hidden: [] }
+  const dflt = { order: ['c'], widths: { c: 120 }, hidden: ['a'] }
+  it("is the account's own arrangement when it has one", () => {
+    expect(effectiveLayout(own, dflt)).toBe(own)
+  })
+  it("is the table's default when the account has none", () => {
+    expect(effectiveLayout(NO_LAYOUT, dflt)).toBe(dflt)
+  })
+  it("is the code's arrangement when neither has one", () => {
+    expect(effectiveLayout(NO_LAYOUT, NO_LAYOUT)).toEqual({ order: [], widths: {}, hidden: [] })
+  })
+})
