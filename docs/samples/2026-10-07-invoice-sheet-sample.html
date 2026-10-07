@@ -151,7 +151,7 @@
   .phone .sheet-tabs { overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
   .phone .mbulk { position: sticky; bottom: 0; margin: 10px -10px 0; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgb(var(--surface)); border-top: 1px solid rgb(var(--walnut) / .3); box-shadow: 0 -6px 16px rgb(var(--walnut) / .1); font-size: 12px; }
   .phone .mbulk b { font-family: 'Chivo Mono', monospace; }
-  .phone .mbulk a { display: inline-block; padding: 8px 14px; border-radius: 6px; background: rgb(var(--accent)); color: #000; font-family: Georgia, serif; font-style: italic; font-size: 13px; text-decoration: none; white-space: nowrap; }
+  .phone .mbulk a { display: inline-block; padding: 8px 14px; border-radius: 6px; background: rgb(233 154 83); color: #000; font-family: Georgia, serif; font-style: italic; font-size: 13px; text-decoration: none; white-space: nowrap; }
   .phone .tabs { height: 54px; display: grid; grid-template-columns: repeat(5, 1fr); background: rgb(var(--chrome)); border-top: 1px solid rgb(var(--hairline)); }
   .phone .tabs div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: rgb(var(--graphite)); }
   .phone .tabs div.on { color: rgb(var(--ink)); font-weight: 600; box-shadow: inset 0 2px 0 rgb(var(--accent)); }
@@ -645,7 +645,7 @@
       </div>
       <div class="mbulk"><span><b>2</b> selected · <b>RM 37,084.15</b></span><a href="#">Settle 2 →</a></div>
     </div>
-    <div class="tabs"><div><i></i>总览</div><div><i></i>审批</div><div><i></i>付款</div><div><i></i>收款</div><div class="on"><i></i>More</div></div>
+    <div class="tabs"><div><i></i>Overview</div><div><i></i>Approvals</div><div><i></i>Payments</div><div><i></i>Receipts</div><div class="on"><i></i>More</div></div>
   </div>
   </div>
 
@@ -688,7 +688,7 @@
         <div style="height:12px"></div>
       </div>
     </div>
-    <div class="tabs"><div><i></i>总览</div><div><i></i>审批</div><div><i></i>付款</div><div><i></i>收款</div><div class="on"><i></i>More</div></div>
+    <div class="tabs"><div><i></i>Overview</div><div><i></i>Approvals</div><div><i></i>Payments</div><div><i></i>Receipts</div><div class="on"><i></i>More</div></div>
   </div>
   </div>
 
@@ -699,7 +699,8 @@
         · Invoices 每行先看 Bill to + Amount；单号、状态 chip、日期缩成小字；▾ 展开看 Description / Category / Mode / Due；Settle → 是橘色按钮（跟 Principal 的 Approve 一样），Open the invoice → / 更多 ⋯ 是字。<br>
     · 勾了几张，底部出 Settle 条（同一个 payer 才能一起）。<br>
     · Statements 同样：Company + Net，▾ 展开看 Invoice / Contra。<br>
-    · 跟 Approvals 一样，tick 和 ▾ 整格可按。
+    · 跟 Approvals 一样，tick 和 ▾ 整格可按。<br>
+    · 底部 tab bar 改英文（Overview / Approvals / Payments / Receipts / More）——Finance 和 Principal 的手机都会是这样。
   </div>
 </div>
 
