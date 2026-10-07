@@ -52,6 +52,11 @@
   .btn-sec { border: 1px solid rgb(var(--hairline)); color: rgb(var(--ink)); background: rgb(var(--surface)); }
   .btn-more { border: 1px solid rgb(var(--hairline)); color: rgb(var(--ink)); background: rgb(var(--surface)); font-style: normal; font-family: 'Inter', sans-serif; font-size: 13px; }
   .btn-quiet { display: inline-block; padding: 6px 12px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); font-family: 'Chivo Mono', monospace; font-size: 11px; color: rgb(var(--graphite)); text-decoration: none; }
+  .act-band { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: -6px 0 20px; padding: 12px 16px; border: 1px solid rgb(var(--hairline)); border-radius: 10px; background: rgb(var(--sheet-filter)); }
+  .act-group { display: flex; flex-direction: column; gap: 7px; }
+  .act-group .cap { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: rgb(var(--card-label)); }
+  .act-group .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .act-group + .act-group { padding-left: 0; }
   .dept-mode { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; padding: 10px 14px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; font-size: 12px; color: rgb(var(--graphite)); }
   .dept-mode b { font-family: 'Chivo Mono', monospace; font-size: 10px; letter-spacing: .1em; color: rgb(var(--ink)); }
   .dept-mode .sw { display: inline-flex; border: 1px solid rgb(var(--hairline)); border-radius: 99px; overflow: hidden; font-size: 11px; }
@@ -152,6 +157,7 @@
   .phone .tabs div.on { color: rgb(var(--ink)); font-weight: 600; box-shadow: inset 0 2px 0 rgb(var(--accent)); }
   .phone .tabs div i { width: 16px; height: 16px; border: 1.5px solid currentColor; border-radius: 4px; display: block; }
   .phone .fab { position: absolute; right: 16px; bottom: 70px; width: 44px; height: 44px; border-radius: 50%; background: rgb(var(--accent)); color: #000; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 6px 16px rgb(var(--walnut) / .25); }
+  .phone .btn-mini { display: inline-block; padding: 7px 12px; border-radius: 6px; background: rgb(var(--accent)); color: #000; font-family: Georgia, serif; font-style: italic; font-size: 13px; text-decoration: none; }
   .phone-note { max-width: 300px; font-size: 12px; line-height: 1.7; color: rgb(var(--graphite)); padding-top: 24px; }
   .phone-note b { color: rgb(var(--ink)); }
 </style>
@@ -166,21 +172,6 @@
   <span class="grp" role="group" aria-label="版本">
     <button type="button" data-set-view="before">现在</button>
     <button type="button" data-set-view="after" aria-pressed="true">改版</button>
-  </span>
-  <span class="grp opt" role="group" aria-label="表头按钮" id="head-grp">
-    <span class="lbl" style="padding:5px 0 5px 10px">表头</span>
-    <button type="button" data-set-head="more" aria-pressed="true">收进 More ▾</button>
-    <button type="button" data-set-head="all">全部摊开</button>
-  </span>
-  <span class="grp opt" role="group" aria-label="进度" id="prog-grp">
-    <span class="lbl" style="padding:5px 0 5px 10px">开票进度</span>
-    <button type="button" data-set-progress="table" aria-pressed="true">表格</button>
-    <button type="button" data-set-progress="cards">卡片（现在那 5 张）</button>
-  </span>
-  <span class="grp opt" role="group" aria-label="薪资底稿" id="basis-grp">
-    <span class="lbl" style="padding:5px 0 5px 10px">薪资底稿</span>
-    <button type="button" data-set-basis="bottom" aria-pressed="true">放最底、收起</button>
-    <button type="button" data-set-basis="top">照旧在 invoices 上面</button>
   </span>
   <span class="grp" role="group" aria-label="装置">
     <button type="button" data-set-device="desktop" aria-pressed="true">桌面</button>
@@ -222,20 +213,24 @@
               <div class="page-eyebrow"><em>I.</em> BILLING · SERVICE INVOICES</div>
               <h1 class="page-title">Service Billing</h1>
             </div>
-            <div class="actions head-more">
+            <div class="actions">
               <span class="period"><span class="lab">Period</span><span class="nav">‹</span><span class="val">September 2026</span><span class="nav">›</span></span>
-              <a class="btn-sec" href="#">Generate payroll invoices</a>
-              <a class="btn-pri" href="#">+ Create Invoice</a>
-              <a class="btn-more" href="#" title="对数补差 · Own-share → Venture (Office) · + Multi-line Invoice · Export Excel / PDF">More ▾</a>
             </div>
-            <div class="actions head-all">
-              <span class="period"><span class="lab">Period</span><span class="nav">‹</span><span class="val">September 2026</span><span class="nav">›</span></span>
-              <a class="btn-sec" href="#">Generate payroll invoices</a>
-              <a class="btn-sec" href="#">对数补差</a>
-              <a class="btn-sec" href="#">Own-share → Venture (Office)</a>
-              <a class="btn-sec" href="#">+ Multi-line Invoice</a>
-              <a class="btn-pri" href="#">+ Create Invoice</a>
-              <a class="btn-more" href="#">Export ▾</a>
+          </div>
+
+          <!-- every control on show, in three captioned groups -->
+          <div class="act-band">
+            <div class="act-group">
+              <div class="cap">From payroll</div>
+              <div class="btns"><a class="btn-sec" href="#">Generate payroll invoices</a><a class="btn-sec" href="#">对数补差</a><a class="btn-sec" href="#">Own-share → Venture (Office)</a></div>
+            </div>
+            <div class="act-group">
+              <div class="cap">Create</div>
+              <div class="btns"><a class="btn-pri" href="#">+ Create Invoice</a><a class="btn-sec" href="#">+ Multi-line Invoice</a></div>
+            </div>
+            <div class="act-group">
+              <div class="cap">Export</div>
+              <div class="btns"><a class="btn-quiet" href="#">Excel</a><a class="btn-quiet" href="#">PDF · list</a><a class="btn-quiet" href="#">PDF · per invoice</a></div>
             </div>
           </div>
 
@@ -266,46 +261,23 @@
             </div>
           </section>
 
-          <div class="sect-head"><h2>Billing progress</h2><span class="rule" aria-hidden="true"></span><span class="count">6 DEPARTMENTS · FROM PAYROLL</span></div>
-          <div class="prog-table">
-            <table class="ledger-table">
-              <thead><tr><th>Department <span class="st-resize"></span></th><th class="right">From payroll <span class="st-resize"></span></th><th class="right">Invoiced <span class="st-resize"></span></th><th>Invoices <span class="st-resize"></span></th><th class="right">Difference <span class="st-resize"></span></th><th style="width:110px"></th></tr></thead>
-              <tbody>
-                <tr><td>HR</td><td class="num">RM 5,797.05</td><td class="num">RM 4,057.35</td><td><span class="type-tag">3 · consolidated</span></td><td class="num">−1,739.70 <span class="sub" style="display:inline">HV share</span></td><td class="mono"><a class="text-accent" href="#">+ Invoice</a></td></tr>
-                <tr><td>Finance</td><td class="num">RM 26,636.73</td><td class="num">RM 24,680.44</td><td><span class="type-tag">5 · consolidated</span></td><td class="num">−1,956.29 <span class="sub" style="display:inline">HV share</span></td><td class="mono"><a class="text-accent" href="#">+ Invoice</a></td></tr>
-                <tr><td>Director Office</td><td class="num">RM 7,415.80</td><td class="num">RM 5,799.68</td><td><span class="type-tag">3 · consolidated</span></td><td class="num">−1,616.12 <span class="sub" style="display:inline">HV share</span></td><td class="mono"><a class="text-accent" href="#">+ Invoice</a></td></tr>
-                <tr><td>IT</td><td class="num">RM 5,971.75</td><td class="num">RM 5,971.76</td><td><span class="type-tag">2 · consolidated</span></td><td class="num">+0.01</td><td class="mono"><a class="text-accent" href="#">+ Invoice</a></td></tr>
-                <tr><td>Director</td><td class="num">RM 76,996.25</td><td class="num">RM 76,996.25</td><td><span class="type-tag">5 · director CTC</span></td><td class="num pos">matched</td><td class="mono"><a class="text-accent" href="#">+ Invoice</a></td></tr>
-                <tr><td>Marketing</td><td class="num">RM 59,697.96</td><td class="num">RM 59,605.24</td><td><span class="type-tag">9 · projects</span></td><td class="num neg">−92.72</td><td class="mono"><a class="text-accent" href="#">+ Invoice</a></td></tr>
-              </tbody>
-              <tfoot><tr><td>6 departments</td><td class="num">RM 182,515.54</td><td class="num">RM 177,110.72</td><td></td><td class="num">−5,404.82</td><td></td></tr></tfoot>
-            </table>
-          </div>
-          <div class="prog-cards">
-            <div class="cost-cards" style="margin-bottom:0">
-              <div class="cost-card"><div class="l">HR OPEX</div><div class="v">RM 4,057.35</div><div class="n">3 consolidated · HV share RM 1,739.70</div><a class="a" href="#">+ Invoice →</a></div>
-              <div class="cost-card"><div class="l">Finance OPEX</div><div class="v">RM 24,680.44</div><div class="n">5 consolidated · HV share RM 1,956.29</div><a class="a" href="#">+ Invoice →</a></div>
-              <div class="cost-card"><div class="l">Director Office OPEX</div><div class="v">RM 5,799.68</div><div class="n">3 consolidated · HV share RM 1,616.12</div><a class="a" href="#">+ Invoice →</a></div>
-              <div class="cost-card"><div class="l">Director OPEX</div><div class="v">RM 76,996.25</div><div class="n">5 invoices · matched</div><a class="a" href="#">+ Invoice →</a></div>
-              <div class="cost-card"><div class="l">Marketing OPEX</div><div class="v">RM 59,605.24</div><div class="n warn">9 invoices · short RM 92.72</div><a class="a" href="#">+ Invoice →</a></div>
+          <details class="basis" style="margin:0 0 26px">
+            <summary>Payroll basis <small>BILLED / FROM PAYROLL — HR 4,057 / 5,797 · FINANCE 24,680 / 26,637 · DIRECTOR OFFICE 5,800 / 7,416 · IT 5,972 / 5,972 · DIRECTOR 76,996 ✓ · MARKETING 59,605 / 59,698</small></summary>
+            <div class="inner">
+              <div class="sect-head" style="margin-top:6px"><h2>Director Salary Submission</h2><span class="rule" aria-hidden="true"></span><span class="count">5 SUBSIDIARIES · RM 76,996.25</span></div>
+              <table class="ledger-table">
+                <thead><tr><th>Subsidiary</th><th class="right">Basic</th><th class="right">KPI</th><th class="right">Allowance</th><th class="right">EPF ER</th><th class="right">SOCSO ER</th><th class="right">EIS ER</th><th class="right">Total</th></tr></thead>
+                <tbody>
+                  <tr><td>2990<span class="sub">2990</span></td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">RM 9,642.13</td></tr>
+                  <tr><td>CONTS<span class="sub">The Cont</span></td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">RM 15,817.92</td></tr>
+                  <tr class="more"><td colspan="8">… DC, HC, HK — 照旧的表，白纸样式</td></tr>
+                </tbody>
+                <tfoot><tr><td>Total</td><td colspan="6"></td><td class="num">RM 76,996.25</td></tr></tfoot>
+              </table>
+              <div class="sect-head" style="margin-top:22px"><h2>Staff Billing Allocation</h2><span class="rule" aria-hidden="true"></span><span class="count">4 DEPARTMENTS</span></div>
+              <div class="muted-line">HR · Finance · Director Office · IT — 每个部门一个表（Salary / Allowance / EPF / SOCSO / EIS / Total，HV own share 一行），照旧。</div>
             </div>
-          </div>
-
-          <!-- payroll basis, on top (today's place) -->
-          <div class="basis-top">
-            <div class="sect-head" style="margin-top:30px"><h2>Director Salary Submission</h2><span class="rule" aria-hidden="true"></span><span class="count">5 SUBSIDIARIES</span></div>
-            <table class="ledger-table">
-              <thead><tr><th>Subsidiary</th><th class="right">Basic</th><th class="right">KPI</th><th class="right">Allowance</th><th class="right">EPF ER</th><th class="right">SOCSO ER</th><th class="right">EIS ER</th><th class="right">Total</th></tr></thead>
-              <tbody>
-                <tr><td>2990<span class="sub">2990</span></td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">RM 9,642.13</td></tr>
-                <tr><td>CONTS<span class="sub">The Cont</span></td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">…</td><td class="num">RM 15,817.92</td></tr>
-                <tr class="more"><td colspan="8">… DC, HC, HK — 照旧的表，搬到白纸样式</td></tr>
-              </tbody>
-              <tfoot><tr><td>Total</td><td colspan="6"></td><td class="num">RM 76,996.25</td></tr></tfoot>
-            </table>
-            <div class="sect-head" style="margin-top:30px"><h2>Staff Billing Allocation</h2><span class="rule" aria-hidden="true"></span><span class="count">4 DEPARTMENTS</span></div>
-            <div class="muted-line">HR · Finance · Director Office · IT — 每个部门一个表（Salary / Allowance / EPF / SOCSO / EIS / Total，HV own share 一行），照旧。</div>
-          </div>
+          </details>
 
           <div class="sect-head" style="margin-top:30px"><h2>Invoices</h2><span class="rule" aria-hidden="true"></span><span class="count">54 INVOICES · SEPTEMBER 2026 · 2 SELECTED</span></div>
           <div class="sheet-tabs" role="tablist">
@@ -373,21 +345,8 @@
             </tbody>
           </table>
 
-          <!-- payroll basis, at the bottom, folded -->
-          <div class="basis-bottom">
-            <details class="basis">
-              <summary>Payroll basis <small>DIRECTOR SALARY SUBMISSION · STAFF BILLING ALLOCATION · 照旧的两组表，放这里收起</small></summary>
-              <div class="inner">
-                <div class="sect-head" style="margin-top:6px"><h2>Director Salary Submission</h2><span class="rule" aria-hidden="true"></span><span class="count">5 SUBSIDIARIES · RM 76,996.25</span></div>
-                <div class="muted-line">Subsidiary · Basic · KPI · Allowance · EPF ER · SOCSO ER · EIS ER · Total — 照旧。</div>
-                <div class="sect-head" style="margin-top:22px"><h2>Staff Billing Allocation</h2><span class="rule" aria-hidden="true"></span><span class="count">4 DEPARTMENTS</span></div>
-                <div class="muted-line">HR · Finance · Director Office · IT — 每个部门一个表，HV own share 一行，照旧。</div>
-              </div>
-            </details>
-          </div>
-
           <div class="legend">
-            <b>改版改了什么</b>：顶部四张卡（Invoiced 深色 primary；Outstanding 有未收就变黄；Received；Payroll basis）。「Billing progress」一张表取代现在那 5 张 OPEX 卡——而且按 line 的部门算，consolidated 那几张（HR + Finance + Director Office 一张单）也算进去，不再像现在显示 HR / Finance 没开票。Invoices 改成白纸表格：tabs 计数、搜索一行、Bill to 带公司名、Status 用 chip、勾选后底下出 Settle 条。Credit notes / Marketing projects / Non-billable 照旧搬成白纸表。Director Salary Submission 和 Staff Billing Allocation 这两组底稿搬到最底收起（可切回上面）。<br>
+            <b>改版改了什么</b>：月份跟标题放一起；六颗按钮全部在，分三组写明 From payroll / Create / Export。顶部四张卡（Invoiced 深色 primary；Outstanding 有未收就变黄；Received；Payroll basis）。不另开「开票进度」表——每个部门从薪资算出来该开多少、开了多少，写在 Payroll basis 那条收起的 summary 上。Director Salary Submission 和 Staff Billing Allocation 收起、放在 invoices 上面（照旧的位置）。Invoices 改成白纸表格：tabs 计数、搜索一行、Bill to 带公司名、Status 用 chip、勾选后底下出 Settle 条。Credit notes / Marketing projects / Non-billable 照旧搬成白纸表。<br>
             <b>没动的</b>：开票、issue、settle、CN、作废、改 account、Edit 的流程；period 选择；Finance 的 department mode 开关。
           </div>
         </div>
@@ -579,21 +538,6 @@
           </div>
         </section>
 
-        <div class="sect-head"><h2>Billing progress</h2><span class="rule" aria-hidden="true"></span><span class="count">6</span></div>
-        <table class="ledger-table no-tick">
-          <colgroup><col><col style="width:112px"><col style="width:30px"></colgroup>
-          <thead><tr><th>Department</th><th class="right">Invoiced</th><th class="lt-toggle" aria-hidden="true"></th></tr></thead>
-          <tbody>
-            <tr><td><span class="d1">HR</span><span class="d2">3 consolidated · HV share 1,739.70</span></td><td class="num">RM 4,057.35</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
-            <tr><td><span class="d1">Finance</span><span class="d2">5 consolidated · HV share 1,956.29</span></td><td class="num">RM 24,680.44</td><td class="lt-toggle"><span class="chev">&#9652;</span></td></tr>
-            <tr class="lt-detail"><td colspan="3"><dl class="lt-detail-list"><dt>From payroll</dt><dd>RM 26,636.73</dd><dt>Invoiced</dt><dd>RM 24,680.44 · 5 invoices</dd><dt>Difference</dt><dd>−1,956.29 · HV own share</dd><dd class="wide"><a class="text-accent" href="#" style="font-family:Georgia,serif;font-style:italic">+ Invoice →</a></dd></dl></td></tr>
-            <tr><td><span class="d1">Director Office</span><span class="d2">3 consolidated · HV share 1,616.12</span></td><td class="num">RM 5,799.68</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
-            <tr><td><span class="d1">IT</span><span class="d2">2 consolidated · +0.01</span></td><td class="num">RM 5,971.76</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
-            <tr><td><span class="d1">Director</span><span class="d2">5 invoices · matched</span></td><td class="num">RM 76,996.25</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
-            <tr><td><span class="d1">Marketing</span><span class="d2">9 projects · short 92.72</span></td><td class="num">RM 59,605.24</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
-          </tbody>
-        </table>
-
         <div class="sect-head" style="margin-top:22px"><h2>Invoices</h2><span class="rule" aria-hidden="true"></span><span class="count">54 · 2 SEL.</span></div>
         <div class="sheet-tabs" role="tablist">
           <button type="button" role="tab" aria-selected="true">All <span class="sheet-count">54</span></button>
@@ -608,7 +552,7 @@
             <tr><td><input type="checkbox" class="accent-accent"></td><td><span class="d1">2990 · AI TOOLS-AUG'2026</span><span class="d2">HV-INV-202610-0010</span><span class="d3"><span class="by"><span class="chip alert"><i class="dot"></i>issued</span></span><span class="on">17 Sep</span></span></td><td class="num">RM 429.84</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
             <tr><td><input type="checkbox" class="accent-accent" disabled></td><td><span class="d1">Carres · AI TOOLS-Aug'2026</span><span class="d2">HV-INV-202610-0009</span><span class="d3"><span class="by"><span class="chip ledger"><i class="dot"></i>paid</span></span><span class="on">17 Sep</span></span></td><td class="num">RM 859.68</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
             <tr class="sel"><td><input type="checkbox" class="accent-accent" checked></td><td><span class="d1">Hookka · Director salary CTC</span><span class="d2">HV-INV-202609-0059</span><span class="d3"><span class="by"><span class="chip alert"><i class="dot"></i>issued</span></span><span class="on">30 Sep</span></span></td><td class="num">RM 11,316.05</td><td class="lt-toggle"><span class="chev">&#9652;</span></td></tr>
-            <tr class="lt-detail"><td colspan="4"><dl class="lt-detail-list"><dt>Description</dt><dd>Director salary CTC — September 2026</dd><dt>Category</dt><dd>Salary Income</dd><dt>Mode</dt><dd>Director attribution</dd><dt>Due</dt><dd>30 Oct 2026</dd><dd class="wide"><a class="text-accent" href="#" style="font-family:Georgia,serif;font-style:italic">Settle →</a><a class="text-accent" href="#" style="font-family:Georgia,serif;font-style:italic">Open the invoice →</a><a href="#" style="font-family:Georgia,serif;font-style:italic;color:rgb(var(--graphite))">更多 ⋯</a></dd></dl></td></tr>
+            <tr class="lt-detail"><td colspan="4"><dl class="lt-detail-list"><dt>Description</dt><dd>Director salary CTC — September 2026</dd><dt>Category</dt><dd>Salary Income</dd><dt>Mode</dt><dd>Director attribution</dd><dt>Due</dt><dd>30 Oct 2026</dd><dd class="wide"><a class="btn-mini" href="#">Settle →</a><a class="text-accent" href="#" style="font-family:Georgia,serif;font-style:italic">Open the invoice →</a><a href="#" style="font-family:Georgia,serif;font-style:italic;color:rgb(var(--graphite))">更多 ⋯</a></dd></dl></td></tr>
             <tr class="sel"><td><input type="checkbox" class="accent-accent" checked></td><td><span class="d1">HOUZS Century · Director salary CTC</span><span class="d2">HV-INV-202609-0058</span><span class="d3"><span class="by"><span class="chip alert"><i class="dot"></i>issued</span></span><span class="on">30 Sep</span></span></td><td class="num">RM 25,768.10</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
             <tr><td><input type="checkbox" class="accent-accent"></td><td><span class="d1">Dream Crafter · Director salary CTC</span><span class="d2">HV-INV-202609-0057</span><span class="d3"><span class="by"><span class="chip alert"><i class="dot"></i>issued</span></span><span class="on">30 Sep</span></span></td><td class="num">RM 14,452.05</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
             <tr><td><input type="checkbox" class="accent-accent"></td><td><span class="d1">The Cont · Director salary CTC</span><span class="d2">HV-INV-202609-0056</span><span class="d3"><span class="by"><span class="chip alert"><i class="dot"></i>issued</span></span><span class="on">30 Sep</span></span></td><td class="num">RM 15,817.92</td><td class="lt-toggle"><span class="chev">&#9662;</span></td></tr>
@@ -669,8 +613,7 @@
   <div class="phone-note">
     <b>手机版</b>：<br>
     · 四张卡变 2 × 2；period 变右上角的小胶囊。<br>
-    · Billing progress 一行一个部门：看 Invoiced，▾ 展开才看 From payroll / Difference 和 + Invoice。<br>
-    · Invoices 每行先看 Bill to + Amount；单号、状态 chip、日期缩成小字；▾ 展开看 Description / Category / Mode / Due，和 Settle → / Open the invoice → / 更多 ⋯。<br>
+        · Invoices 每行先看 Bill to + Amount；单号、状态 chip、日期缩成小字；▾ 展开看 Description / Category / Mode / Due；Settle → 是橘色按钮（跟 Principal 的 Approve 一样），Open the invoice → / 更多 ⋯ 是字。<br>
     · 勾了几张，底部出 Settle 条（同一个 payer 才能一起）。<br>
     · Statements 同样：Company + Net，▾ 展开看 Invoice / Contra。<br>
     · 跟 Approvals 一样，tick 和 ▾ 整格可按。
