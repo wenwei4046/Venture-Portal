@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/utils'
 import { useStickySelection } from '@/lib/useStickySelection'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import type { QueueRow } from '@/lib/approval-queue'
+import AttachmentThumbs, { type AttachmentThumb } from '@/components/voucher/AttachmentThumbs'
 import BatchDetailsModal from './BatchDetailsModal'
 import { approveRequestsBulk, rejectRequestsBulk, type BulkApproveResult, type BulkRejectResult } from '../actions'
 
@@ -24,6 +25,12 @@ export interface PendingRow extends QueueRow {
   /** The pool(s) the row's vouchers draw on, and their category — the phone's panel. */
   pool: string
   category: string
+  /** Who is paid, how ("Bank transfer · Maybank"), and the files attached —
+   *  the phone's panel too (user picked B, 2026-10-07: see the bill without
+   *  leaving the list). */
+  payee: string
+  payBy: string
+  attachments: AttachmentThumb[]
 }
 
 type Outcome =
@@ -216,6 +223,15 @@ export default function PendingApprovals({ rows, canSetDefault = false }: { rows
     },
     { key: 'pool', group: '入账', label: 'Pool', mobile: 'detail-only', render: (r) => r.pool || '—' },
     { key: 'category', group: '入账', label: 'Category', mobile: 'detail-only', render: (r) => r.category || '—' },
+    { key: 'payee', group: '基本', label: 'Payee', mobile: 'detail-only', render: (r) => r.payee || '—' },
+    { key: 'payBy', group: '基本', label: 'Pay by', mobile: 'detail-only', render: (r) => r.payBy || '—' },
+    {
+      key: 'attachments',
+      group: '基本',
+      label: 'Attachments',
+      mobile: 'detail-only',
+      render: (r) => (r.voucherIds.length > 0 ? <AttachmentThumbs attachments={r.attachments} /> : '—'),
+    },
     {
       key: 'by',
       group: '基本',

@@ -49,6 +49,19 @@ and the shared table gained opt-in props only. Then "照这个做看看".
   `RecentDecisions.test.tsx` (3), `approvals/page.test.tsx` (4).
 - Next in batch 1: Invoice / Statements → Service Billing → Billing Allocator →
   Invoice Pool, a sample first for each; then batches 2–4.
+- Follow-ups the same day, from the Principal's phone: (1) Service Billing's
+  six head controls ran past the sheet (`BillingView` page-head: actions now
+  `min-w-0 flex-wrap justify-end`, title `shrink-0` — reproduced in a scratch
+  page with the built CSS: `shrink-0` squeezed the title and overflowed; the
+  fix wraps instead); (2) the queue's phone small print was Chivo Mono at 10px
+  and read as a typewriter / "华语字体" — now the body face at 11px
+  (`.approvals-queue .q-sub`); (3) the user picked **B** for reaching the
+  voucher from the phone: the panel now also shows Payee, Pay by ("Bank
+  transfer · Maybank") and Attachments as thumbnails (`AttachmentThumbs`,
+  components/voucher — signed on open through `getAttachmentPreviewUrls`,
+  other files through `getAttachmentSignedUrl`; `page.tsx` reads
+  `payment_vouchers`, `bank_accounts`, `payment_attachments` for the waiting
+  vouchers). Option A (tap the description to open) was not chosen.
 
 ## CHECKPOINT 2026-10-07 (SHIPPED) — Finance's pages on the white sheet (option A)
 

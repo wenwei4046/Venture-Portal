@@ -55,6 +55,26 @@ function database() {
       if (table === 'hr_staff_costs') return { data: [{ user_id: 'ex', title_id: 'T-acc' }], error: null }
       if (table === 'titles') return { data: [{ id: 'T-acc', level_id: 'L3' }], error: null }
       if (table === 'title_levels') return { data: [{ id: 'L3', name: 'Executive', rank: 3 }, { id: 'L6', name: 'Manager', rank: 6 }], error: null }
+      if (table === 'payment_vouchers') {
+        return {
+          data: [
+            { id: 'v449', payee_name: 'HOUZS Century', payment_method: 'bank_transfer', bank_account_id: 'bank1' },
+            { id: 'v471', payee_name: 'Landlord Sdn Bhd', payment_method: 'bank_transfer', bank_account_id: 'bank1' },
+            { id: 'v475', payee_name: 'Company 2990', payment_method: 'netting', bank_account_id: null },
+          ],
+          error: null,
+        }
+      }
+      if (table === 'bank_accounts') return { data: [{ id: 'bank1', bank_name: 'Maybank' }], error: null }
+      if (table === 'payment_attachments') {
+        return {
+          data: [
+            { id: 'att1', voucher_id: 'v471', file_name: 'tenancy-oct.pdf', file_type: 'application/pdf' },
+            { id: 'att2', voucher_id: 'v471', file_name: 'receipt.jpg', file_type: 'image/jpeg' },
+          ],
+          error: null,
+        }
+      }
       if (table === 'payment_voucher_sources') {
         return {
           data: [
@@ -120,6 +140,18 @@ describe('the Approvals page on the sheet', () => {
     expect(sent().map((r) => r.key)).toEqual(['a', 'b', 'g:grp'])
     expect(sent()[1]).toMatchObject({ pool: 'Venture Pool', category: 'Office Rental', submitterName: 'ONG MEI SHUANG' })
     expect(sent()[0]).toMatchObject({ pool: 'Director Pool', category: 'Loans receivable' })
+    // What the phone's panel shows of the voucher itself (user picked B, 2026-10-07):
+    // who is paid, how, and the files attached.
+    expect(sent()[1]).toMatchObject({
+      payee: 'Landlord Sdn Bhd',
+      payBy: 'Bank transfer · Maybank',
+      attachments: [
+        { id: 'att1', fileName: 'tenancy-oct.pdf', fileType: 'application/pdf' },
+        { id: 'att2', fileName: 'receipt.jpg', fileType: 'image/jpeg' },
+      ],
+    })
+    expect(sent()[0]).toMatchObject({ payee: 'HOUZS Century', payBy: 'Bank transfer · Maybank', attachments: [] })
+    expect(sent()[2]).toMatchObject({ payee: 'Company 2990', payBy: 'Netting', attachments: [] })
     expect(screen.getByTestId('queue')).toHaveAttribute('data-can-set-default', 'true')
     const recent = JSON.parse(screen.getByTestId('recent').textContent ?? '[]') as Array<Record<string, unknown>>
     expect(recent.map((r) => [r.id, r.decision, r.submitterName])).toEqual([

@@ -64,7 +64,8 @@ export default async function ApprovalsPage() {
   // behind each waiting voucher for the phone's panel.
   const submitterIds = uniq(pending.map((r) => r.submitted_by))
   const voucherIds = uniq(rows.flatMap((r) => r.voucherIds))
-  const [{ data: staff }, { data: sources }] = await Promise.all([
+  const none = { data: [] as never[] }
+  const [{ data: staff }, { data: sources }, { data: vouchers }, { data: attachmentRows }] = await Promise.all([
     submitterIds.length > 0
       ? supabase.from('hr_staff_costs').select('user_id, title_id').in('user_id', submitterIds)
       : Promise.resolve({ data: [] as Array<{ user_id: string | null; title_id: string | null }> }),
@@ -74,17 +75,53 @@ export default async function ApprovalsPage() {
           .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
           .in('voucher_id', voucherIds)
           .order('amount', { ascending: false })
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve(none),
+    // The voucher itself — who is paid, how — and its files, for the phone's panel.
+    voucherIds.length > 0
+      ? supabase.from('payment_vouchers').select('id, payee_name, payment_method, bank_account_id').in('id', voucherIds)
+      : Promise.resolve(none),
+    voucherIds.length > 0
+      ? supabase.from('payment_attachments').select('id, voucher_id, file_name, file_type').in('voucher_id', voucherIds).order('uploaded_at', { ascending: true })
+      : Promise.resolve(none),
   ])
   const titleIds = uniq((staff ?? []).map((s) => s.title_id).filter((id): id is string => !!id))
-  const [{ data: titles }, { data: levels }] =
+  const bankIds = uniq((vouchers ?? []).map((v) => v.bank_account_id).filter((id): id is string => !!id))
+  const [{ data: titles }, { data: levels }, { data: banks }] = await Promise.all([
     titleIds.length > 0
-      ? await Promise.all([
-          supabase.from('titles').select('id, level_id').in('id', titleIds),
-          supabase.from('title_levels').select('id, name, rank'),
-        ])
-      : [{ data: [] as Array<{ id: string; level_id: string | null }> }, { data: [] as Array<{ id: string; name: string; rank: number }> }]
+      ? supabase.from('titles').select('id, level_id').in('id', titleIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; level_id: string | null }> }),
+    titleIds.length > 0
+      ? supabase.from('title_levels').select('id, name, rank')
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string; rank: number }> }),
+    bankIds.length > 0
+      ? supabase.from('bank_accounts').select('id, bank_name').in('id', bankIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; bank_name: string }> }),
+  ])
   const executives = executiveSubmitterIds(staff ?? [], titles ?? [], levels ?? [])
+
+  const bankName = new Map((banks ?? []).map((b) => [b.id, b.bank_name]))
+  const voucherById = new Map((vouchers ?? []).map((v) => [v.id, v]))
+  const attachmentsByVoucher = new Map<string, Array<{ id: string; fileName: string; fileType: string }>>()
+  for (const a of attachmentRows ?? []) {
+    const list = attachmentsByVoucher.get(a.voucher_id) ?? []
+    list.push({ id: a.id, fileName: a.file_name, fileType: a.file_type })
+    attachmentsByVoucher.set(a.voucher_id, list)
+  }
+  const methodLabel = (m: string | null) => {
+    const words = (m ?? '').replace(/_/g, ' ').trim()
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : ''
+  }
+  /** "Landlord Sdn Bhd" — or, for a batch paying several people, "Aina + 25 more". */
+  const payeeOf = (ids: string[]) => {
+    const names = uniq(ids.map((id) => voucherById.get(id)?.payee_name ?? '').filter(Boolean))
+    return names.length <= 1 ? (names[0] ?? '') : `${names[0]} + ${names.length - 1} more`
+  }
+  const payByOf = (ids: string[]) => {
+    const v = ids.map((id) => voucherById.get(id)).find(Boolean)
+    if (!v) return ''
+    const bank = v.bank_account_id ? bankName.get(v.bank_account_id) : undefined
+    return [methodLabel(v.payment_method), bank].filter(Boolean).join(' · ')
+  }
   const summary = queueSummary(rows, new Date(), executives)
 
   const poolsByVoucher = new Map<string, string[]>()
@@ -109,6 +146,9 @@ export default async function ApprovalsPage() {
     ...r,
     pool: uniq(r.voucherIds.flatMap((id) => poolsByVoucher.get(id) ?? [])).join(' + '),
     category: uniq(r.voucherIds.flatMap((id) => categoriesByVoucher.get(id) ?? [])).join(' + '),
+    payee: payeeOf(r.voucherIds),
+    payBy: payByOf(r.voucherIds),
+    attachments: r.voucherIds.flatMap((id) => attachmentsByVoucher.get(id) ?? []),
   }))
 
   const canSetDefault = user.role === 'finance' || user.role === 'principal'

@@ -22,6 +22,11 @@ vi.mock('../actions', () => ({
   approveRequestsBulk: mocks.approveRequestsBulk,
   rejectRequestsBulk: mocks.rejectRequestsBulk,
 }))
+vi.mock('@/components/voucher/AttachmentThumbs', () => ({
+  default: (p: { attachments: Array<{ fileName: string }> }) => (
+    <span data-testid="thumbs">{p.attachments.length === 0 ? 'No attachments' : p.attachments.map((a) => a.fileName).join(', ')}</span>
+  ),
+}))
 vi.mock('./BatchDetailsModal', () => ({
   default: (p: { groupId: string; open: boolean; actionable?: boolean; contextItems?: unknown[] }) => (
     <div data-testid="batch-modal" data-group={p.groupId} data-open={String(p.open)} data-actionable={String(!!p.actionable)}>
@@ -56,7 +61,14 @@ const queue = buildQueueRows(
   ],
   { amountOf: (r) => (r.amount === null ? null : Number(r.amount)), nameOf: (id) => names[id] ?? 'Unknown' },
 )
-const rows: PendingRow[] = queue.map((r) => ({ ...r, pool: r.key === 'b' ? 'Venture Pool' : 'Director Pool', category: r.key === 'b' ? 'Office Rental' : 'Loan' }))
+const rows: PendingRow[] = queue.map((r) => ({
+  ...r,
+  pool: r.key === 'b' ? 'Venture Pool' : 'Director Pool',
+  category: r.key === 'b' ? 'Office Rental' : 'Loan',
+  payee: r.key === 'b' ? 'Landlord Sdn Bhd' : 'HOUZS Century',
+  payBy: 'Bank transfer · Maybank',
+  attachments: r.key === 'b' ? [{ id: 'att1', fileName: 'tenancy-oct.pdf', fileType: 'application/pdf' }] : [],
+}))
 
 function desktop(matches: boolean) {
   window.matchMedia = ((query: string) => ({
@@ -171,11 +183,25 @@ describe('the pending queue', () => {
     expect(description).toHaveTextContent('2 Oct')
     fireEvent.click(within(first).getByRole('button', { name: '展开明细' }))
     const panel = document.querySelector('tr.lt-detail') as HTMLElement
-    for (const term of ['Type', 'Pool', 'Category', 'Submitted']) expect(within(panel).getByText(term)).toBeInTheDocument()
+    for (const term of ['Type', 'Pool', 'Category', 'Payee', 'Pay by', 'Attachments', 'Submitted']) {
+      expect(within(panel).getByText(term)).toBeInTheDocument()
+    }
     expect(panel).toHaveTextContent('Director Pool')
     expect(panel).toHaveTextContent('Loan')
+    expect(panel).toHaveTextContent('HOUZS Century')
+    expect(panel).toHaveTextContent('Bank transfer · Maybank')
+    expect(within(panel).getByTestId('thumbs')).toHaveTextContent('No attachments')
     fireEvent.click(within(panel).getByText('Open the voucher →'))
     expect(mocks.push).toHaveBeenCalledWith('/approvals/a')
+  })
+
+  it("on a phone, a voucher's files are in its panel", () => {
+    desktop(false)
+    render(<PendingApprovals rows={rows} />)
+    fireEvent.click(within(bodyRows()[1]).getByRole('button', { name: '展开明细' }))
+    const panel = document.querySelector('tr.lt-detail') as HTMLElement
+    expect(within(panel).getByTestId('thumbs')).toHaveTextContent('tenancy-oct.pdf')
+    expect(panel).toHaveTextContent('Landlord Sdn Bhd')
   })
 
   it('says so when nothing is waiting', () => {
