@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
@@ -13,6 +13,7 @@ import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
 import MoreSheet from './MoreSheet'
 import BackToTop from '@/components/BackToTop'
+import RouteFreshener from './RouteFreshener'
 
 // Portal shell.
 //
@@ -110,6 +111,10 @@ export default function PortalFrame({
       />
 
       <BackToTop />
+      {/* A page answered from the router's memory is read again behind itself (2026-10-08). */}
+      <Suspense fallback={null}>
+        <RouteFreshener />
+      </Suspense>
     </div>
   )
 }
