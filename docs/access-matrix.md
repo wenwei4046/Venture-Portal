@@ -4,6 +4,19 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — The database's functions ask for the action too (PR3b)
+70 write functions decided by the caller's ROLE (or by a key, which a View cell
+opens): a Finance · Checker could book a loan through the API, a Director whose
+template holds Treasury · Create was refused it, a payroll viewer could submit payroll.
+Each now asks for the action the app's own gate asks — Treasury · Create books a loan,
+Treasury · Approve amends a booked one, HR Costing · Create sends payroll to Finance,
+Revenue · Edit closes a salesperson, and so on. A function that runs inside another
+also accepts the outer path's people (reversing a journal: Billing / Treasury · Void, or
+the approver of the cancellation that reverses it). The shared accounts kept everything
+a page of theirs does. Still decided by who you are, on purpose: the approvals (by the
+request's domain since PR2b), managing permissions, Department mode, reopening a closed
+payroll month (the Principal). Mig `20261009030000`.
+---
 ⚡ AMENDMENT 2026-10-09 — The database asks for the action too (PR3a)
 A table's row policies opened it to whoever held ANY key of its domain
 (`has_scope(ARRAY['treasury'])`), and a View cell opens a key — so with their own session
