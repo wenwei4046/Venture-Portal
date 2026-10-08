@@ -657,9 +657,15 @@
 .tileAlt { font-weight: 500; color: var(--rv-sub); }
 .tileCount { color: var(--rv-accent); }
 
-/* ── Modular's board ── */
+/* ── Modular's board ──
+   The one place the page leaves the prototype, by request (2026-10-08: the
+   cards had no depth against the page). The prototype laid white cards on the
+   white page, a 1.5px #EBDDD2 edge apart, and a not-offered card on #FBF7F3 —
+   2.6 L* off white, which nobody can see. Each category now sits on a sand
+   tray (6.4 L* under the white card): an offered model is a white card lifted
+   off it, a not-offered one an empty dashed slot in it. */
 .board { display: flex; flex-direction: column; gap: 28px; }
-.boardSection { display: flex; flex-direction: column; gap: 14px; }
+.boardSection { display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 18px; border-radius: 18px; background: var(--rv-sand); }
 .boardHead { display: flex; align-items: center; gap: 10px; margin: 0; }
 .boardChip { height: 28px; padding: 0 12px; border-radius: 14px; background: var(--rv-brown); color: var(--rv-white); font-size: 13px; font-weight: 650; line-height: 28px; }
 .boardCount { font-size: 13px; color: var(--rv-sub); font-weight: 400; }
@@ -669,7 +675,8 @@
 .brandHead[data-none] .brandDash { background: var(--rv-muted); }
 .brandLabel { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--rv-brown); }
 .brandCount { font-size: 12px; color: var(--rv-sub); font-weight: 400; }
-.brandRule { flex: 1; height: 1px; background: var(--rv-line); }
+/* --rv-line is 4.7 L* off the sand: too faint to read as a rule there. */
+.brandRule { flex: 1; height: 1px; background: var(--rv-line-strong); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
 .card {
   display: flex;
@@ -677,23 +684,32 @@
   gap: 6px;
   padding: 14px 14px 12px;
   border-radius: 14px;
-  border: 1.5px solid var(--rv-line);
+  border: 1px solid var(--rv-line);
   background: var(--rv-white);
   text-align: left;
   white-space: normal;
   color: var(--rv-ink);
-  box-shadow: none;
+  box-shadow: 0 1px 2px var(--rv-ink-08), 0 4px 12px var(--rv-ink-05);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
-.card[data-offered="false"] { background: var(--rv-paper-warm); }
-.card[data-open="true"] { border-color: var(--rv-accent); background: var(--rv-cream); box-shadow: 0 6px 18px var(--rv-accent-12); }
+.card[data-offered="false"] { background: transparent; border: 1.5px dashed var(--rv-muted); box-shadow: none; }
+/* A pointer only: a phone keeps :hover on the last card tapped. */
+@media (hover: hover) {
+  .card:hover:not([data-open="true"]) { border-color: var(--rv-line-strong); box-shadow: 0 2px 4px var(--rv-ink-08), 0 8px 20px var(--rv-ink-08); }
+  .card[data-offered="false"]:hover:not([data-open="true"]) { border-color: var(--rv-faint); background: var(--rv-white-55); box-shadow: none; }
+}
+.card[data-open="true"] { border: 1.5px solid var(--rv-accent); background: var(--rv-cream); box-shadow: 0 6px 18px var(--rv-accent-12); }
 .cardTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
 .cardCode { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
-.cardState { height: 20px; padding: 0 8px; border-radius: 10px; background: var(--rv-sand); color: var(--rv-sub); font-size: 11px; font-weight: 650; line-height: 20px; white-space: nowrap; }
-.card[data-offered="true"] .cardState { background: var(--rv-green-bg); color: var(--rv-kpi-ink); }
+.cardState { height: 20px; padding: 0 8px; border-radius: 10px; background: transparent; box-shadow: inset 0 0 0 1px var(--rv-muted); color: var(--rv-sub); font-size: 11px; font-weight: 650; line-height: 20px; white-space: nowrap; }
+.card[data-offered="true"] .cardState { background: var(--rv-green-bg); box-shadow: none; color: var(--rv-kpi-ink); }
 .cardName { font-size: 12.5px; color: var(--rv-sub); }
 .cardMeta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--rv-sub); }
 .cardFlag { color: var(--rv-amber); font-weight: 650; }
 .boardEmpty { margin: 0; padding: 40px 0; text-align: center; color: var(--rv-sub); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}
 
 /* ── a floating window: the model, the new combo ── */
 .overlay {
