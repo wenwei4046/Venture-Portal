@@ -11,7 +11,14 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions }
 // them current without threading a registry through dozens of call chains.
 // Throttled: departments changes rarely; 30s staleness only ever delays a
 // just-provisioned dept, and the provision action re-primes immediately.
+//
+// Off the critical path (2026-10-08): only an instance's FIRST prime is
+// awaited (its registry is empty until then). After that a due refresh runs
+// beside the request instead of in front of it — on prod it had been adding
+// 40–60 ms to about a third of all requests, and the registry it replaces is
+// never older than the 30 s the throttle already allowed.
 let lastPrimeAt = 0
+let primedOnce = false
 const PRIME_INTERVAL_MS = 30_000
 
 export async function createClient() {
@@ -40,12 +47,13 @@ export async function createClient() {
 
   if (Date.now() - lastPrimeAt > PRIME_INTERVAL_MS) {
     lastPrimeAt = Date.now()
-    try {
-      await primeDeptRegistryFromDb(client as never)
-    } catch {
-      // Priming is best-effort — an unprimed request just folds unknown
-      // departments into Venture, exactly the pre-dynamic behaviour.
-    }
+    // Priming is best-effort — an unprimed request just folds unknown
+    // departments into Venture, exactly the pre-dynamic behaviour.
+    const prime = primeDeptRegistryFromDb(client as never).then(
+      () => { primedOnce = true },
+      () => {},
+    )
+    if (!primedOnce) await prime
   }
 
   return client
