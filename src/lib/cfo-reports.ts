@@ -731,6 +731,35 @@ function startedEarly<T>(read: Promise<T>): Promise<T> {
   return read
 }
 
+/** Σ (Dr − Cr) per account over every line of a non-reversed journal entry
+ *  dated strictly BEFORE `before`, `codes` narrowing it (null = every account).
+ *  Summed by the database — `gl_net_by_account`, mig 20261008180000 — instead
+ *  of downloading the lines to add them up here (2026-10-08: the Ledger's
+ *  opening balances were ~3,860 lines in four pages, the Trial Balance all
+ *  ~4,230 in five; the sum is one row per account, ~29 ms). SECURITY INVOKER,
+ *  so RLS answers as it did for the lines. */
+async function fetchNetByAccount(
+  supabase: SupabaseClient,
+  before: string,
+  codes: string[] | null,
+  label: string,
+): Promise<Map<string, number>> {
+  const { data, error } = await supabase.rpc('gl_net_by_account', {
+    p_before: before,
+    ...(codes ? { p_codes: codes } : {}),
+  })
+  if (error) throw new Error(`${label}: ${error.message}`)
+  return new Map(
+    ((data ?? []) as Array<{ account_code: string; net: number | string }>).map((r) => [r.account_code, Number(r.net)]),
+  )
+}
+
+/** A real `YYYY-MM-DD` day — not `2026-02-31`, which dayjs would roll into
+ *  March and Postgres would refuse. */
+export function isCalendarDay(day: string | null | undefined): day is string {
+  return !!day && /^\d{4}-\d{2}-\d{2}$/.test(day) && dayjs(day).format('YYYY-MM-DD') === day
+}
+
 const INVOICE_REVENUE_STATUSES = ['issued', 'paid', 'paid_via_netting'] as const
 
 interface AccountMeta {
@@ -1646,21 +1675,13 @@ export async function fetchTrialBalance(
   args: { asOf: string; showZeroBalance: boolean },
 ): Promise<TrialBalance> {
   const { asOf, showZeroBalance } = args
+  if (!isCalendarDay(asOf)) throw new Error(`fetchTrialBalance: ${asOf} is not a date`)
 
-  // The ledger read needs nothing from the chart of accounts, so both start
-  // at once and the ledger's pages go together (2026-10-08 — it was the COA,
-  // then five pages one after another). The COA's failure is still the one
-  // reported first.
-  const linesRead = startedEarly(
-    fetchAllRowsParallel(
-      (from, to, withCount) =>
-        supabase
-          .from('journal_lines')
-          .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)', withCount ? { count: 'exact' } : undefined)
-          .order('id', { ascending: true })
-          .range(from, to),
-      'fetchTrialBalance lines',
-    ),
+  // The balances need nothing from the chart of accounts, so both start at
+  // once (2026-10-08 — it was the COA, then five pages of every journal line
+  // one after another). The COA's failure is still the one reported first.
+  const netRead = startedEarly(
+    fetchNetByAccount(supabase, dayjs(asOf).add(1, 'day').format('YYYY-MM-DD'), null, 'fetchTrialBalance lines'),
   )
 
   // ── 1: Resolve the set of leaf accounts. A leaf is an account that is NOT
@@ -1683,27 +1704,14 @@ export async function fetchTrialBalance(
     }))
 
   // ── 2-3: Per-leaf-account net (Dr − Cr) over all non-reversed entries dated
-  //    on/before asOf.
-  //
-  //    CRITICAL: journal_lines must be PAGINATED. PostgREST caps an unranged
-  //    select at 1000 rows, so once the ledger exceeds 1000 lines an unpaginated
-  //    fetch silently truncates the sum and the trial balance stops tying — the
-  //    Σ Dr / Σ Cr totals come out unequal and whole accounts go missing
-  //    (regression found 2026-06-16: 1,939 lines → TB short by ~RM 100k).
-  //    We inner-join journal_entries to filter by date/reversed in the same
-  //    pass, which also avoids a fragile .in() over hundreds of entry UUIDs
-  //    (that URL can blow past length limits and fail outright).
+  //    on/before asOf — summed by the database (fetchNetByAccount), so the
+  //    PostgREST 1,000-row cap that once truncated this sum (2026-06-16: 1,939
+  //    lines → TB short by ~RM 100k) has nothing left to cut: one row per
+  //    account.
   const leafSet = new Set(leafAccounts.map((a) => a.code))
   const netByCode = new Map<string, number>()
-  // Pages are counted on RAW rows (the reversed / later-dated skips run after
-  // every page is in), and summed in page order — the old loop's order.
-  for (const l of await linesRead) {
-    const je = l.journal_entries as unknown as { transaction_date: string; is_reversed: boolean }
-    if (je.is_reversed) continue
-    if (je.transaction_date > asOf) continue
-    const code = l.account_code as string
-    if (!leafSet.has(code)) continue
-    netByCode.set(code, (netByCode.get(code) ?? 0) + Number(l.debit ?? 0) - Number(l.credit ?? 0))
+  for (const [code, net] of await netRead) {
+    if (leafSet.has(code)) netByCode.set(code, net)
   }
 
   return buildTrialBalance({ accounts: leafAccounts, netByCode, asOf, showZeroBalance })
@@ -2035,25 +2043,14 @@ export async function fetchLedgers(
     }),
   )
 
-  // ── 2 + 5: the lines, once the leaf codes are known. Join-filtered — the old
-  //    version materialised EVERY pre-from JE id into the request URL and
-  //    started 400ing ("Bad Request", found 2026-08-13) once history passed a
-  //    few thousand entries. ──
+  // ── 2 + 5: once the leaf codes are known — the opening balances summed by
+  //    the database (fetchNetByAccount: one row per account, not every line
+  //    before the period), the period's lines join-filtered (the old version
+  //    materialised EVERY pre-from JE id into the request URL and started
+  //    400ing — "Bad Request", found 2026-08-13 — once history passed a few
+  //    thousand entries). ──
   const readOpening = (leafCodes: string[]) =>
-    startedEarly(
-      fetchAllRowsParallel(
-        (lo, hi, withCount) =>
-          supabase
-            .from('journal_lines')
-            .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)', withCount ? { count: 'exact' } : undefined)
-            .in('account_code', leafCodes)
-            .lt('journal_entries.transaction_date', from)
-            .eq('journal_entries.is_reversed', false)
-            .order('id', { ascending: true })
-            .range(lo, hi),
-        'fetchLedgers opening',
-      ),
-    )
+    startedEarly(fetchNetByAccount(supabase, from, leafCodes, 'fetchLedgers opening'))
   const readPeriodLines = (leafCodes: string[]) =>
     startedEarly(
       fetchAllRowsParallel(
@@ -2126,18 +2123,8 @@ export async function fetchLedgers(
   periodLinesRead ??= readPeriodLines(leafCodes)
 
   // ── 2: Opening balances. Σ (Dr − Cr) for every line on a non-reversed JE
-  //    with transaction_date < from. Single batched query. ──
-  const openingByCode = new Map<string, number>()
-  {
-    const openLines = (await openingRead) as Record<string, unknown>[]
-    for (const l of openLines) {
-      const code = l.account_code as string
-      openingByCode.set(
-        code,
-        (openingByCode.get(code) ?? 0) + Number(l.debit ?? 0) - Number(l.credit ?? 0),
-      )
-    }
-  }
+  //    with transaction_date < from, per account. ──
+  const openingByCode = await openingRead
 
   // ── 3: Period JEs (read since the start). ──
   const periodJes2 = await periodJesRead

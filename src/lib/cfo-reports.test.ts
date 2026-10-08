@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { classifyRows, buildTrialBalance, fetchTrialBalance, buildLedger, resolveSourceDescriptions, groupRevenueByAccount } from './cfo-reports'
+import { classifyRows, buildTrialBalance, fetchTrialBalance, buildLedger, resolveSourceDescriptions, groupRevenueByAccount, isCalendarDay } from './cfo-reports'
 import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
@@ -562,10 +562,13 @@ describe('resolveSourceDescriptions', () => {
   })
 })
 
-// Mock that mimics PostgREST: chart_of_accounts via .select().eq(); journal_lines
-// via .select().order().range(from,to) returning at most a 1000-row page. This is
-// the contract fetchTrialBalance must honour — an unpaginated read would stop at
-// the first 1000 rows and the trial balance would not tie (regression 2026-06-16).
+// Mock that mimics PostgREST for fetchTrialBalance: chart_of_accounts via
+// .select().eq(), and the balances via rpc('gl_net_by_account') — summed the way
+// the SQL function sums them (mig 20261008180000): Σ (Dr − Cr) per account over
+// non-reversed entries dated BEFORE p_before. The trial balance stopped reading
+// journal_lines (2026-10-08), so a read of it fails here. Its old trap — an
+// unpaginated read stopping at the first 1000 rows (regression 2026-06-16) —
+// cannot recur: the database answers one row per account.
 function mockSupabaseForTB(
   coa: Array<{ code: string; name: string; type: string; parent_code: string | null; is_active: boolean }>,
   lines: Array<{ account_code: string; debit: number; credit: number; transaction_date: string; is_reversed: boolean }>,
@@ -575,33 +578,23 @@ function mockSupabaseForTB(
       if (table === 'chart_of_accounts') {
         return { select: () => ({ eq: async () => ({ data: coa, error: null }) }) }
       }
-      if (table === 'journal_lines') {
-        return {
-          select: () => ({
-            order: () => ({
-              range: async (from: number, to: number) => ({
-                // PostgREST caps a page at 1000 rows even if `to` asks for more.
-                data: lines
-                  .slice(from, Math.min(to + 1, from + 1000))
-                  .map((l) => ({
-                    account_code: l.account_code,
-                    debit: l.debit,
-                    credit: l.credit,
-                    journal_entries: { transaction_date: l.transaction_date, is_reversed: l.is_reversed },
-                  })),
-                error: null,
-              }),
-            }),
-          }),
-        }
-      }
       throw new Error(`unexpected table ${table}`)
+    },
+    rpc: async (name: string, args: { p_before: string; p_codes?: string[] }) => {
+      if (name !== 'gl_net_by_account') throw new Error(`unexpected rpc ${name}`)
+      const sums = new Map<string, number>()
+      for (const l of lines) {
+        if (l.is_reversed || !(l.transaction_date < args.p_before)) continue
+        if (args.p_codes && !args.p_codes.includes(l.account_code)) continue
+        sums.set(l.account_code, (sums.get(l.account_code) ?? 0) + l.debit - l.credit)
+      }
+      return { data: [...sums].map(([account_code, net]) => ({ account_code, net })), error: null }
     },
   } as unknown as SupabaseClient
 }
 
-describe('fetchTrialBalance — pagination', () => {
-  it('sums ALL journal_lines beyond the 1000-row PostgREST cap so the TB ties', async () => {
+describe('fetchTrialBalance — balances summed by the database', () => {
+  it('counts ALL journal lines — 1,500, past the 1000-row PostgREST cap — so the TB ties', async () => {
     const coa = [
       { code: '3000', name: 'Bank', type: 'asset', parent_code: null, is_active: true },
       { code: '4000', name: 'Payable', type: 'liability', parent_code: null, is_active: true },
@@ -622,7 +615,7 @@ describe('fetchTrialBalance — pagination', () => {
     expect(tb.reconciles).toBe(true)
   })
 
-  it('excludes reversed entries and entries dated after asOf', async () => {
+  it('excludes reversed entries and entries dated after asOf, keeping asOf itself', async () => {
     const coa = [
       { code: '3000', name: 'Bank', type: 'asset', parent_code: null, is_active: true },
       { code: '4000', name: 'Payable', type: 'liability', parent_code: null, is_active: true },
@@ -632,12 +625,15 @@ describe('fetchTrialBalance — pagination', () => {
       { account_code: '4000', debit: 0, credit: 100, transaction_date: '2026-01-01', is_reversed: false },
       { account_code: '3000', debit: 999, credit: 0, transaction_date: '2026-01-01', is_reversed: true }, // reversed → skip
       { account_code: '3000', debit: 555, credit: 0, transaction_date: '2027-01-01', is_reversed: false }, // after asOf → skip
+      { account_code: '3000', debit: 50, credit: 0, transaction_date: '2026-06-30', is_reversed: false }, // ON asOf → counts
+      { account_code: '4000', debit: 0, credit: 50, transaction_date: '2026-06-30', is_reversed: false },
+      { account_code: '3000', debit: 7, credit: 0, transaction_date: '2026-07-01', is_reversed: false }, // the day after → skip
     ]
     const client = mockSupabaseForTB(coa, lines)
     const tb = await fetchTrialBalance(client, { asOf: '2026-06-30', showZeroBalance: false })
 
-    expect(tb.totals.debit).toBe(100)
-    expect(tb.totals.credit).toBe(100)
+    expect(tb.totals.debit).toBe(150)
+    expect(tb.totals.credit).toBe(150)
     expect(tb.reconciles).toBe(true)
   })
 })
@@ -672,5 +668,18 @@ describe('groupRevenueByAccount', () => {
 
   it('returns [] when no revenue', () => {
     expect(groupRevenueByAccount({ invoiceItems: [], flatLines: [] })).toEqual([])
+  })
+})
+
+describe('isCalendarDay', () => {
+  it('accepts a real YYYY-MM-DD day and nothing else', () => {
+    expect(isCalendarDay('2026-06-30')).toBe(true)
+    expect(isCalendarDay('2028-02-29')).toBe(true)
+    expect(isCalendarDay('2026-02-31')).toBe(false) // dayjs would roll it into March; Postgres refuses it
+    expect(isCalendarDay('2026-02-29')).toBe(false)
+    expect(isCalendarDay('2026-6-30')).toBe(false)
+    expect(isCalendarDay('abc')).toBe(false)
+    expect(isCalendarDay(undefined)).toBe(false)
+    expect(isCalendarDay('')).toBe(false)
   })
 })

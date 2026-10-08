@@ -8028,6 +8028,13 @@ export type Database = {
           submitted_by_name: string
         }[]
       }
+      gl_net_by_account: {
+        Args: { p_before: string; p_codes?: string[] }
+        Returns: {
+          account_code: string
+          net: number
+        }[]
+      }
       has_perm: { Args: { p_key: string }; Returns: boolean }
       has_scope: { Args: { p_scopes: string[] }; Returns: boolean }
       hr_dashboard_summary: { Args: { p_period?: string }; Returns: Json }
