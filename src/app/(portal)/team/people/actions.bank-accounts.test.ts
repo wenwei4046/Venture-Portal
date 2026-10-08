@@ -14,7 +14,10 @@ const { insert, update, query, createClient } = vi.hoisted(() => {
   return { insert, update, query, createClient: vi.fn().mockResolvedValue({ from: vi.fn().mockReturnValue(query) }) }
 })
 vi.mock('@/lib/supabase/server', () => ({ createClient }))
-vi.mock('@/lib/auth', () => ({ requirePermission: vi.fn().mockResolvedValue({ id: 'admin' }) }))
+vi.mock('@/lib/auth', () => {
+  const gate = vi.fn().mockResolvedValue({ id: 'admin' })
+  return { requirePermission: gate, requireAction: gate, requireAnyAction: gate, requirePayrollPayoutsAction: gate }
+})
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 import { addStaff, updateStaff } from './actions'
 

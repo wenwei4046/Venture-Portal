@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
 
@@ -15,7 +15,7 @@ import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
  * and marks the run paid.
  */
 export async function approvePayrollRun(runId: string): Promise<void> {
-  const user = await requirePermission('approvals')
+  const user = await requireAction('approvals', 'approve')
   const supabase = await createClient()
 
   const { data: run, error: readErr } = await supabase
@@ -67,7 +67,7 @@ export async function approvePayrollRun(runId: string): Promise<void> {
  * HR can re-open the grid and edit after rejection.
  */
 export async function rejectPayrollRun(runId: string, reason: string): Promise<void> {
-  const user = await requirePermission('approvals')
+  const user = await requireAction('approvals', 'approve')
   const supabase = await createClient()
 
   if (!reason || reason.trim().length === 0) {

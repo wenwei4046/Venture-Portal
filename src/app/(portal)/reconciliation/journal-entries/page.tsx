@@ -1,11 +1,15 @@
 import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import JvList, { type JvRow } from './_components/JvList'
 
 export default async function JournalEntriesPage() {
-  await requirePermission('reconciliation')
+  const user = await requirePermission('reconciliation')
+  // A new voucher (or a copy) is raised; Edit and Delete change one (2026-10-08, PR2).
+  const canCreate = canDo(user, 'reconciliation', 'create')
+  const canEdit = canDo(user, 'reconciliation', 'edit')
   const supabase = await createClient()
 
   // Manual journal vouchers + the auto payroll accrual JVs (user 2026-08-07:
@@ -82,12 +86,14 @@ export default async function JournalEntriesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/reconciliation/journal-entries/new"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            + New Entry
-          </Link>
+          {canCreate ? (
+            <Link
+              href="/reconciliation/journal-entries/new"
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              + New Entry
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -108,7 +114,7 @@ export default async function JournalEntriesPage() {
           </p>
         </div>
       ) : (
-        <JvList rows={rows} />
+        <JvList rows={rows} canCreate={canCreate} canEdit={canEdit} />
       )}
     </div>
   )

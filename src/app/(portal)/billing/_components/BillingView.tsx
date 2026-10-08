@@ -6,6 +6,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { officeDayStart, officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { directorBillingTarget } from '@/lib/billing'
@@ -37,9 +38,11 @@ interface Props {
 
 export default async function BillingView({ searchParams }: Props) {
   const user = await requirePermission('billing')
-  // Unified portal (2026-07-16): Principal creates/generates invoices and
-  // contracts with the same buttons Finance sees.
-  const canFinanceCreate = user.role === 'finance' || user.role === 'principal'
+  // Each button asks for the action its Server Action asks (2026-10-08, PR2):
+  // invoices and contracts are Billing · Create; a non-billable payment is a
+  // voucher, Treasury · Create.
+  const canFinanceCreate = canDo(user, 'billing', 'create')
+  const canRaiseVoucher = canDo(user, 'treasury', 'create')
   const supabase = await createClient()
 
   const { period: rawPeriod } = await searchParams
@@ -833,7 +836,7 @@ export default async function BillingView({ searchParams }: Props) {
           reference_table: t.reference_table,
         }))}
         period={period}
-        canAdd={canFinanceCreate}
+        canAdd={canRaiseVoucher}
       />
     </div>
   )

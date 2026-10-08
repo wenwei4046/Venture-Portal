@@ -26,6 +26,12 @@ export interface User {
   // every gate in the portal reads; `role` survives only for the handful of
   // dept_manager row policies no scope can express.
   permissions: string[]
+  // What they may DO, and how far (2026-10-08, PR2): `fn.action` → own / dept
+  // / all, from `current_actions()` — a titled person's template cells, an
+  // untitled account's keys as actions. A gate that writes asks this through
+  // `canDo` / `requireAction` (lib/permission-actions.ts). Absent on a value
+  // built before it existed: read as "no actions".
+  actions?: Record<string, 'own' | 'dept' | 'all'>
 }
 
 export interface Company {

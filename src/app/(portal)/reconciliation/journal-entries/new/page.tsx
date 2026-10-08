@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import JournalVoucherForm from '../_components/JournalVoucherForm'
 
@@ -8,7 +8,7 @@ export default async function NewJournalVoucherPage({
 }: {
   searchParams: Promise<{ from?: string }>
 }) {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'create')
   const supabase = await createClient()
   const { from } = await searchParams
 

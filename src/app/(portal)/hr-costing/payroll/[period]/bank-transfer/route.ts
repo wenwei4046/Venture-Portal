@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { requirePayrollPayouts } from '@/lib/auth'
+import { requirePayrollPayoutsAction } from '@/lib/auth'
 import { generateAllianceBankCsv } from '@/lib/bank-transfer/alliance-bank'
 import { salaryBankPayees, type SalaryBankLine } from '@/lib/bank-transfer/payroll-voucher-payees'
 
@@ -14,7 +14,7 @@ export async function GET(
 ) {
   // Every employee's net pay and bank account: HR Costing, or Treasury WITH
   // Payroll payouts (2026-10-02).
-  await requirePayrollPayouts('hr_costing', 'treasury')
+  await requirePayrollPayoutsAction(['hr_costing', 'export'], ['treasury', 'export'])
   const { period } = await context.params
 
   if (!/^\d{4}-\d{2}-01$/.test(period)) {

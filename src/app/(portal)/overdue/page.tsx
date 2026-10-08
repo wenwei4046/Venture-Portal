@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { markOverduePaid } from './actions'
@@ -58,7 +59,9 @@ export default async function OverduePage() {
   }
   const activePeriods = Array.from(activeByPeriod.keys()).sort().reverse()
 
-  const canFinanceAct = user.role === 'finance' || user.role === 'principal'
+  // Detecting and escalating raise records; Mark paid edits one (2026-10-08, PR2).
+  const canFinanceAct = canDo(user, 'treasury', 'create')
+  const canMarkPaid = canDo(user, 'treasury', 'edit')
 
   return (
     <div>
@@ -175,20 +178,22 @@ export default async function OverduePage() {
                           {formatMoney(Number(row.penalty_amount ?? 0))}
                         </td>
                         <td className="right m-hide">
-                          {canFinanceAct ? (
+                          {canFinanceAct || canMarkPaid ? (
                             <div className="flex items-center justify-end gap-3">
-                              {row.overdue_stage === 'escalation' ? (
+                              {canFinanceAct && row.overdue_stage === 'escalation' ? (
                                 <EscalateButton overdueId={row.id} />
                               ) : null}
-                              <form action={markOverduePaid}>
-                                <input type="hidden" name="id" value={row.id} />
-                                <button
-                                  type="submit"
-                                  className="text-sm text-graphite hover:text-accent font-serif italic transition-colors"
-                                >
-                                  Mark paid
-                                </button>
-                              </form>
+                              {canMarkPaid ? (
+                                <form action={markOverduePaid}>
+                                  <input type="hidden" name="id" value={row.id} />
+                                  <button
+                                    type="submit"
+                                    className="text-sm text-graphite hover:text-accent font-serif italic transition-colors"
+                                  >
+                                    Mark paid
+                                  </button>
+                                </form>
+                              ) : null}
                             </div>
                           ) : (
                             <span className="text-xs font-mono text-muted">—</span>

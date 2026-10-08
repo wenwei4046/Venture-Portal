@@ -23,7 +23,7 @@ function segLabel(seg: string | null): string {
   return (seg ?? 'unallocated').replace(/_/g, ' ')
 }
 
-export default function JvList({ rows }: { rows: JvRow[] }) {
+export default function JvList({ rows, canCreate = false, canEdit = false }: { rows: JvRow[]; canCreate?: boolean; canEdit?: boolean }) {
   const [q, setQ] = useState('')
   const query = q.trim().toLowerCase()
 
@@ -123,7 +123,7 @@ export default function JvList({ rows }: { rows: JvRow[] }) {
                 </td>
                 <td className="num">{formatMoney(Number(entry.total_amount))}</td>
                 <td className="m-hide">
-                  <JvRowActions id={entry.id} entryNo={entry.entry_no} />
+                  <JvRowActions id={entry.id} entryNo={entry.entry_no} canCreate={canCreate} canEdit={canEdit} />
                 </td>
               </LedgerRow>
             ))}

@@ -4,13 +4,13 @@
 // Mirrors ../invoice-doc/route.tsx so the two documents share one pattern.
 
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { exportPdfResponse } from '@/lib/export/response'
 import { CreditNoteDocPdf, type CreditNoteDocData } from '../_format/credit-note-doc-pdf'
 import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  await requirePermission('billing')
+  await requireAction('billing', 'export')
   const url = new URL(req.url)
   const id = url.searchParams.get('id')?.trim() || null
   const idsParam = url.searchParams.get('ids')?.trim() || null

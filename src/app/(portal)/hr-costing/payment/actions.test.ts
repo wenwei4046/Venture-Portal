@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), requirePermission: vi.fn(), revalidatePath: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: mocks.rpc }) }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 import { createPayrollDisbursement, generateStatutorySelection } from './actions'
@@ -11,7 +11,7 @@ describe('generateStatutorySelection', () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.rpc.mockResolvedValue({ data: { count: 2, people: 1, total: 15 }, error: null }) })
   it('forwards both schemes in one transaction with the exact reviewed amount and count', async () => {
     await generateStatutorySelection('2026-08-01', ['SOCSO', 'EIS'], 'staff', 'employee', department, [row], '2026-09-15', { total: 15, voucherCount: 2 })
-    expect(mocks.requirePermission).toHaveBeenCalledWith('hr_costing')
+    expect(mocks.requirePermission).toHaveBeenCalledWith('hr_costing', 'create')
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('create_payroll_statutory_selection', {
       p_period: '2026-08-01', p_schemes: ['SOCSO', 'EIS'], p_scope: 'staff', p_granularity: 'employee',
       p_department_id: department, p_payroll_row_ids: [row], p_payment_date: '2026-09-15', p_expected_total: 15, p_expected_count: 2,

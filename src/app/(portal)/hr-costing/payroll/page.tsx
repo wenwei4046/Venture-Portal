@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { getPeriodMonth } from '@/lib/utils'
 import { fetchAllRows } from '@/lib/paginate'
 import CreatePeriodButton from './_components/CreatePeriodButton'
@@ -17,7 +18,7 @@ function formatPeriodLabel(period: string): string {
 }
 
 export default async function PayrollLandingPage() {
-  await requirePermission('hr_costing')
+  const user = await requirePermission('hr_costing')
   const supabase = await createClient()
 
   const thisPeriod = getPeriodMonth()
@@ -102,7 +103,7 @@ export default async function PayrollLandingPage() {
         </p>
         <div className="flex items-center justify-center gap-3 flex-wrap">
           <CreatePeriodButton period={thisPeriod} />
-          <ImportInfotechEntryButton period={thisPeriod} />
+          {canDo(user, 'hr_costing', 'create') ? <ImportInfotechEntryButton period={thisPeriod} /> : null}
         </div>
       </div>
     </div>

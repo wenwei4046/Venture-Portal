@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { adminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
-import { can } from '@/lib/permissions'
+import { requireAction } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { validateInvite, type RawInvite } from '@/lib/invite'
 
 export type InviteResult = { ok: true; name: string; email: string } | { ok: false; reason: string }
@@ -37,7 +37,7 @@ export type InviteResult = { ok: true; name: string; email: string } | { ok: fal
  */
 export async function inviteUser(raw: RawInvite): Promise<InviteResult> {
   // Minting a login is the Principal's, not HR's: an account is access.
-  const actor = await requirePermission('team_invite')
+  const actor = await requireAction('accounts', 'create')
 
   let input
   try {
@@ -45,7 +45,7 @@ export async function inviteUser(raw: RawInvite): Promise<InviteResult> {
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : 'Check the form and try again.' }
   }
-  if (input.cells.length > 0 && !can(actor, 'permissions_manage')) {
+  if (input.cells.length > 0 && !canDo(actor, 'accounts', 'manage')) {
     return { ok: false, reason: 'Only whoever manages permissions changes a cell for one person. Create the login as the template has it.' }
   }
 

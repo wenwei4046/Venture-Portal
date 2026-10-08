@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { requirePermission } from '@/lib/auth'
+import { requireAnyAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../../billing/_components/ContractForm'
 
 export default async function NewContractFromDeptPool() {
-  const user = await requirePermission('dept_pool')
+  const user = await requireAnyAction(['billing', 'create'], ['my_billing', 'create', 'dept'])
   const supabase = await createClient()
 
   const { data: companies } = await supabase

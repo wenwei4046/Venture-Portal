@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
 import EditStaffForm from '../../_components/EditStaffForm'
 
@@ -10,7 +10,7 @@ interface PageProps {
 }
 
 export default async function EditStaffPage({ params }: PageProps) {
-  await requirePermission('team')
+  await requireAction('team', 'edit')
   const { id } = await params
   const supabase = await createClient()
 

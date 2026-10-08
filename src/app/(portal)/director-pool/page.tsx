@@ -6,12 +6,13 @@
 
 import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
 import DirectorPoolClient from './_components/DirectorPoolClient'
 import DepartmentModeCard from '@/components/department/DepartmentModeCard'
 
 export default async function DirectorPoolPage() {
-  await requirePermission('director_pool')
+  const user = await requirePermission('director_pool')
   const data = await loadDirectorPoolData()
 
   return (
@@ -25,12 +26,14 @@ export default async function DirectorPoolPage() {
         </div>
         {/* Navigation, not a decision — an outline button, so the one orange
             action on the sheet stays the calculator's 💾 Save. */}
-        <Link
-          href="/director-pool/import"
-          className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-        >
-          📂 Import JSON
-        </Link>
+        {canDo(user, 'director_pool', 'edit') ? (
+          <Link
+            href="/director-pool/import"
+            className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+          >
+            📂 Import JSON
+          </Link>
+        ) : null}
       </div>
       {/* Cost center or centralized — the Director department's switch (2026-09-30). */}
       <DepartmentModeCard segmentKey="director" />

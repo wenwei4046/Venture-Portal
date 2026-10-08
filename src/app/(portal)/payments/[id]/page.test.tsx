@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { withActions } from '@/test/with-actions'
 import { render, screen, within } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), notFound: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
@@ -38,7 +39,7 @@ beforeEach(() => {
 
 describe('HR payroll voucher detail access', () => {
   it('shows stored statutory coverage and printing to HR without treasury actions or upload tools', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     const { from, filters } = database()
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(mocks.requirePermission).toHaveBeenCalledWith('treasury', 'hr_costing')
@@ -54,14 +55,14 @@ describe('HR payroll voucher detail access', () => {
   })
 
   it('rejects unrelated treasury records before reading their related details', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     const { from } = database('ordinary_payment')
     await expect(PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) })).rejects.toThrow('NOT_FOUND')
     expect(from).toHaveBeenCalledTimes(1)
   })
 
   it('preserves treasury access and its existing action controls', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
     const { filters } = database('ordinary_payment')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(filters).toEqual([])
@@ -72,7 +73,7 @@ describe('HR payroll voucher detail access', () => {
   })
 
   it('does not expose generic financial reversal for a paid salary PV', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
     const { voucher } = database('payroll_disbursement')
     voucher.status = 'paid'
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
@@ -80,7 +81,7 @@ describe('HR payroll voucher detail access', () => {
   })
 
   it('shows net basic and commission with their recorded receiving accounts as one person', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     const person = { scope: 'staff', payroll_row_id: 'salary-row', employee_name: 'Salary Employee', employee_code: 'SAL001', department_name: 'Original Revenue' }
     const { from } = database('payroll_disbursement', [
       { ...person, id: 'basic', salary_component: 'basic', recipient_account: 'account_1', bank_name: 'Recorded Maybank', bank_account_no: '0012345678', net: 4302.70 },
@@ -104,7 +105,7 @@ describe('HR payroll voucher detail access', () => {
   })
 
   it('labels an old net line without inventing a receiving account', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     database('payroll_disbursement', [{ id: 'legacy', scope: 'staff', payroll_row_id: 'legacy-row', employee_name: 'Legacy Employee', department_name: 'Revenue', net: 1000, salary_component: 'net', recipient_account: null, bank_name: null, bank_account_no: null }])
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) }))
     const table = screen.getByRole('table', { name: 'Salary payments on this voucher' })
@@ -115,7 +116,7 @@ describe('HR payroll voucher detail access', () => {
   })
 
   it('does not hide a failed salary snapshot query behind an empty table', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     database('payroll_disbursement', [], { message: 'private database detail' })
     await expect(PaymentDetailPage({ params: Promise.resolve({ id: 'salary' }) })).rejects.toThrow('Unable to load the recorded salary payment details')
   })
@@ -123,7 +124,7 @@ describe('HR payroll voucher detail access', () => {
 
 // 2026-10-02 (user: "这个 pv 点开看 detail 也是很乱 / receipt 也是字体你看怪怪的").
 describe('the voucher page, laid out like the deal forms', () => {
-  const asFinance = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
   const stepLabels = () => Array.from(document.querySelectorAll('.trail-step')).map((li) => li.firstElementChild?.textContent)
   const panel = () => document.querySelector('aside.deal-side') as HTMLElement
 
@@ -206,7 +207,7 @@ describe('the voucher page, laid out like the deal forms', () => {
 
 // 2026-10-02: a paid voucher's date is corrected in place, from the panel.
 describe('改日期 on the voucher page', () => {
-  const asFinance = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
   const paid = { status: 'paid', payment_date: '2026-10-01', approved_at: '2026-10-01T03:00:00Z', executed_at: '2026-10-01T03:00:00Z' }
 
   it('is offered beside the date of a paid voucher', async () => {
@@ -225,14 +226,14 @@ describe('改日期 on the voucher page', () => {
     pending.unmount()
 
     // A payroll voucher opens only with Payroll payouts; even then its date is HR's.
-    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
     const payroll = database('payroll_disbursement')
     Object.assign(payroll.voucher, paid)
     const salary = render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(screen.queryByTestId('amend-date')).toBeNull()
     salary.unmount()
 
-    mocks.requirePermission.mockResolvedValue({ role: 'hr', permissions: ['hr_costing'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'hr', permissions: ['hr_costing'] }))
     const statutory = database('payroll_statutory')
     Object.assign(statutory.voucher, paid)
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
@@ -242,7 +243,7 @@ describe('改日期 on the voucher page', () => {
 
 // 2026-10-02 (user: "我不希望他看到 payroll detail，也就是每个人的 payout").
 describe('a payroll voucher, for a treasury account without Payroll payouts', () => {
-  const asExecutive = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  const asExecutive = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
 
   it.each(['payroll_disbursement', 'payroll_statutory', 'payroll_payment_request'])(
     'does not open a %s voucher, and reads nothing more about it',
@@ -262,7 +263,7 @@ describe('a payroll voucher, for a treasury account without Payroll payouts', ()
   })
 
   it('opens payroll for the same account once it is given Payroll payouts', async () => {
-    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
+    mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] }))
     database('payroll_statutory')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
     expect(screen.getByRole('table', { name: 'Statutory contributions covered by this voucher' })).toHaveTextContent('Recorded Employee')
@@ -271,7 +272,7 @@ describe('a payroll voucher, for a treasury account without Payroll payouts', ()
 
 // 2026-10-05 (user: two paid PVs had been made without their receipts — "做第 2 条").
 describe('attachments on a voucher that is already decided', () => {
-  const asFinance = () => mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+  const asFinance = () => mocks.requirePermission.mockResolvedValue(withActions({ role: 'finance', permissions: ['treasury'] }))
   const file = (uploaded_at: string) => ({ id: 'f-' + uploaded_at, file_name: 'receipt.pdf', file_type: 'application/pdf', file_size: 1000, storage_path: 'x/receipt.pdf', description: null, uploaded_at, uploaded_by: 'creator' })
 
   it('a paid voucher still takes a file, and says it is a late one; nothing can be removed', async () => {

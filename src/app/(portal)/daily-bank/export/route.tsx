@@ -5,7 +5,7 @@ import React from 'react'
 import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
 import { officeToday } from '@/lib/office-time'
@@ -14,7 +14,7 @@ import { PdfDocument, PdfTable, type PdfColumn, type PdfRowKind } from '@/lib/ex
 import { exportPdfResponse } from '@/lib/export/response'
 
 export async function GET(request: Request) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'export')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const url = new URL(request.url)

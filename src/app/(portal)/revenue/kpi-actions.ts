@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requirePermission } from '@/lib/auth'
 import { EditError } from '@/lib/catalogue/edits'
 import { validateKpiItems, type KpiItemsEdit } from '@/lib/catalogue/rule-edits'
 import { kpiSkuSearchFilter, SKU_SEARCH_LIMIT } from '@/lib/commission/kpi-items-edit'
@@ -47,7 +47,7 @@ function refusal(err: { message: string; code?: string }): string | null {
 
 /** One sub-department's KPI items: added, re-priced, taken off — all or nothing. */
 export async function saveKpiItems(schemeId: string, edit: KpiItemsEdit): Promise<SaveKpiItemsResult> {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   if (typeof schemeId !== 'string' || !UUID.test(schemeId)) return { ok: false, reason: 'No sub-department chosen.' }
   let plan
   try {

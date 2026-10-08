@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   fetchTrialBalance: vi.fn(),
   matrixNowKey: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({}) }))
 vi.mock('@/lib/gl-reports', async (original) => ({
   ...(await original<typeof import('@/lib/gl-reports')>()),

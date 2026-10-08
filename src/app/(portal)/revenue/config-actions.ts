@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { RESERVED_SUB_DEPT_SLUGS, subDeptSlug } from '@/lib/revenue'
 import { officeMonth, officeToday } from '@/lib/office-time'
 import { mintRankKey, rankName, rankLabelOf, rankPayError, rankPayOf, resequenceLadder } from '@/lib/commission/ranks'
@@ -76,7 +76,7 @@ function check(error: { message: string } | null, what: string) {
  * Scheme rules tab that looked like a copy of Fair's.
  */
 export async function createSubDepartment(formData: FormData) {
-  const user = await requirePermission('revenue')
+  const user = await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const departmentId = required(formData, 'department_id', 'Department')
@@ -236,7 +236,7 @@ async function cloneSchemeChildren(
 // ─── Scheme switches ────────────────────────────────────────────────────────
 
 export async function updateScheme(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const id = required(formData, 'scheme_id', 'Scheme')
@@ -323,7 +323,7 @@ export async function updateScheme(formData: FormData) {
  * statements and the hierarchy never notice the split.
  */
 export async function upsertRankDef(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -368,7 +368,7 @@ export async function upsertRankDef(formData: FormData) {
 
 /** Remove a rank no title sits on. One with a title on it is refused: move the title first. */
 export async function deleteRankDef(id: string) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
   if (!id) throw new Error('Which rank?')
 
@@ -407,7 +407,7 @@ export async function deleteRankDef(id: string) {
  * keeps the key: it is a name, not a description.
  */
 export async function upsertRank(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -589,7 +589,7 @@ async function resequenceRanks(supabase: SupabaseClient, schemeId: string): Prom
  * engine adds both to their commission on Comm Cal.
  */
 export async function upsertDirectorPay(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
   const schemeId = required(formData, 'scheme_id', 'Scheme')
   const staffId = required(formData, 'staff_id', 'Director')
@@ -612,7 +612,7 @@ export async function upsertDirectorPay(formData: FormData) {
 // ─── Item groups ────────────────────────────────────────────────────────────
 
 export async function upsertItemGroup(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const row = {
@@ -641,7 +641,7 @@ export async function upsertItemGroup(formData: FormData) {
 // a special, effective-dated. The threshold ladder below is on the same tab.
 
 export async function upsertKpiThreshold(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -669,7 +669,7 @@ export async function upsertKpiThreshold(formData: FormData) {
 }
 
 export async function deleteKpiThreshold(id: string) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
   check((await supabase.from('comm_kpi_thresholds').delete().eq('id', id)).error, 'Could not remove the threshold')
   refresh()
@@ -678,7 +678,7 @@ export async function deleteKpiThreshold(id: string) {
 // ─── Open Bill ──────────────────────────────────────────────────────────────
 
 export async function updateOpenBillRule(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const id = required(formData, 'id', 'Rule')
@@ -692,7 +692,7 @@ export async function updateOpenBillRule(formData: FormData) {
 // ─── Brands and margin bands ────────────────────────────────────────────────
 
 export async function upsertBrand(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -722,7 +722,7 @@ export async function upsertBrand(formData: FormData) {
 }
 
 export async function upsertMarginBand(formData: FormData) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
 
   const id = text(formData, 'id')
@@ -764,7 +764,7 @@ export async function upsertMarginBand(formData: FormData) {
 }
 
 export async function deleteMarginBand(id: string) {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
   check((await supabase.from('comm_margin_bands').delete().eq('id', id)).error, 'Could not remove the band')
   refresh()
@@ -791,7 +791,7 @@ export type SchemeSwitch = 'open_bill' | 'margin' | 'kpi'
  * A month whose run has paid keeps what it paid.
  */
 export async function setMonthOpenBill(subDepartmentId: string, period: string, on: boolean | null): Promise<void> {
-  const user = await requirePermission('revenue')
+  const user = await requireAction('revenue', 'manage')
   if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('A month is its first day, e.g. 2026-08-01')
   const supabase = await client()
 
@@ -828,7 +828,7 @@ export async function setMonthOpenBill(subDepartmentId: string, period: string, 
 }
 
 export async function setSchemeSwitch(schemeId: string, which: SchemeSwitch, on: boolean): Promise<void> {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'manage')
   const supabase = await client()
   const patch =
     which === 'open_bill'

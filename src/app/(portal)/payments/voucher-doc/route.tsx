@@ -5,7 +5,7 @@
 // Mirrors /billing/invoice-doc but for payment vouchers / official receipts.
 
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAnyAction } from '@/lib/auth'
 import { can } from '@/lib/permissions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
@@ -15,7 +15,7 @@ import { VoucherDocPdf, type SalaryPaymentData, type StatutoryCoverageData, type
 import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  const user = await requirePermission('treasury', 'hr_costing')
+  const user = await requireAnyAction(['treasury', 'export'], ['hr_costing', 'export'])
   const url = new URL(req.url)
   const id = url.searchParams.get('id')?.trim() || null
   const idsParam = url.searchParams.get('ids')?.trim() || null

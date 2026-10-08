@@ -9,8 +9,8 @@ interface Props {
   amount: number
   bankBalance: number | null
   bankName: string | null
-  isPrincipal: boolean
-  isFinance: boolean
+  /** What the reader may do (2026-10-08, PR2) — each the action its Server Action asks. */
+  can: { create: boolean; edit: boolean; void: boolean; approve: boolean }
   submitForApproval: (formData: FormData) => Promise<void>
   approveVoucher: (formData: FormData) => Promise<void>
   voidVoucher: (formData: FormData) => Promise<void>
@@ -42,8 +42,7 @@ export default function VoucherActions({
   amount,
   bankBalance,
   bankName,
-  isPrincipal,
-  isFinance,
+  can,
   submitForApproval,
   approveVoucher,
   voidVoucher,
@@ -102,7 +101,7 @@ export default function VoucherActions({
             ? reversePaidPayment
             : undefined
         : undefined
-    const canReverse = !!reverseFn
+    const canReverse = !!reverseFn && can.void
     const confirmText = isReceipt
       ? '确认作废这张已付收据?会反冲银行、池、总账,并把发票退回未收。'
       : '确认反转这张已付付款?会退回银行、反冲总账与池子,凭证转为作废。之后可重开一张正确的。'
@@ -153,29 +152,36 @@ export default function VoucherActions({
 
   return (
     <div className="mt-4 grid gap-2.5">
-      {/* Draft: Finance and Principal can edit, submit or void. Principal used
+      {/* Draft: whoever raises submits it, whoever edits edits it, whoever
+          voids voids it (2026-10-08, PR2 — each its own cell). Principal used
           to be blocked from Submit because no_self_approval left the card
           unapprovable (PV-0111, 2026-07-24) — mig 20260806000000 lifted that,
           so Principal may now submit and approve their own voucher. */}
       {status === 'draft' ? <p className={`${NOTE} plain`}>还是草稿，还没送批。</p> : null}
-      {status === 'draft' && isFinance ? (
+      {status === 'draft' ? (
         <>
-          <button type="button" disabled={isPending} onClick={() => handleAction(submitForApproval)} className={PRIMARY}>
-            {isPending ? 'Submitting…' : 'Submit for approval'}
-          </button>
-          <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
-            Edit
-          </Link>
-          <button type="button" disabled={isPending} onClick={() => handleAction(voidVoucher)} className={QUIET}>
-            Void
-          </button>
+          {can.create ? (
+            <button type="button" disabled={isPending} onClick={() => handleAction(submitForApproval)} className={PRIMARY}>
+              {isPending ? 'Submitting…' : 'Submit for approval'}
+            </button>
+          ) : null}
+          {can.edit ? (
+            <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
+              Edit
+            </Link>
+          ) : null}
+          {can.void ? (
+            <button type="button" disabled={isPending} onClick={() => handleAction(voidVoucher)} className={QUIET}>
+              Void
+            </button>
+          ) : null}
         </>
       ) : null}
 
       {/* Pending: Principal can approve; Finance can void */}
       {status === 'pending_approval' ? (
         <>
-          {isPrincipal && !confirmAction ? (
+          {can.approve && !confirmAction ? (
             <>
               {/* Bank balance info for Principal */}
               {isNoCashPayroll ? (
@@ -202,7 +208,7 @@ export default function VoucherActions({
             </>
           ) : null}
 
-          {isPrincipal && confirmAction === 'approve' ? (
+          {can.approve && confirmAction === 'approve' ? (
             <div className={`${NOTE} plain`}>
               <h3 className="font-sans text-sm font-semibold mb-1.5">Confirm approval</h3>
               <p className="mb-3">
@@ -243,33 +249,37 @@ export default function VoucherActions({
             </div>
           ) : null}
 
-          {isFinance && !isPrincipal ? (
+          {!can.approve && (can.edit || can.void) ? (
             <>
               <p className={NOTE}>等 Principal 批准。批准之前还可以改，或者作废。</p>
-              <div className={`grid gap-2 ${returnToDraft ? 'grid-cols-2' : ''}`}>
-                <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
-                  Edit
-                </Link>
-                {returnToDraft ? (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleAction(returnToDraft)}
-                    className={SECOND}
-                    title="单退回草稿、审批卡关掉,可重新 submit(交错账号时用)"
-                  >
-                    退回 Draft
-                  </button>
-                ) : null}
-              </div>
-              <button type="button" disabled={isPending} onClick={() => handleAction(voidVoucher)} className={QUIET}>
-                Void this voucher
-              </button>
+              {can.edit ? (
+                <div className={`grid gap-2 ${returnToDraft ? 'grid-cols-2' : ''}`}>
+                  <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
+                    Edit
+                  </Link>
+                  {returnToDraft ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleAction(returnToDraft)}
+                      className={SECOND}
+                      title="单退回草稿、审批卡关掉,可重新 submit(交错账号时用)"
+                    >
+                      退回 Draft
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {can.void ? (
+                <button type="button" disabled={isPending} onClick={() => handleAction(voidVoucher)} className={QUIET}>
+                  Void this voucher
+                </button>
+              ) : null}
             </>
           ) : null}
 
-          {/* Principal sees Edit alongside Approve, before they confirm */}
-          {isPrincipal && !confirmAction ? (
+          {/* An approver who also edits sees Edit alongside Approve, before they confirm */}
+          {can.approve && can.edit && !confirmAction ? (
             <div className={`grid gap-2 ${returnToDraft ? 'grid-cols-2' : ''}`}>
               <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
                 Edit
@@ -288,7 +298,7 @@ export default function VoucherActions({
             </div>
           ) : null}
 
-          {!isFinance && !isPrincipal ? <p className={NOTE}>等 Principal 批准。</p> : null}
+          {!can.approve && !can.edit && !can.void ? <p className={NOTE}>等 Principal 批准。</p> : null}
         </>
       ) : null}
 

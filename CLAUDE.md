@@ -2074,8 +2074,8 @@ changes a cell somebody has their own value on asks keep-or-reset per person.
 Every change is in `audit_events` (one txid per save; History on the
 Permissions tab, `permission_history()`, `lib/permission-history.ts`). Old
 per-key `user_permissions` still apply on top (carrie's 3 denies) until cleared
-on her card. NEXT: PR2 actions enforced, PR3 own/dept into RLS, PR4 masking —
-then `permission_cell_keys` goes. Migs `20261008110000`–`130000`,
+on her card. PR2 (actions enforced) below; NEXT: approvals by domain, PR3
+own/dept into RLS, PR4 masking — then `permission_cell_keys` goes. Migs `20261008110000`–`130000`,
 `tests/member-sql/validate-permission-templates.mjs`.
 
 **THE APP-WIDE HISTORY (2026-10-08; user: 在 portal 里人手改的资料全部要有 audit
@@ -2117,6 +2117,37 @@ DISABLE TRIGGER / ALTER POLICY). UI: Audit Log is a sidebar group — **Changes*
 redirect). `lib/audit/changes.ts` (saves, fields, values), `lib/audit/refs.ts`
 (ids → names under the reader's session), mig `20261008190000`,
 `tests/member-sql/validate-app-audit.mjs`.
+
+**EACH ACTION TAKES EFFECT (2026-10-08, PR2; user: 每个 action 各自生效).** A
+write asks for the ACTION it is, not the module key: `requireAction('treasury',
+'create')` / `requireAnyAction([…], […])` / `requirePayrollPayoutsAction` (lib/auth.ts)
+at every Server Action and form page, `canDo(user, fn, action, scope?)` for the
+button (lib/permission-actions.ts), `has_action()` in SQL. The answer is
+`current_actions()` (jsonb `fn.action` → own / dept / all; `User.actions`): a
+titled person's template cells with their own cells over them, else what the
+account's KEYS allowed — `permission_key_actions` (80 rows, TS twin
+`KEY_ACTIONS`, a department manager's department functions at Dept) — so the four
+shared accounts can do exactly what they could (verified on prod: every one of
+the 5 logins' actions = its keys'). A cell counts only while one of the keys that
+open its function's pages is held (`viewKeysOf` = the keys that allowed its View;
+`has_action` asks the same) — PR1's fail-closed key rules still decide pages.
+What each cell opens is in docs/access-matrix.md (amendment 2026-10-08 PR2):
+Approve is somebody else's submission (the queue, a claim, a reconciliation
+marked done, amending a BOOKED loan — the Treasury description), a module's own
+steps are Create / Edit (HR's Complete, Submit, Total Close; Revenue's closes;
+Director Salary's Complete), Void reverses, Export is a file. A key's actions
+must cover every gate it passed (`permission-actions.test.ts`), which is why a
+sign-off Finance always made is Edit OR Approve (send a payroll batch back =
+Void | Approve) and `team` gives `team.manage` (titles + ladder, as HR had).
+`GATED_ACTIONS` lists every action a gate asks and the least reach (Claims ·
+Create Own, My Billing · Create and Dept reports · Export Dept, the rest All);
+the test scans `src/` and fails when a gate is added without it, and the
+matrix's *held for now* reads it (`heldCells`). Unconverted on purpose: page
+reads (key), Reports' layout (key), the member app (its own keys), Department
+mode (`has_perm` in the DB), member back office (DB `member_is_manager`), and
+the approval RPCs' `role = 'principal'` (next: approvals by domain). Test mocks
+of a user carry `actions` (`src/test/with-actions.ts`); a user without them may
+do nothing. Mig `20261008200000`, `tests/member-sql/validate-permission-actions.mjs`.
 
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY

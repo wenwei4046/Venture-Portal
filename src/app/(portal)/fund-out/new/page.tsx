@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { officeToday } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types'
 import { bsAccountsForDisbursement } from '@/lib/loan-disbursement'
 import NewLoanForm from '../_components/NewLoanForm'
 
 export default async function NewLoanPage() {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const [

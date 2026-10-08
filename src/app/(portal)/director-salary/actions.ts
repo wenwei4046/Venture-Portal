@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import {
   calculatePool,
@@ -18,7 +18,7 @@ import dayjs from 'dayjs'
 // ─── Save CTC ──────────────────────────────────────────────────────
 
 export async function saveCTC(formData: FormData) {
-  const user = await requirePermission('director_salary')
+  const user = await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   const directorId = formData.get('director_id') as string
@@ -71,7 +71,7 @@ export interface BatchCTCInput {
 }
 
 export async function batchSaveCTC(period: string, records: BatchCTCInput[]) {
-  const user = await requirePermission('director_salary')
+  const user = await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
@@ -166,7 +166,7 @@ export async function calculateDirectorSalary(
   period: string,
   mode: PayoutMode = 'split',
 ): Promise<CalculateResult> {
-  const user = await requirePermission('director_salary')
+  const user = await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   const fullyPaid = mode === 'fully_paid'
@@ -444,7 +444,7 @@ export async function calculateDirectorSalary(
 // ─── Update PCB ────────────────────────────────────────────────────
 
 export async function updatePCB(payoutId: string, pcbAmount: number) {
-  await requirePermission('director_salary')
+  await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   // Fetch current payout to recalculate net
@@ -524,7 +524,7 @@ function recomputePayrollNet(row: {
 }
 
 export async function updateDirectorStatutory(payoutId: string, fields: DirectorStatutoryUpdate) {
-  const user = await requirePermission('director_salary')
+  const user = await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   // Validate inbound fields: numeric, non-negative, must be a recognised key.
@@ -572,7 +572,7 @@ export async function updateDirectorStatutory(payoutId: string, fields: Director
 }
 
 export async function resetDirectorStatutoryToLookup(payoutId: string) {
-  await requirePermission('director_salary')
+  await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   const { data: row, error: fetchErr } = await supabase
@@ -652,7 +652,7 @@ export async function resetDirectorStatutoryToLookup(payoutId: string) {
 // else, funded from the Director pool. Their accrual JVs post with the batch.
 
 export async function completeDirectorSalary(period: string) {
-  await requirePermission('director_salary')
+  await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')
@@ -673,7 +673,7 @@ export async function completeDirectorSalary(period: string) {
  * with Finance. Anybody already sent is resubmitted from HR › Payroll.
  */
 export async function reopenDirectorSalary(period: string) {
-  await requirePermission('director_salary')
+  await requireAction('director_salary', 'edit')
   const supabase = await createClient()
 
   const periodNorm = dayjs(period).startOf('month').format('YYYY-MM-DD')

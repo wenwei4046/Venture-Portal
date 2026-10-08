@@ -1,7 +1,7 @@
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import LoanAmendForm from '../_components/LoanAmendForm'
 
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default async function LoanEditPage({ params }: Props) {
-  await requirePermission('override')
+  await requireAction('treasury', 'approve')
   const { id } = await params
   const supabase = await createClient()
 

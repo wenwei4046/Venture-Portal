@@ -10,10 +10,12 @@
  * The rules are the design's own (`setCell`, `cycleNext`, `sodWarnings`,
  * `keyList` in its prototype), and `openedKeys` is the database's
  * `current_permissions()` template path, rule for rule (migration
- * 20261008120000): until the gates ask for cells, a cell opens the module key
- * the gates already read — and only where that key cannot reach further than
- * the cell says.
+ * 20261008120000): a cell opens the module key the pages read — and only where
+ * that key cannot reach further than the cell says. Since PR2 a write asks for
+ * the cell itself (lib/permission-actions.ts), and heldCells says which do.
  */
+
+import { GATED_ACTIONS, viewKeysOf, type FunctionKey } from '@/lib/permission-actions'
 
 export const ACTIONS = [
   { key: 'view', label: 'View' },
@@ -408,9 +410,15 @@ function heldBecause(grants: Grants, seesSalary: boolean, baseRole: string, k: C
 /**
  * The granted cells that open nothing today, each with the reason — shown
  * beside the matrix so a cell that is saved but not yet in force is never a
- * silent surprise. A cell with no module key behind it (Logins & invites ·
- * View, Member Services · View) is recorded for the next step and opens
- * nothing either; it is not "held", there is just nothing to open yet.
+ * silent surprise.
+ *
+ * Since 2026-10-08 (PR2) a write asks for its action (`requireAction`): such a
+ * cell is in force once the function's pages are open to the template (one of
+ * its View keys, `viewKeysOf`) and it reaches as far as the gates ask
+ * (`GATED_ACTIONS` — Claims · Create asks Own, My Billing · Create Dept, the
+ * rest All). Anything else still works through its module key, as before. A
+ * cell nothing acts on yet (Revenue · Approve, Venture Pool · Create, Logins &
+ * invites · View …) is not "held" — there is nothing to open.
  */
 export function heldCells(
   grants: Grants,
@@ -420,17 +428,48 @@ export function heldCells(
   functions: readonly PermFunction[],
 ): Array<{ key: string; label: string; reason: string }> {
   const seesSalary = sensitive.includes('salary')
+  const opened = new Set(openedKeys(grants, sensitive, baseRole, cellKeys))
   const out: Array<{ key: string; label: string; reason: string }> = []
   for (const fn of functions) {
     for (const action of fn.actions) {
-      if (cellOf(grants, fn.key, action) === 'none') continue
+      const cell = cellOf(grants, fn.key, action)
+      if (cell === 'none') continue
       const keys = cellKeys.filter(k => k.functionKey === fn.key && k.action === action)
-      if (keys.length === 0) continue
       const reasons = keys.map(k => heldBecause(grants, seesSalary, baseRole, k))
       if (reasons.some(r => r === null)) continue
+      const asked = action === 'view' ? undefined : GATED_ACTIONS[cellKey(fn.key, action)]
+      let reason: string | null = keys.length > 0 ? reasons[0]! : null
+      if (asked) {
+        const views = viewKeysOf(fn.key as FunctionKey)
+        if (views.length > 0 && !views.some(k => opened.has(k))) {
+          reason = viewHeldBecause(grants, seesSalary, baseRole, cellKeys, fn.key, views)
+        } else if (CELL_RANK[cell] < CELL_RANK[asked]) {
+          reason = `${CELL_LABEL[cell]} is not enforced on this yet, so it stays closed until it is — ${CELL_LABEL[asked]} opens it now`
+        } else {
+          reason = null
+        }
+      }
+      if (reason === null) continue
       const label = `${fn.label} · ${ACTIONS.find(a => a.key === action)!.label}`
-      out.push({ key: cellKey(fn.key, action), label, reason: reasons[0]! })
+      out.push({ key: cellKey(fn.key, action), label, reason })
     }
   }
   return out
+}
+
+/** Why a function's pages stay closed: the reason its first granted View key is held. */
+function viewHeldBecause(
+  grants: Grants,
+  seesSalary: boolean,
+  baseRole: string,
+  cellKeys: readonly CellKey[],
+  fnKey: string,
+  views: readonly string[],
+): string {
+  for (const k of cellKeys) {
+    if (k.functionKey !== fnKey || !views.includes(k.legacyKey)) continue
+    const why = heldBecause(grants, seesSalary, baseRole, k)
+    if (why) return why
+  }
+  return 'Its pages are not open to this template — give the function’s View first'
 }

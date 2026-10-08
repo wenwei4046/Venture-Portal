@@ -79,6 +79,18 @@ own permissions — tables by `read_keys`, salary / NRIC / bank blanked by
 `current_sensitive_fields()`, filters and pages. Run only these checks with
 `npm run test:app-audit --prefix tests/member-sql`.
 
+The default command ends with `validate-permission-actions.mjs` (each action
+takes effect, 2026-10-08). Over PR1's world and migrations plus the audit
+migration it applies `20261008200000` verbatim; its 36 checks hold the shared
+accounts to exactly their keys' actions (the Principal everything, Finance no
+Treasury · Approve, HR the titles and ladder but no logins, a department
+manager at Dept), a titled person to exactly their template's cells with their
+own cells over them, `has_action()` to the reach asked and to the keys that
+open the function's pages (a Director's Approve waits for the Approvals key,
+HR Costing without Salary amounts edits nothing), and nobody, a disabled login
+and the publishable key to nothing. Run only these checks with
+`npm run test:permission-actions --prefix tests/member-sql`.
+
 Expected final output:
 
 ```text

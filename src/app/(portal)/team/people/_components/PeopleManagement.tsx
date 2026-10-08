@@ -24,6 +24,8 @@ interface Props {
   canManagePermissions: boolean
   canSeeHistory: boolean
   canInvite: boolean
+  /** Team · Create — adding somebody, by hand or from InfoTech (2026-10-08, PR2). */
+  canAddPeople: boolean
   candidates: InviteCandidate[]
   /** `?template=` — the template a Hierarchy › Roles link opens on. */
   initialTemplateId: string | null
@@ -46,6 +48,7 @@ export default function PeopleManagement({
   canManagePermissions,
   canSeeHistory,
   canInvite,
+  canAddPeople,
   candidates,
   initialTemplateId,
   initialInvite,
@@ -106,18 +109,22 @@ export default function PeopleManagement({
               Invite user
             </button>
           ) : null}
-          <Link
-            href="/team/people/import"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
-          >
-            Import InfoTech
-          </Link>
-          <Link
-            href="/team/people/new"
-            className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
-          >
-            + Add person
-          </Link>
+          {canAddPeople ? (
+            <>
+              <Link
+                href="/team/people/import"
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
+              >
+                Import InfoTech
+              </Link>
+              <Link
+                href="/team/people/new"
+                className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors whitespace-nowrap"
+              >
+                + Add person
+              </Link>
+            </>
+          ) : null}
         </div>
       </div>
 

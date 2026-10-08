@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 
 // ─── Submit Request Payment (Dept Manager → Principal #1 → Finance PV → Principal #2)
 
@@ -13,7 +13,7 @@ export async function submitRequestPayment(args: {
   description: string
   categoryCode: string | null
 }) {
-  await requirePermission('my_billing')
+  await requireAction('my_billing', 'create', 'dept')
   const supabase = await createClient()
 
   if (!args.payeeName.trim()) throw new Error('Payee name is required')
@@ -50,7 +50,7 @@ export async function submitRequestCredit(args: {
   referenceNo: string | null
   lineItems: { subsidiary_id: string; amount: number }[]
 }) {
-  await requirePermission('my_billing')
+  await requireAction('my_billing', 'create', 'dept')
   const supabase = await createClient()
 
   if (args.lineItems.length === 0) throw new Error('At least one line item is required')

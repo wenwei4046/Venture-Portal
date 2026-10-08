@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { withActions } from '@/test/with-actions'
 import { render, screen, within } from '@testing-library/react'
 
 // 2026-10-07 — Service Billing on the sheet (the user approved the Invoice /
@@ -141,7 +142,7 @@ const page = async () => render(await BillingView({ searchParams: Promise.resolv
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ id: 'fm', role: 'finance', permissions: ['billing'] })
+  mocks.requirePermission.mockResolvedValue(withActions({ id: 'fm', role: 'finance', permissions: ['billing'] }))
 })
 
 describe('Service Billing on the sheet', () => {

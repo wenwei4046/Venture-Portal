@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), redirect: vi.fn(), revalidatePath: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
@@ -87,7 +87,7 @@ describe('recorded statutory PV edits', () => {
   it('updates only date and notes without deleting or rewriting any recorded source', async () => {
     const { writes, filters, from } = database()
     await expect(updatePaymentVoucher(editForm())).rejects.toThrow('NEXT_REDIRECT')
-    expect(mocks.requirePermission).toHaveBeenCalledWith('treasury')
+    expect(mocks.requirePermission).toHaveBeenCalledWith('treasury', 'edit')
     expect(writes.filter((write) => write.table === 'payment_vouchers')).toEqual([{ table: 'payment_vouchers', operation: 'update', values: { payment_date: '2026-09-16', notes: 'Payment date updated', updated_at: expect.any(String) } }])
     expect(from).not.toHaveBeenCalledWith('payment_voucher_sources')
     expect(filters).toContainEqual({ table: 'payment_vouchers', column: 'status', values: ['pending_approval', 'draft'] })

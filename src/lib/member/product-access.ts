@@ -2,6 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+import { canDo } from "@/lib/permission-actions";
 import { isPrincipalAccount } from "@/lib/view-as";
 import type { User } from "@/types";
 
@@ -52,4 +53,20 @@ export async function requireProductList(): Promise<User> {
   if (!user) redirect("/login");
   if (!(await canOpenProductList(user))) redirect("/member");
   return user;
+}
+
+/**
+ * A change to the Product List (2026-10-08, PR2): Product list · Edit, asked of
+ * whichever answer opened the page — the session's, else the account behind a
+ * masked Principal (canOpenProductList). View alone reads it.
+ */
+export async function requireProductListEdit(): Promise<User> {
+  const user = await getMemberUser();
+  if (!user) redirect("/login");
+  if (canDo(user, "product_list", "edit")) return user;
+  if (user.actualRole === "principal") {
+    const account = await getAccountUser();
+    if (account && canDo(account, "product_list", "edit")) return user;
+  }
+  redirect("/member");
 }

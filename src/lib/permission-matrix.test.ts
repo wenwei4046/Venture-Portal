@@ -307,9 +307,17 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     expect(held('office').find(h => h.key === 'reports.view')?.reason).toMatch(/Treasury · View/)
     expect(held('dept_head').map(h => h.key)).toEqual(['team.view', 'claims.approve'])
     expect(held('dept_head')[0].reason).toMatch(/^Dept is not enforced/)
-    expect(held('director').map(h => h.label)).toEqual(['Approvals · View', 'Treasury · Approve'])
+    // Since PR2 a write asks for its cell: Treasury · Approve (amending a booked
+    // loan) is in force wherever Treasury opens; Approvals waits on its key.
+    expect(held('director').map(h => h.label)).toEqual(['Approvals · View', 'Approvals · Approve'])
+    expect(held('director')[1].reason).toMatch(/Principal/)
     expect(held('full')).toEqual([])
-    expect(held('fin_checker').map(h => h.key)).toEqual(['treasury.approve'])
+    expect(held('fin_checker')).toEqual([])
+    // Own claims are raised at Own; a reach short of what the gate asks is said.
+    expect(held('staff')).toEqual([])
+    const ownApprover = setCell(T.staff.grants, fn('claims'), 'approve', 'own')
+    expect(heldCells(ownApprover, [], 'staff', CELL_KEYS, FUNCTIONS).map(h => h.reason))
+      .toEqual([expect.stringMatching(/^Own is not enforced on this yet.*All opens it now$/)])
   })
 
   it('a person raised on a cell opens it only where the rule allows', () => {

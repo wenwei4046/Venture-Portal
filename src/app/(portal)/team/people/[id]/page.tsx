@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { formatMoney } from '@/lib/utils'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
@@ -111,12 +112,14 @@ export default async function StaffDetailPage({ params }: PageProps) {
               Invite
             </Link>
           ) : null}
-          <Link
-            href={`/team/people/${staff.id}/edit`}
-            className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors"
-          >
-            Edit
-          </Link>
+          {canDo(viewer, 'team', 'edit') ? (
+            <Link
+              href={`/team/people/${staff.id}/edit`}
+              className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors"
+            >
+              Edit
+            </Link>
+          ) : null}
         </div>
       </div>
 

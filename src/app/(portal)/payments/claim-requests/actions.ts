@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { checkRaiseClaimVoucher, type RaiseClaimVoucherInput } from '@/lib/claim-requests'
 
@@ -16,7 +16,7 @@ import { checkRaiseClaimVoucher, type RaiseClaimVoucherInput } from '@/lib/claim
 export async function raiseClaimVoucher(
   input: RaiseClaimVoucherInput,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const checked = checkRaiseClaimVoucher(input)
   if (!checked.ok) return checked
 
