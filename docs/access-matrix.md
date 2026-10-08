@@ -4,6 +4,22 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — The database asks for the action too (PR3a)
+A table's row policies opened it to whoever held ANY key of its domain
+(`has_scope(ARRAY['treasury'])`), and a View cell opens a key — so with their own session
+and the API a template that only reads Treasury could raise a payment voucher, and a
+Director who sees the roster could rewrite payroll. Now every table a domain policy lets
+somebody write has a RESTRICTIVE policy per command (`needs_action_insert / _update /
+_delete`) asking `may_write(table, command)`: does the caller hold one of the actions the
+app writes that table under (`permission_table_writes`; TS twin `TABLE_WRITES`,
+lib/permission-table-writes.ts — 131 tables, 345 rows). Restrictive, so it only takes
+away; the four shared accounts keep every write their pages make (Finance loses only the
+API's reach into Director Salary's payouts, HR the Venture Pool ledger — no page of theirs
+writes there). Writes inside SECURITY DEFINER functions never meet a row policy; those ask
+for their own action next (PR3b). A later migration that opens a table to a domain must
+register it — the migration's guard and permission-table-writes.test.ts refuse otherwise.
+Mig `20261009020000`.
+---
 ⚡ AMENDMENT 2026-10-09 — Nobody without a portal account reaches a DEFINER function
 `current_user_role()` refuses a sign-in with no active portal account (a self-made sign-up,
 a switched-off account whose session lives on) instead of answering NULL, and the
