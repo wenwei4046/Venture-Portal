@@ -112,7 +112,7 @@ export default function HierarchyView({
           <h1 className="page-title">Hierarchy</h1>
           {/* The sheet's intro line: plain and upright, like the Revenue
               hierarchy's (DESIGN.md › "Sheet theme"). */}
-          <p className="text-sm mt-3 max-w-2xl">
+          <p className="text-[12px] leading-normal mt-3 max-w-[672px]">
             {tab === 'roles' ? (
               <>
                 A title says what somebody is called and which department that role belongs under. How
