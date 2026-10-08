@@ -10,10 +10,11 @@ interface PageProps {
 /**
  * Every rule the commission engine reads for ONE sub-department: its scheme
  * switches, the title ladder, the rank catalogue, and — only while the switch
- * that reads each is on — item groups, KPI items and thresholds, Open Bill
- * rates, brands and their margin bands, plus the recorded promotion criteria:
- * up to nine tabs on one URL (`?tab=`). The salespeople themselves live on
- * Staff Hierarchy's Team tab since 2026-09-05.
+ * that reads each is on — item groups, Open Bill rates, brands and their
+ * margin bands, plus the recorded promotion criteria, the directors' pay and,
+ * last, KPI items with their threshold ladder (set here, not on the Product
+ * List, since 2026-10-08): up to nine tabs on one URL (`?tab=`). The
+ * salespeople themselves live on Staff Hierarchy's Team tab since 2026-09-05.
  *
  * Scoped by the route rather than by an in-page picker (2026-09-01): the
  * sidebar already asks which sub-department you are working on, and a second

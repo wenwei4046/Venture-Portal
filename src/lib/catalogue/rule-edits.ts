@@ -1,8 +1,10 @@
 /**
- * Validating what the Principal types on Product List › Costing Setting and
- * › Add-on / KPI Items (2026-09-27) before `catalogue_save_cost_setting` and
+ * Validating what is typed on Product List › Costing Setting (the Principal)
+ * and Rules › KPI items (Principal and HR — the Product List's Add-on / KPI
+ * Items until 2026-10-08) before `catalogue_save_cost_setting` and
  * `catalogue_save_kpi_items` write it. Pure: the tabs check a draft with the
- * same rules the Server Actions enforce (`app/(portal)/revenue/catalogue-actions.ts`).
+ * same rules the Server Actions enforce (`app/(member)/member/(app)/products/
+ * actions.ts`, `app/(portal)/revenue/kpi-actions.ts`).
  *
  * A RATIO divides a cost — Revenue Team cost = cost ÷ ratio (Fair 0.7). Above
  * 0 and at most 10, the range `revenue_cost_divisor` has always had, to four
@@ -84,7 +86,7 @@ export function teamCost(cost: number, ratio: number): number {
   return cost / ratio
 }
 
-// ─── Add-on / KPI Items ─────────────────────────────────────────────────────
+// ─── KPI items (Rules › KPI items since 2026-10-08) ─────────────────────────
 
 export type KpiItemAdd =
   | { source: 'sku'; erpId: string; amount: string | null; label?: string }

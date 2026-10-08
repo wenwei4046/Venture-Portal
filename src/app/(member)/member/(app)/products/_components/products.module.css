@@ -292,7 +292,6 @@
 .figExampleValue { font-size: 15px; font-weight: 650; }
 .figExampleResult { font-size: 15px; font-weight: 700; color: var(--rv-accent); }
 .figExampleOp { font-size: 15px; color: var(--rv-sub); }
-.figLink { font-size: 13.5px; font-weight: 650; color: var(--rv-accent); text-decoration: none; }
 
 /* ── a section heading ── */
 .heading { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: -8px; }
@@ -361,19 +360,6 @@
 }
 .pickerHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pickerTitle { font-size: 12px; font-weight: 650; letter-spacing: .1em; color: var(--rv-accent); }
-.pickerSeg { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--rv-seg-track); margin-left: auto; }
-.pickerSegButton {
-  height: 30px;
-  padding: 0 11px;
-  border-radius: 7px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--rv-sub);
-  font-size: 12.5px;
-  font-weight: 650;
-}
-.pickerSegButton[aria-pressed="true"] { background: var(--rv-white); box-shadow: 0 1px 2px var(--rv-ink-14); color: var(--rv-accent); }
 .pickerControls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .pickerSearch {
   flex: 1 1 280px;
@@ -466,16 +452,6 @@
 .resultTick[data-on] svg { opacity: 1; }
 .resultCode { flex: 0 0 190px; font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .resultDesc { flex: 1; min-width: 0; font-size: 13px; color: var(--rv-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.resultAdd {
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--rv-line-strong);
-  background: var(--rv-white);
-  color: var(--rv-accent);
-  font-size: 12.5px;
-  font-weight: 650;
-}
 
 /* ── the table card ── */
 .tableCard { border-radius: 16px; border: 1px solid var(--rv-line); overflow: hidden; background: var(--rv-white); }

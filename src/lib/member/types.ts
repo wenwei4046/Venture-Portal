@@ -300,8 +300,8 @@ export interface QuoteRules {
    */
   costRatios?: { productCode: string; ratio: number }[];
   /**
-   * The department's KPI items while its KPI pay is on (Product List ›
-   * Add-on / KPI Items, 2026-09-27): a cart carrying one has that amount off
+   * The department's KPI items while its KPI pay is on (Rules › KPI items;
+   * 2026-09-27, on Rules since 2026-10-08): a cart carrying one has that amount off
    * its price for the margin — the run pays it flat as KPI. Absent = none.
    */
   kpiItems?: KpiItem[];

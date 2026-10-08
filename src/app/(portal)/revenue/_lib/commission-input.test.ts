@@ -217,7 +217,7 @@ describe('authoritative commission input', () => {
     await expect(loadCommissionInput('2026-09-01', 'sub-1', db.client)).rejects.toThrow('Could not read KPI items')
   })
 
-  // Product List › Costing Setting and › Add-on / KPI Items (2026-09-27).
+  // Product List › Costing Setting and Rules › KPI items (2026-09-27).
   it("reads the scheme's SKU ratios, its KPI specials, and the specials a line carries", async () => {
     const data = fixture()
     data.comm_cost_ratios = [{ scheme_id: 'scheme-1', erp_product_id: 'mfg-1', product_code: 'SOFA-1', ratio: '0.6000' }]

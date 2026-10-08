@@ -635,8 +635,9 @@ export async function upsertItemGroup(formData: FormData) {
 
 // ─── KPI items and thresholds ───────────────────────────────────────────────
 
-// KPI items are set on Product List › Add-on / KPI Items since 2026-09-27
-// (`catalogue-actions.ts` saveKpiItems): a SKU or a special, effective-dated.
+// KPI items are set on Rules › KPI items (`kpi-actions.ts` saveKpiItems — the
+// Product List's Add-on / KPI Items from 2026-09-27 until 2026-10-08): a SKU or
+// a special, effective-dated. The threshold ladder below is on the same tab.
 
 export async function upsertKpiThreshold(formData: FormData) {
   await requirePermission('revenue')

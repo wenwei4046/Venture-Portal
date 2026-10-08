@@ -713,7 +713,7 @@ before any of it counts (user, 2026-08-31).
 C1 = PR(S) × effectiveRate(S)
 ```
 
-### 4.3 C2 — KPI items (Product List › Add-on / KPI Items, 2026-09-27)
+### 4.3 C2 — KPI items (Rules › KPI items; 2026-09-27, on Rules since 2026-10-08)
 
 A KPI item is a **SKU** from the SKU Master (a pillow, a protector) or a
 **special** from Maintenance — a bed frame's *HB Straight*, a sofa's *Wooden
@@ -759,10 +759,19 @@ the same amount off a quote before it judges the margin, and says so.
 Items are **dated**: an added item starts today; a new amount — or a removal —
 of an item begun before today closes it yesterday and opens today's
 (`catalogue_save_kpi_items`, one transaction), so a month already run keeps the
-amount it was run at; the run reads the list as at the month's end. The
-switch (`enable_kpi`) and the threshold ladder stay on Rules, where the KPI
-items tab is read-only since. Modelled as a ladder, not a single threshold, so
-a `Tier 2` can be added later without a schema change.
+amount it was run at; the run reads the list as at the month's end. Modelled
+as a ladder, not a single threshold, so a `Tier 2` can be added later without a
+schema change.
+
+**Set on Rules since 2026-10-08** (user: *"rules 这里是用来算薪水的 … product
+list 是拿来 set costing 的"*). The Product List's *Add-on / KPI Items* tab is
+gone; the items, their amounts and the threshold ladder are ONE tab, Rules ›
+**KPI items** (section XI, the last of the rail), set by Principal and HR like
+every rule (`revenue/kpi-actions.ts` → the same writer). The user was asked
+whether the threshold should become per item (*Cable RM 30, 10 cables → +RM 20
+each*) and kept the ladder as it is: every KPI unit of the month together,
+a % on the whole KPI amount — 12 cables at RM 30 with Tier 1 (10 · 20%) pay
+RM 360 + 20% = RM 432. How a bill is found to carry an item is unchanged.
 
 ### 4.4 C3 — Open Bill (1st / 2nd / 3rd bill of the event day)
 
@@ -1737,6 +1746,8 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 >
 > **Tabbed 2026-09-05.** The sections are a tab rail on the header's rule —
 > `?tab=scheme|ladder|groups|kpi|thresholds|open-bill|brands|promotion|ranks`
+> (2026-10-08: `thresholds` folded into `kpi`, which moved to the end, after
+> `directors`; an old `?tab=thresholds` opens it)
 > — one section on screen at a time, the numerals kept on the section heads.
 > *+ Generate new sub-department* moved into the header's action slot and
 > opens its panel above the active tab. Section IX, the salespeople, moved to
@@ -1748,7 +1759,8 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 > rules, Title ladder and Ranks are always there; every other tab is a table
 > one switch on Scheme rules reads, and it appears only while that switch is
 > on (user, on IR's page: "上面的 tab 是 depend on 我 turn on 它才会跳出来"):
-> KPI item allowance → Item groups, KPI items, KPI threshold ladder; Open
+> KPI item allowance → Item groups, KPI items (with the threshold ladder, and
+> since 2026-10-08 also while an item or a rung is recorded); Open
 > Bill bonus → Open Bill rates; Below-margin penalty *or* Monthly margin
 > incentive → Brands & margin bands (one brand ladder holds both kinds of
 > rung). Promotion criteria has no switch — it is recorded policy — so it
@@ -1838,7 +1850,9 @@ OTHER              [ ]              2,210.00
 **IV. KPI items** — pick from the ERP's product codes; qty and value from last
 month shown so the cost of a rate is visible before it is saved. *(2026-09-27:
 set on Product List › Add-on / KPI Items — SKUs and Maintenance specials,
-effective-dated; this tab lists them read-only. §4.3.)*
+effective-dated; this tab listed them read-only. 2026-10-08: set HERE again —
+section XI, the last tab, with the ladder (V) under the items; the Product
+List tab is gone. §4.3.)*
 
 ```
 ITEM CODE                     NAME                    KPI AMOUNT   ACTIVE   JULY QTY
@@ -1848,7 +1862,7 @@ AK- ESSENTIAL BOLSTER         Soft Bolster              30.00       [ ]        4
                                                         [ + add item code ]
 ```
 
-**V. KPI threshold ladder** — `TIER · MIN QTY · BONUS %` (Tier 1 · 10 · 20%).
+**V. KPI threshold ladder** — `TIER · MIN QTY · BONUS %` (Tier 1 · 10 · 20%). *(On the KPI items tab, under the items, since 2026-10-08.)*
 
 **VI. Open Bill rates** — `1st 50% · 2nd 40% · 3rd 30%`.
 

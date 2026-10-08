@@ -33,7 +33,6 @@ describe('Product List scrolling', () => {
     expect(productTabScroll('combos')).toBe('window')
     expect(productTabScroll('gaps')).toBe('window')
     expect(productTabScroll('costing')).toBe('page')
-    expect(productTabScroll('kpi')).toBe('page')
   })
 
   it("marks the workspace with its tab's mode, the fixed window when no tab is named", () => {
@@ -59,13 +58,22 @@ describe('Product List draft navigation', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('carries the sub-department between the two settings tabs, and nowhere else', () => {
-    query.current = 'tab=costing&sub=ir'
-    render(<Workspace active="costing" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add-on / KPI Items' }))
-    expect(push).toHaveBeenLastCalledWith('/member/products?tab=kpi&sub=ir', { scroll: false })
-    fireEvent.click(screen.getByRole('button', { name: 'Combo Pricing' }))
-    expect(push).toHaveBeenLastCalledWith('/member/products?tab=combos', { scroll: false })
+  it('carries the sub-department to Costing Setting, and nowhere else', () => {
+    query.current = 'tab=combos&sub=ir'
+    render(<Workspace active="combos" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Costing Setting' }))
+    expect(push).toHaveBeenLastCalledWith('/member/products?tab=costing&sub=ir', { scroll: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Modular' }))
+    expect(push).toHaveBeenLastCalledWith('/member/products?tab=modular', { scroll: false })
+  })
+
+  // 2026-10-08: which items count as KPI is a rule of the pay — Rules › KPI items.
+  it('has no Add-on / KPI Items tab any more', () => {
+    render(<Workspace />)
+    expect(screen.queryByRole('button', { name: 'Add-on / KPI Items' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button').map(b => b.textContent)).toEqual(
+      expect.arrayContaining(['SKU Master', 'Modular', 'Maintenance', 'Combo Pricing', 'Costing gaps', 'Costing Setting']),
+    )
   })
 
   it('keeps the dirty tab until the user explicitly discards or stays', () => {
