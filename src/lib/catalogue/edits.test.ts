@@ -4,6 +4,7 @@ import {
   parseMoney,
   validateComboPrices,
   validateComboRemovals,
+  validateNewCombo,
   validateModelEdit,
   validateOptionPrices,
   validateSkuPrices,
@@ -495,5 +496,21 @@ describe('validateComboRemovals', () => {
     expect(() => validateComboRemovals(Array.from({ length: 501 }, (_, i) => ({ baseModel: String(i), slotsKey: '[]' })))).toThrow('at most 500')
     expect(() => validateComboRemovals([{ baseModel: '', slotsKey: '[]' }])).toThrow('A combo row is incomplete')
     expect(() => validateComboRemovals([{ baseModel: '8030', slotsKey: '1NA+2NA' }])).toThrow('A combo row is incomplete')
+  })
+})
+
+describe('validateNewCombo — a piece may be either side (2026-10-08)', () => {
+  const base = { baseModel: ' 2376 ', label: '1A(R) + 1NA', prices: { PRICE_2: { '30': 1900 } } }
+
+  it('keeps a slot of the modules it may be, trimmed, as the ERP writes one', () => {
+    expect(validateNewCombo({ ...base, modules: [[' 1A(R)(LHF) ', '1A(R)(RHF)'], ['1NA']] }).modules)
+      .toEqual([['1A(R)(LHF)', '1A(R)(RHF)'], ['1NA']])
+  })
+
+  it('refuses an empty piece, more than four, or one module twice', () => {
+    expect(() => validateNewCombo({ ...base, modules: [[], ['1NA']] })).toThrow('Each piece is one compartment.')
+    expect(() => validateNewCombo({ ...base, modules: [['A', 'B', 'C', 'D', 'E'], ['1NA']] })).toThrow('A compartment may be one of four modules at most.')
+    expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', ' 1A(LHF)'], ['1NA']] })).toThrow('A compartment names the same module twice.')
+    expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', 'a "b'], ['1NA']] })).toThrow('is not a compartment code')
   })
 })

@@ -5,7 +5,7 @@ import { TIERS } from '@/lib/catalogue/pricing'
 import { addCombo } from '../actions'
 import type { CatalogueSku, ComboRow } from '../load'
 import FloatingWindow from './FloatingWindow'
-import { checkCombo, comboModels, comboPieces, draftDirty, moduleSum, readAmount, setLine, type ComboDraft } from './add-combo'
+import { checkCombo, comboModels, comboPieces, draftDirty, moduleSum, readAmount, setLine, type ComboDraft, type ComboPiece } from './add-combo'
 import { money, plural, tierLabel } from './ui'
 import c from './products.module.css'
 
@@ -41,6 +41,11 @@ export default function AddComboWindow({ open, initialModel, sofaSkus, heights, 
   )
 }
 
+/** How a card is read aloud: a left-or-right piece says so. */
+function pieceName(p: ComboPiece): string {
+  return p.either ? `${p.module} either side` : p.module
+}
+
 function AddCombo({ titleId, dismiss, initialModel, sofaSkus, heights, combos, onClose, onAdded, onDirtyChange }: {
   titleId: string
   dismiss: MutableRefObject<() => void>
@@ -65,7 +70,7 @@ function AddCombo({ titleId, dismiss, initialModel, sofaSkus, heights, combos, o
   const pieces = useMemo(() => comboPieces(sofaSkus, draft.model), [sofaSkus, draft.model])
   const check = checkCombo(draft, pieces, heights, combos)
   const dirty = draftDirty(draft)
-  const picked = pieces.filter(p => (draft.pcs[p.module] ?? 0) > 0).map(p => ({ ...p, n: draft.pcs[p.module] }))
+  const picked = pieces.filter(p => (draft.pcs[p.key] ?? 0) > 0).map(p => ({ ...p, n: draft.pcs[p.key] }))
   const line = setLine(picked)
   const modelLabel = models.find(m => m.code === draft.model)?.label ?? draft.model
 
@@ -153,19 +158,19 @@ function AddCombo({ titleId, dismiss, initialModel, sofaSkus, heights, combos, o
           {!draft.model ? <p className={c.emptyBox}>Pick a sofa model to see its compartments.</p> : null}
           <div className={c.pieces}>
             {pieces.map(p => {
-              const n = draft.pcs[p.module] ?? 0
+              const n = draft.pcs[p.key] ?? 0
               return (
-                <div key={p.module} className={c.piece} data-on={n > 0 || undefined}>
+                <div key={p.key} className={c.piece} data-on={n > 0 || undefined} data-either={p.either || undefined}>
                   <span className={c.pieceText}>
                     <span className={c.pieceSize}>{p.module}</span>
                     <span className={c.pieceCode}>{p.code}</span>
                   </span>
                   <div className={c.stepper}>
-                    <button type="button" className={c.step} data-minus="" aria-label={`Remove one ${p.module}`} disabled={n === 0 || saving}
-                      onClick={() => up({ pcs: { ...draft.pcs, [p.module]: n - 1 } })}>−</button>
+                    <button type="button" className={c.step} data-minus="" aria-label={`Remove one ${pieceName(p)}`} disabled={n === 0 || saving}
+                      onClick={() => up({ pcs: { ...draft.pcs, [p.key]: n - 1 } })}>−</button>
                     <span className={c.stepCount} data-on={n > 0 || undefined}>{n}</span>
-                    <button type="button" className={c.step} aria-label={`Add one ${p.module}`} disabled={saving}
-                      onClick={() => up({ pcs: { ...draft.pcs, [p.module]: n + 1 } })}>+</button>
+                    <button type="button" className={c.step} aria-label={`Add one ${pieceName(p)}`} disabled={saving}
+                      onClick={() => up({ pcs: { ...draft.pcs, [p.key]: n + 1 } })}>+</button>
                   </div>
                 </div>
               )
@@ -175,9 +180,12 @@ function AddCombo({ titleId, dismiss, initialModel, sofaSkus, heights, combos, o
             <div className={c.setLine}>
               <span className={c.setLineLabel}>THIS SET</span>
               {picked.map((p, i) => (
-                <span key={p.module} className={c.setLineItem}>
+                <span key={p.key} className={c.setLineItem}>
                   {i > 0 ? <span className={c.setLinePlus}>+</span> : null}
-                  <span className={c.setLineChip}>{p.n > 1 ? `${p.n} × ` : ''}{p.module}</span>
+                  <span className={c.setLineChip}>
+                    {p.n > 1 ? `${p.n} × ` : ''}{p.module}
+                    {p.either ? <span className={c.setLineAlt}>LHF or RHF</span> : null}
+                  </span>
                 </span>
               ))}
             </div>
@@ -226,7 +234,7 @@ function AddCombo({ titleId, dismiss, initialModel, sofaSkus, heights, combos, o
           </div>
           <p className={c.rule}>
             {picked.length
-              ? `When a sales line for Model ${draft.model} has exactly ${line}, it uses this set price for its fabric tier and seat height instead of adding up the module prices. Leave a box blank if that size is not sold as this set.`
+              ? `When a sales line for Model ${draft.model} has exactly ${setLine(picked, '×', true)}, it uses this set price for its fabric tier and seat height instead of adding up the module prices. Leave a box blank if that size is not sold as this set.`
               : 'When a sales line has exactly these compartments, it uses the set price for its fabric tier and seat height instead of adding up the module prices.'}
           </p>
         </section>

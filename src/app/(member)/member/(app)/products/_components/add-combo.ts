@@ -17,10 +17,16 @@ export interface ComboModel {
 }
 
 export interface ComboPiece {
-  /** The module code a slot holds (`erp_products.module_code`), shown as the card's size. */
+  /** What the draft counts it under: the module code, or `either:<module>` for a left-or-right piece. */
+  key: string
+  /** The card's size: the module code (`erp_products.module_code`), or a left/right pair's own name. */
   module: string
-  /** The SKU's full code, under it. */
+  /** Under it: the SKU's full code, or `LHF or RHF`. */
   code: string
+  /** The modules one piece of it may be: one, or the left and the right of a pair. */
+  modules: string[]
+  /** A left-or-right piece (2026-10-08, user: 我需要左右都算的 function) — the ERP's own "1A(LHF) or 1A(RHF)" slot. */
+  either?: boolean
   grid: PriceCell[] | null
 }
 
@@ -36,26 +42,72 @@ export function comboModels(skus: readonly CatalogueSku[]): ComboModel[] {
   return [...byCode.values()].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }))
 }
 
-/** A model's compartments: one card per module code, in the SKU Master's order. */
+/**
+ * The side a module faces, when its code says one: `1A(R)(LHF)`, `2A-LHF`,
+ * `L RHF`. `pair` is the code with the side taken out — the name both sides
+ * share — and `twin` the same code facing the other way.
+ */
+export function moduleSide(code: string): { pair: string; side: 'LHF' | 'RHF'; twin: string } | null {
+  const m = /^(.+?)(\((LHF|RHF)\)|-(LHF|RHF)|\s+(LHF|RHF))$/.exec(code.trim())
+  if (!m) return null
+  const side = (m[3] ?? m[4] ?? m[5]) as 'LHF' | 'RHF'
+  const other = side === 'LHF' ? 'RHF' : 'LHF'
+  return { pair: m[1].trim(), side, twin: m[1] + m[2].replace(side, other) }
+}
+
+/** A left-or-right piece is costed at the dearer side wherever the two differ, so a set price copied from it never under-books. */
+function dearerGrid(a: PriceCell[] | null, b: PriceCell[] | null): PriceCell[] | null {
+  if (!a && !b) return null
+  const out = new Map<string, PriceCell>()
+  for (const cell of [...(a ?? []), ...(b ?? [])]) {
+    const k = `${heightKey(cell.height)}|${cell.tier}`
+    const prev = out.get(k)
+    if (!prev || (typeof cell.price === 'number' && (typeof prev.price !== 'number' || cell.price > prev.price))) out.set(k, cell)
+  }
+  return [...out.values()]
+}
+
+/**
+ * A model's compartments: one card per module code, in the SKU Master's order —
+ * and, right after a module whose other side the model also has, one more for
+ * the pair: a piece that may be either side (2026-10-08), as the ERP's combos
+ * write "1A(R)(LHF) or 1A(R)(RHF)".
+ */
 export function comboPieces(skus: readonly CatalogueSku[], model: string): ComboPiece[] {
   const seen = new Set<string>()
-  const out: ComboPiece[] = []
+  const singles: ComboPiece[] = []
   for (const s of skus) {
     if ((s.baseModel ?? s.modelCode ?? '').trim() !== model || !s.moduleCode || seen.has(s.moduleCode)) continue
     seen.add(s.moduleCode)
-    out.push({ module: s.moduleCode, code: s.code, grid: s.grid })
+    singles.push({ key: s.moduleCode, module: s.moduleCode, code: s.code, modules: [s.moduleCode], grid: s.grid })
+  }
+  const out: ComboPiece[] = []
+  const paired = new Set<string>()
+  for (const p of singles) {
+    out.push(p)
+    const side = moduleSide(p.module)
+    if (!side || paired.has(side.pair)) continue
+    const twin = singles.find(t => t.module === side.twin)
+    // The pair joins the list after whichever of its two sides comes second.
+    if (!twin || singles.indexOf(twin) > singles.indexOf(p)) continue
+    paired.add(side.pair)
+    const [left, right] = side.side === 'LHF' ? [p, twin] : [twin, p]
+    out.push({ key: `either:${side.pair}`, module: side.pair, code: 'LHF or RHF', modules: [left.module, right.module], either: true, grid: dearerGrid(left.grid, right.grid) })
   }
   return out
 }
 
-/** "1A + 2 × 2A-LHF": the set as the strip and a default name read it. */
-export function setLine(picked: ReadonlyArray<{ module: string; n: number }>, times = '×'): string {
-  return picked.map(p => (p.n > 1 ? `${p.n}${times}` : '') + p.module).join(' + ')
+/**
+ * "1A + 2 × 2A-LHF": the set as a default name reads it — a left-or-right piece
+ * by its pair's name ("1A(R) + 1NA"). `sides` spells it out ("1A(R) (LHF or RHF)").
+ */
+export function setLine(picked: ReadonlyArray<{ module: string; n: number; either?: boolean }>, times = '×', sides = false): string {
+  return picked.map(p => (p.n > 1 ? `${p.n}${times}` : '') + p.module + (sides && p.either ? ' (LHF or RHF)' : '')).join(' + ')
 }
 
-/** One piece per slot, as the ERP writes a combo's modules: [["1A"], ["2A-LHF"], ["2A-LHF"]]. */
-export function comboModules(picked: ReadonlyArray<{ module: string; n: number }>): string[][] {
-  return picked.flatMap(p => Array.from({ length: p.n }, () => [p.module]))
+/** One piece per slot, as the ERP writes a combo's modules: [["1A"], ["2A-LHF", "2A-RHF"], ["CNR"]]. */
+export function comboModules(picked: ReadonlyArray<{ modules: readonly string[]; n: number }>): string[][] {
+  return picked.flatMap(p => Array.from({ length: p.n }, () => [...p.modules]))
 }
 
 /** The module total at one tier and seat height, or null when a piece has no price there ("Not sold"). */
@@ -91,7 +143,7 @@ export function readAmount(text: string | undefined): number | null {
 export interface ComboDraft {
   model: string
   label: string
-  /** Pieces per module code. */
+  /** Pieces per card (`ComboPiece.key`). */
   pcs: Record<string, number>
   /** `${tier}#${height}` → what was typed. */
   prices: Record<string, string>
@@ -115,7 +167,7 @@ export interface ComboCheck {
 
 /** The window's checks, in its order (README › Add combo › Validation). */
 export function checkCombo(d: ComboDraft, pieces: readonly ComboPiece[], heights: readonly string[], combos: readonly ComboRow[]): ComboCheck {
-  const picked = pieces.filter(p => (d.pcs[p.module] ?? 0) > 0).map(p => ({ ...p, n: d.pcs[p.module] }))
+  const picked = pieces.filter(p => (d.pcs[p.key] ?? 0) > 0).map(p => ({ ...p, n: d.pcs[p.key] }))
   const count = picked.reduce((n, p) => n + p.n, 0)
   const label = d.label.trim() || setLine(picked)
   const modules = comboModules(picked)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogueSku, ComboRow } from '../load'
-import { checkCombo, comboModels, comboModules, comboPieces, draftDirty, moduleSum, sameCompartments, setLine, type ComboDraft } from './add-combo'
+import { checkCombo, comboModels, comboModules, comboPieces, draftDirty, moduleSide, moduleSum, sameCompartments, setLine, type ComboDraft } from './add-combo'
 
 function sku(code: string, module: string, extra: Partial<CatalogueSku> = {}): CatalogueSku {
   return {
@@ -39,7 +39,7 @@ describe('Add combo', () => {
   })
 
   it('writes the set as the strip, the name and the ERP each read it', () => {
-    const picked = [{ module: '1NA', n: 1 }, { module: '2NA', n: 2 }]
+    const picked = [{ module: '1NA', modules: ['1NA'], n: 1 }, { module: '2NA', modules: ['2NA'], n: 2 }]
     expect(setLine(picked)).toBe('1NA + 2×2NA')
     expect(comboModules(picked)).toEqual([['1NA'], ['2NA'], ['2NA']])
   })
@@ -71,6 +71,64 @@ describe('Add combo', () => {
     expect(ok).toEqual({
       problem: null, label: '1NA + 2NA', pieces: 2, filled: 2, modules: [['1NA'], ['2NA']],
       prices: { PRICE_2: { '28': 2400 }, PRICE_3: { '30': 2600.5 } },
+    })
+  })
+
+  describe('a piece that may be either side (2026-10-08)', () => {
+    const sided = [
+      sku('2376-1A(R)(LHF)', '1A(R)(LHF)', { baseModel: '2376', grid: [{ height: '30', tier: 'PRICE_2', price: 900 }, { height: '24', tier: 'PRICE_2', price: 850 }] }),
+      sku('2376-1NA', '1NA', { baseModel: '2376' }),
+      sku('2376-1A(R)(RHF)', '1A(R)(RHF)', { baseModel: '2376', grid: [{ height: '30', tier: 'PRICE_2', price: 950 }] }),
+      sku('2376-L(LHF)', 'L(LHF)', { baseModel: '2376' }),
+      sku('2376-2A-RHF', '2A-RHF', { baseModel: '2376' }),
+      sku('2376-2A-LHF', '2A-LHF', { baseModel: '2376' }),
+    ]
+
+    it('reads the side a module code faces, in the ways the ERP writes it', () => {
+      expect(moduleSide('1A(R)(LHF)')).toEqual({ pair: '1A(R)', side: 'LHF', twin: '1A(R)(RHF)' })
+      expect(moduleSide('2A-RHF')).toEqual({ pair: '2A', side: 'RHF', twin: '2A-LHF' })
+      expect(moduleSide('L LHF')).toEqual({ pair: 'L', side: 'LHF', twin: 'L RHF' })
+      expect(moduleSide('1NA')).toBeNull()
+      expect(moduleSide('LHF')).toBeNull()
+    })
+
+    it('offers the pair right after its second side, and only when the model has both sides', () => {
+      expect(comboPieces(sided, '2376').map(p => [p.key, p.module, p.code, p.modules])).toEqual([
+        ['1A(R)(LHF)', '1A(R)(LHF)', '2376-1A(R)(LHF)', ['1A(R)(LHF)']],
+        ['1NA', '1NA', '2376-1NA', ['1NA']],
+        ['1A(R)(RHF)', '1A(R)(RHF)', '2376-1A(R)(RHF)', ['1A(R)(RHF)']],
+        ['either:1A(R)', '1A(R)', 'LHF or RHF', ['1A(R)(LHF)', '1A(R)(RHF)']],
+        ['L(LHF)', 'L(LHF)', '2376-L(LHF)', ['L(LHF)']],
+        ['2A-RHF', '2A-RHF', '2376-2A-RHF', ['2A-RHF']],
+        ['2A-LHF', '2A-LHF', '2376-2A-LHF', ['2A-LHF']],
+        ['either:2A', '2A', 'LHF or RHF', ['2A-LHF', '2A-RHF']],
+      ])
+    })
+
+    it('writes each such piece as a slot of both sides, as the ERP does', () => {
+      const pieces = comboPieces(sided, '2376')
+      const ok = checkCombo(draft({ model: '2376', pcs: { 'either:1A(R)': 2, '1NA': 1 }, prices: { 'PRICE_2#30': '2500' } }), pieces, ['30'], [])
+      expect(ok.problem).toBeNull()
+      expect(ok.label).toBe('1NA + 2×1A(R)')
+      expect(ok.modules).toEqual([['1NA'], ['1A(R)(LHF)', '1A(R)(RHF)'], ['1A(R)(LHF)', '1A(R)(RHF)']])
+      const picked = pieces.filter(p => p.key === 'either:1A(R)').map(p => ({ ...p, n: 2 }))
+      expect(setLine(picked, '×', true)).toBe('2×1A(R) (LHF or RHF)')
+    })
+
+    it('adds a pair up at the dearer side, so a copied set price never under-books', () => {
+      const pair = comboPieces(sided, '2376').find(p => p.either && p.module === '1A(R)')!
+      expect(moduleSum([{ ...pair, n: 1 }], 'PRICE_2', '30')).toBe(950)
+      expect(moduleSum([{ ...pair, n: 1 }], 'PRICE_2', '24')).toBe(850)
+    })
+
+    it('knows a set adopted from the ERP with either side in a slot, whichever side is listed first', () => {
+      const adopted: ComboRow = { ...erp, baseModel: '2376', label: '1A(R)+1NA', slots: [['1A(R)(RHF)', '1A(R)(LHF)'], ['1NA']] }
+      const pieces = comboPieces(sided, '2376')
+      expect(checkCombo(draft({ model: '2376', pcs: { 'either:1A(R)': 1, '1NA': 1 }, prices: { 'PRICE_2#30': '1900' } }), pieces, ['30'], [adopted]).problem)
+        .toBe('This model already has a combo with these compartments.')
+      // One side only is another set.
+      expect(checkCombo(draft({ model: '2376', label: 'Left only', pcs: { '1A(R)(LHF)': 1, '1NA': 1 }, prices: { 'PRICE_2#30': '1900' } }), pieces, ['30'], [adopted]).problem)
+        .toBeNull()
     })
   })
 

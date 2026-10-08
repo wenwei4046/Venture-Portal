@@ -1013,6 +1013,8 @@
 .setLineItem { display: flex; align-items: center; gap: 6px; }
 .setLinePlus { color: var(--rv-faint); font-weight: 600; }
 .setLineChip { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--rv-accent-soft); background: var(--rv-white); font-size: 13px; font-weight: 650; line-height: 24px; box-sizing: border-box; }
+/* A left-or-right piece (2026-10-08) says so the way a module tile does: the sides in the muted weight. */
+.setLineAlt { margin-left: 5px; font-weight: 500; color: var(--rv-sub); }
 .priceCard { overflow-x: auto; border: 1px solid var(--rv-line); border-radius: 12px; }
 .priceTable { width: 100%; border-collapse: collapse; font-size: 13px; }
 .priceHead {
