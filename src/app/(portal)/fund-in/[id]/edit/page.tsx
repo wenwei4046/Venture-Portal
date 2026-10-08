@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
@@ -78,7 +78,7 @@ export default async function EditFundSourcePage({ params }: Props) {
           repaymentDate={(source.repayment_date as string | null) ?? (source.effective_date as string)}
           compound={(source as { compound_interest?: boolean }).compound_interest === true}
           notes={source.notes ?? ''}
-          nextMonth={dayjs().add(1, 'month').format('YYYY-MM')}
+          nextMonth={officeTime().add(1, 'month').format('YYYY-MM')}
           termsFrom={((source as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null}
         />
       </div>

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import type { FundSourceType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
 import { buildTermsSegments, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
@@ -200,7 +201,7 @@ export async function createFundSource(formData: FormData) {
   if (!raw.effective_date) {
     throw new Error('Effective date is required (interest accrues from this date)')
   }
-  if (dayjs(raw.effective_date).isAfter(dayjs(), 'day')) {
+  if (dayjs(raw.effective_date).isAfter(officeToday(), 'day')) {
     throw new Error('Effective date cannot be in the future')
   }
   // Repayment date is OPTIONAL too — only checked when provided.
@@ -394,7 +395,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
     return { error: 'Repayment period must be at least 1 month' }
   }
   if (!effectiveDate) return { error: 'Effective date is required' }
-  if (dayjs(effectiveDate).isAfter(dayjs(), 'day')) {
+  if (dayjs(effectiveDate).isAfter(officeToday(), 'day')) {
     return { error: 'Effective date cannot be in the future' }
   }
   if (!repaymentDate) return { error: 'Repayment date is required' }
@@ -794,7 +795,7 @@ export async function listPayableFundSources(
           principalByMonth.get(o.fund_source_id) ?? {},
         )
         if (termsChanged(segs)) {
-          const seg = currentSegment(segs, dayjs().format('YYYY-MM'))
+          const seg = currentSegment(segs, officeMonth())
           rate = seg.rate
           months = seg.months ?? months
           monthlyPrincipal = seg.principalPerMonth

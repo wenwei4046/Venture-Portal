@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
@@ -57,7 +58,7 @@ export default async function DebtorAgingPage() {
     })
     .filter((i) => i.amount > 0.005)
 
-  const today = dayjs().format('YYYY-MM-DD')
+  const today = officeToday()
   const aging = buildDebtorAging(raw, today)
 
   return (

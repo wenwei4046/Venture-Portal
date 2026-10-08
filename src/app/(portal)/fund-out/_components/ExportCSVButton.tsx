@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { exportLoansCSV } from '../actions'
+import { officeToday } from '@/lib/office-time'
 
 export default function ExportCSVButton() {
   const [isPending, startTransition] = useTransition()
@@ -16,7 +17,7 @@ export default function ExportCSVButton() {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `loan-portfolio-${new Date().toISOString().slice(0, 10)}.csv`
+        a.download = `loan-portfolio-${officeToday()}.csv`
         a.click()
         URL.revokeObjectURL(url)
       } catch (err) {

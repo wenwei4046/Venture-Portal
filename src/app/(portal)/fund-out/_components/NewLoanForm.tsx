@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { createLoan } from '../actions'
 import type { Company } from '@/types'
 import type { BsAccountOption } from '@/lib/loan-disbursement'
@@ -42,7 +43,8 @@ export default function NewLoanForm({ companies, baseRate, bsAccounts, banks }: 
   const [companyId, setCompanyId] = useState<string>('')
   const [customRate, setCustomRate] = useState<string>('0.000')
   const [startDate, setStartDate] = useState<string>(
-    () => new Date().toISOString().slice(0, 10)
+    // The office's today — toISOString's date is UTC's, yesterday until 08:00.
+    () => officeToday()
   )
   const [principal, setPrincipal] = useState<string>('')
   const [tenure, setTenure] = useState<string>('')

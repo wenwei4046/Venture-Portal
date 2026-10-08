@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeToday } from '@/lib/office-time'
 
 // ─── Detect overdue loans (Finance) — Phase 7 Step 12 calendar-month rule ────
 //
@@ -23,7 +24,10 @@ export async function detectOverdue() {
   const user = await requirePermission('treasury')
   const supabase = await createClient()
 
-  const now = dayjs()
+  // Today on the office's calendar, as a plain date like the loans' own. The
+  // server's clock (UTC) is still in last month until 08:00 on the 1st, which
+  // checked the month before last.
+  const now = dayjs(officeToday())
   // Check the previous calendar month (current month isn't due yet)
   const periodStart = now.subtract(1, 'month').startOf('month')
   const periodEnd = periodStart.endOf('month')

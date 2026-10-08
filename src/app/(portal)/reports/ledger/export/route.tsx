@@ -4,15 +4,15 @@ import { fetchLedger } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildLedgerXlsx } from './_format/xlsx'
 import { LedgerPdf } from './_format/pdf'
-import dayjs from 'dayjs'
+import { officeTime, officeToday } from '@/lib/office-time'
 
 export async function GET(req: Request) {
   await requirePermission('reports')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const code = url.searchParams.get('code')
-  const from = url.searchParams.get('from') ?? dayjs().startOf('month').format('YYYY-MM-DD')
-  const to = url.searchParams.get('to') ?? dayjs().format('YYYY-MM-DD')
+  const from = url.searchParams.get('from') ?? officeTime().startOf('month').format('YYYY-MM-DD')
+  const to = url.searchParams.get('to') ?? officeToday()
 
   if (!code) return Response.json({ error: 'code is required' }, { status: 400 })
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {

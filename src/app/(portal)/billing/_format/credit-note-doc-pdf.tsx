@@ -109,7 +109,7 @@ function CreditNotePage({ cn }: { cn: CreditNoteDocData }) {
           <Text style={styles.metaLine}>
             <Text style={styles.metaLabel}>Date  </Text>
             <Text style={styles.metaValue}>
-              {cn.created_at ? dayjs(cn.created_at).format('DD MMM YYYY') : '—'}
+              {cn.created_at ? officeTime(cn.created_at).format('DD MMM YYYY') : '—'}
             </Text>
           </Text>
           <Text style={styles.metaLine}>

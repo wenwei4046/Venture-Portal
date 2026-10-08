@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { formatMoney } from '@/lib/utils'
 
 export interface InvoiceDetail {
@@ -282,7 +283,7 @@ export default function InvoiceDetailButton({
 
               {invoice.created_at ? (
                 <div className="pt-3 border-t border-hairline font-mono text-[11px] text-muted">
-                  Created {dayjs(invoice.created_at).format('D MMM YYYY · HH:mm')}
+                  Created {officeTime(invoice.created_at).format('D MMM YYYY · HH:mm')}
                 </div>
               ) : null}
             </div>

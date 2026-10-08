@@ -1,7 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { officeDay, officeTime } from '@/lib/office-time'
 import { recipientAccountLabel, salaryPaymentLabel } from '@/lib/payroll-voucher-display'
 
 // Per-voucher document PDF. Each voucher starts on an A4 portrait page. Mirrors the
@@ -124,7 +124,7 @@ function VoucherPage({ v }: { v: VoucherDocData }) {
           <Text style={styles.metaLine}>
             <Text style={styles.metaLabel}>Date  </Text>
             <Text style={styles.metaValue}>
-              {dayjs(v.payment_date ?? v.created_at).format('DD MMM YYYY')}
+              {officeDay(v.payment_date ?? v.created_at).format('DD MMM YYYY')}
             </Text>
           </Text>
           <Text style={styles.metaLine}>

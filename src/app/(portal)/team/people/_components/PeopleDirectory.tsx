@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { officeTime } from '@/lib/office-time'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { ratePct } from '@/lib/commission/ranks'
@@ -561,13 +562,16 @@ function LastSeen({ person, onInvite }: { person: PersonRow; onInvite?: (staffId
   }
   const at = dayjs(person.lastSeenAt)
   const stale = dayjs().diff(at, 'day') >= STALE_DAYS
+  // The moment on the office's clock (the relative "3 days ago" stays on the
+  // plain instant: an offset one shifts dayjs's day arithmetic).
+  const seenAt = officeTime(person.lastSeenAt).format('D MMM YYYY, HH:mm')
   return stale ? (
-    <span className="chip alert" title={`${at.format('D MMM YYYY, HH:mm')} — no sign-in for ${STALE_DAYS}+ days`}>
+    <span className="chip alert" title={`${seenAt} — no sign-in for ${STALE_DAYS}+ days`}>
       <span className="dot" aria-hidden />
       {at.fromNow()}
     </span>
   ) : (
-    <span className="font-mono text-[11px]" title={at.format('D MMM YYYY, HH:mm')}>
+    <span className="font-mono text-[11px]" title={seenAt}>
       {at.fromNow()}
     </span>
   )

@@ -5,7 +5,7 @@
 // so screen and file always agree; maths tie to Loan Monitor / Repayment
 // Schedule.
 
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
@@ -33,7 +33,7 @@ export default async function CompanyStatementPage() {
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> REPORTS · AS AT {dayjs().format('D MMM YYYY').toUpperCase()}
+            <em>I.</em> REPORTS · AS AT {officeTime().format('D MMM YYYY').toUpperCase()}
           </div>
           <h1 className="page-title">Company Statement</h1>
         </div>

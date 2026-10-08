@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatIntlDate } from '@/lib/utils'
+import { OFFICE_TZ } from '@/lib/office-clock'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { round2 } from '@/lib/payroll-funding'
 import { typedStatutory } from '@/lib/payroll-grid'
@@ -357,7 +358,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
           <p className="pay-status-line text-sm mt-3">
             <span>{peopleNote}</span>
             {closed ? (
-              <span className="chip ledger"><span className="dot" />Closed for good · {formatIntlDate(new Date(closed.at), { day: 'numeric', month: 'short', year: 'numeric' })}{closed.by ? ` · ${closed.by}` : ''}</span>
+              <span className="chip ledger"><span className="dot" />Closed for good · {formatIntlDate(new Date(closed.at), { day: 'numeric', month: 'short', year: 'numeric', timeZone: OFFICE_TZ })}{closed.by ? ` · ${closed.by}` : ''}</span>
             ) : (
               <>
                 {counts.draft > 0 && <span className="chip"><span className="dot" />{counts.draft} draft</span>}

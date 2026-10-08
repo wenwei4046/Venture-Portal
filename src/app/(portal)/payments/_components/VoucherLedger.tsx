@@ -15,6 +15,7 @@ import PaymentFilters from './PaymentFilters'
 import BackToTop from './BackToTop'
 import VouchersTable, { type VoucherRow } from './VouchersTable'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 // Shared ledger page for /payments (debit, HV-PV-*) and /receipts (credit,
 // HV-OR-*) — split per user 2026-06-12: the payment side shows only PVs, the
@@ -205,8 +206,11 @@ export default async function VoucherLedger({
         if (!poolList || !poolList.includes(poolFilter)) return false
       }
     }
-    if (fromFilter && dayjs(v.created_at).isBefore(dayjs(fromFilter), 'day')) return false
-    if (toFilter && dayjs(v.created_at).isAfter(dayjs(toFilter), 'day')) return false
+    // The day it was made in the office — on the server's clock (UTC) a voucher
+    // made before 08:00 fell on the day before and slipped out of the range.
+    const madeOn = dayjs(officeTime(v.created_at).format('YYYY-MM-DD'))
+    if (fromFilter && madeOn.isBefore(dayjs(fromFilter), 'day')) return false
+    if (toFilter && madeOn.isAfter(dayjs(toFilter), 'day')) return false
     if (minFilter !== null && Number(v.amount) < minFilter) return false
     if (maxFilter !== null && Number(v.amount) > maxFilter) return false
     if (qFilter) {

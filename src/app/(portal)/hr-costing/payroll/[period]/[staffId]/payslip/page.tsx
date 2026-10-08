@@ -3,6 +3,7 @@ import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatIntlDate } from '@/lib/utils'
+import { OFFICE_TZ } from '@/lib/office-clock'
 import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
 import { normalisePayLine, payLineKind, payLineLabel } from '@/lib/revenue-pay-lines'
 import { round2 } from '@/lib/payroll-funding'
@@ -294,7 +295,7 @@ export default async function PayslipPage({ params }: PageProps) {
             {row.status === 'paid' && ' · This payslip is final.'}
           </div>
           <div className="font-mono text-xs mt-1">
-            Generated {formatIntlDate(new Date(), { day: 'numeric', month: 'short', year: 'numeric' })}
+            Generated {formatIntlDate(new Date(), { day: 'numeric', month: 'short', year: 'numeric', timeZone: OFFICE_TZ })}
             {' · '}HOUZS Venture Portal
           </div>
         </div>

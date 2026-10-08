@@ -1,6 +1,7 @@
 'use client'
 
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { formatMoney } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
@@ -69,7 +70,7 @@ export default function LoansTable({ rows }: { rows: LoanRow[] }) {
                   ) : null}
                 </div>
                 <div className="font-mono text-[11px] text-graphite mt-0.5">
-                  {l.companyCode} · {dayjs(l.createdAt).format('D MMM YYYY')}
+                  {l.companyCode} · {officeTime(l.createdAt).format('D MMM YYYY')}
                 </div>
               </>
             ),

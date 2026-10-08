@@ -16,6 +16,11 @@
 // (user 2026-10-02: "我现在有 finance executive 了，我不希望他看到 payroll
 // detail，也就是每个人的 payout".)
 
+import { officeDay } from '@/lib/office-time'
+
+/** The office's day a voucher or pool row was made, `YYYY-MM-DD` (its own date is UTC's). */
+const madeOn = (createdAt: string) => officeDay(createdAt).format('YYYY-MM-DD')
+
 export const PAYROLL_REFERENCE_TYPES = [
   'payroll_disbursement',
   'payroll_statutory',
@@ -217,7 +222,7 @@ export function foldPayrollPoolRows<T extends PoolRowLike>(
       out.push(row)
       continue
     }
-    const key = `${label}|${row.created_at.slice(0, 10)}|${row.transaction_type}`
+    const key = `${label}|${madeOn(row.created_at)}|${row.transaction_type}`
     const group = groups.get(key)
     if (group) {
       group.amount = r2(group.amount + Number(row.amount))
@@ -250,8 +255,8 @@ export function filterLockedBatches(batches: LockedBatch[], f: LedgerFilters): L
   return batches.filter((b) => {
     if (f.tab !== 'all' && !b.statuses.includes(f.tab)) return false
     if (f.typeFilter && b.voucherType !== f.typeFilter) return false
-    if (f.fromFilter && b.lastCreated.slice(0, 10) < f.fromFilter) return false
-    if (f.toFilter && b.firstCreated.slice(0, 10) > f.toFilter) return false
+    if (f.fromFilter && madeOn(b.lastCreated) < f.fromFilter) return false
+    if (f.toFilter && madeOn(b.firstCreated) > f.toFilter) return false
     if (f.qFilter && !b.label.toLowerCase().includes(f.qFilter)) return false
     return true
   })

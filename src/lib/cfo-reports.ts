@@ -21,6 +21,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
+import { officeDay, officeTime } from './office-time'
 import { poolLabel, comparePools } from './pools'
 import { fetchAllRows, fetchAllRowsParallel, fetchByKeys } from './paginate'
 import { lineAttributions, segmentToPoolKey } from './invoice-settlement'
@@ -2231,9 +2232,12 @@ export async function fetchLedgers(
 // ────────────────────────────────────────────────────────────────────────────
 // Date helpers
 // ────────────────────────────────────────────────────────────────────────────
+// With no date, the month is the OFFICE's: the server keeps UTC, and on the
+// 1st until 08:00 in the office its own month is still the last one.
+const monthOf = (d?: string) => (d ? officeDay(d) : officeTime())
 export function startOfMonth(d?: string): string {
-  return dayjs(d ?? undefined).startOf('month').format('YYYY-MM-DD')
+  return monthOf(d).startOf('month').format('YYYY-MM-DD')
 }
 export function endOfMonth(d?: string): string {
-  return dayjs(d ?? undefined).endOf('month').format('YYYY-MM-DD')
+  return monthOf(d).endOf('month').format('YYYY-MM-DD')
 }

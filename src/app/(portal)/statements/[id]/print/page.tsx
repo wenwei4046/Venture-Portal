@@ -182,7 +182,7 @@ export default async function StatementPrintPage({ params }: Props) {
               <span className={`status-badge status-${statement.status}`}>{statement.status}</span>
             </div>
             {statement.issued_at && (
-              <div><span className="meta-label">Issued: </span>{dayjs(statement.issued_at).format('D MMM YYYY')}</div>
+              <div><span className="meta-label">Issued: </span>{officeTime(statement.issued_at).format('D MMM YYYY')}</div>
             )}
           </div>
         </div>

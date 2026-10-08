@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } 
 import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeTime, officeToday } from '@/lib/office-time'
 import {
   createManualInvoice,
   createMultiLineInvoice,
@@ -185,7 +186,7 @@ function CreateInvoiceButtonBody({
     if (!dateTouched) setInvoiceDate(periodEnd(period))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, dateTouched, open])
-  const [dueDate, setDueDate] = useState(dayjs().add(30, 'day').format('YYYY-MM-DD'))
+  const [dueDate, setDueDate] = useState(officeTime().add(30, 'day').format('YYYY-MM-DD'))
   const [description, setDescription] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
   const [subRows, setSubRows] = useState<SubRow[]>([newSubRow()])
@@ -236,8 +237,8 @@ function CreateInvoiceButtonBody({
     setDirectorAmount('')
     setPoolRows([newPoolRow(prefillMode)])
     setPeriod(dayjs(currentPeriod).format('YYYY-MM'))
-    setInvoiceDate(dayjs().format('YYYY-MM-DD'))
-    setDueDate(dayjs().add(30, 'day').format('YYYY-MM-DD'))
+    setInvoiceDate(officeToday())
+    setDueDate(officeTime().add(30, 'day').format('YYYY-MM-DD'))
     setDescription('')
     setReferenceNo('')
     setSubRows([newSubRow()])

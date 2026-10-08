@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeTime, officeToday } from '@/lib/office-time'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode, lineAttributions } from '@/lib/invoice-settlement'
@@ -272,7 +273,7 @@ export async function copyInvoice(formData: FormData): Promise<void> {
   if (srcErr || !src) throw new Error('Source invoice not found')
 
   // New draft lands in the CURRENT billing month (copy last month → bill this).
-  const period = dayjs().startOf('month').format('YYYY-MM-DD')
+  const period = officeTime().startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
 
   const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', { p_period: period })
@@ -290,7 +291,7 @@ export async function copyInvoice(formData: FormData): Promise<void> {
       base_amount: src.base_amount,
       total_amount: src.total_amount,
       status: 'draft',
-      invoice_date: dayjs().format('YYYY-MM-DD'),
+      invoice_date: officeToday(),
       due_date: null,
       description: src.description,
       reference_no: src.reference_no,
@@ -810,7 +811,7 @@ export async function createCreditNote(formData: FormData) {
   // Mint CN number under advisory lock (mig 227). Replaces the old
   // SELECT count(*) + 1 pattern which collided under concurrent creates.
   const { data: creditNoteNo, error: mintErr } = await supabase.rpc('mint_credit_note_no', {
-    p_period: dayjs().format('YYYY-MM-DD'),
+    p_period: officeToday(),
   })
   if (mintErr || !creditNoteNo) {
     throw new Error(`Failed to mint credit note number: ${mintErr?.message ?? 'unknown'}`)
@@ -1300,7 +1301,7 @@ export async function updateIssuedInvoiceFull(payload: {
 
   // The entry as the issue would post it today: dated by the invoice, Dr the
   // customer's receivable account for the total, Cr each line's account.
-  const jeDate = invoiceJeDate(header.invoice_date, period, dayjs().format('YYYY-MM-DD'))
+  const jeDate = invoiceJeDate(header.invoice_date, period, officeToday())
   const arCode = await resolveArGlCode(supabase, {
     companyId: header.company_id,
     departmentId: null,
@@ -2299,7 +2300,7 @@ export async function approveInvoice(formData: FormData) {
     const jeDate = invoiceJeDate(
       (inv as { invoice_date?: string | null }).invoice_date,
       inv.period_month,
-      dayjs().format('YYYY-MM-DD'),
+      officeToday(),
     )
     // Consolidated payroll invoice: each line carries its own gl_segment, so
     // post ONE AR-accrual JE PER segment (Dr 3030 dept-subtotal / Cr revenue per
@@ -2426,7 +2427,7 @@ export async function approveInvoice(formData: FormData) {
           transactionDate: invoiceJeDate(
             (inv as { invoice_date?: string | null }).invoice_date,
             inv.period_month,
-            dayjs().format('YYYY-MM-DD'),
+            officeToday(),
           ),
           // The EXPENSE belongs to the PAYING dept's P&L, not the
           // invoice's billing_mode segment (user 2026-06-11). The internal
@@ -2490,7 +2491,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   // Mig 200/P1-6a: post AR accrual per newly-issued invoice.
   // transaction_date = the INVOICE date (user 2026-06-11): a May-31 invoice
   // bulk-issued on June 4 must land in May's P&L, not June's.
-  const todayStr = dayjs().format('YYYY-MM-DD')
+  const todayStr = officeToday()
   for (const row of draftInvoices ?? []) {
     const amount = Number(row.total_amount ?? 0)
     if (amount <= 0) continue
@@ -2690,7 +2691,7 @@ export async function approveCreditNote(formData: FormData) {
 
   try {
     await postJournalEntry(supabase, {
-      transactionDate: dayjs().format('YYYY-MM-DD'),
+      transactionDate: officeToday(),
       segment,
       description: `Credit note ${cn.credit_note_no ?? cn.id.slice(0, 8)} against invoice ${inv.invoice_no ?? inv.id.slice(0, 8)} — ${cn.reason}`,
       referenceType: 'credit_note',
@@ -2840,7 +2841,7 @@ export async function voidCreditNote(formData: FormData) {
         .eq('entry_id', e.id)
       if (!lines || lines.length === 0) continue
       const reversalId = await postJournalEntry(supabase, {
-        transactionDate: dayjs().format('YYYY-MM-DD'),
+        transactionDate: officeToday(),
         segment: (e.segment as string) ?? undefined,
         description: `VOID ${cn.credit_note_no ?? cn.id.slice(0, 8)}: reversal of ${e.description ?? ''}`.trim(),
         referenceType: 'credit_note_void',

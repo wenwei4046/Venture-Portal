@@ -10,6 +10,7 @@ import { fetchPaymentExtras } from '@/lib/payment-extras'
 import { buildVouchersXlsx } from './_format/xlsx'
 import { VouchersPdf } from './_format/pdf'
 import dayjs from 'dayjs'
+import { officeDay, officeTime } from '@/lib/office-time'
 import type { Database } from '@/lib/supabase/database.types'
 
 type PaymentVoucher = Database['public']['Tables']['payment_vouchers']['Row']
@@ -122,8 +123,11 @@ export async function GET(req: Request) {
         if (!poolList || !poolList.includes(poolFilter)) return false
       }
     }
-    if (fromFilter && dayjs(v.created_at).isBefore(dayjs(fromFilter), 'day')) return false
-    if (toFilter && dayjs(v.created_at).isAfter(dayjs(toFilter), 'day')) return false
+    // The day it was made in the office — on the server's clock (UTC) a voucher
+    // made before 08:00 fell on the day before and slipped out of the range.
+    const madeOn = dayjs(officeTime(v.created_at).format('YYYY-MM-DD'))
+    if (fromFilter && madeOn.isBefore(dayjs(fromFilter), 'day')) return false
+    if (toFilter && madeOn.isAfter(dayjs(toFilter), 'day')) return false
     if (minFilter !== null && Number(v.amount) < minFilter) return false
     if (maxFilter !== null && Number(v.amount) > maxFilter) return false
     if (qFilter) {
@@ -158,7 +162,7 @@ export async function GET(req: Request) {
       raw,
       row: {
         voucher_no: v.voucher_no,
-        date: dayjs(raw).format('DD/MM/YYYY'),
+        date: officeDay(raw).format('DD/MM/YYYY'),
         direction: v.direction as 'credit' | 'debit',
         type: v.voucher_type,
         status: v.status,
@@ -175,7 +179,7 @@ export async function GET(req: Request) {
       raw: b.latest,
       row: {
         voucher_no: null,
-        date: dayjs(b.latest).format('DD/MM/YYYY'),
+        date: officeDay(b.latest).format('DD/MM/YYYY'),
         direction: 'debit',
         type: 'payroll',
         status: b.statusText,
@@ -221,7 +225,7 @@ export async function GET(req: Request) {
 
   const rows: VoucherExportRow[] = dated.map((d) => d.row)
 
-  const filename = `payment-vouchers-${dayjs().format('YYYYMMDD')}`
+  const filename = `payment-vouchers-${officeTime().format('YYYYMMDD')}`
 
   if (format === 'xlsx') {
     return exportXlsxResponse({ filename, buffer: buildVouchersXlsx(rows) })

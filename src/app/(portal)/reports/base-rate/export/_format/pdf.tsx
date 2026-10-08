@@ -1,5 +1,5 @@
 import React from 'react'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { PdfDocument, PdfTable } from '@/lib/export/pdf'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -11,11 +11,11 @@ export function BaseRatePdf({ rows }: { rows: BaseRateHistory[] }) {
     Number(row.weighted_cost) * 100,
     Number(row.op_margin) * 100,
     Number(row.base_rate) * 100,
-    row.approved_at ? dayjs(row.approved_at).format('D MMM YYYY') : '—',
+    row.approved_at ? officeTime(row.approved_at).format('D MMM YYYY') : '—',
   ])
 
   return (
-    <PdfDocument title="Base Rate History" periodLabel={dayjs().format('D MMMM YYYY')}>
+    <PdfDocument title="Base Rate History" periodLabel={officeTime().format('D MMMM YYYY')}>
       <PdfTable
         columns={[
           { label: 'Quarter', width: 80 },

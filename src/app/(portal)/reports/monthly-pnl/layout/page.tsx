@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
@@ -13,7 +13,7 @@ export default async function PnlLayoutPage() {
   await requirePermission('reports')
   const supabase = await createClient()
 
-  const period = dayjs().format('YYYY-MM')
+  const period = officeMonth()
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 

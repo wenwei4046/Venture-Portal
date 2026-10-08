@@ -8,6 +8,7 @@
 // movement, so you only ever arrange accounts that really appear.
 
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
@@ -28,7 +29,7 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
   const supabase = await createClient()
 
   const params = await searchParams
-  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : dayjs().format('YYYY-MM')
+  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
 
   const [lines, accounts, { data: banks }, inSaved, outSaved] = await Promise.all([
     fetchAllJournalLines(supabase),

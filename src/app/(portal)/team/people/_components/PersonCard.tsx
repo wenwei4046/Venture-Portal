@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { officeTime } from '@/lib/office-time'
 import PersonAccess, { accessCount } from '../../_components/PersonAccess'
 import EditStaffForm from './EditStaffForm'
 import Promotion from './Promotion'
@@ -303,10 +304,10 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
                         <td className="whitespace-nowrap">
                           <time
                             dateTime={line.at}
-                            title={dayjs(line.at).format('D MMM YYYY HH:mm:ss')}
+                            title={officeTime(line.at).format('D MMM YYYY HH:mm:ss')}
                             className="font-mono text-[11px]"
                           >
-                            {dayjs(line.at).format('D MMM HH:mm')}
+                            {officeTime(line.at).format('D MMM HH:mm')}
                           </time>
                         </td>
                         <td className="text-[10.5px] font-medium uppercase tracking-[0.06em]">

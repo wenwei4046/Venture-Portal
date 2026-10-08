@@ -1,5 +1,5 @@
 import React from 'react'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { PdfDocument, PdfTable } from '@/lib/export/pdf'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -45,7 +45,7 @@ export function FundSummaryPdf({ data }: { data: FundSummaryData }) {
   ]
 
   return (
-    <PdfDocument title="Fund Summary" periodLabel={dayjs().format('D MMMM YYYY')}>
+    <PdfDocument title="Fund Summary" periodLabel={officeTime().format('D MMMM YYYY')}>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 12, textTransform: 'uppercase' }}>
           Paid Capital

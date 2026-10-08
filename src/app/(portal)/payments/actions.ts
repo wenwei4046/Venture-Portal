@@ -5,6 +5,7 @@ import { resolveArGlCode } from '@/lib/ar-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeDate } from '@/lib/office-clock'
+import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
@@ -210,7 +211,7 @@ async function createPaymentVoucherInner(formData: FormData) {
   // Generate voucher number. Debit (outgoing money) → HV-PV-YYYYMM-NNNN
   // (Payment Voucher). Credit (incoming money) → HV-OR-YYYYMM-NNNN
   // (Official Receipt). mig 252 renamed historical credit rows to match.
-  const period = dayjs().format('YYYYMM')
+  const period = officeTime().format('YYYYMM') // the office's month, not UTC's
   const { count } = await supabase
     .from('payment_vouchers')
     .select('*', { count: 'exact', head: true })
@@ -921,7 +922,7 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
   if (isPayrollReference(src.reference_type) && !canSeePayrollPayouts(user)) throw new Error('Source voucher not found')
 
   // New voucher number — same scheme as createPaymentVoucher.
-  const period = dayjs().format('YYYYMM')
+  const period = officeTime().format('YYYYMM') // the office's month, not UTC's
   const { count } = await supabase.from('payment_vouchers').select('*', { count: 'exact', head: true })
   const seq = (count ?? 0) + 1
   const prefix = src.direction === 'credit' ? 'HV-OR-' : 'HV-PV-'
@@ -1386,14 +1387,14 @@ export async function voidPaidReceipt(formData: FormData) {
   const origDate =
     typeof v.payment_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.payment_date)
       ? v.payment_date
-      : dayjs().format('YYYY-MM-DD')
+      : officeDate()
   const { data: lockRow } = await supabase
     .from('period_locks')
     .select('id')
     .eq('period_month', dayjs(origDate).startOf('month').format('YYYY-MM-DD'))
     .eq('is_locked', true)
     .maybeSingle()
-  const reversalDate = lockRow ? dayjs().format('YYYY-MM-DD') : origDate
+  const reversalDate = lockRow ? officeDate() : origDate
 
   // 1) Reverse bank cache (the receipt had added to it). Via bump_bank_balance
   // RPC (mig 20260610000000) — the old direct update was silently blocked by
@@ -1564,14 +1565,14 @@ export async function reversePaidPayment(formData: FormData) {
   const origDate =
     typeof v.payment_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.payment_date)
       ? v.payment_date
-      : dayjs().format('YYYY-MM-DD')
+      : officeDate()
   const { data: lockRow } = await supabase
     .from('period_locks')
     .select('id')
     .eq('period_month', dayjs(origDate).startOf('month').format('YYYY-MM-DD'))
     .eq('is_locked', true)
     .maybeSingle()
-  const reversalDate = lockRow ? dayjs().format('YYYY-MM-DD') : origDate
+  const reversalDate = lockRow ? officeDate() : origDate
 
   // 1) Reverse bank cache — the payment REDUCED it, so add it back. Via
   //    bump_bank_balance RPC (bank_accounts UPDATE is principal-only under RLS).

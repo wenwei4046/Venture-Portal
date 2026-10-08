@@ -5,6 +5,7 @@
 
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -135,7 +136,7 @@ export default async function ReconciliationPage() {
         </p>
         <UploadStatementForm
           banks={banks.map(b => ({ id: b.id, label: `${b.bank_name}${b.account_number ? ` — ${b.account_number}` : ''}` }))}
-          defaultMonth={dayjs().subtract(1, 'month').format('YYYY-MM')}
+          defaultMonth={officeTime().subtract(1, 'month').format('YYYY-MM')}
         />
       </section>
 

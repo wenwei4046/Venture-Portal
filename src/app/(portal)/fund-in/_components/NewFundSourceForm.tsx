@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { createFundSource } from '../actions'
 import type { Company, FundSourceType } from '@/types'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
@@ -66,7 +67,7 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
   const [compound, setCompound] = useState(false)
   const [minPay, setMinPay] = useState(false)
   const [fromLabel, setFromLabel] = useState<string>('')
-  const today = dayjs().format('YYYY-MM-DD')
+  const today = officeToday()
   const [effectiveDate, setEffectiveDate] = useState<string>(today)
   const [bankId, setBankId] = useState<string>(() => banks.find((b) => b.is_primary)?.id ?? banks[0]?.id ?? '')
 

@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
@@ -109,7 +110,7 @@ export default async function HistoryTable({ deptId, filter = 'all', seesPayroll
                 return (
                   <tr key={row.id} className="border-b border-hairline last:border-0">
                     <td className="py-3 pr-4 font-mono text-xs text-muted">
-                      {dayjs(row.created_at).format('D MMM YYYY')}
+                      {officeTime(row.created_at).format('D MMM YYYY')}
                     </td>
                     <td className="py-3 pr-4">
                       <span

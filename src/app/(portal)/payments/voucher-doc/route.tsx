@@ -12,7 +12,7 @@ import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { exportPdfResponse } from '@/lib/export/response'
 import { formatPoolLabel } from '@/lib/voucher-detail'
 import { VoucherDocPdf, type SalaryPaymentData, type StatutoryCoverageData, type VoucherDocData } from '../_format/voucher-doc-pdf'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
   const user = await requirePermission('treasury', 'hr_costing')
@@ -142,7 +142,7 @@ export async function GET(req: Request) {
 
   const filename = id && docs.length === 1
     ? `voucher-${docs[0].voucher_no ?? docs[0].id.slice(0, 8)}`
-    : `vouchers-batch-${dayjs().format('YYYYMMDD')}-${docs.length}`
+    : `vouchers-batch-${officeTime().format('YYYYMMDD')}-${docs.length}`
 
   return exportPdfResponse({ filename, element: <VoucherDocPdf vouchers={docs} /> })
 }

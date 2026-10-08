@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
@@ -112,7 +113,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       })),
       isLoanPrincipal,
     )
-    const currentYM = dayjs().format('YYYY-MM')
+    const currentYM = officeMonth()
     const loanOptions = (loans ?? [])
       .map((l) => {
         const co = l.company_id ? coMap.get(l.company_id as string) : null

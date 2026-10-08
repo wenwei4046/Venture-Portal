@@ -10,6 +10,8 @@
 //
 // Pure: the page reads the rows and hands them to the client table.
 
+import { officeTime } from '@/lib/office-time'
+
 export interface ApprovalRequestRow {
   id: string
   request_type: string
@@ -250,7 +252,13 @@ export interface QueueSummary {
   bySubmitters: { amount: number; count: number; names: string[] }
 }
 
-const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+/**
+ * Whole days on the office's calendar from `from` to `to`. Counted from the
+ * MACHINE's midnight, a request sent at 00:30 in the office (16:30 UTC the day
+ * before) had waited a day longer on the server than it had in the office.
+ */
+const officeDaysBetween = (from: string | Date, to: Date) =>
+  officeTime(to).startOf('day').diff(officeTime(from).startOf('day'), 'day')
 
 export function queueSummary(rows: QueueRow[], now: Date, submitters: ReadonlySet<string> = new Set()): QueueSummary {
   let oldest: QueueRow | null = null
@@ -261,7 +269,7 @@ export function queueSummary(rows: QueueRow[], now: Date, submitters: ReadonlySe
     items: rows.length,
     combined: rows.filter((r) => r.kind === 'group').length,
     oldest: oldest
-      ? { days: Math.max(0, Math.round((dayStart(now) - dayStart(new Date(oldest.submittedAt))) / 86_400_000)), row: oldest }
+      ? { days: Math.max(0, officeDaysBetween(oldest.submittedAt, now)), row: oldest }
       : null,
     bySubmitters: {
       amount: round2(theirs.reduce((s, r) => s + r.amount, 0)),

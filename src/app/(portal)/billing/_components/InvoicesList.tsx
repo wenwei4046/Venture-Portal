@@ -5,6 +5,7 @@ import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { formatMoney } from '@/lib/utils'
 import { ApproveInvoiceButton, BulkIssueInvoicesButton, EditInvoiceButton } from './InvoiceActions'
 import CreateCreditNoteButton from './CreateCreditNoteButton'
@@ -219,7 +220,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
   const tabCount = (tab: StatusTab) => invoices.filter((inv) => inTab(inv, tab)).length
   const [showSettleModal, setShowSettleModal] = useState(false)
   const [settleBank, setSettleBank] = useState<string>('')
-  const [settleDate, setSettleDate] = useState<string>(dayjs().format('YYYY-MM-DD'))
+  const [settleDate, setSettleDate] = useState<string>(officeToday())
   const [settleAmount, setSettleAmount] = useState<string>('')
   const [settleError, setSettleError] = useState<string | null>(null)
   const [settleResult, setSettleResult] = useState<string | null>(null)

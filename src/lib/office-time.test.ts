@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import dayjs from 'dayjs'
 import { inTimeZone } from '@/test/time-zone'
-import { officeDay, officeTime } from './office-time'
+import { officeDay, officeDayStart, officeMonth, officeTime, officeToday } from './office-time'
 
 // The server (Vercel keeps UTC), the office (UTC+8), and a reader either side.
 const ZONES = ['UTC', 'Asia/Kuala_Lumpur', 'Pacific/Kiritimati', 'America/Los_Angeles']
@@ -52,5 +52,43 @@ describe('officeDay', () => {
       expect(inTimeZone(zone, () => officeDay('2026-09-29').format('D MMM')), zone).toBe('29 Sep')
       expect(inTimeZone(zone, () => officeDay('2027-01-01').format('D MMM YYYY')), zone).toBe('1 Jan 2027')
     }
+  })
+})
+
+// 2026-10-08: "today" and "this month" asked of the server's own clock were
+// UTC's — yesterday until 08:00 in the office, and on the 1st, last month.
+describe('officeToday and officeMonth', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it("are the office's day and month when the server is still in yesterday", () => {
+    // 00:30 on 1 November in the office = 16:30 UTC on 31 October.
+    vi.useFakeTimers({ now: new Date('2026-10-31T16:30:00Z'), toFake: ['Date'] })
+    expect(inTimeZone('UTC', () => dayjs().format('YYYY-MM-DD'))).toBe('2026-10-31') // what the server used to say
+    for (const zone of ZONES) {
+      expect(inTimeZone(zone, () => officeToday()), zone).toBe('2026-11-01')
+      expect(inTimeZone(zone, () => officeMonth()), zone).toBe('2026-11')
+    }
+  })
+
+  it('turn with the office at midnight, not at 08:00', () => {
+    vi.useFakeTimers({ now: new Date('2026-12-31T15:59:59Z'), toFake: ['Date'] }) // 23:59:59 on 31 Dec in the office
+    expect(inTimeZone('UTC', () => [officeToday(), officeMonth()])).toEqual(['2026-12-31', '2026-12'])
+    vi.setSystemTime(new Date('2026-12-31T16:00:00Z')) // midnight, New Year
+    expect(inTimeZone('UTC', () => [officeToday(), officeMonth()])).toEqual(['2027-01-01', '2027-01'])
+  })
+})
+
+describe('officeDayStart', () => {
+  it('is the instant the office day begins, whatever zone the machine is in', () => {
+    for (const zone of ZONES) {
+      expect(inTimeZone(zone, () => officeDayStart('2026-10-01')), zone).toBe('2026-09-30T16:00:00.000Z')
+      expect(inTimeZone(zone, () => officeDayStart('2027-01-01T00:00:00')), zone).toBe('2026-12-31T16:00:00.000Z')
+    }
+  })
+
+  it('puts a moment made at half past midnight on the 1st inside its own month', () => {
+    const madeAt = Date.parse('2026-09-30T16:30:00Z') // 00:30 on 1 October in the office
+    expect(madeAt >= Date.parse(officeDayStart('2026-10-01'))).toBe(true)
+    expect(madeAt >= Date.parse(new Date('2026-10-01T00:00:00Z').toISOString())).toBe(false) // the UTC bound left it in September
   })
 })

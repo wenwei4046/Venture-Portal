@@ -23,3 +23,19 @@ export function inTimeZone<T>(timeZone: string, fn: () => T): T {
     process.env.TZ = before ?? startZone
   }
 }
+
+/**
+ * The same for a step that awaits — a server component, a server action, a
+ * route handler — kept in `timeZone` until it settles. A file's tests run one
+ * at a time (and each file in its own process), so nothing else runs in the
+ * borrowed zone meanwhile.
+ */
+export async function inTimeZoneAsync<T>(timeZone: string, fn: () => Promise<T>): Promise<T> {
+  const before = process.env.TZ
+  process.env.TZ = timeZone
+  try {
+    return await fn()
+  } finally {
+    process.env.TZ = before ?? startZone
+  }
+}

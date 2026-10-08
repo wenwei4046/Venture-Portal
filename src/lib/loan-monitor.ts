@@ -6,7 +6,7 @@
 //        定好要还却还没收到的" must age, "收了就不会出现").
 //   区2 Outstanding 总览 — every open balance, split 定好日期 vs 还没定好.
 
-import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled, loanMonthlyInstallment } from '@/lib/treasury-schedule'
@@ -66,7 +66,7 @@ const money = (n: number) =>
   n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export async function fetchLoanMonitorData(supabase: SupabaseClient): Promise<LoanMonitorData> {
-  const currentYM = dayjs().format('YYYY-MM')
+  const currentYM = officeMonth()
 
   const [
     { data: loans },

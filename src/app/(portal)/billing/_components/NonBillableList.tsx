@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { formatMoneyBare } from '@/lib/utils'
 
 interface Transaction {
@@ -73,7 +74,7 @@ export default function NonBillableList({ transactions, period, canAdd }: Props)
                 return (
                   <tr key={t.id} className="border-b border-hairline last:border-0">
                     <td className="py-3 px-4 font-mono text-xs text-muted">
-                      {dayjs(t.created_at).format('DD MMM')}
+                      {officeTime(t.created_at).format('DD MMM')}
                     </td>
                     <td className="py-3 px-4">
                       <em

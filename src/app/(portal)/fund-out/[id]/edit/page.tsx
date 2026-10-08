@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
@@ -50,7 +50,7 @@ export default async function LoanEditPage({ params }: Props) {
         disbursementDate={(loan.disbursement_date as string | null) ?? ''}
         repaymentTerms={(loan.repayment_terms as string | null) ?? ''}
         compound={(loan as { compound_interest?: boolean }).compound_interest === true}
-        nextMonth={dayjs().add(1, 'month').format('YYYY-MM')}
+        nextMonth={officeTime().add(1, 'month').format('YYYY-MM')}
         termsFrom={((loan as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null}
       />
     </div>

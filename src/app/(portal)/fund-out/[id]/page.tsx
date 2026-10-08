@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { officeMonth, officeTime } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -66,7 +66,7 @@ export default async function LoanDetailPage({ params }: Props) {
   const termsHistory = await fetchTermsHistory(supabase, 'loan', [loan.id])
   const repRows = (repayments ?? []).map((r) => ({ id: loan.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
   const termsSegments = buildTermsSegments(termsForLoan(loan, termsHistory.get(loan.id) ?? []), principalPaidByMonth(repRows, isLoanPrincipal).get(loan.id) ?? {})
-  const termsChanges = allTermsChanges(termsSegments, { currentYM: dayjs().format('YYYY-MM'), paidByMonth: paidByMonthByType(repRows, isLoanPrincipal).get(loan.id) ?? {} })
+  const termsChanges = allTermsChanges(termsSegments, { currentYM: officeMonth(), paidByMonth: paidByMonthByType(repRows, isLoanPrincipal).get(loan.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation. Finance can't see /approvals
   // (principal-only), so surface "审批中" here so it doesn't look like the
@@ -85,7 +85,7 @@ export default async function LoanDetailPage({ params }: Props) {
   // Once the terms changed mid-life, the current segment's figure (rate ×
   // principal still owed when it began) is the monthly interest.
   const monthlyInterest = termsChanged(termsSegments)
-    ? currentSegment(termsSegments, dayjs().format('YYYY-MM')).interestPerMonth
+    ? currentSegment(termsSegments, officeMonth()).interestPerMonth
     : outstandingAmount * Number(loan.effective_rate)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
   const totalInterestPaid = Number(outstanding?.total_interest_paid ?? 0)
@@ -128,7 +128,7 @@ export default async function LoanDetailPage({ params }: Props) {
           </div>
           <h1 className="page-title">{company?.name ?? '—'}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {company?.short_code} · Created <em>{dayjs(loan.created_at).format('D MMMM YYYY')}</em>
+            {company?.short_code} · Created <em>{officeTime(loan.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <div className="flex items-center gap-3">

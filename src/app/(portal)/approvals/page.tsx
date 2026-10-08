@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -182,7 +183,7 @@ export default async function ApprovalsPage() {
           icon="clock"
           note={
             summary.oldest
-              ? `${summary.oldest.row.voucherNo ?? summary.oldest.row.typeLabel} · since ${dayjs(summary.oldest.row.submittedAt).format('D MMM')}`
+              ? `${summary.oldest.row.voucherNo ?? summary.oldest.row.typeLabel} · since ${officeTime(summary.oldest.row.submittedAt).format('D MMM')}`
               : 'Nothing waiting'
           }
         />

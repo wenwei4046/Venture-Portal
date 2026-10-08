@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
@@ -234,10 +235,13 @@ export default async function DashboardPage() {
       // three actions (Import Employment List · Import Payroll · Calculate
       // Director Salary), so the dashboard is three entry cards over the live
       // HR figures. One RPC round-trip (hr_dashboard_summary, mig 283).
-      const period = dayjs().startOf('month').format('YYYY-MM-DD')
+      // The office's month. The summary is asked for it by name: left to its
+      // own default (current_date) it answers in UTC, which on the 1st until
+      // 08:00 in the office is still last month — beside this month's title.
+      const period = officeTime().startOf('month').format('YYYY-MM-DD')
       const periodUrl = `/hr-costing/payroll/${period}`
 
-      const { data: hrRaw } = await supabase.rpc('hr_dashboard_summary')
+      const { data: hrRaw } = await supabase.rpc('hr_dashboard_summary', { p_period: period })
 
       type HrDeptStaff = {
         department_id: string
@@ -301,8 +305,8 @@ export default async function DashboardPage() {
       const directorStatus = director?.status ?? 'not_calculated'
       const directorSubmitted = Boolean(director?.submission)
 
-      const monthLabel = dayjs().format('MMMM YYYY')
-      const monthName = dayjs().format('MMMM')
+      const monthLabel = dayjs(period).format('MMMM YYYY')
+      const monthName = dayjs(period).format('MMMM')
       const deptCount = staffDepts.length
       const directorMode =
         director?.payout_mode === 'fully_paid'
@@ -549,7 +553,7 @@ export default async function DashboardPage() {
         return <UnplacedDashboard message="No department assigned. Contact Principal to set this up." />
       }
 
-      const period = dayjs().startOf('month').format('YYYY-MM-DD')
+      const period = officeTime().startOf('month').format('YYYY-MM-DD')
 
       const { data: dept } = await supabase
         .from('departments')
@@ -738,7 +742,7 @@ export default async function DashboardPage() {
                           </td>
                           <td className="num">{formatMoney(Number(r.amount))}</td>
                           <td className="right m-hide font-mono text-xs" data-label="Submitted">
-                            {dayjs(r.created_at).format('D MMM')}
+                            {officeTime(r.created_at).format('D MMM')}
                           </td>
                         </LedgerRow>
                       ))}
@@ -790,7 +794,7 @@ export default async function DashboardPage() {
                             <span className="neg">{formatMoney(-Number(e.amount))}</span>
                           </td>
                           <td className="right font-mono text-xs whitespace-nowrap">
-                            {dayjs(e.created_at).format('D MMM YYYY')}
+                            {officeTime(e.created_at).format('D MMM YYYY')}
                           </td>
                         </tr>
                       ))}
@@ -831,7 +835,7 @@ export default async function DashboardPage() {
   }
 
   const summary = raw as unknown as DashboardSummary
-  const today = dayjs().format('D MMMM YYYY')
+  const today = officeTime().format('D MMMM YYYY')
 
   const pendingApprovals = summary.pending_approvals ?? []
 
@@ -1127,7 +1131,7 @@ export default async function DashboardPage() {
                               <td className="num">{amt != null ? formatMoney(amt) : '—'}</td>
                               <td className="m-hide" data-label="By">{req.submitted_by_name ?? '—'}</td>
                               <td className="right m-hide font-mono text-xs" data-label="Submitted">
-                                {dayjs(req.created_at).format('D MMM')}
+                                {officeTime(req.created_at).format('D MMM')}
                               </td>
                             </LedgerRow>
                           )
@@ -1192,7 +1196,7 @@ export default async function DashboardPage() {
                                 {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
                               </td>
                               <td className="right m-hide font-mono text-xs" data-label="Submitted">
-                                {dayjs(req.created_at).format('D MMM')}
+                                {officeTime(req.created_at).format('D MMM')}
                               </td>
                             </LedgerRow>
                           ))}
@@ -1255,7 +1259,7 @@ export default async function DashboardPage() {
                                 {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
                               </td>
                               <td className="right m-hide font-mono text-xs" data-label="Decided">
-                                {req.approved_at ? dayjs(req.approved_at).format('D MMM') : dayjs(req.created_at).format('D MMM')}
+                                {officeTime(req.approved_at || req.created_at).format('D MMM')}
                               </td>
                             </LedgerRow>
                           ))}
