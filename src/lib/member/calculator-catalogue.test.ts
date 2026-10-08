@@ -150,8 +150,9 @@ describe("option charges", () => {
   });
 });
 
-describe("sofa combos — the ERP's rule at the portal's price", () => {
-  it("costs the matched modules at the combo, the extras at their own price", () => {
+describe("sofa combos — exactly the set, at the portal's price", () => {
+  // User 2026-10-08 chose "完全一样才算" — the ERP costed the set inside a bigger build.
+  it("a piece more is not the set: every module keeps its own price", () => {
     const r = calculateQuote(
       quote([one("a"), one("b"), one("c")], sofa),
       products,
@@ -159,8 +160,10 @@ describe("sofa combos — the ERP's rule at the portal's price", () => {
       undefined,
       pricing({ combos: [lShape] }),
     );
-    // 1A(LHF) + 2NA = one L-shape set at 2,000; the console stays at 400.
-    expect(r.margin).toBeCloseTo(margin(2000 + 400), 10);
+    // 1A(LHF) + 2NA + a console is not the L-shape set: 1,000 + 1,500 + 400.
+    expect(r.margin).toBeCloseTo(margin(1000 + 1500 + 400), 10);
+    const set = calculateQuote(quote([one("a"), one("b")], sofa), products, bands, undefined, pricing({ combos: [lShape] }));
+    expect(set.margin).toBeCloseTo(margin(2000), 10);
   });
 
   it("the combo always wins, dearer or not, and replaces the options on its modules", () => {

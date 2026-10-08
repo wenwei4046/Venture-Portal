@@ -648,8 +648,20 @@ src/
 │   │   │                              `_components/add-combo.ts`; a pair adds up at
 │   │   │                              the dearer side). `catalogue_add_combo` takes
 │   │   │                              1–4 modules per slot, none twice; the costing
-│   │   │                              already matched a slot by any of them. Migs
-│   │   │                              `20261008010000` / `020000` / `030000`.
+│   │   │                              already matched a slot by any of them.
+│   │   │                              ONE BILL, ONE COMBO (same day, user chose
+│   │   │                              完全一样才算): a combo costs a bill only when the
+│   │   │                              sofa IS its set — a 3+2+1 bill takes 3+2+1,
+│   │   │                              never 3+2, and with 3+2 alone takes none
+│   │   │                              (`catalogue_apply_combos`, twin `pickCombo`;
+│   │   │                              14 of the 67 bills since August that the ERP's
+│   │   │                              rule would have matched were sets with a piece
+│   │   │                              more). Add combo refuses a set one bill could
+│   │   │                              match as well as an existing one — `1A(R) (LHF
+│   │   │                              or RHF) + 1NA` beside `1A(R)(LHF) + 1NA`
+│   │   │                              (`catalogue_combos_collide`, twin
+│   │   │                              `combosCollide`); none of the 62 adopted sets
+│   │   │                              collide. Migs `20261008010000` – `040000`.
 │   │   │                              **THE CATALOGUE, MIRRORED — ITEMS ONLY
 │   │   │                              (2026-09-24):** `products/` (Product List)
 │   │   │                              is the Houzs ERP's Products page mirrored
@@ -709,12 +721,13 @@ src/
 │   │   │                              them, else parsed from the ERP's own
 │   │   │                              `description2` grammar
 │   │   │                              (`catalogue_line_facts`). Then, at COMMIT
-│   │   │                              (deferred trigger), a sofa build covering a
-│   │   │                              priced combo is costed at the combo, spread
-│   │   │                              over its modules by their own costs — the
-│   │   │                              ERP's `recomputeTotals`, rule for rule (the
-│   │   │                              combo always wins; one tier + one height;
-│   │   │                              uniform qty or no combo). The ERP's own
+│   │   │                              (deferred trigger), a sofa build that IS a
+│   │   │                              priced combo's set (exactly, since 2026-10-08
+│   │   │                              — the ERP took one it merely covered) is
+│   │   │                              costed at the combo, spread over its modules
+│   │   │                              by their own costs (the combo always wins;
+│   │   │                              one tier + one height; uniform qty or no
+│   │   │                              combo). The ERP's own
 │   │   │                              line cost is NOT a fallback: nothing
 │   │   │                              priced = no cost = no margin, and *Costing
 │   │   │                              gaps* says why (`not_in_sku_master` /

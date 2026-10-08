@@ -33,7 +33,7 @@ describe('Add combo — a piece that may be either side', () => {
     renderWindow()
     const cards = screen.getAllByRole('button', { name: /^Add one / }).map(b => b.getAttribute('aria-label'))
     expect(cards).toEqual(['Add one 1A(R)(LHF)', 'Add one 1A(R)(RHF)', 'Add one 1A(R) either side', 'Add one 1NA'])
-    expect(screen.getByText('LHF or RHF')).toBeInTheDocument()
+    expect(screen.getByText('LHF / RHF')).toBeInTheDocument()
   })
 
   it('saves it as a slot of both sides, and names the set by the pair', async () => {
@@ -41,7 +41,7 @@ describe('Add combo — a piece that may be either side', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add one 1A(R) either side' }))
     fireEvent.click(screen.getByRole('button', { name: 'Add one 1NA' }))
     // The strip says which piece may be either side.
-    expect(screen.getAllByText('LHF or RHF')).toHaveLength(2)
+    expect(screen.getByText('LHF or RHF')).toBeInTheDocument()
     expect(screen.getByText(/has exactly 1A\(R\) \(LHF or RHF\) \+ 1NA/)).toBeInTheDocument()
     fireEvent.change(screen.getByRole('textbox', { name: 'Fabric P2 at 30' }), { target: { value: '1900' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add combo' }))
