@@ -19,7 +19,10 @@ export default function TopBar({ user }: TopBarProps) {
 
   const handleSignOut = async () => {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    // This device only. Given no options supabase-js signs out 'global' —
+    // every session of the account, on every phone and PC — and the shared
+    // accounts are switched on the office PC several times a day (2026-10-08).
+    await supabase.auth.signOut({ scope: 'local' })
     router.push('/login')
     router.refresh()
   }

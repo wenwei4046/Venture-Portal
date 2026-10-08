@@ -60,6 +60,7 @@ describe('canonical sign-in routing', () => {
     mocks.profile.mockResolvedValue({ data })
     await expect(submit()).resolves.toEqual({ error: 'Your account is not active. Please contact HR.' })
     expect(mocks.signOut).toHaveBeenCalledOnce()
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(mocks.redirect).not.toHaveBeenCalled()
     expect(mocks.clearView).not.toHaveBeenCalled()
   })
