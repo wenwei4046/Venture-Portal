@@ -161,9 +161,9 @@ is the spec, `prototype/ProductList.dc.html` the source of truth (both kept in
   module tile's 26px inside its border), an input's own 1px 2px padding, the
   browser's #757575 placeholder. `.design/revenue-app/tools/measure-pl.mjs`
   measures the same elements on the prototype and the live page and lists
-  every difference; what remains is data (column widths), state, and the
-  sidebar row above. Weight 650 renders as 650 here (Inter variable); the
-  prototype file loads only Inter 400–700, so it shows 700.
+  every difference; what remains is data (column widths), state, the
+  sidebar row above and Modular's board below. Weight 650 renders as 650 here
+  (Inter variable); the prototype file loads only Inter 400–700, so it shows 700.
 - **Motion.** As the prototype: a right-hand panel of the app (notifications,
   Profile) shifts the page 432px in 320ms `cubic-bezier(.2,.8,.2,1)`; a
   floating window fades its scrim in 220ms and rises from
@@ -173,6 +173,17 @@ is the spec, `prototype/ProductList.dc.html` the source of truth (both kept in
 - **Tables.** Wide sheets scroll in their own 560px window with a sticky header
   and a frozen first column; the lists grow with the page. Columns can still be
   dragged and resized (`ColumnTable`, a cookie scoped to `/member/products`).
+- **Modular's board — the one place it leaves the prototype (2026-10-08).**
+  The prototype laid white model cards on the white page, a 1.5px #EBDDD2 edge
+  apart, and a not-offered card on #FBF7F3 — ΔL* 2.6 off white, which nobody
+  sees; the user found the board flat. Each category now sits on a sand tray
+  (`--rv-sand`, radius 18, padding 16/16/18, its dark head inside, the brand
+  rule in `--rv-line-strong` so it still reads there). An offered model is a
+  white card, a 1px `--rv-line` edge and a soft lift (`0 1px 2px` + `0 4px
+  12px` of ink at 8% / 5%), 6.4 L* above the tray; a not-offered one is an
+  empty slot — transparent, 1.5px dashed `--rv-muted`, no lift, its *Not
+  offered* pill outlined. Hover deepens the lift (a slot washes white
+  instead), 160ms; the open card is the prototype's.
 
 ### Shared portal rules
 
@@ -2580,6 +2591,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-08 (Product List · Modular's board)** — the model cards get depth against the page (user: the cards and the background had no layering): every category sits on a sand tray, an offered model is a white card lifted off it, a not-offered one an empty dashed slot with an outlined pill; hover deepens the lift. Chosen from two looks shown side by side (the other kept the page white and gave each card a firmer edge and a foot strip). The one place the page leaves the prototype. See "Product List — a page of the Revenue app".
 - **2026-10-08 v3.14 (People Management revamp)** — Permissions moves into People Management as its second tab: permission templates in a 260px rail, the selected one's matrix (function × action, each cell Own · Dept · All, hatched where the function has no such action), its sensitive fields, its keys, the titles on it with a select that moves a title at once, *+ New template*, *N held for now · Why*, a keep-or-reset dialog for people with their own cells, and the History. Invite user becomes a right-hand drawer (the person from the roster, the login, what they can do) opened from the head or a roster row's *Invite*. Roles becomes Hierarchy's fourth tab with Level and Permission template columns. A person's card shows their template's compact matrix with their own cells ringed in walnut. The sidebar's Roles and Permissions rows are gone. See "Permission matrix".
 - **2026-10-08 (Rules · KPI items)** — which items count as KPI moved off the Product List (its *Add-on / KPI Items* tab is gone; `?tab=kpi` redirects) onto Revenue › Rules: **KPI items** is the last tab of the rail (section XI), shown while *KPI item allowance* is on or anything is recorded on it. On the sheet: the section head and hint; an amber `.sheet-warning` while the switch is off, its *Scheme rules* link opening that tab; an *Add an item from* `.sheet-toolbar` — the Brands tab's pills (SKU Master · Bed frame specials · Sofa specials), a search box (a SKU is searched on the server, twenty at a time with *Showing 20 of N*; a special filters the pool) and *Amount RM* for the next pick — over a bordered result list (*Add* / an *On the list* chip / an amber *Off in the ERP* chip); then a `.table-frame` ledger (Item · Name · Kind · Counted · KPI amount · RM as an input · Remove / Keep / Take off; *New* (accent) and *Coming off* (danger) chips, an amber *Gone from the ERP* chip, a retyped amount on a peach wash) whose foot counts items and changes beside *Cancel* and the orange *Save N changes*; under it the **Threshold ladder** (the old tab V, rows saved one by one). The Scheme rules row *KPI item allowance* links to the tab. The screen-reader 'Remove' header is anchored to its cell (`relative`): absolutely placed, it escaped the table's scroll box and widened a phone's page by 46px.
 - **2026-10-08 (Product List · either side)** — the new-combo window offers a left/right pair as one more compartment card (`1A(R)` · *LHF / RHF*): a piece of it may be either side, saved as the ERP writes such a slot. Its THIS SET chip carries the sides in the muted weight. See "Product List — the mirror beside the portal's decisions".
