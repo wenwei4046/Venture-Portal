@@ -4,13 +4,13 @@ import { fetchTrialBalance, isCalendarDay } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildTrialBalanceXlsx } from './_format/xlsx'
 import { TrialBalancePdf } from './_format/pdf'
-import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 
 export async function GET(req: Request) {
   await requirePermission('reports')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
-  const asOf = url.searchParams.get('as_of') ?? dayjs().format('YYYY-MM-DD')
+  const asOf = url.searchParams.get('as_of') ?? officeToday() // the office's today, not UTC's
   const showZero = url.searchParams.get('show_zero') === '1'
 
   if (!isCalendarDay(asOf)) {

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   buildPnlAccounts: vi.fn(),
   fetchLedger: vi.fn(),
+  fetchTrialBalance: vi.fn(),
   matrixNowKey: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
@@ -30,6 +31,7 @@ vi.mock('@/lib/pnl-custom', () => ({
 vi.mock('@/lib/cfo-reports', async (original) => ({
   ...(await original<typeof import('@/lib/cfo-reports')>()),
   fetchLedger: mocks.fetchLedger,
+  fetchTrialBalance: mocks.fetchTrialBalance,
 }))
 vi.mock('@/lib/export/response', () => ({
   exportXlsxResponse: () => new Response('xlsx'),
@@ -37,6 +39,7 @@ vi.mock('@/lib/export/response', () => ({
 }))
 vi.mock('@/lib/export/monthly-matrix-export', () => ({ buildMatrixXlsx: () => Buffer.from('') }))
 vi.mock('./ledger/export/_format/xlsx', () => ({ buildLedgerXlsx: () => Buffer.from('') }))
+vi.mock('./trial-balance/export/_format/xlsx', () => ({ buildTrialBalanceXlsx: () => Buffer.from('') }))
 vi.mock('@/lib/paginate', () => ({ fetchAllRows: async () => [] }))
 vi.mock('@/lib/debtor-aging-data', () => ({ fetchPaidByInvoice: async () => new Map() }))
 vi.mock('./_components/MonthlyMatrix', () => ({
@@ -54,12 +57,21 @@ import MonthlyPnlPage from './monthly-pnl/page'
 import { GET as exportMonthlyPnl } from './monthly-pnl/export/route'
 import { GET as exportLedger } from './ledger/export/route'
 import DebtorAgingPage from './debtor-aging/page'
+import TrialBalancePage from './trial-balance/page'
+import { GET as exportTrialBalance } from './trial-balance/export/route'
 
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.requirePermission.mockResolvedValue({ id: 'f', role: 'finance', permissions: ['reports', 'dept_reports'] })
   mocks.buildPnlAccounts.mockReturnValue({ accounts: [], columns: [], salesByColumn: {} })
   mocks.fetchLedger.mockResolvedValue({ code: '3000', from: '', to: '', lines: [] })
+  mocks.fetchTrialBalance.mockImplementation(async (_db: unknown, args: { asOf: string; showZeroBalance: boolean }) => ({
+    asOf: args.asOf,
+    rows: [],
+    totals: { debit: 0, credit: 0 },
+    reconciles: true,
+    showZeroBalance: args.showZeroBalance,
+  }))
   vi.useFakeTimers({ now: new Date('2026-10-31T16:30:00Z'), toFake: ['Date'] }) // 00:30 on 1 Nov in the office
 })
 afterEach(() => vi.useRealTimers())
@@ -82,6 +94,14 @@ describe("reports open on the office's month", () => {
   it("Ledger export: from the office month's 1st to the office's today", async () => {
     await asTheServer(() => exportLedger(new Request('https://portal.test/reports/ledger/export?code=3000')))
     expect(mocks.fetchLedger).toHaveBeenCalledWith(expect.anything(), { code: '3000', from: '2026-11-01', to: '2026-11-01' })
+  })
+
+  it("Trial Balance and its export: as at the office's today when no day is named", async () => {
+    render(await asTheServer(() => TrialBalancePage({ searchParams: Promise.resolve({}) })))
+    expect(mocks.fetchTrialBalance).toHaveBeenLastCalledWith(expect.anything(), { asOf: '2026-11-01', showZeroBalance: false })
+    expect(screen.getAllByText(/1 November 2026/).length).toBeGreaterThan(0)
+    await asTheServer(() => exportTrialBalance(new Request('https://portal.test/reports/trial-balance/export?format=xlsx')))
+    expect(mocks.fetchTrialBalance).toHaveBeenLastCalledWith(expect.anything(), { asOf: '2026-11-01', showZeroBalance: false })
   })
 
   it("Debtor Aging: as of the office's today", async () => {

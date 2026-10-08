@@ -5,6 +5,7 @@ import { type AccountType } from '@/lib/coa'
 import LedgerPicker from './_components/LedgerPicker'
 import LedgerSections from './_components/LedgerSections'
 import dayjs from 'dayjs'
+import { officeTime, officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 
 interface Props {
@@ -33,8 +34,10 @@ export default async function LedgerPage({ searchParams }: Props) {
 
   const params = await searchParams
   const codes = parseCodes(params.codes, params.code)
-  const from = params.from ?? dayjs().startOf('month').format('YYYY-MM-DD')
-  const to = params.to ?? dayjs().format('YYYY-MM-DD')
+  // The office's month and day: on the server's own clock (UTC) the 1st was
+  // still last month until 08:00 in the office.
+  const from = params.from ?? officeTime().startOf('month').format('YYYY-MM-DD')
+  const to = params.to ?? officeToday()
   const showZero = params.showZero === '1'
 
   // Fetch all leaf accounts for the picker (header rows excluded by the
