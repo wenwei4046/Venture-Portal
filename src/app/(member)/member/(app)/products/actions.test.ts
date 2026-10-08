@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   permission: vi.fn(), createClient: vi.fn(), from: vi.fn(), refresh: vi.fn(),
   select: vi.fn(), eq: vi.fn(), owned: vi.fn(), modelUpsert: vi.fn(), skuUpsert: vi.fn(), rpc: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.permission }))
+vi.mock('@/lib/member/product-access', () => ({ requireProductList: mocks.permission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 vi.mock('server-only', () => ({}))
@@ -42,7 +42,7 @@ describe('Modular settings ownership validation', () => {
   it('refuses a foreign SKU before writing any model settings or SKU ticks', async () => {
     await expect(saveModelSettings(edit({ 'own-sku': true, 'foreign-sku': false })))
       .rejects.toThrow('1 SKU(s) do not belong to this model')
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('product_list')
+    expect(mocks.permission).toHaveBeenCalledOnce()
     expect(mocks.select).toHaveBeenCalledExactlyOnceWith('erp_id')
     expect(mocks.eq).toHaveBeenCalledExactlyOnceWith('model_erp_id', MODEL)
     expect(mocks.owned).toHaveBeenCalledExactlyOnceWith('erp_id', ['own-sku', 'foreign-sku'])
@@ -104,7 +104,7 @@ describe('Costing Setting and Add-on / KPI Items', () => {
       divisor: '0.7',
       ratios: [{ erpId: 'p-1', ratio: '0.6' }, { erpId: 'p-2', ratio: '' }],
     })).toEqual({ saved: 3 })
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('product_list')
+    expect(mocks.permission).toHaveBeenCalledOnce()
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('catalogue_save_cost_setting', {
       p_scheme: SCHEME, p_divisor: 0.7, p_ratios: [{ erp_product_id: 'p-1', ratio: 0.6 }], p_removes: ['p-2'],
     })
@@ -133,7 +133,7 @@ describe('Costing Setting and Add-on / KPI Items', () => {
       changes: [{ id: ITEM, amount: '250' }],
       removes: [],
     })
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('product_list')
+    expect(mocks.permission).toHaveBeenCalledOnce()
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('catalogue_save_kpi_items', {
       p_scheme: SCHEME,
       p_adds: [{ source: 'option', option_pool: 'bedframe_specials', option_value: 'HB Straight', kpi_amount: 200 }],
@@ -168,7 +168,7 @@ describe('Combo Pricing › Add combo', () => {
 
   it('hands the database one set — model upper-cased, positive prices only — for product_list only', async () => {
     expect(await addCombo(set)).toEqual({ ok: true, prices: 2 })
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('product_list')
+    expect(mocks.permission).toHaveBeenCalledOnce()
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('catalogue_add_combo', {
       p_base_model: '8030',
       p_modules: [['1NA'], ['2NA']],
@@ -209,7 +209,7 @@ describe('Combo Pricing › Remove', () => {
       { baseModel: '8030', slotsKey: key },
       { baseModel: '2376', slotsKey: '[["1A"], ["1S"]]' },
     ])).toEqual({ ok: true, removed: 2 })
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('product_list')
+    expect(mocks.permission).toHaveBeenCalledOnce()
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('catalogue_remove_combos', {
       p_sets: [{ base_model: '8030', slots_key: key }, { base_model: '2376', slots_key: '[["1A"], ["1S"]]' }],
     })

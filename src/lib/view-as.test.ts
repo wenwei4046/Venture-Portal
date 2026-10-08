@@ -26,6 +26,13 @@ describe('honouredViewAs — the Revenue View is the member app’s own', () => 
     expect(honouredViewAs('hr', 'member')).toBe('hr')
   })
 
+  // The Product List asks about the account itself (2026-10-08): no view, ever.
+  it('honours nothing when the account itself is asked', () => {
+    expect(honouredViewAs('hr', 'account')).toBeNull()
+    expect(honouredViewAs('finance', 'account')).toBeNull()
+    expect(honouredViewAs('revenue_member', 'account')).toBeNull()
+  })
+
   it('honours nothing for a missing or unknown value', () => {
     expect(honouredViewAs(undefined, 'portal')).toBeNull()
     expect(honouredViewAs('', 'member')).toBeNull()

@@ -78,6 +78,16 @@ export function getMemberUser(): Promise<User | null> {
   return loadUser('member')
 }
 
+/**
+ * The account as it is — no view mask, whatever the portal was left in. Only
+ * the Product List asks (lib/member/product-access.ts): the Revenue app shows a
+ * Principal as the Principal in every view, so an HR or Finance view left on in
+ * the portal must not quietly take the Product List away there (2026-10-08).
+ */
+export function getAccountUser(): Promise<User | null> {
+  return loadUser('account')
+}
+
 export async function requireAuth(): Promise<User> {
   const user = await getUser()
   if (!user) {

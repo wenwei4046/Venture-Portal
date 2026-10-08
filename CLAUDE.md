@@ -596,7 +596,12 @@ src/
 │   │   │                              it under PRINCIPAL only to whoever holds
 │   │   │                              `product_list`
 │   │   │                              (`lib/member/product-access.ts`; a Principal
-│   │   │                              in Revenue View is asked through `getUser()`),
+│   │   │                              in ANY view — Revenue View, or an HR / Finance
+│   │   │                              view left on in the portal — is asked about
+│   │   │                              the account itself, `getAccountUser()`, and
+│   │   │                              the Save stands behind the same answer,
+│   │   │                              `requireProductList`: an HR view used to hide
+│   │   │                              the row with nothing saying why),
 │   │   │                              the Module switcher beside it (Principal only,
 │   │   │                              `setViewAs`). The portal's `/revenue/products`
 │   │   │                              redirects there and the portal nav lost its
@@ -1942,7 +1947,8 @@ tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
 to Revenue View sent every other tab's portal page to /dashboard — a Product
 List tab "jumping to Overview". `vp-view` is a readable mirror of the choice,
 so a tab left open re-renders its shell when another tab switches
-(`useViewAsSync`, `lib/view-as.ts`).
+(`useViewAsSync`, `lib/view-as.ts`). `getAccountUser` (2026-10-08) reads the
+account with no mask at all; only the Product List asks it.
 
 4 Roles (now: the fallback each account is created with)
 Role	DB Value	Access

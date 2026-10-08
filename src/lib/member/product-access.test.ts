@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/types";
 
-const { getUser } = vi.hoisted(() => ({ getUser: vi.fn() }));
+const { getAccountUser, getMemberUser, redirect } = vi.hoisted(() => ({
+  getAccountUser: vi.fn(),
+  getMemberUser: vi.fn(),
+  redirect: vi.fn((to: string) => { throw new Error(`redirect ${to}`); }),
+}));
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/auth", () => ({ getUser }));
+vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("@/lib/auth", () => ({ getAccountUser, getMemberUser }));
 
-import { canOpenProductList, productListAccess } from "./product-access";
+import { canOpenProductList, productListAccess, requireProductList } from "./product-access";
 
 function user(overrides: Partial<User>): User {
   return {
@@ -13,20 +18,24 @@ function user(overrides: Partial<User>): User {
     created_at: "2026-01-01", updated_at: "2026-01-01", permissions: [], ...overrides,
   };
 }
+const principal = user({ role: "principal", permissions: ["product_list", "treasury"] });
 
-beforeEach(() => getUser.mockReset());
+beforeEach(() => {
+  getAccountUser.mockReset();
+  getMemberUser.mockReset();
+  redirect.mockClear();
+});
 
 // The Product List in the Revenue app (2026-10-08): the tab shows only to whoever
-// holds product_list — the same answer its Server Actions get.
+// holds product_list — and its Save stands behind the same answer.
 describe("who may open the Product List", () => {
-  it("a salesperson may not, and the portal is never asked", async () => {
+  it("a salesperson may not, and the account is never asked", async () => {
     expect(await productListAccess(user({ permissions: ["member_insight"] }))).toBeNull();
-    expect(getUser).not.toHaveBeenCalled();
+    expect(getAccountUser).not.toHaveBeenCalled();
   });
 
   it("the Principal may, as the Principal", async () => {
-    expect(await productListAccess(user({ role: "principal", permissions: ["product_list", "treasury"] })))
-      .toEqual({ group: "PRINCIPAL", audience: "Principal only" });
+    expect(await productListAccess(principal)).toEqual({ group: "PRINCIPAL", audience: "Principal only" });
   });
 
   it("a title granted product_list may, under its own heading", async () => {
@@ -34,15 +43,38 @@ describe("who may open the Product List", () => {
       .toEqual({ group: "MANAGEMENT", audience: "Product List access" });
   });
 
-  it("a Principal in Revenue View still may: the portal's reading of the account answers", async () => {
-    getUser.mockResolvedValue(user({ role: "principal", permissions: ["product_list"] }));
+  it("a Principal in Revenue View still may: the account itself answers", async () => {
+    getAccountUser.mockResolvedValue(principal);
     const masked = user({ role: "revenue_member", actualRole: "principal", permissions: ["member_insight"] });
     expect(await canOpenProductList(masked)).toBe(true);
     expect(await productListAccess(masked)).toEqual({ group: "PRINCIPAL", audience: "Principal only" });
   });
 
-  it("a Principal looking at the portal as HR may not", async () => {
-    getUser.mockResolvedValue(user({ role: "hr", actualRole: "principal", permissions: ["staff_costs"] }));
-    expect(await canOpenProductList(user({ role: "revenue_member", actualRole: "principal", permissions: [] }))).toBe(false);
+  // User 2026-10-08: "why there is no product list in revenue view" — an HR view left on in the portal hid it.
+  it.each(["hr", "finance"] as const)("a Principal with the portal left in the %s view still may", async view => {
+    getAccountUser.mockResolvedValue(principal);
+    const masked = user({ role: view, actualRole: "principal", permissions: ["staff_costs"] });
+    expect(await productListAccess(masked)).toEqual({ group: "PRINCIPAL", audience: "Principal only" });
+  });
+
+  it("an account without product_list may not, whatever it is masked as", async () => {
+    getAccountUser.mockResolvedValue(user({ role: "principal", permissions: ["treasury"] }));
+    expect(await canOpenProductList(user({ role: "hr", actualRole: "principal", permissions: [] }))).toBe(false);
+  });
+});
+
+describe("requireProductList — the Save behind the page", () => {
+  it("answers the caller when they may", async () => {
+    getMemberUser.mockResolvedValue(user({ role: "hr", actualRole: "principal", permissions: [] }));
+    getAccountUser.mockResolvedValue(principal);
+    expect(await requireProductList()).toMatchObject({ id: "u1", actualRole: "principal" });
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("sends a stranger to log in and anybody else back to the app", async () => {
+    getMemberUser.mockResolvedValue(null);
+    await expect(requireProductList()).rejects.toThrow("redirect /login");
+    getMemberUser.mockResolvedValue(user({ permissions: ["member_insight"] }));
+    await expect(requireProductList()).rejects.toThrow("redirect /member");
   });
 });
