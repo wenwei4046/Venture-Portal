@@ -5,6 +5,7 @@ import type { MemberReadContext, QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
   loadMemberData,
+  loadMemberCatalogue,
   loadMemberInsight,
   loadMemberInsightRange,
   loadMemberOrderBook,
@@ -23,8 +24,9 @@ import {
   type AdminMemberCommand,
 } from "@/lib/member/server";
 
-export async function refreshMemberData() {
-  const data = await loadMemberData();
+/** `lite`: the Revenue app's pull — everything but the Quote's catalogue (fetchMemberCatalogue). */
+export async function refreshMemberData(options: { lite?: boolean } = {}) {
+  const data = await loadMemberData({ lite: options?.lite === true });
   return data.configured
     ? { ok: true as const, data }
     : {
@@ -32,6 +34,9 @@ export async function refreshMemberData() {
         error:
           data.message ?? "Your member profile has not been configured yet.",
       };
+}
+export async function fetchMemberCatalogue() {
+  return loadMemberCatalogue();
 }
 export async function fetchMemberInsight(period?: string, context?: MemberReadContext) {
   return loadMemberInsight(period, context);

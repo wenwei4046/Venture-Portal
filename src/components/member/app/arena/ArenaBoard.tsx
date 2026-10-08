@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { ICON, Svg } from "../icons";
 import type { PeriodKind } from "../insight/period";
-import { BOARD_ICON, type ArenaSub, type BoardVM, type FairView, type RankView } from "./arena-model";
+import { BOARD_ICON, type ArenaSub, type BoardVM, type FairView, type HeroState, type RankView } from "./arena-model";
 import { PERIOD_SEG } from "./ArenaHub";
 import s from "./arena.module.css";
 
@@ -72,16 +72,24 @@ export default function ArenaBoard({ vm, kind, dateLabel, actions }: { vm: Board
   );
 }
 
+/** The hero's place: the number, "Not ranked yet" in words, or a placeholder while the board is read. */
+function HeroPlace({ state, num, suf }: { state: HeroState; num: string; suf: string }) {
+  if (state === "loading") return <span className={`${s.skel} ${s.heroNumSkel}`} role="img" aria-label="Loading your place" />;
+  if (state === "unranked") return <span className={s.heroNone}>Not ranked yet</span>;
+  // "off" (KPI not counted this period) keeps the dash: nobody has a place, and nobody will.
+  return <span className={s.rankNum}><span className={s.heroNum}>{num}</span><span className={s.heroSuf}>{suf}</span></span>;
+}
+
 function RankHeroBlock({ rank }: { rank: RankView }) {
   const h = rank.hero;
   return (
     <>
       <div className={s.heroRank}>
         <span className={s.heroRankLeft}>
-          <span className={s.rankNum}><span className={s.heroNum}>{h.num}</span><span className={s.heroSuf}>{h.suf}</span></span>
-          <span className={s.heroOf}>of {h.count}</span>
+          <HeroPlace state={h.state} num={h.num} suf={h.suf} />
+          {(h.state === "ranked" || h.state === "off") && <span className={s.heroOf}>of {h.count}</span>}
         </span>
-        <span className={s.heroValue}>{h.value}</span>
+        {h.state === "loading" ? <span className={`${s.skel} ${s.heroValueSkel}`} /> : <span className={s.heroValue}>{h.value}</span>}
       </div>
       <div className={s.heroChase}><Svg d={ICON.arrowUp} size={16} sw={2.2} /><span className={s.heroChaseText}>{h.chase}</span></div>
     </>
@@ -94,8 +102,8 @@ function FairHeroBlock({ fair }: { fair: FairView }) {
     <>
       <div className={s.heroRank}>
         <span className={s.heroRankLeft}>
-          <span className={s.rankNum}><span className={s.heroNum}>{h.num}</span><span className={s.heroSuf}>{h.suf}</span></span>
-          <span className={s.heroOf}>of {h.count}</span>
+          <HeroPlace state={h.state} num={h.num} suf={h.suf} />
+          {(h.state === "ranked" || h.state === "off") && <span className={s.heroOf}>of {h.count}</span>}
         </span>
         <span className={s.heroMedals}>
           {h.medals.map(m => (

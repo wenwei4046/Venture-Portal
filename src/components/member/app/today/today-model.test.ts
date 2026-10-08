@@ -148,6 +148,38 @@ describe("This week and Your Arena", () => {
   });
 });
 
+// 2026-10-08 (screenshot, side agent): "RM 0k · No sales yet" and a dash while loading looked exactly like a
+// month with no sales, so the app seemed to never finish loading — and a real "no sales" looked like loading.
+describe("loading is never mistaken for no sales", () => {
+  it("while this month's figures are on their way, Sales / Margin / KPI are placeholders, not zeros", () => {
+    const m = todayModel({ ...base, metricsLoading: true });
+    expect(m.metrics.map(x => [x.label, x.loading, x.value, x.tag])).toEqual([["Sales", true, "", ""], ["Margin", true, "", ""], ["KPI", true, "", ""]]);
+    // Once they land — even as zero sales — they say so.
+    const loaded = todayModel({ ...base, metricsLoading: false, insight: block({ sales: 0 }, null) });
+    expect(loaded.metrics.map(x => [x.value, x.tag])).toEqual([["RM 0k", "Counted sales"], ["—", "No sales yet"], ["0", "Below threshold"]]);
+    expect(loaded.metrics.every(x => !x.loading)).toBe(true);
+  });
+
+  it("figures kept from an earlier open show while they are read again — no placeholder over them", () => {
+    const m = todayModel({ ...base, metricsLoading: true, insight: block({ sales: 70_000 }, null) });
+    expect(m.metrics[0].value).toBe("RM 70k");
+    expect(m.metrics[0].loading).toBeFalsy();
+  });
+
+  it("the Arena boards: a placeholder while loading, \"Not ranked yet\" when there is no place", () => {
+    expect(todayModel({ ...base, arenaLoading: true }).boards.map(b => b.state)).toEqual(["loading", "loading", "loading", "loading"]);
+    const people = [score({ id: "a", sales: 900, marginRevenue: 900, marginCost: 500 }), score({ id: "me", self: true })];
+    const m = todayModel({ ...base, arenaLoading: false, arena: arena(people) });
+    expect(m.boards.map(b => b.state)).toEqual(["unranked", "unranked", "unranked", "unranked"]);
+  });
+
+  it("the income hero is a placeholder while it is worked out, never a dash", () => {
+    expect(todayModel({ ...base, incomeStatus: "loading" }).heroLoading).toBe(true);
+    expect(todayModel({ ...base, incomeStatus: "loading", hidden: true }).heroLoading).toBe(false);
+    expect(todayModel({ ...base, income: { period: "2026-10", status: "computed", total: 10 } }).heroLoading).toBe(false);
+  });
+});
+
 describe("todayModel — a Principal viewing nobody", () => {
   it("names the department's commission as the department's, not as somebody's income", () => {
     const income = { period: "2026-10", status: "computed", total: 89460.99 };

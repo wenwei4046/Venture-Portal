@@ -39,10 +39,12 @@ export default function ArenaHub({ vm, kind, onKind, onBoard, onRecord }: {
             <span className={s.cardBody}>
               <span className={s.cardLabel}>{c.label}</span>
               <span className={s.cardRank}>
-                <span className={s.rankNum}><span className={s.cardNum}>{c.rankNum}</span><span className={s.cardSuf}>{c.rankSuf}</span></span>
+                {c.state === "loading" ? <span className={`${s.skel} ${s.cardNumSkel}`} />
+                  : c.state === "unranked" ? <span className={s.cardNone}>Not ranked yet</span>
+                  : <span className={s.rankNum}><span className={s.cardNum}>{c.rankNum}</span><span className={s.cardSuf}>{c.rankSuf}</span></span>}
                 <span className={s.cardOf}>{c.of}</span>
               </span>
-              <span className={s.cardValue}>{c.value}</span>
+              {c.state === "loading" ? <span className={`${s.skel} ${s.cardValueSkel}`} /> : <span className={s.cardValue}>{c.value}</span>}
             </span>
           </button>
         ))}

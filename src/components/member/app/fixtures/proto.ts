@@ -103,6 +103,7 @@ export function protoFixture(quote: { brand?: string; sheet?: string; charges?: 
       helloSub: "Sat, 3 Oct · Senior Executive · Rank B",
       heroLabel: "September · Estimated income",
       heroAmount: "RM 6,842.50",
+      heroLoading: false,
       heroSplit: "Fixed salary RM 2,500.00 + commission RM 4,342.50",
       metrics: [
         { key: "sales", label: "Sales", value: "83%", tag: "of RM 70k", tagTone: "sub" },
@@ -116,10 +117,10 @@ export function protoFixture(quote: { brand?: string; sheet?: string; charges?: 
       ],
       week: { title: "Week 2 · Ergotex week", dates: "9–11 Oct", venue: "IOI City Mall", org: "Mega Home Fair" },
       boards: [
-        { id: "sales", label: "Sales", rankNum: "4", rankSuf: "th" },
-        { id: "margin", label: "Margin", rankNum: "2", rankSuf: "nd" },
-        { id: "kpi", label: "KPI", rankNum: "3", rankSuf: "rd" },
-        { id: "champ", label: "Championship", rankNum: "2", rankSuf: "nd" },
+        { id: "sales", label: "Sales", rankNum: "4", rankSuf: "th", state: "ranked" },
+        { id: "margin", label: "Margin", rankNum: "2", rankSuf: "nd", state: "ranked" },
+        { id: "kpi", label: "KPI", rankNum: "3", rankSuf: "rd", state: "ranked" },
+        { id: "champ", label: "Championship", rankNum: "2", rankSuf: "nd", state: "ranked" },
       ],
     },
     notifications: {

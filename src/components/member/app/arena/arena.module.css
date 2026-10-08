@@ -495,3 +495,22 @@
 .csVal { font-size: calc(14px * var(--rv-type)); font-weight: 650; font-variant-numeric: tabular-nums; }
 
 .empty { margin: 0; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); }
+
+/* Still being read (2026-10-08): a soft bar where the place and figure go — never the board's "nobody yet",
+   which read exactly like a board still loading. On every board colour (white at low opacity). */
+.skel {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--rv-white-14) 25%, var(--rv-white-30) 50%, var(--rv-white-14) 75%);
+  background-size: 300% 100%;
+  animation: arena-skel 1.3s ease-in-out infinite;
+}
+@keyframes arena-skel { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+.heroNumSkel { width: 86px; height: calc(48px * var(--rv-type)); margin: 6px 0; }
+.heroValueSkel { width: 88px; height: calc(20px * var(--rv-type)); margin-bottom: 8px; }
+.cardNumSkel { width: 60px; height: calc(38px * var(--rv-type)); margin: 4px 0; }
+.cardValueSkel { width: 70%; height: calc(12px * var(--rv-type)); margin-top: 8px; }
+/* Nothing on this board yet: said in words where the place would be. */
+.heroNone { font-size: calc(22px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; padding-bottom: 6px; }
+.cardNone { font-size: calc(17px * var(--rv-type)); font-weight: 700; letter-spacing: -.01em; padding-bottom: 6px; }

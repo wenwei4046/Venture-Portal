@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import MemberLoginForm from "./MemberLoginForm";
+import { forgetReads } from "./app/read-memory";
 import LoginInstallCard from "@/components/pwa/LoginInstallCard";
 import s from "./MemberLogin.module.css";
 
@@ -23,6 +25,11 @@ export default function MemberLoginScreen({
   preview = false,
   previewHref,
 }: LoginScreenProps) {
+  // Every sign-out ends here: the Revenue app's figures kept on this phone go with the session (2026-10-08),
+  // so a phone handed to somebody else shows nobody's.
+  useEffect(() => {
+    if (!preview) void forgetReads();
+  }, [preview]);
   return (
     <div className={s.screen} lang="en-MY">
       <header className={s.brandHeader}>

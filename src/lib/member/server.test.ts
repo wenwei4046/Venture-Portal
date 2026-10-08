@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -98,6 +98,26 @@ describe('Principal Revenue View server boundary', () => {
     expect(result).toMatchObject({ demo: false, configured: true, principalView: true, profile: { id: userId, salary: null } })
     expect(result.products[0]).not.toHaveProperty('cost')
     expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  // 2026-10-08: every open of the Revenue app waited for the Quote's catalogue (551 ms of the Principal's 610 ms
+  // snapshot, 340 KB of its 480 KB). The first screen asks without it; the Quote reads it on its own.
+  it('asks for the first screen without the Quote catalogue, for the Principal and a member alike', async () => {
+    await loadMemberData({ lite: true })
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_snapshot', { p_full: false })
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal'] }))
+    await loadMemberData({ lite: true })
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_data_snapshot', { p_full: false })
+  })
+
+  it('reads the catalogue from the full snapshot through the same projection — never a cost', async () => {
+    const result = await loadMemberCatalogue()
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_snapshot', undefined)
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.data.products[0]).toMatchObject({ id: productId, code: 'AK-QUEEN' })
+    expect(result.data.products[0]).not.toHaveProperty('cost')
+    expect(result.data.catalogueModels).toEqual([])
   })
 
   it('keeps real member accounts on the own-data RPC and rejects a Principal flag in its payload', async () => {

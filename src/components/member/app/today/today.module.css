@@ -110,3 +110,23 @@
 .board_kpi .boardSuf { color: var(--rv-green-pale); }
 .board_champ { background: var(--rv-accent); color: var(--rv-white); }
 .board_champ .boardSuf { color: var(--rv-orange-bg); }
+
+/* Still on its way (2026-10-08): a soft bar where the figure goes. A zero or a dash while loading read
+   exactly like a month with no sales ("RM 0k · No sales yet"), so the app looked like it never finished. */
+.skel {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--rv-white-14) 25%, var(--rv-white-30) 50%, var(--rv-white-14) 75%);
+  background-size: 300% 100%;
+  animation: today-skel 1.3s ease-in-out infinite;
+}
+@keyframes today-skel { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+.heroSkel { width: 62%; height: calc(36px * var(--rv-type)); margin: 8px 0 6px; }
+.metricSkel { width: 72%; height: calc(19px * var(--rv-type)); margin: 4px 0 5px; }
+.metric:not(:first-child) .metricSkel { margin-left: 12px; }
+.metricTagSkel { width: 52%; height: calc(10px * var(--rv-type)); }
+.metric:not(:first-child) .metricTagSkel { margin-left: 12px; }
+.boardSkel { width: 46px; height: calc(30px * var(--rv-type)); }
+/* A board with no place yet says so in words — a big dash looked like a bar still loading. */
+.boardNone { font-size: calc(13px * var(--rv-type)); font-weight: 650; opacity: .82; line-height: 1.2; }

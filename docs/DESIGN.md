@@ -1470,6 +1470,21 @@ VP's. The member C release above describes the screens this replaced.
   was opened), the pull loads the whole page again instead: the new app and
   its data. Never over something unsaved (a form, brand weeks not saved); then
   the pill asks for another pull.
+- **Opens on what the phone kept (2026-10-08)** — the app opens on the figures
+  it showed last time (kept on the phone per account) and reads everything again
+  behind them: the pull's dot rests spinning while they load, exactly as for a
+  pull, and each figure swaps in as it lands. A first open on a phone, with
+  nothing kept, fills in as before.
+- **Loading is never a zero (2026-10-08)** — a figure on its way is a soft
+  shimmering bar where it will stand (white at 14–30 % on the hero gradient and
+  every board colour, 1.3 s, still under reduced motion): Today's income, Sales /
+  Margin / KPI and the four Arena boards; the Arena hub's cards and a board's
+  hero, whose line reads *Loading the board…*. A board somebody has no place on
+  says **Not ranked yet** in words where the number goes (13px on Today's tiles,
+  17px on the hub, 22px in a board's hero) — the big dash it showed looked like
+  a bar still loading, and "RM 0k · No sales yet" while loading looked like a
+  month with no sales. The Quote with no catalogue yet says *Loading the
+  catalogue…*.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
@@ -2591,6 +2606,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-08 (Revenue app · opens on what the phone kept)** — opening the app shows last time's figures at once and refreshes behind them (the pull's dot spins); a figure still loading is a shimmering placeholder, never a zero or a dash, and a board with no place says *Not ranked yet*. See *Opens on what the phone kept* and *Loading is never a zero* in the Revenue app section.
 - **2026-10-08 (Product List · Modular's board)** — the model cards get depth against the page (user: the cards and the background had no layering): every category sits on a sand tray, an offered model is a white card lifted off it, a not-offered one an empty dashed slot with an outlined pill; hover deepens the lift. Chosen from two looks shown side by side (the other kept the page white and gave each card a firmer edge and a foot strip). The one place the page leaves the prototype. See "Product List — a page of the Revenue app".
 - **2026-10-08 v3.14 (People Management revamp)** — Permissions moves into People Management as its second tab: permission templates in a 260px rail, the selected one's matrix (function × action, each cell Own · Dept · All, hatched where the function has no such action), its sensitive fields, its keys, the titles on it with a select that moves a title at once, *+ New template*, *N held for now · Why*, a keep-or-reset dialog for people with their own cells, and the History. Invite user becomes a right-hand drawer (the person from the roster, the login, what they can do) opened from the head or a roster row's *Invite*. Roles becomes Hierarchy's fourth tab with Level and Permission template columns. A person's card shows their template's compact matrix with their own cells ringed in walnut. The sidebar's Roles and Permissions rows are gone. See "Permission matrix".
 - **2026-10-08 (Rules · KPI items)** — which items count as KPI moved off the Product List (its *Add-on / KPI Items* tab is gone; `?tab=kpi` redirects) onto Revenue › Rules: **KPI items** is the last tab of the rail (section XI), shown while *KPI item allowance* is on or anything is recorded on it. On the sheet: the section head and hint; an amber `.sheet-warning` while the switch is off, its *Scheme rules* link opening that tab; an *Add an item from* `.sheet-toolbar` — the Brands tab's pills (SKU Master · Bed frame specials · Sofa specials), a search box (a SKU is searched on the server, twenty at a time with *Showing 20 of N*; a special filters the pool) and *Amount RM* for the next pick — over a bordered result list (*Add* / an *On the list* chip / an amber *Off in the ERP* chip); then a `.table-frame` ledger (Item · Name · Kind · Counted · KPI amount · RM as an input · Remove / Keep / Take off; *New* (accent) and *Coming off* (danger) chips, an amber *Gone from the ERP* chip, a retyped amount on a peach wash) whose foot counts items and changes beside *Cancel* and the orange *Save N changes*; under it the **Threshold ladder** (the old tab V, rows saved one by one). The Scheme rules row *KPI item allowance* links to the tab. The screen-reader 'Remove' header is anchored to its cell (`relative`): absolutely placed, it escaped the table's scroll box and widened a phone's page by 46px.
