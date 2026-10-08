@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  appointmentRate, appointmentSlots, autoRepliesFor, DEFAULT_AUTO_REPLIES, messagePreview, searchContacts, clipLength, relativeWhen, showUpRate, upcomingByDay, applyAutoFollowUp, cancelAppointment, markAttended, previousLabel, receiveCustomerMessage, rescheduleAppointment, statusAfterCancel, daySlots, isClosedStatus, statusAfterReply, lostReasonComplete, lostReasonLabel, openMinutesBetween, replyUrgency, setLeadStatus, slotClash, sortByUrgency, waitingLabel,
+  appointmentRate, appointmentSlots, autoRepliesFor, DEFAULT_AUTO_REPLIES, messagePreview, searchContacts, clipLength, relativeWhen, showUpRate, upcomingByDay, applyAutoFollowUp, cancelAppointment, markAttended, previousLabel, receiveCustomerMessage, rescheduleAppointment, statusAfterCancel, daySlots, isClosedStatus, statusAfterReply, lostReasonComplete, lostReasonLabel, replyUrgency, setLeadStatus, slotClash, sortByUrgency, waitingLabel,
   type CrmAppointment, type CrmLead, type CrmMessage,
 } from "./crm";
 
@@ -54,32 +54,23 @@ describe("daySlots", () => {
 });
 
 describe("reply urgency", () => {
-  // Local times: opening hours are 8am–8pm wherever the phone is.
+  // Real elapsed time (design handoff 2026-10-09): every hour counts, night or day.
   const at = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute);
   const now = at(2, 12); // Fri 2 Oct, noon
   const msg = (from: CrmMessage["from"], when: Date): CrmMessage => ({ id: from + when.getTime(), from, text: "", at: when.toISOString() });
   const withMessages = (status: CrmLead["status"], ...messages: CrmMessage[]): CrmLead => ({ ...lead("x", status), messages });
 
-  it("counts opening hours only", () => {
-    expect(openMinutesBetween(at(2, 9), at(2, 12))).toBe(180);
-    expect(openMinutesBetween(at(1, 23), at(2, 9))).toBe(60); // 11pm message: the clock starts at 8am
-    expect(openMinutesBetween(at(1, 19), at(2, 9))).toBe(120); // 7–8pm, then 8–9am
-    expect(openMinutesBetween(at(1, 8), at(3, 8))).toBe(24 * 60); // two full days = 24 opening hours
-    expect(openMinutesBetween(at(2, 12), at(2, 9))).toBe(0);
+  it("grades Reply soon at 3 h, Urgent at 6 h, Overdue at 9 h", () => {
+    expect(replyUrgency(withMessages("new", msg("lead", at(2, 10))), now)).toEqual({ level: "none", waitingMinutes: 2 * 60 });
+    expect(replyUrgency(withMessages("new", msg("lead", at(2, 9))), now)).toEqual({ level: "soon", waitingMinutes: 3 * 60 });
+    expect(replyUrgency(withMessages("new", msg("lead", at(2, 6))), now)).toEqual({ level: "urgent", waitingMinutes: 6 * 60 });
+    expect(replyUrgency(withMessages("new", msg("lead", at(2, 3))), now)).toEqual({ level: "overdue", waitingMinutes: 9 * 60 });
+    expect(replyUrgency(withMessages("new", msg("lead", at(0, 10))), now)).toEqual({ level: "overdue", waitingMinutes: 50 * 60 });
   });
 
-  it("grades yellow at 3 h, orange at 6 h, red at 24 h", () => {
-    expect(replyUrgency(withMessages("new", msg("lead", at(2, 10))), now).level).toBe("none");
-    expect(replyUrgency(withMessages("new", msg("lead", at(2, 9))), now).level).toBe("soon");
-    expect(replyUrgency(withMessages("new", msg("lead", at(1, 18))), now).level).toBe("urgent"); // 2 h + 4 h
-    expect(replyUrgency(withMessages("new", msg("lead", at(1, 12))), now)).toEqual({ level: "urgent", waitingMinutes: 12 * 60 });
-    expect(replyUrgency(withMessages("new", msg("lead", at(1, 8))), now)).toEqual({ level: "urgent", waitingMinutes: 16 * 60 }); // yesterday 8am: 12 h + 4 h
-    expect(replyUrgency(withMessages("new", msg("lead", at(0, 10))), now)).toEqual({ level: "overdue", waitingMinutes: 26 * 60 }); // 30 Sep 10am: 10 + 12 + 4
-  });
-
-  it("does not hold the night against the salesperson", () => {
-    // Sent at 10pm, now 9am: one opening hour, not eleven.
-    expect(replyUrgency(withMessages("new", msg("lead", at(1, 22))), at(2, 9))).toEqual({ level: "none", waitingMinutes: 60 });
+  it("counts the night like any other hour", () => {
+    // Sent at 10pm, now 8am: ten hours waiting — Overdue (opening hours used to make this 0 h).
+    expect(replyUrgency(withMessages("new", msg("lead", at(1, 22))), at(2, 8))).toEqual({ level: "overdue", waitingMinutes: 10 * 60 });
   });
 
   it("stops the clock once the salesperson replied, and ignores system notes", () => {
@@ -97,8 +88,8 @@ describe("reply urgency", () => {
     expect(replyUrgency(withMessages("won", msg("lead", at(0, 8))), now).level).toBe("none");
   });
 
-  it("moves only a New lead to Follow up past 24 opening hours", () => {
-    const old = msg("lead", at(0, 10)), recent = msg("lead", at(1, 8));
+  it("moves only a New lead to Follow up once it is Overdue (9 h)", () => {
+    const old = msg("lead", at(2, 2)), recent = msg("lead", at(2, 4));
     const leads = [withMessages("new", old), withMessages("appointment", old), withMessages("new", recent)];
     expect(applyAutoFollowUp(leads, now).map(l => l.status)).toEqual(["follow_up", "appointment", "new"]);
   });

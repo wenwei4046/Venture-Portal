@@ -242,32 +242,16 @@ export function appointmentRate(leads: CrmLead[], appointments: CrmAppointment[]
  * answered it — a reply, or booking them an appointment. A lead that is Won
  * or Lost never waits.
  *
- * Only OPENING HOURS count (8am–8pm, every day): a message at 11pm starts the
- * clock at 8am, and the night is never held against the salesperson. So
- * "24 hours" is 24 opening hours — two working days.
+ * Three levels on REAL elapsed time — every hour counts, night or day
+ * (design handoff 2026-10-09, "CRM urgency rule"): Reply soon from 3 h,
+ * Urgent from 6 h, Overdue from 9 h. The label shows the actual hours.
  */
 export type CrmUrgency = "none" | "soon" | "urgent" | "overdue";
 
-export const URGENCY_THRESHOLDS = { soonMinutes: 3 * 60, urgentMinutes: 6 * 60, overdueMinutes: 24 * 60 };
+export const URGENCY_THRESHOLDS = { soonMinutes: 3 * 60, urgentMinutes: 6 * 60, overdueMinutes: 9 * 60 };
 
+/** Showroom opening hours: the booking slots and the after-hours auto-reply (not the reply clock). */
 export const OPENING_HOURS = { open: 8, close: 20 };
-
-/** Minutes between two moments that fall inside opening hours (local time). */
-export function openMinutesBetween(from: Date, to: Date, hours = OPENING_HOURS): number {
-  if (to <= from) return 0;
-  let total = 0;
-  const day = new Date(from);
-  day.setHours(0, 0, 0, 0);
-  while (day <= to) {
-    const open = new Date(day); open.setHours(hours.open, 0, 0, 0);
-    const close = new Date(day); close.setHours(hours.close, 0, 0, 0);
-    const start = Math.max(open.getTime(), from.getTime());
-    const end = Math.min(close.getTime(), to.getTime());
-    if (end > start) total += end - start;
-    day.setDate(day.getDate() + 1);
-  }
-  return Math.floor(total / 60_000);
-}
 
 export const URGENCY_LABELS: Record<Exclude<CrmUrgency, "none">, string> = {
   soon: "Reply soon",
@@ -279,7 +263,7 @@ export function replyUrgency(lead: CrmLead, now: Date = new Date()): { level: Cr
   if (lead.status === "won" || lead.status === "lost") return { level: "none", waitingMinutes: 0 };
   const last = [...lead.messages].reverse().find(m => (m.from !== "system" || m.kind === "booking") && !m.auto);
   if (!last || last.from !== "lead") return { level: "none", waitingMinutes: 0 };
-  const waitingMinutes = openMinutesBetween(new Date(last.at), now);
+  const waitingMinutes = Math.max(0, Math.floor((now.getTime() - new Date(last.at).getTime()) / 60_000));
   const t = URGENCY_THRESHOLDS;
   const level: CrmUrgency =
     waitingMinutes >= t.overdueMinutes ? "overdue"
@@ -289,7 +273,7 @@ export function replyUrgency(lead: CrmLead, now: Date = new Date()): { level: Cr
   return { level, waitingMinutes };
 }
 
-/** "45 min", "6 h", "30 h" — opening hours the customer has waited. */
+/** "45 min", "6 h", "30 h" — how long the customer has waited. */
 export function waitingLabel(minutes: number): string {
   return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h`;
 }

@@ -5,8 +5,10 @@ import { getMemberUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type CrmPeopleRow, type CrmRows } from "@/lib/member/crm-live";
 import type { CrmMessage } from "@/lib/member/crm";
-import { cleanText, sendWhatsAppText, windowOpen } from "@/lib/whatsapp/send";
-import { messengerWindow, pageToken, sendMessengerText } from "@/lib/messenger/send";
+import { cleanText, fetchWhatsAppTemplates, fillTemplate, mediaMessage, reactionMessage, sendWhatsApp, sendWhatsAppText, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
+import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
+import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
+import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
  * The CRM's live read: everything the signed-in person may see, read under
@@ -115,6 +117,10 @@ export async function sendCrmReply(contactId: string, text: string): Promise<{ o
 const CRM_WRITES = [
   "crm_mark_read", "crm_set_status", "crm_book", "crm_move_appointment", "crm_set_appointment_state",
   "crm_assign_member", "crm_send_to_team", "crm_save_team_settings", "crm_save_team_shares", "crm_save_ad_rule", "crm_set_full_time", "crm_save_showroom", "crm_give_to_hod",
+  // The redesign (mig 20261009030000).
+  "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
+  "crm_save_quick_replies", "crm_save_auto_replies", "crm_seen_notifications", "crm_invite", "crm_answer_invite",
+  "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -131,5 +137,209 @@ export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): P
     const message = error instanceof Error ? error.message : "That could not be saved. Please try again.";
     // The database's own words are written for the member ("You may not …", "A Lost customer needs a reason.").
     return { ok: false, error: /permission denied for/i.test(message) ? "You may not do that." : message.slice(0, 250) };
+  }
+}
+
+/* ── The redesigned CRM (Claude Design handoff, 2026-10-09) ─────────────── */
+
+type Db = SupabaseClient;
+/** The largest photo or file a member sends from the CRM (the client checks the same). */
+const CRM_MEDIA_BYTES = 4 * 1024 * 1024;
+const session = async (): Promise<Db> => {
+  const user = await getMemberUser();
+  if (!user?.is_active) throw new Error("Sign in with an active work account.");
+  return (await createClient()) as unknown as Db;
+};
+const friendly = (error: unknown, fallback: string) => {
+  const message = error instanceof Error ? error.message : fallback;
+  return /permission denied|42501/i.test(message) ? "You may not do that." : message.slice(0, 250);
+};
+
+/**
+ * Everything one person's CRM reads, under their own session. Contacts and
+ * messages are paged (PostgREST stops at 1,000 rows without a word).
+ */
+export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    const read = async <T,>(query: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> => {
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      return (data ?? []) as T;
+    };
+    const [people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs] = await Promise.all([
+      read<CrmDataRows["people"]>(db.rpc("crm_people")),
+      fetchAllRowsParallel<CrmDataRows["contacts"][number]>((from, to, withCount) => db.from("crm_contacts")
+        .select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at, property_type, unit_size, unit_location, requirement, budget, won_amount, details_at", withCount ? { count: "exact" } : undefined)
+        .order("created_at").order("id").range(from, to), "crm contacts"),
+      fetchAllRowsParallel<CrmDataRows["messages"][number]>((from, to, withCount) => db.from("crm_messages")
+        .select("id, contact_id, direction, kind, body, media_id, auto, sent_by, sent_at, status, error, reply_to, my_reaction, card", withCount ? { count: "exact" } : undefined)
+        .order("sent_at").order("id").range(from, to), "crm messages"),
+      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at")),
+      read<CrmDataRows["rooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order, address, slots, cap, weekly, blocks")),
+      read<CrmDataRows["prefs"]>(db.from("crm_contact_prefs").select("contact_id, pinned, muted, hidden, blocked, pinned_message_id")),
+      read<CrmDataRows["hides"]>(db.from("crm_message_hides").select("message_id")),
+      read<CrmDataRows["labels"]>(db.from("crm_labels").select("id, name, color, sort_order")),
+      read<CrmDataRows["contactLabels"]>(db.from("crm_contact_labels").select("label_id, contact_id")),
+      read<CrmDataRows["quickReplies"]>(db.from("crm_quick_replies").select("id, shortcut, message, sort_order")),
+      read<CrmDataRows["autoReplies"]>(db.from("crm_auto_replies").select("settings")),
+      read<CrmDataRows["invites"]>(db.from("crm_invites").select("id, kind, contact_id, contact_name, from_staff, to_staff, state, created_at, decided_at").order("created_at", { ascending: false }).limit(200)),
+      read<CrmDataRows["shares"]>(db.from("crm_contact_shares").select("contact_id, staff_id, invited_by, joined_at")),
+      read<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").order("at", { ascending: false }).limit(500)),
+      read<CrmDataRows["staffPrefs"]>(db.from("crm_staff_prefs").select("notifs_seen_at")),
+    ]);
+    return { ok: true, data: crmDataFromRows({ people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs }) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
+    return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
+      ? "The CRM is not set up for this account yet. Ask your administrator." : message.slice(0, 250) };
+  }
+}
+
+interface Reachable { id: string; channel: "whatsapp" | "messenger"; account_id: string; external_id: string; assigned_to: string | null; last_customer_at: string | null }
+
+/** The customer as the sender needs them — read under RLS, then asked may-you-reply, then Meta's window. */
+async function reachable(db: Db, contactId: string, freeText: boolean): Promise<{ contact: Reachable; token: string; window: "open" | "human_agent" | "shut" }> {
+  if (!/^[0-9a-f-]{36}$/i.test(contactId)) throw new Error("Choose a customer first.");
+  const { data: contact, error } = await db.from("crm_contacts").select("id, channel, account_id, external_id, assigned_to, last_customer_at").eq("id", contactId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!contact) throw new Error("That customer is not in your CRM.");
+  const c = contact as Reachable;
+  const window = c.channel === "messenger" ? messengerWindow(c.last_customer_at) : windowOpen(c.last_customer_at) ? "open" : "shut";
+  if (freeText && window === "shut") {
+    throw new Error(c.channel === "messenger"
+      ? "More than 7 days since the customer's last message — Messenger no longer allows a reply."
+      : "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now.");
+  }
+  const { data: allowed, error: checkError } = await db.rpc("crm_can_reply", { p_contact: contactId });
+  if (checkError) throw new Error(checkError.message);
+  if (allowed !== true) throw new Error("You may not reply to this customer.");
+  const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+  if (!token) throw new Error(`${c.channel === "messenger" ? "Messenger" : "WhatsApp"} is not connected on this server yet. Ask your administrator.`);
+  return { contact: c, token, window };
+}
+
+const recorded = async (db: Db, args: { contact: string; externalId: string; kind: string; body: string; replyTo?: string | null; card?: CrmCard | null }) => {
+  const { data, error } = await db.rpc("crm_record_out", { p_contact: args.contact, p_external_id: args.externalId, p_kind: args.kind, p_body: args.body, p_reply_to: args.replyTo ?? null, p_card: args.card ?? null });
+  return error || !data ? null : chatMessage(data as Parameters<typeof chatMessage>[0]);
+};
+
+/**
+ * Send a text — a reply (optionally quoting one of the customer's messages),
+ * a quick reply, or a visit card's words (Confirmed / Updated / Cancelled /
+ * Reminder, drawn as a card in the chat). It shows only once it went AND was
+ * kept; a failed send keeps the draft.
+ */
+export async function sendCrmMessage(contactId: string, text: string, opts: { replyTo?: string | null; card?: CrmCard | null } = {}): Promise<{ ok: true; message: CrmChatMessage } | { ok: false; error: string }> {
+  try {
+    const clean = cleanText(text);
+    if (!clean.ok) throw new Error(clean.error);
+    const db = await session();
+    const { contact, token, window } = await reachable(db, contactId, true);
+    let quote: string | null = null;
+    if (opts.replyTo) {
+      const { data: q } = await db.from("crm_messages").select("id, external_id, contact_id").eq("id", opts.replyTo).maybeSingle();
+      if (!q || q.contact_id !== contactId) throw new Error("That message is not in this chat.");
+      quote = (q.external_id as string | null) ?? null;
+    }
+    let externalId: string;
+    if (contact.channel === "messenger") {
+      const pageAccess = await pageToken(contact.account_id, token);
+      if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
+      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: window as "open" | "human_agent" });
+      if (!sent.ok) throw new Error(sent.error);
+      externalId = sent.mid;
+    } else {
+      const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: textMessage(contact.external_id, clean.text, quote) });
+      if (!sent.ok) throw new Error(sent.error);
+      externalId = sent.wamid;
+    }
+    const message = await recorded(db, { contact: contactId, externalId, kind: "text", body: clean.text, replyTo: opts.replyTo, card: opts.card });
+    if (!message) return { ok: false, error: `Sent to the customer on ${contact.channel === "messenger" ? "Messenger" : "WhatsApp"}, but it could not be saved here. Reload before sending again.` };
+    return { ok: true, message };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The message could not be sent. Please try again.") };
+  }
+}
+
+/** React to a message. WhatsApp shows it to the customer; Messenger keeps it in the CRM only (Meta offers Pages no reactions). */
+export async function reactToMessage(messageId: string, emoji: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    const { data: m, error } = await db.from("crm_messages").select("id, contact_id, external_id, direction").eq("id", messageId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!m) throw new Error("That message is not in your CRM.");
+    const { contact, token } = await reachable(db, m.contact_id as string, false);
+    if (contact.channel === "whatsapp" && m.external_id) {
+      const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: reactionMessage(contact.external_id, m.external_id as string, emoji) });
+      if (!sent.ok) throw new Error(sent.error);
+    }
+    const { error: saveError } = await db.rpc("crm_set_reaction", { p_message: messageId, p_emoji: emoji });
+    if (saveError) throw new Error(saveError.message);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The reaction could not be sent.") };
+  }
+}
+
+/** The WhatsApp Business Account's approved templates (for a cold lead). */
+export async function fetchCrmTemplates(): Promise<{ ok: true; templates: WaTemplate[] } | { ok: false; error: string }> {
+  try {
+    await session();
+    const token = process.env.META_SYSTEM_USER_TOKEN?.trim(), wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
+    if (!token || !wabaId) throw new Error("WhatsApp is not connected on this server yet. Ask your administrator.");
+    return await fetchWhatsAppTemplates({ wabaId, token });
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The templates could not be loaded.") };
+  }
+}
+
+/** Send an approved template — the only way to write after WhatsApp's 24 hours (it does not reopen the window). */
+export async function sendCrmTemplate(contactId: string, template: { name: string; language: string; text: string }, params: string[]): Promise<{ ok: true; message: CrmChatMessage } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    const { contact, token } = await reachable(db, contactId, false);
+    if (contact.channel !== "whatsapp") throw new Error("Messenger has no templates. Call the customer instead.");
+    const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: templateMessage(contact.external_id, template.name, template.language, params) });
+    if (!sent.ok) throw new Error(sent.error);
+    const message = await recorded(db, { contact: contactId, externalId: sent.wamid, kind: "template", body: fillTemplate(template.text, params) || template.name });
+    if (!message) return { ok: false, error: "Sent to the customer on WhatsApp, but it could not be saved here. Reload before sending again." };
+    return { ok: true, message };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The template could not be sent.") };
+  }
+}
+
+/** A photo or document from the chat's + sheet. */
+export async function sendCrmMedia(form: FormData): Promise<{ ok: true; message: CrmChatMessage } | { ok: false; error: string }> {
+  try {
+    const contactId = String(form.get("contact") ?? ""), caption = String(form.get("caption") ?? "").trim();
+    const file = form.get("file");
+    if (!(file instanceof Blob) || file.size === 0) throw new Error("Choose a file first.");
+    const filename = (file as File).name || "file";
+    const kind: "image" | "document" = ["image/jpeg", "image/png"].includes(file.type) ? "image" : "document";
+    // Vercel takes ~4.5 MB in one request (next.config.ts bodySizeLimit 4 MB): a larger file never reaches here.
+    if (file.size > CRM_MEDIA_BYTES) throw new Error("A photo or file can be up to 4 MB.");
+    const db = await session();
+    const { contact, token, window } = await reachable(db, contactId, true);
+    let externalId: string;
+    if (contact.channel === "messenger") {
+      const pageAccess = await pageToken(contact.account_id, token);
+      if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
+      const sent = await sendMessengerAttachment({ pageId: contact.account_id, psid: contact.external_id, token: pageAccess, window: window as "open" | "human_agent", kind: kind === "image" ? "image" : "file", file, filename });
+      if (!sent.ok) throw new Error(sent.error);
+      externalId = sent.mid;
+    } else {
+      const up = await uploadWhatsAppMedia({ phoneNumberId: contact.account_id, token, file, filename });
+      if (!up.ok) throw new Error(up.error);
+      const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: mediaMessage(contact.external_id, kind, up.id, caption, filename) });
+      if (!sent.ok) throw new Error(sent.error);
+      externalId = sent.wamid;
+    }
+    const message = await recorded(db, { contact: contactId, externalId, kind, body: caption || filename });
+    if (!message) return { ok: false, error: "Sent to the customer, but it could not be saved here. Reload before sending again." };
+    return { ok: true, message };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The file could not be sent.") };
   }
 }

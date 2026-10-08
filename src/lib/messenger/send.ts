@@ -95,3 +95,24 @@ export async function sendMessengerText(
   const mid = (payload as { message_id?: string } | null)?.message_id;
   return mid ? { ok: true, mid } : { ok: false, error: "Messenger did not confirm the message. Check the chat before sending again." };
 }
+
+/** A photo or file through the Send API (uploaded with the message); same windows as text. */
+export async function sendMessengerAttachment(
+  opts: { pageId: string; psid: string; token: string; window: Exclude<MessengerWindow, "shut">; kind: "image" | "file"; file: Blob; filename: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true; mid: string } | { ok: false; error: string }> {
+  const form = new FormData();
+  form.append("recipient", JSON.stringify({ id: opts.psid }));
+  if (opts.window === "open") form.append("messaging_type", "RESPONSE");
+  else { form.append("messaging_type", "MESSAGE_TAG"); form.append("tag", "HUMAN_AGENT"); }
+  form.append("message", JSON.stringify({ attachment: { type: opts.kind, payload: { is_reusable: false } } }));
+  form.append("filedata", opts.file, opts.filename);
+  let response: Response;
+  try {
+    response = await fetchImpl(graph(`${encodeURIComponent(opts.pageId)}/messages`), { method: "POST", headers: { Authorization: `Bearer ${opts.token}` }, body: form });
+  } catch { return { ok: false, error: "Could not reach Messenger to send the file. Try again." }; }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) return { ok: false, error: messengerError(response.status, payload) };
+  const mid = (payload as { message_id?: string } | null)?.message_id;
+  return mid ? { ok: true, mid } : { ok: false, error: "Messenger did not confirm the file. Check the chat before sending again." };
+}

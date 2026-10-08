@@ -1,0 +1,41 @@
+/*
+ * The redesigned CRM's few class rules. Everything else is inline, exactly as
+ * the Claude Design handoff draws it (docs/design_handoff_crm_roles); these
+ * are what inline styles cannot say.
+ */
+
+/* The design's hover states (style-hover in the prototype). */
+.hov1:hover { background: #FBF7F3 !important; }
+.hov2:hover { background: #FBF4EE !important; }
+.hov3:hover { background: #FFF8F2 !important; }
+.hov4:hover { border-color: #387557 !important; }
+.hov5:hover { background: #F5EEE9 !important; }
+
+/* The app: full screen on a phone, the design's own font and colours. */
+.app {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #FFFFFF;
+  color: #3F2B22;
+  font-family: Inter, var(--font-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.app * { box-sizing: border-box; }
+.app a { color: #BD4A19; }
+.app a:hover { color: rgb(150 58 20); }
+/* Inputs take the design's look, not the browser's. */
+.app input, .app textarea { font-family: inherit; }
+/* The portal sets headings in its serif; the design inherits Inter everywhere. */
+.app :where(h1, h2, h3, h4, p, strong, small, b, em, label, span, input, textarea) { font-family: inherit; }
+.app :where(h1, h2, h3, p) { font-size: inherit; line-height: inherit; }
+.app ::-webkit-scrollbar { display: none; }
+/* On a wide screen the CRM keeps a phone's width, centred. */
+@media (min-width: 560px) {
+  .app { left: 50%; right: auto; width: 430px; transform: translateX(-50%); box-shadow: 0 0 0 1px #EBDDD2, 0 30px 60px rgba(63, 43, 34, .12); }
+}
+.loading { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; font-size: 14px; color: #806B60; }
+.problem { margin: 0; padding: 10px 20px; font-size: 13px; color: #A3371A; background: #FBEAE6; }

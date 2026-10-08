@@ -1,0 +1,332 @@
+/**
+ * The redesigned CRM's data (Claude Design handoff, 2026-10-09): everything one
+ * person's CRM reads, as the screens use it. The rows come from crm-actions.ts
+ * under the member's own session (row level security decides what comes back);
+ * this file only reshapes them, so every rule is tested. The demo builds the
+ * same shape (crm-demo-data.ts).
+ */
+import { CRM_LOST_REASONS, type CrmLead, type CrmLostReason, type CrmMessage, type CrmStatus } from "./crm";
+import type { CrmRole } from "./crm-team";
+import type { CrmContactRow, CrmMessageRow, CrmPeopleRow } from "./crm-live";
+
+export type CrmChannel = "whatsapp" | "messenger";
+
+export interface CrmPerson {
+  id: string;
+  name: string;
+  role: CrmRole;
+  uplineId: string | null;
+  fullTime: boolean;
+}
+
+export interface CrmCard { kind: "Confirmed" | "Updated" | "Cancelled" | "Reminder"; start: string; room: string; addr: string }
+
+export interface CrmChatMessage {
+  id: string;
+  from: "lead" | "me";
+  kind: string;
+  text: string;
+  at: string;
+  status?: "sent" | "delivered" | "read" | "failed";
+  error?: string;
+  /** Who of us wrote it (staff id) when the server knows — "Sent by" shows when it is not the customer's own person. */
+  by?: string;
+  auto?: boolean;
+  replyTo?: string;
+  myReaction?: string;
+  card?: CrmCard;
+  media?: { kind: "image" | "video" | "audio" | "file"; url: string; name?: string };
+}
+
+export interface CrmDetails { type: string; size: string; loc: string; req: string; budget: string }
+
+export interface CrmCustomer {
+  id: string;
+  name: string;
+  phone: string;
+  channel: CrmChannel;
+  adId: string | null;
+  ad: string;
+  status: CrmStatus;
+  lost?: { reason: CrmLostReason; note?: string };
+  previous?: "won" | "lost";
+  wonAmount: number | null;
+  assignedTo: string | null;
+  teamId: string | null;
+  lastCustomerAt: string | null;
+  createdAt: string;
+  unread: number;
+  details: CrmDetails;
+  /** Book visit's customer form was saved once (then a booking goes straight to the time). */
+  detailsSaved: boolean;
+  messages: CrmChatMessage[];
+}
+
+export type CrmVisitState = "booked" | "attended" | "no_show" | "cancelled";
+export interface CrmVisit {
+  id: string;
+  customerId: string;
+  showroomId: string;
+  start: string;
+  minutes: number;
+  state: CrmVisitState;
+  outcome: "follow_up" | "won" | "lost" | "rebooked" | null;
+  remindedAt: string | null;
+}
+
+export interface CrmBlock { a: string; b: string; why: string }
+export interface CrmRoom {
+  id: string;
+  name: string;
+  active: boolean;
+  address: string;
+  /** "HH:MM" every day, or "HH:MM@0123456" on those weekdays (0 = Monday). */
+  slots: string[];
+  cap: number;
+  /** Closed every week: 0 = Sunday … 6 = Saturday (Date.getDay). */
+  weekly: number[];
+  blocks: CrmBlock[];
+}
+
+export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null }
+export interface CrmLabel { id: string; name: string; color: string }
+export interface CrmQuickReply { id: string; shortcut: string; message: string }
+
+export interface CrmAutoReply { on: boolean; text: string; img?: string | null; imgName?: string }
+export interface CrmAutoReplySet {
+  welcome: CrmAutoReply;
+  after: CrmAutoReply & { from: string; to: string };
+  kws: (CrmAutoReply & { id: string; words: string })[];
+}
+
+export interface CrmInvite {
+  id: string;
+  kind: "share" | "move";
+  customerId: string;
+  customerName: string;
+  from: string;
+  to: string;
+  state: "pending" | "accepted" | "declined";
+  createdAt: string;
+  decidedAt: string | null;
+}
+export interface CrmShare { customerId: string; staffId: string; invitedBy: string | null; joinedAt: string }
+export interface CrmEvent {
+  id: number;
+  kind: "won" | "lost" | "moved" | "shared" | "share_declined" | "move_declined";
+  customerId: string;
+  actor: string | null;
+  owner: string | null;
+  data: Record<string, unknown>;
+  at: string;
+}
+
+export interface CrmData {
+  viewerId: string | null;
+  setup: "not_linked" | "no_role" | null;
+  people: CrmPerson[];
+  customers: CrmCustomer[];
+  visits: CrmVisit[];
+  rooms: CrmRoom[];
+  prefs: Record<string, CrmPrefs>;
+  hiddenMessages: string[];
+  labels: CrmLabel[];
+  customerLabels: Record<string, string[]>;
+  quickReplies: CrmQuickReply[];
+  autoReplies: CrmAutoReplySet;
+  invites: CrmInvite[];
+  shares: CrmShare[];
+  events: CrmEvent[];
+  notifsSeenAt: string | null;
+}
+
+/* ── Defaults the design starts with ───────────────────────────────────── */
+
+export const DEFAULT_LABELS: Omit<CrmLabel, "id">[] = [
+  { name: "Hot lead", color: "#BD4A19" }, { name: "VIP", color: "#A46312" },
+  { name: "Price enquiry", color: "#387557" }, { name: "Follow up later", color: "#2F8FD8" },
+];
+export const LABEL_SWATCHES = ["#BD4A19", "#A46312", "#387557", "#2F8FD8", "#7A4FB5", "#806B60"];
+
+export const DEFAULT_QUICK_REPLIES: Omit<CrmQuickReply, "id">[] = [
+  { shortcut: "Price", message: "Our prices depend on size and design. Share your measurements and we'll send a quote." },
+  { shortcut: "Hours", message: "Thanks for your message! We're open 8am–8pm daily and will reply first thing tomorrow." },
+];
+
+export const DEFAULT_AUTO_REPLY_SET: CrmAutoReplySet = {
+  welcome: { on: true, text: "Hi! Thanks for messaging HOUZS. A salesperson will reply shortly." },
+  after: { on: true, text: "Thanks for your message! Our showrooms are open 10 am – 9 pm. We'll reply first thing tomorrow.", from: "08:00", to: "20:00" },
+  kws: [{ id: "1", on: true, words: "price, how much, harga", text: "Our prices depend on size and finish. Could you share which item you're looking at?" }],
+};
+
+/* ── The rows, as PostgREST returns them (the new ones) ────────────────── */
+
+export interface CrmContactRowX extends CrmContactRow {
+  property_type?: string | null;
+  unit_size?: string | null;
+  unit_location?: string | null;
+  requirement?: string | null;
+  budget?: string | null;
+  won_amount?: number | string | null;
+  details_at?: string | null;
+}
+export interface CrmMessageRowX extends CrmMessageRow {
+  reply_to?: string | null;
+  my_reaction?: string | null;
+  card?: CrmCard | null;
+}
+export interface CrmVisitRow {
+  id: string; contact_id: string; showroom: string; start_at: string; minutes: number; state: CrmVisitState;
+  outcome?: CrmVisit["outcome"]; reminded_at?: string | null;
+}
+export interface CrmRoomRow {
+  id: string; name: string; active: boolean; sort_order: number;
+  address?: string | null; slots?: string[] | null; cap?: number | null; weekly?: number[] | null; blocks?: CrmBlock[] | null;
+}
+export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null }
+export interface CrmInviteRow {
+  id: string; kind: "share" | "move"; contact_id: string; contact_name: string; from_staff: string; to_staff: string;
+  state: CrmInvite["state"]; created_at: string; decided_at: string | null;
+}
+export interface CrmEventRow { id: number; kind: CrmEvent["kind"]; contact_id: string; actor: string | null; owner: string | null; data: Record<string, unknown> | null; at: string }
+
+export interface CrmDataRows {
+  people: CrmPeopleRow;
+  contacts: CrmContactRowX[];
+  messages: CrmMessageRowX[];
+  visits: CrmVisitRow[];
+  rooms: CrmRoomRow[];
+  prefs: CrmPrefRow[];
+  hides: { message_id: string }[];
+  labels: { id: string; name: string; color: string; sort_order: number }[];
+  contactLabels: { label_id: string; contact_id: string }[];
+  quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
+  autoReplies: { settings: Partial<CrmAutoReplySet> }[];
+  invites: CrmInviteRow[];
+  shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
+  events: CrmEventRow[];
+  staffPrefs: { notifs_seen_at: string | null }[];
+}
+
+/* ── Rows → screens ────────────────────────────────────────────────────── */
+
+const CHANNEL_LABEL: Record<CrmChannel, string> = { whatsapp: "WhatsApp", messenger: "Messenger" };
+const MEDIA_LABEL: Record<string, string> = {
+  image: "📷 Photo", video: "🎥 Video", audio: "🎤 Voice message", document: "📄 Document",
+  sticker: "Sticker", location: "📍 Location", template: "Template message",
+};
+const MEDIA_KIND: Record<string, NonNullable<CrmChatMessage["media"]>["kind"]> = { image: "image", sticker: "image", video: "video", audio: "audio", document: "file" };
+const lostReasons = new Set<string>(CRM_LOST_REASONS.map(r => r.value));
+
+export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
+  const label = MEDIA_LABEL[row.kind];
+  const shown = row.media_id ? MEDIA_KIND[row.kind] : undefined;
+  // A template we sent is its text; media with a file is its caption; media without one is named.
+  const text = row.kind === "template" || row.kind === "text" ? row.body ?? ""
+    : shown ? row.body ?? "" : label ? (row.body ? `${label} · ${row.body}` : label) : row.body ?? "";
+  return {
+    id: row.id,
+    from: row.direction === "in" ? "lead" : "me",
+    kind: row.kind,
+    text,
+    at: row.sent_at,
+    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: row.body || "Document" } : {}) } } : {}),
+    ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
+    ...(row.error ? { error: row.error } : {}),
+    ...(row.auto ? { auto: true } : {}),
+    ...(row.direction === "out" && row.sent_by ? { by: row.sent_by } : {}),
+    ...(row.reply_to ? { replyTo: row.reply_to } : {}),
+    ...(row.my_reaction ? { myReaction: row.my_reaction } : {}),
+    ...(row.card ? { card: row.card } : {}),
+  };
+}
+
+export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[]): CrmCustomer {
+  const reason = row.lost_reason && lostReasons.has(row.lost_reason) ? (row.lost_reason as CrmLostReason) : row.lost_reason ? "other" : null;
+  return {
+    id: row.id,
+    name: row.name?.trim() || row.phone || "Customer",
+    phone: row.phone ?? "",
+    channel: row.channel,
+    adId: row.ad_source_id,
+    ad: row.ad_headline?.trim() || (row.ad_source_id ? `Ad ${row.ad_source_id}` : `${CHANNEL_LABEL[row.channel]} · no ad`),
+    status: row.status,
+    ...(row.status === "lost" && reason ? { lost: { reason, ...(row.lost_note ? { note: row.lost_note } : {}) } } : {}),
+    ...(row.previous_status ? { previous: row.previous_status } : {}),
+    wonAmount: row.won_amount == null ? null : Number(row.won_amount),
+    assignedTo: row.assigned_to,
+    teamId: row.team_id,
+    lastCustomerAt: row.last_customer_at ?? null,
+    createdAt: row.created_at,
+    unread: row.unread,
+    details: {
+      type: row.property_type ?? "", size: row.unit_size ?? "", loc: row.unit_location ?? "",
+      req: row.requirement ?? "", budget: row.budget ?? "",
+    },
+    detailsSaved: !!row.details_at,
+    messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(chatMessage),
+  };
+}
+
+export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
+  id: r.id, name: r.name, active: r.active, address: r.address ?? "",
+  slots: r.slots ?? [], cap: r.cap ?? 2, weekly: r.weekly ?? [], blocks: Array.isArray(r.blocks) ? r.blocks : [],
+});
+
+export const visitFromRow = (a: CrmVisitRow): CrmVisit => ({
+  id: a.id, customerId: a.contact_id, showroomId: a.showroom, start: a.start_at, minutes: a.minutes, state: a.state,
+  outcome: a.outcome ?? null, remindedAt: a.reminded_at ?? null,
+});
+
+/** Saved auto-replies over the defaults, so a half-saved set still has every part. */
+export function autoReplySet(saved: Partial<CrmAutoReplySet> | undefined): CrmAutoReplySet {
+  const d = DEFAULT_AUTO_REPLY_SET;
+  if (!saved) return d;
+  return {
+    welcome: { ...d.welcome, ...(saved.welcome ?? {}) },
+    after: { ...d.after, ...(saved.after ?? {}) },
+    kws: Array.isArray(saved.kws) ? saved.kws : d.kws,
+  };
+}
+
+export function crmDataFromRows(rows: CrmDataRows): CrmData {
+  const customerLabels: Record<string, string[]> = {};
+  for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
+  return {
+    viewerId: rows.people.role ? rows.people.me : null,
+    setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
+    people: rows.people.people.map(p => ({ id: p.id, name: p.name, role: p.role, uplineId: p.uplineId, fullTime: p.fullTime })),
+    customers: rows.contacts.map(c => customerFromRow(c, rows.messages)),
+    visits: rows.visits.map(visitFromRow),
+    rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),
+    prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id }])),
+    hiddenMessages: rows.hides.map(h => h.message_id),
+    labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
+    customerLabels,
+    quickReplies: [...rows.quickReplies].sort((a, b) => a.sort_order - b.sort_order).map(q => ({ id: q.id, shortcut: q.shortcut, message: q.message })),
+    autoReplies: autoReplySet(rows.autoReplies[0]?.settings),
+    invites: rows.invites.map(i => ({ id: i.id, kind: i.kind, customerId: i.contact_id, customerName: i.contact_name, from: i.from_staff, to: i.to_staff, state: i.state, createdAt: i.created_at, decidedAt: i.decided_at })),
+    shares: rows.shares.map(s => ({ customerId: s.contact_id, staffId: s.staff_id, invitedBy: s.invited_by, joinedAt: s.joined_at })),
+    events: rows.events.map(e => ({ id: e.id, kind: e.kind, customerId: e.contact_id, actor: e.actor, owner: e.owner, data: e.data ?? {}, at: e.at })),
+    notifsSeenAt: rows.staffPrefs[0]?.notifs_seen_at ?? null,
+  };
+}
+
+/**
+ * The CRM's rules (crm.ts) were written for CrmLead; a customer is one. The
+ * reply clock, Follow up after Overdue, show-up rate — one set of rules for
+ * every screen.
+ */
+export function asLead(c: CrmCustomer): CrmLead {
+  return {
+    id: c.id, name: c.name, phone: c.phone, adName: c.ad, pageName: CHANNEL_LABEL[c.channel], channel: c.channel,
+    campaign: c.adId ?? "", status: c.status, ...(c.lost ? { lost: c.lost } : {}),
+    ...(c.previous ? { previous: { status: c.previous } } : {}),
+    ...(c.assignedTo ? { assignedTo: c.assignedTo } : {}), ...(c.teamId ? { teamId: c.teamId } : {}),
+    ...(c.lastCustomerAt ? { lastCustomerAt: c.lastCustomerAt } : {}),
+    createdAt: c.createdAt, unread: c.unread,
+    messages: c.messages.map((m): CrmMessage => ({ id: m.id, from: m.from, text: m.text, at: m.at, ...(m.auto ? { auto: true } : {}) })),
+  };
+}
+
+export { CHANNEL_LABEL };

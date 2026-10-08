@@ -20,7 +20,7 @@ import MemberQuoteBuilder from "./MemberQuoteBuilder";
 import MemberSearch, { type MemberSearchItem } from "./MemberSearch";
 import PortalViewSwitcher from "@/components/layout/PortalViewSwitcher";
 import PrincipalRevenuePanels, { RevenueManagementButton } from "./PrincipalRevenuePanels";
-import MemberCrm from "./MemberCrm";
+import CrmApp from "./crm/CrmApp";
 import principalStyles from "./PrincipalRevenuePanels.module.css";
 import { categoryLabel } from "@/lib/member/catalog";
 import {
@@ -2234,7 +2234,7 @@ export default function MemberWorkspace({
   // bar replace the workspace chrome. Back returns to Profile.
   if (page === "crm" && member) {
     return <div className={`${s.workspace} ${liveDesign ? liveStyles.workspace : ""}`} lang="en-MY">
-      <MemberCrm salesperson={data.profile.name} onExit={() => navigate("account")} live={!data.demo} viewingStaffId={principalView ? crmViewing : null} />
+      <CrmApp salesperson={data.profile.name} onExit={() => navigate("account")} live={!data.demo} />
     </div>;
   }
   return (
