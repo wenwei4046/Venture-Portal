@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 import { revenuePath } from '@/lib/revenue'
 import OpenBillBoard, { type BoardOrder } from './_components/OpenBillBoard'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
@@ -49,15 +50,22 @@ export default async function OpenBillPage({ params }: PageProps) {
     .maybeSingle()
   const batchId = (batch as { id: string } | null)?.id ?? null
 
-  const { data: orderRows } = batchId
-    ? await supabase
-        .from('sales_orders')
-        // Named FK: sales_order_shares makes a bare embed ambiguous (PGRST201).
-        .select('id, order_no, staff_id, event_date, order_total, sequence_in_day, hr_staff_costs!sales_orders_staff_id_fkey (employee_name)')
-        .eq('batch_id', batchId)
-        .eq('cancelled', false)
-        .not('staff_id', 'is', null)
-    : { data: null }
+  // Every bill of the month (2026-10-08): ~350 in September, and an
+  // unranged read stops at PostgREST's 1000 rows without a word. Asked as
+  // before while it fits (fetchAllRowsAsWritten) — the board keeps the order
+  // the bills came in where its own sort ties; a failed read is no bills.
+  const orderRows = batchId
+    ? await fetchAllRowsAsWritten((page) => {
+        const q = supabase
+          .from('sales_orders')
+          // Named FK: sales_order_shares makes a bare embed ambiguous (PGRST201).
+          .select('id, order_no, staff_id, event_date, order_total, sequence_in_day, hr_staff_costs!sales_orders_staff_id_fkey (employee_name)')
+          .eq('batch_id', batchId)
+          .eq('cancelled', false)
+          .not('staff_id', 'is', null)
+        return page ? q.order('id').range(page.from, page.to) : q
+      }).catch(() => null)
+    : null
 
   const allOrders = (orderRows ?? []) as unknown as Array<{
     id: string
@@ -72,13 +80,18 @@ export default async function OpenBillPage({ params }: PageProps) {
   // The batch owns these orders even if their salesperson's membership needs repair.
   const rawOrders = allOrders
 
+  // A tag per bill (order_id is unique), 100 bills a time: the month's ids in
+  // one `.in()` (~350 today) near the ~500 where the URL fails outright —
+  // and a failed read here showed every bill unpicked. Still none on a failure.
   const ids = rawOrders.map(o => o.id)
-  const { data: tagRows } = ids.length
-    ? await supabase
-        .from('sales_order_open_bill_tags')
-        .select('order_id, bill_rank, auto_suggested')
-        .in('order_id', ids)
-    : { data: null }
+  const tagRows = ids.length
+    ? await fetchByKeys(ids, chunk =>
+        supabase
+          .from('sales_order_open_bill_tags')
+          .select('order_id, bill_rank, auto_suggested')
+          .in('order_id', chunk),
+      ).catch(() => null)
+    : null
 
   const tagByOrder = new Map(
     ((tagRows ?? []) as Array<{ order_id: string; bill_rank: number; auto_suggested: boolean }>).map(

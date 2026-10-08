@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePayrollPayouts } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney, formatMoneyBare, formatIntlDate } from '@/lib/utils'
 import RequestReleaseButton from './_components/RequestReleaseButton'
 
@@ -14,10 +15,12 @@ export default async function InvoicePoolPage() {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  // Calculate balance
-  const { data: allTxns } = await supabase
-    .from('invoice_payout_pool')
-    .select('transaction_type, amount')
+  // Calculate balance — over every pool row, in 1000-row pages (2026-10-08):
+  // past PostgREST's cap an unranged read would short the balance silently.
+  // A failed read still shows the empty pool it always did.
+  const allTxns = await fetchAllRows((lo, hi) =>
+    supabase.from('invoice_payout_pool').select('transaction_type, amount').order('id').range(lo, hi),
+  ).catch(() => null)
 
   let balance = 0
   for (const t of allTxns ?? []) {

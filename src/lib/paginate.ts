@@ -11,6 +11,8 @@
 //
 //   const rows = await fetchAllRows((from, to) =>
 //     supabase.from('journal_lines').select('debit, credit').eq('x', y).order('id').range(from, to))
+//
+// `label` prefixes the error, for the callers that had their own message.
 const PAGE_SIZE = 1000
 
 export async function fetchAllRows<T>(
@@ -18,15 +20,52 @@ export async function fetchAllRows<T>(
     from: number,
     to: number,
   ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  label = 'fetchAllRows',
 ): Promise<T[]> {
   const out: T[] = []
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await buildPage(from, from + PAGE_SIZE - 1)
-    if (error) throw new Error(`fetchAllRows: ${error.message}`)
+    if (error) throw new Error(`${label}: ${error.message}`)
     if (data && data.length > 0) out.push(...data)
     if (!data || data.length < PAGE_SIZE) break
   }
   return out
+}
+
+// fetchAllRows for a read whose ORDER its page leans on (2026-10-08).
+//
+// Paging needs an order every page agrees on, so a read whose `.order()`
+// leaves ties — or that has none at all — takes a unique tiebreaker
+// (`.order('id')`) before its `.range()`. But such a read hands back its ties
+// in whatever order the database produced them, and a page can lean on that
+// order without anybody having chosen it: labels joined as they arrive
+// ("Rent + Utilities"), the first-seen order of a Map, a stable sort's ties.
+// The tiebreaker would quietly move them while nothing was missing at all.
+//
+// So the read goes out first exactly as written — `build(null)`, no range.
+// PostgREST caps that answer at 1000 rows: fewer back means it is whole, and
+// it is used as it came, in one request, as before. Only a FULL answer (the
+// cap reached, rows possibly cut) is read again, page by page, in the total
+// order `build({ from, to })` adds:
+//
+//   const rows = await fetchAllRowsAsWritten((page) => {
+//     const q = supabase.from('payment_voucher_sources').select('…').order('amount', { ascending: false })
+//     return page ? q.order('id').range(page.from, page.to) : q
+//   })
+//
+// Same rules as fetchAllRows otherwise: an error throws (`label` prefixes it),
+// and a full page is never taken as the end.
+export async function fetchAllRowsAsWritten<T>(
+  build: (
+    page: { from: number; to: number } | null,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  label = 'fetchAllRowsAsWritten',
+): Promise<T[]> {
+  const { data, error } = await build(null)
+  if (error) throw new Error(`${label}: ${error.message}`)
+  const rows = data ?? []
+  if (rows.length < PAGE_SIZE) return rows
+  return fetchAllRows((from, to) => build({ from, to }), label)
 }
 
 // fetchAllRows, its pages in PARALLEL (2026-10-08).

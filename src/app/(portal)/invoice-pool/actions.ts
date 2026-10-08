@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requirePayrollPayouts } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 
 // ─── Request invoice pool release (Finance) ─────────────────────────────────
 
@@ -22,16 +23,16 @@ export async function requestRelease(formData: FormData) {
   }
 
   // ─── Validate against current pool balance ───
-  const { data: allTxns, error: txnError } = await supabase
-    .from('invoice_payout_pool')
-    .select('transaction_type, amount')
-
-  if (txnError) {
-    throw new Error(`Failed to fetch pool balance: ${txnError.message}`)
-  }
+  // Every pool row, in 1000-row pages (2026-10-08): a balance summed from a
+  // read PostgREST stopped at its 1000-row cap would be wrong without a word.
+  const allTxns = await fetchAllRows(
+    (lo, hi) =>
+      supabase.from('invoice_payout_pool').select('transaction_type, amount').order('id').range(lo, hi),
+    'Failed to fetch pool balance',
+  )
 
   let balance = 0
-  for (const t of allTxns ?? []) {
+  for (const t of allTxns) {
     const amt = Number(t.amount)
     if (t.transaction_type === 'accumulate') {
       balance += amt

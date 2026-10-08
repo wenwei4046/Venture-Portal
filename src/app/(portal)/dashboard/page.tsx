@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approval-amounts'
 import { startRead } from '@/lib/start-read'
+import { fetchAllRows } from '@/lib/paginate'
+import { fetchDeptInvoiceSettlements } from '@/lib/dept-receipt-payment'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
@@ -584,9 +586,14 @@ export default async function DashboardPage() {
           .order('created_at', { ascending: false })
           .limit(5),
         // My Billing cards (2026-08-20): own-segment invoices via RLS + the
-        // receipts/CN sums RPC → 本月开单 and 未收 figures.
-        supabase.from('invoices').select('id, total_amount, status, period_month').order('id'),
-        supabase.rpc('dept_invoice_settlements' as never, {} as never),
+        // receipts/CN sums RPC → 本月开单 and 未收 figures. Every one of them,
+        // in 1000-row pages (2026-10-08): both are whole-history, and an
+        // invoice past PostgREST's cap would silently drop out of 未收. A
+        // failed read still counts as none, as before.
+        fetchAllRows((lo, hi) =>
+          supabase.from('invoices').select('id, total_amount, status, period_month').order('id').range(lo, hi),
+        ).then((data) => ({ data }), () => ({ data: null })),
+        fetchDeptInvoiceSettlements(supabase as never).then((data) => ({ data }), () => ({ data: null })),
       ])
 
       type NpRow = {

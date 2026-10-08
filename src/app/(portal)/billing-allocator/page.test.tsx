@@ -71,7 +71,7 @@ function database(txns = TXNS, invoices = INVOICES) {
   const from = vi.fn((table: string) => {
     const result = { data: tables[table] ?? [], error: null }
     const q: Record<string, unknown> = {}
-    for (const m of ['select', 'eq', 'neq', 'like', 'order']) q[m] = () => q
+    for (const m of ['select', 'eq', 'neq', 'like', 'order', 'range']) q[m] = () => q
     q.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => Promise.resolve(result).then(resolve, reject)
     return q
   })

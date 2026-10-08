@@ -513,9 +513,16 @@ export async function loadMemberIncome(
       const ov = (close.statement?.lines ?? []).filter(l => l.component === "override");
       const orderIds = [...new Set(ov.map(l => l.source_order_id).filter((v): v is string => !!v))];
       const sellerIds = [...new Set(ov.map(l => l.source_staff_id).filter((v): v is string => !!v))];
+      // A leader's override lines name every bill of their team's month — a
+      // few hundred ids in one `.in()` nears the ~500 where the URL fails
+      // outright (2026-10-08). 100 a time; ids are unique, so each answer is
+      // its chunk's own rows and only feeds lookups by id.
+      const byIds = (table: string, columns: string, ids: string[], label: string) =>
+        fetchByKeys<unknown, string>(ids, chunk => admin.from(table).select(columns).in("id", chunk) as unknown as PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>, label)
+          .then(data => ({ data, error: null }), (e: Error) => ({ data: null, error: { message: e.message } }));
       const [orders, sellers] = await Promise.all([
-        orderIds.length ? admin.from("sales_orders").select("id, order_no, brand_code, order_total, staff_id").in("id", orderIds) : Promise.resolve({ data: [], error: null }),
-        sellerIds.length ? admin.from("hr_staff_costs").select("id, employee_name").in("id", sellerIds) : Promise.resolve({ data: [], error: null }),
+        orderIds.length ? byIds("sales_orders", "id, order_no, brand_code, order_total, staff_id", orderIds, "Could not read the team's bills") : Promise.resolve({ data: [], error: null }),
+        sellerIds.length ? byIds("hr_staff_costs", "id, employee_name", sellerIds, "Could not read the team's names") : Promise.resolve({ data: [], error: null }),
       ]);
       if (orders.error || sellers.error) throw new Error((orders.error ?? sellers.error)!.message);
       const names = new Map(((sellers.data ?? []) as { id: string; employee_name: string }[]).map(s => [s.id, s.employee_name]));

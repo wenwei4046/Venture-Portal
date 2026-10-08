@@ -50,7 +50,18 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       // Interest-in-Suspense leaves + their live balances, so the form can
       // offer "draw down the suspense" instead of booking income twice.
       supabase.from('chart_of_accounts').select('code, name').eq('parent_code', '3060').eq('is_active', true),
-      supabase.from('journal_lines').select('account_code, debit, credit, journal_entries!inner(is_reversed)').like('account_code', '306%'),
+      // Every suspense line ever posted, in 1000-row pages (2026-10-08): these
+      // are running balances, and a balance summed from a read PostgREST
+      // stopped at 1000 rows is short without a word. A failed read still
+      // shows no suspense, as before.
+      fetchAllRows((lo, hi) =>
+        supabase
+          .from('journal_lines')
+          .select('account_code, debit, credit, journal_entries!inner(is_reversed)')
+          .like('account_code', '306%')
+          .order('id', { ascending: true })
+          .range(lo, hi),
+      ).then((data) => ({ data }), () => ({ data: null })),
     ])
     const suspenseBalance = new Map<string, number>()
     for (const l of (suspenseLines ?? []) as unknown as Array<{

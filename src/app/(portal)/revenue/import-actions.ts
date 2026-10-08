@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 
 /**
  * Committing an ERP sales-order import.
@@ -173,9 +174,13 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
   // Cost is NOT decided here: every line is priced from the Product List by
   // the database as it lands (trigger `sales_order_lines_fill_cost`, the same
   // rule the live feed and a recost use — user 2026-09-24).
-  const { data: productRows } = await supabase
-    .from('comm_products')
-    .select('item_code, brand_code')
+  // Every product (2026-10-08): the list is 1,553 rows and PostgREST stops an
+  // unranged read at 1000 without a word — the other 553 fell back to the
+  // brand prefixes below, or to no brand. Paged; a Map by its unique code, so
+  // the pages' order changes nothing. A failed read still knows no products.
+  const productRows = await fetchAllRows((lo, hi) =>
+    supabase.from('comm_products').select('item_code, brand_code').order('id').range(lo, hi),
+  ).catch(() => null)
   const products = new Map(
     ((productRows ?? []) as Array<{ item_code: string; brand_code: string | null }>).map(
       p => [norm(p.item_code), { brand: p.brand_code }],

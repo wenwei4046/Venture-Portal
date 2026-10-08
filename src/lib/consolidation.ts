@@ -21,6 +21,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { GlLine } from './gl-reports'
+import { fetchAllRows } from './paginate'
 
 export interface InterBillingElimination {
   /** invoices billed to internal counterparties (dept pools + directors). */
@@ -33,7 +34,18 @@ export async function fetchInterBillingElimination(
   supabase: SupabaseClient,
 ): Promise<InterBillingElimination> {
   const [{ data: invs }, { data: codes }] = await Promise.all([
-    supabase.from('invoices').select('id').in('billable_to_type', ['dept_pool', 'director']),
+    // Every internal invoice ever billed, in 1000-row pages (2026-10-08): an
+    // invoice cut by PostgREST's 1000-row cap would quietly stay in the
+    // consolidated figures. A set, so the pages' order will do; a failed read
+    // still eliminates nothing, as before.
+    fetchAllRows((lo, hi) =>
+      supabase
+        .from('invoices')
+        .select('id')
+        .in('billable_to_type', ['dept_pool', 'director'])
+        .order('id', { ascending: true })
+        .range(lo, hi),
+    ).then((data) => ({ data }), () => ({ data: null })),
     supabase.from('chart_of_accounts').select('code').or('code.eq.9050,parent_code.eq.9050'),
   ])
   return {

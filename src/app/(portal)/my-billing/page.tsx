@@ -10,7 +10,8 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { deptNameToSegment } from '@/lib/billing'
-import { fetchDeptCashLines, monthRange } from '@/lib/dept-receipt-payment'
+import { fetchDeptCashLines, fetchDeptInvoiceSettlements, monthRange } from '@/lib/dept-receipt-payment'
+import { fetchAllRowsAsWritten } from '@/lib/paginate'
 import CreateDeptInvoiceButton from './_components/CreateDeptInvoiceButton'
 import DraftInvoiceActions from './_components/DraftInvoiceActions'
 import Link from 'next/link'
@@ -47,13 +48,21 @@ export default async function MyBillingPage() {
 
   const [{ data: invRows }, { data: sums }, { data: contractRows }, { data: companies }, cashLines] =
     await Promise.all([
-      supabase
-        .from('invoices')
-        .select(
-          'id, invoice_no, company_id, billable_to_freetext_name, period_month, invoice_date, due_date, description, total_amount, status, contract_id, created_by',
-        )
-        .order('invoice_no', { ascending: false }),
-      supabase.rpc('dept_invoice_settlements' as never, {} as never),
+      // Every invoice of the segment, and every settlement row (2026-10-08):
+      // both are whole-history, and past PostgREST's 1000-row cap the rest
+      // would silently drop out of the list and of 未收. The list keeps its
+      // own order while it fits (fetchAllRowsAsWritten: drafts carry no
+      // number yet, so they tie); a failed read still counts as none.
+      fetchAllRowsAsWritten((page) => {
+        const q = supabase
+          .from('invoices')
+          .select(
+            'id, invoice_no, company_id, billable_to_freetext_name, period_month, invoice_date, due_date, description, total_amount, status, contract_id, created_by',
+          )
+          .order('invoice_no', { ascending: false })
+        return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+      }).then((data) => ({ data }), () => ({ data: null })),
+      fetchDeptInvoiceSettlements(supabase as never).then((data) => ({ data }), () => ({ data: null })),
       supabase
         .from('service_contracts')
         .select('id, description, amount, status, start_date, end_date, company_id')

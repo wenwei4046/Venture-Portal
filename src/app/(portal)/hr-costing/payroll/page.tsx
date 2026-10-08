@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { getPeriodMonth } from '@/lib/utils'
+import { fetchAllRows } from '@/lib/paginate'
 import CreatePeriodButton from './_components/CreatePeriodButton'
 import ImportInfotechEntryButton from './_components/ImportInfotechEntryButton'
 import PeriodPicker from './_components/PeriodPicker'
@@ -23,9 +24,13 @@ export default async function PayrollLandingPage() {
 
   // All periods that have payroll rows, newest first — the user picks which
   // month to view; nothing is locked to the current month.
-  const { data: allRows } = await supabase
-    .from('hr_monthly_payroll')
-    .select('period_month, status')
+  // Every row, in 1000-row pages (2026-10-08): September added 56, and past
+  // PostgREST's 1000-row cap whole months would drop off this list — the
+  // current one too, and with it the jump into its grid. Only counted by
+  // month, so the pages' order will do; a failed read still lists none.
+  const allRows = await fetchAllRows((lo, hi) =>
+    supabase.from('hr_monthly_payroll').select('period_month, status').order('id').range(lo, hi),
+  ).catch(() => null)
 
   const byPeriod = new Map<string, { count: number; drafts: number }>()
   for (const r of allRows ?? []) {

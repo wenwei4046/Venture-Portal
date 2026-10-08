@@ -8,7 +8,11 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
-vi.mock('@/lib/paginate', () => ({ fetchAllRows: mocks.fetchAllRows }))
+// The vouchers' own read is answered by hand; every other pager is the real one.
+vi.mock('@/lib/paginate', async (original) => ({
+  ...(await original<typeof import('@/lib/paginate')>()),
+  fetchAllRows: mocks.fetchAllRows,
+}))
 vi.mock('@/lib/receipt-extras', async (original) => ({
   ...(await original<typeof import('@/lib/receipt-extras')>()),
   fetchReceiptExtras: vi.fn(async () => []),
@@ -63,6 +67,8 @@ const sent = () => JSON.parse(screen.getByTestId('sent').textContent ?? '[]') as
   description: string | null
   amount: number
   status: string
+  catLabel?: string
+  poolLabel?: string
   batchKey?: string
   locked?: boolean
 }>
@@ -219,5 +225,88 @@ describe('the ledger on the sheet', () => {
     expect(card('Total received')).toHaveAttribute('data-tone', 'primary')
     expect(card('Approved · to receive')).toBeInTheDocument()
     expect(document.querySelector('.sect-head')).toHaveTextContent('Official receipts')
+  })
+})
+
+// 2026-10-08: the sources were one unranged read (620 rows), and PostgREST
+// stops one at 1000 rows without a word — a voucher whose source fell past it
+// lost its category and pool. Asked as written first (ties keep the order the
+// database gave them); a capped answer is read again in pages.
+describe('the ledger’s voucher sources, past 1000 rows', () => {
+  type Source = {
+    id: string
+    voucher_id: string
+    pool: string
+    amount: number
+    account_code: string | null
+    chart_of_accounts: { name: string } | null
+  }
+
+  function databaseWithSources(sources: Source[]) {
+    const db = database()
+    const base = db.from.getMockImplementation()!
+    const requests: Array<{ orders: string[]; range: [number, number] | null }> = []
+    db.from.mockImplementation((table: string) => {
+      if (table !== 'payment_voucher_sources') return base(table)
+      const req = { orders: [] as string[], range: null as [number, number] | null }
+      requests.push(req)
+      const q = {
+        select: () => q,
+        order: (col: string, o?: { ascending?: boolean }) => (req.orders.push(`${col}.${o?.ascending === false ? 'desc' : 'asc'}`), q),
+        range: (lo: number, hi: number) => ((req.range = [lo, hi]), q),
+        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => {
+          // As written: biggest first, ties as stored. Paged: `id` breaks them.
+          const rows = [...sources].sort((a, b) => b.amount - a.amount || (req.range ? a.id.localeCompare(b.id) : 0))
+          const [lo, hi] = req.range ?? [0, 999]
+          return Promise.resolve({ data: rows.slice(lo, Math.min(hi + 1, lo + 1000)), error: null }).then(resolve, reject)
+        },
+      }
+      return q as never
+    })
+    return { ...db, requests }
+  }
+
+  const older = (n: number): Source[] =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `s-${String(i).padStart(5, '0')}`,
+      voucher_id: `v-older-${i}`,
+      pool: 'venture_pool',
+      amount: 5000,
+      account_code: '9087',
+      chart_of_accounts: { name: 'Website & Software' },
+    }))
+
+  beforeEach(() => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
+  })
+
+  it('labels the voucher whose source is the 1,001st row', async () => {
+    // The TNB bill's source is the smallest of 1,001: last in either order.
+    const tnb: Source = {
+      id: 's-tnb', voucher_id: 'v-tnb', pool: 'dept_pool_finance', amount: 1200, account_code: '9091',
+      chart_of_accounts: { name: 'Water & Electricity' },
+    }
+    const { requests } = databaseWithSources([...older(1000), tnb])
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(sent().find((r) => r.id === 'v-tnb')).toMatchObject({ catLabel: 'Water & Electricity', poolLabel: 'Finance' })
+    expect(requests).toEqual([
+      { orders: ['amount.desc'], range: null },
+      { orders: ['amount.desc', 'id.asc'], range: [0, 999] },
+      { orders: ['amount.desc', 'id.asc'], range: [1000, 1999] },
+    ])
+  })
+
+  it('under the cap, asks once, as before, and keeps the order the sources came in', async () => {
+    // Two sources of one amount on one voucher: their labels join in arrival order.
+    const { requests } = databaseWithSources([
+      { id: 's-b', voucher_id: 'v-tnb', pool: 'dept_pool_marketing', amount: 600, account_code: '9094', chart_of_accounts: { name: 'Office Rental' } },
+      { id: 's-a', voucher_id: 'v-tnb', pool: 'dept_pool_finance', amount: 600, account_code: '9091', chart_of_accounts: { name: 'Water & Electricity' } },
+    ])
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(sent().find((r) => r.id === 'v-tnb')).toMatchObject({
+      catLabel: 'Office Rental + Water & Electricity',
+      poolLabel: 'Marketing + Finance',
+    })
+    expect(requests).toEqual([{ orders: ['amount.desc'], range: null }])
   })
 })
