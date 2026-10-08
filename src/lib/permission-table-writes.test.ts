@@ -68,6 +68,15 @@ describe('TABLE_WRITES', () => {
     expect([...listed.matchAll(/'([a-z_0-9]+)'/g)].map(m => m[1]).sort()).toEqual(Object.keys(WRITES_WITHOUT_ACTION).sort())
   })
 
+  it('no row policy written after 20261009040000 asks for the kind of account', () => {
+    // Own / Dept / All are the cell's reach (has_action(fn, action, scope));
+    // current_user_role() names the hidden kind a template starts from.
+    const later = files.filter(f => f > '20261009040000_own_and_dept_reach_the_rows.sql')
+    const asked = later.flatMap(f => [...sqlOf(f).matchAll(/(?:CREATE|ALTER) POLICY\s+(\S+)[^;]*?current_user_role\s*\(/gi)]
+      .map(m => `${f} ${m[1]}`))
+    expect(asked).toEqual([])
+  })
+
   it('a later migration that opens a table to a domain registers what it asks', () => {
     // CREATE POLICY … FOR INSERT|UPDATE|DELETE|ALL … has_scope / current_user_role
     // / has_perm / has_action, after this migration: the table must be in
