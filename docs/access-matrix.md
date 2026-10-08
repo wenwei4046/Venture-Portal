@@ -4,6 +4,14 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — Nobody without a portal account reaches a DEFINER function
+`current_user_role()` refuses a sign-in with no active portal account (a self-made sign-up,
+a switched-off account whose session lives on) instead of answering NULL, and the
+publishable key may call no SECURITY DEFINER function except the five row-policy helpers.
+Before, ~60 functions guarded with `IF v_role NOT IN (…)` let all three through (NULL is
+not "not in"); the publishable key read director payouts and staff allocations that way.
+Mig `20261009000000`; CLAUDE.md › Do NOT.
+---
 ⚡ AMENDMENT 2026-10-08 — Each action takes effect (PR2)
 A write now asks for the ACTION it is, not the module key: `requireAction('treasury',
 'create')` in the app, `has_action()` in the database, answered by `current_actions()` —

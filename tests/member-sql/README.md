@@ -158,3 +158,17 @@ cap alongside complete totals. Recent Income lists retain their source-month
 window while sharing each order's sales and goods-margin calculation.
 
 Auth/users, payroll and Storage scaffolding are synthetic. Selected existing Revenue migrations and every new member migration execute from repository files. This is not a full replay of the entire production migration history, a hosted Storage integration test or a multi-connection concurrency test. See [the verification handoff](../../docs/member-verification.md#sql-verification-record) for the numbered assertions, boundaries and remaining deployment checks.
+
+The default command ends with `validate-definer-login.mjs` (security,
+2026-10-09). It builds production's `current_user_role()` byte for byte with
+Supabase's own default grants, a writer and a reader guarded the way ~60
+production functions were (`IF v_role NOT IN (…)`), a row policy's helper, a
+trigger and a server-only function; shows the hole first (the publishable key,
+a sign-in with no portal account and a switched-off account all pass the
+guard), then applies `20261009000000` verbatim. Its 26 checks: the publishable
+key calls no DEFINER function but the policy helpers (which answer "nobody"),
+a sign-in without an active account is refused everywhere, an active account
+and the service role notice nothing, a trigger and a server-only function keep
+their grants, a function made later is never anon's, and a second run is a
+no-op. Run only these checks with
+`npm run test:definer-login --prefix tests/member-sql`.
