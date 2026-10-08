@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261009000000 (security, 2026-10-09): a
+// Local PostgreSQL regression for 20261009000100 (security, 2026-10-09): a
 // SECURITY DEFINER function's role check must hold for somebody who has no
 // role. Production's current_user_role() is built here byte for byte (the
 // migration's md5 guard checks it), with Supabase's own default grants on the
@@ -111,7 +111,7 @@ try {
   await q('UPDATE bank_accounts SET balance = 100 WHERE id = $1', [BANK])
 
   // ── The migration, verbatim ───────────────────────────────────────────────
-  const sql = (await readFile(new URL('20261009000000_definer_functions_need_a_login.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+  const sql = (await readFile(new URL('20261009000100_definer_functions_need_a_login.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(sql)
   check(await one("SELECT md5(prosrc) FROM pg_proc WHERE proname = 'current_user_role'"), 'a3dee7a8bcb88ec9f995b673ab3e88d9',
     'the new body is the one the guard names')

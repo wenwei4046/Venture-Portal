@@ -2145,9 +2145,37 @@ the test scans `src/` and fails when a gate is added without it, and the
 matrix's *held for now* reads it (`heldCells`). Unconverted on purpose: page
 reads (key), Reports' layout (key), the member app (its own keys), Department
 mode (`has_perm` in the DB), member back office (DB `member_is_manager`), and
-the approval RPCs' `role = 'principal'` (next: approvals by domain). Test mocks
-of a user carry `actions` (`src/test/with-actions.ts`); a user without them may
-do nothing. Mig `20261008200000`, `tests/member-sql/validate-permission-actions.mjs`.
+approvals (below). Test mocks of a user carry `actions` (`src/test/with-actions.ts`);
+a user without them may do nothing. Mig `20261008200000`,
+`tests/member-sql/validate-permission-actions.mjs`.
+
+**APPROVALS GO BY DOMAIN (2026-10-09, PR2b).** A request is decided by whoever
+holds its DOMAIN's Approve — Treasury: vouchers, loans, fund sources and their
+cancellations (`tier_change` on a fund source), department expenses / payment
+requests, advances, withdrawals, escalations, base rate; HR Costing: payroll
+runs, HR cost submissions; Director Salary: Invoice Pool releases; contracts
+only the queue's — or the queue's own Approvals · Approve (everything), and
+NEVER by whoever raised it unless their account is the Principal kind (user
+2026-08-06 kept the Principal's self-approval; a checker approving their own is
+no check). SQL `approval_domain()` / `approvable_types()` / `approver_may(user,
+types, submitters)` (+ `_request(id)` / `_group(id)`; no sign-in = the old rule:
+the account handed in must be a Principal); TS twin `lib/approval-domains.ts`
+(`approvableTypes`, `decision` → why not, `canSeeApprovals`), gates
+`requireApprover` / `requireApprovalQueue` (lib/auth.ts). The ten approval
+functions (approve_single_voucher, the two batches, payroll run approve /
+reject, execute_loan_cancel / _fund_source_cancel — now also only behind an
+APPROVED cancellation — dept expense approve / reject, dept_request_pv_rejected)
+keep production's bodies: one statement swapped in place by
+`pg_temp.swap_check` (pg_get_functiondef + replace, refused unless the old check
+is there exactly once). New key `approvals_queue` (no table scope) is opened by
+Approvals · View, so the Director and Executive office reach `/approvals`
+without the admin-scope `approvals` key. Policies: approval_requests read /
+flip for deciders (`IN (SELECT unnest(approvable_types()))` — `= ANY ((SELECT
+arr))` parses as a SUBQUERY and fails `text = text[]`), loans / bank_accounts
+update for Treasury approvers. The queue draws a non-decidable row with "—" and
+why (`undecidable` on PendingApprovals). hr_costing / director_salary / revenue
+keys' Approve rows moved to the `approvals` key (UPDATE, not DELETE — the MCP
+refuses DELETE): hr@ approves no payroll run, as before. Mig `20261009010000`.
 
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
@@ -2247,7 +2275,7 @@ See `TESTING.md` at repo root for full layer descriptions + how to add new tests
 Do NOT
 Do not hardcode any rates (interest, custom premium, penalty, saving %) — all from Settings/DB
 Do not skip RLS — every table must have policies matching Access Matrix
-Do not leave a SECURITY DEFINER function open to PUBLIC / anon unless it checks the caller itself (`auth.uid()`, `has_perm`, `has_scope` …) — it runs as its owner, so RLS never asks, and Postgres grants EXECUTE to PUBLIC by default: the publishable key every browser holds can call it. A helper only other DEFINER functions call: `REVOKE … FROM PUBLIC, anon, authenticated` + `GRANT … TO service_role` — and "no app code calls it" means its BARE name appears nowhere in `src/`, `scripts/`, `tools/`: a call may put the name on its own line under `.rpc(` (that is how `approve_voucher_batch` was locked by mistake and handed back, mig `20261006050000`). 21 were open, writers and approvals included, until mig `20261006010000` (2026-10-06). And a function handed a user id (`p_user_id` / `p_approver` / `p_created_by`) refuses a JWT caller whose `auth.uid()` is not that id — the approvals do since mig `20261006020000`; the app always hands in `user.id`, which View-as never changes. Journals: the app posts through `post_journal_entry_as_caller` (own name + treasury / admin / hr scope); `post_journal_entry` is the owner's and the service role's (mig `20261006030000`). **A role check must hold for somebody who has NO role (2026-10-09):** `IF v_role NOT IN ('finance', 'principal')` is NULL — not true — when the role is NULL, so it never fires for the publishable key, a self-made sign-up with no portal account, or a switched-off account whose session lives on; ~60 DEFINER functions were guarded only that way, and the publishable key read director payouts and staff allocations through them (checked on prod, rolled back). Since mig `20261009000000`: `current_user_role()` REFUSES (42501) a sign-in with no active portal account (still NULL with no sign-in: anon / service role / the database); EXECUTE on every non-trigger DEFINER function is revoked from PUBLIC + anon except the five row-policy helpers (`current_user_role`, `current_user_department_id`, `current_user_segment`, `has_perm`, `has_scope`); and the schema's default no longer grants anon or PUBLIC EXECUTE on new functions — a function the browser's anon key must call (none today) needs an explicit GRANT. Write a new guard as `IS DISTINCT FROM` / `has_action()` anyway. `tests/member-sql/validate-definer-login.mjs`.
+Do not leave a SECURITY DEFINER function open to PUBLIC / anon unless it checks the caller itself (`auth.uid()`, `has_perm`, `has_scope` …) — it runs as its owner, so RLS never asks, and Postgres grants EXECUTE to PUBLIC by default: the publishable key every browser holds can call it. A helper only other DEFINER functions call: `REVOKE … FROM PUBLIC, anon, authenticated` + `GRANT … TO service_role` — and "no app code calls it" means its BARE name appears nowhere in `src/`, `scripts/`, `tools/`: a call may put the name on its own line under `.rpc(` (that is how `approve_voucher_batch` was locked by mistake and handed back, mig `20261006050000`). 21 were open, writers and approvals included, until mig `20261006010000` (2026-10-06). And a function handed a user id (`p_user_id` / `p_approver` / `p_created_by`) refuses a JWT caller whose `auth.uid()` is not that id — the approvals do since mig `20261006020000`; the app always hands in `user.id`, which View-as never changes. Journals: the app posts through `post_journal_entry_as_caller` (own name + treasury / admin / hr scope); `post_journal_entry` is the owner's and the service role's (mig `20261006030000`). **A role check must hold for somebody who has NO role (2026-10-09):** `IF v_role NOT IN ('finance', 'principal')` is NULL — not true — when the role is NULL, so it never fires for the publishable key, a self-made sign-up with no portal account, or a switched-off account whose session lives on; ~60 DEFINER functions were guarded only that way, and the publishable key read director payouts and staff allocations through them (checked on prod, rolled back). Since mig `20261009000100`: `current_user_role()` REFUSES (42501) a sign-in with no active portal account (still NULL with no sign-in: anon / service role / the database); EXECUTE on every non-trigger DEFINER function is revoked from PUBLIC + anon except the five row-policy helpers (`current_user_role`, `current_user_department_id`, `current_user_segment`, `has_perm`, `has_scope`); and the schema's default no longer grants anon or PUBLIC EXECUTE on new functions — a function the browser's anon key must call (none today) needs an explicit GRANT. Write a new guard as `IS DISTINCT FROM` / `has_action()` anyway. `tests/member-sql/validate-definer-login.mjs`.
 Do not `CREATE OR REPLACE` a function from its last copy in `supabase/migrations` without first comparing that copy's body with production's `md5(prosrc)` — functions changed straight on the database drift, and an old copy re-applied silently undoes production's fixes and guards. Nine (the approvals, `post_journal_entry`, `apply_pool_adjustment`, `reopen_director_salary`, `get_payroll_breakdown_by_pool`) were brought back in line by mig `20261006040000` (2026-10-06), which holds them exactly as production runs them. A change made straight on production goes into a migration file the same day.
 Do not let Finance access hr_staff_costs or director_payouts detail — use aggregate views
 Do not use localStorage for auth — use Supabase Auth sessions

@@ -165,10 +165,25 @@ Supabase's own default grants, a writer and a reader guarded the way ~60
 production functions were (`IF v_role NOT IN (…)`), a row policy's helper, a
 trigger and a server-only function; shows the hole first (the publishable key,
 a sign-in with no portal account and a switched-off account all pass the
-guard), then applies `20261009000000` verbatim. Its 26 checks: the publishable
+guard), then applies `20261009000100` verbatim. Its 26 checks: the publishable
 key calls no DEFINER function but the policy helpers (which answer "nobody"),
 a sign-in without an active account is refused everywhere, an active account
 and the service role notice nothing, a trigger and a server-only function keep
 their grants, a function made later is never anon's, and a second run is a
 no-op. Run only these checks with
 `npm run test:definer-login --prefix tests/member-sql`.
+
+`validate-permission-actions.mjs` also covers approvals by domain
+(`20261009010000`, 2026-10-09): after the security hotfix it builds the
+approval world (request types, requests, payroll runs, loans, bank accounts)
+and the ten approval functions as stand-ins carrying production's exact role
+check, shows a Checker approving nothing before, then applies the migration
+twice (the second run a no-op). Its 29 further checks: hr@ no longer says it
+approves payroll runs and the Principal still holds all three through the
+queue's key; the shared accounts decide nothing; a Finance · Checker decides
+Treasury's requests — a Maker's voucher, a loan with its voucher, a booked
+loan only behind its approved cancellation — never their own, never in
+somebody else's name, never a group holding a payroll run; a Director decides
+everything in the queue; the Executive office reads it and decides nothing;
+row policies keep a Checker off their own request and hr@ off bank balances;
+with no sign-in the old Principal-only rule stands.

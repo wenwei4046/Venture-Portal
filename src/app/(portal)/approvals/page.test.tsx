@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { withActions } from '@/test/with-actions'
 import { render, screen } from '@testing-library/react'
 import { inTimeZoneAsync } from '@/test/time-zone'
 
@@ -12,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   resolveLiveApprovalAmounts: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireApprovalQueue: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/approval-amounts', () => ({ resolveLiveApprovalAmounts: mocks.resolveLiveApprovalAmounts }))
 vi.mock('./_components/PendingApprovals', () => ({
@@ -114,7 +115,7 @@ const sent = () => JSON.parse(screen.getByTestId('queue').textContent ?? '[]') a
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ now: new Date(2026, 9, 7, 15, 0, 0), toFake: ['Date'] })
-  mocks.requirePermission.mockResolvedValue({ id: 'p', role: 'principal', permissions: ['approvals'] })
+  mocks.requirePermission.mockResolvedValue(withActions({ id: 'p', role: 'principal', permissions: ['approvals'] }))
   mocks.resolveLiveApprovalAmounts.mockResolvedValue(new Map())
 })
 afterEach(() => vi.useRealTimers())

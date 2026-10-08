@@ -60,15 +60,19 @@ export function canDoAny(holder: ActionHolder | null | undefined, ...wants: Arra
  */
 export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.${Action}`>>> = {
   dashboard: ['dashboard.view'],
-  approvals: ['approvals.view', 'approvals.approve'],
+  // The queue's Approve — the Principal's — also carries HR Costing's, Director
+  // Salary's and Revenue's: deciding a payroll run or an Invoice Pool release
+  // was only ever theirs (20261009010000 moved the three rows here).
+  approvals: ['approvals.view', 'approvals.approve', 'hr_costing.approve', 'director_salary.approve', 'revenue.approve'],
+  approvals_queue: ['approvals.view'],
   treasury: ['treasury.view', 'treasury.create', 'treasury.edit', 'treasury.void', 'treasury.export'],
   override: ['treasury.approve'],
   billing: ['billing.view', 'billing.create', 'billing.edit', 'billing.void', 'billing.export'],
   categories: ['categories.view', 'categories.manage'],
-  hr_costing: ['hr_costing.view', 'hr_costing.create', 'hr_costing.edit', 'hr_costing.approve', 'hr_costing.export'],
-  revenue: ['revenue.view', 'revenue.create', 'revenue.edit', 'revenue.approve', 'revenue.export', 'revenue.manage'],
+  hr_costing: ['hr_costing.view', 'hr_costing.create', 'hr_costing.edit', 'hr_costing.export'],
+  revenue: ['revenue.view', 'revenue.create', 'revenue.edit', 'revenue.export', 'revenue.manage'],
   product_list: ['product_list.view', 'product_list.edit'],
-  director_salary: ['director_salary.view', 'director_salary.edit', 'director_salary.approve'],
+  director_salary: ['director_salary.view', 'director_salary.edit'],
   director_pool: ['director_pool.view', 'director_pool.edit'],
   team: ['team.view', 'team.create', 'team.edit', 'team.manage'],
   team_invite: ['accounts.view', 'accounts.create'],
@@ -125,6 +129,7 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'accounts.create': 'all',
   'accounts.manage': 'all',
   'approvals.approve': 'all',
+  'approvals.view': 'all',
   'billing.create': 'all',
   'billing.edit': 'all',
   'billing.export': 'all',
@@ -134,7 +139,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'claims.create': 'own',
   'dept_reports.export': 'dept',
   'director_pool.edit': 'all',
+  'director_salary.approve': 'all',
   'director_salary.edit': 'all',
+  'hr_costing.approve': 'all',
   'hr_costing.create': 'all',
   'hr_costing.edit': 'all',
   'hr_costing.export': 'all',

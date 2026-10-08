@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
+import { canDecide } from '@/lib/approval-domains'
 import { can } from '@/lib/permissions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
@@ -108,6 +109,20 @@ export default async function PaymentDetailPage({ params }: Props) {
   // Attachments come and go freely only while the voucher is still being made.
   const attachmentsOpen = voucher.status === 'draft' || voucher.status === 'pending_approval'
 
+  // Who may decide its pending approval: Treasury's Approve or the queue's,
+  // never whoever submitted it unless they are the Principal (2026-10-09).
+  let mayDecide = false
+  if (canReadTreasury && voucher.status === 'pending_approval') {
+    const { data: pendingApproval } = await supabase
+      .from('approval_requests')
+      .select('request_type, submitted_by')
+      .eq('reference_id', id)
+      .eq('reference_table', 'payment_vouchers')
+      .eq('status', 'pending')
+      .maybeSingle()
+    mayDecide = !!pendingApproval && canDecide(user, [pendingApproval.request_type], [pendingApproval.submitted_by])
+  }
+
   // What this reader may do to the voucher (2026-10-08, PR2): each button asks
   // for the action its Server Action asks — raise (Submit, Copy), edit (Edit,
   // back to draft, a paid voucher's date or GL account), void, and Approve.
@@ -115,7 +130,7 @@ export default async function PaymentDetailPage({ params }: Props) {
     create: canReadTreasury && canDo(user, 'treasury', 'create'),
     edit: canReadTreasury && canDo(user, 'treasury', 'edit'),
     void: canReadTreasury && canDo(user, 'treasury', 'void'),
-    approve: canReadTreasury && canDo(user, 'approvals', 'approve'),
+    approve: mayDecide,
   }
 
   // Post-mig 238: PVS rows reference chart_of_accounts directly via account_code

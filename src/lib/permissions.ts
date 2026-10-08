@@ -11,6 +11,9 @@
 export const PERMISSIONS = [
   'dashboard',
   'approvals',
+  // Opens the approval queue and nothing else (2026-10-09) — what one may decide
+  // there is their Approve's (lib/approval-domains.ts).
+  'approvals_queue',
   'treasury',
   'payroll_payouts',
   'billing',

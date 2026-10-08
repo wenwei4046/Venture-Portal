@@ -1,6 +1,8 @@
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
 import { AUDIT_READ_KEYS } from '@/lib/audit/read-keys'
+import { canSeeApprovals } from '@/lib/approval-domains'
+import type { ActionHolder } from '@/lib/permission-actions'
 
 // What each part of the portal needs.
 //
@@ -95,8 +97,10 @@ export function canAccessCategories(u: PermissionHolder): boolean {
   return can(u, 'categories')
 }
 
-export function canApprove(u: PermissionHolder): boolean {
-  return can(u, 'approvals')
+export function canApprove(u: ActionHolder): boolean {
+  // The queue opens for whoever may see it or decide anything in it — the
+  // queue's own Approve or a domain's (2026-10-09, lib/approval-domains.ts).
+  return canSeeApprovals(u)
 }
 
 export function canSeeIndividualSalary(u: PermissionHolder): boolean {

@@ -23,10 +23,23 @@ const holder = (role: keyof typeof ROLE_DEFAULTS) => {
 }
 
 describe('KEY_ACTIONS', () => {
-  it('is the migration’s permission_key_actions, row for row', () => {
-    const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261008200000_permission_actions.sql'), 'utf8')
-    const block = sql.slice(sql.indexOf('FROM (VALUES'), sql.indexOf(') AS k(legacy_key'))
-    const rows = [...block.matchAll(/\('([a-z_]+)', '([a-z_]+)', '([a-z]+)'\)/g)].map(m => `${m[1]} ${m[2]}.${m[3]}`)
+  it('is the migrations’ permission_key_actions, row for row', () => {
+    // Every migration that adds rows to the table (20261008200000, then the
+    // approval queue's own key in 20261009010000).
+    const dir = resolve(process.cwd(), 'supabase/migrations')
+    const rows = readdirSync(dir).sort().flatMap(file => {
+      const sql = readFileSync(join(dir, file), 'utf8')
+      return [...sql.matchAll(/INSERT INTO public\.permission_key_actions[^;]*;/g)].flatMap(m =>
+        [...m[0].matchAll(/\('([a-z_]+)', '([a-z_]+)', '([a-z]+)'\)/g)].map(r => `${r[1]} ${r[2]}.${r[3]}`))
+    })
+    // …then every row a later migration moved to another key.
+    for (const file of readdirSync(dir).sort()) {
+      const sql = readFileSync(join(dir, file), 'utf8')
+      for (const m of sql.matchAll(/UPDATE public\.permission_key_actions SET legacy_key = '([a-z_]+)' WHERE legacy_key = '([a-z_]+)' AND function_key = '([a-z_]+)' AND action = '([a-z]+)';/g)) {
+        const at = rows.indexOf(`${m[2]} ${m[3]}.${m[4]}`)
+        if (at >= 0) rows[at] = `${m[1]} ${m[3]}.${m[4]}`
+      }
+    }
     const twin = Object.entries(KEY_ACTIONS).flatMap(([key, list]) => list.map(fa => `${key} ${fa}`))
     expect(rows.length).toBeGreaterThan(70)
     expect([...twin].sort()).toEqual([...rows].sort())
@@ -57,9 +70,11 @@ describe('the shared accounts keep exactly what they had', () => {
     expect(canDo(f, 'hr_costing', 'view')).toBe(false)
   })
 
-  it('HR runs payroll, the roster, its titles and ladder, and member services — not logins', () => {
+  it('HR runs payroll, the roster, its titles and ladder, and member services — not logins, and approves no run', () => {
     const h = holder('hr')
-    expect(canDo(h, 'hr_costing', 'approve')).toBe(true)
+    expect(canDo(h, 'hr_costing', 'edit')).toBe(true)
+    expect(canDo(h, 'hr_costing', 'approve')).toBe(false)
+    expect(canDo(h, 'director_salary', 'approve')).toBe(false)
     expect(canDo(h, 'team', 'edit')).toBe(true)
     expect(canDo(h, 'member', 'manage')).toBe(true)
     expect(canDo(h, 'team', 'manage')).toBe(true)

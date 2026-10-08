@@ -15,6 +15,7 @@ import {
   canAccessTeam,
 } from './roles'
 import type { UserRole } from '@/types'
+import { actionsFromKeys } from './permission-actions'
 
 // The seed in the permission_catalog migration, transcribed. Two things are
 // being pinned at once: that the helpers read permissions, and that the seed
@@ -44,7 +45,8 @@ const ROLE_DEFAULTS: Record<UserRole, string[]> = {
 }
 
 const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'dept_manager', 'revenue_member']
-const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role] })
+// As loadUser() answers an account with no template: its keys, and the actions they allow.
+const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role], actions: actionsFromKeys(ROLE_DEFAULTS[role], role) })
 
 /** Assert exactly which roles a gate lets through, so a widening is a failure. */
 function allows(gate: (u: { permissions: string[] }) => boolean, expected: UserRole[]) {

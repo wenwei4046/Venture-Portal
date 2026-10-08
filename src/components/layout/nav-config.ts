@@ -37,7 +37,8 @@ import {
  * are about somebody having ONE department of their own, which no permission
  * expresses.
  */
-export type NavViewer = PermissionHolder & { role: UserRole }
+/** The signed-in account, as the menus read it: its keys, its role, and (since PR2) what it may do. */
+export type NavViewer = PermissionHolder & { role: UserRole; actions?: Readonly<Record<string, 'own' | 'dept' | 'all'>> }
 
 export interface NavItem {
   href: string

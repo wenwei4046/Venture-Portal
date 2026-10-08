@@ -40,7 +40,16 @@ type Outcome =
 const round2 = (n: number) => Math.round(n * 100) / 100
 const cut = (s: string, n = 80) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-export default function PendingApprovals({ rows, canSetDefault = false }: { rows: PendingRow[]; canSetDefault?: boolean }) {
+export default function PendingApprovals({
+  rows,
+  canSetDefault = false,
+  undecidable = {},
+}: {
+  rows: PendingRow[]
+  canSetDefault?: boolean
+  /** Rows this reader may see but not decide, with why (2026-10-09, approvals by domain). */
+  undecidable?: Record<string, string>
+}) {
   const router = useRouter()
   const [step, setStep] = useState<'idle' | 'approve' | 'reject'>('idle')
   const [notes, setNotes] = useState('')
@@ -54,7 +63,8 @@ export default function PendingApprovals({ rows, canSetDefault = false }: { rows
   // Ticks survive the trip into a row's page and back (user 2026-09-01); a
   // combined row joins the set under its g: key (user 2026-08-06: select-all
   // must cover the combined ones too) — lib/selection-store.ts.
-  const keys = useMemo(() => rows.map((r) => r.key), [rows])
+  // Only what this reader may decide can be ticked.
+  const keys = useMemo(() => rows.filter((r) => !(r.key in undecidable)).map((r) => r.key), [rows, undecidable])
   const { selected, toggle, replace, clear } = useStickySelection('/approvals', keys)
   const allSelected = keys.length > 0 && keys.every((k) => selected.has(k))
   const chosen = rows.filter((r) => selected.has(r.key))
@@ -148,18 +158,23 @@ export default function PendingApprovals({ rows, canSetDefault = false }: { rows
         />
       ),
       cellClassName: 'st-tick-cell',
-      render: (r) => (
-        // The whole cell is the tap target, not the 18px box.
-        <label className="st-tick" title="Select for the decision below">
-          <input
-            type="checkbox"
-            checked={selected.has(r.key)}
-            onChange={() => toggle(r.key)}
-            aria-label={`Select ${r.voucherNo ?? r.description}`}
-            className="accent-accent cursor-pointer"
-          />
-        </label>
-      ),
+      render: (r) =>
+        r.key in undecidable ? (
+          <span className="st-tick text-muted" title={undecidable[r.key]} aria-label={undecidable[r.key]}>
+            —
+          </span>
+        ) : (
+          // The whole cell is the tap target, not the 18px box.
+          <label className="st-tick" title="Select for the decision below">
+            <input
+              type="checkbox"
+              checked={selected.has(r.key)}
+              onChange={() => toggle(r.key)}
+              aria-label={`Select ${r.voucherNo ?? r.description}`}
+              className="accent-accent cursor-pointer"
+            />
+          </label>
+        ),
     },
     {
       key: 'voucher_no',

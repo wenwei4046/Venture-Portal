@@ -67,6 +67,8 @@ const K = (functionKey: string, action: Action, legacyKey: string, minScope: Sco
 const CELL_KEYS: CellKey[] = [
   K('dashboard', 'view', 'dashboard', 'own'),
   K('approvals', 'view', 'approvals', 'all', 'principal'),
+  // The queue's own key (20261009010000): Approvals · View opens it for anybody.
+  K('approvals', 'view', 'approvals_queue', 'all'),
   K('treasury', 'view', 'treasury', 'all', 'treasury'),
   K('treasury', 'approve', 'override', 'all', 'principal'),
   K('billing', 'view', 'billing', 'all', 'treasury'),
@@ -280,9 +282,9 @@ describe('one person', () => {
 describe('what a template opens today — the database rule, in TypeScript', () => {
   const opens = (key: keyof typeof T) => openedKeys(T[key].grants, T[key].sensitive, T[key].baseRole, CELL_KEYS)
 
-  it('Ultimate and Full are the Principal role (and My Billing); only Ultimate switches views', () => {
-    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'my_billing', 'view_switch'].sort())
-    expect(opens('full')).toEqual([...PRINCIPAL, 'my_billing'].sort())
+  it('Ultimate and Full are the Principal role (and My Billing and the queue); only Ultimate switches views', () => {
+    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing', 'view_switch'].sort())
+    expect(opens('full')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing'].sort())
   })
 
   it('the checker, the department head and the Revenue team are their old roles exactly', () => {
@@ -292,9 +294,11 @@ describe('what a template opens today — the database rule, in TypeScript', () 
   })
 
   it('holds back what a module key would open wider than the cell', () => {
-    expect(opens('director')).toEqual(['claims', 'dashboard', 'dept_reports', 'director_pool', 'director_salary',
+    // The queue's own key (2026-10-09) opens for Approvals · View; the admin-scope
+    // `approvals` key still needs an owner's template.
+    expect(opens('director')).toEqual(['approvals_queue', 'claims', 'dashboard', 'dept_reports', 'director_pool', 'director_salary',
       'payroll_payouts', 'reports', 'salary_individual', 'team', 'treasury', 'venture_pool'])
-    expect(opens('office')).toEqual(['claims', 'dashboard'])
+    expect(opens('office')).toEqual(['approvals_queue', 'claims', 'dashboard'])
     expect(opens('staff')).toEqual(['claims', 'dashboard'])
     expect(opens('hr')).toEqual(['claims', 'dashboard', 'director_pool', 'director_salary', 'hr_costing',
       'member_memos_manage', 'member_requests_manage', 'payroll_payouts', 'revenue', 'salary_individual', 'team'])
@@ -302,15 +306,15 @@ describe('what a template opens today — the database rule, in TypeScript', () 
 
   it('says why, cell by cell', () => {
     const held = (key: keyof typeof T) => heldCells(T[key].grants, T[key].sensitive, T[key].baseRole, CELL_KEYS, FUNCTIONS)
-    expect(held('office').map(h => h.key)).toEqual(['approvals.view', 'team.view', 'reports.view'])
+    expect(held('office').map(h => h.key)).toEqual(['team.view', 'reports.view'])
     expect(held('office').find(h => h.key === 'team.view')?.reason).toMatch(/Salary amounts/)
     expect(held('office').find(h => h.key === 'reports.view')?.reason).toMatch(/Treasury · View/)
     expect(held('dept_head').map(h => h.key)).toEqual(['team.view', 'claims.approve'])
     expect(held('dept_head')[0].reason).toMatch(/^Dept is not enforced/)
     // Since PR2 a write asks for its cell: Treasury · Approve (amending a booked
-    // loan) is in force wherever Treasury opens; Approvals waits on its key.
-    expect(held('director').map(h => h.label)).toEqual(['Approvals · View', 'Approvals · Approve'])
-    expect(held('director')[1].reason).toMatch(/Principal/)
+    // loan) is in force wherever Treasury opens, and since approvals go by
+    // domain the queue opens on its own key — a Director's Approve is in force.
+    expect(held('director')).toEqual([])
     expect(held('full')).toEqual([])
     expect(held('fin_checker')).toEqual([])
     // Own claims are raised at Own; a reach short of what the gate asks is said.

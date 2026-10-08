@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { withActions } from '@/test/with-actions'
 import { inTimeZoneAsync } from '@/test/time-zone'
 import { recordingSupabase, type RecordedCall } from '@/test/recording-supabase'
 
@@ -8,7 +9,7 @@ import { recordingSupabase, type RecordedCall } from '@/test/recording-supabase'
 // its disbursement posted into October.
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), redirect: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission, requireApprover: mocks.requirePermission, requireApprovalQueue: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
@@ -19,7 +20,7 @@ import { approveRequestGroup } from './actions'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ id: 'principal', name: 'Principal', role: 'principal', permissions: ['approvals'] })
+  mocks.requirePermission.mockResolvedValue(withActions({ id: 'principal', name: 'Principal', role: 'principal', permissions: ['approvals'] }))
   mocks.redirect.mockImplementation(() => { throw new Error('NEXT_REDIRECT') })
   vi.useFakeTimers({ now: new Date('2026-10-31T16:30:00Z'), toFake: ['Date'] }) // 00:30 on 1 Nov in the office
 })

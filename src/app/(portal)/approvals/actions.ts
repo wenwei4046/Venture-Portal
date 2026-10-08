@@ -4,13 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requirePermission } from '@/lib/auth'
+import { requireApprovalQueue, requireApprover } from '@/lib/auth'
+import { decision } from '@/lib/approval-domains'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeToday } from '@/lib/office-time'
 import { notifyApprovalDecision } from '@/lib/slack'
 import { postJournalEntry } from '@/lib/journal'
 import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 import type { Database } from '@/lib/supabase/database.types'
+import type { User } from '@/types'
 
 // Mig 197: dept name → equity GL code mirror (must match dept_pool_gl_code SQL helper).
 // 2026-08-19: realigned to the post-unified-COA codes — the old 3030-3080 had
@@ -28,6 +30,17 @@ const DEPT_POOL_GL: Record<string, string> = {
   IT: '1100',
 }
 
+// ─── Who decides (2026-10-09, PR2b) ───────────────────────────────────────────
+// A request is decided by whoever holds its domain's Approve (or the queue's
+// own), never by whoever raised it unless they are the Principal —
+// lib/approval-domains.ts, the twin of the database's approver_may(), which
+// the approval functions and row policies ask as well.
+
+function assertMayDecide(user: User, rows: ReadonlyArray<{ request_type: string; submitted_by: string }>) {
+  const verdict = decision(user, rows.map((r) => r.request_type), rows.map((r) => r.submitted_by))
+  if (!verdict.may) throw new Error(verdict.why)
+}
+
 // ─── Shared approval executor ─────────────────────────────────────────────────
 // The money-moving side-effect chain for approving ONE non-grouped request.
 // Throws on any failure. Callers own the period-lock check + revalidate +
@@ -40,10 +53,11 @@ type ApprovalRecord = Database['public']['Tables']['approval_requests']['Row']
 
 async function performApproval(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; name: string },
+  user: User,
   approval: ApprovalRecord,
   opts: { notes: string | null; allowOverdraw: boolean }
 ) {
+  assertMayDecide(user, [approval])
   const id = approval.id
   const notes = opts.notes
 
@@ -349,7 +363,7 @@ async function performApproval(
 // revalidate + redirect back to the queue.
 
 export async function approveRequest(formData: FormData) {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -374,9 +388,9 @@ export async function approveRequest(formData: FormData) {
     throw new Error('This request is part of a combined approval — use the combined card to approve both together.')
   }
 
-  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能
-  // approve"). Approvers are principal-only (requireRole above), so the old
-  // submitted_by === user.id block is gone by design.
+  // Self-approval: the Principal may approve their own (user 2026-08-06:
+  // "principal submit 要自己能 approve"); anybody else's Approve never reaches
+  // their own request (assertMayDecide, in performApproval).
 
   // Approving moves money (loan disbursement, voucher exec, pool release) — block if today's period is locked
   await assertPeriodOpen(supabase, new Date())
@@ -414,7 +428,7 @@ export async function approveRequestsBulk(args: {
   notes?: string
   allowOverdraw?: boolean
 }): Promise<BulkApproveResult> {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const ids = Array.from(new Set((args.ids ?? []).filter(Boolean)))
@@ -451,8 +465,8 @@ export async function approveRequestsBulk(args: {
       })
       continue
     }
-    // Self-approval allowed (user 2026-08-06) — principal may batch-approve
-    // their own submissions too.
+    // The Principal may batch-approve their own submissions too (user
+    // 2026-08-06); anybody else's are refused row by row (assertMayDecide).
     try {
       await performApproval(supabase, user, approval, {
         notes: args.notes ?? null,
@@ -501,7 +515,7 @@ export async function approveRequestsBulk(args: {
 // ─── Reject request (Principal) ───────────────────────────────────────────────
 
 export async function rejectRequest(formData: FormData) {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -544,10 +558,11 @@ export async function rejectRequest(formData: FormData) {
 // revalidate and any redirect.
 async function performRejection(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; name: string },
+  user: User,
   approval: ApprovalRecord,
   notes: string,
 ) {
+  assertMayDecide(user, [approval])
   const id = approval.id
   const now = new Date().toISOString()
 
@@ -636,7 +651,7 @@ export async function rejectRequestsBulk(args: {
   groupIds?: string[]
   notes: string
 }): Promise<BulkRejectResult> {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const notes = (args.notes ?? '').trim()
@@ -701,7 +716,7 @@ export async function rejectRequestsBulk(args: {
 // once.
 
 export async function approveRequestGroup(formData: FormData) {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const groupId = (formData.get('group_id') as string) ?? ''
@@ -721,7 +736,7 @@ export async function approveRequestGroup(formData: FormData) {
 // Callers own the period-lock check and any redirect.
 async function performGroupApproval(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; name: string },
+  user: User,
   groupId: string,
   notes: string | null,
 ): Promise<number> {
@@ -736,8 +751,10 @@ async function performGroupApproval(
     throw new Error('Approval group not found or already processed')
   }
 
-  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能
-  // approve") — combined cards included.
+  // Who decides — combined cards included: the Principal may approve their
+  // own (user 2026-08-06: "principal submit 要自己能 approve"), anybody else
+  // only what their Approve reaches and never their own.
+  assertMayDecide(user, group)
 
   const loanApproval = group.find((r) => r.request_type === 'new_loan')
   const voucherApprovals = group.filter((r) => r.request_type === 'payment_voucher')
@@ -972,7 +989,7 @@ async function performGroupApproval(
 // ─── Reject combined group (Principal) — Phase 7 Step 9 ──────────────────────
 
 export async function rejectRequestGroup(formData: FormData) {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const groupId = (formData.get('group_id') as string) ?? ''
@@ -996,7 +1013,7 @@ export async function rejectRequestGroup(formData: FormData) {
 // rejected. Callers own the revalidate and any redirect.
 async function performGroupRejection(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; name: string },
+  user: User,
   groupId: string,
   notes: string,
 ): Promise<number> {
@@ -1009,6 +1026,7 @@ async function performGroupRejection(
   if (fetchError || !group || group.length === 0) {
     throw new Error('Approval group not found or already processed')
   }
+  assertMayDecide(user, group)
 
   const now = new Date().toISOString()
 
@@ -1069,8 +1087,16 @@ export async function approveRequestGroupPartial(args: {
   approveNotes: string
   rejectReason: string
 }) {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
+
+  const { data: pendingRows } = await supabase
+    .from('approval_requests')
+    .select('request_type, submitted_by')
+    .eq('group_id', args.groupId)
+    .eq('status', 'pending')
+  // Nothing pending is the function's own "already processed" to say.
+  if (pendingRows && pendingRows.length > 0) assertMayDecide(user, pendingRows)
 
   const { error } = await supabase.rpc('approve_voucher_batch_partial', {
     p_group_id: args.groupId,
@@ -1120,7 +1146,7 @@ export interface BatchVoucherRow {
 }
 
 export async function getBatchVoucherDetails(groupId: string): Promise<BatchVoucherRow[]> {
-  await requirePermission('approvals')
+  await requireApprovalQueue()
   const supabase = await createClient()
 
   const { data: approvalRows } = await supabase
