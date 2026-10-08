@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
+import { officeTime } from '@/lib/office-time'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import type { DecisionRow } from '@/lib/approval-queue'
 
@@ -56,7 +56,7 @@ export default function RecentDecisions({ rows, canSetDefault = false }: { rows:
             {r.voucherNo ? <span className="q-sub-no">{r.voucherNo}</span> : null}
             <span className="q-sub-by">
               <span className="by">{chip(r.decision)}</span>
-              <span className="on">{r.decidedAt ? dayjs(r.decidedAt).format('D MMM') : ''}</span>
+              <span className="on">{r.decidedAt ? officeTime(r.decidedAt).format('D MMM') : ''}</span>
             </span>
           </span>
         </>
@@ -97,7 +97,10 @@ export default function RecentDecisions({ rows, canSetDefault = false }: { rows:
       group: '日期',
       label: 'Decided',
       mobile: 'detail',
-      render: (r) => (r.decidedAt ? dayjs(r.decidedAt).format('D MMM') : '—'),
+      // On the office clock: the server (UTC) and the browser draw this table in
+      // turn, and on the machine's clock a decision taken after midnight in the
+      // office was the day before on the server (2026-10-08).
+      render: (r) => (r.decidedAt ? officeTime(r.decidedAt).format('D MMM') : '—'),
       sortValue: (r) => (r.decidedAt ? new Date(r.decidedAt) : null),
       cellClassName: 'font-mono text-[12px] text-graphite whitespace-nowrap',
     },

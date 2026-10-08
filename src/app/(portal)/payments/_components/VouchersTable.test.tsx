@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
+import { inTimeZone } from '@/test/time-zone'
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }))
@@ -216,5 +218,26 @@ describe('a locked payroll batch', () => {
     expect(screen.queryByText('展开')).toBeNull()
     expect(screen.queryByRole('button', { name: /Payroll disbursement/ })).toBeNull()
     expect(screen.getByRole('table')).toBeVisible()
+  })
+})
+
+// 2026-10-08 (production): a voucher not yet paid is dated by the moment it
+// was made, and that moment was read on the MACHINE's clock — "10 Sep" on the
+// server (UTC), "11 Sep" in the browser (UTC+8) — so React threw the server's
+// page away (#418). A payment date has no time and stays the day it names.
+describe('on the office clock', () => {
+  // 16:45 UTC on the 10th is a quarter to one on the 11th in the office.
+  const pending: VoucherRow = { ...voucher, id: 'pv-2', voucher_no: 'HV-PV-202609-0440', status: 'pending_approval', payee_name: 'GDex', paymentOrCreatedDate: '2026-09-10T16:45:12.345+00:00' }
+  const member = (id: string, payee: string): VoucherRow => ({ ...pending, id, payee_name: payee, batchKey: 'Payroll disbursement Sep 2026' })
+
+  it('the server and the browser render the same ledger: a payment date as it is, a moment in office time', () => {
+    const rows = [voucher, pending, member('pv-7', 'Aina'), member('pv-8', 'Bala')]
+    const html = (zone: string) => inTimeZone(zone, () => renderToString(<VouchersTable rows={rows} />))
+    const server = html('UTC')
+    // The office, and a reader east of it — where the payment date would slip a day if moved.
+    for (const zone of ['Asia/Kuala_Lumpur', 'Pacific/Kiritimati']) expect(html(zone), zone).toBe(server)
+    expect(server).toContain('29 Sep') // TNB's payment date
+    expect(server).toContain('11 Sep') // GDex, and the batch's header
+    expect(server).not.toContain('10 Sep')
   })
 })

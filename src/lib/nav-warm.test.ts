@@ -149,3 +149,59 @@ describe('warmOnIntent', () => {
     expect(() => warmRoute(router, '/fund-in')).not.toThrow()
   })
 })
+
+describe('the pages somebody opens most are warmed while the portal sits idle (2026-10-08)', () => {
+  const store = () => {
+    const data = new Map<string, string>()
+    return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => { data.set(k, v) } }
+  }
+  const NAV = ['/dashboard', '/payments', '/receipts', '/statements', '/reports/ledger', '/team/people', '/settings?tab=accounts']
+
+  it('only pages opened at least twice, the most-visited first, never the one on screen or an audited one', async () => {
+    const { recordVisit, usualPages } = await import('./nav-warm')
+    const s = store()
+    for (const [path, n] of [['/payments', 5], ['/reports/ledger', 3], ['/receipts', 1], ['/team/people', 9], ['/dashboard', 4]] as const) {
+      for (let i = 0; i < n; i++) recordVisit(path, s)
+    }
+    expect(usualPages(NAV, '/dashboard', s)).toEqual(['/payments', '/reports/ledger'])
+    expect(usualPages(NAV, '/payments', s)).toEqual(['/dashboard', '/reports/ledger'])
+    expect(usualPages(NAV, '/payments', s, 1)).toEqual(['/dashboard'])
+  })
+
+  it('only links this person can see in the nav, matched without their query', async () => {
+    const { recordVisit, usualPages } = await import('./nav-warm')
+    const s = store()
+    for (let i = 0; i < 3; i++) { recordVisit('/settings', s); recordVisit('/fund-in', s) }
+    expect(usualPages(NAV, '/dashboard', s)).toEqual(['/settings?tab=accounts'])
+  })
+
+  it('a broken or empty store warms nothing', async () => {
+    const { usualPages } = await import('./nav-warm')
+    expect(usualPages(NAV, '/dashboard', null)).toEqual([])
+    const s = store()
+    s.setItem('vp-nav-visits', 'not json')
+    expect(usualPages(NAV, '/dashboard', s)).toEqual([])
+  })
+
+  it('warms one at a time after a quiet spell, and a navigation first cancels the rest', async () => {
+    vi.useFakeTimers()
+    try {
+      const { IDLE_WARM_AFTER_MS, IDLE_WARM_GAP_MS, warmWhenIdle } = await import('./nav-warm')
+      window.history.replaceState({}, '', '/dashboard')
+      const router = { prefetch: vi.fn() }
+      const cancel = warmWhenIdle(router, ['/payments', '/reports/ledger', '/receipts'])
+      vi.advanceTimersByTime(IDLE_WARM_AFTER_MS - 1)
+      expect(router.prefetch).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(router.prefetch).toHaveBeenCalledTimes(1)
+      expect(router.prefetch).toHaveBeenLastCalledWith('/payments')
+      vi.advanceTimersByTime(IDLE_WARM_GAP_MS)
+      expect(router.prefetch).toHaveBeenCalledTimes(2)
+      cancel()
+      vi.advanceTimersByTime(IDLE_WARM_GAP_MS * 5)
+      expect(router.prefetch).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

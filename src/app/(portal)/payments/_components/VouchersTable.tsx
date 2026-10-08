@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
+import { officeDay } from '@/lib/office-time'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
@@ -162,7 +162,7 @@ export default function VouchersTable({
                   </span>
                   <span className="flex items-baseline gap-4 shrink-0">
                     <span className="font-mono text-sm font-semibold">−{formatMoney(b.total).replace('RM ', '')}</span>
-                    <span className="font-mono text-xs text-graphite">{b.latest ? dayjs(b.latest).format('D MMM') : ''}</span>
+                    <span className="font-mono text-xs text-graphite">{b.latest ? officeDay(b.latest).format('D MMM') : ''}</span>
                     <span className="text-xs font-serif italic text-accent">{open ? '收起' : '展开'}</span>
                   </span>
                 </button>
@@ -284,7 +284,10 @@ export default function VouchersTable({
           key: 'date',
           group: '基本',
           label: 'Date',
-          render: (v) => dayjs(v.paymentOrCreatedDate).format('D MMM'),
+          // A payment date as it is, a creation moment on the office clock: on
+          // the machine's clock the server (UTC) and the browser printed two
+          // different days for one voucher (2026-10-08, lib/office-time.ts).
+          render: (v) => officeDay(v.paymentOrCreatedDate).format('D MMM'),
           sortValue: (v) => new Date(v.paymentOrCreatedDate),
           cellClassName: 'text-graphite',
         },

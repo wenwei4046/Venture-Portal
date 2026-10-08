@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { buildQueueRows, type ApprovalRequestRow } from '@/lib/approval-queue'
+import { inTimeZone } from '@/test/time-zone'
 
 // 2026-10-07 — the pending queue as a table (user approved the Approvals
 // sample: "英文 排队用表格不错，但把 description 和 pv no 分开"; on the phone
@@ -37,7 +39,9 @@ vi.mock('./BatchDetailsModal', () => ({
 
 import PendingApprovals, { type PendingRow } from './PendingApprovals'
 
-const at = (day: number, hour = 10, minute = 0) => new Date(2026, 9, day, hour, minute, 0).toISOString()
+// A moment in the office (UTC+8) — what the queue prints, whatever zone runs the suite.
+const two = (n: number) => String(n).padStart(2, '0')
+const at = (day: number, hour = 10, minute = 0) => `2026-10-${two(day)}T${two(hour)}:${two(minute)}:00+08:00`
 const request = (over: Partial<ApprovalRequestRow> & { id: string }): ApprovalRequestRow => ({
   request_type: 'payment_voucher',
   description: null,
@@ -208,5 +212,28 @@ describe('the pending queue', () => {
     render(<PendingApprovals rows={[]} />)
     expect(screen.getByText('All caught up.')).toBeInTheDocument()
     expect(document.querySelector('.sect-head .count')).toHaveTextContent('0 ITEMS')
+  })
+})
+
+// 2026-10-08 (production): the queue printed when a request was sent on the
+// MACHINE's clock. It is rendered on the server, which keeps UTC, and again in
+// the browser, in the office's UTC+8 — "2 Oct 04:35" against "2 Oct 12:35" —
+// so React threw the server's page away (#418) and drew it a second time.
+describe('on the office clock', () => {
+  const night: PendingRow[] = buildQueueRows(
+    // 16:30 UTC on the 6th is half past midnight on the 7th in the office.
+    [request({ id: 'n', description: 'HV-PV-202610-0480: Night courier', amount: 80, reference_id: 'v480', created_at: '2026-10-06T16:30:00Z' })],
+    { amountOf: (r) => Number(r.amount), nameOf: (id) => names[id] ?? 'Unknown' },
+  ).map((r) => ({ ...r, pool: 'Venture Pool', category: 'Courier', payee: 'GDex', payBy: 'Bank transfer', attachments: [] }))
+
+  it('the server (UTC) and the browser (UTC+8) render the same queue, in office time', () => {
+    const html = (zone: string) => inTimeZone(zone, () => renderToString(<PendingApprovals rows={night} />))
+    const server = html('UTC')
+    expect(html('Asia/Kuala_Lumpur')).toBe(server)
+    const page = document.createElement('div')
+    page.innerHTML = server
+    expect(page.querySelector('.q-sub .on')).toHaveTextContent('7 Oct')
+    expect(server).toContain('7 Oct 00:30')
+    expect(server).not.toContain('6 Oct')
   })
 })

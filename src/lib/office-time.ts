@@ -18,7 +18,8 @@
 // component rendered on both sides cannot disagree with itself.
 //
 // For a MOMENT only (created_at, approved_at, now). A date column such as
-// payment_date has no time and no zone; format it as it is.
+// payment_date has no time and no zone; format it as it is — and a value that
+// may be either goes through `officeDay` below.
 
 import dayjs, { type ConfigType, type Dayjs } from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -29,4 +30,22 @@ const OFFICE_UTC_OFFSET_MINUTES = 8 * 60
 
 export function officeTime(at?: ConfigType): Dayjs {
   return dayjs(at).utcOffset(OFFICE_UTC_OFFSET_MINUTES)
+}
+
+/** A date column as PostgREST sends it: `2026-09-29`, no time and no zone. */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * The office's day for a value that is sometimes a date column and sometimes
+ * a moment — the payments ledger's `payment_date ?? created_at`. A bare
+ * `YYYY-MM-DD` already names its day and is read as it is (through
+ * `officeTime` it would land on the day before for a reader east of UTC+8); a
+ * moment moves to the office clock.
+ *
+ * `dayjs(x).format('D MMM')` read the moment on the MACHINE's clock: a voucher
+ * made after midnight in the office was "10 Sep" on the server (UTC) and
+ * "11 Sep" in the browser, and React threw the server's page away (2026-10-08).
+ */
+export function officeDay(at: string): Dayjs {
+  return DATE_ONLY.test(at) ? dayjs(at) : officeTime(at)
 }

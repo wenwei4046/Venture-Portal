@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link, { useLinkStatus } from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { cancelWarmIntent, railEntered, warmOnIntent } from '@/lib/nav-warm'
+import { cancelWarmIntent, railEntered, recordVisit, usualPages, warmOnIntent, warmWhenIdle } from '@/lib/nav-warm'
 import type { NavViewer } from './nav-config'
 import {
   buildNavEntries,
@@ -88,6 +88,21 @@ export default function Sidebar({ viewer, navData }: SidebarProps) {
     onMouseEnter: () => warmOnIntent(router, href),
     onMouseLeave: cancelWarmIntent,
   })
+
+  // And since 2026-10-08 the pages this person opens most are rendered ahead
+  // while the portal sits idle — one at a time, three at most, never an
+  // audited page (lib/nav-warm.ts) — so the first click of a session on one
+  // of them is instant too. Desktop only: the phone's tab bar warms its own.
+  const hrefs = visibleHrefs(visible, viewer)
+  const hrefsKey = hrefs.join(' ')
+  const navHrefs = useMemo(() => hrefsKey.split(' '), [hrefsKey])
+  useEffect(() => {
+    if (pathname) recordVisit(pathname)
+  }, [pathname])
+  useEffect(() => {
+    if (!pathname || typeof window === 'undefined' || !window.matchMedia?.('(min-width: 768px)').matches) return
+    return warmWhenIdle(router, usualPages(navHrefs, pathname))
+  }, [pathname, navHrefs, router])
 
   // Auto-open every group on the way to the page being read — both Revenue and
   // the sub-department inside it, so arriving at /revenue/fair/rules from a
@@ -412,4 +427,11 @@ function Marker({ active, depth, pending = false }: { active: boolean; depth: nu
       }
     />
   )
+}
+
+/** Every link this viewer can see in the nav, groups opened up. */
+function visibleHrefs(entries: NavEntry[], viewer: NavViewer): string[] {
+  return entries
+    .filter((entry) => entry.visible(viewer))
+    .flatMap((entry) => (isGroup(entry) ? visibleHrefs(entry.children, viewer) : [(entry as NavItem).href]))
 }
