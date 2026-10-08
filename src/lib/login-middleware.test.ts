@@ -54,6 +54,7 @@ describe('canonical login middleware', () => {
     mocks.profile.mockResolvedValue({ data: { role: 'principal', is_active: false } })
     const response = await middleware(new NextRequest('https://portal.example/login'))
     expect(mocks.signOut).toHaveBeenCalledOnce()
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(response.headers.get('x-middleware-next')).toBe('1')
     expect(response.headers.get('location')).toBeNull()
   })

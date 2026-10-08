@@ -75,7 +75,8 @@ export default function MoreSheet({ user, navData, open, onClose }: Props) {
 
   const handleSignOut = async () => {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    // This device only — the default ('global') ends the account everywhere.
+    await supabase.auth.signOut({ scope: 'local' })
     router.push('/login')
     router.refresh()
   }

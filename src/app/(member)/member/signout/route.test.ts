@@ -19,6 +19,8 @@ describe('member sign-out returns to canonical login', () => {
     request.headers.set('origin', 'https://portal.example')
     const response = await POST(request)
     expect(mocks.signOut).toHaveBeenCalledOnce()
+    // This phone only: a global sign-out ended the account on every device.
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(response.status).toBe(303)
     expect(response.headers.get('location')).toBe('https://portal.example/login')
   })
