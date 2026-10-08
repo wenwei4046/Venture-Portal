@@ -635,8 +635,21 @@ src/
 │   │   │                              still written by the ingest and read by
 │   │   │                              nothing, so the ERP needs no change. A bill
 │   │   │                              costed at a removed combo keeps that cost
-│   │   │                              until its month is Recosted. Migs
-│   │   │                              `20261008010000` / `020000`.
+│   │   │                              until its month is Recosted.
+│   │   │                              A PIECE MAY BE EITHER SIDE (same day, user:
+│   │   │                              我需要左右都算的 function): after a module whose other
+│   │   │                              side the model also has (`1A(R)(LHF)` /
+│   │   │                              `(RHF)`, `2A-LHF` / `-RHF`), Add combo offers
+│   │   │                              the pair as one more card — `1A(R)` · *LHF or
+│   │   │                              RHF* — and each piece of it is ONE slot of
+│   │   │                              both sides, the ERP's own shape, so a set
+│   │   │                              adopted from the ERP can be made again after a
+│   │   │                              Remove (`moduleSide` / `comboPieces` in
+│   │   │                              `_components/add-combo.ts`; a pair adds up at
+│   │   │                              the dearer side). `catalogue_add_combo` takes
+│   │   │                              1–4 modules per slot, none twice; the costing
+│   │   │                              already matched a slot by any of them. Migs
+│   │   │                              `20261008010000` / `020000` / `030000`.
 │   │   │                              **THE CATALOGUE, MIRRORED — ITEMS ONLY
 │   │   │                              (2026-09-24):** `products/` (Product List)
 │   │   │                              is the Houzs ERP's Products page mirrored

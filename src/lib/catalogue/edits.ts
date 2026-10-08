@@ -209,7 +209,7 @@ export function validateComboPrices(edits: readonly ComboPriceEdit[]): Array<{
 
 export interface NewComboEdit {
   baseModel: string
-  /** One piece per slot: [["1A"], ["2A-LHF"], ["2A-LHF"]]. */
+  /** One piece per slot, each the module it is or the modules it may be: [["1A"], ["2A-LHF", "2A-RHF"], ["CNR"]]. */
   modules: string[][]
   label: string
   /** Positive prices only: tier → seat height → RM. */
@@ -240,11 +240,18 @@ export function validateNewCombo(edit: NewComboEdit): NewComboPlan {
   const modules = Array.isArray(edit.modules) ? edit.modules : []
   if (modules.length < 2) throw new EditError('Add at least two compartments.')
   if (modules.length > 30) throw new EditError('A set holds at most 30 pieces.')
+  // A piece is one module, or a few it may be instead — the left or the right
+  // of a pair (2026-10-08), as the ERP's own combos write a slot.
   const slots = modules.map(slot => {
-    if (!Array.isArray(slot) || slot.length !== 1) throw new EditError('Each piece is one compartment.')
-    const code = String(slot[0] ?? '').trim()
-    if (!MODULE_CODE.test(code)) throw new EditError(`"${code}" is not a compartment code.`)
-    return [code]
+    if (!Array.isArray(slot) || slot.length === 0) throw new EditError('Each piece is one compartment.')
+    if (slot.length > 4) throw new EditError('A compartment may be one of four modules at most.')
+    const codes = slot.map(raw => {
+      const code = String(raw ?? '').trim()
+      if (!MODULE_CODE.test(code)) throw new EditError(`"${code}" is not a compartment code.`)
+      return code
+    })
+    if (new Set(codes).size !== codes.length) throw new EditError('A compartment names the same module twice.')
+    return codes
   })
   const label = String(edit.label ?? '').trim()
   if (!label) throw new EditError('Give the set a name.')
