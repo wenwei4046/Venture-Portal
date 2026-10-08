@@ -6,7 +6,8 @@
 import { crmDemo, crmTeamDemo, demoShowrooms } from "./crm-demo";
 import { DEFAULT_AUTO_REPLY_SET, type CrmData } from "./crm-data";
 
-export function crmDemoData(you = "You"): CrmData {
+/** `viewer`: whose eyes — "a1" (a salesperson), or "boss" / "hod" for the Control panel (/member/preview?page=crm&crmAs=boss). */
+export function crmDemoData(you = "You", viewer = "a1"): CrmData {
   const demo = crmDemo(), team = crmTeamDemo(you);
   const people = team.members.map(m => ({ id: m.id, name: m.name, role: m.role, uplineId: m.uplineId ?? null, fullTime: !!m.fullTime }));
   const customers = demo.leads.map((l, i) => {
@@ -22,10 +23,10 @@ export function crmDemoData(you = "You"): CrmData {
     };
   });
   return {
-    viewerId: "a1", setup: null, people, customers,
+    viewerId: people.some(p => p.id === viewer) ? viewer : "a1", setup: null, people, customers,
     visits: demo.appointments.map(a => ({ id: a.id, customerId: a.leadId, showroomId: a.showroomId, start: a.start, minutes: a.minutes, state: a.state === "attended" ? "attended" : a.state === "cancelled" ? "cancelled" : "booked", outcome: null, remindedAt: null })),
     rooms: demoShowrooms.map((r, i) => ({ id: r.id, name: r.name, active: true, address: i === 0 ? "Jalan Ampang, Kuala Lumpur" : "", slots: ["11:00", "13:00", "15:00", "17:00", "19:00"], cap: 2, weekly: [], blocks: [] })),
     prefs: {}, hiddenMessages: [], labels: [], customerLabels: {}, quickReplies: [], autoReplies: DEFAULT_AUTO_REPLY_SET,
-    invites: [], shares: [], events: [], notifsSeenAt: null,
+    invites: [], shares: [], events: [], notifsSeenAt: null, notifRead: [], adRules: [], ftRules: [],
   };
 }

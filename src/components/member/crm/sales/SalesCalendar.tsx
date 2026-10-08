@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react/no-unescaped-entities -- generated from the design; its text keeps its own apostrophes */
 
 // GENERATED from docs/design_handoff_crm_roles/CRM Revenue View.dc.html (3b) by the
 // design converter — markup and styles exactly as designed. Behaviour lives in

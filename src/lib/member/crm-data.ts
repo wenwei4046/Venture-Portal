@@ -121,6 +121,11 @@ export interface CrmEvent {
   at: string;
 }
 
+/** Ads to teams (mig 20261009050000): how one ad's enquiries are dealt. */
+export interface CrmAdRule { adId: string; label: string; mode: "even" | "split" | "people"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; startedAt: string }
+/** Full time lead allocation for one team: on these weekdays (0 = Monday) the full-time RS take their maximum or % first. */
+export interface CrmFtRule { tlId: string; mode: "cnt" | "pct"; days: number[]; vals: Record<string, Record<string, number>> }
+
 export interface CrmData {
   viewerId: string | null;
   setup: "not_linked" | "no_role" | null;
@@ -138,6 +143,10 @@ export interface CrmData {
   shares: CrmShare[];
   events: CrmEvent[];
   notifsSeenAt: string | null;
+  /** Notifications read one by one (the Control panel). */
+  notifRead: string[];
+  adRules: CrmAdRule[];
+  ftRules: CrmFtRule[];
 }
 
 /* ── Defaults the design starts with ───────────────────────────────────── */
@@ -205,7 +214,9 @@ export interface CrmDataRows {
   invites: CrmInviteRow[];
   shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
   events: CrmEventRow[];
-  staffPrefs: { notifs_seen_at: string | null }[];
+  staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null }[];
+  adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string }[];
+  ftRules: { tl_id: string; mode: "cnt" | "pct"; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
 }
 
 /* ── Rows → screens ────────────────────────────────────────────────────── */
@@ -309,6 +320,9 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     shares: rows.shares.map(s => ({ customerId: s.contact_id, staffId: s.staff_id, invitedBy: s.invited_by, joinedAt: s.joined_at })),
     events: rows.events.map(e => ({ id: e.id, kind: e.kind, customerId: e.contact_id, actor: e.actor, owner: e.owner, data: e.data ?? {}, at: e.at })),
     notifsSeenAt: rows.staffPrefs[0]?.notifs_seen_at ?? null,
+    notifRead: rows.staffPrefs[0]?.notif_read ?? [],
+    adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at })),
+    ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
   };
 }
 

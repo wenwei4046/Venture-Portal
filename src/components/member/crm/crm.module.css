@@ -39,3 +39,4 @@
 }
 .loading { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; font-size: 14px; color: #806B60; }
 .problem { margin: 0; padding: 10px 20px; font-size: 13px; color: #A3371A; background: #FBEAE6; }
+.panel { background: #FBF7F3; }

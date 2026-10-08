@@ -121,5 +121,6 @@ export interface SalesRefs {
   irDrag?: boolean;
   celT?: ReturnType<typeof setTimeout>;
   toastT?: ReturnType<typeof setTimeout>;
+  panelToastT?: ReturnType<typeof setTimeout>;
   slotKey?: string;
 }

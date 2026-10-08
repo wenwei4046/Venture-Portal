@@ -54,7 +54,7 @@ function systemLines(ctx: SalesCtx, c: CrmCustomer): { at: string; text: string 
 }
 
 /** "reply window open 20h 15m" / Messenger's 7 days as a person. */
-function windowLeft(c: CrmCustomer, now: Date): string {
+export function windowLeft(c: CrmCustomer, now: Date): string {
   if (!c.lastCustomerAt) return "";
   const gone = now.getTime() - new Date(c.lastCustomerAt).getTime();
   const left = 24 * 3_600_000 - gone;

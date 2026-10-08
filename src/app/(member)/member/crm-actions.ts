@@ -121,6 +121,8 @@ const CRM_WRITES = [
   "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
   "crm_save_quick_replies", "crm_save_auto_replies", "crm_seen_notifications", "crm_invite", "crm_answer_invite",
   "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
+  // The Control panel (mig 20261009050000).
+  "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -167,7 +169,7 @@ export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok
       if (error) throw new Error(error.message);
       return (data ?? []) as T;
     };
-    const [people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs] = await Promise.all([
+    const [people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules] = await Promise.all([
       read<CrmDataRows["people"]>(db.rpc("crm_people")),
       fetchAllRowsParallel<CrmDataRows["contacts"][number]>((from, to, withCount) => db.from("crm_contacts")
         .select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at, property_type, unit_size, unit_location, requirement, budget, won_amount, details_at", withCount ? { count: "exact" } : undefined)
@@ -186,9 +188,11 @@ export async function fetchCrmData(): Promise<{ ok: true; data: CrmData } | { ok
       read<CrmDataRows["invites"]>(db.from("crm_invites").select("id, kind, contact_id, contact_name, from_staff, to_staff, state, created_at, decided_at").order("created_at", { ascending: false }).limit(200)),
       read<CrmDataRows["shares"]>(db.from("crm_contact_shares").select("contact_id, staff_id, invited_by, joined_at")),
       read<CrmDataRows["events"]>(db.from("crm_events").select("id, kind, contact_id, actor, owner, data, at").order("at", { ascending: false }).limit(500)),
-      read<CrmDataRows["staffPrefs"]>(db.from("crm_staff_prefs").select("notifs_seen_at")),
+      read<CrmDataRows["staffPrefs"]>(db.from("crm_staff_prefs").select("notifs_seen_at, notif_read")),
+      read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at")),
+      read<CrmDataRows["ftRules"]>(db.from("crm_fulltime_rules").select("tl_id, mode, days, vals")),
     ]);
-    return { ok: true, data: crmDataFromRows({ people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs }) };
+    return { ok: true, data: crmDataFromRows({ people, contacts, messages, visits, rooms, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, events, staffPrefs, adRules, ftRules }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
