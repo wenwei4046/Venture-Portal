@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   ActionButton,
   ActionForm,
@@ -13,7 +14,7 @@ import {
   Tick,
   Hint,
 } from '@/components/RowForm'
-import { createTitle, deleteTitle, updateTitle } from '../actions'
+import { createTitle, deleteTitle, updateTitle } from '../title-actions'
 
 export interface TitleRow {
   id: string
@@ -24,6 +25,11 @@ export interface TitleRow {
   /** Heads its department (Revenue Director): above the ladder, no rank, no override. */
   isDepartmentHead: boolean
   people: number
+  /** Where it stands on the ladder (Hierarchy › Levels); null when not placed. */
+  levelRank: number | null
+  /** The permission template its holders follow; null while it has none. */
+  templateId: string | null
+  templateName: string | null
 }
 
 export interface DepartmentOption {
@@ -32,7 +38,9 @@ export interface DepartmentOption {
 }
 
 /**
- * The title table.
+ * The title table — Hierarchy › Roles since 2026-10-08 (the Claude Design
+ * handoff merged the Roles page in as the fourth tab), with the rung each
+ * title stands on and the permission template it points at.
  *
  * Every row is its own form, so it uses RowForm and the `form` attribute
  * rather than a `<form>` inside `<tbody>` — and for the same reason the table
@@ -92,7 +100,8 @@ export default function TitlesSection({
         hold it and only stops it being offered to the next hire. <strong>Head</strong> marks
         the title that heads its department — the Revenue Director: it stands above the
         commission ladder with no rank, every team leader and standalone member of the
-        sub-departments it directs reports to it, and no override climbs to it.
+        sub-departments it directs reports to it, and no override climbs to it. Each title points at one
+        permission template, edited under People Management → Permissions.
         {inactiveCount > 0 ? (
           <>
             {' '}
@@ -171,9 +180,11 @@ export default function TitlesSection({
               <tr>
                 <th>Title</th>
                 <th>Department</th>
+                <th>Level</th>
                 <th className="text-center">Active</th>
                 <th className="text-center" title="Heads its department: above the commission ladder, no rank, no override">Head</th>
                 <th className="text-right">People</th>
+                <th>Permission template</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
@@ -185,7 +196,7 @@ export default function TitlesSection({
                       `.band-row`). It labels the rows under it; unlike the
                       roster's it does not fold. */}
                   <tr className="band-row">
-                    <td colSpan={6}>
+                    <td colSpan={8}>
                       {group.dept}
                       <span className="count">
                         {group.rows.length} {group.rows.length === 1 ? 'title' : 'titles'}
@@ -218,6 +229,9 @@ export default function TitlesSection({
                               ))}
                             </Choice>
                           </td>
+                          <td className="font-mono text-[11px] whitespace-nowrap">
+                            {t.levelRank !== null ? `L${t.levelRank}` : '—'}
+                          </td>
                           <td className="text-center">
                             <Tick
                               name="is_active"
@@ -233,6 +247,20 @@ export default function TitlesSection({
                             />
                           </td>
                           <td className="num">{t.people}</td>
+                          <td className="whitespace-nowrap">
+                            {/* What it may do lives on People Management › Permissions;
+                                the link opens that template. */}
+                            <Link
+                              href={
+                                t.templateId
+                                  ? `/team/people?tab=permissions&template=${t.templateId}`
+                                  : '/team/people?tab=permissions'
+                              }
+                              className="underline underline-offset-[3px] decoration-ink/35 hover:decoration-ink"
+                            >
+                              {t.templateName ?? 'No template yet'} →
+                            </Link>
+                          </td>
                           <td className="text-right whitespace-nowrap">
                             <SaveButton pending={pending} />
                             {canDelete && t.people === 0 ? (

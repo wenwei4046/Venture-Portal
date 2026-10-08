@@ -4,6 +4,17 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-08 — Permission templates (People Management › Permissions)
+The four roles below are no longer what a person gets. A TITLE points at a permission
+TEMPLATE: function × action (view create edit approve void export manage) × scope
+(own / dept / all), plus the salary / NRIC / bank fields it may see; one person can be
+raised or lowered on a cell. Ten templates are seeded (Ultimate full access, Full access,
+Director, Executive office, Finance · Checker, Finance · Maker, HR · Payroll, Department
+head, Staff · Basic, Revenue Team). Until the gates enforce each cell (the next three
+steps), a cell opens the old module key only where that key cannot reach further than
+the cell — see CLAUDE.md › Permissions › PERMISSION TEMPLATES. The four shared accounts
+(no person behind them) keep the role tables below until moved onto a person.
+---
 ⚡ AMENDMENT 2026-07-16 — Unified Portal (one login, all tabs)
 Principal 现在拥有全模块的完整写权限(write parity):下表中标 "✅ 写" 给 Finance / HR
 而 Principal 标 ❌ 的格子,一律视为 Principal 也 ✅ 写。落地在三层:

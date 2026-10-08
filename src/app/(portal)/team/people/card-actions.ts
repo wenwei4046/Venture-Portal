@@ -9,8 +9,7 @@ import { describeActivity, type ActivityRow } from '@/lib/activity'
 import { ladderAllows, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
 import { offersVariablePay, type TitleRow } from '@/lib/staff-form'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
-import { resolvePersonPermissions } from '../_lib/person-permissions'
-import type { PersonPermissionRow } from '../_components/PersonPermissions'
+import { loadPersonAccess, type PersonAccessData } from '../_lib/person-permissions'
 import type { StaffRow } from './_components/EditStaffForm'
 
 export interface CardActivityLine {
@@ -44,7 +43,8 @@ export interface PersonCardData {
   /** The same three payroll-blocking gaps the roster row marks. */
   missing: string[]
   account: { id: string; email: string; role: string; isActive: boolean; lastSeenAt: string | null } | null
-  permissions: { rows: PersonPermissionRow[]; source: string } | null
+  /** Their title's template with their own cells — or, with no template yet, the old per-key view. */
+  access: PersonAccessData | null
   canManagePermissions: boolean
   /** null when the reader may not read access_log — an empty list would read
    *  as "they did nothing", which is a different and wrong statement. */
@@ -75,7 +75,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     supabase
       .from('hr_staff_costs')
       .select(
-        '*, departments(name, payroll_source, segment_key), titles(id, name, level_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
+        '*, departments(name, payroll_source, segment_key), titles(id, name, level_id, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -117,11 +117,11 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     }
   }
 
-  const permissions = acct
-    ? await resolvePersonPermissions(
+  const access = acct
+    ? await loadPersonAccess(
         supabase,
         { id: acct.id, role: acct.role },
-        { id: row.title_id ?? null, name: titleName },
+        { id: row.title_id ?? null, name: titleName, templateId: row.titles?.template_id ?? null },
       )
     : null
 
@@ -242,7 +242,7 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
           lastSeenAt: acct.last_seen_at,
         }
       : null,
-    permissions,
+    access,
     canManagePermissions: canManagePermissions(viewer),
     activity,
   }

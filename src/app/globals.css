@@ -4663,3 +4663,158 @@ h1.title-number {
 .trail-step.done::after { background: rgb(var(--accent)); border-color: rgb(var(--accent)); }
 .trail-step.joined::before { background: rgb(var(--accent)); }
 .trail-step.bad::after { background: rgb(var(--danger)); border-color: rgb(var(--danger)); }
+
+/* ── Permissions: templates × function × action × scope (2026-10-08) ─────────
+   The People Management revamp (Claude Design handoff, DESIGN.md › "Permission
+   matrix"). Every value is the prototype's, mapped back onto the sheet's own
+   tokens — the frames are the sheet's table frames, the cells its accent
+   washes, the drawer the modal panel. */
+.sheet-theme { --perm-hatch: 239 238 234; }
+.perm-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .perm-layout { grid-template-columns: minmax(0, 1fr); } }
+.perm-rail {
+  position: sticky; top: 0; overflow: hidden;
+  border: 1px solid rgb(var(--sheet-table-border)); border-radius: 10px; background: rgb(var(--surface));
+}
+@media (max-width: 1000px) { .perm-rail { position: static; } }
+.perm-band {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid rgb(var(--sheet-table-rule)); background: rgb(var(--sheet-table-head));
+}
+.perm-band .label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+.perm-band .n { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; }
+.perm-rail-list { max-height: 640px; overflow-y: auto; }
+.perm-rail-item {
+  display: block; width: 100%; padding: 11px 14px; text-align: left; cursor: pointer;
+  border: 0; border-bottom: 1px solid rgb(var(--hairline)); background: rgb(var(--surface)); color: rgb(var(--ink));
+}
+.perm-rail-item:hover { background: rgb(var(--sheet-row-hover)); }
+.perm-rail-item[aria-current='true'] { background: rgb(var(--accent-bg)); box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+.perm-rail-item .name { font-size: 13px; font-weight: 500; }
+.perm-rail-item[aria-current='true'] .name { font-weight: 600; }
+.perm-rail-item .meta { display: block; margin-top: 3px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; line-height: 1.5; }
+.perm-rail-item .titles { display: block; margin-top: 3px; font-size: 11px; line-height: 1.45; color: rgb(var(--card-label)); }
+.perm-rail-foot { padding: 10px 12px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--sheet-filter)); }
+.perm-sod {
+  margin-left: auto; padding: 1px 6px; border-radius: 99px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px;
+  background: rgb(var(--alert-bg)); color: rgb(var(--alert)); border: 1px solid rgb(var(--alert) / 0.4);
+}
+.perm-frame { overflow: hidden; border: 1px solid rgb(var(--sheet-table-border)); border-radius: 10px; background: rgb(var(--surface)); }
+.perm-frame-head {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid rgb(var(--hairline));
+}
+.perm-eyebrow { margin-bottom: 4px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.perm-chip {
+  padding: 2px 8px; border-radius: 99px; border: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2));
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; white-space: nowrap; cursor: pointer; color: rgb(var(--ink));
+}
+.perm-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 10px 20px; font-size: 11px;
+  border-bottom: 1px solid rgb(var(--hairline)); background: rgb(var(--sheet-filter));
+}
+.perm-legend .swatch { width: 38px; height: 20px; font-size: 10px; cursor: default; }
+.perm-warn {
+  margin: 14px 20px 0; padding: 10px 14px; border-radius: 8px; font-size: 12px; line-height: 1.6;
+  border: 1px solid rgb(var(--card-alert-bar)); background: rgb(var(--card-alert-icon-bg));
+}
+.perm-matrix-wrap { padding: 14px 20px 20px; overflow-x: auto; }
+table.perm-matrix { width: 100%; min-width: 680px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+table.perm-matrix th {
+  width: 68px; padding: 8px 4px; text-align: center; border-bottom: 1px solid rgb(var(--sheet-table-rule));
+  background: rgb(var(--sheet-table-head)); font-size: 10px; font-weight: 600; letter-spacing: 0.045em; text-transform: uppercase;
+}
+table.perm-matrix th:first-child { width: auto; padding: 8px 10px; text-align: left; border-radius: 6px 0 0 0; }
+table.perm-matrix th:last-child { border-radius: 0 6px 0 0; }
+table.perm-matrix td.section {
+  padding: 14px 10px 6px; border-bottom: 1px solid rgb(var(--sheet-divider));
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+}
+table.perm-matrix td.section .tally { margin-left: 8px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-weight: 400; }
+table.perm-matrix tr.fn > td { padding: 5px 4px; text-align: center; border-bottom: 1px solid rgb(var(--perm-hatch)); }
+table.perm-matrix tr.fn > td:first-child { padding: 6px 10px; text-align: left; }
+table.perm-matrix tr.fn.zebra { background: rgb(var(--sheet-foot)); }
+table.perm-matrix .fn-label { font-size: 12.5px; font-weight: 500; }
+table.perm-matrix .fn-key { margin-top: 1px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; color: rgb(var(--card-label)); }
+/* The compact matrix: the invite drawer and a person's card. */
+table.perm-matrix.compact { min-width: 0; font-size: 11.5px; background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 8px; overflow: hidden; }
+table.perm-matrix.compact th { width: 52px; padding: 6px 2px; border-bottom: 1px solid rgb(var(--hairline)); font-size: 9px; letter-spacing: 0.03em; border-radius: 0; }
+table.perm-matrix.compact th:first-child { padding: 6px 8px; font-size: 9.5px; letter-spacing: 0.045em; }
+table.perm-matrix.compact tr.fn > td { padding: 3px 2px; }
+table.perm-matrix.compact tr.fn > td:first-child { padding: 4px 8px; white-space: nowrap; }
+table.perm-matrix.compact tr.fn.zebra { background: transparent; }
+/* A cell: · Own Dept All, or hatched where the function has no such action. */
+.perm-cell {
+  display: inline-grid; place-items: center; width: 52px; height: 24px; padding: 0; border-radius: 5px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; line-height: 1;
+  cursor: pointer; user-select: none; color: rgb(var(--ink) / 0.35);
+  border: 1px dashed rgb(var(--hairline)); background: transparent;
+}
+.perm-cell.own { color: rgb(var(--ink)); background: rgb(var(--surface)); border: 1px solid rgb(var(--sheet-table-border)); }
+.perm-cell.dept { color: rgb(var(--ink)); background: rgb(var(--accent-bg)); border: 1px solid rgb(var(--accent)); }
+.perm-cell.all { color: rgb(var(--ink)); background: rgb(var(--accent)); border: 1px solid rgb(var(--accent)); font-weight: 600; }
+.perm-cell.na {
+  cursor: default; color: transparent; border: 1px solid transparent;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, rgb(var(--perm-hatch)) 4px 5px);
+}
+.perm-cell.small { width: 42px; height: 20px; font-size: 9.5px; }
+.perm-cell.changed { box-shadow: 0 0 0 2px rgb(var(--walnut)); }
+.perm-cell:disabled { cursor: default; }
+.perm-cell:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 1px; }
+.perm-sensitive { padding: 16px 20px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--sheet-foot)); }
+.perm-sensitive .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 767px) { .perm-sensitive .grid3 { grid-template-columns: minmax(0, 1fr); } }
+.perm-sensitive label {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; cursor: pointer;
+  border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface));
+}
+.perm-sensitive input[type='checkbox'] { width: 16px; height: 16px; margin: 1px 0 0; flex: none; accent-color: rgb(var(--accent)); }
+.perm-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 20px; border-top: 1px solid rgb(var(--hairline)); font-size: 11px; }
+pre.perm-keylist {
+  margin: 0; padding: 12px 20px 16px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2));
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; line-height: 1.7; white-space: pre-wrap;
+}
+.perm-link {
+  padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgb(var(--ink) / 0.35);
+}
+.perm-link:hover { text-decoration-color: rgb(var(--ink)); }
+.perm-held { padding: 10px 20px 14px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--alert-bg) / 0.45); font-size: 11.5px; line-height: 1.6; }
+.perm-held li { margin-top: 2px; }
+/* The invite drawer: a right-hand panel over a walnut scrim. */
+.drawer-scrim { position: fixed; inset: 0; z-index: 40; background: rgb(var(--scrim) / 0.28); }
+.drawer-panel {
+  position: fixed; top: 10px; right: 10px; bottom: 10px; z-index: 41; width: 640px; max-width: calc(100vw - 20px);
+  display: flex; flex-direction: column; overflow: hidden; font-size: 13px; color: rgb(var(--ink));
+  background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 16px;
+  box-shadow: 0 10px 40px rgb(var(--ink) / 0.15);
+}
+.drawer-step { padding: 16px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(var(--surface-2)); }
+.drawer-step > h2 {
+  display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 1px solid rgb(var(--hairline)); font-size: 14px; font-weight: 600;
+}
+.drawer-step > h2 .n { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; font-weight: 500; }
+.drawer-label { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.025em; }
+.drawer-input {
+  width: 100%; padding: 8px 12px; font-size: 13px; outline: none;
+  background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 6px;
+}
+.drawer-input:focus { border-color: rgb(var(--accent)); }
+.drawer-pick { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgb(var(--perm-hatch)); }
+.drawer-pick:hover { background: rgb(var(--sheet-row-hover)); }
+.drawer-band {
+  padding: 6px 12px; background: rgb(var(--sheet-table-head)); border-left: 3px solid rgb(var(--walnut));
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+}
+.pw-seg { width: 22px; height: 4px; border-radius: 2px; background: rgb(var(--hairline)); }
+.pw-seg.weak { background: rgb(var(--danger)); }
+.pw-seg.fair { background: rgb(var(--card-alert-bar)); }
+.pw-seg.strong { background: rgb(var(--ledger)); }
+/* The roster row's Invite: the sheet's row-Save treatment. */
+.invite-cell {
+  padding: 3px 10px; border: 1px solid rgb(var(--accent)); border-radius: 6px; background: rgb(var(--surface));
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 11px; color: rgb(var(--ink)); cursor: pointer;
+}
+.invite-cell:hover { background: rgb(var(--accent)); }

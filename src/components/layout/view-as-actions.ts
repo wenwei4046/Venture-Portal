@@ -5,10 +5,11 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE, isViewAsRole } from '@/lib/view-as'
 
-// Switch the Principal's app-layer view to another role (or back to
-// principal, which clears the cookie). Reads the REAL role straight from the
-// users row — getUser() reports the masked role, and a masked session must
-// still be allowed to switch back. Session cookie (no maxAge): the mask
+// Switch the app-layer view to another role (or back to principal, which
+// clears the cookie). Allowed to an account holding `view_switch` — Ultimate
+// full access (2026-10-08; it was the Principal role) — read from the REAL
+// account: current_permissions() answers for auth.uid(), never for the mask,
+// and a masked session must still be allowed to switch back. Session cookie (no maxAge): the mask
 // resets when the browser closes.
 export async function setViewAs(formData: FormData) {
   const role = formData.get('role')
@@ -26,7 +27,10 @@ export async function setViewAs(formData: FormData) {
     .eq('id', authUser.id)
     .single()
   if (!row?.is_active) redirect('/login')
-  if (row.role !== 'principal') redirect(row.role === 'revenue_member' ? '/member' : '/dashboard')
+  const { data: perms } = await supabase.rpc('current_permissions')
+  if (!((perms as string[] | null) ?? []).includes('view_switch')) {
+    redirect(row.role === 'revenue_member' ? '/member' : '/dashboard')
+  }
   if (target !== 'principal' && !isViewAsRole(target)) redirect('/dashboard')
 
   const store = await cookies()

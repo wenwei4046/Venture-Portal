@@ -21,6 +21,8 @@ import type { UserRole } from '@/types'
 // still reproduces what the four roles could do before 2026-09-01 — which is
 // the whole argument for why that cutover changed nobody's access.
 const ROLE_DEFAULTS: Record<UserRole, string[]> = {
+  // No defaults at all (2026-10-08): a staff account is its title's template.
+  staff: [],
   revenue_member: ['member_portal', 'member_quote', 'member_requests', 'member_memos'],
   principal: [
     'dashboard', 'approvals', 'treasury', 'billing', 'categories', 'hr_costing',

@@ -6984,6 +6984,7 @@ export type Database = {
           level_id: string | null
           name: string
           sort_order: number
+          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -6996,6 +6997,7 @@ export type Database = {
           level_id?: string | null
           name: string
           sort_order?: number
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -7008,6 +7010,7 @@ export type Database = {
           level_id?: string | null
           name?: string
           sort_order?: number
+          template_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -8590,7 +8593,7 @@ export type Database = {
       statement_direction: "receivable" | "payable"
       statement_line_type: "invoice" | "contra"
       statement_status: "draft" | "issued" | "paid" | "partial" | "overdue"
-      user_role: "principal" | "finance" | "hr" | "dept_manager" | "revenue_member"
+      user_role: "principal" | "finance" | "hr" | "dept_manager" | "revenue_member" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8912,7 +8915,7 @@ export const Constants = {
       statement_direction: ["receivable", "payable"],
       statement_line_type: ["invoice", "contra"],
       statement_status: ["draft", "issued", "paid", "partial", "overdue"],
-      user_role: ["principal", "finance", "hr", "dept_manager", "revenue_member"],
+      user_role: ["principal", "finance", "hr", "dept_manager", "revenue_member", "staff"],
     },
   },
 } as const

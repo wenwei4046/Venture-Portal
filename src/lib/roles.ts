@@ -144,6 +144,7 @@ export function getRoleLabel(role: UserRole): string {
     hr: 'HR',
     dept_manager: 'Dept Manager',
     revenue_member: 'Revenue Member',
+    staff: 'Staff',
   }
   return labels[role]
 }

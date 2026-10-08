@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@/types'
 import { getRoleLabel } from '@/lib/roles'
 import { officeClock } from '@/lib/office-clock'
-import { isPrincipalAccount } from '@/lib/view-as'
 import PortalViewSwitcher from './PortalViewSwitcher'
 import ThemeToggle from './ThemeToggle'
 
@@ -15,7 +14,9 @@ interface TopBarProps {
 
 export default function TopBar({ user }: TopBarProps) {
   const router = useRouter()
-  const principalAccount = isPrincipalAccount(user)
+  // Ultimate full access (`view_switch`, 2026-10-08) — the Principal role
+  // used to be the test, which Full access now shares without the switcher.
+  const canSwitchView = user.canSwitchView === true
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -67,13 +68,13 @@ export default function TopBar({ user }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-4 md:gap-5 shrink-0">
-        {/* View-as switcher — Principal account only. Flips the entire
+        {/* View-as switcher — Ultimate full access only. Flips the entire
             app-layer experience (sidebar, gates, buttons) to the chosen
             role; auth identity stays the Principal. Always visible (also on
             mobile) so a masked session can switch back anywhere. */}
-        {principalAccount ? <PortalViewSwitcher value={user.role} /> : null}
+        {canSwitchView ? <PortalViewSwitcher value={user.role} /> : null}
         <div className="hidden sm:flex items-baseline gap-3 font-mono text-[11px] text-muted tracking-[0.02em]">
-          {!principalAccount ? (
+          {!canSwitchView ? (
             <span className="inline-flex items-baseline gap-1.5 font-sans font-normal text-[13.5px] text-graphite">
               <span aria-hidden className="w-[5px] h-[5px] rounded-full bg-ledger inline-block translate-y-[-2px]" />
               {getRoleLabel(user.role)}

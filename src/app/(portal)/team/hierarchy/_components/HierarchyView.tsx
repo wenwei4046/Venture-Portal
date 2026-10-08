@@ -7,12 +7,13 @@ import type { Rung } from '@/lib/ladder'
 import TeamOrgChart, { ALL_DEPARTMENTS, type ChartPerson } from './TeamOrgChart'
 import LevelsBoard, { type BoardTitle } from './LevelsBoard'
 import StaffTable from './StaffTable'
+import TitlesSection, { type DepartmentOption, type TitleRow } from './TitlesSection'
 
-export type HierarchyTab = 'chart' | 'table' | 'levels'
+export type HierarchyTab = 'chart' | 'table' | 'levels' | 'roles'
 
 /** The view a `?tab=` value names. Anything else is the chart. */
 export function hierarchyTab(param: string | null | undefined): HierarchyTab {
-  return param === 'table' || param === 'levels' ? param : 'chart'
+  return param === 'table' || param === 'levels' || param === 'roles' ? param : 'chart'
 }
 
 /**
@@ -39,11 +40,14 @@ export function hierarchyTab(param: string | null | undefined): HierarchyTab {
  * the chart scrolls to Lucas and lights him up, crossing the department filter
  * to get there if it has to.
  *
- * Three views:
+ * Four views:
  *
  *   Org chart  the canvas. Drag, or draw a line from a manager down.
  *   Table      the same facts as rows, which is the shape bulk work wants.
  *   Levels     the ladder board, still editable in full.
+ *   Roles      the titles — what somebody is called, under which department,
+ *              on which rung, following which permission template. Its own
+ *              page until 2026-10-08 (the Claude Design handoff).
  *
  * The tab is `?tab=`, pushed with the browser's own history so Next syncs
  * `useSearchParams` without a round trip and Back returns to the last view.
@@ -55,6 +59,9 @@ export default function HierarchyView({
   rungs,
   titles,
   breaks,
+  roleTitles,
+  departments,
+  canDeleteTitles,
 }: {
   people: ChartPerson[]
   /** Includes extra scheme-specific roles; Table and Levels keep the roster. */
@@ -64,6 +71,10 @@ export default function HierarchyView({
   titles: BoardTitle[]
   /** Reporting lines the ladder, as it stands, would refuse. */
   breaks: Array<{ id: string; managerId: string }>
+  /** The Roles tab: every title, with its rung and template. */
+  roleTitles: TitleRow[]
+  departments: DepartmentOption[]
+  canDeleteTitles: boolean
 }) {
   const searchParams = useSearchParams()
   const tab = hierarchyTab(searchParams.get('tab'))
@@ -80,6 +91,7 @@ export default function HierarchyView({
     { key: 'chart', label: 'Org chart' },
     { key: 'table', label: 'Table', count: people.length },
     { key: 'levels', label: 'Levels' },
+    { key: 'roles', label: 'Roles', count: roleTitles.length },
   ]
 
   function goTo(key: string) {
@@ -101,7 +113,13 @@ export default function HierarchyView({
           {/* The sheet's intro line: plain and upright, like the Revenue
               hierarchy's (DESIGN.md › "Sheet theme"). */}
           <p className="text-sm mt-3 max-w-2xl">
-            {tab === 'levels' ? (
+            {tab === 'roles' ? (
+              <>
+                A title says what somebody is called and which department that role belongs under. How
+                high it stands is the ladder, under Levels; what it may do is its permission template,
+                under People Management → Permissions.
+              </>
+            ) : tab === 'levels' ? (
               <>
                 Which title stands on which level — one scale for the whole company. The chart
                 obeys it, and a promotion climbs it.
@@ -125,7 +143,9 @@ export default function HierarchyView({
 
       <SlidingTabs items={tabs} active={tab} onTabChange={goTo} variant="control" />
 
-      {tab === 'levels' ? (
+      {tab === 'roles' ? (
+        <TitlesSection titles={roleTitles} departments={departments} canDelete={canDeleteTitles} />
+      ) : tab === 'levels' ? (
         <LevelsBoard rungs={rungs} titles={titles} breaks={breaks.length} />
       ) : people.length === 0 ? (
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">

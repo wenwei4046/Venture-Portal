@@ -322,7 +322,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
           ) : titleChoices.length === 0 ? (
             <p className={helpText}>
               No titles for {department?.name} yet —{' '}
-              <Link href="/team/roles" className="underline underline-offset-2 hover:no-underline">
+              <Link href="/team/hierarchy?tab=roles" className="underline underline-offset-2 hover:no-underline">
                 add one under Role &amp; Permission
               </Link>
               .
