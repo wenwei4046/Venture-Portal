@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F3F1;font-family:Inter,system-ui,sans-serif;color:#3F2B22}
+a{color:#BD4A19}a:hover{color:#4E2F20}
+</style>
+</helmet>
+<section id="turn-26" style="padding:56px 64px 80px;display:flex;flex-direction:column;gap:24px;">
+<div style="max-width:880px;">
+<p style="margin:0 0 8px;font-size:12px;font-weight:650;letter-spacing:.12em;color:#BD4A19;">DESKTOP · PRINCIPAL · PRODUCT LIST</p>
+<h2 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-.03em;">Product List, moved into Revenue</h2>
+<p style="margin:10px 0 0;font-size:14px;line-height:1.55;color:#806B60;">The HR-side Product List now lives under a Principal group in the sidebar, below Notifications. All seven tabs keep the portal's rules: the ERP says what exists, the portal types what it costs. Drafts survive filters; switching tab or sub-department with unsaved changes asks first. A Modular model opens in a floating window over the list, with fixed save and cancel controls, as on the original page.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;">
+<div id="26a" style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;font-weight:700;color:#fff;background:#BD4A19;border-radius:6px;padding:3px 8px;">26a</span><span style="font-size:15px;font-weight:600;color:#3F2B22;">SKU Master</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="sku" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">SKU Master · Sofa, per seat height and tier</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="sku" product-category="SOFA" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Modular · model open in a floating window</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="modular" product-model="1025" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Maintenance · bed frame option charges</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="maintenance" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Combo Pricing</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="combos" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Combo Pricing · Add combo window</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="combos" product-new-combo="true" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Costing gaps</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="gaps" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Costing Setting · editing, picker open</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="costing" product-editing="true" hint-size="1440px,900px"></dc-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:15px;font-weight:600;color:#806B60;">Add-on / KPI Items</span></div>
+<dc-import name="RevenueApp" platform="desktop" desk-style="a" principal="true" screen="products" product-tab="kpi" hint-size="1440px,900px"></dc-import>
+</div>
+</div>
+</section>
+</x-dc>
+</body>
+</html>

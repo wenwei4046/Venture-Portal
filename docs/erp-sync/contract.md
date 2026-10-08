@@ -533,7 +533,7 @@ The ERP's Products page, as the portal's Product List mirrors it:
 | `maintenance.pools` | `scm.maintenance_config_history` (scope `master`, latest effective) | `erp_maintenance_options` | Bedframe `divanHeights` / `totalHeights` / `gaps` / `legHeights`, Sofa `sofaSizes` / `sofaLegHeights` — values only |
 | `specials` | `scm.special_addons` | `erp_maintenance_options` (`bedframe_specials` / `sofa_specials`) | one row per category it applies to |
 | `fabrics` | `scm.fabric_trackings` | `erp_fabrics` | code, series, and the PRICE_1/2/3 tier it costs a sofa / bed frame at |
-| `combos` | `scm.sofa_combo_pricing`, master rows (no customer, no supplier) | `erp_sofa_combos` | slots, tier, label and the seat heights it is offered at — the KEYS of its price grid, never the values |
+| `combos` | `scm.sofa_combo_pricing`, master rows (no customer, no supplier) | `erp_sofa_combos` | slots, tier, label and the seat heights it is offered at — the KEYS of its price grid, never the values. **Recorded, no longer read (2026-10-08):** the portal keeps its own combos (`catalogue_combos`, which adopted the live rows once); nothing on the ERP side needs to change |
 
 **Not sent:** Variants, Fabric Converter, Categories, the "Products
 Maintenance" pools (bed frame and mattress sizes, compartments, brandings,
@@ -611,7 +611,7 @@ TypeScript twins (`lib/catalogue/*`, which the member calculator uses):
    price adds nothing;
 3. **× qty**;
 4. then, per order at commit, a sofa build that covers one of its model's
-   priced combos is costed at the combo instead, spread over the matched lines
+   priced combos (the portal's own since 2026-10-08, `catalogue_combos`) is costed at the combo instead, spread over the matched lines
    in proportion to their own costs — the ERP's `recomputeTotals` rule for rule
    (same base model, one tier and one seat height across the set, subset
    coverage with extras at their own price, uniform quantity or no combo, the

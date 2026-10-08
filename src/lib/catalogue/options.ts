@@ -61,6 +61,12 @@ export function optionKeysOf(category: string | null): OptionKey[] {
   return []
 }
 
+// The prototype's words (design_handoff_product_list). The bed frame's specials and
+// the sofa's leg heights and specials are charges since 2026-10-06 (the prototype
+// still calls them surcharges), so theirs follow the same voice.
+const FRAME_CHARGE = 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote. Out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC.'
+const CHARGE_TAIL = 'Out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI.'
+
 /**
  * The Maintenance tab's rail, as the ERP draws it (the Products Maintenance
  * pools are not mirrored). `charge`: the price is the customer's, out of the
@@ -71,19 +77,19 @@ export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: 
   {
     section: 'Bedframe',
     pools: [
-      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
-      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
-      { pool: 'bedframe_gaps', label: 'Gaps', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
-      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every option charged here that the bed frame has turned on in Modular.' },
-      { pool: 'bedframe_specials', label: 'Specials', priced: true, charge: true, note: 'What the customer pays (RM) when a member ticks this special for a bed frame on the Quote, per frame — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. The Quote offers only a special charged here that the bed frame has turned on in Modular — blank or 0 is not offered (on a bill from the ERP it is free).' },
+      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_gaps', label: 'Gaps', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_specials', label: 'Specials', priced: true, charge: true, note: `What the customer pays (RM) when a member ticks this special for a bed frame on the Quote. ${CHARGE_TAIL} Blank or 0 is not offered.` },
     ],
   },
   {
     section: 'Sofa',
     pools: [
-      { pool: 'sofa_sizes', label: 'Sizes', priced: false, charge: false, note: 'ERP choices only. A seat height carries no price here — the price grid of the SKU does; model availability is set on Modular.' },
-      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: 'What the customer pays (RM) for this leg height on the Quote, ONCE per sofa however many pieces — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC. The Quote offers FOC plus every leg height charged here that the sofa has turned on in Modular.' },
-      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: true, note: 'What the customer pays (RM) for this special on the Quote, ONCE per sofa however many pieces — out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. The Quote offers only a special charged here that the sofa has turned on in Modular — blank or 0 is not offered (on a bill from the ERP it is free).' },
+      { pool: 'sofa_sizes', label: 'Sizes', priced: false, charge: false, note: 'ERP choices only. This pool has no surcharge; model availability is set on Modular.' },
+      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: `What the customer pays (RM) for this leg height on the Quote, once per sofa. ${CHARGE_TAIL} Blank or 0 is FOC.` },
+      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: true, note: `What the customer pays (RM) for this special on the Quote, once per sofa. ${CHARGE_TAIL} Blank or 0 is not offered.` },
     ],
   },
 ]

@@ -22,8 +22,9 @@
 // figure strip) is not yet rebuilt into summary cards, so it stays as it was
 // until that page is converted (DESIGN.md › "How a page is built on it").
 //
-// The Product List keeps its own workspace (`.product-theme`), which re-tones
-// the shell as well and decides its own scrolling per tab (`productTabScroll`).
+// The Product List kept a workspace of its own here until 2026-10-08, when it
+// moved into the Revenue app (`/member/products`): every portal page now sits
+// on the sheet.
 
 /** Route prefixes that render on the sheet — a prefix covers its whole subtree. */
 export const SHEET_ROUTE_PREFIXES = [
@@ -61,9 +62,6 @@ export const SHEET_ROUTE_PREFIXES = [
   '/settings',
 ] as const
 
-/** Routes under a prefix that keep a workspace of their own. */
-const OWN_WORKSPACE = ['/revenue/products']
-
 function under(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(prefix + '/')
 }
@@ -71,6 +69,5 @@ function under(pathname: string, prefix: string): boolean {
 /** Does this page render on the white sheet? */
 export function isSheetRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
-  if (OWN_WORKSPACE.some((p) => under(pathname, p))) return false
   return SHEET_ROUTE_PREFIXES.some((p) => under(pathname, p))
 }

@@ -8,7 +8,7 @@
 
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
-import { PRODUCT_LIST_PATH, REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
+import { REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
 import {
   canAccessAuditLog,
   canAccessCategories,
@@ -19,7 +19,6 @@ import {
   canAccessDirectorSalary,
   canAccessMyBilling,
   canAccessOpex,
-  canAccessProductList,
   canAccessReconciliation,
   canAccessReports,
   canAccessRevenue,
@@ -242,11 +241,10 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // in the sidebar. Fair itself stays a link, so one click still lands on
     // Commission Calculation the way it did before.
     //
-    // The Product List and Venues are the two department-wide children:
-    // `comm_products`, `comm_venues` and `comm_organisers` carry no scheme, so
-    // one of each serves every sub-department. What a product costs stays with
-    // the Principal; the venue register is HR's, because naming the organiser
-    // of a fair is part of reading the month.
+    // The Product List was the department-wide child here until 2026-10-08,
+    // when it moved into the Revenue app (user: it is set for the Revenue
+    // team's margins, so it belongs to their view — `/member/products`, under
+    // PRINCIPAL in that app's sidebar, for whoever holds `product_list`).
     {
       label: 'Revenue',
       section: 'Departments',
@@ -276,7 +274,6 @@ export function buildNavEntries(data: NavData): NavEntry[] {
             { href: revenuePath(s.slug, 'rules'), label: 'Rules', visible: canAccessRevenue },
           ],
         })),
-        { href: PRODUCT_LIST_PATH, label: 'Product List', visible: canAccessProductList },
         // Venues went on 2026-09-27: the ERP names every bill's fair — venue,
         // organiser and days — so nothing about a fair is typed here any more.
         // The department as a whole (2026-09-30): its mode, cost center or

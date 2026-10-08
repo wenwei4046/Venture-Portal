@@ -1,0 +1,88 @@
+[
+  {
+    "name": "sku",
+    "proto": { "attrs": { "product-tab": "sku" } },
+    "live": { "path": "/member/products" },
+    "texts": ["REVENUE", "PRODUCTS", "Product List#2", "Product List#1", "Principal only · Fair and IR", "SKU Master", "Modular", "Maintenance", "Combo Pricing", "Costing gaps", "Costing Setting", "Add-on / KPI Items",
+      "All", "Sofa", "Bedframe", "Sofa Accessory", "Service", "Edit prices", "PRODUCT CODE", "DESCRIPTION", "MODEL", "SIZE", "BRAND", "PRICE (RM)", "00830-1S", "SOFA 00830 1S", "ZANOTTI", "1S",
+      "Today", "Insight", "Quote", "Arena", "Profile", "Notifications", "MODULE", "Revenue team", "SIGN OUT"]
+  },
+  {
+    "name": "sofa",
+    "proto": { "attrs": { "product-tab": "sku", "product-category": "SOFA" } },
+    "live": { "path": "/member/products", "actions": [{ "click": "button:has-text('Sofa')" }] },
+    "texts": ["Tier", "P1", "P2", "P3", "Model", "CATEGORY", "TIER", "00830-1S", "Sofa#2"]
+  },
+  {
+    "name": "sku-edit",
+    "proto": { "attrs": { "product-tab": "sku" }, "actions": [{ "click": "button:has-text('Edit prices')" }] },
+    "live": { "path": "/member/products", "actions": [{ "click": "button:has-text('Edit prices')" }] },
+    "texts": ["Cancel", "Save changes", "Blank clears a price; 0 is a zero price. Changes across models and tiers are saved together."]
+  },
+  {
+    "name": "modular",
+    "proto": { "attrs": { "product-tab": "modular" } },
+    "live": { "path": "/member/products?tab=modular" },
+    "texts": ["Sofa#2", "00830", "Not offered", "Offered", "Zanotti", "ZANOTTI", "Open a model to set what the Quote may offer of it.", "Show"]
+  },
+  {
+    "name": "modular-open",
+    "proto": { "attrs": { "product-tab": "modular", "product-model": "1025" } },
+    "live": { "path": "/member/products?tab=modular", "actions": [{ "click": "button[aria-label='Configure 1025']", "wait": 1500 }] },
+    "texts": ["MODULAR", "1025#2", "REVENUE CALCULATOR", "FREE GIFT", "Sizes", "Divan height", "Total height", "Gap", "Select all", "Clear all", "Cancel", "Save", "Next ›", "No unsaved changes", "Bedframe#2", "Single", "1025-(S)"]
+  },
+  {
+    "name": "maintenance",
+    "proto": { "attrs": { "product-tab": "maintenance" } },
+    "live": { "path": "/member/products?tab=maintenance" },
+    "texts": ["Bedframe", "Sofa", "Fabrics", "Divan Heights", "Total Heights", "Gaps", "Leg Heights", "Specials", "Edit charges", "OPTION VALUE", "DESCRIPTION", "CHARGE (RM)", "STATUS", "Active", "Bedframe · Divan Heights"]
+  },
+  {
+    "name": "combos",
+    "proto": { "attrs": { "product-tab": "combos" } },
+    "live": { "path": "/member/products?tab=combos" },
+    "texts": ["+ Add combo", "Edit prices", "SET", "WHAT IS IN IT", "Tier", "All", "P1", "P2", "P3", "Model"]
+  },
+  {
+    "name": "combos-new",
+    "proto": { "attrs": { "product-tab": "combos", "product-new-combo": "true" } },
+    "live": { "path": "/member/products?tab=combos", "actions": [{ "click": "button:has-text('+ Add combo')", "wait": 1200 }] },
+    "texts": ["SOFA MODEL", "SET NAME", "Blank uses the compartments as the name.", "Compartments", "Clear all", "Price per set (RM)", "Copy module totals", "FABRIC TIER", "Fabric P1", "Fabric P2", "Fabric P3", "Cancel", "Add combo"]
+  },
+  {
+    "name": "gaps",
+    "proto": { "attrs": { "product-tab": "gaps" } },
+    "live": { "path": "/member/products?tab=gaps", "settle": 5000 },
+    "texts": ["Costing gaps#2", "Open SKU Master", "ITEM CODE", "PRODUCT", "GROUP", "LINES", "BILLS", "REVENUE (RM)", "REASON", "Reason", "Sales from 1 Aug 2026 up to, but not including, 1 Nov 2026."]
+  },
+  {
+    "name": "costing",
+    "proto": { "attrs": { "product-tab": "costing" } },
+    "live": { "path": "/member/products?tab=costing" },
+    "texts": ["SUB-DEPARTMENT", "Fair", "IR", "FAIR · COST RATIO", "0.70", "divides every SKU’s cost", "Product List cost", "RM 1,000.00", "Revenue Team cost", "RM 1,428.57", "Edit ratios", "SKU CODE", "CATEGORY", "PRODUCT LIST COST", "RATIO", "TEAM COST", "SKUs at their own ratio"]
+  },
+  {
+    "name": "costing-edit",
+    "proto": { "attrs": { "product-tab": "costing" }, "actions": [{ "click": "button:has-text('Edit ratios')" }] },
+    "live": { "path": "/member/products?tab=costing", "actions": [{ "click": "button:has-text('Edit ratios')" }] },
+    "texts": ["ADD SKUS AT A RATIO OF THEIR OWN", "Ratio", "Tick SKUs to add", "Cancel changes", "Save changes", "Type to find SKUs. Nothing shows until you search."]
+  },
+  {
+    "name": "kpi",
+    "proto": { "attrs": { "product-tab": "kpi" } },
+    "live": { "path": "/member/products?tab=kpi" },
+    "texts": ["FAIR · KPI", "Set on Rules →", "Edit items", "ITEM", "NAME", "KIND", "COUNTED", "KPI AMOUNT (RM)", "HB Straight", "Bed frame special", "Per bed frame", "Add-on / KPI items"]
+  },
+  {
+    "name": "kpi-edit",
+    "proto": { "attrs": { "product-tab": "kpi" }, "actions": [{ "click": "button:has-text('Edit items')" }] },
+    "live": { "path": "/member/products?tab=kpi", "actions": [{ "click": "button:has-text('Edit items')" }] },
+    "texts": ["ADD AN ITEM", "SKU Master#2", "Bed frame specials", "Sofa specials", "Amount RM", "Add", "Cancel changes", "Save changes"]
+  },
+  {
+    "name": "module-menu",
+    "proto": { "attrs": { "product-tab": "sku" }, "actions": [{ "click": "button[aria-label='Switch module']" }] },
+    "live": { "path": "/member/products", "actions": [{ "click": "button[aria-label='Switch module']" }] },
+    "texts": ["SWITCH MODULE", "Finance", "HR"]
+  }
+]

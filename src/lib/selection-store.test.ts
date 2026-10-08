@@ -132,6 +132,8 @@ describe('navRootPaths', () => {
   it('leaves the sub-departments out when none are passed', () => {
     expect(roots.has('/revenue/fair')).toBe(false)
     // The department-wide child is a constant, so it is always there.
-    expect(roots.has('/revenue/products')).toBe(true)
+    expect(roots.has('/revenue/department')).toBe(true)
+    // The Product List moved into the Revenue app (2026-10-08).
+    expect(roots.has('/revenue/products')).toBe(false)
   })
 })

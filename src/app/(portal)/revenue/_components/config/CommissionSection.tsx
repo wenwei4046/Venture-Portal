@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { formatMoneyBare } from '@/lib/utils'
-import { PRODUCT_LIST_PATH } from '@/lib/revenue'
+import { productListPath } from '@/lib/revenue'
 import { kpiItemKind } from '@/lib/commission/kpi'
 import { compareRankPay, rankLetters, rankPayLabelOf, rankPayOf } from '@/lib/commission/ranks'
 import {
@@ -335,7 +335,7 @@ function SchemeRules({ scheme, subSlug }: { scheme: SchemeRow; subSlug: string }
             0.7 turns a RM 1,000 cost into RM 1,428.57; 1 keeps the cost as keyed. A SKU can have a
             ratio of its own, on{' '}
             <Link
-              href={`${PRODUCT_LIST_PATH}?tab=costing&sub=${encodeURIComponent(subSlug)}`}
+              href={productListPath({ tab: 'costing', sub: subSlug })}
               className="underline underline-offset-2"
             >
               Product List › Costing Setting
@@ -906,7 +906,7 @@ function ItemGroups({ data, scheme }: { data: CommissionSettingsData; scheme: Sc
  * changed an amount in place under every month.
  */
 function KpiItems({ data, subSlug }: { data: CommissionSettingsData; subSlug: string }) {
-  const href = `${PRODUCT_LIST_PATH}?tab=kpi&sub=${encodeURIComponent(subSlug)}`
+  const href = productListPath({ tab: 'kpi', sub: subSlug })
   const items = [...data.kpiItems].sort(
     (a, b) => kpiOrder(a) - kpiOrder(b) || kpiLabel(a).localeCompare(kpiLabel(b)),
   )

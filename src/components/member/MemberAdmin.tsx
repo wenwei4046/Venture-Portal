@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { productListPath } from "@/lib/revenue";
 import {
   adminMemberAction,
   type AdminMemberData,
@@ -1167,7 +1168,7 @@ export default function MemberAdmin({
           <section className={s.card}>
             <div className={s.sectionHead}>
               <h2>Sales catalogue</h2>
-              <Link className={s.link} href="/revenue/products?tab=modular">
+              <Link className={s.link} href={productListPath({ tab: 'modular' })}>
                 Open Product List › Modular →
               </Link>
             </div>
