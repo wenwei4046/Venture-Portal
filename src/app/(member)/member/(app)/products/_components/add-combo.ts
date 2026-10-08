@@ -1,3 +1,4 @@
+import { combosCollide } from '@/lib/catalogue/combos'
 import { heightKey } from '@/lib/catalogue/keys'
 import { TIERS, type PriceCell } from '@/lib/catalogue/pricing'
 import type { CatalogueSku, ComboRow } from '../load'
@@ -186,12 +187,15 @@ export function checkCombo(d: ComboDraft, pieces: readonly ComboPiece[], heights
   }
   const mine = combos.filter(c => c.baseModel.trim().toUpperCase() === d.model.trim().toUpperCase())
   const dup = !!d.model && picked.length > 0 && mine.some(c => c.slots.length > 0 && sameCompartments(c, modules))
+  // One bill, one combo (2026-10-08): a set one bill could match as well as an existing one.
+  const clash = !!d.model && picked.length > 0 && !dup ? mine.find(c => c.slots.length > 0 && combosCollide(modules, c.slots)) : undefined
   const nameTaken = !!d.model && mine.some(c => (c.label ?? '').trim().toLowerCase() === label.toLowerCase())
   const problem = !d.model ? 'Pick a sofa model.'
     : count < 2 ? 'Add at least two compartments.'
     : bad ? 'A price is not a number.'
     : !filled ? 'Fill at least one price.'
     : dup ? 'This model already has a combo with these compartments.'
+    : clash ? `Model ${d.model} already has a combo for these pieces: "${clash.label ?? ''}".`
     : nameTaken ? `Model ${d.model} already has a set called "${label}".`
     : null
   return { problem, label, pieces: count, prices, filled, modules }

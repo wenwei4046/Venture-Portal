@@ -4,6 +4,7 @@ import {
   matchComboSlots,
   normaliseComboModules,
   pickCombo,
+  combosCollide,
   spreadComboTotal,
   type PricedCombo,
 } from './combos'
@@ -241,19 +242,33 @@ function combo(over: Partial<PricedCombo> = {}): PricedCombo {
   }
 }
 
-/** A 2A + console + L build at seat height 30, PRICE_2 fabric. */
+/** A 2A + L build at seat height 30, PRICE_2 fabric — exactly the 2+L set. */
 function build(over: Partial<Parameters<typeof pickCombo>[0]> = {}): Parameters<typeof pickCombo>[0] {
-  return { baseModel: '8030', modules: ['2A(LHF)', 'CONSOLE', 'L(RHF)'], height: '30', tier: 'PRICE_2', ...over }
+  return { baseModel: '8030', modules: ['2A(LHF)', 'L(RHF)'], height: '30', tier: 'PRICE_2', ...over }
 }
 
 describe('pickCombo — the pick inside catalogue_apply_combos', () => {
-  it('a build that covers the combo’s slots is costed at the portal’s price for its height', () => {
+  it('a build that IS the combo’s set is costed at the portal’s price for its height', () => {
     const hit = pickCombo(build(), [combo()])
     expect(hit).not.toBeNull()
     expect(hit!.combo.erpId).toBe('c1')
     expect(hit!.price).toBe(3200)
-    // The console is an extra: it keeps its own price.
-    expect(hit!.matched).toEqual([0, 2])
+    expect(hit!.matched).toEqual([0, 1])
+  })
+
+  // User 2026-10-08 chose "完全一样才算": the ERP took a combo the build merely covered.
+  it('a piece more or a piece less is not the set: no combo, every module at its own price', () => {
+    expect(pickCombo(build({ modules: ['2A(LHF)', 'CONSOLE', 'L(RHF)'] }), [combo()])).toBeNull()
+    expect(pickCombo(build({ modules: ['2A(LHF)'] }), [combo()])).toBeNull()
+  })
+
+  it('a 3+2+1 build takes 3+2+1 — never 3+2 — and with 3+2 alone takes none', () => {
+    const threeTwo = combo({ erpId: 'c32', modules: [['3S'], ['2S']], label: '3+2', priceByHeight: { '30': 3100 } })
+    const threeTwoOne = combo({ erpId: 'c321', modules: [['3S'], ['2S'], ['1S']], label: '3+2+1', priceByHeight: { '30': 3900 } })
+    const b = build({ modules: ['3S', '2S', '1S'] })
+    expect(pickCombo(b, [threeTwo, threeTwoOne])?.combo.label).toBe('3+2+1')
+    expect(pickCombo(b, [threeTwo])).toBeNull()
+    expect(pickCombo(build({ modules: ['2S', '3S'] }), [threeTwo, threeTwoOne])?.combo.label).toBe('3+2')
   })
 
   it('the base model matches regardless of case and surrounding space', () => {
@@ -356,4 +371,18 @@ describe('pickCombo — the pick inside catalogue_apply_combos', () => {
   // set, and a uniform quantity — belong to its caller: costLines in
   // lib/member/calculator.ts (one cart-level build; mixed quantities keep their
   // own costs), covered by lib/member/calculator-catalogue.test.ts.
+})
+
+describe('combosCollide — could one bill match both? (2026-10-08)', () => {
+  it('pairs the pieces so each pair shares a module', () => {
+    expect(combosCollide([['1A(R)(LHF)', '1A(R)(RHF)'], ['1NA']], [['1A(R)(LHF)'], ['1NA']])).toBe(true)
+    expect(combosCollide([['2S'], ['3S']], [['3S'], ['2S']])).toBe(true)
+    expect(combosCollide([['A(LHF)', 'A(RHF)'], ['A(LHF)', 'A(RHF)']], [['A(LHF)'], ['A(RHF)']])).toBe(true)
+  })
+
+  it('one side against the other, or a piece more, never collide', () => {
+    expect(combosCollide([['1A(R)(LHF)'], ['1NA']], [['1A(R)(RHF)'], ['1NA']])).toBe(false)
+    expect(combosCollide([['3S'], ['2S']], [['3S'], ['2S'], ['1S']])).toBe(false)
+    expect(combosCollide([], [])).toBe(false)
+  })
 })

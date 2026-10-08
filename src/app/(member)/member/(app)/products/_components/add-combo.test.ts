@@ -126,8 +126,11 @@ describe('Add combo', () => {
       const pieces = comboPieces(sided, '2376')
       expect(checkCombo(draft({ model: '2376', pcs: { 'either:1A(R)': 1, '1NA': 1 }, prices: { 'PRICE_2#30': '1900' } }), pieces, ['30'], [adopted]).problem)
         .toBe('This model already has a combo with these compartments.')
-      // One side only is another set.
+      // One side only would meet the same bill as the either-side set: one bill, one combo.
       expect(checkCombo(draft({ model: '2376', label: 'Left only', pcs: { '1A(R)(LHF)': 1, '1NA': 1 }, prices: { 'PRICE_2#30': '1900' } }), pieces, ['30'], [adopted]).problem)
+        .toBe('Model 2376 already has a combo for these pieces: "1A(R)+1NA".')
+      // A piece more is another set.
+      expect(checkCombo(draft({ model: '2376', label: 'With L', pcs: { 'either:1A(R)': 1, '1NA': 1, 'L(LHF)': 1 }, prices: { 'PRICE_2#30': '2900' } }), pieces, ['30'], [adopted]).problem)
         .toBeNull()
     })
   })
