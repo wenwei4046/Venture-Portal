@@ -22,7 +22,7 @@ export interface ComboPiece {
   key: string
   /** The card's size: the module code (`erp_products.module_code`), or a left/right pair's own name. */
   module: string
-  /** Under it: the SKU's full code, or `LHF or RHF`. */
+  /** Under it: the SKU's full code, or `LHF / RHF` (a card is narrow; the strip says `LHF or RHF`). */
   code: string
   /** The modules one piece of it may be: one, or the left and the right of a pair. */
   modules: string[]
@@ -93,7 +93,7 @@ export function comboPieces(skus: readonly CatalogueSku[], model: string): Combo
     if (!twin || singles.indexOf(twin) > singles.indexOf(p)) continue
     paired.add(side.pair)
     const [left, right] = side.side === 'LHF' ? [p, twin] : [twin, p]
-    out.push({ key: `either:${side.pair}`, module: side.pair, code: 'LHF or RHF', modules: [left.module, right.module], either: true, grid: dearerGrid(left.grid, right.grid) })
+    out.push({ key: `either:${side.pair}`, module: side.pair, code: 'LHF / RHF', modules: [left.module, right.module], either: true, grid: dearerGrid(left.grid, right.grid) })
   }
   return out
 }

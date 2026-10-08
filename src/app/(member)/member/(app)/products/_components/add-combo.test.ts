@@ -97,11 +97,11 @@ describe('Add combo', () => {
         ['1A(R)(LHF)', '1A(R)(LHF)', '2376-1A(R)(LHF)', ['1A(R)(LHF)']],
         ['1NA', '1NA', '2376-1NA', ['1NA']],
         ['1A(R)(RHF)', '1A(R)(RHF)', '2376-1A(R)(RHF)', ['1A(R)(RHF)']],
-        ['either:1A(R)', '1A(R)', 'LHF or RHF', ['1A(R)(LHF)', '1A(R)(RHF)']],
+        ['either:1A(R)', '1A(R)', 'LHF / RHF', ['1A(R)(LHF)', '1A(R)(RHF)']],
         ['L(LHF)', 'L(LHF)', '2376-L(LHF)', ['L(LHF)']],
         ['2A-RHF', '2A-RHF', '2376-2A-RHF', ['2A-RHF']],
         ['2A-LHF', '2A-LHF', '2376-2A-LHF', ['2A-LHF']],
-        ['either:2A', '2A', 'LHF or RHF', ['2A-LHF', '2A-RHF']],
+        ['either:2A', '2A', 'LHF / RHF', ['2A-LHF', '2A-RHF']],
       ])
     })
 
