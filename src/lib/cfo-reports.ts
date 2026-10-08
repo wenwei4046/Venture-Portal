@@ -22,7 +22,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import { poolLabel, comparePools } from './pools'
-import { fetchAllRows } from './paginate'
+import { fetchAllRows, fetchAllRowsParallel, fetchByKeys } from './paginate'
 import { lineAttributions, segmentToPoolKey } from './invoice-settlement'
 import { primedModeToPool, primedSegmentToPool } from './dept-registry'
 import type { AccountType, CashFlowCategory } from './coa'
@@ -723,6 +723,14 @@ export function classifyRows(input: ClassifyInput): ClassifyOutput {
 // Supabase-backed gathering + fetch wrappers
 // ────────────────────────────────────────────────────────────────────────────
 
+/** A read started ahead of the step that awaits it (2026-10-08), marked
+ *  handled: if an earlier step throws or returns first, nothing awaits it, and
+ *  an unawaited rejection would be an unhandled one. Awaiting it still throws. */
+function startedEarly<T>(read: Promise<T>): Promise<T> {
+  read.catch(() => {})
+  return read
+}
+
 const INVOICE_REVENUE_STATUSES = ['issued', 'paid', 'paid_via_netting'] as const
 
 interface AccountMeta {
@@ -748,11 +756,22 @@ async function fetchAccountIndex(supabase: SupabaseClient): Promise<Map<string, 
   return byCode
 }
 
+interface PvSourceRow {
+  id: string
+  voucher_id: string
+  pool: string
+  account_code: string | null
+  amount: number | string | null
+}
+
 async function gatherPvSources(
   supabase: SupabaseClient,
   args: { from: string; to: string },
 ): Promise<RawPvSourceRow[]> {
   const { from, to } = args
+  // 3) (started first — it needs nothing below) Account lookup → name + type +
+  //    cash_flow_category.
+  const accountIndexRead = startedEarly(fetchAccountIndex(supabase))
 
   // 1) Paid vouchers in window.
   const vouchers = await fetchAllRows((lo, hi) => supabase
@@ -792,18 +811,30 @@ async function gatherPvSources(
 
   // 2) Their source rows. Column was renamed category_code → account_code
   //    in migration 238.
-  const sources = await fetchAllRows((lo, hi) => supabase
-    .from('payment_voucher_sources')
-    .select('voucher_id, pool, account_code, amount')
-    .in('voucher_id', voucherIds)
-    .order('id', { ascending: true })
-    .range(lo, hi))
+  //    Chunked by voucher (fetchByKeys, 2026-10-08). Every paid voucher's id
+  //    in ONE `.in()` is a URL that grows with the books: the all-time accrual
+  //    view (Dept Pool) had 418 → ~16 KB, which already fails off production,
+  //    and 507 ids is where the same kind of list broke before (paginate.ts).
+  //    Each chunk still pages — 100 vouchers could pass 1,000 source rows —
+  //    and the rows are put back in source-row id order, the order the one
+  //    query answered in: classifyRows sums in that order and breaks ties by
+  //    it (linesFrom, the balance movements). `id` is read for that alone.
+  const sources = await fetchByKeys<PvSourceRow, string>(voucherIds, async (chunk) => ({
+    data: await fetchAllRows<PvSourceRow>((lo, hi) => supabase
+      .from('payment_voucher_sources')
+      .select('id, voucher_id, pool, account_code, amount')
+      .in('voucher_id', chunk)
+      .order('id', { ascending: true })
+      .range(lo, hi)),
+    error: null,
+  }))
+  // uuid order = byte order = plain string order of the lowercase hex form.
+  sources.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 
-  // 3) Account lookup → name + type + cash_flow_category.
-  const accountByCode = await fetchAccountIndex(supabase)
+  const accountByCode = await accountIndexRead
 
   const rows: RawPvSourceRow[] = []
-  for (const src of sources ?? []) {
+  for (const src of sources) {
     const voucherId = src.voucher_id as string
     const meta = voucherMeta.get(voucherId)
     if (!meta) continue
@@ -864,12 +895,19 @@ async function gatherInvoices(
     Array<{ amount: number; segment: string | null; category_code: string | null }>
   >()
   if (consolidatedIds.length > 0) {
-    const cLines = await fetchAllRows((lo, hi) => supabase
-      .from('invoice_lines')
-      .select('invoice_id, amount, segment, category_code')
-      .in('invoice_id', consolidatedIds)
-      .order('id', { ascending: true })
-      .range(lo, hi))
+    // Chunked by invoice (fetchByKeys, 2026-10-08): over an all-time window
+    // these ids are a list that only grows, in one URL. Every line of an
+    // invoice lands in ONE chunk, in id order — the per-invoice order the one
+    // query gave, and the only order read below.
+    const cLines = await fetchByKeys(consolidatedIds, async (chunk) => ({
+      data: await fetchAllRows((lo, hi) => supabase
+        .from('invoice_lines')
+        .select('invoice_id, amount, segment, category_code')
+        .in('invoice_id', chunk)
+        .order('id', { ascending: true })
+        .range(lo, hi)),
+      error: null,
+    }))
     for (const ln of cLines ?? []) {
       const arr = clinesByInvoice.get(ln.invoice_id as string) ?? []
       arr.push({
@@ -1142,10 +1180,15 @@ async function gatherRepaymentPrincipalInflows(
   if (!data || data.length === 0) return []
 
   const loanIds = Array.from(new Set(data.map((r) => r.loan_id as string)))
-  const { data: loans } = loanIds.length
-    ? await supabase.from('loans').select('id, company_id').in('id', loanIds)
-    : { data: [] as { id: string; company_id: string }[] }
-  const companyIdByLoanId = new Map((loans ?? []).map((l) => [l.id as string, l.company_id as string]))
+  // Chunked (fetchByKeys, 2026-10-08): over an all-time window every repaid
+  // loan's id went into one URL. A failed read still only leaves the labels
+  // at '—', as before (this read's error was never checked).
+  const loans = loanIds.length
+    ? await fetchByKeys<{ id: string; company_id: string }, string>(loanIds, (chunk) =>
+        supabase.from('loans').select('id, company_id').in('id', chunk),
+      ).catch(() => [] as { id: string; company_id: string }[])
+    : ([] as { id: string; company_id: string }[])
+  const companyIdByLoanId = new Map(loans.map((l) => [l.id, l.company_id]))
 
   const companyIds = Array.from(new Set(Array.from(companyIdByLoanId.values())))
   const { data: companies } = companyIds.length
@@ -1604,6 +1647,22 @@ export async function fetchTrialBalance(
 ): Promise<TrialBalance> {
   const { asOf, showZeroBalance } = args
 
+  // The ledger read needs nothing from the chart of accounts, so both start
+  // at once and the ledger's pages go together (2026-10-08 — it was the COA,
+  // then five pages one after another). The COA's failure is still the one
+  // reported first.
+  const linesRead = startedEarly(
+    fetchAllRowsParallel(
+      (from, to, withCount) =>
+        supabase
+          .from('journal_lines')
+          .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)', withCount ? { count: 'exact' } : undefined)
+          .order('id', { ascending: true })
+          .range(from, to),
+      'fetchTrialBalance lines',
+    ),
+  )
+
   // ── 1: Resolve the set of leaf accounts. A leaf is an account that is NOT
   //    a header — its code is not referenced by any other row's parent_code.
   const { data: coaRows, error: coaErr } = await supabase
@@ -1636,23 +1695,15 @@ export async function fetchTrialBalance(
   //    (that URL can blow past length limits and fail outright).
   const leafSet = new Set(leafAccounts.map((a) => a.code))
   const netByCode = new Map<string, number>()
-  const PAGE = 1000
-  for (let fromIdx = 0; ; fromIdx += PAGE) {
-    const { data: lines, error: jlErr } = await supabase
-      .from('journal_lines')
-      .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
-      .order('id', { ascending: true })
-      .range(fromIdx, fromIdx + PAGE - 1)
-    if (jlErr) throw new Error(`fetchTrialBalance lines: ${jlErr.message}`)
-    for (const l of lines ?? []) {
-      const je = l.journal_entries as unknown as { transaction_date: string; is_reversed: boolean }
-      if (je.is_reversed) continue
-      if (je.transaction_date > asOf) continue
-      const code = l.account_code as string
-      if (!leafSet.has(code)) continue
-      netByCode.set(code, (netByCode.get(code) ?? 0) + Number(l.debit ?? 0) - Number(l.credit ?? 0))
-    }
-    if (!lines || lines.length < PAGE) break
+  // Pages are counted on RAW rows (the reversed / later-dated skips run after
+  // every page is in), and summed in page order — the old loop's order.
+  for (const l of await linesRead) {
+    const je = l.journal_entries as unknown as { transaction_date: string; is_reversed: boolean }
+    if (je.is_reversed) continue
+    if (je.transaction_date > asOf) continue
+    const code = l.account_code as string
+    if (!leafSet.has(code)) continue
+    netByCode.set(code, (netByCode.get(code) ?? 0) + Number(l.debit ?? 0) - Number(l.credit ?? 0))
   }
 
   return buildTrialBalance({ accounts: leafAccounts, netByCode, asOf, showZeroBalance })
@@ -1785,40 +1836,95 @@ export async function resolveSourceDescriptions(
   supabase: SupabaseClient,
   refs: Array<{ referenceType: string; referenceId: string }>,
 ): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
-  if (refs.length === 0) return out
+  if (refs.length === 0) return new Map<string, string>()
+  return sourceDescriptionsFrom(
+    await readLedgerSourceRows(supabase, refs, SOURCE_DESCRIPTION_COLUMNS, 'resolveSourceDescriptions'),
+  )
+}
 
+// ── The rows behind both resolvers (2026-10-08) ──────────────────────────────
+// The Ledger used to ask for the SAME invoices and payment vouchers twice — once
+// for descriptions, once for Journal Type + Ref — four reads in a row. Now one
+// read per table serves both, the two tables go at once, and the ids are
+// chunked (fetchByKeys): a period's worth of ids in one `.in()` builds the URL
+// that fails outright past a few hundred ids (paginate.ts), and an unpaged
+// `.in()` past 1,000 ids would silently drop rows. A table's failure is still
+// reported as it was — invoices before payment_vouchers.
+
+interface LedgerSourceRow {
+  id: string
+  description?: string | null
+  invoice_no?: string | null
+  voucher_no?: string | null
+  direction?: string | null
+}
+
+interface LedgerSourceRows {
+  invoices: LedgerSourceRow[]
+  vouchers: LedgerSourceRow[]
+}
+
+const SOURCE_DESCRIPTION_COLUMNS = { invoices: 'id, description', vouchers: 'id, description' }
+const SOURCE_META_COLUMNS = { invoices: 'id, invoice_no', vouchers: 'id, voucher_no, direction' }
+const LEDGER_SOURCE_COLUMNS = {
+  invoices: 'id, description, invoice_no',
+  vouchers: 'id, description, voucher_no, direction',
+}
+
+async function readLedgerSourceRows(
+  supabase: SupabaseClient,
+  refs: Array<{ referenceType: string; referenceId: string }>,
+  columns: { invoices: string; vouchers: string },
+  label: string,
+): Promise<LedgerSourceRows> {
   const invoiceIds = new Set<string>()
   const pvIds = new Set<string>()
   for (const r of refs) {
     if (r.referenceType === 'invoice') invoiceIds.add(r.referenceId)
     else if (r.referenceType === 'payment_voucher') pvIds.add(r.referenceId)
   }
+  type Chunk = PromiseLike<{ data: LedgerSourceRow[] | null; error: { message: string } | null }>
+  const [invoices, vouchers] = await Promise.allSettled([
+    fetchByKeys<LedgerSourceRow, string>(
+      Array.from(invoiceIds),
+      (chunk) => supabase.from('invoices').select(columns.invoices).in('id', chunk) as unknown as Chunk,
+      `${label} invoices`,
+    ),
+    fetchByKeys<LedgerSourceRow, string>(
+      Array.from(pvIds),
+      (chunk) => supabase.from('payment_vouchers').select(columns.vouchers).in('id', chunk) as unknown as Chunk,
+      `${label} payment_vouchers`,
+    ),
+  ])
+  if (invoices.status === 'rejected') throw invoices.reason
+  if (vouchers.status === 'rejected') throw vouchers.reason
+  return { invoices: invoices.value, vouchers: vouchers.value }
+}
 
-  if (invoiceIds.size > 0) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('id, description')
-      .in('id', Array.from(invoiceIds))
-    if (error) throw new Error(`resolveSourceDescriptions invoices: ${error.message}`)
-    for (const r of data ?? []) {
-      const desc = (r.description as string | null)?.trim()
-      if (desc) out.set(`invoice:${r.id as string}`, desc)
-    }
+function sourceDescriptionsFrom(rows: LedgerSourceRows): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const r of rows.invoices) {
+    const desc = r.description?.trim()
+    if (desc) out.set(`invoice:${r.id}`, desc)
   }
-
-  if (pvIds.size > 0) {
-    const { data, error } = await supabase
-      .from('payment_vouchers')
-      .select('id, description')
-      .in('id', Array.from(pvIds))
-    if (error) throw new Error(`resolveSourceDescriptions payment_vouchers: ${error.message}`)
-    for (const r of data ?? []) {
-      const desc = (r.description as string | null)?.trim()
-      if (desc) out.set(`payment_voucher:${r.id as string}`, desc)
-    }
+  for (const r of rows.vouchers) {
+    const desc = r.description?.trim()
+    if (desc) out.set(`payment_voucher:${r.id}`, desc)
   }
+  return out
+}
 
+function sourceMetaFrom(rows: LedgerSourceRows): Map<string, { journalType: string; ref: string }> {
+  const out = new Map<string, { journalType: string; ref: string }>()
+  for (const r of rows.invoices) {
+    out.set(`invoice:${r.id}`, { journalType: 'SALES', ref: r.invoice_no ?? '' })
+  }
+  for (const r of rows.vouchers) {
+    out.set(`payment_voucher:${r.id}`, {
+      journalType: r.direction === 'credit' ? 'RECEIPT' : 'PAYMENT',
+      ref: r.voucher_no ?? '',
+    })
+  }
   return out
 }
 
@@ -1845,46 +1951,8 @@ export async function resolveLedgerSourceMeta(
   supabase: SupabaseClient,
   refs: Array<{ referenceType: string; referenceId: string }>,
 ): Promise<Map<string, { journalType: string; ref: string }>> {
-  const out = new Map<string, { journalType: string; ref: string }>()
-  if (refs.length === 0) return out
-
-  const invoiceIds = new Set<string>()
-  const pvIds = new Set<string>()
-  for (const r of refs) {
-    if (r.referenceType === 'invoice') invoiceIds.add(r.referenceId)
-    else if (r.referenceType === 'payment_voucher') pvIds.add(r.referenceId)
-  }
-
-  if (invoiceIds.size > 0) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('id, invoice_no')
-      .in('id', Array.from(invoiceIds))
-    if (error) throw new Error(`resolveLedgerSourceMeta invoices: ${error.message}`)
-    for (const r of data ?? []) {
-      out.set(`invoice:${r.id as string}`, {
-        journalType: 'SALES',
-        ref: (r.invoice_no as string | null) ?? '',
-      })
-    }
-  }
-
-  if (pvIds.size > 0) {
-    const { data, error } = await supabase
-      .from('payment_vouchers')
-      .select('id, voucher_no, direction')
-      .in('id', Array.from(pvIds))
-    if (error) throw new Error(`resolveLedgerSourceMeta payment_vouchers: ${error.message}`)
-    for (const r of data ?? []) {
-      const dir = r.direction as string | null
-      out.set(`payment_voucher:${r.id as string}`, {
-        journalType: dir === 'credit' ? 'RECEIPT' : 'PAYMENT',
-        ref: (r.voucher_no as string | null) ?? '',
-      })
-    }
-  }
-
-  return out
+  if (refs.length === 0) return new Map<string, { journalType: string; ref: string }>()
+  return sourceMetaFrom(await readLedgerSourceRows(supabase, refs, SOURCE_META_COLUMNS, 'resolveLedgerSourceMeta'))
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1895,20 +1963,127 @@ export async function resolveLedgerSourceMeta(
 // source-description lookup. Returns one Ledger per requested account, in the
 // canonical TB type order (asset · fixed_asset · liability · equity · revenue ·
 // cost · other_income · expense), then by code within each type.
+//
+// Nothing waits for what it does not need (2026-10-08). The page used to cost
+// 12 round trips in a row: the COA twice, the opening balance's four pages,
+// the period JEs, the source lookups four reads deep, then the period lines.
+// Now the period JEs (and the source lookups behind them) start at once; the
+// opening and period lines start as soon as the leaf codes are known — at
+// once too when the codes are given, since valid codes ARE the leaf set — and
+// the pages of each go together. Every read is still AWAITED in the old order,
+// so the first failure reported is the one the old code reported; a read
+// started early is marked handled, so one left unawaited (an earlier step
+// threw or returned) is not an unhandled rejection.
 // ────────────────────────────────────────────────────────────────────────────
+
+/** The chart_of_accounts columns fetchLedgers reads. */
+export interface LedgerCoaRow {
+  code: string
+  name: string
+  type: string
+  parent_code: string | null
+  is_active: boolean
+}
 
 export async function fetchLedgers(
   supabase: SupabaseClient,
-  args: { codes: string[]; from: string; to: string },
+  args: {
+    codes: string[]
+    from: string
+    to: string
+    /** The caller's own read of the ACTIVE chart of accounts, when it has one
+     *  (the Ledger page needs it for its picker — it was read twice). Same
+     *  columns and filter as the read below; its order does not matter, the
+     *  accounts are sorted here. */
+    coa?: PromiseLike<{ data: LedgerCoaRow[] | null; error: { message: string } | null }>
+  },
 ): Promise<Ledger[]> {
   const { codes, from, to } = args
 
+  // ── 3 (started first): Period JEs with metadata for the description
+  //    override — they need nothing from the accounts. ──
+  const periodJesRead = startedEarly(
+    fetchAllRowsParallel(
+      (lo, hi, withCount) =>
+        supabase
+          .from('journal_entries')
+          .select('id, entry_no, transaction_date, description, reference_type, reference_id, segment', withCount ? { count: 'exact' } : undefined)
+          .gte('transaction_date', from)
+          .lte('transaction_date', to)
+          .eq('is_reversed', false)
+          .order('transaction_date', { ascending: true })
+          .order('entry_no', { ascending: true })
+          .order('id', { ascending: true })
+          .range(lo, hi),
+      'fetchLedgers period entries',
+    ),
+  )
+  // ── 4 (started as soon as the JEs are in): source-description override and
+  //    Journal Type / Ref (invoices / payment_vouchers) — ONE read per table
+  //    serves both (it was two). ──
+  const sourcesRead = startedEarly(
+    periodJesRead.then((periodJes) => {
+      const refs: Array<{ referenceType: string; referenceId: string }> = []
+      for (const j of periodJes) {
+        const t = j.reference_type as string | null
+        const id = j.reference_id as string | null
+        if (t && id) refs.push({ referenceType: t, referenceId: id })
+      }
+      return refs.length === 0
+        ? { invoices: [], vouchers: [] }
+        : readLedgerSourceRows(supabase, refs, LEDGER_SOURCE_COLUMNS, 'resolveSourceDescriptions')
+    }),
+  )
+
+  // ── 2 + 5: the lines, once the leaf codes are known. Join-filtered — the old
+  //    version materialised EVERY pre-from JE id into the request URL and
+  //    started 400ing ("Bad Request", found 2026-08-13) once history passed a
+  //    few thousand entries. ──
+  const readOpening = (leafCodes: string[]) =>
+    startedEarly(
+      fetchAllRowsParallel(
+        (lo, hi, withCount) =>
+          supabase
+            .from('journal_lines')
+            .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)', withCount ? { count: 'exact' } : undefined)
+            .in('account_code', leafCodes)
+            .lt('journal_entries.transaction_date', from)
+            .eq('journal_entries.is_reversed', false)
+            .order('id', { ascending: true })
+            .range(lo, hi),
+        'fetchLedgers opening',
+      ),
+    )
+  const readPeriodLines = (leafCodes: string[]) =>
+    startedEarly(
+      fetchAllRowsParallel(
+        (lo, hi, withCount) =>
+          supabase
+            .from('journal_lines')
+            .select('id, entry_id, account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)', withCount ? { count: 'exact' } : undefined)
+            .in('account_code', leafCodes)
+            .gte('journal_entries.transaction_date', from)
+            .lte('journal_entries.transaction_date', to)
+            .eq('journal_entries.is_reversed', false)
+            .order('id', { ascending: true })
+            .range(lo, hi),
+        'fetchLedgers lines',
+      ),
+    )
+  // Given codes need nothing from the COA: if they are valid leaves (checked
+  // below, before any line is used) they are exactly the leaf set.
+  const givenCodes = codes.length > 0 ? Array.from(new Set(codes)) : null
+  let openingRead = givenCodes ? readOpening(givenCodes) : null
+  let periodLinesRead = givenCodes ? readPeriodLines(givenCodes) : null
+
   // ── 1: Resolve the leaf accounts. If codes given, use those (and verify
   //    none are headers); else pick every leaf. ──
-  const { data: coaRows, error: coaErr } = await supabase
-    .from('chart_of_accounts')
-    .select('code, name, type, parent_code, is_active')
-    .eq('is_active', true)
+  const { data: coaRows, error: coaErr }: { data: LedgerCoaRow[] | null; error: { message: string } | null } =
+    await (args.coa ??
+      supabase
+        .from('chart_of_accounts')
+        .select('code, name, type, parent_code, is_active')
+        .eq('is_active', true))
   if (coaErr) throw new Error(`fetchLedgers COA: ${coaErr.message}`)
   const allCoa = coaRows ?? []
   const headerCodes = new Set(
@@ -1947,22 +2122,14 @@ export async function fetchLedgers(
 
   if (accounts.length === 0) return []
   const leafCodes = accounts.map((a) => a.code)
+  openingRead ??= readOpening(leafCodes)
+  periodLinesRead ??= readPeriodLines(leafCodes)
 
   // ── 2: Opening balances. Σ (Dr − Cr) for every line on a non-reversed JE
   //    with transaction_date < from. Single batched query. ──
-  // Join-filtered in one query — the old version materialised EVERY pre-from
-  // JE id into the request URL and started 400ing ("Bad Request", found
-  // 2026-08-13) once history passed a few thousand entries.
   const openingByCode = new Map<string, number>()
   {
-    const openLines = (await fetchAllRows((lo, hi) => supabase
-      .from('journal_lines')
-      .select('account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
-      .in('account_code', leafCodes)
-      .lt('journal_entries.transaction_date', from)
-      .eq('journal_entries.is_reversed', false)
-      .order('id', { ascending: true })
-      .range(lo, hi))) as Record<string, unknown>[]
+    const openLines = (await openingRead) as Record<string, unknown>[]
     for (const l of openLines) {
       const code = l.account_code as string
       openingByCode.set(
@@ -1972,28 +2139,13 @@ export async function fetchLedgers(
     }
   }
 
-  // ── 3: Period JEs with metadata for the description override. ──
-  const periodJes = await fetchAllRows((lo, hi) => supabase
-    .from('journal_entries')
-    .select('id, entry_no, transaction_date, description, reference_type, reference_id, segment')
-    .gte('transaction_date', from)
-    .lte('transaction_date', to)
-    .eq('is_reversed', false)
-    .order('transaction_date', { ascending: true })
-    .order('entry_no', { ascending: true })
-    .order('id', { ascending: true })
-    .range(lo, hi))
-  const periodJes2 = periodJes ?? []
+  // ── 3: Period JEs (read since the start). ──
+  const periodJes2 = await periodJesRead
 
-  // ── 4: Source-description override (invoices / payment_vouchers). ──
-  const refs: Array<{ referenceType: string; referenceId: string }> = []
-  for (const j of periodJes2) {
-    const t = j.reference_type as string | null
-    const id = j.reference_id as string | null
-    if (t && id) refs.push({ referenceType: t, referenceId: id })
-  }
-  const descOverrides = await resolveSourceDescriptions(supabase, refs)
-  const srcMeta = await resolveLedgerSourceMeta(supabase, refs)
+  // ── 4: Source-description override + Journal Type / Ref. ──
+  const sourceRows = await sourcesRead
+  const descOverrides = sourceDescriptionsFrom(sourceRows)
+  const srcMeta = sourceMetaFrom(sourceRows)
 
   const jeById = new Map<
     string,
@@ -2036,15 +2188,7 @@ export async function fetchLedgers(
   {
     // Join-filtered — same URL-size fix as the opening query; JE metadata
     // still comes from jeById (built above from the period JE fetch).
-    const lines = (await fetchAllRows((lo, hi) => supabase
-      .from('journal_lines')
-      .select('id, entry_id, account_code, debit, credit, journal_entries!inner(transaction_date, is_reversed)')
-      .in('account_code', leafCodes)
-      .gte('journal_entries.transaction_date', from)
-      .lte('journal_entries.transaction_date', to)
-      .eq('journal_entries.is_reversed', false)
-      .order('id', { ascending: true })
-      .range(lo, hi))) as Record<string, unknown>[]
+    const lines = (await periodLinesRead) as Record<string, unknown>[]
     for (const l of lines) {
       const je = jeById.get(l.entry_id as string)
       if (!je) continue

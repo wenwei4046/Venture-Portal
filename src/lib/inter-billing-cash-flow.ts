@@ -210,16 +210,17 @@ interface PoolRow {
  * same `HV-OR-…` PV ref (which excludes ordinary external receipts). Resilient:
  * on any read error (e.g. a dept_manager RLS-blocked from dept_pools) it returns
  * no lines, so the Cash Flow still renders (just un-adjusted, as before).
+ *
+ * `bankCodes` may be the page's own pending read (2026-10-08): none of the
+ * reads below needs it — only the synthetic lines' bank leg does — so they all
+ * start at once, beside the page's journal read, instead of after it.
  */
 export async function fetchInterBillingCashFlow(
   supabase: SupabaseClient,
-  bankCodes: ReadonlySet<string>,
+  bankCodes: ReadonlySet<string> | PromiseLike<ReadonlySet<string>>,
 ): Promise<{ lines: GlLine[]; account: CoaAccount; payrollAccount: CoaAccount }> {
-  const bankCode = bankCodes.has('3000')
-    ? '3000'
-    : (bankCodes.values().next().value ?? '3000')
   try {
-    const [payRes, recRes, custodyRes, fundRes, voidedRes, flagsRes] = await Promise.all([
+    const [payRes, recRes, custodyRes, fundRes, voidedRes, flagsRes, mirrorRes] = await Promise.all([
       supabase
         .from('dept_pools')
         .select('amount, created_at, description, departments!inner(name)')
@@ -261,14 +262,18 @@ export async function fetchInterBillingCashFlow(
       // emptied custodyRefs + voided and silently killed their payroll bridge.
       // Ref strings only — unioned with the direct reads below.
       supabase.rpc('bridge_ref_flags' as never),
+      // Mirror rows carry the PAYING side's real expense account per nature
+      // (rent / utilities / salary…) since the 2026-07-24 by-nature change.
+      // Via bridge_mirror_slices RPC (mig 20260820030000): the direct
+      // payment_voucher_sources read is RLS-blocked for dept_manager, which
+      // lumped their inter-billing line; the RPC serves finance/principal all
+      // slices and a dept_manager only their own department's vouchers.
+      // (In this batch since 2026-10-08 — it needs nothing from the reads
+      // above; awaited after them it was one more round trip in a row.)
+      supabase.rpc('bridge_mirror_slices' as never),
     ])
-    // Mirror rows carry the PAYING side's real expense account per nature
-    // (rent / utilities / salary…) since the 2026-07-24 by-nature change.
-    // Via bridge_mirror_slices RPC (mig 20260820030000): the direct
-    // payment_voucher_sources read is RLS-blocked for dept_manager, which
-    // lumped their inter-billing line; the RPC serves finance/principal all
-    // slices and a dept_manager only their own department's vouchers.
-    const mirrorRes = await supabase.rpc('bridge_mirror_slices' as never)
+    const banks = await bankCodes
+    const bankCode = banks.has('3000') ? '3000' : (banks.values().next().value ?? '3000')
     if (payRes.error) throw payRes.error
     if (recRes.error) throw recRes.error
     if (custodyRes.error) throw custodyRes.error

@@ -7,7 +7,11 @@ import { buildCashFlow, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } fr
 import { cashFlowBlocks } from '@/lib/gl-report-blocks'
 import { buildCashFlowSideSections } from '@/lib/cash-flow-sections'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import {
+  fetchInterBillingCashFlow,
+  interBillTransferAccount,
+  payrollCustodyAccount,
+} from '@/lib/inter-billing-cash-flow'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
 import { segmentFilterFor } from '../../_components/report-segments'
 
@@ -25,21 +29,27 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createClient()
-  const [lines, accounts, { data: banks }] = await Promise.all([
+  // Every read at once, as on the page (2026-10-08). Mirror the page:
+  // internal-transfer bridge lines only make sense inside a single segment;
+  // consolidated exports drop them (this route is principal/finance only, so
+  // no-segment == consolidated) — and there the bridge is not read at all.
+  const bankCodesRead = Promise.resolve(
+    supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
+  ).then(({ data: banks }) => new Set((banks ?? []) as unknown as string[]))
+  const [lines, accounts, bankCodes, ib, inLayoutRaw, outLayoutRaw] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
+    bankCodesRead,
+    segment ? fetchInterBillingCashFlow(supabase, bankCodesRead) : null,
+    // Same user-arranged sections the page renders.
+    readReportLayout(supabase, 'cash_flow_in'),
+    readReportLayout(supabase, 'cash_flow_out'),
   ])
-  const bankCodes = new Set((banks ?? []) as unknown as string[])
-  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  // Mirror the page: internal-transfer bridge lines only make sense inside a
-  // single segment; consolidated exports drop them (this route is
-  // principal/finance only, so no-segment == consolidated).
-  const ibLines = segment ? ib.lines : []
+  const ibLines = ib ? ib.lines : []
 
   const cf = buildCashFlow(
     [...lines, ...ibLines],
-    [...accounts, ib.account, ib.payrollAccount],
+    [...accounts, interBillTransferAccount, payrollCustodyAccount],
     {
       current: monthPeriod(period),
       previous: monthPeriod(compare || period),
@@ -48,12 +58,7 @@ export async function GET(req: Request) {
     bankCodes,
   )
 
-  // Same user-arranged sections the page renders.
-  const coaWithSynthetic = [...accounts, ib.account, ib.payrollAccount]
-  const [inLayoutRaw, outLayoutRaw] = await Promise.all([
-    readReportLayout(supabase, 'cash_flow_in'),
-    readReportLayout(supabase, 'cash_flow_out'),
-  ])
+  const coaWithSynthetic = [...accounts, interBillTransferAccount, payrollCustodyAccount]
 
   return glStatementExportResponse({
     format,

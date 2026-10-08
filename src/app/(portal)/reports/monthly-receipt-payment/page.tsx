@@ -12,7 +12,11 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import {
+  fetchInterBillingCashFlow,
+  interBillTransferAccount,
+  payrollCustodyAccount,
+} from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { monthColumns, type MatrixRow } from '@/lib/monthly-matrix'
 import { buildRnpMatrixRows, type RnpInvoiceEvent } from '@/lib/monthly-rnp'
@@ -40,11 +44,18 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
-  const [lines, accounts, { data: banks }, inSaved, outSaved, eventsRes, { data: companyRows }] =
+  const consolidated = !isDeptMgr && !segment
+  // The bridge starts beside the journal read with the bank codes still
+  // pending (2026-10-08), and is not read where its lines are dropped.
+  const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
+    ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
+  )
+  const [lines, accounts, bankCodes, ib, inSaved, outSaved, eventsRes, { data: companyRows }] =
     await Promise.all([
       fetchAllJournalLines(supabase),
       fetchCoaAccounts(supabase),
-      supabase.rpc('bank_gl_codes' as never),
+      bankCodesRead,
+      consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
       readReportLayout(supabase, 'cash_flow_in'),
       readReportLayout(supabase, 'cash_flow_out'),
       supabase.rpc(
@@ -53,14 +64,11 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       ),
       supabase.from('companies').select('id, name, short_code'),
     ])
-  const bankCodes = new Set((banks ?? []) as unknown as string[])
-  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  const consolidated = !isDeptMgr && !segment
-  const ibLines = consolidated ? [] : ib.lines
+  const ibLines = ib ? ib.lines : []
 
   const data = buildMonthlyCashFlowSides(
     [...lines, ...ibLines],
-    [...accounts, ib.account, ib.payrollAccount],
+    [...accounts, interBillTransferAccount, payrollCustodyAccount],
     bankCodes,
     { year, throughMonth, segment: segmentFilterFor(segment) },
   )
