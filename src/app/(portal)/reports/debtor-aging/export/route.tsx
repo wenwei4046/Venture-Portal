@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
@@ -51,7 +52,7 @@ async function loadAging() {
       }
     })
     .filter((i) => i.amount > 0.005)
-  return buildDebtorAging(raw, dayjs().format('YYYY-MM-DD'))
+  return buildDebtorAging(raw, officeToday())
 }
 
 const m = (v: number) => (v ? formatMoneyBare(v) : '—')

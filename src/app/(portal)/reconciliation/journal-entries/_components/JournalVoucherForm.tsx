@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { formatMoney } from '@/lib/utils'
+import { officeToday } from '@/lib/office-time'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
 import {
   createJournalVoucher,
@@ -68,8 +69,9 @@ function emptyLine(): LineDraft {
   return { key: nextKey(), account_code: '', debit: '', credit: '', description: '' }
 }
 
+/** The office's today (an ISO string's date is UTC's — yesterday until 08:00). */
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  return officeToday()
 }
 
 export default function JournalVoucherForm({ accounts, entry, prefill }: Props) {

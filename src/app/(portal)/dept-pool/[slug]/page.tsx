@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeDayStart } from '@/lib/office-time'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
@@ -67,8 +68,9 @@ export default async function DeptPoolDetailPage({ params, searchParams }: Props
       .from('dept_pools')
       .select('transaction_type, amount')
       .eq('department_id', dept.id)
-      .gte('created_at', periodStart)
-      .lt('created_at', nextMonthStart)
+      // By the office's calendar: a bare date is UTC midnight to the database.
+      .gte('created_at', officeDayStart(periodStart))
+      .lt('created_at', officeDayStart(nextMonthStart))
     for (const r of monthRows ?? []) {
       if (r.transaction_type === 'np_in') monthIn += Number(r.amount)
       else if (r.transaction_type === 'expense_out' || r.transaction_type === 'inter_billing_out') {

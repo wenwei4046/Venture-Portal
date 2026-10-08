@@ -4,7 +4,7 @@ import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildClaimsXlsx } from './_format/xlsx'
 import { ClaimsPdf } from './_format/pdf'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
   await requirePermission('reports')
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 
   const claims = await fetchAllRows((lo, hi) => supabase.from('claims').select('*').order('created_at', { ascending: false }).order('id', { ascending: true }).range(lo, hi))
 
-  const filename = `claims-${dayjs().format('YYYYMMDD')}`
+  const filename = `claims-${officeTime().format('YYYYMMDD')}`
   if (format === 'xlsx') {
     return exportXlsxResponse({ filename, buffer: buildClaimsXlsx(claims ?? []) })
   }

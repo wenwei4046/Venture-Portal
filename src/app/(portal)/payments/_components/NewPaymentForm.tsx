@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect } from 'react'
+import { officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 import { createPaymentVoucher } from '../actions'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
@@ -180,10 +181,10 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
   const [amount, setAmount] = useState(
     isInvoicePay ? invoicePreset!.total_amount.toFixed(2) : isRefund ? refundPreset!.amount.toFixed(2) : '',
   )
-  // Payment date — defaults to today (browser-LOCAL date so a UTC+8 user
-  // doesn't get "yesterday" in the early morning), user can backdate.
-  const now = new Date()
-  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  // Payment date — defaults to the OFFICE's today, user can backdate. The
+  // browser-local date this used to read was the server's (UTC) while the
+  // page was drawn there, so before 08:00 it opened on yesterday.
+  const todayIso = officeToday()
   const [paymentDate, setPaymentDate] = useState(todayIso)
   // Controlled payee fields so loan-repayment mode can auto-fill them
   const [payeeName, setPayeeName] = useState(

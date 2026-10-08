@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { inTimeZoneAsync } from '@/test/time-zone'
 
 // 2026-10-07 — Approvals on the sheet (the user approved the sample):
 // four summary cards over the queue, the queue and the recent decisions as
@@ -39,7 +40,7 @@ const RECENT = [
 ]
 
 type Filter = [string, string, unknown]
-function database() {
+function database(pending = PENDING) {
   const from = vi.fn((table: string) => {
     const filters: Filter[] = []
     let head = false
@@ -48,7 +49,7 @@ function database() {
       const has = (f: string, col: string, val?: unknown) => filters.some(([ff, c, v]) => ff === f && c === col && (val === undefined || v === val))
       if (table === 'approval_requests') {
         if (head) return { data: null, error: null, count: has('eq', 'status', 'approved') ? 93 : 9 }
-        if (has('eq', 'status', 'pending')) return { data: PENDING, error: null }
+        if (has('eq', 'status', 'pending')) return { data: pending, error: null }
         return { data: limit ? RECENT.slice(0, limit) : RECENT, error: null }
       }
       if (table === 'users') return { data: [{ id: 'fm', name: 'Finance Manager' }, { id: 'ex', name: 'ONG MEI SHUANG' }, { id: 'p', name: 'Principal' }], error: null }
@@ -175,5 +176,19 @@ describe('the Approvals page on the sheet', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Approvals')
     expect(card('Pending · to approve')).toHaveTextContent('RM 57,000.00')
     expect(sent()[0]).toMatchObject({ amount: 11000 })
+  })
+})
+
+// 2026-10-08: the page is drawn on the server, which keeps UTC. A voucher sent
+// at 00:30 in the office (16:30 UTC the day before) read "since 2 Oct" and had
+// waited a day longer than it had.
+describe('the oldest wait, on the office clock', () => {
+  it('names the office day it was sent and counts office days, drawn as the server would', async () => {
+    database([{ ...PENDING[0], created_at: '2026-10-02T16:30:00Z' }]) // 00:30 on 3 Oct in the office
+    vi.setSystemTime(new Date('2026-10-07T01:00:00Z')) // 09:00 on 7 Oct in the office
+    const page = await inTimeZoneAsync('UTC', () => ApprovalsPage())
+    render(page)
+    expect(card('Oldest waiting')).toHaveTextContent('4 days')
+    expect(card('Oldest waiting')).toHaveTextContent('HV-PV-202610-0449 · since 3 Oct')
   })
 })

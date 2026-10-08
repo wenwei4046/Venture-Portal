@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -28,7 +29,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const sp = await searchParams
-  const period = /^\d{4}-\d{2}$/.test(sp.period ?? '') ? sp.period! : dayjs().format('YYYY-MM')
+  const period = /^\d{4}-\d{2}$/.test(sp.period ?? '') ? sp.period! : officeMonth()
   const pd = `${period}-01`
   const ref = `ALC-${period.replace('-', '')}`
 

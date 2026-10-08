@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { officeDay, officeTime } from '@/lib/office-time'
 
 export function formatMoney(amount: number | null | undefined): string {
   const val = amount ?? 0
@@ -32,12 +32,20 @@ export function formatRate(rate: number): string {
   return `${(rate * 100).toFixed(2)}%`
 }
 
+/**
+ * The day of a date or a moment, on the office's calendar. A date column
+ * (`2026-10-09`) is the day it names; a moment (a timestamp, a Date) is the
+ * office's day it fell on — read on the server's own clock (UTC on Vercel)
+ * an ERP sync at 07:30 in the office printed as the day before.
+ */
+const officeCalendar = (date: string | Date) => (typeof date === 'string' ? officeDay(date) : officeTime(date))
+
 export function formatDate(date: string | Date): string {
-  return dayjs(date).format('DD MMM YYYY')
+  return officeCalendar(date).format('DD MMM YYYY')
 }
 
 export function formatMonth(date: string | Date): string {
-  return dayjs(date).format('MMM YYYY')
+  return officeCalendar(date).format('MMM YYYY')
 }
 
 /**

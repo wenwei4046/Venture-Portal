@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import Link from 'next/link'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import BaseRateTrendChart from './_components/BaseRateTrendChart'
 import LedgerRow from '@/components/LedgerRow'
 
@@ -83,7 +83,7 @@ export default async function BaseRateHistoryPage() {
                     <td className="num text-num-ink font-semibold">{(Number(h.base_rate) * 100).toFixed(3)}%</td>
                     <td className="m-hide" data-label="Approved">
                       <div className="font-mono text-xs text-muted">
-                        {h.approved_at ? dayjs(h.approved_at).format('D MMM YYYY') : '—'}
+                        {h.approved_at ? officeTime(h.approved_at).format('D MMM YYYY') : '—'}
                       </div>
                     </td>
                   </LedgerRow>

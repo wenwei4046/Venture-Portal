@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { calcBa, daysBetween } from '@/lib/ba'
 import { formatMoneyBare } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
@@ -74,7 +75,7 @@ interface CalcFields {
 const emptyCalc = (): CalcFields => ({
   face: '',
   bankRatePct: '',
-  startDate: dayjs().format('YYYY-MM-DD'),
+  startDate: officeToday(),
   endDate: '',
   days: '90',
   chargePct: '2.5',
@@ -652,7 +653,7 @@ function LimitCards({ rows, limits }: { rows: BaRow[]; limits: LimitRow[] }) {
               </div>
             ) : null}
             {(expanded[c.companyId] ? c.active : c.active.slice(0, 2)).map(r => {
-              const daysLeft = dayjs(r.maturityDate).diff(dayjs(), 'day')
+              const daysLeft = dayjs(r.maturityDate).diff(officeToday(), 'day')
               return (
                 <div
                   key={r.id}
@@ -1154,7 +1155,7 @@ export default function BaView({
                 group: '基本',
                 label: 'Status',
                 render: r => {
-                  const daysLeft = dayjs(r.maturityDate).diff(dayjs(), 'day')
+                  const daysLeft = dayjs(r.maturityDate).diff(officeToday(), 'day')
                   return (
                     <div>
                       <em

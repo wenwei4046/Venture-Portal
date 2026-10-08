@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeToday } from '@/lib/office-time'
 import { notifyApprovalDecision } from '@/lib/slack'
 import { postJournalEntry } from '@/lib/journal'
 import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
@@ -226,7 +227,7 @@ async function performApproval(
         (srcDept?.name ? DEPT_POOL_GL[srcDept.name] : undefined)
       if (srcGl) {
         await postJournalEntry(supabase, {
-          transactionDate: fundSource.effective_date ?? new Date().toISOString().slice(0, 10),
+          transactionDate: fundSource.effective_date ?? officeToday(),
           description: `Dept Pool → Venture transfer (${srcDept?.name}) — fund source ${fundSource.id}`,
           referenceType: 'fund_source',
           referenceId: fundSource.id,
@@ -285,7 +286,7 @@ async function performApproval(
     if (fundSource.source_type !== 'department_pool') {
       const liabilityCode = fundSource.account_code ?? '4000'
       await postJournalEntry(supabase, {
-        transactionDate: fundSource.effective_date ?? new Date().toISOString().slice(0, 10),
+        transactionDate: fundSource.effective_date ?? officeToday(),
         description: approval.description ?? `Fund source activated — ${fundSource.source_type}`,
         referenceType: 'fund_source',
         referenceId: fundSource.id,
@@ -746,7 +747,9 @@ async function performGroupApproval(
   }
 
   const now = new Date().toISOString()
-  const todayStr = now.slice(0, 10)
+  // The office's day, not UTC's (the ISO string's own date): the fallback
+  // payment date and GL date of a loan recorded without a start date.
+  const todayStr = officeToday()
 
   // ── Batch disbursement mode: no new_loan, N payment_vouchers ──────────────
   // Payroll disbursement vouchers ship as one approval group (same group_id),

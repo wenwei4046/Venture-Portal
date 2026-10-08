@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getMemberUser } from '@/lib/auth'
 import { productListAccess } from '@/lib/member/product-access'
 import { formatIntlDate } from '@/lib/utils'
+import { officeTime } from '@/lib/office-time'
 import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '@/app/(portal)/revenue/_lib/sub-departments'
 import {
@@ -101,9 +102,9 @@ export default async function ProductListPage({
   const { tab: asked, q, sub: subAsked } = await searchParams
   const tab: ProductTab = (TABS as readonly string[]).includes(asked ?? '') ? (asked as ProductTab) : 'sku'
 
-  const gapTo = new Date()
-  gapTo.setUTCMonth(gapTo.getUTCMonth() + 1, 1)
-  const gapToIso = gapTo.toISOString().slice(0, 10)
+  // The 1st of next month on the office's calendar (UTC's month runs eight
+  // hours behind on the 1st).
+  const gapToIso = officeTime().startOf('month').add(1, 'month').format('YYYY-MM-DD')
 
   const [status, subDepts] = await Promise.all([loadMirrorStatus(), listSubDepartments()])
 

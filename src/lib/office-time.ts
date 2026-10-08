@@ -20,6 +20,11 @@
 // For a MOMENT only (created_at, approved_at, now). A date column such as
 // payment_date has no time and no zone; format it as it is — and a value that
 // may be either goes through `officeDay` below.
+//
+// "Now" is a moment too: `officeTime()` is the office's now, and
+// `officeToday()` / `officeMonth()` its day and month. A server that asks
+// `dayjs()` or `new Date()` for today gets UTC's today, which until 08:00 in
+// the office is yesterday — and on the 1st, last month.
 
 import dayjs, { type ConfigType, type Dayjs } from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -30,6 +35,39 @@ const OFFICE_UTC_OFFSET_MINUTES = 8 * 60
 
 export function officeTime(at?: ConfigType): Dayjs {
   return dayjs(at).utcOffset(OFFICE_UTC_OFFSET_MINUTES)
+}
+
+/**
+ * Today in the office, `YYYY-MM-DD` — what a server must use for "today"
+ * (a default payment date, an "as at" day, a day picker's default).
+ *
+ * `dayjs().format('YYYY-MM-DD')` asks the MACHINE's calendar: on Vercel (UTC)
+ * it was still yesterday until 08:00 in the office, so a voucher keyed at
+ * 07:30 was dated the day before and /daily-bank opened on yesterday
+ * (2026-10-08). The same day as `officeDate()` in office-clock.ts.
+ */
+export function officeToday(): string {
+  return officeTime().format('YYYY-MM-DD')
+}
+
+/**
+ * This month in the office, `YYYY-MM` — a report's default period, the month
+ * a new document is filed under. On the 1st, until 08:00, the server's own
+ * calendar still says last month.
+ */
+export function officeMonth(): string {
+  return officeTime().format('YYYY-MM')
+}
+
+/**
+ * When a calendar day begins in the office, as an instant:
+ * `officeDayStart('2026-10-01')` = `2026-09-30T16:00:00.000Z`. The bound of a
+ * range over a timestamp column — handed a bare `2026-10-01`, the database
+ * reads UTC midnight, eight hours into the office's day, so whatever happened
+ * before 08:00 on the 1st was counted in the month before.
+ */
+export function officeDayStart(day: string): string {
+  return new Date(`${day.slice(0, 10)}T00:00:00+08:00`).toISOString()
 }
 
 /** A date column as PostgREST sends it: `2026-09-29`, no time and no zone. */

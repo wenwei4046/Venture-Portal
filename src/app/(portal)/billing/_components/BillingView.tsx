@@ -4,7 +4,7 @@
 
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { officeDayStart, officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
@@ -45,8 +45,10 @@ export default async function BillingView({ searchParams }: Props) {
   const { period: rawPeriod } = await searchParams
   const period = dayjs(rawPeriod ?? getPeriodMonth()).startOf('month').format('YYYY-MM-DD')
 
-  const periodStart = dayjs(period).startOf('month').toISOString()
-  const periodEnd = dayjs(period).endOf('month').toISOString()
+  // The month's venture-pool movements, by the office's calendar: a bare date
+  // bound is UTC midnight, which put the 1st's first eight hours in last month.
+  const periodStart = officeDayStart(period)
+  const periodEnd = officeTime(periodStart).endOf('month').toISOString()
 
   // ── Every read the page needs, in two stages (2026-10-08) ─────────────
   // One after another they were eleven round trips (~690 ms in production),
@@ -465,8 +467,8 @@ export default async function BillingView({ searchParams }: Props) {
   })
   const payrollBasis = payrollSubmitted && directorSubmitted ? 'Submitted' : payrollSubmitted || directorSubmitted ? 'Partly' : 'Pending'
   const payrollBasisNote = [
-    `HR ${payrollSubmitted && payrollRun?.approved_at ? dayjs(payrollRun.approved_at).format('D MMM') : 'pending'}`,
-    `Director salary ${directorSubmitted && directorSubmission?.submitted_at ? dayjs(directorSubmission.submitted_at).format('D MMM') : 'pending'}`,
+    `HR ${payrollSubmitted && payrollRun?.approved_at ? officeTime(payrollRun.approved_at).format('D MMM') : 'pending'}`,
+    `Director salary ${directorSubmitted && directorSubmission?.submitted_at ? officeTime(directorSubmission.submitted_at).format('D MMM') : 'pending'}`,
     `${marketingContractsActive} marketing contract${marketingContractsActive === 1 ? '' : 's'}`,
   ].join(' · ')
   const periodMonth = dayjs(period).format('YYYY-MM')

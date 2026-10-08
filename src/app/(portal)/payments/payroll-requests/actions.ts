@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePayrollPayouts } from '@/lib/auth'
 
@@ -65,7 +66,7 @@ export async function generatePvFromRequest(
   // today; the approval RPC period-lock guards the chosen month.
   const payDate = /^\d{4}-\d{2}-\d{2}$/.test(paymentDate ?? '')
     ? paymentDate
-    : dayjs().format('YYYY-MM-DD')
+    : officeToday()
 
   // ── Read the request + its linked payroll_run for period context ──────────
   // Run-less requests are director salary fundings (mig 20260727100000) —

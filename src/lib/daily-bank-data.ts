@@ -11,7 +11,7 @@
 //   Receipts D = credit vouchers (OR) with payment_date = D per bank
 // Timestamps are anchored to Malaysia time (+08:00, no DST).
 
-import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
@@ -191,7 +191,7 @@ export async function fetchDailyBank(
         supabase.from('departments').select('id, name, is_internal'),
       ]),
     )
-  const todayRead = date === dayjs().format('YYYY-MM-DD') ? startTodayReads() : null
+  const todayRead = date === officeToday() ? startTodayReads() : null
 
   const [{ data: fullDeptRows }, banks] = await Promise.all([fullDeptRead, banksRead])
   const extraCols = ((fullDeptRows ?? []) as Array<{ name: string; segment_key: string }>)
@@ -207,7 +207,7 @@ export async function fetchDailyBank(
   const pending = await pendingRead
   const { data: orRows } = await orRead
   const todayAnswers =
-    date === dayjs().format('YYYY-MM-DD') ? await (todayRead ?? startTodayReads()) : null
+    date === officeToday() ? await (todayRead ?? startTodayReads()) : null
 
   // Every read is in. Set BEFORE any emptyAmounts()/column resolution below.
   setExtraDbColumns(extraCols)

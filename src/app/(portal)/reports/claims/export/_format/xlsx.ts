@@ -1,6 +1,6 @@
 import { buildXlsxBuffer } from '@/lib/export/excel'
 import type { Database } from '@/lib/supabase/database.types'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 type Claim = Database['public']['Tables']['claims']['Row']
 
@@ -21,8 +21,8 @@ export function buildClaimsXlsx(rows: Claim[]): Buffer {
           : row.status === 'rejected'
             ? 'Rejected'
             : 'Paid',
-      row.created_at ? dayjs(row.created_at).format('D MMM YYYY') : '',
-      row.approved_at ? dayjs(row.approved_at).format('D MMM YYYY') : '',
+      row.created_at ? officeTime(row.created_at).format('D MMM YYYY') : '',
+      row.approved_at ? officeTime(row.approved_at).format('D MMM YYYY') : '',
     ])
   }
 

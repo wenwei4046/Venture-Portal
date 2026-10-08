@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePayrollPayouts } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney, formatMoneyBare, formatIntlDate } from '@/lib/utils'
+import { OFFICE_TZ } from '@/lib/office-clock'
 import RequestReleaseButton from './_components/RequestReleaseButton'
 
 export default async function InvoicePoolPage() {
@@ -89,7 +90,7 @@ export default async function InvoicePoolPage() {
                 return (
                   <tr key={t.id} className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
                     <td className="py-4 pr-4 font-mono text-xs text-muted">
-                      {formatIntlDate(new Date(t.created_at), { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatIntlDate(new Date(t.created_at), { day: 'numeric', month: 'short', year: 'numeric', timeZone: OFFICE_TZ })}
                     </td>
                     <td className="py-4 pr-4">
                       <em className={`font-serif text-sm ${isIn ? 'text-ledger' : 'text-alert'}`}>

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import NewClaimForm from './_components/NewClaimForm'
 import ClaimActions from './_components/ClaimActions'
@@ -121,7 +121,7 @@ export default async function ClaimsPage() {
                       </span>
                     </td>
                     <td className="font-mono text-xs">
-                      {dayjs(c.created_at).format('D MMM YYYY')}
+                      {officeTime(c.created_at).format('D MMM YYYY')}
                     </td>
                     <td className="right">
                       {(c.status === 'pending' || c.status === 'approved') && (

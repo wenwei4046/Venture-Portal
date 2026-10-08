@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeDayStart, officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import PnlCharts from './PnlCharts'
@@ -47,8 +48,8 @@ export default async function MarketingPnlView({ deptId, period, seesPayroll }: 
       .select('amount')
       .eq('department_id', deptId)
       .in('transaction_type', ['expense_out', 'inter_billing_out'])
-      .gte('created_at', monthStart)
-      .lt('created_at', nextMonth),
+      .gte('created_at', officeDayStart(monthStart))
+      .lt('created_at', officeDayStart(nextMonth)),
   ])
 
   const revenue = (invoiceRows ?? []).reduce((s, r) => s + Number(r.total_amount), 0)
@@ -99,7 +100,7 @@ export default async function MarketingPnlView({ deptId, period, seesPayroll }: 
       .select('amount, created_at')
       .eq('department_id', deptId)
       .in('transaction_type', ['expense_out', 'inter_billing_out'])
-      .gte('created_at', trendStart),
+      .gte('created_at', officeDayStart(trendStart)),
   ])
 
   const trendMap = new Map<string, { revenue: number; cost: number }>()
@@ -114,7 +115,7 @@ export default async function MarketingPnlView({ deptId, period, seesPayroll }: 
     if (row) row.revenue += Number(inv.total_amount)
   }
   for (const e of trendExpenses ?? []) {
-    const k = dayjs(e.created_at).format('YYYY-MM-01')
+    const k = officeTime(e.created_at).format('YYYY-MM-01') // the office's month
     const row = trendMap.get(k)
     if (row) row.cost += Number(e.amount)
   }
@@ -200,7 +201,7 @@ export default async function MarketingPnlView({ deptId, period, seesPayroll }: 
                   return (
                     <tr key={r.id} className="border-b border-hairline last:border-0">
                       <td className="py-3 pr-4 font-mono text-xs text-muted">
-                        {dayjs(r.created_at).format('D MMM YYYY')}
+                        {officeTime(r.created_at).format('D MMM YYYY')}
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs text-graphite">{r.voucher_no ?? '—'}</td>
                       <td className="py-3 pr-4">

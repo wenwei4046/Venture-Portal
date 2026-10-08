@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { RESERVED_SUB_DEPT_SLUGS, subDeptSlug } from '@/lib/revenue'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import { mintRankKey, rankName, rankLabelOf, rankPayError, rankPayOf, resequenceLadder } from '@/lib/commission/ranks'
 import { newSchemeSettings, type SchemeSettings } from '@/lib/commission/scheme-defaults'
 import { checkDirectorPay } from '@/lib/commission/director-pay'
@@ -118,7 +119,7 @@ export async function createSubDepartment(formData: FormData) {
       sub_department_id: sub!.id,
       scheme_name: `${name} scheme`,
       cloned_from_scheme_id: cloneFrom,
-      effective_from: new Date().toISOString().slice(0, 8) + '01',
+      effective_from: `${officeMonth()}-01`, // the office's month, not UTC's
       created_by: user.id,
       ...newSchemeSettings(source),
     })
@@ -654,7 +655,7 @@ export async function upsertKpiThreshold(formData: FormData) {
     tier_label: text(formData, 'tier_label') || null,
     min_qty: minQty,
     bonus_pct: bonus,
-    effective_from: text(formData, 'effective_from') || new Date().toISOString().slice(0, 10),
+    effective_from: text(formData, 'effective_from') || officeToday(),
   }
 
   check(

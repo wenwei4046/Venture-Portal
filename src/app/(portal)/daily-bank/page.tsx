@@ -11,6 +11,7 @@ import { requirePermission } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
+import { officeToday } from '@/lib/office-time'
 import DailyBankView from './_components/DailyBankView'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,9 @@ export default async function DailyBankPage({
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { date: rawDate } = await searchParams
 
-  const today = dayjs().format('YYYY-MM-DD')
+  // The office's today, not the server's: on Vercel (UTC) the board opened on
+  // yesterday until 08:00.
+  const today = officeToday()
   const date =
     rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && dayjs(rawDate).isValid() ? rawDate : today
 

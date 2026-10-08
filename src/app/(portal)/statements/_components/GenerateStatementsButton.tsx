@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { generateStatements } from '../actions'
 
 export default function GenerateStatementsButton() {
   const [isPending, startTransition] = useTransition()
   const [confirming, setConfirming] = useState(false)
-  const [period, setPeriod] = useState(dayjs().startOf('month').format('YYYY-MM-DD'))
+  const [period, setPeriod] = useState(officeTime().startOf('month').format('YYYY-MM-DD'))
   const [result, setResult] = useState<{
     generated: number
     skipped: number

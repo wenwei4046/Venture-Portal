@@ -6,6 +6,7 @@
 // data is the per-invoice receipts/CN sums via dept_invoice_settlements.
 
 import dayjs from 'dayjs'
+import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
@@ -43,7 +44,7 @@ export default async function MyBillingPage() {
     ((dept as { segment_key?: string | null } | null)?.segment_key ?? null) ||
     (deptNameToSegment(deptName) ?? null)
 
-  const thisMonth = dayjs().format('YYYY-MM')
+  const thisMonth = officeMonth()
   const { from, to } = monthRange(thisMonth)
 
   const [{ data: invRows }, { data: sums }, { data: contractRows }, { data: companies }, cashLines] =
@@ -117,7 +118,7 @@ export default async function MyBillingPage() {
     company_id: string | null
   }
   const contracts = (contractRows ?? []) as Contract[]
-  const today = dayjs()
+  const today = officeToday()
   const expiring = contracts.filter(
     (c) =>
       c.status === 'active' &&
@@ -165,12 +166,12 @@ export default async function MyBillingPage() {
       {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-sm text-accent mb-1">本月开单 Billed {dayjs().format('MMM')}</div>
+          <div className="font-serif italic text-sm text-accent mb-1">本月开单 Billed {officeTime().format('MMM')}</div>
           <div className="statement-amount text-num-ink">{formatMoney(billedThisMonth)}</div>
           <div className="font-mono text-xs text-muted mt-2">issued + paid · period {thisMonth}</div>
         </div>
         <div className="border border-hairline rounded-md bg-surface p-5">
-          <div className="font-serif italic text-sm text-accent mb-1">本月实收 Received {dayjs().format('MMM')}</div>
+          <div className="font-serif italic text-sm text-accent mb-1">本月实收 Received {officeTime().format('MMM')}</div>
           <div className="statement-amount text-num-ink">{formatMoney(receivedThisMonth)}</div>
           <div className="font-mono text-xs text-muted mt-2">bank-in on {deptName} GL</div>
         </div>

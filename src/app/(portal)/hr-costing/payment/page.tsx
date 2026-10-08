@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { getPeriodMonth } from '@/lib/utils'
+import { officeToday } from '@/lib/office-time'
 import {
   contributionTotals,
   cycleHeadline,
@@ -88,7 +89,7 @@ export default async function HRPaymentPage({ searchParams }: { searchParams: Pr
   const phase = cyclePhase(cycle)
   const staffFunded = phase === 'funded'
   const dirFunded = directorsFunded(cycle)
-  const today = dayjs().format('YYYY-MM-DD')
+  const today = officeToday()
 
   // Default pay date: the 28th of the period month, or today if that has passed.
   const twentyEighth = period.slice(0, 8) + '28'

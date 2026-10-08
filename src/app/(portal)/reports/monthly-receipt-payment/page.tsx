@@ -6,7 +6,7 @@
 // The 支出对象 paid-to breakdown was removed on request (2026-08-24: "我只是
 // 要还没收回的就好").
 
-import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
@@ -38,7 +38,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const supabase = await createClient()
 
   const params = await searchParams
-  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : dayjs().format('YYYY-MM')
+  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   const isDeptMgr = user.role === 'dept_manager'
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const year = Number(period.slice(0, 4))

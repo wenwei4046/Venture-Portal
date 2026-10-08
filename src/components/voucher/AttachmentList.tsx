@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import {
   getAttachmentSignedUrl,
   getAttachmentPreviewUrls,
@@ -159,7 +159,7 @@ export default function AttachmentList({ attachments, emptyMessage, canDelete = 
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-mono text-xs text-muted hidden sm:block">
-                    {dayjs(a.uploaded_at).format('D MMM HH:mm')}
+                    {officeTime(a.uploaded_at).format('D MMM HH:mm')}
                   </span>
                   {isLate(a.uploaded_at) ? (
                     <span className="font-serif italic text-xs text-alert" title="凭单批准之后才加的">事后补上</span>

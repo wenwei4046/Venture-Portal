@@ -7,6 +7,7 @@ import { monthsBefore } from '@/lib/commission/engine'
 import { toEngineInput } from '@/lib/commission/run-payload'
 import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/director-pay'
 import { carriesInto } from '@/lib/commission/carry'
+import { officeToday } from '@/lib/office-time'
 import { loadMonthOrders } from './month-orders'
 import type {
   CostRatioRow,
@@ -113,7 +114,8 @@ export async function loadCommissionInput(
   options: CommissionInputOptions = {},
 ): Promise<CommissionInputContext> {
   const asAt = periodEnd(period)
-  const currentDate = new Date().toISOString().slice(0, 10)
+  // The rules in force today — the office's today; the ISO string's date is UTC's.
+  const currentDate = officeToday()
   const supabase = existingClient ?? (await createClient()) as unknown as SupabaseClient
   const schemes = await readRows<SchemeRow>('the commission scheme', (from, to) =>
     supabase.from('comm_schemes')

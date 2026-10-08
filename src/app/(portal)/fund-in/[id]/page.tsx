@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
@@ -58,7 +58,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const termsHistory = await fetchTermsHistory(supabase, 'fund_source', [source.id])
   const repRows = (repayments ?? []).map((r) => ({ id: source.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
   const termsSegments = buildTermsSegments(termsForFundSource(source, termsHistory.get(source.id) ?? []), principalPaidByMonth(repRows, isFundSourcePrincipal).get(source.id) ?? {})
-  const termsChanges = allTermsChanges(termsSegments, { currentYM: dayjs().format('YYYY-MM'), paidByMonth: paidByMonthByType(repRows, isFundSourcePrincipal).get(source.id) ?? {} })
+  const termsChanges = allTermsChanges(termsSegments, { currentYM: officeMonth(), paidByMonth: paidByMonthByType(repRows, isFundSourcePrincipal).get(source.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation (cancelFundSource files a
   // tier_change approval). Finance can't see /approvals (principal-only), so
@@ -154,7 +154,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const canFinanceEdit = user.role === 'finance' || user.role === 'principal'
 
   const maturityDays = source.maturity_date
-    ? dayjs(source.maturity_date).diff(dayjs(), 'day')
+    ? dayjs(source.maturity_date).diff(officeToday(), 'day')
     : null
 
   // Outstanding balance from view (falls back to original amount if no repayments)
@@ -168,7 +168,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
   // changed mid-life, the current segment's figure (rate × principal still
   // owed when it began).
   const monthlyInterest = termsChanged(termsSegments)
-    ? currentSegment(termsSegments, dayjs().format('YYYY-MM')).interestPerMonth
+    ? currentSegment(termsSegments, officeMonth()).interestPerMonth
     : Number(source.amount) * Number(source.cost_rate)
 
   const repaymentsList = repayments ?? []
@@ -218,7 +218,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           </div>
           <h1 className="page-title">{fromLabel}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded <em>{dayjs(source.created_at).format('D MMMM YYYY')}</em>
+            {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded <em>{officeTime(source.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -479,7 +479,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           <p className="font-serif text-md text-ink">
             Repaid on{' '}
             <em className="font-serif italic text-ledger">
-              {dayjs(source.repaid_at).format('D MMM YYYY')}
+              {officeTime(source.repaid_at).format('D MMM YYYY')}
             </em>
             {repaidByName ? (
               <> by <em className="font-serif italic text-ledger">{repaidByName}</em></>

@@ -1,6 +1,7 @@
 'use client'
 
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { formatMoney, lentToFromNotes } from '@/lib/utils'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
@@ -30,7 +31,7 @@ function StatusLabel({ status, maturityDate }: { status: FundSourceStatus; matur
   }
   if (status === 'active') {
     if (maturityDate) {
-      const days = dayjs(maturityDate).diff(dayjs(), 'day')
+      const days = dayjs(maturityDate).diff(officeToday(), 'day')
       if (days >= 0 && days <= 30) {
         return <em className="font-serif text-alert text-sm">matures in {days}d</em>
       }

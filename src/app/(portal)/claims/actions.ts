@@ -88,7 +88,7 @@ export async function approveClaim(claimId: string) {
     const { count } = await supabase
       .from('payment_vouchers')
       .select('*', { count: 'exact', head: true })
-    const period = new Date().toISOString().slice(0, 7).replace('-', '')
+    const period = officeDate().slice(0, 7).replace('-', '') // the office's month, not UTC's
     const voucherNo = `HV-PV-${period}-${String((count ?? 0) + 1).padStart(4, '0')}`
 
     // Default the paying bank to primary — a debit PV approved with NO bank

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect } from 'react'
+import { officeToday } from '@/lib/office-time'
 import { recordLoanRepaymentReceived } from '../../fund-out/actions'
 import {
   dealFormClass,
@@ -55,8 +56,9 @@ const inputCls =
 export default function LoanRepaymentReceivedForm({ loans, bankAccounts }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const now = new Date()
-  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  // The office's today. Built from this machine's own calendar it was UTC's
+  // whenever the server drew the page — yesterday until 08:00.
+  const todayIso = officeToday()
   const [loanId, setLoanId] = useState('')
   const [principal, setPrincipal] = useState('0.00')
   const [interest, setInterest] = useState('0.00')

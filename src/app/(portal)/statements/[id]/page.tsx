@@ -63,7 +63,7 @@ export default async function StatementDetailPage({ params }: Props) {
           </div>
           <h1 className="page-title">{company?.name ?? '—'}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {company?.short_code} · Created <em>{dayjs(statement.created_at).format('D MMMM YYYY')}</em>
+            {company?.short_code} · Created <em>{officeTime(statement.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <div className="flex items-center gap-3">

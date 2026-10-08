@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 
 // Month navigator for the Repayment Schedule — step back/forward a month or
 // pick one, so Finance can review a past (or upcoming) month's schedule.
@@ -26,7 +27,7 @@ export default function MonthNav({ month, isCurrent }: { month: string; isCurren
       <button onClick={() => go(next)} className={btn} aria-label="Next month" title="Next month">→</button>
       {!isCurrent && (
         <button
-          onClick={() => go(dayjs().format('YYYY-MM'))}
+          onClick={() => go(officeMonth())}
           className="px-3 py-2 text-accent hover:text-accent-hover text-sm font-sans transition-colors"
         >
           This month

@@ -12,7 +12,7 @@
 //     account 6001 Interest Expense - BA, venture_pool source row.
 // No JE is posted from here, so nothing double-books.
 
-import dayjs from 'dayjs'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
@@ -542,8 +542,8 @@ export async function generateBaInvoice(
     const { invoice_no } = await createMultiLineInvoice({
       billableType: ba.borrower_company_id ? 'subsidiary' : 'freetext',
       billingMode: 'venture_attribution',
-      period: dayjs().format('YYYY-MM'),
-      invoiceDate: dayjs().format('YYYY-MM-DD'),
+      period: officeMonth(),
+      invoiceDate: officeToday(),
       dueDate: (ba.maturity_date as string) ?? '',
       referenceNo: ref,
       headerDescription: `BA ${label} interest — ${borrowerLabel}`,

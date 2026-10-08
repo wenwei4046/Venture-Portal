@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } 
 import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeTime, officeToday } from '@/lib/office-time'
 import {
   createMultiLineInvoice,
   fetchStaffAllocationByCompany,
@@ -106,8 +107,8 @@ function CreateMultiLineInvoiceButtonBody({
   const [billingMode, setBillingMode] = useState<CreateInvoiceMode>('marketing_project')
 
   const [period, setPeriod] = useState(dayjs(currentPeriod).format('YYYY-MM'))
-  const [invoiceDate, setInvoiceDate] = useState(dayjs().format('YYYY-MM-DD'))
-  const [dueDate, setDueDate] = useState(dayjs().add(30, 'day').format('YYYY-MM-DD'))
+  const [invoiceDate, setInvoiceDate] = useState(officeToday())
+  const [dueDate, setDueDate] = useState(officeTime().add(30, 'day').format('YYYY-MM-DD'))
   const [headerDescription, setHeaderDescription] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
   const [lines, setLines] = useState<LineRow[]>([newLine()])
@@ -208,8 +209,8 @@ function CreateMultiLineInvoiceButtonBody({
     setFreetextEmail('')
     setBillingMode('marketing_project')
     setPeriod(dayjs(currentPeriod).format('YYYY-MM'))
-    setInvoiceDate(dayjs().format('YYYY-MM-DD'))
-    setDueDate(dayjs().add(30, 'day').format('YYYY-MM-DD'))
+    setInvoiceDate(officeToday())
+    setDueDate(officeTime().add(30, 'day').format('YYYY-MM-DD'))
     setHeaderDescription('')
     setReferenceNo('')
     setLines([newLine()])

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { recordRepayment } from '../actions'
 import { formatMoney } from '@/lib/utils'
 import type { PaymentType } from '@/types'
@@ -23,7 +23,7 @@ export default function RepaymentForm({ loanId, outstanding }: Props) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [paymentType, setPaymentType] = useState<PaymentType>('interest')
 
-  const today = dayjs().format('YYYY-MM-DD')
+  const today = officeToday()
 
   async function handleSubmit(formData: FormData) {
     setMessage(null)

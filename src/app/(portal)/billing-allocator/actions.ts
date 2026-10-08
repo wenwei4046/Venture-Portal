@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache'
 import dayjs from 'dayjs'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -104,7 +105,7 @@ async function saveAllocStaffInner(payload: {
   }
 
   // Script parity: every staff edit re-snapshots the CURRENT month.
-  await snapshotPeriod(dayjs().format('YYYY-MM'))
+  await snapshotPeriod(officeMonth())
   revalidatePath('/billing-allocator')
 }
 
@@ -113,7 +114,7 @@ async function deleteAllocStaffInner(id: string): Promise<void> {
   const supabase = await allocClient()
   const { error } = await supabase.from('alloc_staff').delete().eq('id', id)
   if (error) throw new Error(error.message)
-  await snapshotPeriod(dayjs().format('YYYY-MM'))
+  await snapshotPeriod(officeMonth())
   revalidatePath('/billing-allocator')
 }
 
@@ -230,7 +231,7 @@ async function importAllocStaffFromHrInner(hrPeriod: string): Promise<{ imported
     }
   }
 
-  await snapshotPeriod(dayjs().format('YYYY-MM'))
+  await snapshotPeriod(officeMonth())
   revalidatePath('/billing-allocator')
   return { imported: byStaff.size }
 }
@@ -768,7 +769,7 @@ async function generateAllocatorInvoicesInner(period: string): Promise<GenerateR
   if (byTarget.size === 0) throw new Error('Nothing billable — every line is own share')
 
   const monthLabel = dayjs(pd).format('MMM YYYY')
-  const today = dayjs().format('YYYY-MM-DD')
+  const today = officeToday()
   const result: GenerateResult = { created: [], skipped: [] }
 
   // CLAIM the allocations under this batch ref BEFORE creating invoices: if

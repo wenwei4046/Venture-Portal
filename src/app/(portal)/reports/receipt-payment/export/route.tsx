@@ -2,6 +2,7 @@
 // the page: the Cash Flow statement grammar PLUS the 未收 To-collect section.
 
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import {
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
   const user = await requirePermission('dept_reports')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
-  const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
+  const period = url.searchParams.get('period') ?? officeMonth()
   const compare = url.searchParams.get('compare') ?? ''
   const isDeptMgr = user.role === 'dept_manager'
   const segment = isDeptMgr ? '' : (url.searchParams.get('segment') ?? '')

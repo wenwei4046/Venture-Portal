@@ -3,7 +3,7 @@
 // screen and file can't drift apart. Query set + counterparty resolution
 // mirror lib/loan-monitor; maths live in lib/counterparty-statement.
 
-import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
@@ -36,7 +36,7 @@ export interface CounterpartyStatementData {
 export async function fetchCounterpartyStatement(
   supabase: SupabaseClient,
 ): Promise<CounterpartyStatementData> {
-  const currentYM = dayjs().format('YYYY-MM')
+  const currentYM = officeMonth()
 
   const [
     { data: loans },

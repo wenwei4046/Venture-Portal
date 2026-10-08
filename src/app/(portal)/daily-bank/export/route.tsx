@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { fetchDailyBank } from '@/lib/daily-bank-data'
+import { officeToday } from '@/lib/office-time'
 import { sumAmounts } from '@/lib/daily-bank'
 import { PdfDocument, PdfTable, type PdfColumn, type PdfRowKind } from '@/lib/export/pdf'
 import { exportPdfResponse } from '@/lib/export/response'
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const raw = url.searchParams.get('date') ?? ''
   const date =
-    /^\d{4}-\d{2}-\d{2}$/.test(raw) && dayjs(raw).isValid() ? raw : dayjs().format('YYYY-MM-DD')
+    /^\d{4}-\d{2}-\d{2}$/.test(raw) && dayjs(raw).isValid() ? raw : officeToday()
 
   const data = await fetchDailyBank(supabase, date, { seesPayroll: canSeePayrollPayouts(user) })
   // Dynamic departments: the column set comes from the payload (cores + one

@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { inTimeZoneAsync } from '@/test/time-zone'
 
 vi.mock('@/lib/paginate', () => ({
   fetchAllRows: async (page: (lo: number, hi: number) => PromiseLike<{ data: unknown[] | null }>) =>
@@ -141,5 +142,25 @@ describe('Daily Bank — reads', () => {
     expect(data.columns).toContainEqual({ key: 'it', label: 'IT' })
     expect(data.banks[0].bf).toMatchObject({ it: 500, venture: 0 })
     expect(data.banks[0].outToday).toMatchObject({ it: 120 })
+  })
+})
+
+// 2026-10-08: "today" was the server's (UTC's) until 08:00 in the office, so
+// between midnight and 08:00 the board treated yesterday as today — the pool
+// balances were folded into yesterday and left out of the real today.
+describe("Daily Bank — today is the office's", () => {
+  afterEach(() => vi.useRealTimers())
+
+  it("reads today's pool balances for the office's today, not the server's", async () => {
+    vi.useFakeTimers({ now: new Date('2026-10-08T16:30:00Z'), toFake: ['Date'] }) // 00:30 on 9 Oct in the office
+    await inTimeZoneAsync('UTC', async () => {
+      const asked: string[] = []
+      await fetchDailyBank(database({ asked }), '2026-10-09', { seesPayroll: true })
+      expect(asked).toContain('dept_pool_balances')
+
+      const yesterday: string[] = []
+      await fetchDailyBank(database({ asked: yesterday }), '2026-10-08', { seesPayroll: true })
+      expect(yesterday).not.toContain('dept_pool_balances')
+    })
   })
 })

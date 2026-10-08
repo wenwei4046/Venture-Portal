@@ -1,5 +1,6 @@
 import React from 'react'
 import { PdfDocument, PdfTable } from '@/lib/export/pdf'
+import { OFFICE_TZ } from '@/lib/office-clock'
 
 const COLUMNS = [
   { label: 'Voucher No', width: 70 },
@@ -29,7 +30,7 @@ export function VouchersPdf({ rows }: { rows: VoucherExportRow[] }) {
   return (
     <PdfDocument
       title="Payment Vouchers"
-      periodLabel={new Date().toLocaleDateString('en-MY', { year: 'numeric', month: 'long' })}
+      periodLabel={new Date().toLocaleDateString('en-MY', { year: 'numeric', month: 'long', timeZone: OFFICE_TZ })}
       orientation="landscape"
     >
       <PdfTable

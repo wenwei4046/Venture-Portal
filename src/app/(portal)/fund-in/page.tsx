@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -84,7 +85,7 @@ export default async function FundInPage({ searchParams }: Props) {
 
   const maturingIn30d = active.filter((s) => {
     if (!s.maturity_date) return false
-    const days = dayjs(s.maturity_date).diff(dayjs(), 'day')
+    const days = dayjs(s.maturity_date).diff(officeToday(), 'day')
     return days >= 0 && days <= 30
   })
 

@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeMonth } from '@/lib/office-time'
 
 // ─── Submit HR cost summary for a period (HR) ────────────────────────────────
 
@@ -18,8 +19,9 @@ export async function submitHRCostSummary(formData: FormData) {
   // Normalize to first of month
   const period = dayjs(rawPeriod).startOf('month').format('YYYY-MM-DD')
 
-  // Block future periods — HR submits for the current or past month
-  if (dayjs(period).isAfter(dayjs().startOf('month'))) {
+  // Block future periods — HR submits for the current or past month (the
+  // office's: on the 1st, until 08:00, the server's own month is the last one)
+  if (dayjs(period).isAfter(`${officeMonth()}-01`)) {
     throw new Error('Cannot submit for a future period')
   }
 

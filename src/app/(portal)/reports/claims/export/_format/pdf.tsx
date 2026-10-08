@@ -1,5 +1,5 @@
 import React from 'react'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { PdfDocument, PdfTable } from '@/lib/export/pdf'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -17,12 +17,12 @@ export function ClaimsPdf({ rows }: { rows: Claim[] }) {
         : claim.status === 'rejected'
           ? 'Rejected'
           : 'Paid',
-    claim.created_at ? dayjs(claim.created_at).format('D MMM YYYY') : '',
-    claim.approved_at ? dayjs(claim.approved_at).format('D MMM YYYY') : '',
+    claim.created_at ? officeTime(claim.created_at).format('D MMM YYYY') : '',
+    claim.approved_at ? officeTime(claim.approved_at).format('D MMM YYYY') : '',
   ])
 
   return (
-    <PdfDocument title="Claims Summary" periodLabel={dayjs().format('D MMMM YYYY')} orientation="portrait">
+    <PdfDocument title="Claims Summary" periodLabel={officeTime().format('D MMMM YYYY')} orientation="portrait">
       <PdfTable
         columns={[
           { label: 'Claimant Name', width: 150 },

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { officeTime, officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePayrollPayouts } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
@@ -295,7 +295,7 @@ export default async function PayrollRequestsPage() {
                     committedTotal={committed}
                     banks={bankOptions}
                     breakdown={breakdown}
-                    defaultDate={dayjs().format('YYYY-MM-DD')}
+                    defaultDate={officeToday()}
                   />
                 </div>
               )

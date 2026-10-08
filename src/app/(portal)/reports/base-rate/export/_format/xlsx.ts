@@ -1,4 +1,5 @@
 import { buildXlsxBuffer } from '@/lib/export/excel'
+import { officeTime } from '@/lib/office-time'
 import type { Database } from '@/lib/supabase/database.types'
 
 type BaseRateHistory = Database['public']['Tables']['base_rate_history']['Row']
@@ -10,7 +11,7 @@ export function buildBaseRateXlsx(rows: BaseRateHistory[]): Buffer {
     Number(row.weighted_cost) * 100,
     Number(row.op_margin) * 100,
     Number(row.base_rate) * 100,
-    row.approved_at ? new Date(row.approved_at).toLocaleDateString() : '',
+    row.approved_at ? officeTime(row.approved_at).format('M/D/YYYY') : '',
   ])
 
   return buildXlsxBuffer({

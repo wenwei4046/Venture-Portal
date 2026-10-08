@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeToday } from '@/lib/office-time'
 import { postJournalEntry } from '@/lib/journal'
 import { validateDisbursementAccount } from '@/lib/loan-disbursement'
 import {
@@ -117,7 +118,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
     .from('base_rate_history')
     .select('base_rate, effective_from, effective_to')
     .not('approved_at', 'is', null)
-    .lte('effective_from', dayjs().format('YYYY-MM-DD'))
+    .lte('effective_from', officeToday())
     .order('effective_from', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -228,7 +229,7 @@ export async function recordRepayment(formData: FormData) {
   if (!paymentDate) {
     throw new Error('Payment date is required')
   }
-  if (dayjs(paymentDate).isAfter(dayjs(), 'day')) {
+  if (dayjs(paymentDate).isAfter(officeToday(), 'day')) {
     throw new Error('Payment date cannot be in the future')
   }
 

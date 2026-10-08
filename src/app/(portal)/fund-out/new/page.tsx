@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types'
@@ -21,7 +21,7 @@ export default async function NewLoanPage() {
       .from('base_rate_history')
       .select('base_rate, quarter, effective_from')
       .not('approved_at', 'is', null)
-      .lte('effective_from', dayjs().format('YYYY-MM-DD'))
+      .lte('effective_from', officeToday())
       .order('effective_from', { ascending: false })
       .limit(1)
       .maybeSingle(),

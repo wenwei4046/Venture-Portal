@@ -5,6 +5,7 @@
 // equity/liabilities mostly live in the corporate segment.
 
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
@@ -33,7 +34,7 @@ export default async function BalanceSheetPage({ searchParams }: Props) {
   const supabase = await createClient()
 
   const params = await searchParams
-  const period = params.period ?? dayjs().format('YYYY-MM')
+  const period = params.period ?? officeMonth()
   // Comparison is OPT-IN (user 2026-06-11): default is a clean single-month view.
   const compare = params.compare ?? ''
   const segment = params.segment ?? ''

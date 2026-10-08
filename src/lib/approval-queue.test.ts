@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { inTimeZone } from '@/test/time-zone'
 import {
   buildQueueRows,
   executiveSubmitterIds,
@@ -175,6 +176,20 @@ describe('queueSummary', () => {
   it('is empty-safe', () => {
     const s = queueSummary([], new Date(2026, 9, 7))
     expect(s).toMatchObject({ total: 0, items: 0, combined: 0, oldest: null, bySubmitters: { amount: 0, count: 0, names: [] } })
+  })
+
+  // 2026-10-08: the wait was counted in the MACHINE's days. On the server
+  // (UTC) a voucher sent at 00:30 in the office belonged to the day before,
+  // so it had waited a day longer there than in the office.
+  it("counts the wait in the office's days, whatever zone the server keeps", () => {
+    const sentAfterMidnight = buildQueueRows(
+      [request({ id: 'n', description: 'HV-PV-202610-0480: Night courier', amount: 80, created_at: '2026-10-02T16:30:00Z' })], // 00:30 on 3 Oct
+      opts,
+    )
+    const now = new Date('2026-10-07T01:00:00Z') // 09:00 on 7 Oct in the office
+    for (const zone of ['UTC', 'Asia/Kuala_Lumpur', 'America/Los_Angeles']) {
+      expect(inTimeZone(zone, () => queueSummary(sentAfterMidnight, now).oldest?.days), zone).toBe(4)
+    }
   })
 })
 
