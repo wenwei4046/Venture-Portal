@@ -8,6 +8,8 @@ import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import { fetchIncomeStatement } from '@/lib/cfo-reports'
 import { deptNameToPoolKey, splitPoolAccrual } from '@/lib/dept-pool-accrual'
 import { extraDeptNameToSegment, primedRegistryRows } from '@/lib/dept-registry'
+import { startRead } from '@/lib/start-read'
+import type { User } from '@/types'
 import { BalanceProvider, BalanceToggle, BalanceValue } from './_components/RevealAmount'
 
 // dept_manager only owns their own dept pool. Skip the multi-dept list and
@@ -26,6 +28,12 @@ interface HRCostSubmissionRow {
   submitted_by_name: string | null
   execution_state: string
   dept_summaries: Record<string, { total_ctc?: number; department_id?: string }> | null
+}
+
+// Dept Manager sees only their own dept
+function visibleDepartments<D extends { id: string }>(user: User, departments: D[] | null): D[] {
+  const all = departments ?? []
+  return user.role === 'dept_manager' ? all.filter((d) => d.id === user.department_id) : all
 }
 
 export default async function DeptPoolPage({
@@ -53,28 +61,35 @@ export default async function DeptPoolPage({
 
   const period = getPeriodMonth()
 
+  // Every read either view needs is started before the first is awaited
+  // (2026-10-08): the cash view awaited nine one after another, 0.7–1.0 s in
+  // production, though only its two journal_lines reads need an earlier
+  // answer (the active banks' GL codes). Each answer is still read below,
+  // where it always was.
+
   // Load departments. Filter is_internal=false so the hidden 'Venture Office'
   // pseudo-department (departments.is_internal=true) never renders as a 6th
   // real department in the "By department" list. Its ledger is instead folded
   // into the Venture (Office) row below (see ventureCash).
-  const { data: departments } = await supabase
-    .from('departments')
-    .select('id, name')
-    .eq('is_internal', false)
-    .order('name')
-
-  // Dept Manager sees only their own dept
-  let visible = departments ?? []
-  if (user.role === 'dept_manager') {
-    visible = visible.filter((d) => d.id === user.department_id)
-  }
+  const departmentsRead = startRead(
+    supabase
+      .from('departments')
+      .select('id, name')
+      .eq('is_internal', false)
+      .order('name'),
+  )
 
   if (basis === 'accrual') {
     // Cumulative (to-date) accrual P&L — matches the Cash view's all-time basis.
     // From inception through the end of the current period (not just this month).
+    // Asked beside the departments: it needs nothing from them.
     const from = '2000-01-01'
     const to = dayjs(period).endOf('month').format('YYYY-MM-DD')
-    const income = await fetchIncomeStatement(supabase, { from, to })
+    const [{ data: departments }, income] = await Promise.all([
+      departmentsRead,
+      fetchIncomeStatement(supabase, { from, to }),
+    ])
+    const visible = visibleDepartments(user, departments)
     const poolByKey = new Map(income.pools.map((p) => [p.pool, p]))
 
     const rows = visible.map((dept) => {
@@ -226,12 +241,80 @@ export default async function DeptPoolPage({
     )
   }
 
+  // ── The cash view's reads, all in flight before the first is awaited ──
+  const balancesRead = startRead(supabase.from('dept_pool_balances').select('department_id, balance'))
+  const ventureOfficeRead = startRead(
+    supabase
+      .from('departments')
+      .select('id')
+      .eq('is_internal', true)
+      .eq('name', 'Venture Office')
+      .maybeSingle(),
+  )
+  const poolTxnsRead = startRead(
+    fetchAllRows((lo, hi) => supabase
+      .from('dept_pools')
+      .select('department_id, transaction_type, amount')
+      .order('id', { ascending: true })
+      .range(lo, hi)),
+  )
+  const submissionsRead = startRead(supabase.rpc('get_hr_cost_submissions_list'))
+  // Venture (Office) and the per-bank breakdown are Principal / Finance only.
+  // Both start from the active bank accounts — the cash slice from their GL
+  // codes, the breakdown from the rest — so the accounts are read ONCE (they
+  // were two reads of the same rows), and each journal_lines read starts the
+  // moment they are in. null = no active bank has a GL code: nothing to read.
+  const bankRowsRead =
+    user.role !== 'dept_manager'
+      ? startRead(
+          supabase
+            .from('bank_accounts')
+            .select('gl_account_code, bank_name, current_balance, is_primary')
+            .eq('status', 'active')
+            .order('is_primary', { ascending: false })
+            .then(({ data }) => data ?? []),
+        )
+      : null
+  const corpCashRead =
+    bankRowsRead &&
+    startRead(
+      bankRowsRead.then(async (bankRows) => {
+        const cashCodes = bankRows.map((b) => b.gl_account_code as string).filter(Boolean)
+        if (cashCodes.length === 0) return null
+        return fetchAllRows((lo, hi) => supabase
+          .from('journal_lines')
+          .select('debit, credit, journal_entries!inner(segment, is_reversed)')
+          .in('account_code', cashCodes)
+          .in('journal_entries.segment', ['corporate', 'treasury'])
+          // Void pairs net to zero in the balance but inflated the Venture row's
+          // gross In/Out (user 2026-09-10).
+          .eq('journal_entries.is_reversed', false)
+          .order('id', { ascending: true })
+          .range(lo, hi))
+      }),
+    )
+  const bankLinesRead =
+    bankRowsRead &&
+    startRead(
+      bankRowsRead.then(async (bankRows) => {
+        const codes = bankRows.filter((b) => b.gl_account_code).map((b) => b.gl_account_code as string)
+        if (codes.length === 0) return null
+        return fetchAllRows((lo, hi) => supabase
+          .from('journal_lines')
+          .select('account_code, debit, credit, journal_entries!inner(segment)')
+          .in('account_code', codes)
+          .order('id', { ascending: true })
+          .range(lo, hi))
+      }),
+    )
+
+  const { data: departments } = await departmentsRead
+  const visible = visibleDepartments(user, departments)
+
   // Load balances — all 5 Dept Pools live in dept_pool_balances after the
   // Stage-6 unification (HR / Finance / Director Office migrated from
   // operating_pools into dept_pools).
-  const { data: balances } = await supabase
-    .from('dept_pool_balances')
-    .select('department_id, balance')
+  const { data: balances } = await balancesRead
 
   const balanceMap = new Map(
     (balances ?? []).map((b) => [b.department_id as string, Number(b.balance)])
@@ -243,12 +326,7 @@ export default async function DeptPoolPage({
   // balance + In/Out out of the real-dept maps so it is neither rendered as a
   // 6th department nor double-counted in the grand total; it is folded into
   // ventureCash instead.
-  const { data: ventureOfficeDept } = await supabase
-    .from('departments')
-    .select('id')
-    .eq('is_internal', true)
-    .eq('name', 'Venture Office')
-    .maybeSingle()
+  const { data: ventureOfficeDept } = await ventureOfficeRead
   const ventureOfficeId = ventureOfficeDept?.id as string | undefined
   // The pseudo-dept's own view balance (folded into ventureCash below). Remove
   // it from balanceMap so the totalDeployed sum-over-real-depts excludes it.
@@ -261,11 +339,7 @@ export default async function DeptPoolPage({
   // Marketing's P&L breakdown still lives on /dept-pool/marketing.
   // Accumulated (all-time) In/Out per dept, so In − Out foots exactly to the
   // accumulated Balance. (Previously this-month only.)
-  const poolTxns = await fetchAllRows((lo, hi) => supabase
-    .from('dept_pools')
-    .select('department_id, transaction_type, amount')
-    .order('id', { ascending: true })
-    .range(lo, hi))
+  const poolTxns = await poolTxnsRead
 
   const inOutByDept = new Map<string, { in_amt: number; out_amt: number }>()
   for (const t of poolTxns ?? []) {
@@ -284,7 +358,7 @@ export default async function DeptPoolPage({
   // Lifetime sum of approved HR cost submissions per dept. Only count
   // submissions Principal has approved — pending snapshots shouldn't flow
   // into the Dept Pool total yet.
-  const { data: submissionsRaw } = await supabase.rpc('get_hr_cost_submissions_list')
+  const { data: submissionsRaw } = await submissionsRead
   const submissions = (submissionsRaw ?? []) as unknown as HRCostSubmissionRow[]
   const costingByDept = new Map<string, number>()
   for (const sub of submissions) {
@@ -316,31 +390,14 @@ export default async function DeptPoolPage({
   // pseudo-dept overlay.
   let ventureCash: { balance: number; in_amt: number; out_amt: number } | null = null
   if (user.role !== 'dept_manager') {
-    const { data: bankCodes } = await supabase
-      .from('bank_accounts')
-      .select('gl_account_code')
-      .eq('status', 'active')
-    const cashCodes = (bankCodes ?? [])
-      .map((b) => b.gl_account_code as string)
-      .filter(Boolean)
-
+    // The GL corporate/treasury lines on every active bank's code (item 2),
+    // read above beside everything else; null = no bank code, nothing read.
     let vIn = 0
     let vOut = 0
-    if (cashCodes.length > 0) {
-      const corpCashRows = await fetchAllRows((lo, hi) => supabase
-        .from('journal_lines')
-        .select('debit, credit, journal_entries!inner(segment, is_reversed)')
-        .in('account_code', cashCodes)
-        .in('journal_entries.segment', ['corporate', 'treasury'])
-        // Void pairs net to zero in the balance but inflated the Venture row's
-        // gross In/Out (user 2026-09-10).
-        .eq('journal_entries.is_reversed', false)
-        .order('id', { ascending: true })
-        .range(lo, hi))
-      for (const r of corpCashRows ?? []) {
-        vIn += Number(r.debit ?? 0)
-        vOut += Number(r.credit ?? 0)
-      }
+    const corpCashRows = await corpCashRead
+    for (const r of corpCashRows ?? []) {
+      vIn += Number(r.debit ?? 0)
+      vOut += Number(r.credit ?? 0)
     }
     // Fold in the 'Venture Office' pseudo-dept overlay (item 3 above). Its
     // In/Out come from dept_pools (via inOutByDept), its balance from the
@@ -364,11 +421,7 @@ export default async function DeptPoolPage({
   type PerBankRow = { segment: string; label: string; perBank: Record<string, number>; total: number }
   let perBankBreakdown: { banks: BankInfo[]; rows: PerBankRow[]; totals: { perBank: Record<string, number>; grand: number } } | null = null
   if (user.role !== 'dept_manager') {
-    const { data: bankRows } = await supabase
-      .from('bank_accounts')
-      .select('gl_account_code, bank_name, current_balance, is_primary')
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false })
+    const bankRows = await bankRowsRead
     const banks: BankInfo[] = (bankRows ?? [])
       .filter((b) => b.gl_account_code)
       .map((b) => ({
@@ -378,13 +431,9 @@ export default async function DeptPoolPage({
       }))
 
     if (banks.length > 0) {
-      const codes = banks.map((b) => b.code)
-      const bankLines = await fetchAllRows((lo, hi) => supabase
-        .from('journal_lines')
-        .select('account_code, debit, credit, journal_entries!inner(segment)')
-        .in('account_code', codes)
-        .order('id', { ascending: true })
-        .range(lo, hi))
+      // Every journal line on those banks' codes, read above the moment the
+      // accounts were in.
+      const bankLines = await bankLinesRead
       const agg = new Map<string, Map<string, number>>() // segment -> bankCode -> net
       for (const r of bankLines ?? []) {
         const seg = (r as { journal_entries: { segment: string } }).journal_entries.segment ?? 'unallocated'

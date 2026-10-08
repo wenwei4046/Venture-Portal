@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fetchAllRows, fetchByKeys } from './paginate'
+import { fetchAllRows, fetchAllRowsParallel, fetchByKeys } from './paginate'
 
 // Simulate PostgREST: a page is at most 1000 rows; .range(from, to) returns the slice.
 function pagedSource(total: number) {
@@ -45,6 +45,125 @@ describe('fetchAllRows', () => {
     await expect(
       fetchAllRows(() => Promise.resolve({ data: null, error: { message: 'boom' } })),
     ).rejects.toThrow(/boom/)
+  })
+})
+
+describe('fetchAllRowsParallel', () => {
+  /**
+   * PostgREST as the GL reports meet it: a page is `.range(from, to)` capped at
+   * 1000 rows, and the total comes back only on a request that asked to count.
+   * `delay` lets a page answer late (or a later page answer first); `count`
+   * overrides the total the counted page reports (a stale or missing count).
+   */
+  function countedSource(
+    total: number,
+    opts: { delay?: (from: number) => number; count?: number | null } = {},
+  ) {
+    const all = Array.from({ length: total }, (_, i) => ({ id: i }))
+    const calls: Array<{ from: number; withCount: boolean }> = []
+    let inFlight = 0
+    let most = 0
+    const fetch = async (from: number, to: number, withCount: boolean) => {
+      calls.push({ from, withCount })
+      inFlight++
+      most = Math.max(most, inFlight)
+      await new Promise(resolve => setTimeout(resolve, opts.delay?.(from) ?? 0))
+      inFlight--
+      return {
+        data: all.slice(from, Math.min(to + 1, from + 1000)),
+        error: null,
+        count: withCount ? (opts.count === undefined ? total : opts.count) : null,
+      }
+    }
+    return { fetch, calls, most: () => most }
+  }
+
+  it('reads the ledger’s five pages in two round trips, counting on the first only', async () => {
+    // 2026-10-08: journal_lines = ~4,230 rows, read one page after another.
+    const src = countedSource(4230)
+    const rows = await fetchAllRowsParallel(src.fetch)
+    expect(rows.length).toBe(4230)
+    expect(src.calls).toEqual([
+      { from: 0, withCount: true },
+      { from: 1000, withCount: false },
+      { from: 2000, withCount: false },
+      { from: 3000, withCount: false },
+      { from: 4000, withCount: false },
+    ])
+    expect(src.most()).toBe(4) // the four pages after the first all at once
+  })
+
+  it('answers in page order even when later pages arrive first', async () => {
+    const src = countedSource(4230, { delay: from => 40 - from / 200 })
+    const rows = await fetchAllRowsParallel(src.fetch)
+    expect(rows.map(r => r.id)).toEqual(Array.from({ length: 4230 }, (_, i) => i))
+  })
+
+  it('keeps at most four pages in flight', async () => {
+    const src = countedSource(9500, { delay: () => 5 })
+    const rows = await fetchAllRowsParallel(src.fetch)
+    expect(rows.length).toBe(9500)
+    expect(src.most()).toBe(4)
+    expect(src.calls.map(c => c.from)).toEqual([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000])
+  })
+
+  it('asks once for a set smaller than a page, and once for nothing at all', async () => {
+    const small = countedSource(42)
+    expect((await fetchAllRowsParallel(small.fetch)).length).toBe(42)
+    expect(small.calls).toEqual([{ from: 0, withCount: true }])
+
+    const empty = countedSource(0)
+    expect(await fetchAllRowsParallel(empty.fetch)).toEqual([])
+    expect(empty.calls).toEqual([{ from: 0, withCount: true }])
+  })
+
+  it('on exactly 1000 rows still looks past the full page, as fetchAllRows does', async () => {
+    // The count only decides how much to ask for at once — a full last page is
+    // never taken as the end.
+    const src = countedSource(1000)
+    const rows = await fetchAllRowsParallel(src.fetch)
+    expect(rows.length).toBe(1000)
+    expect(src.calls.map(c => c.from)).toEqual([0, 1000])
+  })
+
+  it('on exactly 2000 rows reads both pages, then confirms the end', async () => {
+    const src = countedSource(2000)
+    const rows = await fetchAllRowsParallel(src.fetch)
+    expect(rows.map(r => r.id)).toEqual(Array.from({ length: 2000 }, (_, i) => i))
+    expect(src.calls.map(c => c.from)).toEqual([0, 1000, 2000])
+  })
+
+  it('keeps reading when the table grew past what the count said', async () => {
+    const src = countedSource(2500, { count: 1500 })
+    const rows = await fetchAllRowsParallel(src.fetch)
+    expect(rows.map(r => r.id)).toEqual(Array.from({ length: 2500 }, (_, i) => i))
+    expect(src.calls.map(c => c.from)).toEqual([0, 1000, 2000])
+  })
+
+  it('reads one page at a time, like fetchAllRows, when no count comes back', async () => {
+    const src = countedSource(2500, { count: null, delay: () => 2 })
+    const rows = await fetchAllRowsParallel(src.fetch)
+    expect(rows.length).toBe(2500)
+    expect(src.most()).toBe(1)
+    expect(src.calls.map(c => c.from)).toEqual([0, 1000, 2000])
+  })
+
+  it('throws on an error on the first page', async () => {
+    await expect(
+      fetchAllRowsParallel(() => Promise.resolve({ data: null, error: { message: 'boom' }, count: null })),
+    ).rejects.toThrow(/^fetchAllRowsParallel: boom$/)
+  })
+
+  it('fails when any later page fails, even with others still in flight — under the caller’s label', async () => {
+    const all = Array.from({ length: 6000 }, (_, i) => ({ id: i }))
+    await expect(
+      fetchAllRowsParallel(async (from, to, withCount) => {
+        await new Promise(resolve => setTimeout(resolve, 5))
+        return from === 3000
+          ? { data: null, error: { message: 'TypeError: fetch failed' }, count: null }
+          : { data: all.slice(from, to + 1), error: null, count: withCount ? all.length : null }
+      }, 'fetchAllJournalLines'),
+    ).rejects.toThrow(/^fetchAllJournalLines: TypeError: fetch failed$/)
   })
 })
 

@@ -12,10 +12,13 @@ const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   createClient: vi.fn(),
   fetchPaidByInvoice: vi.fn(),
+  loadDepartmentMode: vi.fn(),
+  departmentModeCard: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/debtor-aging-data', () => ({ fetchPaidByInvoice: mocks.fetchPaidByInvoice }))
+vi.mock('@/lib/department-mode-server', () => ({ loadDepartmentMode: mocks.loadDepartmentMode }))
 vi.mock('@/lib/dept-registry', async (original) => ({
   ...(await original<typeof import('@/lib/dept-registry')>()),
   extraBillingModeOptions: () => [],
@@ -31,7 +34,12 @@ vi.mock('./CreateMultiLineInvoiceButton', () => ({ default: () => <button type="
 vi.mock('./GenerateConsolidatedInvoicesButton', () => ({ default: () => <button type="button">Generate payroll invoices</button> }))
 vi.mock('./ReconcilePayrollBillingButton', () => ({ default: () => <button type="button">对数补差</button> }))
 vi.mock('./GenerateOwnShareInvoiceButton', () => ({ default: () => <button type="button">Own-share → Venture (Office)</button> }))
-vi.mock('@/components/department/DepartmentModeCard', () => ({ default: () => <div data-testid="dept-mode" /> }))
+vi.mock('@/components/department/DepartmentModeCard', () => ({
+  default: (props: { segmentKey: string; department?: Promise<unknown> }) => {
+    mocks.departmentModeCard(props)
+    return <div data-testid="dept-mode" />
+  },
+}))
 vi.mock('./InvoicesList', () => ({
   default: (p: { invoices: Array<{ id: string }>; categoryByInvoice?: Record<string, string>; canSetDefault?: boolean }) => (
     <pre data-testid="list">{JSON.stringify({ ids: p.invoices.map((i) => i.id), categoryByInvoice: p.categoryByInvoice, canSetDefault: p.canSetDefault })}</pre>
@@ -111,6 +119,7 @@ function database() {
   })
   mocks.createClient.mockResolvedValue({ from, rpc })
   mocks.fetchPaidByInvoice.mockResolvedValue(new Map())
+  mocks.loadDepartmentMode.mockResolvedValue(null)
   return { from, rpc }
 }
 
@@ -177,5 +186,49 @@ describe('Service Billing on the sheet', () => {
     expect(sent().ids).toEqual(['d1', 'c1', 'm1', 'v1'])
     expect(sent().categoryByInvoice).toEqual({ c1: 'Salary Income', m1: 'Design Income' })
     expect(sent().canSetDefault).toBe(true)
+  })
+})
+
+// 2026-10-08 — the page awaited eleven reads one after another (~690 ms in
+// production) and the mode switch a twelfth after that. Two stages now.
+describe('Service Billing reads in two stages', () => {
+  it('asks for what hangs off the invoices the moment both invoice lists are in — not after every other read', async () => {
+    const { from, rpc } = database()
+    // Hold back a read nothing else needs: the staff billing allocation.
+    let release = () => {}
+    const held = new Promise<void>((resolve) => { release = resolve })
+    const answer = rpc.getMockImplementation()!
+    rpc.mockImplementation((name: string) => {
+      const q = answer(name)
+      if (name !== 'get_staff_billing_allocation') return q
+      return {
+        ...q,
+        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => held.then(() => q.then(resolve, reject)),
+      }
+    })
+
+    const rendering = page()
+    await vi.waitFor(() => {
+      expect(from).toHaveBeenCalledWith('invoice_lines')
+      expect(from).toHaveBeenCalledWith('credit_notes')
+      expect(mocks.fetchPaidByInvoice).toHaveBeenCalledWith(expect.anything(), ['d1'])
+    })
+    release()
+    await rendering
+    expect(card('Invoiced · September')).toHaveTextContent('RM 21,133.76')
+  })
+
+  it('starts Finance’s mode switch with the page’s own reads, and hands the card that read', async () => {
+    const { from } = database()
+    const mode = { id: 'dept-fin', name: 'Finance', segmentKey: 'finance', isInternal: false, costModel: 'cost_center', openSplitPeople: 0, canSwitch: true }
+    mocks.loadDepartmentMode.mockResolvedValue(mode)
+    await page()
+    expect(mocks.loadDepartmentMode).toHaveBeenCalledTimes(1)
+    expect(mocks.loadDepartmentMode).toHaveBeenCalledWith('finance')
+    const lines = from.mock.calls.findIndex(([table]) => table === 'invoice_lines')
+    expect(mocks.loadDepartmentMode.mock.invocationCallOrder[0]).toBeLessThan(from.mock.invocationCallOrder[lines])
+    const props = mocks.departmentModeCard.mock.calls[0][0] as { segmentKey: string; department?: Promise<unknown> }
+    expect(props.segmentKey).toBe('finance')
+    await expect(props.department).resolves.toBe(mode)
   })
 })

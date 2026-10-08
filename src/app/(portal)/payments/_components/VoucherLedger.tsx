@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/paginate'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
 import { fetchPaymentExtras } from '@/lib/payment-extras'
+import { startRead } from '@/lib/start-read'
 import { formatMoney } from '@/lib/utils'
 import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 import PaymentTabs from './PaymentTabs'
@@ -62,35 +63,63 @@ export default async function VoucherLedger({
   const minFilter = params.min ? parseFloat(params.min) : null
   const maxFilter = params.max ? parseFloat(params.max) : null
 
-  // Fetch this side's vouchers only (category labels live on sources — below)
-  const vouchers = await fetchAllRows((lo, hi) => supabase
-    .from('payment_vouchers')
-    .select('*')
-    .eq('direction', direction)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: true })
-    .range(lo, hi))
+  // ── Every read the ledger needs, started together (2026-10-08) ─────────
+  // None needs another's answer, yet they were five round trips one after
+  // another (~400–450 ms in production). Each is still awaited, below, where
+  // its answer is used.
+
+  // Fetch this side's vouchers only (category labels live on sources — below).
+  // The columns this page reads, not `*` (2026-10-08): with every column —
+  // notes, repayment breakdowns, approval and journal links nobody here shows
+  // — a side's vouchers came to ~340 KB.
+  const vouchersRead = startRead(
+    fetchAllRows((lo, hi) => supabase
+      .from('payment_vouchers')
+      .select('id, voucher_no, direction, amount, payee_name, status, voucher_type, reference_type, description, payment_date, created_at, target_pool, source_pool, fund_source_id, loan_id')
+      .eq('direction', direction)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(lo, hi)),
+  )
 
   // Stage D/E surface: payroll requests badge — payment side only.
-  const { count: payrollRequestsPending } = isReceipts || !seesPayroll
-    ? { count: 0 }
-    : await supabase
-        .from('payroll_payment_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'submitted')
+  const payrollRequestsRead = isReceipts || !seesPayroll
+    ? null
+    : startRead(
+        supabase
+          .from('payroll_payment_requests')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'submitted'),
+      )
 
   // Approved claims waiting for Finance's voucher (2026-10-08) — payment side
   // only. A badge, never a reason for the ledger itself not to open.
-  const claimRequestsPending = isReceipts
-    ? 0
-    : await (async () => {
+  const claimRequestsRead = isReceipts
+    ? null
+    : startRead((async () => {
         try {
           const { data } = await supabase.rpc('claim_payment_queue')
           return (data ?? []).filter(r => !r.voucher_id).length
         } catch {
           return 0
         }
-      })()
+      })())
+
+  const sourcesRead = startRead(
+    supabase
+      .from('payment_voucher_sources')
+      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
+      .order('amount', { ascending: false }),
+  )
+
+  // Money that moved outside the voucher flow (extraRows below).
+  const extraRowsRead = startRead(isReceipts ? fetchReceiptExtras(supabase) : fetchPaymentExtras(supabase))
+
+  const vouchers = await vouchersRead
+
+  const { count: payrollRequestsPending } = payrollRequestsRead ? await payrollRequestsRead : { count: 0 }
+
+  const claimRequestsPending = claimRequestsRead ? await claimRequestsRead : 0
 
   // Post-mig 238: PVS rows reference chart_of_accounts via account_code
   // (the COA `code` IS the GL). Load once, index by voucher_id, then derive
@@ -98,10 +127,7 @@ export default async function VoucherLedger({
   const sourcesByVoucher = new Map<string, string[]>()
   const categoriesByVoucher = new Map<string, string[]>()
   {
-    const { data: srcs } = await supabase
-      .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
-      .order('amount', { ascending: false })
+    const { data: srcs } = await sourcesRead
     for (const s of (srcs ?? []) as Array<{
       voucher_id: string
       pool: string
@@ -128,9 +154,7 @@ export default async function VoucherLedger({
   // 收到repayment的钱和fund in 的钱全部都显示在receipt这边"). Payments: direct
   // fund-source repayments (no PV) + Loan OUT disbursements (user 2026-08-06:
   // "不能像reciept 这样显示全部吗？"). Shared with /payments/export.
-  const extraRows: VoucherRow[] = isReceipts
-    ? await fetchReceiptExtras(supabase)
-    : await fetchPaymentExtras(supabase)
+  const extraRows: VoucherRow[] = await extraRowsRead
 
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'

@@ -8,6 +8,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ACCOUNT_TYPES, type AccountType, type CashFlowCategory, defaultCashFlowCategoryFor, rangeFor } from './coa'
+import { fetchAllRowsParallel } from './paginate'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -48,48 +49,53 @@ export interface CoaAccount {
  *  "cancel 或 void 的不要算"). Both legs of a pair carry the flag (mig
  *  20260730000000 refuses to flag a pair that doesn't net to zero), so no
  *  total moves — the cancelled rows simply stop appearing in statements and
- *  their drill-downs. Matches what the ledger/TB/BS queries already did. */
+ *  their drill-downs. Matches what the ledger/TB/BS queries already did.
+ *
+ *  The pages go out together (2026-10-08, `fetchAllRowsParallel`): one after
+ *  another they were five round trips in a row (66–95 ms each in production)
+ *  in front of every GL statement. */
 export async function fetchAllJournalLines(supabase: SupabaseClient): Promise<GlLine[]> {
+  const rows = await fetchAllRowsParallel(
+    (from, to, withCount) =>
+      supabase
+        .from('journal_lines')
+        .select(
+          'account_code, debit, credit, description, entry_id, journal_entries!inner(transaction_date, entry_no, description, segment, reference_type, reference_id, is_reversed)',
+          withCount ? { count: 'exact' } : undefined,
+        )
+        .order('id', { ascending: true })
+        .range(from, to),
+    'fetchAllJournalLines',
+  )
   const out: GlLine[] = []
-  const PAGE = 1000
-  for (let fromIdx = 0; ; fromIdx += PAGE) {
-    const { data, error } = await supabase
-      .from('journal_lines')
-      .select(
-        'account_code, debit, credit, description, entry_id, journal_entries!inner(transaction_date, entry_no, description, segment, reference_type, reference_id, is_reversed)',
-      )
-      .order('id', { ascending: true })
-      .range(fromIdx, fromIdx + PAGE - 1)
-    if (error) throw new Error(`fetchAllJournalLines: ${error.message}`)
-    for (const row of data ?? []) {
-      const je = row.journal_entries as unknown as {
-        transaction_date: string
-        entry_no: string | null
-        description: string | null
-        segment: string | null
-        reference_type: string | null
-        reference_id: string | null
-        is_reversed: boolean
-      }
-      // Skip void/reversal pairs — filtered here (not in the query) to match
-      // the existing embedded-column pattern in cfo-reports.fetchBankMovements.
-      // Paging stays correct because the page size check below counts RAW rows.
-      if (je.is_reversed) continue
-      out.push({
-        account_code: row.account_code as string,
-        debit: Number(row.debit ?? 0),
-        credit: Number(row.credit ?? 0),
-        description: (row.description as string | null) ?? null,
-        entry_id: row.entry_id as string,
-        date: je.transaction_date,
-        entry_no: je.entry_no,
-        entry_description: je.description,
-        segment: je.segment ?? '',
-        ref_type: je.reference_type,
-        ref_id: je.reference_id,
-      })
+  for (const row of rows) {
+    const je = row.journal_entries as unknown as {
+      transaction_date: string
+      entry_no: string | null
+      description: string | null
+      segment: string | null
+      reference_type: string | null
+      reference_id: string | null
+      is_reversed: boolean
     }
-    if (!data || data.length < PAGE) break
+    // Skip void/reversal pairs — filtered here (not in the query) to match
+    // the existing embedded-column pattern in cfo-reports.fetchBankMovements.
+    // Paging stays correct because the pager counts RAW rows: the skip runs
+    // only after every page is in.
+    if (je.is_reversed) continue
+    out.push({
+      account_code: row.account_code as string,
+      debit: Number(row.debit ?? 0),
+      credit: Number(row.credit ?? 0),
+      description: (row.description as string | null) ?? null,
+      entry_id: row.entry_id as string,
+      date: je.transaction_date,
+      entry_no: je.entry_no,
+      entry_description: je.description,
+      segment: je.segment ?? '',
+      ref_type: je.reference_type,
+      ref_id: je.reference_id,
+    })
   }
   return out
 }

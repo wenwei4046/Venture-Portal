@@ -15,6 +15,7 @@ import dayjs from 'dayjs'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
+import { startRead } from '@/lib/start-read'
 import {
   applyPoolAdjust,
   buildBankDay,
@@ -53,48 +54,163 @@ export async function fetchDailyBank(
 ): Promise<DailyBankData> {
   const dayEndIso = `${date}T23:59:59.999+08:00`
 
+  // ── Every read the day needs, started together (2026-10-08) ──────────
+  // One after another they were eight round trips (~415 ms in production).
+  // Only real dependencies wait: the GL lines for the banks' codes, and the
+  // pending chain — requests → their vouchers → those vouchers' sources.
+  // Nothing is worked out until every read is in, so the column set below
+  // (setExtraDbColumns, module state) is set and used with no await between.
+
   // Dynamic departments (2026-08-24): every provisioned full dept gets its
-  // own column. Set BEFORE any emptyAmounts()/column resolution below.
-  const { data: fullDeptRows } = await supabase
-    .from('departments')
-    .select('name, segment_key')
-    .not('segment_key', 'is', null)
+  // own column.
+  const fullDeptRead = startRead(
+    supabase
+      .from('departments')
+      .select('name, segment_key')
+      .not('segment_key', 'is', null),
+  )
+
+  const banksRead = startRead(
+    supabase
+      .from('bank_accounts')
+      .select('id, bank_name, gl_account_code, is_primary')
+      .eq('status', 'active')
+      .order('is_primary', { ascending: false })
+      .then(({ data: bankRows }) => ((bankRows ?? []) as Array<{
+        id: string
+        bank_name: string
+        gl_account_code: string | null
+        is_primary: boolean
+      }>).filter(b => b.gl_account_code)),
+  )
+
+  // ── GL lines on every bank code up to D, with the JE's segment ──
+  // (No bank code → the day has nothing to show and returns before reading
+  // these; see below.)
+  const glRowsRead = startRead(
+    banksRead.then(async banks => {
+      const codes = banks.map(b => b.gl_account_code as string)
+      if (codes.length === 0) return []
+      return (await fetchAllRows((lo, hi) =>
+        supabase
+          .from('journal_lines')
+          .select('account_code, debit, credit, journal_entries!inner(transaction_date, segment, is_reversed)')
+          .in('account_code', codes)
+          .lte('journal_entries.transaction_date', date)
+          .eq('journal_entries.is_reversed', false)
+          .order('id')
+          .range(lo, hi),
+      )) as unknown as Array<{
+        account_code: string
+        debit: number | null
+        credit: number | null
+        journal_entries: { transaction_date: string; segment: string | null }
+      }>
+    }),
+  )
+
+  // ── Pending as at end of D: submitted ≤ D, not approved by D ──
+  // The three reads of the chain; what they come to is worked out below.
+  const pendingRead = startRead(
+    (async () => {
+      const arRows = (await fetchAllRows((lo, hi) =>
+        supabase
+          .from('approval_requests')
+          .select('reference_id, status, created_at, approved_at, updated_at')
+          .eq('reference_table', 'payment_vouchers')
+          .lte('created_at', dayEndIso)
+          .order('id')
+          .range(lo, hi),
+      )) as Array<{
+        reference_id: string
+        status: string
+        created_at: string
+        approved_at: string | null
+        updated_at: string
+      }>
+      const pendingIds = [
+        ...new Set(
+          arRows
+            .filter(ar => {
+              if (ar.approved_at && ar.approved_at <= dayEndIso) return false // approved by D
+              if (ar.status === 'rejected' && ar.updated_at <= dayEndIso) return false // rejected by D
+              return true
+            })
+            .map(ar => ar.reference_id),
+        ),
+      ]
+      if (pendingIds.length === 0) return null
+
+      const { data: pvRows } = await supabase
+        .from('payment_vouchers')
+        .select('id, voucher_no, payee_name, description, amount, bank_account_id, direction, status, updated_at, reference_type')
+        .in('id', pendingIds)
+      const vouchers = ((pvRows ?? []) as Array<{
+        id: string
+        voucher_no: string | null
+        payee_name: string | null
+        description: string | null
+        amount: number
+        bank_account_id: string | null
+        direction: string
+        status: string
+        updated_at: string
+        reference_type: string | null
+      }>).filter(
+        v =>
+          v.direction === 'debit' &&
+          // voided before/on D → was gone by then (void time ≈ updated_at)
+          !(v.status === 'voided' && v.updated_at <= dayEndIso),
+      )
+
+      const { data: srcRows } = await supabase
+        .from('payment_voucher_sources')
+        .select('voucher_id, pool, amount, role')
+        .in('voucher_id', vouchers.map(v => v.id))
+      return { vouchers, srcRows }
+    })(),
+  )
+
+  // ── Receipts (OR vouchers) dated D, itemised for the by-bank view ──
+  const orRead = startRead(
+    supabase
+      .from('payment_vouchers')
+      .select('voucher_no, payee_name, description, amount, bank_account_id')
+      .eq('direction', 'credit')
+      .neq('status', 'voided')
+      .eq('payment_date', date),
+  )
+
+  // TODAY only: the pool balances whose gap is folded into the primary bank
+  // (below). Asked now when D is today; whether to fold is still decided at
+  // the end, as before.
+  const startTodayReads = () =>
+    startRead(
+      Promise.all([
+        supabase.from('dept_pool_balances').select('department_id, balance'),
+        supabase.from('departments').select('id, name, is_internal'),
+      ]),
+    )
+  const todayRead = date === dayjs().format('YYYY-MM-DD') ? startTodayReads() : null
+
+  const [{ data: fullDeptRows }, banks] = await Promise.all([fullDeptRead, banksRead])
   const extraCols = ((fullDeptRows ?? []) as Array<{ name: string; segment_key: string }>)
     .filter(d => !['marketing', 'hr', 'finance', 'director_office', 'director', 'corporate'].includes(d.segment_key))
     .map(d => ({ key: d.segment_key, label: d.name }))
-  setExtraDbColumns(extraCols)
-
-  const { data: bankRows } = await supabase
-    .from('bank_accounts')
-    .select('id, bank_name, gl_account_code, is_primary')
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
-  const banks = ((bankRows ?? []) as Array<{
-    id: string
-    bank_name: string
-    gl_account_code: string | null
-    is_primary: boolean
-  }>).filter(b => b.gl_account_code)
   const codes = banks.map(b => b.gl_account_code as string)
-  if (codes.length === 0)
+  if (codes.length === 0) {
+    setExtraDbColumns(extraCols)
     return { date, banks: [], totals: totalsAcrossBanks([]), columns: dbColumnsWithLabels() }
+  }
 
-  // ── GL lines on every bank code up to D, with the JE's segment ──
-  const glRows = (await fetchAllRows((lo, hi) =>
-    supabase
-      .from('journal_lines')
-      .select('account_code, debit, credit, journal_entries!inner(transaction_date, segment, is_reversed)')
-      .in('account_code', codes)
-      .lte('journal_entries.transaction_date', date)
-      .eq('journal_entries.is_reversed', false)
-      .order('id')
-      .range(lo, hi),
-  )) as unknown as Array<{
-    account_code: string
-    debit: number | null
-    credit: number | null
-    journal_entries: { transaction_date: string; segment: string | null }
-  }>
+  const glRows = await glRowsRead
+  const pending = await pendingRead
+  const { data: orRows } = await orRead
+  const todayAnswers =
+    date === dayjs().format('YYYY-MM-DD') ? await (todayRead ?? startTodayReads()) : null
+
+  // Every read is in. Set BEFORE any emptyAmounts()/column resolution below.
+  setExtraDbColumns(extraCols)
 
   const byCode = new Map<string, { bf: SegAmounts; inToday: SegAmounts; outToday: SegAmounts }>()
   for (const code of codes) {
@@ -114,62 +230,10 @@ export async function fetchDailyBank(
     }
   }
 
-  // ── Pending as at end of D: submitted ≤ D, not approved by D ──
-  const arRows = (await fetchAllRows((lo, hi) =>
-    supabase
-      .from('approval_requests')
-      .select('reference_id, status, created_at, approved_at, updated_at')
-      .eq('reference_table', 'payment_vouchers')
-      .lte('created_at', dayEndIso)
-      .order('id')
-      .range(lo, hi),
-  )) as Array<{
-    reference_id: string
-    status: string
-    created_at: string
-    approved_at: string | null
-    updated_at: string
-  }>
-  const pendingIds = [
-    ...new Set(
-      arRows
-        .filter(ar => {
-          if (ar.approved_at && ar.approved_at <= dayEndIso) return false // approved by D
-          if (ar.status === 'rejected' && ar.updated_at <= dayEndIso) return false // rejected by D
-          return true
-        })
-        .map(ar => ar.reference_id),
-    ),
-  ]
-
+  // ── Pending as at end of D (read above): null = nothing pending ──
   let pendingByBank = new Map<string, PendingItem[]>()
-  if (pendingIds.length > 0) {
-    const { data: pvRows } = await supabase
-      .from('payment_vouchers')
-      .select('id, voucher_no, payee_name, description, amount, bank_account_id, direction, status, updated_at, reference_type')
-      .in('id', pendingIds)
-    const vouchers = ((pvRows ?? []) as Array<{
-      id: string
-      voucher_no: string | null
-      payee_name: string | null
-      description: string | null
-      amount: number
-      bank_account_id: string | null
-      direction: string
-      status: string
-      updated_at: string
-      reference_type: string | null
-    }>).filter(
-      v =>
-        v.direction === 'debit' &&
-        // voided before/on D → was gone by then (void time ≈ updated_at)
-        !(v.status === 'voided' && v.updated_at <= dayEndIso),
-    )
-
-    const { data: srcRows } = await supabase
-      .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, role')
-      .in('voucher_id', vouchers.map(v => v.id))
+  if (pending) {
+    const { vouchers, srcRows } = pending
     const srcByVoucher = new Map<string, Array<{ pool: string | null; amount: number }>>()
     for (const s of ((srcRows ?? []) as Array<{
       voucher_id: string
@@ -244,12 +308,6 @@ export async function fetchDailyBank(
   }
 
   // ── Receipts (OR vouchers) dated D, itemised for the by-bank view ──
-  const { data: orRows } = await supabase
-    .from('payment_vouchers')
-    .select('voucher_no, payee_name, description, amount, bank_account_id')
-    .eq('direction', 'credit')
-    .neq('status', 'voided')
-    .eq('payment_date', date)
   const receiptsByBank = new Map<string, ReceiptItem[]>()
   for (const r of ((orRows ?? []) as Array<{
     voucher_no: string | null
@@ -292,11 +350,8 @@ export async function fetchDailyBank(
   // "By department" cash the user already trusts (user 2026-08-11: 直接拿现有
   // department 的 cash 当做 opening). Past dates stay GL-only (pool history is
   // not date-sliced), stated in the legend.
-  if (date === dayjs().format('YYYY-MM-DD')) {
-    const [{ data: balances }, { data: deptRows }] = await Promise.all([
-      supabase.from('dept_pool_balances').select('department_id, balance'),
-      supabase.from('departments').select('id, name, is_internal'),
-    ])
+  if (todayAnswers) {
+    const [{ data: balances }, { data: deptRows }] = todayAnswers
     const balanceByDept = new Map(
       ((balances ?? []) as Array<{ department_id: string; balance: number }>).map(b => [
         b.department_id,

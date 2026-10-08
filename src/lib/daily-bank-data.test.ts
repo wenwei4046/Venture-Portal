@@ -24,8 +24,18 @@ const SOURCES = [
   { voucher_id: 'v-bala', pool: 'dept_pool_marketing', amount: 4100.25, role: null },
 ]
 
-function database(): SupabaseClient {
+function database(
+  opts: {
+    departments?: unknown[]
+    journalLines?: unknown[]
+    /** A table whose answer waits for this promise. */
+    hold?: { table: string; until: Promise<void> }
+    /** Every table asked for, in order. */
+    asked?: string[]
+  } = {},
+): SupabaseClient {
   const from = (table: string) => {
+    opts.asked?.push(table)
     let ids: string[] | null = null
     let receipts = false
     const rows = (): unknown[] => {
@@ -38,10 +48,15 @@ function database(): SupabaseClient {
           return receipts ? [] : VOUCHERS.filter((v) => ids?.includes(v.id))
         case 'payment_voucher_sources':
           return SOURCES.filter((s) => ids?.includes(s.voucher_id))
+        case 'departments':
+          return opts.departments ?? []
+        case 'journal_lines':
+          return opts.journalLines ?? []
         default:
-          return [] // departments, journal_lines
+          return []
       }
     }
+    const held = opts.hold?.table === table ? opts.hold.until : Promise.resolve()
     const q = {
       select: () => q, not: () => q, order: () => q, lte: () => q, neq: () => q, range: () => q,
       eq: (column: string, value: unknown) => {
@@ -52,7 +67,7 @@ function database(): SupabaseClient {
         if (column === 'id' || column === 'voucher_id') ids = values
         return q
       },
-      then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => Promise.resolve(resolve({ data: rows(), error: null })),
+      then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => held.then(() => resolve({ data: rows(), error: null })),
     }
     return q
   }
@@ -90,5 +105,41 @@ describe('Daily Bank — payroll waiting for approval', () => {
     expect(folded.banks[0].available).toEqual(open.banks[0].available)
     expect(folded.totals).toEqual(open.totals)
     expect(open.banks[0].pendingTotal).toMatchObject({ venture: 1200, hr: 3200.5, marketing: 4100.25 })
+  })
+})
+
+// 2026-10-08 — the day's reads were eight round trips one after another
+// (~415 ms in production). They start together now; only the GL lines (on the
+// banks' codes) and the pending chain (requests → vouchers → sources) wait.
+describe('Daily Bank — reads', () => {
+  it('runs the whole pending chain while the GL lines are still on their way', async () => {
+    const asked: string[] = []
+    let release = () => {}
+    const until = new Promise<void>((resolve) => { release = resolve })
+    const day = fetchDailyBank(database({ asked, hold: { table: 'journal_lines', until } }), DAY, { seesPayroll: true })
+
+    // Requests → their vouchers → those vouchers' sources, and the day's
+    // receipts, all asked before the GL lines have answered.
+    await vi.waitFor(() => expect(asked).toContain('payment_voucher_sources'))
+    expect(asked.filter((t) => t === 'payment_vouchers')).toHaveLength(2)
+    release()
+    expect((await day).banks[0].pending).toHaveLength(3)
+  })
+
+  it('still gives a provisioned department its own column — set before anything is worked out', async () => {
+    const data = await fetchDailyBank(
+      database({
+        departments: [{ name: 'IT', segment_key: 'it' }],
+        journalLines: [
+          { account_code: '3000', debit: 500, credit: 0, journal_entries: { transaction_date: '2026-01-10', segment: 'it' } },
+          { account_code: '3000', debit: 0, credit: 120, journal_entries: { transaction_date: DAY, segment: 'it' } },
+        ],
+      }),
+      DAY,
+      { seesPayroll: true },
+    )
+    expect(data.columns).toContainEqual({ key: 'it', label: 'IT' })
+    expect(data.banks[0].bf).toMatchObject({ it: 500, venture: 0 })
+    expect(data.banks[0].outToday).toMatchObject({ it: 120 })
   })
 })

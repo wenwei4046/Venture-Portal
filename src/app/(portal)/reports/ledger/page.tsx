@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { fetchLedgers } from '@/lib/cfo-reports'
+import { fetchLedgers, type Ledger } from '@/lib/cfo-reports'
 import { type AccountType } from '@/lib/coa'
 import LedgerPicker from './_components/LedgerPicker'
 import LedgerSections from './_components/LedgerSections'
@@ -38,12 +38,23 @@ export default async function LedgerPage({ searchParams }: Props) {
   const showZero = params.showZero === '1'
 
   // Fetch all leaf accounts for the picker (header rows excluded by the
-  // existing AccountPicker behavior).
-  const { data: coaRows } = await supabase
-    .from('chart_of_accounts')
-    .select('code, name, type, parent_code, is_active')
-    .eq('is_active', true)
-    .order('code')
+  // existing AccountPicker behavior). The SAME read feeds the ledger body
+  // (2026-10-08 — it read the chart again, and only once this one was back),
+  // and the body's own reads start now, beside it. Promise.resolve: the query
+  // is sent once and awaited twice.
+  const coaRead = Promise.resolve(
+    supabase
+      .from('chart_of_accounts')
+      .select('code, name, type, parent_code, is_active')
+      .eq('is_active', true)
+      .order('code'),
+  )
+  const ledgersRead = fetchLedgers(supabase, { codes, from, to, coa: coaRead })
+  // LedgerBody awaits it — and shows its error — only after this page has
+  // rendered; until then a failure must not count as an unhandled rejection.
+  ledgersRead.catch(() => {})
+
+  const { data: coaRows } = await coaRead
   const accounts = (coaRows ?? []).map((r) => ({
     code: r.code as string,
     name: r.name as string,
@@ -88,22 +99,23 @@ export default async function LedgerPage({ searchParams }: Props) {
         </div>
       </div>
 
-      <LedgerBody codes={codes} from={from} to={to} showZero={showZero} supabase={supabase} />
+      <LedgerBody ledgersRead={ledgersRead} codes={codes} from={from} to={to} showZero={showZero} />
     </div>
   )
 }
 
 async function LedgerBody({
-  codes, from, to, showZero, supabase,
+  ledgersRead, codes, from, to, showZero,
 }: {
+  /** fetchLedgers, already under way (started by the page). */
+  ledgersRead: Promise<Ledger[]>
   codes: string[]
   from: string
   to: string
   showZero: boolean
-  supabase: Awaited<ReturnType<typeof createClient>>
 }) {
   try {
-    const ledgers = await fetchLedgers(supabase, { codes, from, to })
+    const ledgers = await ledgersRead
     const visible = showZero
       ? ledgers
       : ledgers.filter(

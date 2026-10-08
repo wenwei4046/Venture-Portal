@@ -27,6 +27,8 @@ import ReconcilePayrollBillingButton from './ReconcilePayrollBillingButton'
 import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
 import LedgerRow from '@/components/LedgerRow'
 import DepartmentModeCard from '@/components/department/DepartmentModeCard'
+import { loadDepartmentMode } from '@/lib/department-mode-server'
+import { startRead } from '@/lib/start-read'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -45,59 +47,165 @@ export default async function BillingView({ searchParams }: Props) {
   const periodStart = dayjs(period).startOf('month').toISOString()
   const periodEnd = dayjs(period).endOf('month').toISOString()
 
-  const [
-    { error: hrSummaryError },
-    { data: marketingContracts },
-    { data: invoices },
-    { data: companies },
-    { data: nonBillableTxns },
-    { data: departments },
-    { data: categories },
-    { data: banks },
-  ] = await Promise.all([
-    supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
-    supabase
-      .from('service_contracts')
-      .select(
-        'id, description, amount, status, start_date, end_date, company_id, approved_by'
-      )
-      .eq('billing_mode', 'marketing_project')
-      .order('created_at', { ascending: false }),
+  // ── Every read the page needs, in two stages (2026-10-08) ─────────────
+  // One after another they were eleven round trips (~690 ms in production),
+  // and Finance's mode switch below only began a twelfth once the page had
+  // every figure. Now everything that needs nothing is asked at once, and what
+  // hangs off the invoices — their lines, receipts, credit notes and batch
+  // settlement vouchers — the moment both invoice lists are in, without
+  // waiting for the rest. The answers are then put together exactly as before.
+  const invoicesRead = startRead(
     supabase
       .from('invoices')
       .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at, settlement_voucher_id')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
-    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
+  )
+  // 跨月合并结算 (2026-08-20): a payer often clears several months' invoices
+  // with ONE transfer, but this page is period-scoped — fetch OTHER periods'
+  // still-issued invoices too, and InvoicesList reveals them behind a 跨月
+  // toggle so they can be ticked into the same receipt. Period totals stay
+  // period-only.
+  const otherOpenRead = startRead(
     supabase
-      .from('venture_pool')
-      .select('id, created_at, transaction_type, amount, description, reference_table')
-      .gte('created_at', periodStart)
-      .lte('created_at', periodEnd)
-      .order('created_at', { ascending: false }),
-    // is_internal=false — the 'Venture Office' pseudo-dept must not appear in
-    // the invoice "bill to" department picker (it is not a billable dept).
-    supabase.from('departments').select('id, name').eq('is_internal', false).order('name'),
-    // Post-mig 238: payment_categories is gone. Pull every active leaf
-    // account from chart_of_accounts so the invoice "category" picker can
-    // route the credit side anywhere — revenue (5000s), other_income (9000)
-    // for recoveries, or balance-sheet codes (e.g. clearing a receivable
-    // originally booked when HV paid on someone's behalf).
-    // Mig 246 adds parent_code so downstream pickers can hide headers.
-    supabase
-      .from('chart_of_accounts')
-      .select('code, name, type, parent_code')
-      .eq('is_active', true)
-      // By code — sort_order is unset on most rows, which left the pickers in
-      // insertion order (user 2026-09-28: "这个太乱了，应该顺序").
-      .order('code'),
-    // For the batch-settle modal in InvoicesList.
-    supabase
-      .from('bank_accounts')
-      .select('id, bank_name, account_number, gl_account_code, is_primary')
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false }),
+      .from('invoices')
+      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at')
+      .eq('status', 'issued')
+      .neq('period_month', period)
+      .order('period_month', { ascending: false }),
+  )
+  const firstReads = startRead(
+    Promise.all([
+      supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
+      supabase
+        .from('service_contracts')
+        .select(
+          'id, description, amount, status, start_date, end_date, company_id, approved_by'
+        )
+        .eq('billing_mode', 'marketing_project')
+        .order('created_at', { ascending: false }),
+      supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
+      supabase
+        .from('venture_pool')
+        .select('id, created_at, transaction_type, amount, description, reference_table')
+        .gte('created_at', periodStart)
+        .lte('created_at', periodEnd)
+        .order('created_at', { ascending: false }),
+      // is_internal=false — the 'Venture Office' pseudo-dept must not appear in
+      // the invoice "bill to" department picker (it is not a billable dept).
+      supabase.from('departments').select('id, name').eq('is_internal', false).order('name'),
+      // Post-mig 238: payment_categories is gone. Pull every active leaf
+      // account from chart_of_accounts so the invoice "category" picker can
+      // route the credit side anywhere — revenue (5000s), other_income (9000)
+      // for recoveries, or balance-sheet codes (e.g. clearing a receivable
+      // originally booked when HV paid on someone's behalf).
+      // Mig 246 adds parent_code so downstream pickers can hide headers.
+      supabase
+        .from('chart_of_accounts')
+        .select('code, name, type, parent_code')
+        .eq('is_active', true)
+        // By code — sort_order is unset on most rows, which left the pickers in
+        // insertion order (user 2026-09-28: "这个太乱了，应该顺序").
+        .order('code'),
+      // For the batch-settle modal in InvoicesList.
+      supabase
+        .from('bank_accounts')
+        .select('id, bank_name, account_number, gl_account_code, is_primary')
+        .eq('status', 'active')
+        .order('is_primary', { ascending: false }),
+      // The live payroll_run's per-dept OPEX totals (payrollSubmitted below).
+      supabase
+        .from('payroll_runs')
+        .select(
+          'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, it_opex_total, revenue_opex_total, director_salary_total, approved_at'
+        )
+        .eq('period_month', period)
+        .neq('status', 'rejected')
+        .maybeSingle(),
+      // Staff billing allocation, dept × company aggregates (allocByDept below).
+      supabase.rpc('get_staff_billing_allocation', { p_period_month: period }),
+      // The Director Payroll Submission snapshot (directorSubmitted below).
+      supabase
+        .from('director_salary_submissions')
+        .select('total_gross, total_payroll_gross, total_invoice, total_saving, director_count, by_company, submitted_at')
+        .eq('period_month', period)
+        .maybeSingle(),
+    ]),
+  )
+  // Finance's mode switch (DepartmentModeCard below), begun with the page's
+  // reads rather than once the page is done. It never throws: a failed read
+  // is logged and the card draws nothing, as before.
+  const departmentModeRead = loadDepartmentMode('finance')
+
+  const [{ data: invoices }, { data: otherOpenRaw }] = await Promise.all([invoicesRead, otherOpenRead])
+  const invoiceList = invoices ?? []
+  const otherOpenInvoices = otherOpenRaw ?? []
+  const invoiceIds = invoiceList.map((i) => i.id)
+  const issuedIds = [
+    ...invoiceList.filter((i) => i.status === 'issued').map((i) => i.id as string),
+    ...otherOpenInvoices.map((i) => i.id as string),
+  ]
+  const allInvoiceIds = [
+    ...invoiceList.map((i) => i.id as string),
+    ...otherOpenInvoices.map((i) => i.id as string),
+  ]
+  const allInvoiceRows = [...(invoices ?? []), ...otherOpenInvoices] as Array<{
+    id: string
+    settlement_voucher_id?: string | null
+  }>
+  const settleVoucherIds = [
+    ...new Set(allInvoiceRows.map((i) => i.settlement_voucher_id).filter(Boolean) as string[]),
+  ]
+  const [{ data: lineRows }, paidMap, { data: cnRows }, { data: rcptRows }, { data: svRows }] = await Promise.all([
+    // Line items for this period's invoices — the edit modal mirrors the
+    // multi-line create form, so drafts need their lines prefilled.
+    invoiceIds.length > 0
+      ? supabase
+          .from('invoice_lines')
+          .select('invoice_id, line_no, description, amount, category_code, segment')
+          .in('invoice_id', invoiceIds)
+          .order('line_no')
+      : { data: null },
+    // Σ receipts per issued invoice (paidByInvoice below).
+    fetchPaidByInvoice(supabase as unknown as Parameters<typeof fetchPaidByInvoice>[0], issuedIds),
+    // Credit notes against the listed invoices (cnByInvoice below).
+    allInvoiceIds.length
+      ? supabase
+          .from('credit_notes')
+          .select('id, credit_note_no, invoice_id, amount, reason, status, category_code, billing_mode, created_at')
+          .in('invoice_id', allInvoiceIds)
+          .order('created_at', { ascending: false })
+      : { data: [] as never[] },
+    // Direct-linked receipts per invoice (receiptsByInvoice below).
+    allInvoiceIds.length
+      ? supabase
+          .from('payment_vouchers')
+          .select('invoice_id, voucher_no, payment_date, amount')
+          .in('invoice_id', allInvoiceIds)
+          .eq('direction', 'credit')
+          .neq('status', 'voided')
+          .order('payment_date')
+      : { data: [] as never[] },
+    // The batch settlement voucher each paid invoice points at (same).
+    settleVoucherIds.length > 0
+      ? supabase
+          .from('payment_vouchers')
+          .select('id, voucher_no, payment_date, amount')
+          .in('id', settleVoucherIds)
+      : { data: null },
   ])
+  const [
+    { error: hrSummaryError },
+    { data: marketingContracts },
+    { data: companies },
+    { data: nonBillableTxns },
+    { data: departments },
+    { data: categories },
+    { data: banks },
+    { data: payrollRun },
+    { data: staffAllocRows, error: staffAllocError },
+    { data: directorSubmission },
+  ] = await firstReads
 
   const bankList = (banks ?? []).map((b) => ({
     id: b.id as string,
@@ -105,17 +213,6 @@ export default async function BillingView({ searchParams }: Props) {
     account_number: (b.account_number as string | null) ?? null,
   }))
 
-  // Line items for this period's invoices — the edit modal mirrors the
-  // multi-line create form, so drafts need their lines prefilled.
-  const invoiceIds = (invoices ?? []).map((i) => i.id)
-  const { data: lineRows } =
-    invoiceIds.length > 0
-      ? await supabase
-          .from('invoice_lines')
-          .select('invoice_id, line_no, description, amount, category_code, segment')
-          .in('invoice_id', invoiceIds)
-          .order('line_no')
-      : { data: null }
   const linesByInvoice: Record<string, Array<{ description: string | null; amount: number; category_code: string | null }>> = {}
   for (const l of lineRows ?? []) {
     const arr = linesByInvoice[l.invoice_id] ?? []
@@ -150,28 +247,8 @@ export default async function BillingView({ searchParams }: Props) {
     (c) => c.status === 'active'
   ).length
 
-  const invoiceList = invoices ?? []
-
-  // 跨月合并结算 (2026-08-20): a payer often clears several months' invoices
-  // with ONE transfer, but this page is period-scoped — fetch OTHER periods'
-  // still-issued invoices too, and InvoicesList reveals them behind a 跨月
-  // toggle so they can be ticked into the same receipt. Period totals stay
-  // period-only.
-  const { data: otherOpenRaw } = await supabase
-    .from('invoices')
-    .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at')
-    .eq('status', 'issued')
-    .neq('period_month', period)
-    .order('period_month', { ascending: false })
-  const otherOpenInvoices = otherOpenRaw ?? []
-
   // Partial payments: Σ receipts per issued invoice so the list can show
   // part-paid badges and the settle modal collects the REMAINING balance.
-  const issuedIds = [
-    ...invoiceList.filter((i) => i.status === 'issued').map((i) => i.id as string),
-    ...otherOpenInvoices.map((i) => i.id as string),
-  ]
-  const paidMap = await fetchPaidByInvoice(supabase as unknown as Parameters<typeof fetchPaidByInvoice>[0], issuedIds)
   const paidByInvoice: Record<string, number> = {}
   for (const [id, paid] of paidMap) {
     if (paid > 0) paidByInvoice[id] = paid
@@ -181,17 +258,6 @@ export default async function BillingView({ searchParams }: Props) {
   // sums net off the settle balance (cnByInvoice); the full rows power the
   // Credit Notes section below the invoice list. Bounded .in() — one period's
   // invoice ids, same shape as fetchPaidByInvoice above.
-  const allInvoiceIds = [
-    ...invoiceList.map((i) => i.id as string),
-    ...otherOpenInvoices.map((i) => i.id as string),
-  ]
-  const { data: cnRows } = allInvoiceIds.length
-    ? await supabase
-        .from('credit_notes')
-        .select('id, credit_note_no, invoice_id, amount, reason, status, category_code, billing_mode, created_at')
-        .in('invoice_id', allInvoiceIds)
-        .order('created_at', { ascending: false })
-    : { data: [] as never[] }
   const cnByInvoice: Record<string, number> = {}
   for (const cn of cnRows ?? []) {
     if (cn.status !== 'approved') continue
@@ -208,15 +274,6 @@ export default async function BillingView({ searchParams }: Props) {
     string,
     Array<{ voucherNo: string | null; date: string | null; amount: number; batch?: boolean }>
   > = {}
-  const { data: rcptRows } = allInvoiceIds.length
-    ? await supabase
-        .from('payment_vouchers')
-        .select('invoice_id, voucher_no, payment_date, amount')
-        .in('invoice_id', allInvoiceIds)
-        .eq('direction', 'credit')
-        .neq('status', 'voided')
-        .order('payment_date')
-    : { data: [] as never[] }
   const directVoucherNos = new Set<string>()
   for (const r of rcptRows ?? []) {
     const arr = receiptsByInvoice[r.invoice_id as string] ?? []
@@ -228,18 +285,7 @@ export default async function BillingView({ searchParams }: Props) {
     receiptsByInvoice[r.invoice_id as string] = arr
     if (r.voucher_no) directVoucherNos.add(`${r.invoice_id}|${r.voucher_no}`)
   }
-  const allInvoiceRows = [...(invoices ?? []), ...otherOpenInvoices] as Array<{
-    id: string
-    settlement_voucher_id?: string | null
-  }>
-  const settleVoucherIds = [
-    ...new Set(allInvoiceRows.map((i) => i.settlement_voucher_id).filter(Boolean) as string[]),
-  ]
   if (settleVoucherIds.length > 0) {
-    const { data: svRows } = await supabase
-      .from('payment_vouchers')
-      .select('id, voucher_no, payment_date, amount')
-      .in('id', settleVoucherIds)
     const svById = new Map(
       ((svRows ?? []) as Array<{ id: string; voucher_no: string | null; payment_date: string | null; amount: number }>).map(
         (v) => [v.id, v],
@@ -278,14 +324,6 @@ export default async function BillingView({ searchParams }: Props) {
   // Pull the per-dept OPEX totals from the live payroll_run. Since mig 278
   // HR's Submit lands the run directly in status='approved' (approved_at set
   // at submit) — no Principal gate. Rejected rows are reopen history, skip.
-  const { data: payrollRun } = await supabase
-    .from('payroll_runs')
-    .select(
-      'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, it_opex_total, revenue_opex_total, director_salary_total, approved_at'
-    )
-    .eq('period_month', period)
-    .neq('status', 'rejected')
-    .maybeSingle()
   const payrollSubmitted = !!payrollRun?.approved_at
   const marketingFromPayroll = payrollSubmitted ? Number(payrollRun?.marketing_opex_total ?? 0) : 0
   const hrFromPayroll = payrollSubmitted ? Number(payrollRun?.hr_opex_total ?? 0) : 0
@@ -301,10 +339,6 @@ export default async function BillingView({ searchParams }: Props) {
   // dept × company aggregates only — no names, no individual salaries — so
   // Finance can read it. Amounts reconcile against the dept OPEX cards: the
   // gap between a dept's OPEX total and its allocated sum is HV's own share.
-  const { data: staffAllocRows, error: staffAllocError } = await supabase.rpc(
-    'get_staff_billing_allocation',
-    { p_period_month: period },
-  )
   if (staffAllocError) {
     console.error('get_staff_billing_allocation failed:', staffAllocError.message)
   }
@@ -341,11 +375,6 @@ export default async function BillingView({ searchParams }: Props) {
   // Director salary is decoupled from the staff run (mig 278/279) — Finance
   // reads the Director Payroll Submission snapshot. Legacy runs (pre-278)
   // still carry director_salary_total, so fall back to that.
-  const { data: directorSubmission } = await supabase
-    .from('director_salary_submissions')
-    .select('total_gross, total_payroll_gross, total_invoice, total_saving, director_count, by_company, submitted_at')
-    .eq('period_month', period)
-    .maybeSingle()
   const directorSubmitted = !!directorSubmission
   // What Finance bills for director salary is the submission's per-company
   // CTC, not its payroll gross (2026-10-06: the card read "over RM 19,396.25"
@@ -541,7 +570,7 @@ export default async function BillingView({ searchParams }: Props) {
       </div>
 
       {/* Cost center or centralized — Finance's own switch (2026-09-30). */}      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}
-      <DepartmentModeCard segmentKey="finance" />
+      <DepartmentModeCard segmentKey="finance" department={departmentModeRead} />
 
       <StatCards label="Service Billing">
         <StatCard
