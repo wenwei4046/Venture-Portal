@@ -29,6 +29,7 @@ import LedgerRow from '@/components/LedgerRow'
 import DepartmentModeCard from '@/components/department/DepartmentModeCard'
 import { loadDepartmentMode } from '@/lib/department-mode-server'
 import { startRead } from '@/lib/start-read'
+import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
@@ -156,6 +157,14 @@ export default async function BillingView({ searchParams }: Props) {
   const settleVoucherIds = [
     ...new Set(allInvoiceRows.map((i) => i.settlement_voucher_id).filter(Boolean) as string[]),
   ]
+  // The other months' open invoices ride along in every list below, so the
+  // ids are not one month's any more: past ~500 the URL fails outright. 100
+  // ids a time (fetchByKeys), and each answer kept as the page always read it.
+  // A failed read still leaves its rows out, as before.
+  const leftOutOnError = <T,>(read: Promise<T[]>) => read.then((data) => ({ data }), () => ({ data: null }))
+  // `created_at DESC` as Postgres sorts it, to the millisecond (NULLS FIRST).
+  // Rows the database already ordered stay where they are: the sort is stable.
+  const newestFirst = (at: string | null | undefined) => (at ? Date.parse(at) : Infinity)
   const [{ data: lineRows }, paidMap, { data: cnRows }, { data: rcptRows }, { data: svRows }] = await Promise.all([
     // Line items for this period's invoices — the edit modal mirrors the
     // multi-line create form, so drafts need their lines prefilled.
@@ -168,30 +177,51 @@ export default async function BillingView({ searchParams }: Props) {
       : { data: null },
     // Σ receipts per issued invoice (paidByInvoice below).
     fetchPaidByInvoice(supabase as unknown as Parameters<typeof fetchPaidByInvoice>[0], issuedIds),
-    // Credit notes against the listed invoices (cnByInvoice below).
+    // Credit notes against the listed invoices (cnByInvoice below). The
+    // Credit Notes section lists them newest first, so the chunks' answers are
+    // put back in that order (a stable sort — one chunk is left exactly as is).
     allInvoiceIds.length
-      ? supabase
-          .from('credit_notes')
-          .select('id, credit_note_no, invoice_id, amount, reason, status, category_code, billing_mode, created_at')
-          .in('invoice_id', allInvoiceIds)
-          .order('created_at', { ascending: false })
+      ? leftOutOnError(
+          fetchByKeys(allInvoiceIds, (chunk) =>
+            supabase
+              .from('credit_notes')
+              .select('id, credit_note_no, invoice_id, amount, reason, status, category_code, billing_mode, created_at')
+              .in('invoice_id', chunk)
+              .order('created_at', { ascending: false }),
+          ).then((rows) => rows.sort((a, b) => newestFirst(b.created_at) - newestFirst(a.created_at))),
+        )
       : { data: [] as never[] },
-    // Direct-linked receipts per invoice (receiptsByInvoice below).
+    // Direct-linked receipts per invoice (receiptsByInvoice below). Every
+    // receipt of one invoice sits in its invoice's chunk, in payment-date
+    // order; a chunk that reaches PostgREST's 1000-row cap is read again in
+    // pages, `id` breaking the date's ties (fetchAllRowsAsWritten).
     allInvoiceIds.length
-      ? supabase
-          .from('payment_vouchers')
-          .select('invoice_id, voucher_no, payment_date, amount')
-          .in('invoice_id', allInvoiceIds)
-          .eq('direction', 'credit')
-          .neq('status', 'voided')
-          .order('payment_date')
+      ? leftOutOnError(
+          fetchByKeys(allInvoiceIds, async (chunk) => ({
+            data: await fetchAllRowsAsWritten((page) => {
+              const q = supabase
+                .from('payment_vouchers')
+                .select('invoice_id, voucher_no, payment_date, amount')
+                .in('invoice_id', chunk)
+                .eq('direction', 'credit')
+                .neq('status', 'voided')
+                .order('payment_date')
+              return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+            }),
+            error: null,
+          })),
+        )
       : { data: [] as never[] },
     // The batch settlement voucher each paid invoice points at (same).
     settleVoucherIds.length > 0
-      ? supabase
-          .from('payment_vouchers')
-          .select('id, voucher_no, payment_date, amount')
-          .in('id', settleVoucherIds)
+      ? leftOutOnError(
+          fetchByKeys(settleVoucherIds, (chunk) =>
+            supabase
+              .from('payment_vouchers')
+              .select('id, voucher_no, payment_date, amount')
+              .in('id', chunk),
+          ),
+        )
       : { data: null },
   ])
   const [

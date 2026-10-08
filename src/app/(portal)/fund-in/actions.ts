@@ -212,11 +212,18 @@ export async function createFundSource(formData: FormData) {
 
   // ── Balance validation for department_pool ──
   if (raw.source_type === 'department_pool') {
-    // Find department_id from from_id, then check dept_pool balance
-    const { data: deptBalance } = await supabase
-      .from('dept_pools')
-      .select('amount, transaction_type')
-      .eq('department_id', raw.from_id)
+    // Find department_id from from_id, then check dept_pool balance — over
+    // every row the pool has ever had, in 1000-row pages (2026-10-08): a
+    // balance summed from a read PostgREST stopped at 1000 rows is wrong
+    // without a word. A failed read still counts as an empty pool, as before.
+    const deptBalance = await fetchAllRows((lo, hi) =>
+      supabase
+        .from('dept_pools')
+        .select('amount, transaction_type')
+        .eq('department_id', raw.from_id)
+        .order('id')
+        .range(lo, hi),
+    ).catch(() => null)
 
     const balance = (deptBalance ?? []).reduce((sum, row) => {
       return sum + (row.transaction_type === 'np_in' ? Number(row.amount) : -Number(row.amount))

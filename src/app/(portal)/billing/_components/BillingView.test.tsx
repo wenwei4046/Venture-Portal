@@ -41,8 +41,15 @@ vi.mock('@/components/department/DepartmentModeCard', () => ({
   },
 }))
 vi.mock('./InvoicesList', () => ({
-  default: (p: { invoices: Array<{ id: string }>; categoryByInvoice?: Record<string, string>; canSetDefault?: boolean }) => (
-    <pre data-testid="list">{JSON.stringify({ ids: p.invoices.map((i) => i.id), categoryByInvoice: p.categoryByInvoice, canSetDefault: p.canSetDefault })}</pre>
+  default: (p: {
+    invoices: Array<{ id: string }>
+    categoryByInvoice?: Record<string, string>
+    canSetDefault?: boolean
+    receiptsByInvoice?: Record<string, Array<{ voucherNo: string | null }>>
+  }) => (
+    <pre data-testid="list">
+      {JSON.stringify({ ids: p.invoices.map((i) => i.id), categoryByInvoice: p.categoryByInvoice, canSetDefault: p.canSetDefault, receiptsByInvoice: p.receiptsByInvoice })}
+    </pre>
   ),
 }))
 
@@ -124,7 +131,12 @@ function database() {
 }
 
 const card = (name: string) => screen.getByRole('group', { name })
-const sent = () => JSON.parse(screen.getByTestId('list').textContent ?? '{}') as { ids: string[]; categoryByInvoice: Record<string, string>; canSetDefault: boolean }
+const sent = () => JSON.parse(screen.getByTestId('list').textContent ?? '{}') as {
+  ids: string[]
+  categoryByInvoice: Record<string, string>
+  canSetDefault: boolean
+  receiptsByInvoice: Record<string, Array<{ voucherNo: string | null; date: string | null; amount: number; batch?: boolean }>>
+}
 const page = async () => render(await BillingView({ searchParams: Promise.resolve({ period: PERIOD }) }))
 
 beforeEach(() => {
@@ -230,5 +242,87 @@ describe('Service Billing reads in two stages', () => {
     const props = mocks.departmentModeCard.mock.calls[0][0] as { segmentKey: string; department?: Promise<unknown> }
     expect(props.segmentKey).toBe('finance')
     await expect(props.department).resolves.toBe(mode)
+  })
+})
+
+// 2026-10-08 — the receipts, credit notes and batch vouchers of every listed
+// invoice were each one `.in()` over every listed id (this month's AND every
+// other month's still-open invoice) — past ~500 ids the URL fails outright —
+// and one unranged read, which PostgREST stops at 1000 rows without a word.
+describe('Service Billing’s receipts, past the caps', () => {
+  type Row = Record<string, unknown>
+  const INVOICE = { ...base, settlement_voucher_id: null }
+
+  /** 150 issued invoices this month; invoice p000 holds 1,001 receipts. */
+  function bigMonth() {
+    const db = database()
+    const base = db.from.getMockImplementation()!
+    const invoices: Row[] = Array.from({ length: 150 }, (_, i) => ({
+      ...INVOICE,
+      id: `p${String(i).padStart(3, '0')}`,
+      invoice_no: `HV-INV-202609-${String(i).padStart(4, '0')}`,
+      billing_mode: 'marketing_project',
+      total_amount: 100,
+      status: 'issued',
+    }))
+    const receipts: Row[] = Array.from({ length: 1001 }, (_, i) => ({
+      id: `r${String(i).padStart(4, '0')}`,
+      invoice_id: 'p000',
+      voucher_no: i === 1000 ? 'HV-OR-202609-LAST' : `HV-OR-202609-${String(i).padStart(4, '0')}`,
+      // The last receipt is the latest: 1,001st in payment-date order.
+      payment_date: i === 1000 ? '2026-09-30' : '2026-09-01',
+      amount: 0.1,
+      direction: 'credit',
+      status: 'paid',
+    }))
+    const tables: Record<string, Row[]> = { invoices, payment_vouchers: receipts, credit_notes: [] }
+    const inLists: Record<string, number[]> = {}
+    db.from.mockImplementation((table: string) => {
+      if (!(table in tables)) return base(table)
+      const filters: Array<(r: Row) => boolean> = []
+      const orders: string[] = []
+      let range: [number, number] | null = null
+      const q = {
+        select: () => q,
+        eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
+        neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), q),
+        in: (c: string, v: unknown[]) => {
+          ;(inLists[`${table}.${c}`] ??= []).push(v.length)
+          filters.push((r) => v.includes(r[c]))
+          return q
+        },
+        order: (c: string) => (orders.push(c), q),
+        range: (lo: number, hi: number) => ((range = [lo, hi]), q),
+        maybeSingle: async () => ({ data: null, error: null }),
+        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => {
+          const rows = tables[table].filter((r) => filters.every((f) => f(r)))
+          rows.sort((a, b) => {
+            for (const c of orders) {
+              const x = String(a[c])
+              const y = String(b[c])
+              if (x !== y) return x < y ? -1 : 1
+            }
+            return 0
+          })
+          const [lo, hi] = range ?? [0, 999]
+          return Promise.resolve({ data: rows.slice(lo, Math.min(hi + 1, lo + 1000)), error: null }).then(resolve, reject)
+        },
+      }
+      return q as never
+    })
+    return { inLists }
+  }
+
+  it('asks 100 invoices a time, and still hands the list the 1,001st receipt', async () => {
+    const { inLists } = bigMonth()
+    await page()
+    const p000 = sent().receiptsByInvoice.p000
+    expect(p000).toHaveLength(1001)
+    expect(p000[1000]).toMatchObject({ voucherNo: 'HV-OR-202609-LAST', date: '2026-09-30' })
+    // Credit notes: one chunk of 100, one of 50. Receipts: the same two as
+    // written, then the capped chunk again in two pages.
+    expect(inLists['credit_notes.invoice_id']).toEqual([100, 50])
+    expect([...inLists['payment_vouchers.invoice_id']].sort((a, b) => a - b)).toEqual([50, 100, 100, 100])
+    expect(Math.max(...Object.values(inLists).flat())).toBe(100)
   })
 })

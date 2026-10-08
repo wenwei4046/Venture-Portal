@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
 
 /**
  * The human side of the ERP live feed.
@@ -134,21 +135,31 @@ export async function replayHeldErpEvents(period: string, subDepartmentId: strin
 
   const supabase = await client()
   await assertErpSubDepartment(supabase, subDepartmentId)
-  const { data, error } = await supabase
-    .from('erp_sync_events')
-    .select('id, doc_no, payload, received_at')
-    .eq('status', 'held')
-    .eq('period_month', period)
-    .eq('sub_department_id', subDepartmentId)
-    .is('replayed_at', null)
-    .order('received_at', { ascending: true })
-  if (error) throw new Error(`Could not read the held events: ${error.message}`)
+  // Every held delivery of the month (2026-10-08): the ERP re-sends a document
+  // on every save, so a month closed for long piles them up (262 in one month
+  // already), and an unranged read stops at PostgREST's 1000 rows without a
+  // word — the documents past it would never be replayed. Paged, oldest first
+  // as before; `id` only settles two deliveries of one instant.
+  const data = await fetchAllRows(
+    (lo, hi) =>
+      supabase
+        .from('erp_sync_events')
+        .select('id, doc_no, payload, received_at')
+        .eq('status', 'held')
+        .eq('period_month', period)
+        .eq('sub_department_id', subDepartmentId)
+        .is('replayed_at', null)
+        .order('received_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(lo, hi),
+    'Could not read the held events',
+  )
 
   // The last delivery of a document is the one that matters; the ones before
   // it were already overtaken in the ERP.
   const latest = new Map<string, HeldEventRow>()
   const superseded: string[] = []
-  for (const row of (data ?? []) as HeldEventRow[]) {
+  for (const row of data as HeldEventRow[]) {
     const key = row.doc_no ?? row.id
     const prev = latest.get(key)
     if (prev) superseded.push(prev.id)

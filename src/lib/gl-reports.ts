@@ -8,7 +8,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ACCOUNT_TYPES, type AccountType, type CashFlowCategory, defaultCashFlowCategoryFor, rangeFor } from './coa'
-import { fetchAllRowsParallel } from './paginate'
+import { fetchAllRows, fetchAllRowsParallel } from './paginate'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -117,25 +117,45 @@ export interface GlRefs {
 }
 
 /** Reference lookups for enriching drill-down rows: invoice number /
- *  description / bill-to, and voucher payee names. */
+ *  description / bill-to, and voucher payee names.
+ *
+ *  Every invoice, voucher and credit note is read in 1000-row pages
+ *  (2026-10-08): an unranged read stops at PostgREST's 1000 rows without a
+ *  word, and the rows past it would simply lose their invoice number and
+ *  counterparty in every drill-down. Each answer only feeds a Map by id, so
+ *  the pages' `id` order changes nothing else. */
 export async function fetchGlRefs(supabase: SupabaseClient): Promise<GlRefs> {
-  const [{ data: invoices, error: iErr }, { data: companies }, { data: departments }, { data: vouchers, error: vErr }, { data: creditNotes }] =
+  const [invoices, { data: companies }, { data: departments }, vouchers, creditNotes] =
     await Promise.all([
-      supabase
-        .from('invoices')
-        .select('id, invoice_no, description, company_id, billable_to_department_id, billable_to_freetext_name'),
+      fetchAllRows(
+        (from, to) =>
+          supabase
+            .from('invoices')
+            .select('id, invoice_no, description, company_id, billable_to_department_id, billable_to_freetext_name')
+            .order('id', { ascending: true })
+            .range(from, to),
+        'fetchGlRefs invoices',
+      ),
       supabase.from('companies').select('id, name, short_code'),
       // is_internal=false — the 'Venture Office' pseudo-dept is never a billable
       // party; keep it out of the id→name resolver too.
       supabase.from('departments').select('id, name').eq('is_internal', false),
-      supabase.from('payment_vouchers').select('id, payee_name, invoice_id'),
+      fetchAllRows(
+        (from, to) =>
+          supabase
+            .from('payment_vouchers')
+            .select('id, payee_name, invoice_id')
+            .order('id', { ascending: true })
+            .range(from, to),
+        'fetchGlRefs vouchers',
+      ),
       // CN JEs (reference_type='credit_note') resolve their party through the
       // parent invoice's bill-to. Errors tolerated (dept_manager RLS blocks
       // credit_notes) — those lines just keep a null party.
-      supabase.from('credit_notes').select('id, invoice_id'),
+      fetchAllRows((from, to) =>
+        supabase.from('credit_notes').select('id, invoice_id').order('id', { ascending: true }).range(from, to),
+      ).catch(() => [] as Array<{ id: string; invoice_id: string }>),
     ])
-  if (iErr) throw new Error(`fetchGlRefs invoices: ${iErr.message}`)
-  if (vErr) throw new Error(`fetchGlRefs vouchers: ${vErr.message}`)
 
   const coById = new Map((companies ?? []).map((c) => [c.id as string, (c.short_code as string | null) ?? (c.name as string)]))
   const deptById = new Map((departments ?? []).map((d) => [d.id as string, d.name as string]))

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
-import { fetchAllRows } from '@/lib/paginate'
+import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
 import { fetchPaymentExtras } from '@/lib/payment-extras'
@@ -68,10 +68,15 @@ export async function GET(req: Request) {
   const sourcesByVoucher = new Map<string, string[]>()
   const categoriesByVoucher = new Map<string, string[]>()
   {
-    const { data: srcs } = await supabase
-      .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
-      .order('amount', { ascending: false })
+    // Every source row, as the page reads them (VoucherLedger, 2026-10-08):
+    // as written while under PostgREST's 1000-row cap, paged once it is not.
+    const srcs = await fetchAllRowsAsWritten((page) => {
+      const q = supabase
+        .from('payment_voucher_sources')
+        .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
+        .order('amount', { ascending: false })
+      return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+    }).catch(() => null)
 
     for (const s of (srcs ?? []) as Array<{
       voucher_id: string

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { suggestStaffByName } from '@/lib/erp-sync/suggest-staff'
+import { fetchAllRows } from '@/lib/paginate'
 
 /**
  * What the Comm Cal page shows about the ERP live feed. Read here, rendered
@@ -77,12 +78,21 @@ export async function loadErpSyncPanelData(supabase: SupabaseClient, subDepartme
       .eq('sub_department_id', subDepartmentId)
       .order('received_at', { ascending: false })
       .limit(RECENT),
-    supabase
-      .from('erp_sync_events')
-      .select('period_month')
-      .eq('sub_department_id', subDepartmentId)
-      .eq('status', 'held')
-      .is('replayed_at', null),
+    // Every held delivery (2026-10-08): a month closed to the feed for good
+    // keeps holding each re-save of its documents (329 already), and past
+    // PostgREST's 1000-row cap the counts below would silently come up short.
+    // Only counted by month, so the pages' order will do; a failed read
+    // still counts none, as before.
+    fetchAllRows((lo, hi) =>
+      supabase
+        .from('erp_sync_events')
+        .select('period_month')
+        .eq('sub_department_id', subDepartmentId)
+        .eq('status', 'held')
+        .is('replayed_at', null)
+        .order('id')
+        .range(lo, hi),
+    ).then((data) => ({ data }), () => ({ data: null })),
     // Counted in SQL, deliberately (2026-09-16). Read as rows and grouped
     // here, this was capped at PostgREST's first 1,000 — so after the ERP
     // back-fill delivered 2,889 unplaced orders the panel showed a third of

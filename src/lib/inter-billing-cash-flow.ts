@@ -27,6 +27,7 @@ import type { CoaAccount, GlLine } from './gl-reports'
 import type { CashFlowLayout } from './cash-flow-custom'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { primedNameToSegment } from './dept-registry'
+import { fetchAllRows, fetchAllRowsAsWritten } from './paginate'
 
 /** Pseudo account code for the synthetic Financing transfer legs. */
 export const INTERBILL_TRANSFER_CODE = 'IB-XFER'
@@ -214,49 +215,69 @@ interface PoolRow {
  * `bankCodes` may be the page's own pending read (2026-10-08): none of the
  * reads below needs it — only the synthetic lines' bank leg does — so they all
  * start at once, beside the page's journal read, instead of after it.
+ *
+ * Every row of every read (2026-10-08): the pool reads are whole-history and
+ * PostgREST stops an unranged read at 1000 rows without a word — the rounds
+ * past it would silently drop out of every segment's cash. The pool reads go
+ * out as written while they fit (fetchAllRowsAsWritten): the sides below
+ * follow the rows' order, and so does a same-day drill-down. A capped answer
+ * is read again in pages, in ledger order (`created_at`, `id`).
  */
 export async function fetchInterBillingCashFlow(
   supabase: SupabaseClient,
   bankCodes: ReadonlySet<string> | PromiseLike<ReadonlySet<string>>,
 ): Promise<{ lines: GlLine[]; account: CoaAccount; payrollAccount: CoaAccount }> {
   try {
-    const [payRes, recRes, custodyRes, fundRes, voidedRes, flagsRes, mirrorRes] = await Promise.all([
-      supabase
-        .from('dept_pools')
-        .select('amount, created_at, description, departments!inner(name)')
-        .eq('transaction_type', 'inter_billing_out'),
-      supabase
-        .from('dept_pools')
-        .select('amount, created_at, description, departments!inner(name)')
-        .eq('transaction_type', 'np_in')
-        .like('description', 'PV HV-OR-%'),
+    const POOL_COLUMNS = 'amount, created_at, description, departments!inner(name)'
+    const [payRead, recRead, custodyRead, fundRead, voidedRows, flagsRes, mirrorRes] = await Promise.all([
+      fetchAllRowsAsWritten((page) => {
+        const q = supabase.from('dept_pools').select(POOL_COLUMNS).eq('transaction_type', 'inter_billing_out')
+        return page ? q.order('created_at').order('id').range(page.from, page.to) : q
+      }),
+      fetchAllRowsAsWritten((page) => {
+        const q = supabase
+          .from('dept_pools')
+          .select(POOL_COLUMNS)
+          .eq('transaction_type', 'np_in')
+          .like('description', 'PV HV-OR-%')
+        return page ? q.order('created_at').order('id').range(page.from, page.to) : q
+      }),
       // Payroll custody receipts — the funding PV parks the FULL round in the
       // custody pool; marker written by approve_single_voucher. The wording
       // changed 2026-08 ('… → HR custody' → '… → custody pool'), which
       // silently unbridged every August round — match the stable prefix and
       // let the ref-pairing below do the filtering.
-      supabase
-        .from('dept_pools')
-        .select('amount, created_at, description, departments!inner(name)')
-        .eq('transaction_type', 'np_in')
-        .like('description', '%payroll fund → %'),
+      fetchAllRowsAsWritten((page) => {
+        const q = supabase
+          .from('dept_pools')
+          .select(POOL_COLUMNS)
+          .eq('transaction_type', 'np_in')
+          .like('description', '%payroll fund → %')
+        return page ? q.order('created_at').order('id').range(page.from, page.to) : q
+      }),
       // Payroll funding drains — each department's typed contribution.
       // Director rounds too (2026-09-11): since 2026-08-07 director funding
       // drains dept_pool_director into HR custody exactly like staff, and
       // from Sept the payout JEs are hr-segment (mig 20260911010000), so the
       // Director segment's cash-out exists ONLY as this bridged drain.
-      supabase
-        .from('dept_pools')
-        .select('amount, created_at, description, departments!inner(name)')
-        .eq('transaction_type', 'expense_out')
-        .or(
-          'description.like.PV HV-PV-%: Payroll bank transfer%,description.like.PV HV-PV-%: Director salary bank transfer%',
-        ),
+      fetchAllRowsAsWritten((page) => {
+        const q = supabase
+          .from('dept_pools')
+          .select(POOL_COLUMNS)
+          .eq('transaction_type', 'expense_out')
+          .or(
+            'description.like.PV HV-PV-%: Payroll bank transfer%,description.like.PV HV-PV-%: Director salary bank transfer%',
+          )
+        return page ? q.order('created_at').order('id').range(page.from, page.to) : q
+      }),
       // Voiding a paid voucher REVERSES its pool rows with new void_in/void_out
       // rows — the originals stay for audit. Skip both sides of any voided
       // voucher's round, otherwise the bridge counts the original leg while the
       // reversal leg never matches (found live with voided HV-PV-202607-0115).
-      supabase.from('payment_vouchers').select('voucher_no').eq('status', 'voided'),
+      // A set of voucher numbers: any order will do.
+      fetchAllRows((from, to) =>
+        supabase.from('payment_vouchers').select('voucher_no').eq('status', 'voided').order('id').range(from, to),
+      ),
       // Pairing refs via SECURITY DEFINER (mig 20260820020000): a dept_manager's
       // RLS hides the HR-pool custody rows and all payment_vouchers, which
       // emptied custodyRefs + voided and silently killed their payroll bridge.
@@ -274,22 +295,19 @@ export async function fetchInterBillingCashFlow(
     ])
     const banks = await bankCodes
     const bankCode = banks.has('3000') ? '3000' : (banks.values().next().value ?? '3000')
-    if (payRes.error) throw payRes.error
-    if (recRes.error) throw recRes.error
-    if (custodyRes.error) throw custodyRes.error
-    if (fundRes.error) throw fundRes.error
-    if (voidedRes.error) throw voidedRes.error
+    // A read that failed has thrown already (fetchAllRows*), into the catch
+    // below — no lines, as before.
 
-    const payRows = (payRes.data ?? []) as unknown as PoolRow[]
-    const recRows = (recRes.data ?? []) as unknown as PoolRow[]
-    const custodyRows = (custodyRes.data ?? []) as unknown as PoolRow[]
-    const fundRows = (fundRes.data ?? []) as unknown as PoolRow[]
+    const payRows = payRead as unknown as PoolRow[]
+    const recRows = recRead as unknown as PoolRow[]
+    const custodyRows = custodyRead as unknown as PoolRow[]
+    const fundRows = fundRead as unknown as PoolRow[]
     const flags = ((flagsRes as { data?: unknown })?.data ?? {}) as {
       voided?: string[]
       payroll_refs?: string[]
     }
     const voided = new Set([
-      ...(((voidedRes.data ?? []) as { voucher_no: string | null }[])
+      ...((voidedRows as { voucher_no: string | null }[])
         .map((v) => v.voucher_no)
         .filter(Boolean) as string[]),
       ...(Array.isArray(flags.voided) ? flags.voided : []),

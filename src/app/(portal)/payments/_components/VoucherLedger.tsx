@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import { requirePermission } from '@/lib/auth'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
-import { fetchAllRows } from '@/lib/paginate'
+import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
 import { fetchPaymentExtras } from '@/lib/payment-extras'
 import { startRead } from '@/lib/start-read'
@@ -105,11 +105,23 @@ export default async function VoucherLedger({
         }
       })())
 
+  // Every source row (2026-10-08): 620 rows today, past PostgREST's 1000-row
+  // cap the vouchers beyond it would lose their pool and category. Read as
+  // written first: a voucher's labels join in arrival order, and two sources
+  // of one amount arrive as the database hands them over — only a capped
+  // answer is read again, paged, with `id` breaking those ties.
   const sourcesRead = startRead(
-    supabase
-      .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
-      .order('amount', { ascending: false }),
+    fetchAllRowsAsWritten((page) => {
+      const q = supabase
+        .from('payment_voucher_sources')
+        .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
+        .order('amount', { ascending: false })
+      return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+    }).then(
+      (data) => ({ data }),
+      // A failed read leaves the labels blank, as it always did.
+      () => ({ data: null }),
+    ),
   )
 
   // Money that moved outside the voucher flow (extraRows below).

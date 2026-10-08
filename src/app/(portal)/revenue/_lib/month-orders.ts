@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchByKeys } from '@/lib/paginate'
+import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 import type { HandExclusion } from '@/lib/commission/bill-exclusion'
 import type { BrandOption } from '@/lib/commission/bill-brand'
 
@@ -128,12 +128,26 @@ export async function loadMonthOrders(
   subDepartmentId: string,
   period: string,
 ): Promise<MonthOrder[]> {
-  const { data, error } = await supabase.rpc('revenue_month_orders', {
-    p_sub_department_id: subDepartmentId,
-    p_period: period,
-  })
-  if (error) throw new Error(`Could not read the month's orders: ${error.message}`)
-  return ((data ?? []) as Row[]).map(r => ({
+  // One row per bill, and PostgREST caps a function's rows at 1000 like any
+  // read (2026-10-08: ~370 bills in September) — past it the month's last
+  // days would silently drop off every list and total built on this. Asked as
+  // before while it fits; a capped answer is read again in pages, in the
+  // function's own order (date, sequence, number) with the bill's id last.
+  const data = await fetchAllRowsAsWritten<Row>((page) => {
+    const q = supabase.rpc('revenue_month_orders', {
+      p_sub_department_id: subDepartmentId,
+      p_period: period,
+    })
+    return page
+      ? q
+          .order('order_date')
+          .order('sequence_in_day', { nullsFirst: false })
+          .order('order_no')
+          .order('order_id')
+          .range(page.from, page.to)
+      : q
+  }, "Could not read the month's orders")
+  return data.map(r => ({
     orderId: r.order_id,
     orderNo: r.order_no,
     orderDate: r.order_date,

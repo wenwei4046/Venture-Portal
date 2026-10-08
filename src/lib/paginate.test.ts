@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fetchAllRows, fetchAllRowsParallel, fetchByKeys } from './paginate'
+import { fetchAllRows, fetchAllRowsAsWritten, fetchAllRowsParallel, fetchByKeys } from './paginate'
 
 // Simulate PostgREST: a page is at most 1000 rows; .range(from, to) returns the slice.
 function pagedSource(total: number) {
@@ -45,6 +45,68 @@ describe('fetchAllRows', () => {
     await expect(
       fetchAllRows(() => Promise.resolve({ data: null, error: { message: 'boom' } })),
     ).rejects.toThrow(/boom/)
+  })
+
+  it('names the caller in its error when given a label, and itself otherwise', async () => {
+    const failing = () => Promise.resolve({ data: null, error: { message: 'boom' } })
+    await expect(fetchAllRows(failing)).rejects.toThrow(/^fetchAllRows: boom$/)
+    await expect(fetchAllRows(failing, 'fetchGlRefs invoices')).rejects.toThrow(/^fetchGlRefs invoices: boom$/)
+  })
+})
+
+describe('fetchAllRowsAsWritten', () => {
+  /**
+   * PostgREST with a read that leaves ties: as written (no range) it answers at
+   * most 1000 rows in the database's own order — here, newest first, the way a
+   * scan can hand rows back — and a page asks for the total order (`id`).
+   */
+  function tiedSource(total: number) {
+    const all = Array.from({ length: total }, (_, i) => ({ id: i, amount: 100 }))
+    const calls: Array<{ from: number; to: number } | null> = []
+    const build = (page: { from: number; to: number } | null) => {
+      calls.push(page)
+      if (!page) return Promise.resolve({ data: [...all].reverse().slice(0, 1000), error: null })
+      return Promise.resolve({ data: all.slice(page.from, Math.min(page.to + 1, page.from + 1000)), error: null })
+    }
+    return { build, calls }
+  }
+
+  it('keeps a read under the cap exactly as it came — one request, its own order', async () => {
+    const src = tiedSource(42)
+    const rows = await fetchAllRowsAsWritten(src.build)
+    expect(rows.map((r) => r.id)).toEqual(Array.from({ length: 42 }, (_, i) => 41 - i))
+    expect(src.calls).toEqual([null])
+  })
+
+  it('reads a capped answer again, page by page in the total order, so row 1,001 is there', async () => {
+    const src = tiedSource(1001)
+    const rows = await fetchAllRowsAsWritten(src.build)
+    expect(rows.map((r) => r.id)).toEqual(Array.from({ length: 1001 }, (_, i) => i))
+    expect(src.calls).toEqual([null, { from: 0, to: 999 }, { from: 1000, to: 1999 }])
+  })
+
+  it('never takes a full answer as the whole of it', async () => {
+    const src = tiedSource(1000)
+    const rows = await fetchAllRowsAsWritten(src.build)
+    expect(rows).toHaveLength(1000)
+    expect(src.calls).toEqual([null, { from: 0, to: 999 }, { from: 1000, to: 1999 }])
+  })
+
+  it('answers nothing for nothing', async () => {
+    expect(await fetchAllRowsAsWritten(() => Promise.resolve({ data: null, error: null }))).toEqual([])
+  })
+
+  it('throws under its label — on the read as written, and on a page', async () => {
+    await expect(
+      fetchAllRowsAsWritten(() => Promise.resolve({ data: null, error: { message: 'boom' } }), 'sources'),
+    ).rejects.toThrow(/^sources: boom$/)
+    const full = Array.from({ length: 1000 }, (_, i) => ({ id: i }))
+    await expect(
+      fetchAllRowsAsWritten(
+        (page) => Promise.resolve(page ? { data: null, error: { message: 'page down' } } : { data: full, error: null }),
+        'sources',
+      ),
+    ).rejects.toThrow(/^sources: page down$/)
   })
 })
 

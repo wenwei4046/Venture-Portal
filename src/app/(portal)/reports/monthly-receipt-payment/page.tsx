@@ -19,7 +19,7 @@ import {
 } from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { monthColumns, type MatrixRow } from '@/lib/monthly-matrix'
-import { buildRnpMatrixRows, type RnpInvoiceEvent } from '@/lib/monthly-rnp'
+import { buildRnpMatrixRows, fetchRnpInvoiceEvents } from '@/lib/monthly-rnp'
 import { segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import MonthlyMatrix from '../_components/MonthlyMatrix'
@@ -50,7 +50,7 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
     ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
   )
-  const [lines, accounts, bankCodes, ib, inSaved, outSaved, eventsRes, { data: companyRows }] =
+  const [lines, accounts, bankCodes, ib, inSaved, outSaved, events, { data: companyRows }] =
     await Promise.all([
       fetchAllJournalLines(supabase),
       fetchCoaAccounts(supabase),
@@ -58,10 +58,8 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
       consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
       readReportLayout(supabase, 'cash_flow_in'),
       readReportLayout(supabase, 'cash_flow_out'),
-      supabase.rpc(
-        'rnp_invoice_events' as never,
-        (isDeptMgr || !segment ? {} : { p_segment: segment }) as never,
-      ),
+      // Every event, paged past PostgREST's cap (lib/monthly-rnp.ts).
+      fetchRnpInvoiceEvents(supabase, isDeptMgr || !segment ? {} : { p_segment: segment }),
       supabase.from('companies').select('id, name, short_code'),
     ])
   const ibLines = ib ? ib.lines : []
@@ -74,11 +72,6 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   )
 
   const { months, accPeriod } = monthColumns(year, throughMonth)
-  const events = (
-    Array.isArray((eventsRes as { data?: unknown })?.data)
-      ? ((eventsRes as { data: unknown }).data as RnpInvoiceEvent[])
-      : []
-  )
   const companyLabelById = new Map<string, string>(
     ((companyRows ?? []) as Array<{ id: string; name: string; short_code: string | null }>).map(
       (c) => [c.id, c.short_code ?? c.name],

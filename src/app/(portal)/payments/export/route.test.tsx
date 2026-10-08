@@ -8,7 +8,11 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
-vi.mock('@/lib/paginate', () => ({ fetchAllRows: mocks.fetchAllRows }))
+// The vouchers' own read is answered by hand; every other pager is the real one.
+vi.mock('@/lib/paginate', async (original) => ({
+  ...(await original<typeof import('@/lib/paginate')>()),
+  fetchAllRows: mocks.fetchAllRows,
+}))
 vi.mock('@/lib/export/response', () => ({ exportXlsxResponse: mocks.exportXlsxResponse, exportPdfResponse: vi.fn() }))
 vi.mock('@/lib/receipt-extras', async (original) => ({
   ...(await original<typeof import('@/lib/receipt-extras')>()),

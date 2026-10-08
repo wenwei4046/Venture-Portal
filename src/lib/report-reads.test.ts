@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchAllJournalLines } from './gl-reports'
+import { applyGlRefs, fetchAllJournalLines, fetchGlRefs, type GlLine } from './gl-reports'
 import { classifyRows, fetchIncomeStatement, fetchLedgers, fetchTrialBalance, type RawPvSourceRow } from './cfo-reports'
 import { fetchInterBillingCashFlow } from './inter-billing-cash-flow'
+import { fetchInterBillingElimination } from './consolidation'
+import { fetchDeptOutstanding } from './dept-receipt-payment'
+import { fetchRnpInvoiceEvents } from './monthly-rnp'
 
 // How the finance reports READ (2026-10-08). Each sequential PostgREST round
 // trip costs ~35–40 ms in production, so these tests pin down not only what a
@@ -24,6 +27,10 @@ interface Req {
   inLists: Array<{ col: string; size: number }>
   /** An rpc's arguments, as sent. */
   args?: unknown
+  /** `col.asc` / `col.desc`, in the order asked. */
+  orders?: string[]
+  /** The `.range()` asked for — none means "as written": capped at 1000. */
+  range?: [number, number] | null
 }
 
 interface Answer {
@@ -60,8 +67,18 @@ function pocketPostgrest(
     })()
   }
 
+  const sortRows = (rows: Row[], orders: Array<{ col: string; asc: boolean }>) =>
+    rows.sort((x, y) => {
+      for (const o of orders) {
+        const a = String(read(x, o.col))
+        const b = String(read(y, o.col))
+        if (a !== b) return (a < b ? -1 : 1) * (o.asc ? 1 : -1)
+      }
+      return 0
+    })
+
   const from = (table: string) => {
-    const req: Req = { table, counted: false, inLists: [] }
+    const req: Req = { table, counted: false, inLists: [], orders: [], range: null }
     const filters: Array<(row: Row) => boolean> = []
     const orders: Array<{ col: string; asc: boolean }> = []
     let range: [number, number] = [0, 999]
@@ -100,6 +117,7 @@ function pocketPostgrest(
       or(expr: string) {
         const alternatives = expr.split(',').map((part) => {
           const [col, op, ...rest] = part.split('.')
+          if (op === 'eq') return (r: Row) => String(read(r, col) ?? '') === rest.join('.')
           if (op !== 'like') throw new Error(`pocketPostgrest: or(${op}) not supported`)
           const re = like(rest.join('.'))
           return (r: Row) => re.test(String(read(r, col) ?? ''))
@@ -114,10 +132,12 @@ function pocketPostgrest(
       },
       order(col: string, o?: { ascending?: boolean }) {
         orders.push({ col, asc: o?.ascending ?? true })
+        req.orders!.push(`${col}.${(o?.ascending ?? true) ? 'asc' : 'desc'}`)
         return builder
       },
       range(lo: number, hi: number) {
         range = [lo, hi]
+        req.range = [lo, hi]
         return builder
       },
       then<A = Answer, B = never>(
@@ -125,15 +145,7 @@ function pocketPostgrest(
         onErr?: ((e: unknown) => B | PromiseLike<B>) | null,
       ): Promise<A | B> {
         return settle(req, () => {
-          const rows = (tables[table] ?? []).filter((r) => filters.every((f) => f(r)))
-          rows.sort((x, y) => {
-            for (const o of orders) {
-              const a = String(read(x, o.col))
-              const b = String(read(y, o.col))
-              if (a !== b) return (a < b ? -1 : 1) * (o.asc ? 1 : -1)
-            }
-            return 0
-          })
+          const rows = sortRows((tables[table] ?? []).filter((r) => filters.every((f) => f(r))), orders)
           const [lo, hi] = range
           return {
             data: rows.slice(lo, Math.min(hi + 1, lo + 1000)),
@@ -159,23 +171,43 @@ function pocketPostgrest(
     }
     return [...sums].map(([account_code, net]) => ({ account_code, net }))
   }
-  const rpc = (name: string, args?: Record<string, unknown>) => ({
-    then<A = Answer, B = never>(
-      onOk?: ((v: Answer) => A | PromiseLike<A>) | null,
-      onErr?: ((e: unknown) => B | PromiseLike<B>) | null,
-    ): Promise<A | B> {
-      return settle({ table: `rpc:${name}`, counted: false, inLists: [], args }, () => ({
-        data:
-          opts.rpc && name in opts.rpc
-            ? opts.rpc[name]
-            : name === 'gl_net_by_account'
-              ? glNetByAccount(args as { p_before: string; p_codes?: string[] })
-              : null,
-        error: null,
-        count: null,
-      })).then(onOk, onErr)
-    },
-  })
+  // A function's answer: a value as it is; a set ordered, ranged and capped at
+  // 1000 rows exactly like a table read.
+  const rpc = (name: string, args?: Record<string, unknown>) => {
+    const req: Req = { table: `rpc:${name}`, counted: false, inLists: [], args, orders: [], range: null }
+    const orders: Array<{ col: string; asc: boolean }> = []
+    let range: [number, number] = [0, 999]
+    const builder = {
+      order(col: string, o?: { ascending?: boolean }) {
+        orders.push({ col, asc: o?.ascending ?? true })
+        req.orders!.push(`${col}.${(o?.ascending ?? true) ? 'asc' : 'desc'}`)
+        return builder
+      },
+      range(lo: number, hi: number) {
+        range = [lo, hi]
+        req.range = [lo, hi]
+        return builder
+      },
+      then<A = Answer, B = never>(
+        onOk?: ((v: Answer) => A | PromiseLike<A>) | null,
+        onErr?: ((e: unknown) => B | PromiseLike<B>) | null,
+      ): Promise<A | B> {
+        return settle(req, () => {
+          const answer =
+            opts.rpc && name in opts.rpc
+              ? opts.rpc[name]
+              : name === 'gl_net_by_account'
+                ? glNetByAccount(args as { p_before: string; p_codes?: string[] })
+                : null
+          if (!Array.isArray(answer)) return { data: answer ?? null, error: null, count: null }
+          const rows = sortRows([...(answer as Row[])], orders)
+          const [lo, hi] = range
+          return { data: rows.slice(lo, Math.min(hi + 1, lo + 1000)), error: null, count: null }
+        }).then(onOk, onErr)
+      },
+    }
+    return builder
+  }
   return { client: { from, rpc } as unknown as SupabaseClient, log }
 }
 
@@ -523,5 +555,207 @@ describe('fetchInterBillingCashFlow — reads before the bank codes are known', 
       ['3000', 500, 0, 'corporate'],
       ['IB-XFER', 0, 500, 'corporate'],
     ])
+  })
+})
+
+// ── Past PostgREST's 1000-row cap (2026-10-08) ───────────────────────────────
+// An unranged read — table or set-returning function — stops at 1000 rows and
+// says nothing. Each reader below once lost every row past it; each must now
+// use the 1,001st.
+
+const pageRanges = (log: Req[], table: string) => log.filter((r) => r.table === table).map((r) => r.range)
+
+describe('fetchGlRefs — every invoice, voucher and credit note', () => {
+  function books() {
+    return {
+      invoices: Array.from({ length: 1005 }, (_, i) => ({
+        id: `inv${pad(i)}`,
+        invoice_no: `INV-${i}`,
+        description: `Sale ${i}`,
+        company_id: i % 2 ? 'co-a' : null,
+        billable_to_department_id: null,
+        billable_to_freetext_name: i % 2 ? null : `Walk-in ${i}`,
+      })),
+      payment_vouchers: Array.from({ length: 1003 }, (_, i) => ({ id: `pv${pad(i)}`, payee_name: `Payee ${i}`, invoice_id: null })),
+      credit_notes: Array.from({ length: 1002 }, (_, i) => ({ id: `cn${pad(i)}`, invoice_id: `inv${pad(i)}` })),
+      companies: [{ id: 'co-a', name: 'Alpha Sdn Bhd', short_code: 'ALP' }],
+      departments: [],
+    }
+  }
+
+  it('resolves the rows past the 1000th, each table in two pages', async () => {
+    const db = pocketPostgrest(books())
+    const refs = await fetchGlRefs(db.client)
+    expect(refs.invoices.size).toBe(1005)
+    expect(refs.invoices.get('inv01004')).toEqual({ invoice_no: 'INV-1004', description: 'Sale 1004', billTo: 'Walk-in 1004' })
+    expect(refs.voucherPayees.get('pv01002')).toBe('Payee 1002')
+    expect(refs.creditNoteParties?.get('cn01001')).toBe('ALP')
+    for (const table of ['invoices', 'payment_vouchers', 'credit_notes']) {
+      expect(pageRanges(db.log, table)).toEqual([[0, 999], [1000, 1999]])
+    }
+  })
+
+  it('names the drill-down lines that point past the 1000th invoice and voucher', async () => {
+    const refs = await fetchGlRefs(pocketPostgrest(books()).client)
+    const line = (ref_type: string, ref_id: string): GlLine => ({
+      account_code: '3000', debit: 1, credit: 0, description: null, entry_id: 'e', date: '2026-09-01',
+      entry_no: null, entry_description: null, segment: 'corporate', ref_type, ref_id,
+    })
+    const [sale, payment] = applyGlRefs([line('invoice', 'inv01003'), line('payment_voucher', 'pv01001')], refs)
+    expect(sale).toMatchObject({ description: 'INV-1003 · Sale 1003', party: 'ALP' })
+    expect(payment).toMatchObject({ party: 'Payee 1001' })
+  })
+
+  it('still lets the credit notes fail quietly, and the invoices not', async () => {
+    const quiet = await fetchGlRefs(pocketPostgrest(books(), { fail: (r) => (r.table === 'credit_notes' ? 'denied' : null) }).client)
+    expect(quiet.creditNoteParties?.size).toBe(0)
+    expect(quiet.invoices.size).toBe(1005)
+    await expect(
+      fetchGlRefs(pocketPostgrest(books(), { fail: (r) => (r.table === 'invoices' ? 'TypeError: fetch failed' : null) }).client),
+    ).rejects.toThrow(/^fetchGlRefs invoices: TypeError: fetch failed$/)
+  })
+})
+
+describe('fetchInterBillingElimination — every internal invoice', () => {
+  it('eliminates the 1,001st', async () => {
+    const invoices = Array.from({ length: 1001 }, (_, i) => ({ id: `inv${pad(i)}`, billable_to_type: i % 2 ? 'dept_pool' : 'director' }))
+    const db = pocketPostgrest({ invoices, chart_of_accounts: [{ code: '9050', parent_code: null }] })
+    const elim = await fetchInterBillingElimination(db.client)
+    expect(elim.internalInvoiceIds.size).toBe(1001)
+    expect(elim.internalInvoiceIds.has('inv01000')).toBe(true)
+  })
+})
+
+describe('fetchInterBillingCashFlow — every pool row', () => {
+  // 1,001 reallocations, each a payer row and its receiver: both reads pass
+  // the cap. The last pair is the one an unranged read would have dropped.
+  function pools(n: number) {
+    const rows: Row[] = []
+    for (let i = 0; i < n; i++) {
+      const ref = `HV-OR-202607-${pad(i, 4)}`
+      rows.push(
+        {
+          id: `dp-pay-${pad(i)}`,
+          amount: 10,
+          created_at: '2026-07-05T03:00:00Z',
+          description: `PV ${ref}: Office rent share [dept_pool_marketing]`,
+          transaction_type: 'inter_billing_out',
+          departments: { name: 'Marketing' },
+        },
+        {
+          id: `dp-rec-${pad(i)}`,
+          amount: 10,
+          created_at: '2026-07-05T03:00:00Z',
+          description: `PV ${ref}: Office rent share [venture_pool]`,
+          transaction_type: 'np_in',
+          departments: { name: 'Venture Office' },
+        },
+      )
+    }
+    return rows
+  }
+  const rpc = { bridge_ref_flags: { voided: [], payroll_refs: [] }, bridge_mirror_slices: [] }
+
+  it('bridges the 1,001st reallocation on both sides', async () => {
+    const db = pocketPostgrest({ dept_pools: pools(1001), payment_vouchers: [] }, { rpc })
+    const out = await fetchInterBillingCashFlow(db.client, new Set(['3000']))
+    expect(out.lines).toHaveLength(4 * 1001)
+    expect(out.lines.filter((l) => l.description?.includes('HV-OR-202607-1000')).map((l) => [l.account_code, l.segment])).toEqual([
+      ['IB-XFER', 'marketing'],
+      ['IB-XFER', 'corporate'],
+    ])
+    // Each capped pool read: once as written, then two pages in ledger order.
+    const pages = db.log.filter((r) => r.table === 'dept_pools' && r.range)
+    expect(pages.map((r) => [r.orders, r.range])).toEqual([
+      [['created_at.asc', 'id.asc'], [0, 999]],
+      [['created_at.asc', 'id.asc'], [0, 999]],
+      [['created_at.asc', 'id.asc'], [1000, 1999]],
+      [['created_at.asc', 'id.asc'], [1000, 1999]],
+    ])
+  })
+
+  it('under the cap, sends each pool read as written, once', async () => {
+    const db = pocketPostgrest({ dept_pools: pools(3), payment_vouchers: [] }, { rpc })
+    const out = await fetchInterBillingCashFlow(db.client, new Set(['3000']))
+    expect(out.lines).toHaveLength(12)
+    expect(db.log.filter((r) => r.table === 'dept_pools').map((r) => [r.orders, r.range])).toEqual([
+      [[], null],
+      [[], null],
+      [[], null],
+      [[], null],
+    ])
+  })
+
+  it('still answers no lines when a pool read fails past the first page', async () => {
+    const db = pocketPostgrest(
+      { dept_pools: pools(1001), payment_vouchers: [] },
+      { rpc, fail: (r) => (r.table === 'dept_pools' && r.range?.[0] === 1000 ? 'TypeError: fetch failed' : null) },
+    )
+    const out = await fetchInterBillingCashFlow(db.client, new Set(['3000']))
+    expect(out.lines).toEqual([])
+  })
+})
+
+describe('fetchDeptOutstanding — every issued invoice and its settlement row', () => {
+  it('owes the 1,001st invoice, reading both the table and the function in pages', async () => {
+    const invoices = Array.from({ length: 1001 }, (_, i) => ({
+      id: `inv${pad(i)}`,
+      invoice_no: `HV-INV-202609-${pad(i, 4)}`,
+      company_id: null,
+      billable_to_freetext_name: 'Walk-in',
+      period_month: '2026-09-01',
+      invoice_date: '2026-09-30',
+      total_amount: 100,
+      status: 'issued',
+      billing_mode: 'marketing_project',
+    }))
+    const settlements = invoices.map((i) => ({ invoice_id: i.id, receipts: 40, credits: 0 }))
+    const db = pocketPostgrest({ invoices }, { rpc: { dept_invoice_settlements: settlements } })
+    const owed = await fetchDeptOutstanding(db.client as never, { segment: 'marketing' })
+    expect(owed).toHaveLength(1001)
+    expect(owed[1000]).toMatchObject({ invoiceNo: 'HV-INV-202609-1000', receipts: 40, outstanding: 60 })
+    expect(pageRanges(db.log, 'invoices')).toEqual([[0, 999], [1000, 1999]])
+    expect(db.log.filter((r) => r.table === 'rpc:dept_invoice_settlements').map((r) => [r.orders, r.range])).toEqual([
+      [['invoice_id.asc'], [0, 999]],
+      [['invoice_id.asc'], [1000, 1999]],
+    ])
+  })
+})
+
+describe('fetchRnpInvoiceEvents — every billed / collected / credited event', () => {
+  const events = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      invoice_id: `inv${pad(i)}`,
+      invoice_no: `INV-${i}`,
+      company_id: null,
+      party_fallback: 'Walk-in',
+      event_kind: 'billed',
+      amount: 100,
+      event_date: '2026-09-30',
+    }))
+
+  it('reads a capped answer again in pages, in a total order, and keeps the 1,001st', async () => {
+    const db = pocketPostgrest({}, { rpc: { rnp_invoice_events: events(1001) } })
+    const got = await fetchRnpInvoiceEvents(db.client, {})
+    expect(got).toHaveLength(1001)
+    expect(got.map((e) => e.invoice_id)).toContain('inv01000')
+    const order = ['invoice_id.asc', 'event_kind.asc', 'event_date.asc', 'amount.asc']
+    expect(db.log.map((r) => [r.table, r.orders, r.range])).toEqual([
+      ['rpc:rnp_invoice_events', [], null],
+      ['rpc:rnp_invoice_events', order, [0, 999]],
+      ['rpc:rnp_invoice_events', order, [1000, 1999]],
+    ])
+  })
+
+  it('under the cap, asks once as before and keeps the function’s own order', async () => {
+    const backwards = events(3).reverse()
+    const db = pocketPostgrest({}, { rpc: { rnp_invoice_events: backwards } })
+    expect(await fetchRnpInvoiceEvents(db.client, { p_segment: 'marketing' })).toEqual(backwards)
+    expect(db.log).toHaveLength(1)
+  })
+
+  it('reads a failure as no events, as the pages always did', async () => {
+    const db = pocketPostgrest({}, { rpc: { rnp_invoice_events: events(3) }, fail: () => 'denied' })
+    expect(await fetchRnpInvoiceEvents(db.client, {})).toEqual([])
   })
 })

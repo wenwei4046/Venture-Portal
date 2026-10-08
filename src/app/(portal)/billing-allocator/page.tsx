@@ -4,6 +4,7 @@ import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { allocatorSummary } from '@/lib/allocator-sheet'
+import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import AllocatorTabs from './_components/AllocatorTabs'
 import AllocatorPeriod from './_components/AllocatorPeriod'
@@ -52,10 +53,17 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     supabase.from('alloc_staff_splits').select('staff_id, company_id, department_id, pct'),
     // ALL snapshot rows — the Calculate headcount picker offers every saved
     // month (user 2026-08-13: bill one month on another month's list).
-    supabase
-      .from('alloc_staff_history')
-      .select('period_month, company_id, department_id, pct, status')
-      .order('period_month', { ascending: false }),
+    // Every one, in pages once past PostgREST's 1000-row cap (2026-10-08: 310
+    // rows, 80–90 more a month): the months past it would vanish from the
+    // picker. A month's rows keep the order they always came in while the
+    // read fits (fetchAllRowsAsWritten); a failed read still offers none.
+    fetchAllRowsAsWritten((page) => {
+      const q = supabase
+        .from('alloc_staff_history')
+        .select('period_month, company_id, department_id, pct, status')
+        .order('period_month', { ascending: false })
+      return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+    }).then((data) => ({ data }), () => ({ data: null })),
     supabase.from('alloc_categories').select('id, name, coa_code').order('name'),
     supabase.from('alloc_templates').select('id, name, default_method, default_amount, category_id, status').order('name'),
     supabase.from('alloc_template_splits').select('template_id, company_id, pct'),
@@ -71,8 +79,18 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       .like('reference_no', `${ref}%`)
       // Voided invoices (2026-09-15) neither lock the allocation nor count as live.
       .neq('status', 'voided'),
-    // READ-ONLY peek at HR's allocation months, for the one-click import.
-    supabase.from('hr_staff_allocation').select('period_month').order('period_month', { ascending: false }),
+    // READ-ONLY peek at HR's allocation months, for the one-click import —
+    // every row, paged (2026-10-08: ~25–30 a month; past the 1000-row cap the
+    // older months would drop out). Only the distinct months are kept, so the
+    // pages' `id` tiebreak changes nothing; a failed read still offers none.
+    fetchAllRows((lo, hi) =>
+      supabase
+        .from('hr_staff_allocation')
+        .select('period_month')
+        .order('period_month', { ascending: false })
+        .order('id', { ascending: true })
+        .range(lo, hi),
+    ).then((data) => ({ data }), () => ({ data: null })),
     supabase.from('alloc_company_settings').select('company_id, enabled'),
     supabase
       .from('chart_of_accounts')
