@@ -22,6 +22,8 @@ interface Req {
   table: string
   counted: boolean
   inLists: Array<{ col: string; size: number }>
+  /** An rpc's arguments, as sent. */
+  args?: unknown
 }
 
 interface Answer {
@@ -143,13 +145,32 @@ function pocketPostgrest(
     }
     return builder
   }
-  const rpc = (name: string) => ({
+  // gl_net_by_account (mig 20261008180000), worked out from the pocket's own
+  // journal lines: Σ (Dr − Cr) per account over live entries dated BEFORE
+  // p_before, p_codes narrowing it.
+  const glNetByAccount = (args: { p_before: string; p_codes?: string[] }) => {
+    const sums = new Map<string, number>()
+    for (const l of tables.journal_lines ?? []) {
+      const je = l.journal_entries as Row
+      if (je.is_reversed || !(String(je.transaction_date) < args.p_before)) continue
+      const code = String(l.account_code)
+      if (args.p_codes && !args.p_codes.includes(code)) continue
+      sums.set(code, (sums.get(code) ?? 0) + Number(l.debit) - Number(l.credit))
+    }
+    return [...sums].map(([account_code, net]) => ({ account_code, net }))
+  }
+  const rpc = (name: string, args?: Record<string, unknown>) => ({
     then<A = Answer, B = never>(
       onOk?: ((v: Answer) => A | PromiseLike<A>) | null,
       onErr?: ((e: unknown) => B | PromiseLike<B>) | null,
     ): Promise<A | B> {
-      return settle({ table: `rpc:${name}`, counted: false, inLists: [] }, () => ({
-        data: opts.rpc?.[name] ?? null,
+      return settle({ table: `rpc:${name}`, counted: false, inLists: [], args }, () => ({
+        data:
+          opts.rpc && name in opts.rpc
+            ? opts.rpc[name]
+            : name === 'gl_net_by_account'
+              ? glNetByAccount(args as { p_before: string; p_codes?: string[] })
+              : null,
         error: null,
         count: null,
       })).then(onOk, onErr)
@@ -301,7 +322,10 @@ describe('fetchLedgers — reads at once, each table once', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
       const before = db.log.map((r) => r.table)
       expect(before).toContain('journal_entries') // the period JEs never wait
-      expect(before.filter((t) => t === 'journal_lines')).toHaveLength(codes.length > 0 ? 2 : 0)
+      // The opening balances (summed) and the period's lines.
+      expect(before.filter((t) => t === 'journal_lines' || t === 'rpc:gl_net_by_account').sort()).toEqual(
+        codes.length > 0 ? ['journal_lines', 'rpc:gl_net_by_account'] : [],
+      )
       release()
       const ledgers = await pending
       expect(ledgers.length).toBe(codes.length > 0 ? 1 : 3)
@@ -310,24 +334,43 @@ describe('fetchLedgers — reads at once, each table once', () => {
 
   it('still reports the chart’s failure first, and an invalid code, with the line reads failing too', async () => {
     const { tables } = smallLedger()
+    const lineReads = new Set(['journal_lines', 'rpc:gl_net_by_account'])
     const down = pocketPostgrest(tables, {
-      fail: (r) => (r.table === 'chart_of_accounts' || r.table === 'journal_lines' ? `${r.table} down` : null),
+      fail: (r) => (r.table === 'chart_of_accounts' || lineReads.has(r.table) ? `${r.table} down` : null),
     })
     await expect(fetchLedgers(down.client, { codes: [], from: FROM, to: TO })).rejects.toThrow(
       /^fetchLedgers COA: chart_of_accounts down$/,
     )
     // The lines were started early for given codes; their failure is not
     // reported (and not left unhandled) when the code itself is wrong.
-    const linesDown = pocketPostgrest(tables, { fail: (r) => (r.table === 'journal_lines' ? 'lines down' : null) })
+    const linesDown = pocketPostgrest(tables, { fail: (r) => (lineReads.has(r.table) ? 'lines down' : null) })
     await expect(fetchLedgers(linesDown.client, { codes: ['1234'], from: FROM, to: TO })).rejects.toThrow(
       /^fetchLedgers: account 1234 not found$/,
     )
     await expect(fetchLedgers(linesDown.client, { codes: ['9000'], from: FROM, to: TO })).rejects.toThrow(/is a header/)
+    // With the code valid, the summed opening balances' failure is reported as the opening's.
+    const sumDown = pocketPostgrest(tables, { fail: (r) => (r.table === 'rpc:gl_net_by_account' ? 'sum down' : null) })
+    await expect(fetchLedgers(sumDown.client, { codes: ['3000'], from: FROM, to: TO })).rejects.toThrow(
+      /^fetchLedgers opening: sum down$/,
+    )
+  })
+
+  // 2026-10-08: the opening balances were every line before the period (~3,860
+  // in production, four pages) downloaded to be added up here.
+  it('asks the database for the opening balances — one summed read, never the lines before the period', async () => {
+    const { tables } = smallLedger()
+    const db = pocketPostgrest(tables)
+    await fetchLedgers(db.client, { codes: [], from: FROM, to: TO })
+    expect(db.log.filter((r) => r.table === 'rpc:gl_net_by_account').map((r) => r.args)).toEqual([
+      { p_before: FROM, p_codes: ['3000', '5000', '9010'] },
+    ])
+    // Only the period's lines are read: June's 300 entries, two lines each — one page.
+    expect(db.log.filter((r) => r.table === 'journal_lines')).toHaveLength(1)
   })
 })
 
-describe('fetchTrialBalance — the chart and the ledger at once', () => {
-  it('ties, reading the chart beside three pages that go together', async () => {
+describe('fetchTrialBalance — the chart and the summed balances at once', () => {
+  it('ties, reading the chart beside ONE summed read of every account up to the day', async () => {
     const { tables, lines } = smallLedger()
     const db = pocketPostgrest(tables)
     const tb = await fetchTrialBalance(db.client, { asOf: '2026-06-15', showZeroBalance: false })
@@ -338,12 +381,19 @@ describe('fetchTrialBalance — the chart and the ledger at once', () => {
       expect(row && row.debit - row.credit).toBeCloseTo(balance, 2)
     }
     expect(tb.reconciles).toBe(true)
-    expect(db.log.map((r) => [r.table, r.counted])).toEqual([
-      ['journal_lines', true],
-      ['chart_of_accounts', false],
-      ['journal_lines', false],
-      ['journal_lines', false],
+    // As at the 15th = every entry dated BEFORE the 16th; the chart beside it.
+    expect(db.log.map((r) => [r.table, r.args])).toEqual([
+      ['rpc:gl_net_by_account', { p_before: '2026-06-16' }],
+      ['chart_of_accounts', undefined],
     ])
+  })
+
+  it('refuses a day that is not one before reading anything', async () => {
+    const db = pocketPostgrest(smallLedger().tables)
+    await expect(fetchTrialBalance(db.client, { asOf: '2026-02-31', showZeroBalance: false })).rejects.toThrow(
+      /^fetchTrialBalance: 2026-02-31 is not a date$/,
+    )
+    expect(db.log).toHaveLength(0)
   })
 
   it('reports the chart’s failure before the ledger’s', async () => {

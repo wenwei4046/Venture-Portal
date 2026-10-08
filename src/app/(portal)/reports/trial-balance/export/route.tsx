@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { fetchTrialBalance } from '@/lib/cfo-reports'
+import { fetchTrialBalance, isCalendarDay } from '@/lib/cfo-reports'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildTrialBalanceXlsx } from './_format/xlsx'
 import { TrialBalancePdf } from './_format/pdf'
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const asOf = url.searchParams.get('as_of') ?? dayjs().format('YYYY-MM-DD')
   const showZero = url.searchParams.get('show_zero') === '1'
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+  if (!isCalendarDay(asOf)) {
     return Response.json({ error: 'invalid as_of date' }, { status: 400 })
   }
 
