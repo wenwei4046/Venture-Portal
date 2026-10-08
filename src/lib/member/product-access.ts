@@ -1,5 +1,6 @@
 import "server-only";
-import { getUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { isPrincipalAccount } from "@/lib/view-as";
 import type { User } from "@/types";
@@ -8,21 +9,22 @@ import type { User } from "@/types";
  * Who may open the Product List inside the Revenue app (2026-10-08, user: the
  * Product List moves from the HR side into the Revenue view, and "只有拥有权限进去
  * 的时候，才会看到这个 tab"). The answer is the ACCOUNT's `product_list` — what a
- * title grants, the Principal by default — and the same answer the Product
- * List's Server Actions get from `requirePermission('product_list')`.
+ * title grants, the Principal by default.
  *
  * The member app reads its caller with `getMemberUser()`, which honours a
- * Principal's Revenue View: their permissions there are a salesperson's. The
- * Product List is the Principal's own tool all the same, so for a masked
- * Principal the question goes to the portal's reading (`getUser()`), which
- * ignores the Revenue View and still honours an HR or Finance view — so a
- * Principal looking at the portal as HR does not see it here either.
+ * Principal's view: in the Revenue View their permissions are a salesperson's,
+ * in an HR or Finance view left on in the portal they are HR's or Finance's.
+ * The Revenue app still shows them as the Principal — its Module box reads
+ * "Revenue team" whatever the portal was left in — so a masked Principal is
+ * asked about the account itself (`getAccountUser()`, no mask). Until the
+ * same day an HR or Finance view hid the row with nothing on screen saying why
+ * (user: "why there is no product list in revenue view").
  */
 export async function canOpenProductList(memberUser: User): Promise<boolean> {
   if (can(memberUser, "product_list")) return true;
   if (memberUser.actualRole !== "principal") return false;
-  const portalUser = await getUser();
-  return !!portalUser && can(portalUser, "product_list");
+  const account = await getAccountUser();
+  return !!account && can(account, "product_list");
 }
 
 export interface ProductListAccess {
@@ -38,4 +40,16 @@ export async function productListAccess(memberUser: User): Promise<ProductListAc
   return isPrincipalAccount(memberUser)
     ? { group: "PRINCIPAL", audience: "Principal only" }
     : { group: "MANAGEMENT", audience: "Product List access" };
+}
+
+/**
+ * The Product List's Server Actions stand behind the same answer as its page —
+ * `requirePermission('product_list')` read the portal's view, so a Principal
+ * in HR view would have been shown the page and refused its Save.
+ */
+export async function requireProductList(): Promise<User> {
+  const user = await getMemberUser();
+  if (!user) redirect("/login");
+  if (!(await canOpenProductList(user))) redirect("/member");
+  return user;
 }

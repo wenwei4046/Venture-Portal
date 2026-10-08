@@ -29,12 +29,16 @@ export function isViewAsRole(value: string): value is ViewAsRole {
 // tab follows those when another tab switches (`VIEW_AS_MIRROR_COOKIE`,
 // `useViewAsSync`).
 
-/** Where a request is being answered: the member app, or anywhere else. */
-export type ViewSurface = 'portal' | 'member'
+/**
+ * Where a request is being answered: the member app, or anywhere else — or
+ * `account`, the account as it is with no mask at all, asked only by the one
+ * tool the Principal keeps in every view: the Product List (2026-10-08).
+ */
+export type ViewSurface = 'portal' | 'member' | 'account'
 
 /** The mask a request on `surface` honours — null when it honours none. */
 export function honouredViewAs(value: string | null | undefined, surface: ViewSurface): ViewAsRole | null {
-  if (!value || !isViewAsRole(value)) return null
+  if (!value || !isViewAsRole(value) || surface === 'account') return null
   if (value === 'revenue_member' && surface !== 'member') return null
   return value
 }
