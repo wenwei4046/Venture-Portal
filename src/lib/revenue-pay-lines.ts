@@ -42,6 +42,22 @@ export interface PayLine {
   amount: number
   /** Bumped by every save. The editor hands back what it opened, so a save over a newer edit is refused. */
   version: number
+  /**
+   * The approved member claim that put this line here (2026-10-08), or null for
+   * a line HR typed. A claim's line is the claim's: the editor shows it but
+   * never sends it, and `revenue_save_pay_lines` neither changes nor deletes it.
+   */
+  claimId: string | null
+}
+
+/** The lines HR may edit — everything a claim did not put there. */
+export function editableLines(lines: readonly PayLine[]): PayLine[] {
+  return lines.filter(line => !line.claimId)
+}
+
+/** The lines approved claims put there, shown read-only. */
+export function claimLines(lines: readonly PayLine[]): PayLine[] {
+  return lines.filter(line => line.claimId)
 }
 
 /** The most a month holds — the RPC refuses more. */
@@ -82,6 +98,7 @@ export function normalisePayLine(raw: unknown): PayLine & { staffId: string } {
     description: typeof row.description === 'string' && row.description.trim() ? row.description : null,
     amount,
     version: Number(row.version ?? 1),
+    claimId: typeof row.claim_id === 'string' ? row.claim_id : null,
   }
 }
 

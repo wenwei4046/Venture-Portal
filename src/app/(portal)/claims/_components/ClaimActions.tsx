@@ -9,25 +9,17 @@ const PRIMARY = 'bg-accent hover:bg-accent-hover text-xs font-medium px-3 py-1.5
 
 interface Props {
   claimId: string
-  claimType: 'project' | 'benefit'
   claimStatus: string
   userRole: string
 }
 
-export default function ClaimActions({ claimId, claimType, claimStatus, userRole }: Props) {
+/** A pool claim's decision: Finance (or the Principal) approves and pays it. */
+export default function ClaimActions({ claimId, claimStatus, userRole }: Props) {
   const [isPending, startTransition] = useTransition()
 
-  const canApprove =
-    userRole === 'principal' ||
-    (claimType === 'project' && userRole === 'finance') ||
-    (claimType === 'benefit' && userRole === 'hr')
+  const canDecide = userRole === 'principal' || userRole === 'finance'
 
-  const canMarkPaid =
-    userRole === 'principal' ||
-    (claimType === 'project' && userRole === 'finance') ||
-    (claimType === 'benefit' && userRole === 'hr')
-
-  if (claimStatus === 'approved' && canMarkPaid) {
+  if (claimStatus === 'approved' && canDecide) {
     return (
       <button
         onClick={() => startTransition(() => markClaimPaid(claimId))}
@@ -39,7 +31,7 @@ export default function ClaimActions({ claimId, claimType, claimStatus, userRole
     )
   }
 
-  if (claimStatus !== 'pending' || !canApprove) return null
+  if (claimStatus !== 'pending' || !canDecide) return null
 
   return (
     <div className="flex items-center justify-end gap-2">

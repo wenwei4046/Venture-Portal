@@ -29,8 +29,8 @@ function source(lines: PayLine[] = []) {
   }
 }
 
-const claim: PayLine = { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'special_claim', description: 'Petrol, Penang fair', amount: 500, version: 1 }
-const advance: PayLine = { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'deduction', description: 'Salary advance', amount: 200, version: 2 }
+const claim: PayLine = { id: 'aaaaaaaa-0000-4000-8000-000000000001', kind: 'special_claim', description: 'Petrol, Penang fair', amount: 500, version: 1, claimId: null }
+const advance: PayLine = { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'deduction', description: 'Salary advance', amount: 200, version: 2, claimId: null }
 
 function renderSalary(lines: PayLine[] = [], closedReason: string | null = null) {
   return render(<SalaryCalculation staffName="CHEA HUAN" period="2026-09-01" commission={7_202.52}
@@ -168,6 +168,31 @@ describe('SalaryCalculation · the pay lines on a salesperson’s month', () => 
     fireEvent.click(pencil())
     expect(screen.queryByRole('group', { name: /Pay lines/ })).toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('Pay lines for September 2026 can no longer change: Payroll for Sep 2026 has already been submitted')
+  })
+
+  // A line an approved member claim put here (2026-10-08) is the claim's.
+  it('shows a claim’s line read-only, counts it, and never sends it back', async () => {
+    const fromClaim: PayLine = {
+      id: 'aaaaaaaa-0000-4000-8000-000000000003', kind: 'special_claim', description: 'RQ-2609-004 · Airbnb · 2 pax × 1 night',
+      amount: 220, version: 1, claimId: 'cccccccc-0000-4000-8000-000000000001',
+    }
+    renderSalary([fromClaim, advance])
+    fireEvent.click(pencil())
+    const fromClaims = screen.getByRole('list', { name: 'Lines from approved claims' })
+    expect(fromClaims).toHaveTextContent('Special claim · RQ-2609-004 · Airbnb · 2 pax × 1 night')
+    expect(fromClaims).toHaveTextContent('From a claim approved in Member Services')
+    // Only HR's own line is a field to edit.
+    expect(screen.getByRole('combobox', { name: 'Line 1 type' })).toHaveValue('deduction')
+    expect(screen.queryByRole('combobox', { name: 'Line 2 type' })).toBeNull()
+    // 7,202.52 + 220 − 200, the claim counted while editing too.
+    expect(takeHome()).toHaveTextContent('RM 7,222.52')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Line 1 amount' }), { target: { value: '150' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save lines' }))
+    await waitFor(() => expect(savePayLines).toHaveBeenCalledTimes(1))
+    expect(savePayLines.mock.calls[0][0]).toMatchObject({
+      seen: [`${fromClaim.id}:1`, `${advance.id}:2`],
+      lines: [{ id: advance.id, kind: 'deduction', description: 'Salary advance', amount: 150 }],
+    })
   })
 
   it('offers no pencil when this session cannot see the person’s pay', () => {

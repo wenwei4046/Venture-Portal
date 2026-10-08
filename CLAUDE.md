@@ -1567,6 +1567,38 @@ src/
 │   │                                  and send nothing — *Read-only while
 │   │                                  viewing as* (user 2026-10-06: 只能看，不能
 │   │                                  送出); only the member's own login sends.
+│   │                                  **A CLAIM IS DECIDED ONCE (2026-10-08,
+│   │                                  user: 一个一个就好了):** HR approves or
+│   │                                  rejects a member's claim in People ›
+│   │                                  Member services — never again on the
+│   │                                  portal's Claims page, which is POOL claims
+│   │                                  only now — and picks where the money comes
+│   │                                  from (`member_review_claim`, reached
+│   │                                  through `member_admin_action`):
+│   │                                  *Approve · add to payroll* = a
+│   │                                  `special_claim` pay line in the month the
+│   │                                  claim was SENT, or the next month still
+│   │                                  open for them, never before the
+│   │                                  sub-department's cutover
+│   │                                  (`member_claim_payroll_month`); the line
+│   │                                  is the claim's (`revenue_pay_lines.
+│   │                                  claim_id`) — Comm Cal's pencil shows it
+│   │                                  read-only and `revenue_save_pay_lines`
+│   │                                  neither edits nor deletes it.
+│   │                                  *Approve · request payment* = it waits on
+│   │                                  Finance's **Payments › Claim requests**
+│   │                                  (`claim_payment_queue`, which reads the RQ
+│   │                                  number Finance cannot), who raise the
+│   │                                  voucher (`claim_create_payment_voucher`:
+│   │                                  claim_payout, its pool, G&A 9000) for the
+│   │                                  Principal. A claim turns paid with its
+│   │                                  voucher or its payroll row
+│   │                                  (`claims_follow_their_voucher` /
+│   │                                  `_payroll`); a voided voucher sends it
+│   │                                  back to Finance's queue. The request says
+│   │                                  where (`payout` on `member_request_json`,
+│   │                                  `lib/member/claim-payout.ts`). Mig
+│   │                                  `20261008100000`.
 │   │                                  **A CLAIM IS FOR YOUR BRAND WEEK
 │   │                                  (2026-10-06, user):** the phone sends only
 │   │                                  the weekend; the fair is the booth the

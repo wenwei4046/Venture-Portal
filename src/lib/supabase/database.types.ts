@@ -1156,6 +1156,7 @@ export type Database = {
           description: string | null
           id: string
           payroll_month: string | null
+          payout_route: string | null
           receipt_url: string | null
           source_pool: string | null
           status: Database["public"]["Enums"]["claim_status"]
@@ -1174,6 +1175,7 @@ export type Database = {
           description?: string | null
           id?: string
           payroll_month?: string | null
+          payout_route?: string | null
           receipt_url?: string | null
           source_pool?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
@@ -1192,6 +1194,7 @@ export type Database = {
           description?: string | null
           id?: string
           payroll_month?: string | null
+          payout_route?: string | null
           receipt_url?: string | null
           source_pool?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
@@ -5701,6 +5704,7 @@ export type Database = {
           created_at: string
           updated_by: string
           updated_at: string
+          claim_id: string | null
         }
         Insert: {
           id?: string
@@ -5715,6 +5719,7 @@ export type Database = {
           created_at?: string
           updated_by: string
           updated_at?: string
+          claim_id?: string | null
         }
         Update: {
           id?: string
@@ -5729,6 +5734,7 @@ export type Database = {
           created_at?: string
           updated_by?: string
           updated_at?: string
+          claim_id?: string | null
         }
         Relationships: [
           { foreignKeyName: "revenue_pay_lines_staff_id_fkey"; columns: ["staff_id"]; isOneToOne: false; referencedRelation: "hr_staff_costs"; referencedColumns: ["id"] },
@@ -7702,6 +7708,28 @@ export type Database = {
       change_account_type: {
         Args: { p_new_type: string; p_old: string }
         Returns: Json
+      }
+      claim_create_payment_voucher: {
+        Args: { p_bank: string; p_claim: string; p_method: string }
+        Returns: string
+      }
+      claim_payment_queue: {
+        Args: never
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by_name: string | null
+          claim_id: string
+          claim_type: string
+          claimant_name: string
+          department: string | null
+          description: string | null
+          request_no: string | null
+          source_pool: string | null
+          voucher_id: string | null
+          voucher_no: string | null
+          voucher_status: string | null
+        }[]
       }
       close_approvals_for_voided_voucher: {
         Args: { p_voucher_id: string }

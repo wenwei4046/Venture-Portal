@@ -1,5 +1,6 @@
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
 import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import { MONTHS_SHORT, dayRange, initials, klDate, klDayTime, klLongTime, monthShort, rm, rm2, shortDay } from "../format";
 import type {
   ClaimWeek, MemoCat, MemoVM, PersonSheetVM, ProfileMainVM, RequestDetailVM, RequestEventVM, RequestKindVM, RequestRowVM,
@@ -152,6 +153,8 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
   if (!log.length) {
     log.push({ what: "Submitted", who: "You", when: klDayTime(r.submittedAt ?? r.createdAt), note: requestSummary(r, options.nameOf), dot: r.status === "withdrawn" ? "bad" : "good" });
   }
+  // An approved claim says where its money is coming from (2026-10-08).
+  const payout = r.kind === "claim" ? claimPayoutLine(readClaimPayout(r.payout), r.status, "member") : null;
   return {
     id: r.id,
     title: requestTitle(r, options.nameOf),
@@ -163,6 +166,7 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
       { l: "Submitted", v: shortDay(klDate(r.submittedAt ?? r.createdAt)) },
       ...(r.kind === "claim" && Number.isFinite(amount) ? [{ l: "Claim amount", v: rm2(amount) }] : []),
       { l: "Current step", v: status },
+      ...(payout ? [{ l: "Payment", v: payout }] : []),
     ],
     log,
     canCancel: !options.readOnly && (r.status === "submitted" || r.status === "needs_info"),

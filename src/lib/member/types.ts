@@ -1,5 +1,6 @@
 import type { QuotePricing } from "./calculator";
 import type { KpiItem } from "@/lib/commission/kpi";
+import type { ClaimPayout } from "./claim-payout";
 export type MemberPage =
   | "today"
   | "insight"
@@ -192,6 +193,8 @@ export interface MemberRequest {
   detail: Record<string, unknown>;
   note?: string;
   claimId?: string | null;
+  /** Where an approved claim's money comes from (mig 20261008100000) — read it with `readClaimPayout`. */
+  payout?: ClaimPayout | null;
 }
 export interface MemberMemo {
   id: string;

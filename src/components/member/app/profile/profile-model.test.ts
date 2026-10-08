@@ -51,6 +51,15 @@ describe("requests", () => {
     expect(requestDetailVM(request({ status: "approved" }), null, { nameOf, readOnly: false })).toMatchObject({ canCancel: false, canUpdate: false });
     expect(requestDetailVM(request(), null, { nameOf, readOnly: true })).toMatchObject({ canCancel: false, canUpdate: false });
   });
+
+  // HR decides a claim once, in Member services (2026-10-08), and says where the money comes from.
+  it("tells the member where an approved claim's money comes from", () => {
+    const payroll = requestDetailVM(request({ status: "approved", payout: { route: "payroll", payrollMonth: "2026-10-01", voucherNo: null, voucherStatus: null } }), null, { nameOf, readOnly: false });
+    expect(payroll.facts).toContainEqual({ l: "Payment", v: "Comes with your Oct 2026 salary" });
+    const payment = requestDetailVM(request({ status: "approved", payout: { route: "payment", payrollMonth: null, voucherNo: null, voucherStatus: null } }), null, { nameOf, readOnly: false });
+    expect(payment.facts).toContainEqual({ l: "Payment", v: "Finance is arranging the payment" });
+    expect(requestDetailVM(request(), null, { nameOf, readOnly: false }).facts.some(f => f.l === "Payment")).toBe(false);
+  });
 });
 
 describe("memos", () => {
