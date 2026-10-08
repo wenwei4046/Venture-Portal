@@ -1512,6 +1512,49 @@ src/
 │   │                                  read (dev 1.7 s) and a page opens in two
 │   │                                  requests, not 6–14. Writes and the
 │   │                                  quote's price still go straight.
+│   │                                  **THE APP OPENS ON WHAT THE PHONE KEPT
+│   │                                  (2026-10-08, user: 每次进来好像都在 loading
+│   │                                  … 进去的时候先看旧的数据，等它 refresh 之后才是
+│   │                                  新的数据):** every read's last answer is
+│   │                                  kept per ACCOUNT in IndexedDB
+│   │                                  (`app/read-memory.ts`, `createLiveSource(
+│   │                                  account)`); the next open shows those at
+│   │                                  once — `peek` in `useKeyedRead`,
+│   │                                  `useInsightData`, `useArenaData`,
+│   │                                  `useMonthArena` and the two-month book —
+│   │                                  and reads everything again behind them,
+│   │                                  the pull's dot spinning until the open's
+│   │                                  reads land. Nothing is asked before the
+│   │                                  phone's answers load (≤300 ms). /login
+│   │                                  forgets it all (every sign-out ends
+│   │                                  there), a week-old answer is dropped, the
+│   │                                  account is in every key; only what the
+│   │                                  reads already hand the browser — no page
+│   │                                  (sw.js still caches none), no cost.
+│   │                                  The snapshot every open waited for no
+│   │                                  longer carries the Quote's catalogue:
+│   │                                  `loadMemberData({ lite: true })` =
+│   │                                  `member_*_snapshot(p_full => false)` (mig
+│   │                                  `20261008160000`, overloads WITHOUT a
+│   │                                  default; the zero-arg calls are `(true)`):
+│   │                                  Principal 610 ms / 480 KB → 4 ms / 13 KB.
+│   │                                  The catalogue is its own read
+│   │                                  (`catalogue`, `loadMemberCatalogue`) when
+│   │                                  the Quote or its brand list opens, or once
+│   │                                  in the background when the phone kept
+│   │                                  none. Today's reads leave as ONE request:
+│   │                                  this month's block, KPI and Arena no
+│   │                                  longer wait for the two-month book to name
+│   │                                  the month being worked; last month's
+│   │                                  Arena is read only by brand weeks,
+│   │                                  requests and the team map. Loading is
+│   │                                  never a zero: Today's hero, Sales / Margin
+│   │                                  / KPI and the boards show a placeholder,
+│   │                                  and no place says "Not ranked yet" (Arena
+│   │                                  hero and hub too) — "RM 0k · No sales yet"
+│   │                                  while loading read exactly like a month
+│   │                                  with no sales (prod: income 2.6–8 s, Arena
+│   │                                  3.3–8 s on every View-as open before).
 │   │                                  **My income** is Comm Cal's own engine
 │   │                                  run for the member's month
 │   │                                  (`loadMemberIncome`: the service role,

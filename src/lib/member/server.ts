@@ -24,6 +24,7 @@ import type { ArenaHistorySnapshot } from "./arena-history";
 import type {
   BedframeBuild,
   MemberBand,
+  MemberCatalogue,
   MemberData,
   MemberInsight,
   MemberMemo,
@@ -231,8 +232,16 @@ function requestLabels(request: MemberRequest): MemberRequest {
   };
 }
 
-/** No demo fallback and no privileged row query: the database resolves the caller. */
-export async function loadMemberData(): Promise<MemberData> {
+/**
+ * No demo fallback and no privileged row query: the database resolves the caller.
+ *
+ * `lite` (2026-10-08) is the Revenue app's first screen: the snapshot without
+ * the Quote's catalogue and the recent orders (`p_full => false`, mig
+ * 20261008160000) — 5 ms and 13 KB instead of 610 ms and 480 KB for the
+ * Principal, which every open of the app used to wait for. The catalogue is
+ * read on its own when the Quote needs it (`loadMemberCatalogue`).
+ */
+export async function loadMemberData(options: { lite?: boolean } = {}): Promise<MemberData> {
   const user = await getMemberUser();
   const principalView = !!user && isPrincipalAccount(user);
   const empty: MemberData = {
@@ -261,6 +270,7 @@ export async function loadMemberData(): Promise<MemberData> {
     const data = await rpc<MemberData>(
       client,
       principalView ? "member_principal_snapshot" : "member_data_snapshot",
+      options.lite ? { p_full: false } : undefined,
     );
     if (!data || !Array.isArray(data.memberships) || !data.profile?.id)
       throw new Error("Member information is temporarily unavailable.");
@@ -300,6 +310,19 @@ export async function loadMemberData(): Promise<MemberData> {
   } catch (error) {
     return { ...empty, message: message(error) };
   }
+}
+
+/**
+ * The Quote's catalogue (2026-10-08): the full snapshot's products and model
+ * options, through the same projection as before — read when the Quote opens
+ * (the phone shows the one it kept meanwhile), not with every open of the app.
+ */
+export async function loadMemberCatalogue(): Promise<MemberOutcome<MemberCatalogue>> {
+  return outcome(async () => {
+    const data = await loadMemberData();
+    if (!data.configured) throw new Error(data.message ?? "The catalogue is temporarily unavailable.");
+    return { products: data.products, catalogueModels: data.catalogueModels ?? [] };
+  });
 }
 
 /**

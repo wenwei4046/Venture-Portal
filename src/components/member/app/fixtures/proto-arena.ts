@@ -131,7 +131,7 @@ function rankView(board: Board, kind: PeriodKind, brand: string): RankView {
   const me = ch.me;
   const top = rows.filter(r => r.pos).slice(0, 3);
   return {
-    hero: { num: me.pos ? String(me.pos) : "—", suf: me.pos ? suffix(me.pos) : "", count: rows.length, value: fmtV(board, me.v), chase: ch.c1 },
+    hero: { num: me.pos ? String(me.pos) : "—", suf: me.pos ? suffix(me.pos) : "", count: rows.length, value: fmtV(board, me.v), chase: ch.c1, state: me.pos ? "ranked" : "unranked" },
     podium: [top[1], top[0], top[2]].filter((r): r is Ranked => !!r).map(r => ({ id: r.id, place: r.pos as 1 | 2 | 3, ini: ini(r.name), name: r.id === "me" ? "You" : first2(r.name), value: fmtV(board, r.v) })),
     listTitle: board === "champ" ? "Standings" : "Full ranking",
     count: rows.length,
@@ -156,6 +156,7 @@ function fairView(kind: PeriodKind): FairView {
       num: String(myF.pos), suf: suffix(myF.pos), count: PEOPLE.length,
       medals: ([["1st", myF.g], ["2nd", myF.s], ["3rd", myF.b]] as const).map(([label, count], i) => ({ n: (i + 1) as 1 | 2 | 3, label, count })),
       chase: ahead ? (ahead.g > myF.g ? `${ahead.g - myF.g} more 1st place${ahead.g - myF.g > 1 ? "s" : ""} to catch ${first2(ahead.name)}` : `More 2nd places to pass ${first2(ahead.name)}`) : "Most fair wins this period",
+      state: "ranked",
     },
     podium: order.map(r => ({ id: r.id, medal: r.pos as 1 | 2 | 3, place: ordinal(r.pos), joint: r.joint ? "Joint" : "", ini: ini(r.name), name: r.id === "me" ? "You" : first2(r.name), g: r.g, s: r.s, b: r.b, big: r.pos === 1 })),
     entrySub: `${myF.ev} fairs · tap for venues, dates and sales`,
@@ -220,7 +221,7 @@ function hub(kind: PeriodKind, recordLine: string): HubVM {
     recordLine,
     cards: BOARDS.map(b => {
       const r = ranking(b.id, kind, "All"), c = chase(b.id, r), n = c.me.pos;
-      return { board: b.id, label: b.label, rankNum: n ? String(n) : "—", rankSuf: n ? suffix(n) : "", of: `of ${r.length}`, value: fmtV(b.id, c.me.v) };
+      return { board: b.id, label: b.label, rankNum: n ? String(n) : "—", rankSuf: n ? suffix(n) : "", of: `of ${r.length}`, value: fmtV(b.id, c.me.v), state: n ? "ranked" as const : "unranked" as const };
     }),
   };
 }

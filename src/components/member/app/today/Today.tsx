@@ -32,14 +32,25 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
             <Svg d={hidden ? ICON.eyeOff : ICON.eye} size={18} sw={1.7} />
           </button>
         </div>
-        <div className={s.heroAmount}>{model.heroAmount}</div>
+        {model.heroLoading
+          ? <span className={`${s.skel} ${s.heroSkel}`} role="img" aria-label="Working out your income" />
+          : <div className={s.heroAmount}>{model.heroAmount}</div>}
         <p className={s.heroSplit}>{model.heroSplit}</p>
         <div className={s.heroMetrics}>
           {model.metrics.map(m => (
-            <button key={m.key} className={s.metric} onClick={() => actions.openMetric(m.key)}>
+            <button key={m.key} className={s.metric} onClick={() => actions.openMetric(m.key)} aria-busy={m.loading || undefined}>
               <span className={s.metricLabel}>{m.label}</span>
-              <span className={s.metricValue}>{m.value}</span>
-              <span className={`${s.metricTag} ${m.tagTone === "good" ? s.metricTagGood : s.metricTagSub}`}>{m.tag}</span>
+              {m.loading ? (
+                <>
+                  <span className={`${s.skel} ${s.metricSkel}`} />
+                  <span className={`${s.skel} ${s.metricTagSkel}`} />
+                </>
+              ) : (
+                <>
+                  <span className={s.metricValue}>{m.value}</span>
+                  <span className={`${s.metricTag} ${m.tagTone === "good" ? s.metricTagGood : s.metricTagSub}`}>{m.tag}</span>
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -81,9 +92,12 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
         </div>
         <div className={s.boards}>
           {model.boards.map(b => (
-            <button key={b.id} className={`${s.board} ${BOARD[b.id]}`} onClick={() => actions.openBoard(b.id)}>
+            <button key={b.id} className={`${s.board} ${BOARD[b.id]}`} onClick={() => actions.openBoard(b.id)} aria-busy={b.state === "loading" || undefined}>
               <span className={s.boardLabel}>{b.label}</span>
-              <span className={s.boardRank}><span className={s.boardNum}>{b.rankNum}</span><span className={s.boardSuf}>{b.rankSuf}</span></span>
+              {b.state === "loading" ? <span className={`${s.skel} ${s.boardSkel}`} />
+                : b.state === "unranked" ? <span className={s.boardNone}>Not ranked yet</span>
+                : b.state === "off" ? <span className={s.boardNone}>Not counted</span>
+                : <span className={s.boardRank}><span className={s.boardNum}>{b.rankNum}</span><span className={s.boardSuf}>{b.rankSuf}</span></span>}
             </button>
           ))}
         </div>

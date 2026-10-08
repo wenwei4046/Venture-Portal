@@ -245,6 +245,15 @@ export interface MemberData {
   requests: MemberRequest[];
   memos: MemberMemo[];
 }
+/**
+ * The Quote's catalogue (2026-10-08): what `MemberData.products` and
+ * `catalogueModels` carried, read on its own when the Quote needs it rather
+ * than with every open of the app. Unpriced, exactly as before.
+ */
+export interface MemberCatalogue {
+  products: MemberProduct[];
+  catalogueModels: MemberCatalogueModel[];
+}
 export interface QuoteLine {
   productId: string;
   quantity: number;

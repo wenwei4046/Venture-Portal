@@ -5,7 +5,7 @@ import type { MemberReadContext } from "@/lib/member/types";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
 import type { ArenaHistorySnapshot } from "@/lib/member/arena-history";
 import { championshipMonth, championshipStandings, type ChampMonth, type ChampStanding } from "@/lib/member/championship";
-import { untracked, type Outcome, type RevenueSource, type TrackRead } from "../source";
+import { ask, untracked, type Outcome, type RevenueSource, type TrackRead } from "../source";
 import { addMonths, type InsightPeriod } from "../insight/period";
 
 export interface ArenaData {
@@ -59,6 +59,10 @@ export function useArenaData({ source, membershipId, context, readable, period, 
   // A different person or department is a different cache; a pull empties it, so every month is read again.
   useEffect(() => { cache.current.clear(); }, [viewer, membershipId, gen]);
 
+  /** What the phone kept for a read (2026-10-08), shown until the server's answer lands. */
+  const kept = (month: string, window: ArenaWindow, history: boolean) =>
+    source.peek?.<MemberArenaSnapshot>(ask.arena(membershipId, month, window, context, { history }));
+
   const read = (month: string, window: ArenaWindow, history: boolean) => {
     const key = `${viewer}|${membershipId}|${window}|${month}|${history ? "h" : ""}`;
     let hit = cache.current.get(key);
@@ -88,15 +92,21 @@ export function useArenaData({ source, membershipId, context, readable, period, 
     if (kind === "monthly" && from === knownMonth && known) {
       setSnapshot(known);
     } else {
-      if (!again) setSnapshot(null);
+      if (!again) {
+        const phone = kept(from, kind, !known?.history);
+        setSnapshot(phone ? mark(phone) : null);
+      }
       void read(from, kind, !known?.history).then(r => {
         if (stale) return;
         if (r.ok) setSnapshot(mark(r.data)); else if (!again) setFailed(r.error);
       });
     }
     // The Championship: each month of the window.
-    if (!again) setMonthSnaps(null);
     const months = windowMonths(period);
+    if (!again) {
+      const phone = months.map(m => (m === knownMonth && known ? known : kept(m, "monthly", false)));
+      setMonthSnaps(phone.every(Boolean) ? (phone as MemberArenaSnapshot[]) : null);
+    }
     void Promise.all(months.map(m => (m === knownMonth && known ? Promise.resolve({ ok: true as const, data: known }) : read(m, "monthly", false))))
       .then(results => {
         if (stale) return;

@@ -97,7 +97,12 @@ export function chaseLine(board: Board, rows: readonly BoardRow[]): { line: stri
   return { line: next ? `You lead by ${gap(board, me.value! - next.value!)}` : "You lead", aboveId: null };
 }
 
-export interface RankHero { num: string; suf: string; count: number; value: string; chase: string }
+/**
+ * `state` (2026-10-08): `ranked` shows the place; `unranked` (nothing on this board yet) says so in words — a giant
+ * dash looked like a bar still loading; `loading` is a placeholder while the board is read.
+ */
+export type HeroState = "ranked" | "unranked" | "loading" | "off";
+export interface RankHero { num: string; suf: string; count: number; value: string; chase: string; state: HeroState }
 export interface PodiumItem { id: string; place: 1 | 2 | 3; ini: string; name: string; value: string }
 export interface RankRowVM { id: string; pos: string; medal: Medal; ini: string; name: string; value: string; tag: "you" | "next" | null; mine: boolean; muted: boolean }
 
@@ -132,6 +137,7 @@ function rankView(board: Board, rows: BoardRow[], count: number): RankView {
       count,
       value: me ? boardValue(board, me.value, me.pending) : "—",
       chase: line,
+      state: me?.position ? "ranked" : "unranked",
     },
     podium,
     listTitle: board === "champ" ? "Standings" : "Full ranking",
@@ -223,7 +229,7 @@ export interface FairPodiumVM { id: string; medal: 1 | 2 | 3; place: string; joi
 export interface FairRowVM { id: string; pos: string; medal: Medal; ini: string; name: string; sub: string; joint: boolean; g: number; s: number; b: number; mine: boolean }
 export interface FairListItem { venue: string; dates: string; sales: string; finish: string; place: string; medal: Medal }
 export interface FairView {
-  hero: { num: string; suf: string; count: number; medals: FairMedalVM[]; chase: string };
+  hero: { num: string; suf: string; count: number; medals: FairMedalVM[]; chase: string; state: HeroState };
   podium: FairPodiumVM[];
   entrySub: string;
   chips: FairListItem[];
@@ -260,6 +266,7 @@ function fairView(tallies: FairTally[], count: number): FairView {
       num: me?.position ? String(me.position) : "—", suf: me?.position ? ordinalSuffix(me.position) : "", count,
       medals: [["1st", me?.g ?? 0], ["2nd", me?.s ?? 0], ["3rd", me?.b ?? 0]].map(([label, c], i) => ({ n: (i + 1) as 1 | 2 | 3, label: String(label), count: Number(c) })),
       chase,
+      state: me?.position ? "ranked" : "unranked",
     },
     podium: order.map(t => ({
       id: t.id, medal: Math.min(3, t.position!) as 1 | 2 | 3, place: ordinal(t.position!), joint: t.joint ? "Joint" : "",
@@ -315,6 +322,8 @@ export interface ArenaInput {
   openMonths: readonly string[];
   /** The current month, `YYYY-MM`. */
   current: string;
+  /** The window's read failed: nothing is on its way, so nothing shows as loading. */
+  failed?: boolean;
 }
 
 /** The scheme's brands, in the prototype's order. */
@@ -401,9 +410,16 @@ export function boardModel(input: ArenaInput): BoardVM {
       // KPI switched off for the sub-department: nobody has a count to show.
       rank.hero.value = "Not counted";
       rank.hero.chase = "KPI items are not counted this period";
+      // Nobody will ever have a place here: not "Not ranked yet".
+      rank.hero.state = "off";
       rank.rows = rank.rows.map(r => ({ ...r, value: "—" }));
     }
   }
+  // Still being read: a placeholder in the hero, never "No counted sales yet" — that is what a month with no
+  // sales says, and the two looked the same (2026-10-08).
+  const loading = !input.failed && (board === "champ" && !isFair ? !input.standings : !snapshot);
+  if (loading && rank) rank.hero = { ...rank.hero, num: "", suf: "", value: "", chase: "Loading the board…", state: "loading" };
+  if (loading && fair) fair.hero = { ...fair.hero, num: "", suf: "", chase: "Loading the fairs…", state: "loading" };
 
   return {
     board, title, sub,
@@ -420,7 +436,7 @@ export function boardModel(input: ArenaInput): BoardVM {
 
 // ── the hub ──────────────────────────────────────────────────────────────
 
-export interface HubCardVM { board: Board; label: string; rankNum: string; rankSuf: string; of: string; value: string }
+export interface HubCardVM { board: Board; label: string; rankNum: string; rankSuf: string; of: string; value: string; state: HeroState }
 export interface HubVM { updated: string; cards: HubCardVM[]; recordLine: string }
 
 /** `2:40 pm` in Kuala Lumpur. */
@@ -434,12 +450,13 @@ export function hubModel(input: Omit<ArenaInput, "board" | "sub" | "brand">): Hu
   const cards = BOARDS.map(board => {
     const vm = boardModel({ ...input, board, sub: "total", brand: "" });
     const hero = vm.rank?.hero;
-    const loading = board === "champ" ? !input.standings : !input.snapshot;
+    const loading = hero?.state === "loading";
     return {
       board, label: BOARD_LABEL[board],
       rankNum: hero?.num ?? "—", rankSuf: hero?.suf ?? "",
-      of: loading ? "" : `of ${hero?.count ?? 0}`,
-      value: loading ? "…" : hero?.value ?? "—",
+      of: hero?.state === "ranked" || hero?.state === "off" ? `of ${hero?.count ?? 0}` : "",
+      value: loading ? "" : hero?.value ?? "—",
+      state: hero?.state ?? "unranked",
     };
   });
   return { updated: input.snapshot ? klTime(input.snapshot.asOf) : "", cards, recordLine: recordModel(input.history, input.selfId).cardLine };

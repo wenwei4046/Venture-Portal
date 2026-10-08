@@ -21,6 +21,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 export default async function MemberAppLayout({ children }: { children: ReactNode }) {
   const user = await getMemberUser();
   if (!user) redirect("/login");
-  const [data, products] = await Promise.all([loadMemberData(), productListAccess(user)]);
+  // The first screen's snapshot: no Quote catalogue (2026-10-08) — the app reads that when the Quote opens.
+  const [data, products] = await Promise.all([loadMemberData({ lite: true }), productListAccess(user)]);
   return <RevenueApp initialData={data} productList={products}>{children}</RevenueApp>;
 }

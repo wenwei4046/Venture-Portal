@@ -4,6 +4,7 @@ import type { ArenaWindow } from "@/lib/member/arena";
 import type { MemberReadContext } from "@/lib/member/types";
 import {
   fetchDepartmentIncome,
+  fetchMemberCatalogue,
   fetchMemberClaimRates,
   fetchMemberHonours,
   fetchMemberIncome,
@@ -20,7 +21,8 @@ import { fetchMemberKpiSummary } from "./kpi-summary-actions";
 
 /** One of the Revenue app's reads, named by the action it calls. */
 export type MemberRead =
-  | { kind: "refresh" }
+  | { kind: "refresh"; lite?: boolean }
+  | { kind: "catalogue" }
   | { kind: "insight"; period?: string; context?: MemberReadContext }
   | { kind: "kpi"; schemeId: string; period?: string; context?: MemberReadContext }
   | { kind: "arena"; membershipId: string; period: string; window: ArenaWindow; context?: MemberReadContext; options?: { history?: boolean } }
@@ -58,7 +60,8 @@ export async function readMemberBatch(reads: MemberRead[]): Promise<MemberReadSl
 
 function readOne(read: MemberRead): Promise<unknown> {
   switch (read?.kind) {
-    case "refresh": return refreshMemberData();
+    case "refresh": return refreshMemberData({ lite: read.lite === true });
+    case "catalogue": return fetchMemberCatalogue();
     case "insight": return fetchMemberInsight(read.period, read.context);
     case "kpi": return fetchMemberKpiSummary(read.schemeId, read.context, read.period);
     case "arena": return fetchMemberArena(read.membershipId, read.period, read.window, read.context, read.options);

@@ -89,6 +89,26 @@ describe("boardModel", () => {
   });
 });
 
+// 2026-10-08: the board being read and a board with nobody on it looked the same (a giant dash, "No counted
+// sales yet"). Loading is a placeholder now, and no place is said in words.
+describe("loading versus no place", () => {
+  it("a board still being read is a placeholder, not \"No counted sales yet\"", () => {
+    const vm = boardModel(input({ snapshot: null }));
+    expect(vm.rank!.hero).toMatchObject({ state: "loading", num: "", value: "", chase: "Loading the board…" });
+    expect(hubModel(input({ snapshot: null })).cards.every(c => c.state === "loading" || c.board === "champ")).toBe(true);
+  });
+
+  it("a read that failed is not shown as loading forever", () => {
+    expect(boardModel(input({ snapshot: null, failed: true })).rank!.hero.state).toBe("unranked");
+  });
+
+  it("somebody with nothing on the board is unranked; somebody placed is ranked", () => {
+    const zed = boardModel(input({ selfId: "z", snapshot: snapshot(people.map(p => ({ ...p, self: p.id === "z" }))) }));
+    expect(zed.rank!.hero).toMatchObject({ state: "unranked", chase: "No counted sales yet" });
+    expect(boardModel(input()).rank!.hero.state).toBe("ranked");
+  });
+});
+
 describe("fairTallies", () => {
   it("counts only the brand week's booth, at the place held among everybody there", () => {
     const rows = fairTallies(people, history, "2026-09", "2026-09");

@@ -38,6 +38,12 @@ export interface TodayInput {
   arena?: MemberArenaSnapshot | null;
   /** This month's bills and the brands' ladders — the margin's tier. */
   book?: MemberOrderBook | null;
+  /**
+   * Still on its way (2026-10-08): Sales / Margin / KPI and the Arena boards show a placeholder, never a
+   * zero — "RM 0k · No sales yet" while loading read exactly like a month with no sales.
+   */
+  metricsLoading?: boolean;
+  arenaLoading?: boolean;
   bands?: MemberBand[];
   memos: MemberMemo[];
   requests: MemberRequest[];
@@ -48,14 +54,20 @@ export interface TodayInput {
 export type TodoTone = "memo" | "request" | "weeks";
 export type TodoTarget = "memos" | "requests" | "brandWeeks";
 export interface TodayTodo { key: string; tone: TodoTone; icon: string; title: string; sub: string; target: TodoTarget }
-export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good" }
-export interface TodayBoard { id: "sales" | "margin" | "kpi" | "champ"; label: string; rankNum: string; rankSuf: string }
+export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
+/**
+ * `ranked` shows the place; `unranked` says so in words (nothing on that board yet); `loading` is a placeholder;
+ * `off` is KPI not counted this period — nobody will ever have a place there.
+ */
+export interface TodayBoard { id: "sales" | "margin" | "kpi" | "champ"; label: string; rankNum: string; rankSuf: string; state: "ranked" | "unranked" | "loading" | "off" }
 export interface TodayWeek { title: string; dates: string; venue: string | null; org: string | null }
 export interface TodayModel {
   hello: string;
   helloSub: string;
   heroLabel: string;
   heroAmount: string;
+  /** The figure is still being worked out: a placeholder where it goes, not "RM —". */
+  heroLoading: boolean;
   heroSplit: string;
   metrics: TodayMetric[];
   todo: TodayTodo[];
@@ -190,11 +202,21 @@ const BOARDS: { id: TodayBoard["id"]; label: string; metric?: ArenaMetric }[] = 
 
 function boards(input: TodayInput, championRank: number | null): TodayBoard[] {
   return BOARDS.map(({ id, label, metric }) => {
+    if (input.arenaLoading && !input.arena) return { id, label, rankNum: "", rankSuf: "", state: "loading" as const };
+    if (id === "kpi" && input.kpi && !input.kpi.enabled) return { id, label, rankNum: "—", rankSuf: "", state: "off" as const };
     const people = input.arena?.people ?? [];
     const position = metric ? arenaRankings(people, metric).find(row => row.self)?.position ?? null : championRank;
-    return { id, label, rankNum: position ? String(position) : "—", rankSuf: position ? ordinalSuffix(position) : "" };
+    return position
+      ? { id, label, rankNum: String(position), rankSuf: ordinalSuffix(position), state: "ranked" as const }
+      : { id, label, rankNum: "—", rankSuf: "", state: "unranked" as const };
   });
 }
+
+const LOADING_METRICS: TodayMetric[] = [
+  { key: "sales", label: "Sales", value: "", tag: "", tagTone: "sub", loading: true },
+  { key: "margin", label: "Margin", value: "", tag: "", tagTone: "sub", loading: true },
+  { key: "kpi", label: "KPI", value: "", tag: "", tagTone: "sub", loading: true },
+];
 
 export function todayModel(input: TodayInput, championRank: number | null = null): TodayModel {
   const income = input.income;
@@ -209,13 +231,14 @@ export function todayModel(input: TodayInput, championRank: number | null = null
     helloSub: [dayLabel(input.today), input.title, input.rank].filter(Boolean).join(" · "),
     heroLabel: dept ? `${month} · ${dept} commission` : `${month} · ${settled ? "Settled income" : "Estimated income"}`,
     heroAmount: input.hidden ? "RM ••••••" : pending ? "RM —" : dept ? rm2(commission ?? 0) : commission === null ? rm2(fixed) : rm2(fixed + commission),
+    heroLoading: !input.hidden && pending === "loading",
     heroSplit: input.hidden ? "Amounts hidden"
       : pending === "loading" ? `Working out ${month}'s commission…`
       : pending === "failed" ? `${month}'s commission is unavailable right now`
       : dept ? `Everybody in ${dept}, before salaries · View as a member for their own`
       : commission === null ? `Fixed salary ${rm2(fixed)} · commission shows once ${month} is computed`
       : `Fixed salary ${rm2(fixed)} + commission ${rm2(commission)}`,
-    metrics: [salesMetric(input), marginMetric(input), kpiMetric(input)],
+    metrics: input.metricsLoading && !input.insight ? LOADING_METRICS : [salesMetric(input), marginMetric(input), kpiMetric(input)],
     todo: todos(input),
     week: thisWeek(input),
     boards: boards(input, championRank),
