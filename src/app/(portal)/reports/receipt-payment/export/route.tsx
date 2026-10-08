@@ -4,7 +4,7 @@
 import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import {
   applyGlRefs,
   buildCashFlow,
@@ -33,7 +33,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS + the settlements RPC
   // both scope to it).
-  const user = await requirePermission('dept_reports')
+  const user = await requireAction('dept_reports', 'export', 'dept')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
   const period = url.searchParams.get('period') ?? officeMonth()

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { withActions } from '@/test/with-actions'
 import { render, screen } from '@testing-library/react'
 
 // 2026-10-07 — the monthly Statements on the sheet (the approved Invoice /
@@ -41,7 +42,7 @@ const card = (name: string) => screen.getByRole('group', { name })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ id: 'fm', role: 'finance', permissions: ['treasury'] })
+  mocks.requirePermission.mockResolvedValue(withActions({ id: 'fm', role: 'finance', permissions: ['treasury'] }))
 })
 
 describe('the monthly Statements on the sheet', () => {

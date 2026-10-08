@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requireAnyAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../_components/ContractForm'
 
 export default async function NewContractPage() {
-  const user = await requirePermission('billing', 'my_billing')
+  const user = await requireAnyAction(['billing', 'create'], ['my_billing', 'create', 'dept'])
   const supabase = await createClient()
 
   // Dept Manager restriction: must be Marketing's manager (it's the only

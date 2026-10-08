@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import SubmitHRCostButton from './_components/SubmitHRCostButton'
@@ -81,8 +82,9 @@ export default async function HRCostingPage() {
     }
   )
 
-  const canSubmit = user.role === 'hr' || user.role === 'principal'
-  const canExecute = user.role === 'finance' || user.role === 'principal'
+  // The submission is raised in HR Costing; executing it is Treasury's (2026-10-08, PR2).
+  const canSubmit = canDo(user, 'hr_costing', 'create')
+  const canExecute = canDo(user, 'treasury', 'edit')
 
   const monthLabel = dayjs(currentPeriod).format('MMMM YYYY')
 

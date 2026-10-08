@@ -10,7 +10,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("@/lib/auth", () => ({ getAccountUser, getMemberUser }));
 
-import { canOpenProductList, productListAccess, requireProductList } from "./product-access";
+import { canOpenProductList, productListAccess, requireProductList, requireProductListEdit } from "./product-access";
 
 function user(overrides: Partial<User>): User {
   return {
@@ -76,5 +76,29 @@ describe("requireProductList — the Save behind the page", () => {
     await expect(requireProductList()).rejects.toThrow("redirect /login");
     getMemberUser.mockResolvedValue(user({ permissions: ["member_insight"] }));
     await expect(requireProductList()).rejects.toThrow("redirect /member");
+  });
+});
+
+// PR2 (2026-10-08): reading the Product List is its View; changing it is its Edit.
+describe("requireProductListEdit — a change to the Product List", () => {
+  const editor = { "product_list.view": "all", "product_list.edit": "all" } as const;
+
+  it("lets an account holding Product list · Edit save", async () => {
+    getMemberUser.mockResolvedValue(user({ role: "staff", permissions: ["product_list"], actions: editor }));
+    expect(await requireProductListEdit()).toMatchObject({ id: "u1" });
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("asks the account behind a masked Principal, as the page does", async () => {
+    getMemberUser.mockResolvedValue(user({ role: "revenue_member", actualRole: "principal", permissions: ["member_insight"] }));
+    getAccountUser.mockResolvedValue({ ...principal, actions: editor });
+    expect(await requireProductListEdit()).toMatchObject({ actualRole: "principal" });
+  });
+
+  it("sends somebody who may only read it back to the app", async () => {
+    getMemberUser.mockResolvedValue(user({ role: "staff", permissions: ["product_list"], actions: { "product_list.view": "all" } }));
+    await expect(requireProductListEdit()).rejects.toThrow("redirect /member");
+    getMemberUser.mockResolvedValue(null);
+    await expect(requireProductListEdit()).rejects.toThrow("redirect /login");
   });
 });

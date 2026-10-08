@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -1173,8 +1173,13 @@ sheet's tokens:
   changed; its `aria-label` says *Function · Action: value*.
 - **Held for now** (portal, not in the drawing): beside the keys, *N held for
   now · Why* opens `.perm-held` (alert wash) listing each granted cell that
-  opens nothing yet and why — the gates still read one key per module, so a
-  cell is only in force where its key cannot reach further than it says.
+  opens nothing yet and why. A page still opens on its module key, so a View
+  cell is in force only where its key cannot reach further than it says;
+  since v3.16 every other cell is asked for by the writes themselves, so it is
+  held only while its function's pages stay closed to the template or it
+  reaches less far than they ask (Claims · Create asks Own, My Billing ·
+  Create Dept, the rest All). A cell nothing acts on yet (Revenue · Approve,
+  Venture Pool · Create) is not listed — there is nothing to hold.
 - **Titles on this template**: a 15px/600 heading on a hairline rule with
   *N PEOPLE*, a `ledger-table tight` — Title (+ mono `L{n}`) · Department ·
   People · Personal exceptions (mono *SR hr_costing.export:✕*) · Template (a
@@ -2648,6 +2653,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-08 v3.16 (Every action takes effect)** — a button is drawn only for somebody who holds the cell its Server Action asks for: *Create payment*, *Record new loan*, *+ New Entry*, *+ Add person*, *Import InfoTech* (Create); *Edit*, *Mark paid*, *Issue* (Edit); *Void*, *Withdraw*, *Request cancellation*, a repayment's reversal (Void); *Amend terms* (Treasury · Approve); a voucher's *Approve* (Approvals · Approve); the loans CSV (Export). A Finance · Maker sees *Submit* and *Edit* on a draft voucher and no *Void*; a Checker sees *Approve* alone. Nothing moves for the four shared accounts — their keys still allow every action they did. The matrix's *held for now* now reads the same rule. See "Permission matrix".
 - **2026-10-08 v3.15 (Audit Log › Changes)** — every change people make through the portal is listed: one row per save, each record it touched with its fields before → after, filtered by area, record, person and dates, a record's own history a click away. The reader sees only the areas their permissions open, and salary / NRIC / bank values only where their title may. Audit Log becomes a sidebar group: Changes (`/audit-log`) and Access (`/audit-log/access`, the old page; old links redirect). See "Audit log — Changes".
 - **2026-10-08 (Navigation · instant revisits that stay current)** — a page visited in the last five minutes (was 30 s) opens from memory with no wait, then quietly reads itself again and swaps in whatever moved; the pages each person opens most are rendered ahead while the portal sits idle (three at most, one at a time). See "Navigation feedback".
 - **2026-10-08 (Revenue app · opens on what the phone kept)** — opening the app shows last time's figures at once and refreshes behind them (the pull's dot spins); a figure still loading is a shimmering placeholder, never a zero or a dash, and a board with no place says *Not ranked yet*. See *Opens on what the phone kept* and *Loading is never a zero* in the Revenue app section.

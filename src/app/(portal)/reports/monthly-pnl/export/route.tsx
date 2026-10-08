@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { buildPnlAccounts, buildCustomPnlRows, defaultPnlLayout } from '@/lib/pnl-custom'
@@ -13,7 +13,7 @@ import { MatrixPdf } from '@/lib/export/matrix-pdf'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
-  const user = await requirePermission('dept_reports')
+  const user = await requireAction('dept_reports', 'export', 'dept')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { formatMoney, formatIntlDate } from '@/lib/utils'
 import { OFFICE_TZ } from '@/lib/office-clock'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
@@ -59,6 +60,10 @@ interface LineRow {
  */
 export default async function PayrollGridPage({ params }: PageProps) {
   const user = await requirePermission('hr_costing')
+  // Opening the month or importing it raises rows; copying last month edits
+  // them (2026-10-08, PR2).
+  const canRaiseRows = canDo(user, 'hr_costing', 'create')
+  const canEditRows = canDo(user, 'hr_costing', 'edit')
   const { period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
 
@@ -298,13 +303,15 @@ export default async function PayrollGridPage({ params }: PageProps) {
         <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center mb-12">
           <p className="text-sm mb-4">No staff rows for this period yet.</p>
           <div className="flex items-start justify-center gap-3 flex-wrap">
-            {closed ? null : <CreatePeriodButton period={period} />}
-            <Link
-              href={`/hr-costing/payroll/${period}/import`}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-            >
-              Import InfoTech →
-            </Link>
+            {closed || !canRaiseRows ? null : <CreatePeriodButton period={period} />}
+            {canRaiseRows ? (
+              <Link
+                href={`/hr-costing/payroll/${period}/import`}
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+              >
+                Import InfoTech →
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
@@ -391,7 +398,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
           while nothing of the month has gone to Finance, since it overwrites. */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">
-          {!closed && (
+          {!closed && canRaiseRows && (
             <Link
               href={`/hr-costing/payroll/${period}/import`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
@@ -399,7 +406,7 @@ export default async function PayrollGridPage({ params }: PageProps) {
               Import InfoTech
             </Link>
           )}
-          {!closed && standingBatches === 0 && <CopyFromLastMonthButton period={period} />}
+          {!closed && canEditRows && standingBatches === 0 && <CopyFromLastMonthButton period={period} />}
           <Link
             href={`/hr-costing/allocation/${period}`}
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"

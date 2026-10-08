@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireProductList } from '@/lib/member/product-access'
+import { requireProductListEdit } from '@/lib/member/product-access'
 import {
   EditError,
   validateComboPrices,
@@ -76,7 +76,7 @@ export interface SaveSummary {
 
 /** Prices for many SKUs at once — the SKU Master's Edit prices. */
 export async function saveSkuPrices(edits: SkuPriceEdit[]): Promise<SaveSummary> {
-  const user = await requireProductList()
+  const user = await requireProductListEdit()
   const rows = guard(() => validateSkuPrices(edits))
   const sb = await client()
   const now = new Date().toISOString()
@@ -93,7 +93,7 @@ export async function saveSkuPrices(edits: SkuPriceEdit[]): Promise<SaveSummary>
 
 /** Tick or untick SKUs for the Revenue calculator. */
 export async function setSkusOffered(erpIds: string[], offered: boolean): Promise<SaveSummary> {
-  const user = await requireProductList()
+  const user = await requireProductListEdit()
   const ids = [...new Set((erpIds ?? []).map(String).filter(id => /^[A-Za-z0-9_.:-]{1,80}$/.test(id)))]
   if (ids.length === 0) throw new Error('No SKU chosen')
   const sb = await client()
@@ -109,7 +109,7 @@ export async function setSkusOffered(erpIds: string[], offered: boolean): Promis
 
 /** One model's Modular ticks: offered, its option pools, its SKUs, and its overrides. */
 export async function saveModelSettings(edit: ModelEdit): Promise<SaveSummary> {
-  const user = await requireProductList()
+  const user = await requireProductListEdit()
   const { model, skus } = guard(() => validateModelEdit(edit))
   const sb = await client()
   const now = new Date().toISOString()
@@ -146,7 +146,7 @@ export async function saveModelSettings(edit: ModelEdit): Promise<SaveSummary> {
 
 /** A Maintenance pool's surcharges. Blank clears an option's price. */
 export async function saveOptionPrices(pool: string, edits: OptionPriceEdit[]): Promise<SaveSummary> {
-  const user = await requireProductList()
+  const user = await requireProductListEdit()
   const { upserts, clears } = guard(() => validateOptionPrices(pool, edits))
   const sb = await client()
   const now = new Date().toISOString()
@@ -172,7 +172,7 @@ export async function saveOptionPrices(pool: string, edits: OptionPriceEdit[]): 
 
 /** Combo prices per seat height. A combo whose every height is blank loses its price row. */
 export async function saveComboPrices(edits: ComboPriceEdit[]): Promise<SaveSummary> {
-  const user = await requireProductList()
+  const user = await requireProductListEdit()
   const rows = guard(() => validateComboPrices(edits))
   const sb = await client()
   const now = new Date().toISOString()
@@ -221,7 +221,7 @@ function schemeOf(schemeId: string): string {
 
 /** One sub-department's cost ratio and its SKUs' own, in one transaction. */
 export async function saveCostSetting(schemeId: string, edit: CostSettingEdit): Promise<SaveSummary> {
-  await requireProductList()
+  await requireProductListEdit()
   const scheme = schemeOf(schemeId)
   const plan = guard(() => validateCostSetting(edit))
   const sb = await client()
@@ -248,7 +248,7 @@ export type AddComboResult = { ok: true; prices: number } | { ok: false; reason:
  * `reason`; production hides a thrown message.
  */
 export async function addCombo(edit: NewComboEdit): Promise<AddComboResult> {
-  await requireProductList()
+  await requireProductListEdit()
   let plan
   try {
     plan = validateNewCombo(edit)
@@ -283,7 +283,7 @@ export type RemoveCombosResult = { ok: true; removed: number } | { ok: false; re
  * cost until its month is Recosted.
  */
 export async function removeCombos(sets: ComboSetRef[]): Promise<RemoveCombosResult> {
-  await requireProductList()
+  await requireProductListEdit()
   let rows
   try {
     rows = validateComboRemovals(sets)

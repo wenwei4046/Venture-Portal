@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAuth, requirePermission } from '@/lib/auth'
+import { requireAction, requireAuth } from '@/lib/auth'
 import { can } from '@/lib/permissions'
 import { isAction, isScope, isSensitiveField } from '@/lib/permission-matrix'
 import { describeHistory, type AuditRow, type HistoryEntry } from '@/lib/permission-history'
@@ -65,7 +65,7 @@ export async function saveTemplate(input: {
   /** People whose own cells on the changed cells the Principal chose to put back on the template. */
   reset: Array<{ userId: string; functionKey: string; action: string }>
 }): Promise<Result<{ version: number; titles: number }>> {
-  await requirePermission('permissions_manage')
+  await requireAction('accounts', 'manage')
   if (
     !input ||
     !UUID.test(input.templateId) ||
@@ -98,7 +98,7 @@ export async function createTemplate(input: {
   description: string
   copyFrom: string | null
 }): Promise<Result<{ id: string }>> {
-  await requirePermission('permissions_manage')
+  await requireAction('accounts', 'manage')
   const name = (input?.name ?? '').trim()
   if (!name || name.length > 80) return { ok: false, reason: 'Give the template a name, up to 80 characters.' }
   if ((input.description ?? '').length > 400) return { ok: false, reason: 'Keep the description under 400 characters.' }
@@ -117,7 +117,7 @@ export async function createTemplate(input: {
 
 /** A title onto another template — at once, the design's select. */
 export async function setTitleTemplate(titleId: string, templateId: string | null): Promise<Result> {
-  await requirePermission('permissions_manage')
+  await requireAction('accounts', 'manage')
   if (!UUID.test(titleId) || (templateId !== null && !UUID.test(templateId))) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -130,7 +130,7 @@ export async function setTitleTemplate(titleId: string, templateId: string | nul
 
 /** One person's own cells, the whole set (✕ = null). */
 export async function setPersonCells(userId: string, cells: CellInput[]): Promise<Result> {
-  await requirePermission('permissions_manage')
+  await requireAction('accounts', 'manage')
   if (!UUID.test(userId) || !cellsAreShaped(cells, true)) return { ok: false, reason: 'Reload the page and try again.' }
   const supabase = await db()
   const { error } = await supabase.rpc('permission_user_cells_set', { p_user: userId, p_cells: cells })
@@ -141,7 +141,7 @@ export async function setPersonCells(userId: string, cells: CellInput[]): Promis
 
 /** A person's old per-key exceptions, cleared so their template and their cells decide. */
 export async function clearLegacyExceptions(userId: string): Promise<Result<{ cleared: number }>> {
-  await requirePermission('permissions_manage')
+  await requireAction('accounts', 'manage')
   if (!UUID.test(userId)) return { ok: false, reason: 'Reload the page and try again.' }
   const supabase = await db()
   const { data, error } = await supabase.rpc('permission_user_clear_legacy', { p_user: userId })
@@ -190,7 +190,7 @@ export async function loadPermissionHistory(): Promise<Result<{ entries: History
  * denial; null removes the exception.
  */
 export async function setUserPermission(userId: string, key: string, granted: boolean | null): Promise<void> {
-  await requirePermission('permissions_manage')
+  await requireAction('accounts', 'manage')
   if (!userId || !key) throw new Error('Which person, and which permission?')
 
   const supabase = await createClient()

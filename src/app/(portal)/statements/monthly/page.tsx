@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { statementsSummary } from '@/lib/billing-sheet'
@@ -55,7 +56,8 @@ export default async function MonthlyStatementsPage() {
   const latestLabel = summary.latestPeriod ? dayjs(summary.latestPeriod).format('MMMM YYYY') : null
   const latestMonth = summary.latestPeriod ? dayjs(summary.latestPeriod).format('MMMM') : null
   const latestMix = summary.latestPeriod ? statusMix(byPeriod.get(summary.latestPeriod) ?? []).toLowerCase() : ''
-  const canGenerate = user.role === 'finance' || user.role === 'principal'
+  // Generating raises the month's statements: Treasury · Create (2026-10-08, PR2).
+  const canGenerate = canDo(user, 'treasury', 'create')
 
   return (
     <div>

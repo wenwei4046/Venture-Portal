@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   resolveArGlCode: vi.fn(),
   primeDeptRegistryFromDb: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))

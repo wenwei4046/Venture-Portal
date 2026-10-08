@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { can } from '@/lib/permissions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
@@ -107,10 +108,15 @@ export default async function PaymentDetailPage({ params }: Props) {
   // Attachments come and go freely only while the voucher is still being made.
   const attachmentsOpen = voucher.status === 'draft' || voucher.status === 'pending_approval'
 
-  const isPrincipal = canReadTreasury && user.role === 'principal'
-  // Unified portal (2026-07-16): Principal gets the Finance-side voucher
-  // actions too (copy / mark paid / void).
-  const isFinance = canReadTreasury && (user.role === 'finance' || isPrincipal)
+  // What this reader may do to the voucher (2026-10-08, PR2): each button asks
+  // for the action its Server Action asks — raise (Submit, Copy), edit (Edit,
+  // back to draft, a paid voucher's date or GL account), void, and Approve.
+  const voucherCan = {
+    create: canReadTreasury && canDo(user, 'treasury', 'create'),
+    edit: canReadTreasury && canDo(user, 'treasury', 'edit'),
+    void: canReadTreasury && canDo(user, 'treasury', 'void'),
+    approve: canReadTreasury && canDo(user, 'approvals', 'approve'),
+  }
 
   // Post-mig 238: PVS rows reference chart_of_accounts directly via account_code
   // (the COA `code` IS the GL). Pool + account name both come from the sources
@@ -202,7 +208,7 @@ export default async function PaymentDetailPage({ params }: Props) {
   // excluded — that leg belongs to invoice settlement.
   let reassignFrom: Array<{ code: string; name: string; total: number }> = []
   let accountOptions: Array<{ code: string; name: string }> = []
-  if (isFinance && (voucher.status === 'approved' || voucher.status === 'paid')) {
+  if (voucherCan.edit && (voucher.status === 'approved' || voucher.status === 'paid')) {
     const [{ data: jlRows }, { data: coaRows }, { data: bankCodesData }] = await Promise.all([
       supabase
         .from('journal_lines')
@@ -340,7 +346,7 @@ export default async function PaymentDetailPage({ params }: Props) {
           >
             Print
           </Link>
-          {isFinance ? <CopyVoucherButton voucherId={voucher.id} voucherNo={voucher.voucher_no} /> : null}
+          {voucherCan.create ? <CopyVoucherButton voucherId={voucher.id} voucherNo={voucher.voucher_no} /> : null}
         </div>
       </div>
 
@@ -594,7 +600,7 @@ export default async function PaymentDetailPage({ params }: Props) {
                   {voucher.payment_date ? dayjs(voucher.payment_date).format('D MMM YYYY') : '还没定'}
                   {/* A paid voucher's date is corrected in place; a draft or pending
                       one with Edit; payroll's from HR Payment. */}
-                  {isFinance && status === 'paid' && voucher.payment_date && !isPayrollVoucher ? (
+                  {voucherCan.edit && status === 'paid' && voucher.payment_date && !isPayrollVoucher ? (
                     <AmendDateButton
                       kind="voucher"
                       id={voucher.id}
@@ -628,8 +634,7 @@ export default async function PaymentDetailPage({ params }: Props) {
             amount={Number(voucher.amount)}
             bankBalance={bankBalance}
             bankName={bankName}
-            isPrincipal={isPrincipal}
-            isFinance={isFinance}
+            can={voucherCan}
             submitForApproval={submitForApproval}
             approveVoucher={approveVoucher}
             voidVoucher={voidVoucher}

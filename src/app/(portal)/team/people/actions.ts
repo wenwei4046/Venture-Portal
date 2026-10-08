@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payFieldsForUpdate } from '@/lib/staff-form'
 import { validateSecondaryStaffBankAccount } from '@/lib/staff-bank-accounts'
 
@@ -36,7 +36,7 @@ const str = (formData: FormData, key: string): string | null =>
  * database derives correct on the first write.
  */
 export async function addStaff(formData: FormData) {
-  const user = await requirePermission('team')
+  const user = await requireAction('team', 'create')
   const supabase = await createClient()
 
   const form = validateStaffForm({
@@ -119,7 +119,7 @@ export async function addStaff(formData: FormData) {
 }
 
 export async function updateStaff(id: string, formData: FormData) {
-  await requirePermission('team')
+  await requireAction('team', 'edit')
   const supabase = await createClient()
 
   const hireDate = (formData.get('hire_date') as string) || null
@@ -254,7 +254,7 @@ export async function updateStaff(id: string, formData: FormData) {
  * until the next hard reload.
  */
 async function setEmployment(id: string, status: 'active' | 'inactive') {
-  await requirePermission('team')
+  await requireAction('team', 'edit')
   const supabase = await createClient()
 
   const { error } = await supabase.from('hr_staff_costs').update({ status }).eq('id', id)

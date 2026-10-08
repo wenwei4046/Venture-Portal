@@ -4,7 +4,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const mocks = vi.hoisted(() => ({ client: vi.fn(), revalidate: vi.fn() }))
 vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidate }))
-vi.mock('@/lib/auth', () => ({ requirePermission: vi.fn(async () => ({ id: 'user-1' })) }))
+vi.mock('@/lib/auth', () => {
+  const gate = vi.fn(async () => ({ id: 'user-1' }))
+  return { requirePermission: gate, requireAction: gate, requireAnyAction: gate, requirePayrollPayoutsAction: gate }
+})
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.client }))
 vi.mock('./_lib/commission-input', () => ({ loadCommissionInput: vi.fn() }))
 

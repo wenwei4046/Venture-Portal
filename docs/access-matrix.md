@@ -4,6 +4,48 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-08 — Each action takes effect (PR2)
+A write now asks for the ACTION it is, not the module key: `requireAction('treasury',
+'create')` in the app, `has_action()` in the database, answered by `current_actions()` —
+a titled person's template cells (their own cells over them), else what the account's
+keys allowed (`permission_key_actions`, so the four shared accounts lost and gained
+nothing). A cell counts only while one of the keys that open its function's pages is
+held. What each cell opens:
+  Treasury       Create = raise a voucher, receipt, loan, fund source, BA, statement run,
+                 overdue escalation · Edit = change one, move it along (issue, mark
+                 paid, settle, back to draft, a paid voucher's date or GL account) ·
+                 Void = void, withdraw, cancel, reverse · Export = files ·
+                 Approve = amend a booked loan or fund source, approve a credit note
+                 (and, next step, Treasury's approvals)
+  Billing        Create = invoices, contracts, credit notes, receipts, generations ·
+                 Edit = drafts, issuing, the allocator · Void = issued invoices,
+                 approved credit notes · Export = invoice / credit-note PDFs
+  Chart of Acct  Manage = accounts and departments
+  HR Costing     Create = open a month, import, submit to Finance, raise salary and
+                 statutory PVs, a top-up · Edit = rows, Complete, unlock, Total
+                 Close, allocation splits · Export = bank and statutory files ·
+                 Approve = (next step) approving a payroll run
+  Revenue        Create = a sales import · Edit = the month and the hierarchy
+                 (picks, shares, Don't count, closes, ERP matches) · Manage = rules,
+                 KPI items, the ERP link, the cutover · Approve / Export = nothing yet
+  Product list   Edit = every Save on the Product List
+  Director Sal.  Edit = the month, its import, Complete and its undo ·
+                 Approve = (next step) Invoice Pool releases
+  Director Pool  Edit = the calculator
+  Team & roster  Create = add people (by hand or InfoTech) · Edit = change a person,
+                 the reporting line · Manage = titles and the ladder
+  Logins         Create = invite · Manage = templates, a person's cells, deleting a title
+  My Billing     Create (Dept) = the department's invoices and requests
+  Claims         Create (Own) = raise a claim · Approve = approve, reject, mark paid
+  Reconciliation Create = upload a statement, a journal voucher · Edit = match,
+                 contra, ignore, delete · Approve = mark a session done
+  Reports        Export = report files (Dept reports at Dept)
+  Settings       Manage = everything on Settings
+  Approvals      Approve = the queue (by domain: next step)
+A cell nothing acts on yet (Revenue · Approve, Venture Pool · Create, Claims · Edit …)
+gives nothing; the matrix does not list it as held. Reading a page still follows its
+module key, and Own / Dept rows reach RLS in the next step.
+---
 ⚡ AMENDMENT 2026-10-08 — The app-wide history (Audit Log › Changes)
 Every change people make through the portal is kept (`audit_events`, as `audit_tables`
 says — CLAUDE.md › THE APP-WIDE HISTORY), and READING IT FOLLOWS THE READER'S OWN

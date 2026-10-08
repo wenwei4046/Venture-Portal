@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import {
   ACCOUNT_TYPES,
   CASH_FLOW_CATEGORIES,
@@ -15,7 +15,7 @@ import type { OverdueConfigStage } from '@/types'
 // ─── Treasury Config (op_margin, saving_rate) ────────────────────────────────
 
 export async function updateTreasuryConfig(formData: FormData) {
-  const user = await requirePermission('settings')
+  const user = await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const opMarginPercent = parseFloat((formData.get('op_margin') as string) ?? '0')
@@ -79,7 +79,7 @@ export async function updateTreasuryConfig(formData: FormData) {
 // ─── Overdue Stages (grace / late_1 / late_2 / escalation) ────────────────────
 
 export async function updateOverdueStages(formData: FormData) {
-  const user = await requirePermission('settings')
+  const user = await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const stages: OverdueConfigStage[] = ['grace', 'late_1', 'late_2', 'escalation']
@@ -133,7 +133,7 @@ async function upsertSplits(
   kind: 'rent' | 'utility',
   formData: FormData
 ): Promise<void> {
-  const user = await requirePermission('settings')
+  const user = await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const rawPayload = formData.get('splits') as string | null
@@ -217,7 +217,7 @@ export async function updateUtilitySplits(formData: FormData) {
 export async function updateDirectorConfig(
   updates: { id: string; weightage: number; min_payout: number }[]
 ) {
-  await requirePermission('settings')
+  await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   for (const u of updates) {
@@ -236,7 +236,7 @@ export async function updateDirectorConfig(
 // ─── Period Closing (Principal only) ────────────────────────────────────────
 
 export async function closePeriod(formData: FormData) {
-  const user = await requirePermission('settings')
+  const user = await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const periodMonth = formData.get('period_month') as string
@@ -263,7 +263,7 @@ export async function closePeriod(formData: FormData) {
 }
 
 export async function reopenPeriod(formData: FormData) {
-  const user = await requirePermission('settings')
+  const user = await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const periodMonth = formData.get('period_month') as string
@@ -293,7 +293,7 @@ export async function reopenPeriod(formData: FormData) {
 // departments are lightweight (staff / claims / inter-billing targets); their
 // GL folds into Venture until a full segment build is done for them.
 export async function addDepartment(formData: FormData) {
-  await requirePermission('categories')
+  await requireAction('categories', 'manage')
   const supabase = await createClient()
 
   const name = (formData.get('name') as string)?.trim()
@@ -317,7 +317,7 @@ export async function addDepartment(formData: FormData) {
 // Office bears it) or simply stays in the department's own pool. It used to
 // be a literal in the code, so only a deploy could change it.
 export async function setDepartmentBillback(formData: FormData) {
-  await requirePermission('categories')
+  await requireAction('categories', 'manage')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -355,7 +355,7 @@ export async function setDepartmentBillback(formData: FormData) {
 // registry row. From then on every consumer (invoice modes, settle pools,
 // report rails, bridge) picks it up via the primed dept registry.
 export async function provisionDepartment(formData: FormData) {
-  await requirePermission('categories')
+  await requireAction('categories', 'manage')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -382,7 +382,7 @@ export async function provisionDepartment(formData: FormData) {
 }
 
 export async function addCompany(formData: FormData) {
-  await requirePermission('settings')
+  await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const name = (formData.get('name') as string)?.trim()
@@ -406,7 +406,7 @@ export async function addCompany(formData: FormData) {
 }
 
 export async function updateCompany(formData: FormData) {
-  await requirePermission('settings')
+  await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -454,7 +454,7 @@ export async function updateCompany(formData: FormData) {
 }
 
 export async function toggleCompanyActive(formData: FormData) {
-  await requirePermission('settings')
+  await requireAction('settings', 'manage')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -481,7 +481,7 @@ export async function toggleCompanyActive(formData: FormData) {
 export type AccountActionResult = { error?: string; message?: string } | undefined
 
 export async function createAccount(formData: FormData): Promise<AccountActionResult> {
-  await requirePermission('categories')
+  await requireAction('categories', 'manage')
   const supabase = await createClient()
 
   const type = ((formData.get('type') as string) ?? '').trim() as AccountType
@@ -528,7 +528,7 @@ export async function createAccount(formData: FormData): Promise<AccountActionRe
 // enforced by DB triggers (migs 246 / 256 / 20260611000000) — their messages
 // surface as the error.
 export async function moveAccount(formData: FormData): Promise<AccountActionResult> {
-  await requirePermission('categories')
+  await requireAction('categories', 'manage')
   const supabase = await createClient()
 
   const code = ((formData.get('code') as string) ?? '').trim()
@@ -547,7 +547,7 @@ export async function moveAccount(formData: FormData): Promise<AccountActionResu
 }
 
 export async function updateAccount(formData: FormData): Promise<AccountActionResult> {
-  await requirePermission('categories')
+  await requireAction('categories', 'manage')
   const supabase = await createClient()
 
   const code = ((formData.get('code') as string) ?? '').trim()

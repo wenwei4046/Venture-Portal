@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import VoucherActions from './VoucherActions'
 
+// What a Finance account and the Principal hold (2026-10-08, PR2: each button asks its own action).
+const FINANCE = { create: true, edit: true, void: true, approve: false }
+const PRINCIPAL = { create: true, edit: true, void: true, approve: true }
+
 const props = () => ({ voucherId: 'salary', amount: 4302.70, bankBalance: 10000, bankName: 'Alliance',
-  isPrincipal: false, isFinance: true, submitForApproval: vi.fn(), approveVoucher: vi.fn(), voidVoucher: vi.fn(),
+  can: FINANCE, submitForApproval: vi.fn(), approveVoucher: vi.fn(), voidVoucher: vi.fn(),
   direction: 'debit', voucherType: 'other', reversePaidPayment: undefined })
 describe('salary PV actions without generic paid reversal', () => {
   it('says the voucher is paid, without a reverse button', () => {
@@ -38,7 +42,7 @@ describe('what each state offers', () => {
   })
 
   it('pending, to the Principal: the bank balance, Approve, and a confirmation before it pays', () => {
-    render(<VoucherActions {...props()} status="pending_approval" isPrincipal returnToDraft={vi.fn()} />)
+    render(<VoucherActions {...props()} status="pending_approval" can={PRINCIPAL} returnToDraft={vi.fn()} />)
     expect(screen.getByText(/Alliance balance/)).toHaveTextContent('RM 10,000.00')
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
     expect(screen.getByText(/pays this voucher immediately/)).toBeVisible()
@@ -46,7 +50,7 @@ describe('what each state offers', () => {
   })
 
   it('…who cannot approve what the bank cannot pay', () => {
-    render(<VoucherActions {...props()} status="pending_approval" isPrincipal bankBalance={100} />)
+    render(<VoucherActions {...props()} status="pending_approval" can={PRINCIPAL} bankBalance={100} />)
     expect(screen.getByRole('button', { name: 'Insufficient balance' })).toBeDisabled()
     expect(screen.getByText(/insufficient for RM 4,302.70 payment/)).toBeVisible()
   })
@@ -60,6 +64,21 @@ describe('what each state offers', () => {
     expect(screen.getByText(/确认作废这张已付收据/)).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '确认' }))
     expect(voidPaidReceipt).toHaveBeenCalledTimes(1)
+  })
+
+  it('a maker raises and edits, and voids nothing', () => {
+    render(<VoucherActions {...props()} can={{ create: true, edit: true, void: false, approve: false }} status="draft" />)
+    expect(names()).toEqual(['Submit for approval', 'Edit'])
+  })
+
+  it('a checker approves, and neither edits nor voids', () => {
+    render(<VoucherActions {...props()} can={{ create: false, edit: false, void: false, approve: true }} status="pending_approval" returnToDraft={vi.fn()} />)
+    expect(names()).toEqual(['Approve'])
+  })
+
+  it('a paid voucher is reversed only by whoever voids', () => {
+    render(<VoucherActions {...props()} can={{ create: true, edit: true, void: false, approve: false }} status="paid" direction="credit" voidPaidReceipt={vi.fn()} />)
+    expect(names()).toEqual([])
   })
 
   it('a voided voucher offers nothing', () => {

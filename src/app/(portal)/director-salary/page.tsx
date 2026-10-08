@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import {
   calculateDirectorGap,
@@ -48,7 +49,9 @@ interface ByCompanyRow {
 }
 
 export default async function DirectorSalaryPage({ searchParams }: Props) {
-  await requirePermission('director_salary')
+  const user = await requirePermission('director_salary')
+  // Importing InfoTech's file changes the month: Director Salary · Edit (2026-10-08, PR2).
+  const canEditMonth = canDo(user, 'director_salary', 'edit')
   const supabase = await createClient()
 
   const { period: rawPeriod, tab: rawTab } = await searchParams
@@ -245,16 +248,18 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                   {directorState.withFinance > 0 || directorState.completed > 0 ? 'View submission →' : 'Complete →'}
                 </Link>
               </p>
-              <Link
-                href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
-                className="self-start sm:self-auto shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-              >
-                Import InfoTech →
-              </Link>
+              {canEditMonth ? (
+                <Link
+                  href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
+                  className="self-start sm:self-auto shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+                >
+                  Import InfoTech →
+                </Link>
+              ) : null}
             </div>
 
             {actualRows.length === 0 ? (
-              <DirectorPayrollEmptyState period={period} />
+              <DirectorPayrollEmptyState period={period} canImport={canEditMonth} />
             ) : (
               <DirectorPayrollActualGrid rows={actualRows} period={period} />
             )}

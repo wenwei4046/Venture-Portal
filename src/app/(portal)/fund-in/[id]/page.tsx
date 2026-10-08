@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
@@ -151,7 +152,13 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const isMatured = source.status === 'matured'
   const isRepaid = source.status === 'repaid'
   const isPending = source.status === 'pending_approval'
-  const canFinanceEdit = user.role === 'finance' || user.role === 'principal'
+  // Each button asks for the action its Server Action asks (2026-10-08, PR2):
+  // recording a repayment raises a voucher, Edit edits, Withdraw and
+  // cancellation void, and amending a booked fund source is Treasury · Approve.
+  const canRaise = canDo(user, 'treasury', 'create')
+  const canFinanceEdit = canDo(user, 'treasury', 'edit')
+  const canVoid = canDo(user, 'treasury', 'void')
+  const canAmend = canDo(user, 'treasury', 'approve')
 
   const maturityDays = source.maturity_date
     ? dayjs(source.maturity_date).diff(officeToday(), 'day')
@@ -176,7 +183,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
   // Record repayment (2026-10-02): the form below files the same voucher
   // Create payment does in loan-repayment mode, so it needs the banks, the
   // pools and which of the three default accounts actually exist.
-  const canRecordRepayment = canFinanceEdit && (isActive || isMatured) && outstanding > 0
+  const canRecordRepayment = canRaise && (isActive || isMatured) && outstanding > 0
   const repaymentAccounts = [source.account_code, INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT].filter(
     (c): c is string => Boolean(c),
   )
@@ -222,7 +229,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {user.role === 'principal' && isActive ? (
+          {canAmend && isActive ? (
             <Link
               href={`/fund-in/${source.id}/edit`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -505,7 +512,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
       />
 
       <div className="mt-8">
-        <TermsTimeline kind="fund_source" recordId={source.id} segments={termsSegments} changes={termsChanges} canRevert={user.role === 'principal' && source.status === 'active'} />
+        <TermsTimeline kind="fund_source" recordId={source.id} segments={termsSegments} changes={termsChanges} canRevert={canAmend && source.status === 'active'} />
       </div>
 
       <NotesEditor sourceId={source.id} current={(source.notes as string | null) ?? null} />
@@ -525,7 +532,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
             </p>
           </div>
         </section>
-      ) : canFinanceEdit && isPending ? (
+      ) : (canFinanceEdit || canVoid) && isPending ? (
         <section className="border-t border-hairline pt-8">
           <div className="sect-head">
             <h2>Actions</h2>
@@ -533,20 +540,22 @@ export default async function FundSourceDetailPage({ params }: Props) {
             <span className="count">EDITABLE UNTIL PRINCIPAL APPROVES</span>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <Link
-              href={`/fund-in/${source.id}/edit`}
-              className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
-            >
-              Edit fund source
-            </Link>
-            <WithdrawButton id={source.id} />
+            {canFinanceEdit ? (
+              <Link
+                href={`/fund-in/${source.id}/edit`}
+                className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
+              >
+                Edit fund source
+              </Link>
+            ) : null}
+            {canVoid ? <WithdrawButton id={source.id} /> : null}
           </div>
           <p className="text-xs text-muted mt-2 italic font-serif">
             Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once Principal approves.
             Submitted the whole thing by mistake? Withdraw it directly — no Principal needed.
           </p>
         </section>
-      ) : canFinanceEdit && isActive ? (
+      ) : canVoid && isActive ? (
         <section className="border-t border-hairline pt-8">
           <div className="sect-head">
             <h2>Actions</h2>

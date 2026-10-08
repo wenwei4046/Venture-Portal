@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 
 /**
  * Answering "is this one bill claimed twice?" (2026-09-26).
@@ -20,7 +20,7 @@ async function client(): Promise<SupabaseClient> {
 
 /** "Checked — these are separate sales." Returns how many bills the answer covers. */
 export async function dismissDoubleClaim(subDepartmentId: string, billRef: string, note?: string): Promise<number> {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'edit')
   if (!subDepartmentId || !billRef.trim()) throw new Error('Nothing to answer')
 
   const supabase = await client()
@@ -37,7 +37,7 @@ export async function dismissDoubleClaim(subDepartmentId: string, billRef: strin
 
 /** Take the answer back, so the group is asked about again. */
 export async function restoreDoubleClaim(subDepartmentId: string, billRef: string): Promise<void> {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'edit')
   if (!subDepartmentId || !billRef.trim()) throw new Error('Nothing to restore')
 
   const supabase = await client()

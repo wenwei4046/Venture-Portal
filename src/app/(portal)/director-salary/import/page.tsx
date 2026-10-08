@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { getPeriodMonth } from '@/lib/utils'
 import DirectorImportWizard from './_components/DirectorImportWizard'
 import DirectorPeriodPicker from '../_components/DirectorPeriodPicker'
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default async function DirectorPayrollImportPage({ searchParams }: Props) {
-  await requirePermission('director_salary')
+  await requireAction('director_salary', 'edit')
   const { period: rawPeriod } = await searchParams
   const period = dayjs(rawPeriod ?? getPeriodMonth()).startOf('month').format('YYYY-MM-DD')
   const periodLabel = dayjs(period).format('MMMM YYYY')

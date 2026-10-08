@@ -2,6 +2,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { redirect } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { fetchAllRows } from '@/lib/paginate'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
@@ -549,7 +550,7 @@ export default async function DeptPoolPage({
           >
             HR Past Month Submission
           </Link>
-          {user.role === 'dept_manager' ? (
+          {canDo(user, 'my_billing', 'create', 'dept') ? (
             <Link
               href="/dept-pool/contracts/new"
               className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2.5 rounded-md transition-colors"

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { generateKwspFormA } from '@/lib/statutory/kwsp-form-a'
 import { generatePerkesoSocso } from '@/lib/statutory/perkeso-socso'
 import { generatePerkesoEis } from '@/lib/statutory/perkeso-eis'
@@ -22,7 +22,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ period: string }> },
 ) {
-  await requirePermission('hr_costing')
+  await requireAction('hr_costing', 'export')
   const { period } = await context.params
   if (!/^\d{4}-\d{2}-01$/.test(period)) {
     return NextResponse.json({ error: 'invalid period format' }, { status: 400 })

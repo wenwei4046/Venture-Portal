@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { can } from '@/lib/permissions'
 import { loadPermissionsData } from '../_lib/permission-templates'
 import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
@@ -206,9 +207,10 @@ export default async function PeopleManagementPage({
       unattachedAccounts={unattached}
       canSeeActivity={can(user, 'audit_log')}
       permissions={permissions}
-      canManagePermissions={can(user, 'permissions_manage')}
+      canManagePermissions={canDo(user, 'accounts', 'manage')}
       canSeeHistory={can(user, 'permissions_manage', 'audit_log')}
-      canInvite={can(user, 'team_invite')}
+      canInvite={canDo(user, 'accounts', 'create')}
+      canAddPeople={canDo(user, 'team', 'create')}
       candidates={candidates}
       initialTemplateId={params.template && UUID.test(params.template) ? params.template : null}
       initialInvite={invite}

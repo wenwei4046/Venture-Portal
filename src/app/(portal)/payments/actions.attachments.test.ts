@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), redirect: vi.fn(), revalidatePath: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))

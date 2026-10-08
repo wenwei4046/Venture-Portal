@@ -1,12 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildBaseRateXlsx } from './_format/xlsx'
 import { BaseRatePdf } from './_format/pdf'
 import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  await requirePermission('reports')
+  await requireAction('reports', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 

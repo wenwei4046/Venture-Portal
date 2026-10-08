@@ -3,7 +3,7 @@
 import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { buildBalanceSheet, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { balanceSheetBlocks } from '@/lib/gl-report-blocks'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
@@ -12,7 +12,7 @@ import { segmentFilterFor } from '../../_components/report-segments'
 const YM = /^\d{4}-\d{2}$/
 
 export async function GET(req: Request) {
-  await requirePermission('reports')
+  await requireAction('reports', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
   const period = url.searchParams.get('period') ?? officeMonth()

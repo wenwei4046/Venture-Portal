@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 
 /**
  * The ladder.
@@ -23,7 +23,7 @@ function refresh() {
 
 /** Put a title on a rung, or take it off the ladder (null). */
 export async function setTitleLevel(titleId: string, levelId: string | null): Promise<void> {
-  await requirePermission('team')
+  await requireAction('team', 'manage')
   if (!titleId) throw new Error('Which title?')
 
   const supabase = await createClient()
@@ -41,7 +41,7 @@ export async function setTitleLevel(titleId: string, levelId: string | null): Pr
  * one more than the top rank to add a rung on top, 1 to add one underneath.
  */
 export async function insertLevel(rank: number, name = 'New level'): Promise<void> {
-  await requirePermission('team')
+  await requireAction('team', 'manage')
   if (!Number.isInteger(rank) || rank < 1) throw new Error('Where should the level go?')
 
   const supabase = await createClient()
@@ -53,7 +53,7 @@ export async function insertLevel(rank: number, name = 'New level'): Promise<voi
 }
 
 export async function renameLevel(levelId: string, name: string): Promise<void> {
-  await requirePermission('team')
+  await requireAction('team', 'manage')
   if (!levelId) throw new Error('Which level?')
   const trimmed = name.trim()
   if (!trimmed) throw new Error('A level needs a name')
@@ -71,7 +71,7 @@ export async function renameLevel(levelId: string, name: string): Promise<void> 
 
 /** Remove an EMPTY rung; the ones above it close the gap. */
 export async function deleteLevel(levelId: string): Promise<void> {
-  await requirePermission('team')
+  await requireAction('team', 'manage')
   if (!levelId) throw new Error('Which level?')
 
   const supabase = await createClient()

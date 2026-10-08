@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
@@ -320,7 +321,7 @@ export default async function VoucherLedger({
               ) : null}
             </Link>
           ) : null}
-          {user.role === 'finance' || user.role === 'principal' ? (
+          {canDo(user, 'treasury', 'create') ? (
             isReceipts ? (
               <>
                 <Link

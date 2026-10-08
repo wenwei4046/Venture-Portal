@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   permission: vi.fn(), createClient: vi.fn(), from: vi.fn(), refresh: vi.fn(),
   select: vi.fn(), eq: vi.fn(), owned: vi.fn(), modelUpsert: vi.fn(), skuUpsert: vi.fn(), rpc: vi.fn(),
 }))
-vi.mock('@/lib/member/product-access', () => ({ requireProductList: mocks.permission }))
+vi.mock('@/lib/member/product-access', () => ({ requireProductList: mocks.permission, requireProductListEdit: mocks.permission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 vi.mock('server-only', () => ({}))

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { officeMonth } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
@@ -32,7 +32,7 @@ interface Props {
 }
 
 export default async function NewPaymentPage({ searchParams }: Props) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const { invoice_id: invoiceId, preset, mode, return_to: returnToRaw } = await searchParams

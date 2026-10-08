@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { checkSavePayLines, type SavePayLinesInput } from '@/lib/revenue-pay-lines'
 
 /**
@@ -23,7 +23,7 @@ export interface SavePayLinesResult {
 }
 
 export async function savePayLines(input: SavePayLinesInput): Promise<SavePayLinesResult> {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'edit')
   const save = checkSavePayLines(input)
   const supabase = (await createClient()) as unknown as SupabaseClient
 

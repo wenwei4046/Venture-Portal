@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
 }))
 vi.mock('server-only', () => ({}))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('./_lib/sub-departments', () => ({ listSubDepartments: mocks.listSubDepartments }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
@@ -96,7 +96,7 @@ describe('addMember with a selected destination title on the chart or Team tab',
   it('adds an independent destination membership at its title floor without changing the original', async () => {
     const original = { ...db.source }
     expect(await addMember(form())).toEqual({ ok: true, note: null })
-    expect(mocks.requirePermission).toHaveBeenCalledWith('revenue')
+    expect(mocks.requirePermission).toHaveBeenCalledWith('revenue', 'edit')
     expect(db.writes).toEqual([{
       table: 'comm_hierarchy',
       row: {

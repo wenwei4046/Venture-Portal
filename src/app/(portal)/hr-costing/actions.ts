@@ -3,14 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeMonth } from '@/lib/office-time'
 
 // ─── Submit HR cost summary for a period (HR) ────────────────────────────────
 
 export async function submitHRCostSummary(formData: FormData) {
-  const user = await requirePermission('hr_costing')
+  const user = await requireAction('hr_costing', 'create')
   const supabase = await createClient()
 
   const rawPeriod = (formData.get('period_month') as string) ?? ''
@@ -88,7 +88,7 @@ export async function submitHRCostSummary(formData: FormData) {
 // movement here — billing already consumes the snapshot.
 
 export async function executeHrCosting(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''

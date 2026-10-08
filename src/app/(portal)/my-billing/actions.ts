@@ -9,7 +9,7 @@
 import { revalidatePath } from 'next/cache'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { deptNameToSegment } from '@/lib/billing'
 
@@ -29,7 +29,7 @@ const SEGMENT_TO_BILLING_MODE: Record<string, string> = {
 export async function updateDeptInvoice(
   formData: FormData,
 ): Promise<{ error?: string }> {
-  await requirePermission('my_billing')
+  await requireAction('my_billing', 'create', 'dept')
   const supabase = await createClient()
 
   const id = String(formData.get('id') ?? '').trim()
@@ -65,7 +65,7 @@ export async function updateDeptInvoice(
 export async function deleteDeptInvoice(
   formData: FormData,
 ): Promise<{ error?: string }> {
-  await requirePermission('my_billing')
+  await requireAction('my_billing', 'create', 'dept')
   const supabase = await createClient()
 
   const id = String(formData.get('id') ?? '').trim()
@@ -88,7 +88,7 @@ export async function deleteDeptInvoice(
 export async function createDeptInvoice(
   formData: FormData,
 ): Promise<{ error?: string; invoiceNo?: string }> {
-  const user = await requirePermission('my_billing')
+  const user = await requireAction('my_billing', 'create', 'dept')
   const supabase = await createClient()
 
   if (!user.department_id) return { error: 'No department assigned to your account' }

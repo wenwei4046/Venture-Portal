@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { isTopupKind, type RowStatus } from '@/lib/payroll-lifecycle'
 import { centralizedSplitMessage, costModelOf } from '@/lib/department-mode'
@@ -38,7 +38,7 @@ export async function saveStaffAllocation(
   periodMonth: string,
   rows: AllocationRow[],
 ): Promise<SaveSplitResult> {
-  const user = await requirePermission('hr_costing')
+  const user = await requireAction('hr_costing', 'edit')
   const supabase = await createClient()
 
   if (!staffId) throw new Error('Staff id is required')
@@ -130,7 +130,7 @@ export async function copyAllocationsFromLastMonth(periodMonth: string): Promise
   centralizedStaff: number
   notOnPayrollStaff: number
 }> {
-  const user = await requirePermission('hr_costing')
+  const user = await requireAction('hr_costing', 'edit')
   const supabase = await createClient()
 
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
