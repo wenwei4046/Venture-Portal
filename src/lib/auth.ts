@@ -7,6 +7,7 @@ import { VIEW_AS_COOKIE, honouredViewAs, type ViewSurface } from '@/lib/view-as'
 import { can, type Permission } from '@/lib/permissions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib/permission-actions'
+import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
 import type { Action, Scope } from '@/lib/permission-matrix'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
@@ -150,6 +151,29 @@ export async function requireAction(fn: FunctionKey, action: Action, scope: Scop
 export async function requireAnyAction(...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
   const user = await requireAuth()
   if (!wants.some(([fn, action, scope]) => canDo(user, fn, action, scope ?? 'all'))) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/**
+ * The approval queue's decisions (2026-10-09, PR2b): anybody whose Approve
+ * reaches some kind of request — the queue's own, or a domain's (Treasury,
+ * HR Costing, Director Salary; lib/approval-domains.ts). Each request is then
+ * asked about on its own, as the database's approver_may() asks.
+ */
+export async function requireApprover(): Promise<User> {
+  const user = await requireAuth()
+  if (approvableTypes(user).length === 0) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/** The approval queue's pages: whoever may see it (Approvals · View) or decide anything in it. */
+export async function requireApprovalQueue(): Promise<User> {
+  const user = await requireAuth()
+  if (!canSeeApprovals(user)) {
     redirect('/dashboard')
   }
   return user

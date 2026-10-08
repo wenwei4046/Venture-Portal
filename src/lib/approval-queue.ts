@@ -54,6 +54,8 @@ export interface QueueRow {
   typeLabel: string
   requestTypes: string[]
   submitterId: string
+  /** Everybody who raised a request in the row — who may not decide it (lib/approval-domains.ts). */
+  submitterIds: string[]
   submitterName: string
   submittedAt: string
   /** What approving the row moves. A group's loan and its disbursement
@@ -190,6 +192,7 @@ export function buildQueueRows(pending: ApprovalRequestRow[], opts: Options): Qu
         typeLabel: m.typeLabel,
         requestTypes: [row.request_type],
         submitterId: row.submitted_by,
+        submitterIds: [row.submitted_by],
         submitterName: opts.nameOf(row.submitted_by),
         submittedAt: row.created_at,
         amount: m.amount ?? 0,
@@ -231,6 +234,7 @@ export function buildQueueRows(pending: ApprovalRequestRow[], opts: Options): Qu
       typeLabel,
       requestTypes: types,
       submitterId: first[0].submitted_by,
+      submitterIds: [...new Set(first.map((r) => r.submitted_by))],
       submitterName: opts.nameOf(first[0].submitted_by),
       submittedAt,
       amount: groupCashTotal(members),

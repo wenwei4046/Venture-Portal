@@ -24,6 +24,8 @@ function database(referenceType = 'payroll_statutory', salaryLines: Record<strin
       select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
       in: vi.fn((column: string, values: string[]) => { if (column === 'reference_type') { allowedReferences = values; filters.push(values) } return query }),
       single: vi.fn(() => Promise.resolve({ data: table === 'payment_vouchers' ? (allowedReferences && !allowedReferences.includes(referenceType) ? null : voucher) : { name: 'Creator' }, error: null })),
+      // The pending approval's submitter — who may decide it (2026-10-09).
+      maybeSingle: vi.fn(() => Promise.resolve({ data: table === 'approval_requests' ? { request_type: 'payment_voucher', submitted_by: 'creator' } : null, error: null })),
       then: (resolve: (value: typeof result) => unknown) => Promise.resolve(resolve(result)),
     }
     return query

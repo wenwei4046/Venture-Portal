@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import { requireApprovalQueue } from '@/lib/auth'
+import { decision } from '@/lib/approval-domains'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { poolLabel } from '@/lib/pools'
@@ -31,7 +32,9 @@ function waitLabel(days: number): string {
 }
 
 export default async function ApprovalsPage() {
-  const user = await requirePermission('approvals')
+  // The queue opens for whoever may see it or decide anything in it; what each
+  // may decide is asked row by row below (2026-10-09, approvals by domain).
+  const user = await requireApprovalQueue()
   const supabase = await createClient()
   const since = dayjs().subtract(30, 'day').toISOString()
 
@@ -152,6 +155,14 @@ export default async function ApprovalsPage() {
     attachments: r.voucherIds.flatMap((id) => attachmentsByVoucher.get(id) ?? []),
   }))
 
+  // Which rows this reader may tick and decide, and why not the others.
+  const undecidable = Object.fromEntries(
+    queue.flatMap((r) => {
+      const verdict = decision(user, r.requestTypes, r.submitterIds)
+      return verdict.may ? [] : [[r.key, verdict.why]]
+    }),
+  ) as Record<string, string>
+
   const canSetDefault = user.role === 'finance' || user.role === 'principal'
   const decided = (approved30 ?? 0) + (rejected30 ?? 0)
 
@@ -204,7 +215,7 @@ export default async function ApprovalsPage() {
       </StatCards>
 
       {/* ───────── Pending queue (multi-select + the decision bar) ───────── */}
-      <PendingApprovals rows={queue} canSetDefault={canSetDefault} />
+      <PendingApprovals rows={queue} canSetDefault={canSetDefault} undecidable={undecidable} />
 
       {/* ───────── Recent history ───────── */}
       <RecentDecisions rows={decisions} canSetDefault={canSetDefault} />

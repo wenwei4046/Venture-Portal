@@ -4,7 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction } from '@/lib/auth'
+import { requireApprover } from '@/lib/auth'
+import { decision } from '@/lib/approval-domains'
+import type { User } from '@/types'
+
+/** A run is decided by HR Costing's Approve (or the queue's), never by whoever submitted it unless they are the Principal. */
+function assertMayDecideRun(user: User, submittedBy: string | null) {
+  const verdict = decision(user, ['payroll_run'], submittedBy ? [submittedBy] : [])
+  if (!verdict.may) throw new Error(verdict.why)
+}
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
 
@@ -15,7 +23,7 @@ import { postPayrollAccrualJVs } from '@/lib/payroll-accrual'
  * and marks the run paid.
  */
 export async function approvePayrollRun(runId: string): Promise<void> {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const { data: run, error: readErr } = await supabase
@@ -25,7 +33,7 @@ export async function approvePayrollRun(runId: string): Promise<void> {
     .maybeSingle()
 
   if (readErr || !run) throw new Error('Payroll run not found')
-  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能approve")
+  assertMayDecideRun(user, run.submitted_by)
   if (run.status !== 'submitted') throw new Error(`Run status is ${run.status}, not submitted`)
 
   // Period-lock gate (voucher fan-out writes against today's period)
@@ -67,7 +75,7 @@ export async function approvePayrollRun(runId: string): Promise<void> {
  * HR can re-open the grid and edit after rejection.
  */
 export async function rejectPayrollRun(runId: string, reason: string): Promise<void> {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   if (!reason || reason.trim().length === 0) {
@@ -81,7 +89,7 @@ export async function rejectPayrollRun(runId: string, reason: string): Promise<v
     .maybeSingle()
 
   if (readErr || !run) throw new Error('Payroll run not found')
-  // Self-reject allowed too (mirror of the 2026-08-06 self-approval rule).
+  assertMayDecideRun(user, run.submitted_by)
   if (run.status !== 'submitted') throw new Error(`Run status is ${run.status}, not submitted`)
 
   const { error } = await supabase.rpc('reject_payroll_run', {

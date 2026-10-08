@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { officeTime } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
+import { canSeeApprovals, decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
@@ -51,6 +52,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
     .single()
 
   if (error || !approval) notFound()
+  const verdict = decision(user, [approval.request_type], [approval.submitted_by])
 
   const { data: submitter } = await supabase
     .from('users')
@@ -116,10 +118,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
   return (
     <div>
       <Link
-        href={user.role === 'principal' ? '/approvals' : '/dashboard'}
+        href={canSeeApprovals(user) ? '/approvals' : '/dashboard'}
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← {user.role === 'principal' ? 'Back to Approvals' : 'Back to Overview'}
+        ← {canSeeApprovals(user) ? 'Back to Approvals' : 'Back to Overview'}
       </Link>
 
       <div className="page-head">
@@ -394,15 +396,15 @@ export default async function ApprovalDetailPage({ params }: Props) {
 
       {/* ───────── Action buttons / read-only status ───────── */}
       {isPending ? (
-        user.role !== 'principal' ? (
+        !verdict.may ? (
           <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">
             <p className="font-serif italic text-graphite text-sm">
-              Awaiting Principal sign-off. <em>You can track the status here.</em>
+              Awaiting sign-off. <em>You can track the status here.</em>
             </p>
           </div>
         ) : (
-          // Self-approval allowed (user 2026-08-06: "principal submit 要自己
-          // 能approve") — no more own-submission banner.
+          // Who decides goes by domain (2026-10-09): the Principal may approve
+          // their own (user 2026-08-06), anybody else never their own.
           <ApprovalActions
             approvalId={approval.id}
             requestType={approval.request_type as ApprovalRequestTypeLocal}

@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261009000000_definer_functions_need_a_login.sql
+-- 20261009000100_definer_functions_need_a_login.sql
 -- A role check must hold for somebody who has no role (security, 2026-10-09).
 -- ============================================================================
 --

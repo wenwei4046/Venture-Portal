@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { withActions } from '@/test/with-actions'
 
 // 2026-10-07 — the Approvals queue is a table with one bar under it for what
 // is ticked: Approve n → and Reject…. Rejecting several at once did not exist
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   redirect: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission, requireApprover: mocks.requirePermission, requireApprovalQueue: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
@@ -92,7 +93,7 @@ function database(rows: Row[] = PENDING) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ id: 'principal', name: 'Principal', role: 'principal', permissions: ['approvals'] })
+  mocks.requirePermission.mockResolvedValue(withActions({ id: 'principal', name: 'Principal', role: 'principal', permissions: ['approvals'] }))
   mocks.redirect.mockImplementation(() => {
     throw new Error('NEXT_REDIRECT')
   })

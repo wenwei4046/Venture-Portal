@@ -7,7 +7,8 @@ import dayjs from 'dayjs'
 import { officeDate } from '@/lib/office-clock'
 import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requireAction, requirePermission } from '@/lib/auth'
+import { requireAction, requireApprover, requirePermission } from '@/lib/auth'
+import { decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { postJournalEntry, r2 } from '@/lib/journal'
@@ -853,7 +854,7 @@ export async function returnVoucherToDraft(formData: FormData) {
 // the money + marks the voucher paid in the same action.
 
 export async function approveVoucher(formData: FormData) {
-  const user = await requireAction('approvals', 'approve')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -864,7 +865,7 @@ export async function approveVoucher(formData: FormData) {
   // approvals-queue path. RPC takes approval_id, so look it up first.
   const { data: approvalReq, error: arErr } = await supabase
     .from('approval_requests')
-    .select('id, group_id')
+    .select('id, group_id, request_type, submitted_by')
     .eq('reference_id', id)
     .eq('reference_table', 'payment_vouchers')
     .eq('status', 'pending')
@@ -873,6 +874,9 @@ export async function approveVoucher(formData: FormData) {
   if (arErr || !approvalReq) {
     throw new Error('Voucher has no pending approval request')
   }
+  // Treasury · Approve (or the queue's), never your own unless you are the Principal.
+  const verdict = decision(user, [approvalReq.request_type], [approvalReq.submitted_by])
+  if (!verdict.may) throw new Error(verdict.why)
   if (approvalReq.group_id) {
     throw new Error('Voucher is part of a combined approval — approve it from the Approvals queue.')
   }

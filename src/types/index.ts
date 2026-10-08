@@ -65,6 +65,7 @@ export type ApprovalRequestType =
   | 'hr_costing'
   | 'payroll_run'
   | 'dept_payment_request'
+  | 'loan_cancel'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 

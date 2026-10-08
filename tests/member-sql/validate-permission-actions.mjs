@@ -269,7 +269,198 @@ try {
   checks++
   await asSystem()
 
-  console.log(`PASS: ${checks} permission action checks. PR1 world; the migrations verbatim; no live database.`)
+  // ══ Approvals by domain (20261009010000) ═══════════════════════════════════
+  // The hotfix first (production's current_user_role(), then refused for a
+  // sign-in with no account), then the approval world as production keeps it:
+  // the request types, the requests, payroll runs, loans, bank accounts, and
+  // the ten approval functions as stand-ins carrying production's exact role
+  // check — the statement the migration swaps.
+  await asSystem()
+  await q('UPDATE users SET is_active = true WHERE id = $1', [FINANCE])
+  await db.exec(`CREATE FUNCTION public.current_user_role() RETURNS user_role LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public' AS $function$\n    SELECT role FROM users WHERE id = auth.uid() AND is_active = TRUE\n$function$;`)
+  await db.exec(await migrationText('20261009000100_definer_functions_need_a_login'))
+  await db.exec(`
+    CREATE TYPE approval_request_type AS ENUM ('new_loan', 'base_rate', 'tier_change', 'new_contract', 'contract_change',
+      'dept_expense', 'advance', 'escalation', 'invoice_pool_release', 'profit_withdrawal', 'payment_voucher',
+      'new_fund_source', 'hr_costing', 'payroll_run', 'dept_payment_request', 'loan_cancel');
+    CREATE TABLE approval_requests(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), request_type approval_request_type NOT NULL,
+      reference_id uuid, reference_table text, submitted_by uuid NOT NULL, status text NOT NULL DEFAULT 'pending', group_id uuid);
+    CREATE TABLE payroll_runs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), submitted_by uuid, status text NOT NULL DEFAULT 'submitted');
+    CREATE TABLE loans(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), status text NOT NULL DEFAULT 'active');
+    CREATE TABLE bank_accounts(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), current_balance numeric NOT NULL DEFAULT 0);
+    ALTER TABLE approval_requests ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE loans ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE bank_accounts ENABLE ROW LEVEL SECURITY;
+    -- What production's own policies give the Principal (admin scope) and the
+    -- shared Finance account (treasury scope) to read.
+    CREATE POLICY approvals_privileged_select ON approval_requests FOR SELECT USING ((SELECT has_scope(ARRAY['treasury'])));
+    CREATE POLICY approvals_principal_update ON approval_requests FOR UPDATE USING ((SELECT has_scope(ARRAY['admin'])));
+    CREATE POLICY loans_read ON loans FOR SELECT USING (true);
+    CREATE POLICY bank_read ON bank_accounts FOR SELECT USING (true);
+    GRANT SELECT, INSERT, UPDATE ON approval_requests, payroll_runs, loans, bank_accounts TO authenticated;
+  `)
+  const pr2b = await migrationText('20261009010000_approvals_by_domain')
+  const maybe = async (sql, params = []) => { const rows = await q(sql, params); return rows.length ? Object.values(rows[0])[0] : null }
+  const STAND_IN_USER = {
+    approve_single_voucher: 'p_user_id', approve_voucher_batch: 'p_user_id', approve_voucher_batch_partial: 'p_user_id',
+    approve_payroll_run: 'p_approver', reject_payroll_run: 'p_approver',
+  }
+  const ARGS = {
+    approve_single_voucher: 'p_approval_id uuid, p_user_id uuid, p_notes text, p_allow_overdraw boolean',
+    approve_voucher_batch: 'p_group_id uuid, p_user_id uuid, p_notes text',
+    approve_voucher_batch_partial: 'p_group_id uuid, p_approve_ids uuid[], p_reject_ids uuid[], p_user_id uuid, p_approve_notes text, p_reject_reason text',
+    approve_payroll_run: 'p_run_id uuid, p_approver uuid',
+    reject_payroll_run: 'p_run_id uuid, p_approver uuid, p_reason text',
+    execute_loan_cancel: 'p_loan_id uuid',
+    execute_fund_source_cancel: 'p_fund_source_id uuid',
+    approve_dept_payment_expense: 'p_approval_id uuid',
+    reject_dept_payment_request: 'p_approval_id uuid',
+    dept_request_pv_rejected: 'p_voucher_id uuid',
+  }
+  const swaps = [...pr2b.matchAll(/swap_check\('public\.([a-z_]+)\([^)]*\)',\n\s+\$old\$([\s\S]*?)\$old\$/g)]
+  check(swaps.map(m => m[1]).sort(), Object.keys(ARGS).sort(), 'the migration swaps the ten approval checks')
+  for (const [, name, oldCheck] of swaps) {
+    await db.exec(`CREATE FUNCTION public.${name}(${ARGS[name]}) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $f$
+DECLARE v_approver_role user_role; v_role user_role;
+BEGIN
+    v_role := current_user_role();
+    SELECT role INTO v_approver_role FROM users WHERE id = ${STAND_IN_USER[name] ?? 'auth.uid()'};
+    ${oldCheck}
+    RETURN 'ran';
+END $f$;`)
+    await db.exec(`GRANT EXECUTE ON FUNCTION public.${name}(${ARGS[name].replace(/p_[a-z_]+ /g, '')}) TO authenticated, service_role`)
+  }
+
+  // Before the migration only the Principal decides.
+  const titled = async (templateKey, n, label) => {
+    const user = id(400 + n)
+    const title = await one('INSERT INTO titles(name, department_id, template_id) VALUES ($1, $2, $3) RETURNING id',
+      [`TEST ${label}`, DEPT_IDS.Finance, T[templateKey]])
+    await q("INSERT INTO users(id, email, name, role) VALUES ($1, $2, $3, 'finance')", [user, `${label}@example.com`, `PERSON ${label}`])
+    await q('INSERT INTO hr_staff_costs(employee_name, department_id, title_id, user_id) VALUES ($1, $2, $3, $4)',
+      [`PERSON ${label}`, DEPT_IDS.Finance, title, user])
+    return user
+  }
+  const checker2 = await titled('fin_checker', 1, 'checker two')
+  const officer = await titled('office', 2, 'executive office')
+  const voucherBy = async (by, type = 'payment_voucher', extra = {}) => one(
+    `INSERT INTO approval_requests(request_type, submitted_by, reference_id, reference_table, status, group_id)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [type, by, extra.reference_id ?? null, extra.reference_table ?? null, extra.status ?? 'pending', extra.group_id ?? null])
+  const fromMaker = await voucherBy(maker)
+  await as(checker2)
+  await assert.rejects(() => q('SELECT approve_single_voucher($1, $2, NULL, false)', [fromMaker, checker2]),
+    /only Principal may approve/, 'before: a Checker approved nothing')
+  checks++
+
+  await asSystem()
+  await db.exec(pr2b)
+  check(await one("SELECT count(*)::int FROM pg_proc WHERE proname = ANY ($1) AND (prosrc LIKE '%approver_may%' OR prosrc LIKE '%approvable_types()%')",
+    [Object.keys(ARGS)]), 10, 'all ten now ask who may decide')
+  await db.exec(pr2b)
+  checks++ // a second run is a no-op (each check is already swapped)
+
+  // ── Nobody's access moves ──────────────────────────────────────────────────
+  check([(await actionsOf(HR_SHARED))['hr_costing.approve'], (await actionsOf(HR_SHARED))['director_salary.approve']],
+    [undefined, undefined], 'hr@ no longer says it approves payroll runs or Invoice Pool releases — it never could')
+  const principalActs = await actionsOf(PRINCIPAL)
+  check([principalActs['hr_costing.approve'], principalActs['director_salary.approve'], principalActs['revenue.approve']],
+    ['all', 'all', 'all'], 'the Principal still holds all three, through the queue’s own key')
+  const typesOf = async user => { await as(user); const t = await one('SELECT approvable_types()'); await asSystem(); return t }
+  check((await typesOf(PRINCIPAL)).length, 16, 'the Principal decides every kind of request')
+  check([await typesOf(FINANCE), await typesOf(HR_SHARED), await typesOf(MARKETING)], [[], [], []],
+    'the shared Finance, HR and department accounts decide nothing, as before')
+
+  // ── A Checker: Treasury's requests, never their own ───────────────────────
+  const checkerTypes = await typesOf(checker2)
+  check([checkerTypes.includes('payment_voucher'), checkerTypes.includes('loan_cancel'), checkerTypes.includes('payroll_run'),
+    checkerTypes.includes('new_contract')], [true, true, false, false], 'a Checker decides Treasury’s requests only')
+  await as(checker2)
+  check(await one('SELECT approve_single_voucher($1, $2, NULL, false)', [fromMaker, checker2]), 'ran',
+    'a Checker approves what a Maker raised')
+  await asSystem()
+  const ownVoucher = await voucherBy(checker2)
+  await as(checker2)
+  await assert.rejects(() => q('SELECT approve_single_voucher($1, $2, NULL, false)', [ownVoucher, checker2]),
+    /may not decide this request/, 'but not the voucher they raised themselves')
+  checks++
+  await assert.rejects(() => q('SELECT approve_single_voucher($1, $2, NULL, false)', [fromMaker, maker]),
+    /may not decide|as yourself|42501/, 'nor in somebody else’s name')
+  checks++
+
+  // A combined approval: every type in it, none of its submitters.
+  await asSystem()
+  const group = '00000000-0000-4000-8000-00000000a001'
+  await voucherBy(maker, 'payment_voucher', { group_id: group })
+  await voucherBy(maker, 'new_loan', { group_id: group })
+  const mixed = '00000000-0000-4000-8000-00000000a002'
+  await voucherBy(maker, 'payment_voucher', { group_id: mixed })
+  await voucherBy(maker, 'payroll_run', { group_id: mixed })
+  await as(checker2)
+  check(await one('SELECT approve_voucher_batch($1, $2, NULL)', [group, checker2]), 'ran', 'a loan and its voucher, together')
+  await assert.rejects(() => q('SELECT approve_voucher_batch($1, $2, NULL)', [mixed, checker2]),
+    /may not decide this group/, 'not a group holding a payroll run')
+  checks++
+
+  // A booked loan is reversed only behind its approved cancellation.
+  await asSystem()
+  const loan = await one("INSERT INTO loans(status) VALUES ('active') RETURNING id")
+  await as(checker2)
+  await assert.rejects(() => q('SELECT execute_loan_cancel($1)', [loan]), /no approved cancellation/,
+    'no cancellation approved, nothing reversed')
+  checks++
+  await asSystem()
+  await voucherBy(maker, 'loan_cancel', { reference_id: loan, reference_table: 'loans', status: 'approved' })
+  await as(checker2)
+  check(await one('SELECT execute_loan_cancel($1)', [loan]), 'ran', 'once approved, the Checker reverses it')
+  await as(HR_SHARED)
+  await assert.rejects(() => q('SELECT execute_loan_cancel($1)', [loan]), /may not cancel a booked loan/, 'hr@ never')
+  checks++
+
+  // ── A Director: the queue's own Approve — everything in it ────────────────
+  await asSystem()
+  const run = await one('INSERT INTO payroll_runs(submitted_by) VALUES ($1) RETURNING id', [HR_SHARED])
+  await as(director)
+  check((await one('SELECT approvable_types()')).length, 16, 'a Director decides every kind of request')
+  check(await one('SELECT approve_payroll_run($1, $2)', [run, director]), 'ran', 'a payroll run included')
+  await as(checker2)
+  await assert.rejects(() => q('SELECT approve_payroll_run($1, $2)', [run, checker2]), /may not approve this run/,
+    'a Checker’s Treasury Approve does not reach payroll')
+  checks++
+  await as(director)
+  check(await one('SELECT dept_request_pv_rejected($1)', [id(999)]), 'ran',
+    'whoever may decide a voucher hands its department request back on a rejection')
+
+  // ── The Executive office: sees the queue, decides nothing ──────────────────
+  await as(officer)
+  check(await one('SELECT count(*)::int FROM approval_requests') > 0, true, 'the office reads the queue')
+  check(await one('SELECT approvable_types()'), [], 'and decides nothing in it')
+  check(await maybe("UPDATE approval_requests SET status = 'approved' WHERE id = $1 RETURNING 'flipped'", [fromMaker]),
+    null, 'nor flips one by hand')
+
+  // ── Row policies ───────────────────────────────────────────────────────────
+  await as(checker2)
+  check(await maybe("UPDATE approval_requests SET status = 'rejected' WHERE id = $1 RETURNING 'flipped'", [ownVoucher]),
+    null, 'a Checker cannot flip their own request')
+  const bank = await (async () => { await asSystem(); return one('INSERT INTO bank_accounts DEFAULT VALUES RETURNING id') })()
+  await as(checker2)
+  check(await one("UPDATE bank_accounts SET current_balance = 10 WHERE id = $1 RETURNING 'moved'", [bank]), 'moved',
+    'a Treasury approver moves the bank balance an approval moves')
+  await as(HR_SHARED)
+  check(await maybe("UPDATE bank_accounts SET current_balance = 20 WHERE id = $1 RETURNING 'moved'", [bank]), null,
+    'hr@ does not')
+
+  // ── With no sign-in: the rule as it was ────────────────────────────────────
+  await as(null, 'service_role')
+  check(await one('SELECT approve_single_voucher($1, $2, NULL, false)', [fromMaker, PRINCIPAL]), 'ran',
+    'the server, handing in the Principal, approves as before')
+  await assert.rejects(() => q('SELECT approve_single_voucher($1, $2, NULL, false)', [fromMaker, FINANCE]),
+    /may not decide this request/, 'handing in anybody else, it does not')
+  checks++
+  await asSystem()
+
+  console.log(`PASS: ${checks} permission action checks (PR2 + approvals by domain). PR1 world; the migrations verbatim; no live database.`)
 } catch (error) {
   console.error(error)
   process.exitCode = 1

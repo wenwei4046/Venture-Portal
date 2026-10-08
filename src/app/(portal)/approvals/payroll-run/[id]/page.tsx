@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
+import { canSeeApprovals, canDecide } from '@/lib/approval-domains'
+import { can } from '@/lib/permissions'
+import { canSeeIndividualSalary } from '@/lib/roles'
 import { formatMoney } from '@/lib/utils'
 import { OFFICE_TZ } from '@/lib/office-clock'
 import ApproveRejectButtons from './_components/ApproveRejectButtons'
@@ -33,7 +36,8 @@ function statusBadge(status: string) {
 
 export default async function PayrollRunApprovalPage({ params }: PageProps) {
   const user = await requireAuth()
-  if (!['principal', 'hr', 'finance'].includes(user.role)) notFound()
+  // Whoever runs payroll, funds it, or may see or decide the queue (2026-10-09).
+  if (!canSeeApprovals(user) && !can(user, 'hr_costing', 'treasury')) notFound()
 
   const { id } = await params
   const supabase = await createClient()
@@ -53,7 +57,7 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
   if (!run) notFound()
 
   // Per-employee detail: only for principal + hr (Finance sees aggregates only)
-  const canDrillDown = user.role === 'principal' || user.role === 'hr'
+  const canDrillDown = canSeeIndividualSalary(user)
 
   let detailRows: Array<{
     id: string
@@ -104,8 +108,9 @@ export default async function PayrollRunApprovalPage({ params }: PageProps) {
     })
   }
 
-  // Self-approval allowed (user 2026-08-06: "principal submit 要自己能approve")
-  const canAct = user.role === 'principal' && run.status === 'submitted'
+  // HR Costing · Approve (or the queue's) decides a run — the Principal even
+  // their own (user 2026-08-06), anybody else never their own (2026-10-09).
+  const canAct = canDecide(user, ['payroll_run'], run.submitted_by ? [run.submitted_by] : []) && run.status === 'submitted'
 
   return (
     <div>

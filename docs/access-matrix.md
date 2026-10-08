@@ -10,7 +10,7 @@ a switched-off account whose session lives on) instead of answering NULL, and th
 publishable key may call no SECURITY DEFINER function except the five row-policy helpers.
 Before, ~60 functions guarded with `IF v_role NOT IN (…)` let all three through (NULL is
 not "not in"); the publishable key read director payouts and staff allocations that way.
-Mig `20261009000000`; CLAUDE.md › Do NOT.
+Mig `20261009000100`; CLAUDE.md › Do NOT.
 ---
 ⚡ AMENDMENT 2026-10-08 — Each action takes effect (PR2)
 A write now asks for the ACTION it is, not the module key: `requireAction('treasury',
@@ -49,7 +49,12 @@ held. What each cell opens:
                  contra, ignore, delete · Approve = mark a session done
   Reports        Export = report files (Dept reports at Dept)
   Settings       Manage = everything on Settings
-  Approvals      Approve = the queue (by domain: next step)
+  Approvals      View = the queue (its own key, `approvals_queue`) · Approve = every
+                 request in it
+  Approve by domain (2026-10-09): Treasury · Approve decides vouchers, loans, fund
+  sources and their cancellations, department expenses / payment requests;
+  HR Costing · Approve decides payroll runs; Director Salary · Approve decides
+  Invoice Pool releases. Nobody decides a request they raised, except the Principal.
 A cell nothing acts on yet (Revenue · Approve, Venture Pool · Create, Claims · Edit …)
 gives nothing; the matrix does not list it as held. Reading a page still follows its
 module key, and Own / Dept rows reach RLS in the next step.
