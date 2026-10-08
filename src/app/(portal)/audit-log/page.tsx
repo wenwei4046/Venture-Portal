@@ -1,179 +1,191 @@
-import { officeTime } from '@/lib/office-time'
-import { requirePermission } from '@/lib/auth'
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import LedgerRow from '@/components/LedgerRow'
+import { canSeeAuditChanges } from '@/lib/roles'
+import { officeTime } from '@/lib/office-time'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import {
+  AUDIT_AREAS,
+  filtersHref,
+  groupSaves,
+  officeDayRange,
+  parseChangeFilters,
+  rowLabel,
+  type AuditChange,
+  type AuditTableLine,
+} from '@/lib/audit/changes'
+import ChangesFilters from './_components/ChangesFilters'
+import RecordedTables from './_components/RecordedTables'
+import SavesTable from './_components/SavesTable'
+import { loadRefLabels } from './_lib/ref-labels'
 
-interface Props {
-  searchParams: Promise<{ resource?: string; page?: string }>
+// Audit Log › Changes (2026-10-08) — who changed what, when, before and after,
+// across the app (supabase/migrations/20261008190000_app_wide_audit.sql).
+// Each reader sees the areas their own permissions open: the database decides,
+// table by table and value by value (audit_changes()); this page only asks.
+//
+// audit_tables / audit_changes / audit_overview postdate database.types.ts —
+// untyped-client convention.
+
+const PAGE = 100
+
+interface Overview {
+  saves_today: number
+  changes_week: number
+  people_week: number
+  last_at: string | null
+  actors: Array<{ id: string; name: string }>
 }
 
-const PAGE_SIZE = 50
+export default async function AuditChangesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const user = await requireAuth()
+  if (!canSeeAuditChanges(user)) redirect('/dashboard')
+  const sp = await searchParams
 
-export default async function AuditLogPage({ searchParams }: Props) {
-  await requirePermission('audit_log')
-  const supabase = await createClient()
-
-  const { resource, page: rawPage } = await searchParams
-  const page = Math.max(1, parseInt(rawPage ?? '1', 10))
-  const offset = (page - 1) * PAGE_SIZE
-
-  let query = supabase
-    .from('access_log')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(offset, offset + PAGE_SIZE - 1)
-
-  // Page views arrived on 2026-09-01 and outnumber everything else by an order
-  // of magnitude, so the default view is the one this page was built for — the
-  // privileged reads. 'page' and 'all' are a click away, and neither is hidden.
-  if (resource === 'page') {
-    query = query.eq('resource_type', 'page')
-  } else if (resource && resource !== 'all') {
-    query = query.eq('resource_type', resource)
-  } else if (!resource) {
-    query = query.neq('resource_type', 'page')
+  // The Access log lived at this address until 2026-10-08: an old link to it
+  // (its filters were ?resource= and ?page=) still lands there.
+  if (sp.resource !== undefined || sp.page !== undefined) {
+    const params = new URLSearchParams()
+    for (const key of ['resource', 'page'] as const) {
+      const v = sp[key]
+      if (typeof v === 'string' && v) params.set(key, v)
+    }
+    const qs = params.toString()
+    redirect(`/audit-log/access${qs ? `?${qs}` : ''}`)
   }
 
-  const { data: logs, count } = await query
-  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
+  const filters = parseChangeFilters(sp)
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const range = officeDayRange(filters.from, filters.to)
 
-  const resourceTypes = [
-    { value: '', label: 'Data access' },
-    { value: 'page', label: 'Page views' },
-    { value: 'all', label: 'Everything' },
-    { value: 'director_payouts', label: 'Director Payouts' },
-    { value: 'director_salary_print', label: 'Director Print' },
-    { value: 'hr_staff_costs', label: 'HR Staff Costs' },
-  ]
+  const linesRead = supabase
+    .from('audit_tables')
+    .select('table_name, label, area, mode, label_columns, reason')
+    .then(r => r)
+  const overviewRead = supabase.rpc('audit_overview').then(r => r)
+  const changesFor = (tables: string[] | null) =>
+    supabase
+      .rpc('audit_changes', {
+        p_tables: tables,
+        p_actor: filters.who && filters.who !== 'system' ? filters.who : null,
+        p_system: filters.who === 'system',
+        p_from: range.from,
+        p_to: range.to,
+        p_row: filters.row,
+        p_before: filters.before,
+        p_limit: PAGE + 1,
+      })
+      .then(r => r)
+
+  // An area filter needs the register to know its tables; anything else
+  // reads the changes beside the register.
+  const changesNow = filters.area && !filters.table ? null : changesFor(filters.table ? [filters.table] : null)
+  const [linesRes, overviewRes] = await Promise.all([linesRead, overviewRead])
+  if (linesRes.error) throw new Error(`Could not read the audit register: ${linesRes.error.message}`)
+  if (overviewRes.error) throw new Error(`Could not read the audit summary: ${overviewRes.error.message}`)
+  const lines = (linesRes.data ?? []) as AuditTableLine[]
+  const byTable = new Map(lines.map(l => [l.table_name, l]))
+  const changesRes = await (changesNow ??
+    changesFor(lines.filter(l => l.area === filters.area).map(l => l.table_name)))
+  if (changesRes.error) throw new Error(`Could not read the changes: ${changesRes.error.message}`)
+
+  const all = (changesRes.data ?? []) as AuditChange[]
+  const rows = all.slice(0, PAGE)
+  const more = all.length > PAGE
+  const refs = await loadRefLabels(supabase, rows)
+  const saves = groupSaves(rows, byTable, refs)
+  const overview = (overviewRes.data ?? { saves_today: 0, changes_week: 0, people_week: 0, last_at: null, actors: [] }) as Overview
+
+  const areasRead = AUDIT_AREAS.filter(a => lines.some(l => l.area === a && l.mode !== 'none'))
+  const rowTable = filters.table ? byTable.get(filters.table) : undefined
+  const rowName = filters.row && rows[0] ? rowLabel(rows[0], byTable.get(rows[0].table_name), refs) : null
+  const filtered = Boolean(filters.area || filters.table || filters.who || filters.from || filters.to || filters.row)
 
   return (
     <div>
       <div className="page-head">
         <div>
           <div className="page-eyebrow">
-            <em>I.</em> ADMIN · ACCESS AUDIT
+            <em>I.</em> ADMIN · AUDIT LOG · CHANGES
           </div>
-          <h1 className="page-title">Access Audit Log</h1>
-        </div>
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-3 mb-6">
-        <span className="font-serif italic text-sm text-graphite">Filter:</span>
-        {resourceTypes.map((rt) => {
-          const active = (resource ?? '') === rt.value
-          return (
-            <a
-              key={rt.value}
-              href={rt.value ? `/audit-log?resource=${rt.value}` : '/audit-log'}
-              className={
-                active
-                  ? 'px-3 py-1 rounded-md bg-accent text-white font-serif italic text-sm'
-                  : 'px-3 py-1 rounded-md bg-surface text-graphite hover:bg-surface-2 font-serif italic text-sm transition-colors'
-              }
-            >
-              {rt.label}
-            </a>
-          )
-        })}
-      </div>
-
-      {/* Count */}
-      <p className="font-mono text-xs text-muted mb-4">
-        {count ?? 0} total entries · Page {page} of {Math.max(1, totalPages)}
-      </p>
-
-      {/* Table */}
-      {!logs || logs.length === 0 ? (
-        <div className="border border-hairline rounded-md bg-surface p-8 text-center">
-          <p className="font-serif italic text-muted text-sm">
-            Nothing recorded under this filter yet.
+          <h1 className="page-title">Changes</h1>
+          <p className="sheet-subtitle">
+            Who changed what and when, with every value before and after. You see the areas your own permissions open;
+            salary, NRIC and bank values only where your title may see them.
           </p>
         </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th className="m-hide">User</th>
-                <th className="m-hide">Role</th>
-                <th className="m-hide">Resource</th>
-                <th>Action</th>
-                <th className="m-hide">Details</th>
-                <th className="lt-toggle" aria-hidden />
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => (
-                <LedgerRow key={log.id}>
-                  <td className="font-mono text-[11px] text-graphite whitespace-nowrap">
-                    {officeTime(log.created_at).format('D MMM YY HH:mm')}
-                  </td>
-                  <td className="font-serif text-[15px] text-ink m-hide" data-label="User">
-                    {log.user_email ?? '—'}
-                  </td>
-                  <td className="m-hide" data-label="Role">
-                    <span className="font-serif italic text-graphite text-sm">
-                      {log.user_role ?? '—'}
-                    </span>
-                  </td>
-                  <td className="font-mono text-[12px] text-ink m-hide" data-label="Resource">
-                    {formatResource(log.resource_type)}
-                    {log.resource_id ? (
-                      <span className="text-graphite ml-1">
-                        {log.resource_type === 'page'
-                          ? log.resource_id
-                          : `#${log.resource_id.slice(0, 8)}`}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="font-serif italic text-sm text-graphite">
-                    {log.action}
-                  </td>
-                  <td className="font-mono text-[11px] text-graphite max-w-[200px] truncate m-hide" data-label="Details">
-                    {log.metadata && Object.keys(log.metadata as object).length > 0
-                      ? JSON.stringify(log.metadata)
-                      : '—'}
-                  </td>
-                </LedgerRow>
-              ))}
-            </tbody>
-          </table>
+      </div>
+
+      <StatCards label="The history, in numbers">
+        <StatCard
+          label="Saves today"
+          value={overview.saves_today}
+          icon="check"
+          tone="primary"
+          note={overview.last_at ? `Last ${officeTime(overview.last_at).format('D MMM HH:mm')}` : 'Nothing yet'}
+        />
+        <StatCard label="Changes · 7 days" value={overview.changes_week} icon="layers" note="Records added, changed or removed" />
+        <StatCard label="People · 7 days" value={overview.people_week} icon="people" note="Who changed something you can see" />
+        <StatCard
+          label="Areas you read"
+          value={`${areasRead.length} of ${AUDIT_AREAS.length}`}
+          icon="shield"
+          note={areasRead.join(' · ') || 'None'}
+          href="#recorded"
+        />
+      </StatCards>
+
+      <ChangesFilters filters={filters} lines={lines} actors={overview.actors} />
+
+      {filters.row ? (
+        <div className="sheet-notice">
+          Every change to one {rowTable?.label ?? 'record'}
+          {rowName ? <> — <strong>{rowName}</strong></> : null}.{' '}
+          <Link href={filtersHref(filters, { row: null, table: null, before: null })}>Show every record</Link>
         </div>
+      ) : null}
+
+      <div className="sect-head">
+        <h2>{filtered ? 'Changes found' : 'Latest changes'}</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">
+          {saves.length} {saves.length === 1 ? 'SAVE' : 'SAVES'} · {rows.length} {rows.length === 1 ? 'RECORD' : 'RECORDS'}
+        </span>
+      </div>
+
+      {saves.length === 0 ? (
+        <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center text-sm">
+          {filtered ? 'No change matches these filters.' : 'Nothing has been changed in your areas yet.'}
+        </div>
+      ) : (
+        <SavesTable saves={saves} />
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {filters.before || more ? (
         <div className="flex items-center justify-center gap-3 mt-6">
-          {page > 1 && (
-            <a
-              href={`/audit-log?page=${page - 1}${resource ? `&resource=${resource}` : ''}`}
-              className="px-3 py-1 rounded-md bg-surface text-graphite hover:bg-surface-2 font-sans text-sm transition-colors"
+          {filters.before ? (
+            <Link href={filtersHref(filters, { before: null })} className="bg-surface hover:bg-surface-2 border border-hairline text-sm px-3 py-1 rounded-control">
+              ← Newest
+            </Link>
+          ) : null}
+          {more ? (
+            <Link
+              href={filtersHref(filters, { before: rows[rows.length - 1].id })}
+              className="bg-surface hover:bg-surface-2 border border-hairline text-sm px-3 py-1 rounded-control"
             >
-              ← Prev
-            </a>
-          )}
-          {page < totalPages && (
-            <a
-              href={`/audit-log?page=${page + 1}${resource ? `&resource=${resource}` : ''}`}
-              className="px-3 py-1 rounded-md bg-surface text-graphite hover:bg-surface-2 font-sans text-sm transition-colors"
-            >
-              Next →
-            </a>
-          )}
+              Older →
+            </Link>
+          ) : null}
         </div>
-      )}
+      ) : null}
+
+      <RecordedTables lines={lines} />
     </div>
   )
-}
-
-function formatResource(type: string): string {
-  const labels: Record<string, string> = {
-    director_payouts: 'Director Payouts',
-    director_salary_print: 'Director Print',
-    hr_staff_costs: 'HR Staff Costs',
-    page: 'Page',
-  }
-  return labels[type] ?? type
 }

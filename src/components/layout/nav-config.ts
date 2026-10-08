@@ -27,6 +27,7 @@ import {
   canAccessTreasury,
   canAccessVenturePool,
   canApprove,
+  canSeeAuditChanges,
 } from '@/lib/roles'
 
 /**
@@ -334,7 +335,18 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     },
     { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
     { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Reports & Admin', visible: canAccessTreasury },
-    { href: '/audit-log', label: 'Audit Log', section: 'Reports & Admin', visible: canAccessSettings },
+    // The app-wide history (2026-10-08): Changes for whoever's permissions
+    // open some area of it — each reader sees only those areas — and Access
+    // (who read what) for the Principal, as before.
+    {
+      label: 'Audit Log',
+      section: 'Reports & Admin',
+      visible: canSeeAuditChanges,
+      children: [
+        { href: '/audit-log', label: 'Changes', exact: true, visible: canSeeAuditChanges },
+        { href: '/audit-log/access', label: 'Access', visible: canAccessAuditLog },
+      ],
+    },
     // Settings tabs flattened into the group (user 2026-06-10). Finance only
     // gets Chart of Account (the categories tab they can edit) + Base Rate
     // History; the other tabs are Principal-only.

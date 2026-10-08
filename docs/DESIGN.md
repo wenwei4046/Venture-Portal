@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -1209,6 +1209,48 @@ On a roster row an active person with no login shows `.invite-cell`
 **Hierarchy › Roles** is the titles table as a fourth tab (*Roles {n}*), with
 **Level** (mono `L{n}`) and **Permission template** (an underlined *Name →*
 link to People Management › Permissions on that template) columns.
+
+### Audit log — Changes (2026-10-08 — Audit Log › Changes, the app-wide history)
+
+Who changed what, when, before and after, for every table people change
+(`audit_tables`; CLAUDE.md › THE APP-WIDE HISTORY). Audit Log is a sidebar
+group — **Changes** (`/audit-log`) for anybody whose permissions open some
+area of the history, **Access** (`/audit-log/access`, who read what) for the
+Principal — never a tab rail between them. Each reader sees their own areas
+only; the page says so in its intro rather than hiding it.
+
+- **Head**: `.page-head`, eyebrow *ADMIN · AUDIT LOG · CHANGES*, title
+  *Changes*, a `.sheet-subtitle` of what is shown and why some values are not.
+- **Summary cards** (`StatCards`): *Saves today* (primary, *Last {time}*),
+  *Changes · 7 days*, *People · 7 days*, *Areas you read* (*5 of 12* + the
+  areas, links to the register fold).
+- **Filters**: one `.sheet-toolbar` GET form — Area · Record (optgroups per
+  area, only the reader's) · Who (*Anybody* / *System — ERP feed, server,
+  migrations* / the people who changed something they can see) · From · To,
+  the orange *Show* and *Clear*. Every control is keyed by its value. A
+  record's own history (`?table=&row=`) adds a `.sheet-notice` naming it, with
+  *Show every record*.
+- **The list** (`.sect-head` *Latest changes* / *Changes found* + *N SAVES · N
+  RECORDS*, then `table.ledger-table.audit-saves`): one row per SAVE (a
+  database transaction) — When (mono, office time; seconds on hover) · Who
+  (+ an 11px *via* line: *ERP feed or server job*, *database (a migration)*,
+  *through the server*) · What changed. Cells sit at the top. Each record is a
+  `.audit-change`: a chip (*Added* ledger · *Changed* info · *Removed*
+  danger, with its dot), the record's label in 600, its name as an underlined
+  link to that record's history, then `.audit-fields` — a two-column grid,
+  field (graphite) and value: *before → after* (`.audit-was` struck through,
+  `.audit-now` 600) for a change; the row's values for an add (or struck for a
+  removal), eight then *All N fields*. A value the reader's title may not see
+  reads *changed — hidden from your title*; an add / removal counts them (*3
+  values hidden from your title*). Six records per save, then *All N records
+  of this save* (`<details>`). Values: money 2-dp with brackets for negatives,
+  a rate with every decimal, a month column as *Sep 2026*, a date *15 Sep
+  2026*, a moment in office time, an id by the name behind it (read under the
+  reader's own session, else `#1a2b3c4d`). Paging: *Older →* / *← Newest*.
+- **What this history keeps**: a closing `<details id="recorded">` — every
+  register line the reader may read (Area · Record + mono table name · Kept:
+  *Every change* / *People's changes only* / *Not recorded* · Why not). On a
+  phone the field grid stacks to one column.
 
 ### Closing — a lock you can see (2026-09-27 — Revenue › Comm Cal's month)
 
@@ -2606,6 +2648,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-08 v3.15 (Audit Log › Changes)** — every change people make through the portal is listed: one row per save, each record it touched with its fields before → after, filtered by area, record, person and dates, a record's own history a click away. The reader sees only the areas their permissions open, and salary / NRIC / bank values only where their title may. Audit Log becomes a sidebar group: Changes (`/audit-log`) and Access (`/audit-log/access`, the old page; old links redirect). See "Audit log — Changes".
 - **2026-10-08 (Navigation · instant revisits that stay current)** — a page visited in the last five minutes (was 30 s) opens from memory with no wait, then quietly reads itself again and swaps in whatever moved; the pages each person opens most are rendered ahead while the portal sits idle (three at most, one at a time). See "Navigation feedback".
 - **2026-10-08 (Revenue app · opens on what the phone kept)** — opening the app shows last time's figures at once and refreshes behind them (the pull's dot spins); a figure still loading is a shimmering placeholder, never a zero or a dash, and a board with no place says *Not ranked yet*. See *Opens on what the phone kept* and *Loading is never a zero* in the Revenue app section.
 - **2026-10-08 (Product List · Modular's board)** — the model cards get depth against the page (user: the cards and the background had no layering): every category sits on a sand tray, an offered model is a white card lifted off it, a not-offered one an empty dashed slot with an outlined pill; hover deepens the lift. Chosen from two looks shown side by side (the other kept the page white and gave each card a firmer edge and a foot strip). The one place the page leaves the prototype. See "Product List — a page of the Revenue app".
