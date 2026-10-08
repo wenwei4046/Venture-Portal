@@ -119,11 +119,23 @@ export interface KpiItemRow {
   source: 'sku' | 'option'
   product_code: string | null
   product_name: string | null
+  /** The SKU Master row a SKU item was picked from. */
+  erp_product_id: string | null
   option_pool: 'bedframe_specials' | 'sofa_specials' | null
   option_value: string | null
   kpi_amount: number
   effective_from: string
   effective_to: string | null
+}
+
+/** A special of the Bedframe or Sofa Maintenance pool — what Rules › KPI items picks from. */
+export interface KpiSpecialRow {
+  pool: 'bedframe_specials' | 'sofa_specials'
+  value: string
+  label: string
+  sort_order: number
+  /** The ERP took it out of the pool: no new bill can print it. */
+  removed: boolean
 }
 
 export interface KpiThresholdRow {
@@ -281,8 +293,13 @@ export interface CommissionSettingsData {
    */
   titles: TitleRow[]
   itemGroups: ItemGroupRow[]
+  /** In force today or later — Rules › KPI items sets them (2026-10-08). */
   kpiItems: KpiItemRow[]
   kpiThresholds: KpiThresholdRow[]
+  /** The Bedframe and Sofa specials pools, for the KPI items picker. */
+  kpiSpecials: KpiSpecialRow[]
+  /** SKU items whose SKU the ERP has since removed (their `erp_product_id`). */
+  kpiGoneSkus: string[]
   openBillRules: OpenBillRuleRow[]
   brands: BrandRow[]
   marginBands: MarginBandRow[]

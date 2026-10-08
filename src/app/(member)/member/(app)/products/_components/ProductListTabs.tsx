@@ -6,8 +6,13 @@ import { useProductDraftState } from './ProductWorkspace'
 import { plural } from './ui'
 import c from './products.module.css'
 
-export type ProductTab = 'sku' | 'modular' | 'maintenance' | 'combos' | 'gaps' | 'costing' | 'kpi'
+export type ProductTab = 'sku' | 'modular' | 'maintenance' | 'combos' | 'gaps' | 'costing'
 
+/**
+ * Add-on / KPI Items was the seventh until 2026-10-08: which items count as
+ * KPI is a rule of the pay, so it moved to Rules › KPI items (user: "product
+ * list 是拿来 set costing 的"). `?tab=kpi` is sent there.
+ */
 export const PRODUCT_TABS: ReadonlyArray<{ key: ProductTab; label: string }> = [
   { key: 'sku', label: 'SKU Master' },
   { key: 'modular', label: 'Modular' },
@@ -15,14 +20,13 @@ export const PRODUCT_TABS: ReadonlyArray<{ key: ProductTab; label: string }> = [
   { key: 'combos', label: 'Combo Pricing' },
   { key: 'gaps', label: 'Costing gaps' },
   { key: 'costing', label: 'Costing Setting' },
-  { key: 'kpi', label: 'Add-on / KPI Items' },
 ]
 
-/** The query a tab opens at; the two settings tabs carry the sub-department, any tab may carry a search. */
+/** The query a tab opens at; Costing Setting carries the sub-department, any tab may carry a search. */
 export function productTabHref(pathname: string, key: ProductTab, keep: { sub?: string | null; department?: string | null; q?: string | null } = {}): string {
   const q = new URLSearchParams()
   if (key !== 'sku') q.set('tab', key)
-  if ((key === 'costing' || key === 'kpi') && keep.sub) q.set('sub', keep.sub)
+  if (key === 'costing' && keep.sub) q.set('sub', keep.sub)
   if (keep.q) q.set('q', keep.q)
   if (keep.department) q.set('department', keep.department)
   const s = q.toString()
@@ -32,7 +36,7 @@ export function productTabHref(pathname: string, key: ProductTab, keep: { sub?: 
 /**
  * The Product List's rail, on the header's rule — the ERP Products page's own
  * tabs (SKU Master, Modular, Maintenance, Combo Pricing), the work list and
- * the two settings — and under it the bar that asks before unsaved changes are
+ * Costing Setting — and under it the bar that asks before unsaved changes are
  * thrown away (the prototype's leave guard).
  *
  * Switching IS a round trip: each tab reads a different part of the catalogue

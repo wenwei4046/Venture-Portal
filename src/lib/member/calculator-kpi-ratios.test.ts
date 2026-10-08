@@ -4,7 +4,7 @@ import { quoteCostRatios, quoteCostRules, quoteKpiItems } from "./quote-rules";
 import type { MemberBand, MemberProduct, QuoteInput, QuoteRules } from "./types";
 
 /**
- * Product List › Costing Setting and › Add-on / KPI Items in the calculator
+ * Product List › Costing Setting and Rules › KPI items in the calculator
  * (2026-09-27): a SKU's own cost ratio, and a cart's KPI items paid flat as
  * KPI — so its margin is the main price's, the one the run will judge.
  */

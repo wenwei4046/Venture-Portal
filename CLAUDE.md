@@ -812,18 +812,18 @@ src/
 │   │   │                              `lib/erp-sync/catalogue.ts`,
 │   │   │                              `(member)/member/(app)/products/actions.ts`, migs
 │   │   │                              `20260924020000` / `025000` / `030000`.
-│   │   │                              **COSTING SETTING + ADD-ON / KPI ITEMS
-│   │   │                              (2026-09-27):** two more Product List tabs,
-│   │   │                              per sub-department (`?sub=`). Costing
-│   │   │                              Setting = the ratio a cost is divided by
-│   │   │                              for the Revenue Team (`comm_schemes.
-│   │   │                              revenue_cost_divisor`, Fair 0.7) and SKUs
-│   │   │                              with a ratio of their OWN
+│   │   │                              **COSTING SETTING + KPI ITEMS (2026-09-27;
+│   │   │                              KPI items on RULES since 2026-10-08):**
+│   │   │                              Costing Setting is a Product List tab, per
+│   │   │                              sub-department (`?sub=`) = the ratio a cost
+│   │   │                              is divided by for the Revenue Team
+│   │   │                              (`comm_schemes.revenue_cost_divisor`, Fair
+│   │   │                              0.7) and SKUs with a ratio of their OWN
 │   │   │                              (`comm_cost_ratios`, e.g. ÷ 0.6), applied
 │   │   │                              per line in the engine (`lib/commission/
 │   │   │                              cost-basis.ts`), the month page, the member
-│   │   │                              facts and the calculator. Add-on / KPI
-│   │   │                              Items = a SKU or a bed frame / sofa SPECIAL
+│   │   │                              facts and the calculator. KPI items = a SKU
+│   │   │                              or a bed frame / sofa SPECIAL
 │   │   │                              (`comm_kpi_items.source` 'sku' | 'option',
 │   │   │                              `option_pool` / `option_value`) with one
 │   │   │                              amount. A bill that carries one (found by
@@ -840,12 +840,31 @@ src/
 │   │   │                              are effective-dated — a change closes the
 │   │   │                              old row yesterday and opens today's
 │   │   │                              (`catalogue_save_kpi_items`), so a month
-│   │   │                              already run keeps its amount. Rules › KPI
-│   │   │                              items is read-only now; the switch and the
-│   │   │                              threshold ladder stay on Rules.
-│   │   │                              `lib/commission/kpi.ts`,
-│   │   │                              `lib/catalogue/rule-edits.ts`, mig
-│   │   │                              `20260927050000`.
+│   │   │                              already run keeps its amount.
+│   │   │                              **WHERE THEY ARE SET (2026-10-08, user:
+│   │   │                              rules 这里是用来算薪水的 … product list 是拿来
+│   │   │                              set costing 的):** Rules › **KPI items**, the
+│   │   │                              LAST tab of the rail (section XI) — the
+│   │   │                              items AND the threshold ladder on one tab
+│   │   │                              (the ladder was its own tab V; asked with
+│   │   │                              an RM example, the user KEPT it as it is:
+│   │   │                              every KPI unit of the month together →
+│   │   │                              a % on the whole KPI amount — no threshold
+│   │   │                              per item). Principal + HR
+│   │   │                              (`requirePermission('revenue')`,
+│   │   │                              `revenue/kpi-actions.ts`; the table's RLS
+│   │   │                              was always both): a SKU is searched on the
+│   │   │                              server (`searchKpiSkus` — never a price),
+│   │   │                              the 39 specials are listed; one draft, one
+│   │   │                              Save (the writer is unchanged), the draft
+│   │   │                              kept while another tab is read. Shown while
+│   │   │                              the switch is on OR an item / rung is
+│   │   │                              recorded (`rules-tabs.ts`), with an Off
+│   │   │                              note. The Product List's Add-on / KPI Items
+│   │   │                              tab is GONE (`?tab=kpi` redirects to Rules).
+│   │   │                              `lib/commission/kpi.ts`, `lib/commission/
+│   │   │                              kpi-items-edit.ts`, `lib/catalogue/rule-
+│   │   │                              edits.ts`, mig `20260927050000`.
 │   │   │                              Inside a view, sections get their own nav
 │   │   │                              (2026-09-05): rules = 9 sections (`?tab=`)
 │   │   │                              in a VERTICAL sidebar since 2026-09-07 —

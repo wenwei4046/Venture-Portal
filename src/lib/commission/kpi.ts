@@ -1,6 +1,7 @@
 /**
- * KPI items — what the Product List's *Add-on / KPI Items* tab sets, and how a
- * bill is found to carry one (2026-09-27).
+ * KPI items — what Rules › KPI items sets (the Product List's *Add-on / KPI
+ * Items* tab until 2026-10-08: which items count as KPI is the pay's rule, not
+ * a price), and how a bill is found to carry one (2026-09-27).
  *
  * A KPI item is a SKU from the SKU Master (a pillow, a protector) or a special
  * from Maintenance (a bed frame's *HB Straight*, a sofa's *Wooden Arm*), each

@@ -767,7 +767,7 @@ describe('KPI items', () => {
   })
 })
 
-// ─── KPI items a bill carries (Product List › Add-on / KPI Items) ───────────
+// ─── KPI items a bill carries (Rules › KPI items) ────────────────────────────
 
 describe('KPI items a bill carries — the flat allowance, 2026-09-27', () => {
   const HB_STRAIGHT = { source: 'option' as const, optionPool: 'bedframe_specials' as const, optionValue: 'HB Straight', kpiAmount: 200 }

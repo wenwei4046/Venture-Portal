@@ -10,7 +10,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 vi.mock('server-only', () => ({}))
 
-import { addCombo, removeCombos, saveCostSetting, saveKpiItems, saveModelSettings } from './actions'
+import { addCombo, removeCombos, saveCostSetting, saveModelSettings } from './actions'
 
 /** A save refreshes the Product List's own page and every Comm Cal page a price moves. */
 const REFRESHED = [['/member/products'], ['/revenue', 'layout']]
@@ -90,9 +90,8 @@ describe('Modular settings ownership validation', () => {
   })
 })
 
-describe('Costing Setting and Add-on / KPI Items', () => {
+describe('Costing Setting', () => {
   const SCHEME = '9d6c1f7e-7c1d-4a8e-9f55-0b7d2d3f1a10'
-  const ITEM = '11111111-1111-4111-8111-111111111111'
 
   beforeEach(() => {
     mocks.createClient.mockResolvedValue({ from: mocks.from, rpc: mocks.rpc })
@@ -124,31 +123,6 @@ describe('Costing Setting and Add-on / KPI Items', () => {
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_comm_cost_ratio_code"' } })
     await expect(saveCostSetting(SCHEME, { ratios: [{ erpId: 'p-1', ratio: '0.6' }] }))
       .rejects.toThrow('Two SKUs share that code')
-    expect(mocks.refresh).not.toHaveBeenCalled()
-  })
-
-  it('writes KPI items as rows the database takes', async () => {
-    await saveKpiItems(SCHEME, {
-      adds: [{ source: 'option', optionPool: 'bedframe_specials', optionValue: 'HB Straight', amount: '200' }],
-      changes: [{ id: ITEM, amount: '250' }],
-      removes: [],
-    })
-    expect(mocks.permission).toHaveBeenCalledOnce()
-    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('catalogue_save_kpi_items', {
-      p_scheme: SCHEME,
-      p_adds: [{ source: 'option', option_pool: 'bedframe_specials', option_value: 'HB Straight', kpi_amount: 200 }],
-      p_changes: [{ id: ITEM, kpi_amount: 250 }],
-      p_removes: [],
-    })
-  })
-
-  it("passes the writer's own refusal through, and names an item added twice", async () => {
-    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: '40001', message: 'A KPI item changed since the page was opened. Reload and try again.' } })
-    await expect(saveKpiItems(SCHEME, { adds: [], changes: [], removes: [ITEM] }))
-      .rejects.toThrow('A KPI item changed since the page was opened. Reload and try again.')
-    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: '23P01', message: 'conflicting key value violates exclusion constraint "no_overlapping_kpi_option"' } })
-    await expect(saveKpiItems(SCHEME, { adds: [{ source: 'sku', erpId: 'p-1', amount: '5' }], changes: [], removes: [] }))
-      .rejects.toThrow('That item is already a KPI item of this sub-department')
     expect(mocks.refresh).not.toHaveBeenCalled()
   })
 })

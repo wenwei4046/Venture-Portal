@@ -117,7 +117,8 @@ export interface ItemGroupRow {
 
 /**
  * A KPI item: a SKU (`product_code`) or a Maintenance special
- * (`option_pool` + `option_value`) — Product List › Add-on / KPI Items.
+ * (`option_pool` + `option_value`) — Rules › KPI items (the Product List's
+ * Add-on / KPI Items until 2026-10-08).
  * Rows written before 2026-09-27 carry no `source` and are SKUs.
  */
 export interface KpiItemRow {

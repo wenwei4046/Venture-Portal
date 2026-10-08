@@ -12,16 +12,15 @@ export interface SubRef {
 }
 
 /**
- * Which sub-department Costing Setting and Add-on / KPI Items are set for —
- * Fair and IR each keep their own ratio and their own KPI items (user
- * 2026-09-27). Switching is a round trip (`?sub=`), and like a tab switch it
- * asks — in the bar under the tabs — before it throws away what has not been
- * saved.
+ * Which sub-department Costing Setting is set for — Fair and IR each keep
+ * their own ratio (user 2026-09-27). Switching is a round trip (`?sub=`), and
+ * like a tab switch it asks — in the bar under the tabs — before it throws
+ * away what has not been saved.
  */
 export default function SubDepartmentChips({ subs, active, tab }: {
   subs: SubRef[]
   active: string
-  tab: 'costing' | 'kpi'
+  tab: 'costing'
 }) {
   const router = useRouter()
   const pathname = usePathname()

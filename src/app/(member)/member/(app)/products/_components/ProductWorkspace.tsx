@@ -10,11 +10,10 @@ import c from './products.module.css'
  * sheets: a window of their own (560px, the prototype's `maxH`) that you drag
  * both ways. Modular and Maintenance only ever grow downward, so they grow
  * with the page and the page's own scrollbar moves them, the way the ERP's
- * Products page does (user 2026-09-27) — and so do the two settings tabs,
- * Costing Setting and Add-on / KPI Items.
+ * Products page does (user 2026-09-27) — and so does Costing Setting.
  */
 export function productTabScroll(tab: ProductTab): 'page' | 'window' {
-  return tab === 'modular' || tab === 'maintenance' || tab === 'costing' || tab === 'kpi' ? 'page' : 'window'
+  return tab === 'modular' || tab === 'maintenance' || tab === 'costing' ? 'page' : 'window'
 }
 
 type DraftState = { changes: number; saving: boolean }

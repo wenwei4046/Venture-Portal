@@ -10,6 +10,8 @@ import type {
   CommissionSettingsData,
   DirectorPayRow,
   DirectorRow,
+  KpiItemRow,
+  KpiSpecialRow,
   MemberCandidate,
   RankDefRow,
   RankRow,
@@ -124,6 +126,8 @@ export async function loadCommissionSettings(
     itemGroups: [],
     kpiItems: [],
     kpiThresholds: [],
+    kpiSpecials: [],
+    kpiGoneSkus: [],
     openBillRules: [],
     brands: [],
     marginBands: [],
@@ -143,6 +147,7 @@ export async function loadCommissionSettings(
     itemGroups,
     kpiItems,
     kpiThresholds,
+    kpiSpecials,
     openBillRules,
     brands,
     marginBands,
@@ -152,10 +157,15 @@ export async function loadCommissionSettings(
     supabase.from('comm_rank_defs').select('*').eq('scheme_id', schemeId).order('sort_order'),
     supabase.from('comm_ranks').select('*').eq('scheme_id', schemeId).order('sort_order'),
     supabase.from('comm_item_groups').select('*').eq('scheme_id', schemeId).order('item_group'),
-    // In force today or later, as Product List › Add-on / KPI Items lists them.
+    // In force today or later: what Rules › KPI items lists and edits.
     supabase.from('comm_kpi_items').select('*').eq('scheme_id', schemeId)
       .or(`effective_to.is.null,effective_to.gte.${officeDate()}`).order('effective_from').order('id'),
     supabase.from('comm_kpi_thresholds').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('min_qty'),
+    // The specials a KPI item may be: 39 rows on 2026-10-08, so all of them.
+    // A SKU is searched for instead (kpi-actions.ts) — the master is 2,368.
+    supabase.from('erp_maintenance_options').select('pool, value, label, sort_order, removed_at')
+      .eq('erp_company_id', 1).in('pool', ['bedframe_specials', 'sofa_specials'])
+      .order('pool').order('sort_order').order('value'),
     supabase.from('comm_open_bill_rules').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('bill_rank'),
     supabase.from('comm_brands').select('*').eq('scheme_id', schemeId).order('code'),
     supabase.from('comm_margin_bands').select('*').eq('scheme_id', schemeId).order('sort_order'),
@@ -163,18 +173,24 @@ export async function loadCommissionSettings(
   ])
 
   // Rules › Directors (2026-09-27): who the sub-department reports to, and
-  // what each is paid here.
+  // what each is paid here. And which KPI SKUs the ERP has since removed.
   const subDepartmentId = (scheme.data as SchemeRow | null)?.sub_department_id ?? null
-  const [directorRows, payRows] = subDepartmentId
-    ? await Promise.all([
-      supabase.from('comm_sub_department_directors')
+  const kpiSkuIds = [...new Set(rows<KpiItemRow>(kpiItems.data).map(k => k.erp_product_id).filter((id): id is string => !!id))]
+  const [directorRows, payRows, kpiSkus] = await Promise.all([
+    subDepartmentId
+      ? supabase.from('comm_sub_department_directors')
         .select('staff_id, hr_staff_costs (employee_name, employee_code, titles (name))')
-        .eq('sub_department_id', subDepartmentId),
-      supabase.from('comm_director_pay')
+        .eq('sub_department_id', subDepartmentId)
+      : Promise.resolve({ data: [] }),
+    subDepartmentId
+      ? supabase.from('comm_director_pay')
         .select('staff_id, fixed_amount, sales_threshold, incentive_amount')
-        .eq('scheme_id', schemeId),
-    ])
-    : [{ data: [] }, { data: [] }]
+        .eq('scheme_id', schemeId)
+      : Promise.resolve({ data: [] }),
+    kpiSkuIds.length > 0
+      ? supabase.from('erp_products').select('erp_id, removed_at').in('erp_id', kpiSkuIds)
+      : Promise.resolve({ data: [] }),
+  ])
   const payByStaff = new Map(rows<{ staff_id: string; fixed_amount: number | string; sales_threshold: number | string | null; incentive_amount: number | string }>(payRows.data)
     .map(p => [p.staff_id, p]))
   type DirectorEmbed = { employee_name: string; employee_code: string | null; titles: { name: string } | { name: string }[] | null }
@@ -203,6 +219,17 @@ export async function loadCommissionSettings(
     itemGroups: rows(itemGroups.data),
     kpiItems: rows(kpiItems.data),
     kpiThresholds: rows(kpiThresholds.data),
+    kpiSpecials: rows<{ pool: KpiSpecialRow['pool']; value: string; label: string | null; sort_order: number | null; removed_at: string | null }>(kpiSpecials.data)
+      .map(o => ({
+        pool: o.pool,
+        value: o.value,
+        label: o.label ?? o.value,
+        sort_order: Number(o.sort_order ?? 0),
+        removed: o.removed_at !== null && o.removed_at !== undefined,
+      })),
+    kpiGoneSkus: rows<{ erp_id: string; removed_at: string | null }>(kpiSkus.data)
+      .filter(p => p.removed_at !== null && p.removed_at !== undefined)
+      .map(p => p.erp_id),
     openBillRules: rows(openBillRules.data),
     brands: rows(brands.data),
     marginBands: rows(marginBands.data),

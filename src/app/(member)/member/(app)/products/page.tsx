@@ -3,12 +3,12 @@ import { redirect } from 'next/navigation'
 import { getMemberUser } from '@/lib/auth'
 import { productListAccess } from '@/lib/member/product-access'
 import { formatIntlDate } from '@/lib/utils'
+import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '@/app/(portal)/revenue/_lib/sub-departments'
 import {
   loadCombos,
   loadCostRatios,
   loadCostingGaps,
-  loadKpiItems,
   loadMaintenance,
   loadMirrorStatus,
   loadModels,
@@ -24,7 +24,6 @@ import MaintenanceTab from './_components/MaintenanceTab'
 import ComboPricingTab from './_components/ComboPricingTab'
 import CostingGapsSection from './_components/CostingGapsSection'
 import CostSettingTab from './_components/CostSettingTab'
-import KpiItemsTab from './_components/KpiItemsTab'
 import ProductWorkspace from './_components/ProductWorkspace'
 import { Notice } from './_components/ui'
 import { layoutsFromCookies } from './_components/column-layout'
@@ -50,7 +49,7 @@ export const metadata = { title: 'Product List · HOUZS Venture' }
  * the ERP has not: a sofa combo added on Combo Pricing (2026-10-08), costed
  * exactly as the ERP's are.
  *
- * Seven tabs — the ERP's own four, the work list, and two settings:
+ * Six tabs — the ERP's own four, the work list, and a setting:
  *
  *   SKU Master          every SKU, and its price (a sofa module's per seat
  *                       height and fabric tier)
@@ -62,11 +61,14 @@ export const metadata = { title: 'Product List · HOUZS Venture' }
  *   Costing gaps        what was sold and nothing could price, worth-first
  *   Costing Setting     the ratio a cost is divided by for the Revenue Team,
  *                       and the SKUs divided by a ratio of their own
- *   Add-on / KPI Items  SKUs and Maintenance specials paid flat as KPI and
- *                       taken off the bill's sales (2026-09-27)
+ *
+ * The seventh, Add-on / KPI Items, moved to Rules › KPI items on 2026-10-08
+ * (user: "rules 这里是用来算薪水的 … product list 是拿来 set costing 的"): which
+ * items count as KPI is a rule of the pay, not a price. `?tab=kpi` is sent
+ * there.
  *
  * Each tab loads its own data (`?tab=`): the SKU master alone is 2,350 rows
- * and nobody reads all seven at once. The two settings are per sub-department
+ * and nobody reads all six at once. Costing Setting is per sub-department
  * (`?sub=`, the first when absent).
  *
  * **Only for an account holding `product_list`** (the Principal by default):
@@ -77,7 +79,7 @@ export const metadata = { title: 'Product List · HOUZS Venture' }
 // so a gap older than that is not one anybody can act on.
 const GAP_WINDOW_FROM = '2026-08-01'
 
-const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 'gaps', 'costing', 'kpi']
+const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 'gaps', 'costing']
 
 /** 2026-08-01 → "1 Aug 2026", the prototype's way of writing the window. */
 const dayLabel = (iso: string) => formatIntlDate(new Date(`${iso}T00:00:00Z`), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }, 'en-GB')
@@ -104,6 +106,13 @@ export default async function ProductListPage({
   const gapToIso = gapTo.toISOString().slice(0, 10)
 
   const [status, subDepts] = await Promise.all([loadMirrorStatus(), listSubDepartments()])
+
+  // Add-on / KPI Items is Rules › KPI items since 2026-10-08: an old link
+  // opens it there, for the sub-department it named.
+  if (asked === 'kpi') {
+    const target = subDepts.find(s => s.slug === subAsked) ?? subDepts[0]
+    if (target) redirect(`${revenuePath(target.slug, 'rules')}?tab=kpi`)
+  }
   // The columns as this reader arranged them, so the first paint is already theirs.
   const columnLayouts = layoutsFromCookies((await cookies()).getAll())
 
@@ -120,14 +129,14 @@ export default async function ProductListPage({
   } else if (tab === 'combos') {
     const [combos, skus, sofaSizes] = await Promise.all([loadCombos(), loadSkus(), loadSofaSizes()])
     body = <ComboPricingTab combos={combos} sofaSkus={skus.filter(s => (s.category ?? '').toUpperCase() === 'SOFA' && !s.removed)} sofaSizes={sofaSizes} />
-  } else if (tab === 'costing' || tab === 'kpi') {
-    // Per sub-department: each keeps its own ratio and its own KPI items.
+  } else if (tab === 'costing') {
+    // Per sub-department: each keeps its own ratio.
     const current = subDepts.find(s => s.slug === subAsked) ?? subDepts[0]
     const subs = subDepts.map(s => ({ slug: s.slug, name: s.name }))
     const rules = current?.schemeId ? await loadSchemeRules(current.schemeId) : null
     if (!current || !current.schemeId || !rules) {
       body = <Notice tone="error">{current ? `${current.name} has no active scheme yet.` : 'No Revenue sub-department is set up yet.'}</Notice>
-    } else if (tab === 'costing') {
+    } else {
       const [skus, ratios] = await Promise.all([loadSkus(), loadCostRatios(current.schemeId)])
       body = (
         <CostSettingTab
@@ -138,24 +147,6 @@ export default async function ProductListPage({
           divisor={rules.divisor}
           ratios={ratios}
           skus={skus.map(toPickSku)}
-        />
-      )
-    } else {
-      const [skus, items, maintenance] = await Promise.all([
-        loadSkus(),
-        loadKpiItems(current.schemeId),
-        loadMaintenance(),
-      ])
-      body = (
-        <KpiItemsTab
-          key={current.slug}
-          sub={{ slug: current.slug, name: current.name }}
-          subs={subs}
-          schemeId={current.schemeId}
-          enableKpi={rules.enableKpi}
-          items={items}
-          skus={skus.map(toPickSku)}
-          specials={maintenance.options.filter(o => o.pool === 'bedframe_specials' || o.pool === 'sofa_specials')}
         />
       )
     }
