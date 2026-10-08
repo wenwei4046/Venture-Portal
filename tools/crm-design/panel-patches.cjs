@@ -4,5 +4,9 @@ module.exports = {
     ['<span title="Back to Revenue app" style=', '<span onClick={v.exitApp} title="Back to Revenue app" style='],
     ["Wed, 7 Oct · {v.meTitle} · All access", "{v.todayLabel} · {v.meTitle} · All access"],
   ],
-  PanelLead: [["{v.ld.ownerName}'s customer · reply window open 20h 15m", "{v.ld.ownerName}'s customer{v.ld.windowNote}"]],
+  PanelLead: [
+    ["{v.ld.ownerName}'s customer · reply window open 20h 15m", "{v.ld.ownerName}'s customer{v.ld.windowNote}"],
+    // The Principal / Director do reply — from Inbox, in the owner's CRM (crm_can_reply). This page only reads.
+    ["View only · {v.ld.ownerFirst}'s customer. The Principal reads chats but doesn't reply.", "View only · {v.ld.ownerFirst}'s customer. To reply, open this chat from Inbox."],
+  ],
 };

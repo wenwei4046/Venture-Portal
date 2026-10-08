@@ -29,7 +29,7 @@ export default function PanelLead({ v }: { v: LeadVM }) {
               <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z">
               </path>
             </svg>
-            <span style={{ flex: "1" }}>View only · {v.ld.ownerFirst}'s customer. The Principal reads chats but doesn't reply.</span>
+            <span style={{ flex: "1" }}>View only · {v.ld.ownerFirst}'s customer. To reply, open this chat from Inbox.</span>
           </div>
         </>)}
         {!!(v.lx.inbox) && (<>
