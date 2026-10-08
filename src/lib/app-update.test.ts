@@ -32,6 +32,13 @@ describe('mayReloadOn', () => {
     expect(mayReloadOn('/member/preview')).toBe(true)
   })
 
+  // 2026-10-08: the Product List is a page of the Revenue app and holds price edits until Save.
+  it('is never the Product List, though it is in the Revenue app', () => {
+    expect(mayReloadOn('/member/products')).toBe(false)
+    expect(mayReloadOn('/member/products/anything')).toBe(false)
+    expect(mayReloadOn('/member/productsheet')).toBe(true)
+  })
+
   it('is never a portal page: HR › Payroll keeps edits until Save all', () => {
     expect(mayReloadOn('/hr-costing/payroll/2026-10')).toBe(false)
     expect(mayReloadOn('/dashboard')).toBe(false)

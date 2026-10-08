@@ -151,6 +151,67 @@
   text-align: center;
 }
 .asideSpacer { flex: 1; }
+/* The Product List's group (2026-10-08): `PRINCIPAL`, then its row — the
+   prototype's `plGroup` and `toProducts`. */
+.asideGroup { display: block; margin: 18px 12px 6px; font-size: calc(11px * var(--rv-type)); font-weight: 700; letter-spacing: .12em; color: var(--rv-faint); }
+
+/* The module switcher at the foot of the sidebar: a button, and a menu that
+   opens upward over the rows above it. */
+.module { position: relative; padding: 0 0 6px; }
+.moduleScrim { position: fixed; inset: 0; z-index: 5; }
+.moduleMenu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% - 2px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  box-shadow: 0 12px 32px var(--rv-ink-16);
+}
+.moduleMenuLabel { padding: 6px 10px 4px; font-size: calc(11px * var(--rv-type)); font-weight: 700; letter-spacing: .12em; color: var(--rv-faint); }
+.moduleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--rv-ink);
+  font-size: calc(14px * var(--rv-type));
+  font-weight: 550;
+  text-align: left;
+}
+.moduleRowOn { background: var(--rv-cream); font-weight: 650; }
+.moduleRowLabel { flex: 1; }
+.moduleDot { width: 8px; height: 8px; border-radius: 50%; }
+.moduleDotFinance { background: var(--rv-module-finance); }
+.moduleDotPrincipal { background: var(--rv-brown); }
+.moduleDotHr { background: var(--rv-green); }
+.moduleDotRevenue { background: var(--rv-accent); }
+.moduleButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 10px 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-white);
+  color: var(--rv-ink);
+  text-align: left;
+}
+.moduleText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.moduleLabel { font-size: calc(10.5px * var(--rv-type)); font-weight: 700; letter-spacing: .1em; color: var(--rv-faint); }
+.moduleName { font-size: calc(14px * var(--rv-type)); font-weight: 650; }
 .asideMe {
   display: flex;
   align-items: center;
@@ -396,4 +457,9 @@
     padding-left: max(20px, calc((100% - 400px - 760px) / 2));
     padding-right: max(420px, calc((100% - 400px - 760px) / 2 + 400px));
   }
+  /* The Product List takes the whole column (the prototype's mainPL/mainPR 0). */
+  .main.mainProducts { padding-left: 0; padding-right: 0; }
 }
+
+/* The Product List page scrolls inside itself: the column is its frame. */
+.mainProducts { position: relative; overflow: hidden; padding-left: 0; padding-right: 0; }

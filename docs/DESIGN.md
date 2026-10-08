@@ -1,9 +1,9 @@
 # DESIGN.md — HOUZS Venture Portal
 
 **Version:** 3.10
-**Last updated:** 2026-09-27
+**Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.12 (Sheet theme on Finance's view as well — every portal route but the Product List / Walnut shell / approved Product List workspace, with its two settings tabs) — single source of truth for all UI work
+**Status:** v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -133,129 +133,45 @@ selector>`, so it has exactly the specificity of the rule it replaces: a page's
 own utilities keep the power they had. Don't add a sheet rule with more weight
 than its base.
 
-### Product List workspace — approved 2026-09-24
+### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 
-The user's approved Product List design supersedes the older restrictions on
-white surfaces and warm accents **within `/revenue/products` and its visible
-shell**. Since 2026-09-27 the same tokens are the sheet theme's (above) on HR's
-view; the Product List is the one route that also re-tones the shell.
-`.product-theme` scopes the tokens in `globals.css`; the user's theme preference
-is not rewritten.
+The Product List left the portal for the Revenue app: `/member/products`,
+inside the app's own shell (`RevenueApp`, the `[data-revenue-app]` palette),
+drawn to the Claude Design handoff *design_handoff_product_list* — its README
+is the spec, `prototype/ProductList.dc.html` the source of truth (both kept in
+`.design/revenue-app/`). The portal's light `.product-theme` workspace
+(approved 2026-09-24) is gone with it; `/revenue/products` redirects.
 
-- Keep the existing light brown sidebar and greeting bar (`#DED7CA`), on a
-  light neutral gray base (`#F3F3F1`). The content panel and inputs are white.
-- Use the lighter orange (`#E99A53`) for actions, active tab rules and markers.
-  The current sidebar item has a pale orange background (`#FFF4E7`) and a narrow
-  orange marker. It is not a solid orange block.
-- **All text is standard black (`#000000`)**, including the sidebar, title,
-  buttons, placeholders, labels, prices and supporting copy. Establish hierarchy
-  with surfaces, spacing and weight. Status remains explicit in words and can
-  use coloured borders/backgrounds; it must not depend on coloured text.
-- Place category chips and search/model/tier controls in one shallow gray
-  filter panel (`#F6F6F4`), with a divider between the two rows. Keep the main
-  Product List tabs outside this panel.
-- Use a stronger table header (`#EBE7E0`), subtle white / `#F7F7F5` alternating
-  rows, and a footer. The wide sheets scroll internally in both directions,
-  with a sticky header and a frozen first column: Combo Pricing fills the
-  remaining window, SKU Master (and Costing gaps) take a whole screen — see
-  *One screen* below; on mobile a fixed-height window.
-- **Lists scroll with the page (2026-09-27).** Modular and Maintenance only grow
-  downward, so they grow with their rows and the page's own scrollbar moves them,
-  as the ERP's Products page does — no box inside the page. A table there keeps
-  its header stuck to the top of the page and scrolls sideways inside its card
-  only while it is wider than the card. `productTabScroll` names each tab's mode;
-  a new tab that only grows downward belongs on the page.
-- SKU Master is for finding SKUs and maintaining prices: omit pricing summary
-  cards, calculator labels/filters, category ratios and the long introduction.
-  Sofa prices remain the ERP-ordered size columns and P1/P2/P3 tiers. Sofa,
-  Mattress and Bedframe — whose models gather several SKUs — each carry a model
-  filter, as on the ERP; the other categories are one SKU per model and do not.
-  Preserve raw size labels, but omit the `DEFAULT` size and flat
-  fallback price columns. Omit Status throughout SKU Master. Hidden saved
-  defaults and fallback prices survive edits to visible prices; other product
-  categories retain their ordinary Price column.
-- Retain portal-owned price writes, permission checks and existing pricing
-  semantics. No ERP source price becomes a portal cost through this restyle.
-- Modular is a board of model cards grouped by category, in the ERP's order, and
-  **inside a category by branding** (2026-09-27): the ERP's branding — the
-  model's own, else its SKUs' — named by the brand register's code when the
-  register knows it (DUNLOPILLO sits under DUNLOP, the word on its cards), A→Z,
-  the unbranded together last as *No branding*. Each run of cards opens on a
-  small heading: the eyebrow's orange dash (grey for *No branding*), the
-  branding in caps and its count, then a hairline to the edge. A category where
-  nothing is branded has no such headings. A heading counts its whole group
-  even while *Show more* holds some cards back, and ‹ › steps through the
-  models in the order they are drawn. The margin ladder chosen in a model's
-  window never moves its card — the branding is the ERP's fact
-  (`modular-board.ts`). A card opens the model in a floating one-sheet window
-  with fixed save/cancel controls; on phones the window fills the screen. The
-  window's listing panel is the *Revenue calculator* switch and *Free gift*;
-  **Margin ladder** and **Calculator section** stand between them only for a
-  mattress or a sofa whose ERP branding names no brand the portal knows
-  (MYLATEX, or none — 2026-10-06), with *Required* under the ladder until one
-  is picked. A branded mattress or sofa follows its brand and its ERP section,
-  and a rider (bed frame, accessory …) the cart's brand, so neither is asked
-  (`needsBrandPick`; `.modular-win-gates[data-picks]` is the four-column
-  panel, the two-field one keeps the switch and Free gift at the same widths). Empty
-  ERP allowlists are unrestricted; empty portal selections mean none. Keep
-  inactive saved selections visible so they can be removed.
-- Maintenance keeps the ERP's Bedframe/Sofa pool order and values, with a separate
-  fabric view. An option pool has no search box — the largest holds about twenty
-  values and the ERP's Maintenance lists have none; the fabric view keeps its
-  search and tier filters. Fabrics expose both category tiers, using the shared
-  tier and then P2 when a category mapping is absent. All rows remain reachable
-  with Load more. Every priced pool reads *Charge (RM)* with an *Edit charges*
-  button (2026-10-06: a price there is the customer's, never a cost), and the
-  note under the toolbar says what a price in that pool does — per frame for a
-  bed frame, ONCE per sofa for a sofa; blank or 0 is FOC (free for a special).
-- Combo Pricing retains module slots, alternatives, repeated modules, tiers and
-  effective dates. Match equivalent size keys without losing their raw labels or
-  historical price columns. A blank clears a price; zero remains a stored zero.
-- Preserve drafts across filters and require a keep/discard choice before tab or
-  model switches. Disable competing actions while a save is running. Save errors
-  retain edits, and partially successful maintenance batches retry only failures.
-- Costing gaps is a searchable work list with reason filters and a direct SKU
-  lookup. Sum lines and revenue; do not sum per-code bill counts, which overlap.
-- **Two settings tabs close the rail (2026-09-27): Costing Setting and Add-on /
-  KPI Items.** Both are per sub-department — the filter panel holds one row of
-  sub-department chips (`?sub=`, carried from one of the two tabs to the other;
-  switching with unsaved changes asks keep/discard like a tab switch) — and
-  both scroll with the page. Under the panel a card holds the sub-department's
-  own figure: the ratio every SKU's cost is divided by, with a worked RM 1,000
-  example, or the KPI switch — On on the ledger green wash, Off on the amber
-  one — and a link to Rules, where it is set. Then the workspace's own rhythm:
-  heading and count, *Edit ratios* / *Edit items*, then *Cancel changes* and
-  *Save N changes*. While editing, a peach picker panel sits above the table:
-  a search that shows nothing until something is typed (twenty results at
-  most, *narrow the search* beyond), what is already listed marked *On the
-  list*; Costing Setting ticks SKUs and adds them at one ratio, Add-on / KPI
-  Items adds one at a time from SKU Master, Bed frame specials or Sofa
-  specials, at the amount typed beside the search. Added rows land at the top
-  on the peach wash with a NEW chip; a row being removed fades and says so,
-  with *Keep* to undo. Nothing is written until Save; a failed save keeps
-  every draft, and a good one keeps them on screen, read-only, until the
-  refreshed list arrives — never the list from before the save.
-- **One screen, not the remainder (2026-09-27).** SKU Master and Costing gaps
-  hold the count row, its notes and the table in a stage exactly one screen tall
-  (`.sku-stage`) instead of the space the filters leave: the page scrolls again,
-  one turn of the wheel slides the filters away and the table fills the screen.
-  A downward wheel over the table moves the page first, so rows never scroll
-  inside a frame whose bottom is below the screen; upward is the browser's own.
-  Phones keep the fixed-height window.
-- **The columns are the reader's (2026-09-27).** On those two tables a header
-  dragged onto another swaps their places (an orange bar shows where it lands)
-  and a header's right edge drags wider or narrower; double-clicking the edge
-  fits the column to its widest cell; from the keyboard ←/→ on the focused edge
-  resizes and Alt+←/→ moves. Whichever column stands first is the frozen one; a
-  sofa's seat-size prices stay behind the rest, in the ERP's order. The table
-  opens at its natural widths and then holds them, so widening one column never
-  squeezes another — a blank last column takes the slack. Each table (and the
-  sofa sheet apart) keeps its layout in this browser only, in a cookie scoped to
-  the Product List so the server renders it; *Reset columns* in the footer puts
-  it back. `ColumnTable` / `useColumnLayout`.
-
-The light workspace remains light when opened from a dark-mode route so black
-text retains contrast. The preference still applies when leaving Product List.
+- **Shell.** The app's desktop sidebar shows **Product List** (cube icon) under
+  a group label — PRINCIPAL for the Principal, MANAGEMENT for another holder of
+  `product_list`; nobody else sees the row. Active row: #FFF1E6, ink #BD4A19,
+  650 (the README's — the prototype reads undefined variables there and shows a
+  grey browser button). Above the profile card the **Module** switcher
+  (Principal only) opens Finance / Principal / HR / Revenue team.
+- **Page.** Eyebrow REVENUE / PRODUCTS with its dash, the Georgia title,
+  `Principal only · Fair and IR` on the right; the seven tabs on the header's
+  rule (SKU Master · Modular · Maintenance · Combo Pricing · Costing gaps ·
+  Costing Setting · Add-on / KPI Items). The tab holding unsaved edits carries a
+  dot; leaving it asks in a bar under the rail, and the app's own nav confirms.
+- **Values.** Every colour is a `--rv-*` token and every size the prototype's
+  (`_components/products.module.css`, primitives in `_components/ui.tsx`).
+  Tailwind's reset is undone where it changes the prototype's boxes: elements
+  the prototype draws content-box (a picker row's 46px is inside its padding, a
+  module tile's 26px inside its border), an input's own 1px 2px padding, the
+  browser's #757575 placeholder. `.design/revenue-app/tools/measure-pl.mjs`
+  measures the same elements on the prototype and the live page and lists
+  every difference; what remains is data (column widths), state, and the
+  sidebar row above. Weight 650 renders as 650 here (Inter variable); the
+  prototype file loads only Inter 400–700, so it shows 700.
+- **Motion.** As the prototype: a right-hand panel of the app (notifications,
+  Profile) shifts the page 432px in 320ms `cubic-bezier(.2,.8,.2,1)`; a
+  floating window fades its scrim in 220ms and rises from
+  `translateY(14px) scale(.98)` in 260ms on the same curve; a toggle's knob
+  moves in 160ms; the new-combo window appears without motion. Reduced motion
+  turns them off.
+- **Tables.** Wide sheets scroll in their own 560px window with a sticky header
+  and a frozen first column; the lists grow with the page. Columns can still be
+  dragged and resized (`ColumnTable`, a cookie scoped to `/member/products`).
 
 ### Shared portal rules
 
@@ -1262,28 +1178,27 @@ mono address + Copy; Last delivery — `formatAgo`, ticking), and text actions
 (accent "Replace key", danger "Unlink"). No test button here: the ERP's own
 page proves the key. `src/app/(portal)/revenue/_components/ErpLinkPanel.tsx`.
 
-### Product List — the mirror beside the portal's decisions (2026-09-24 — Revenue › Product List)
+### Product List — the mirror beside the portal's decisions (2026-09-24; in the Revenue app since 2026-10-08)
 
-The ERP's Products catalogue is presented in the approved light workspace
-defined under Implementation rules above. A plain tab rail contains *SKU
-Master* · *Modular* · *Maintenance* · *Combo Pricing* · *Costing gaps*.
-Switching uses `?tab=`; the server loads the selected tab. Tab counts, summary
-cards and the long mirror introduction are omitted. A short notice reports
-an unsuccessful catalogue delivery when relevant.
+What the ERP says EXISTS is plain text (code, description, model, category,
+the ERP's allowed options); what the portal DECIDES is an input — a price (a
+right-aligned cell input, amber while edited), a tick, a toggle. A mirror row's
+state is a chip in its first cell: NEW, Inactive, Removed. Filters sit in one
+panel above each table (category chips, a ruled row of search / select /
+segmented Tier). Modular opens a model in a floating window — its SKUs and each
+option list as tick tiles, *Select all* / *Clear all* per section, Save, Save &
+next, and the guard before leaving unsaved edits. A price moves margins only
+from the moment it is saved — a landed month waits for Recost.
 
-THE SPLIT IS VISIBLE: what the ERP says EXISTS is plain text (code, description,
-model, category, the ERP's allowed options as chips); what the portal DECIDES
-is an input — a price (`.num` right-aligned, `MONEY_INPUT`), a tick, a chip that
-toggles. Row status uses explicit black text: **New**, **Inactive** (off in
-the ERP), or **Removed from ERP** (retired, retained for historical references).
-Filters sit in the shared gray `.sku-filters` panel above the
-`.ledger-table.sku-table` — a bounded window on the wide sheets, the page's own
-scroll on the lists (Modular, Maintenance). Modular opens a model in
-`ModelEditor` — its SKUs (compartments / sizes) and each option list as tick
-chips, what the ERP allows first and anything ticked here that it no longer
-allows after. Saving reports the result; a price moves margins only
-from that moment — a landed month waits for Recost.
-`src/app/(portal)/revenue/products/_components/`.
+**Combo Pricing is the portal's own (2026-10-08).** One row per set, a column
+band per fabric tier; *+ Add combo* opens the new-combo window (model,
+compartments with steppers, THIS SET strip, a price per fabric × seat height
+with each module total under it). *Edit prices* adds a **Remove** column that
+stays in view on the right while the sheet scrolls sideways — the costing
+tables' pattern: Remove (#A3371A) marks the set (row at 55%, a REMOVING chip,
+its prices read-only), Keep (#BD4A19) unmarks, Save takes the marked sets away
+with their prices and saves the rest.
+`src/app/(member)/member/(app)/products/_components/`.
 
 ### Revenue member C release (2026-09-16)
 
@@ -2589,7 +2504,8 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
-- **2026-10-06 (Product List · Modular window)** — a model's window no longer shows *Margin ladder* and *Calculator section* for a model whose brand the ERP already names, nor for a rider: a ZANOTTI sofa's panel is just *Revenue calculator* and *Free gift*. The two dropdowns come back, between those two, only for a mattress or a sofa whose ERP branding is no brand the portal knows (MYLATEX, or none), and there the ladder is *Required* (its help names the ERP's branding). See "Product List workspace".
+- **2026-10-08 v3.13 (Product List · in the Revenue app)** — the Product List moves from the portal into the Revenue app (`/member/products`), redrawn to the *design_handoff_product_list* prototype in the app's own palette: the app's sidebar row under PRINCIPAL (only for `product_list`) and the Module switcher, the seven tabs on the header's rule with a dot for unsaved edits and a leave bar, one filter panel per tab, the prototype's tables, cards, floating windows and motion, and Combo Pricing's *+ Add combo* window. Combos become the portal's own the same day, and *Edit prices* gains a Remove column that stays in view on the right (Remove / Keep, a REMOVING chip, the set taken away with its prices on Save). Tailwind's reset is undone where it would change the prototype's boxes (content-box rows and tiles, inputs' own 1px 2px padding, the #757575 placeholder); `tools/measure-pl.mjs` diffs every element against the prototype. The portal's `.product-theme` workspace and its CSS are gone. See "Product List — a page of the Revenue app".
+- **2026-10-06 (Product List · Modular window)** — a model's window no longer shows *Margin ladder* and *Calculator section* for a model whose brand the ERP already names, nor for a rider: a ZANOTTI sofa's panel is just *Revenue calculator* and *Free gift*. The two dropdowns come back, between those two, only for a mattress or a sofa whose ERP branding is no brand the portal knows (MYLATEX, or none), and there the ladder is *Required* (its help names the ERP's branding). See "Product List — a page of the Revenue app".
 - **2026-10-06 (Revenue app · only priced specials)** — on the Quote, a bed frame's or sofa's *Specials* row shows only the specials Maintenance charges, each with its *+ RM x*; one turned ON on Modular with no price is not shown, and the captions are always *Charged on top · not in margin* / *Once per sofa · not in margin* (*Optional* and *For every sofa in this quote* are gone). The sofa's *Leg height* row — FOC + the charged legs — now shows on the live app too: the catalogue reader had kept only a bed frame's charges. Maintenance's *Specials* notes say a blank or 0 is not offered.
 - **2026-10-06 (Revenue app · when it cannot load)** — the Revenue app's error page is no longer the old *HOUZS VENTURE · Unable to load your workspace* page (same beige band): it is the same frame as the loading screen with, in the middle, a red alert circle, *Couldn't open the Revenue app*, *Try again* (a fresh load) and the error's *Ref* for the logs. See *While it loads, and when it cannot*.
 - **2026-10-06 (Revenue app · while it loads)** — opening or refreshing the Revenue app no longer shows the old *HOUZS VENTURE · Preparing your Revenue workspace…* page (with a beige band above it and a page that scrolled): it shows the app's own frame — the phone header on Today, the bottom bar lit on the tab being opened (the sidebar on a desktop) — and one orange spinner where the page will be. When the app lands, nothing in the frame moves. See *While it loads, and when it cannot*.
@@ -2619,15 +2535,15 @@ If adding a new component to vocabulary, update this doc first.
 - **2026-09-27 (second payroll)** — HR › Payroll's row menu gains *Second payroll…* beside *Resubmit…*: the same unlock, recorded as a planned second payment (a sub-department that pays on the 15th) rather than a correction. The status chip, the header's status line, the Submit confirmation, *Submitted to Finance* and Finance's request labels name each kind (`1 resubmit · 1 second payroll`). See "Payroll batches".
 - **2026-09-27 (unified Payroll)** — HR › Payroll holds everybody's pay and moves it person by person. The grid gains a frozen **Status** column (`td.pg-status`, offsets `.l0`–`.l5`), a ⋯ and right-click menu per row (*Resubmit…*), a *Director* band, and a selection bar of *Complete / Unlock / Delete*; the header's *Submit to Finance · N* stays pressable after every batch, *Total Close* sits beside it, and a new **Submitted to Finance** section lists each batch with its funding. Director Salary's *Submit to Finance* is *Complete*; Comm Cal's payroll bar (no button since the entry below) gains one line — a salesperson sent from here shows on *HR › Payroll →* as Completed — and names a Total Closed month as such. See "Payroll batches".
 - **2026-09-27 (night)** — The payroll bar sends nothing. Its whole-month *Send RM X to payroll* / *Update payroll* / *Take back* lived a few hours: the user's Send is per salesperson (tick five and send them, or send everybody not yet sent — somebody already sent is never sent again), which is the per-person close's, not a card about the month. The bar keeps its state, its reasons by name, the draft note and *This month pays*; `.payrollActions` / `.payrollConfirm` / `.payrollDone` / `.payrollError` went with the button.
-- **2026-09-27 v3.11** — Product List gains **Costing Setting** and **Add-on / KPI Items**, per sub-department: a chip row for the sub-department, a card for its own figure (the cost ratio at work on RM 1,000, or the KPI switch with a link to Rules), and a peach picker panel above the table while editing. Both scroll with the page. See "Product List workspace".
+- **2026-09-27 v3.11** — Product List gains **Costing Setting** and **Add-on / KPI Items**, per sub-department: a chip row for the sub-department, a card for its own figure (the cost ratio at work on RM 1,000, or the KPI switch with a link to Rules), and a peach picker panel above the table while editing. Both scroll with the page. See "Product List — a page of the Revenue app".
 - **2026-09-27 (close)** — Comm Cal's month can be **closed** salesperson by salesperson: ticks in the list's first column, a close bar above it (progress, *Close N ticked* / *Close the N still open* / *Reopen N* behind an inline confirm strip, green once everybody is closed), a **CLOSED** tag and the locked figures on a closed row, and *Close NAME* / *Close & next →* in the empty middle of the ledger's walnut header, which turns into a green CLOSED stamp with *Reopen*. See "Closing — a lock you can see".
 - **2026-09-27 (later)** — Comm Cal's workbench stands in the URL (`?view=` · `?person=` · `?orders=`, search / brand / sort as `?q=` `?brand=` `?sort=`), so Back from a bill returns to the salesperson's ledger it was opened from; bill links carry `?from=` and the bill page's header leads with **← NAME** (`ReturnLink`, which steps Back when that is where the reader came from), then *All bills*. The bill context menu joins a salesperson's Personal / Overriding / Below deposit tables and the month's Below deposit tab. See "Tabbed pages" and "Bill context menu".
 - **2026-09-27 v3.10** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
 - **2026-09-27 (night)** — A pencil on a folded box. Comm Cal's *Salary calculation · current preview* keeps its `<details>` fold and gains a 30px outlined icon button pinned to the box's top-right corner (a sibling of the details, never inside the summary). It opens an editor inside the box, above the table: an orange-bordered white panel of one-row lines — type select · description · `RM` amount (mono, right-aligned) · ✕ — then *+ Add line* on the left and *Cancel* / *Save lines* (the accent button) on the right. The table below recomputes as the lines are typed, and a pay line in it is marked by a 3px orange rule on its first cell. Where the month can no longer change the pencil stays, dimmed (`aria-disabled`), and pressing it says why. On a phone a line takes two rows: the type beside its ✕, then description and amount.
 - **2026-09-27 (payroll bar)** — Comm Cal's month says what payroll holds. The folded *Payroll & source tools* section at the foot of the month (saved-run hero, warnings, *Recompute & sync payroll*, Open Bill cost / Upsales & drops rail, payroll adjustments) is removed; a **payroll bar** under the summary cards names the state (not sent · in payroll · moved since · closed · settled by hand) with a 4px tone rule and dot, lists what stops a send by name, carries one amount-bearing action (*Send RM X to payroll* / *Update payroll to RM X*) plus a ghost *Take back* with inline confirm, and holds the month's switches in a grey foot row. *Drops and upsells the ERP found* gains a *Paid in {month}* list with Undo. A salesperson's ledger keeps its per-bill button, now the real *Don't count* (a ghost button; the notice above the table carries Undo), and *Show not counted* opens a small table under the ledger with *Count again* per bill. The Brand column names the bill's own brand only. See "The payroll bar" under Tabbed pages.
-- **2026-09-27 (evening)** — Product List › Modular splits each category by branding. Under the category's chip every branding gets its own run of cards and a small heading (orange dash, the branding and its count, a hairline): Mattress reads AKEMI · DUNLOP · ERGOTEX · MYLATEX · *No branding*, Sofa ZANOTTI · *No branding*, and Accessory finds its AK- and DL- pieces by their SKUs' branding. The unbranded close the category together under a grey dash; a category with no branding at all is drawn as before. Category and branding headings count their whole group, and ‹ › follows the drawn order. See "Product List workspace".
-- **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List workspace".
-- **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List workspace".
+- **2026-09-27 (evening)** — Product List › Modular splits each category by branding. Under the category's chip every branding gets its own run of cards and a small heading (orange dash, the branding and its count, a hairline): Mattress reads AKEMI · DUNLOP · ERGOTEX · MYLATEX · *No branding*, Sofa ZANOTTI · *No branding*, and Accessory finds its AK- and DL- pieces by their SKUs' branding. The unbranded close the category together under a grey dash; a category with no branding at all is drawn as before. Category and branding headings count their whole group, and ‹ › follows the drawn order. See "Product List — a page of the Revenue app".
+- **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List — a page of the Revenue app".
+- **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List — a page of the Revenue app".
 - **2026-09-27 v3.9** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".
 - **2026-09-27** — Revenue › Venues removed: the ERP names every bill's fair (venue, organiser, days), so there is nothing left to type. The one person's step it held — moving bills into their fair's month — is a panel on the month page, *Bills of another month's fair* (`FairMovesPanel`), in the same bordered-surface vocabulary as *Drops and upsells the ERP found*: a serif heading with a mono alert count, an italic explanation, one `.ledger-table` (Bill · Salesperson · Fair · Move · Sales value, the move's status as a small mono label), and one accent button *Move the N confirmed*.
 - **2026-09-26 (later)** — Comm Cal's month in one table design. *Below deposit* and *Sales by venue* join the workbench's rail (Total Sales Orders · KPI Items · Open Bill · Below deposit · Sales by venue), both in the workbench table (`.tableFrame` / `.table`, sticky first and answer columns, `tfoot`, `.tableFooter`); a salesperson's page gains *Below deposit* beside Personal / Overriding; the Total Sales Orders table gains *Group sales* between Commissionable value and Upsell, with the run's promotion preview as `.badge` tags under the rank. The saved run's `.ledger-table`, the *Waiting on a deposit* section and *Sales by person* are gone, and Sales by venue lost its organiser dropdown and *same place as…*. See "Tabbed pages".

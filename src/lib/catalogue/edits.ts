@@ -206,3 +206,88 @@ export function validateComboPrices(edits: readonly ComboPriceEdit[]): Array<{
     return { base_model: baseModel, slots_key: slotsKey, tier, price_by_height: out }
   })
 }
+
+export interface NewComboEdit {
+  baseModel: string
+  /** One piece per slot: [["1A"], ["2A-LHF"], ["2A-LHF"]]. */
+  modules: string[][]
+  label: string
+  /** Positive prices only: tier → seat height → RM. */
+  prices: Record<string, Record<string, number | string>>
+}
+
+export interface NewComboPlan {
+  base_model: string
+  modules: string[][]
+  label: string
+  prices: Record<string, Record<string, number>>
+  filled: number
+}
+
+/** A compartment code as the ERP writes one: 1A, 2A(LHF), Console — no quote or backslash, 80 characters at most. */
+const MODULE_CODE = /^[^\s"\\][^"\\]{0,79}$/
+
+/**
+ * A sofa set made on the Product List (2026-10-08): the shape the database's
+ * `catalogue_add_combo` is handed, checked before it is. The database checks
+ * again what only it can — that the model and its modules exist, that the set
+ * and its name are new to the model.
+ */
+export function validateNewCombo(edit: NewComboEdit): NewComboPlan {
+  const baseModel = String(edit?.baseModel ?? '').trim().toUpperCase()
+  if (!baseModel) throw new EditError('Pick a sofa model.')
+  if (baseModel.length > 80) throw new EditError('That model code is too long.')
+  const modules = Array.isArray(edit.modules) ? edit.modules : []
+  if (modules.length < 2) throw new EditError('Add at least two compartments.')
+  if (modules.length > 30) throw new EditError('A set holds at most 30 pieces.')
+  const slots = modules.map(slot => {
+    if (!Array.isArray(slot) || slot.length !== 1) throw new EditError('Each piece is one compartment.')
+    const code = String(slot[0] ?? '').trim()
+    if (!MODULE_CODE.test(code)) throw new EditError(`"${code}" is not a compartment code.`)
+    return [code]
+  })
+  const label = String(edit.label ?? '').trim()
+  if (!label) throw new EditError('Give the set a name.')
+  if (label.length > 120) throw new EditError('The set name is too long (120 characters at most).')
+  const prices: Record<string, Record<string, number>> = {}
+  let filled = 0
+  for (const [tier, byHeight] of Object.entries(edit.prices ?? {})) {
+    if (!(TIERS as readonly string[]).includes(tier)) throw new EditError(`Unknown tier ${tier}`)
+    const seen = new Set<string>()
+    for (const [h, raw] of Object.entries(byHeight ?? {})) {
+      const height = h.trim()
+      if (!height || height.length > 20) throw new EditError(`"${h}" is not a seat height.`)
+      const p = parseMoney(raw, `Fabric ${tier.replace('PRICE_', 'P')} at ${height}`)
+      if (p === null || p <= 0) continue
+      const k = heightKey(height)!
+      if (seen.has(k)) throw new EditError(`Two prices for seat height ${height} in fabric ${tier.replace('PRICE_', 'P')}.`)
+      seen.add(k)
+      prices[tier] = { ...(prices[tier] ?? {}), [height]: p }
+      filled++
+    }
+  }
+  if (filled === 0) throw new EditError('Fill at least one price.')
+  return { base_model: baseModel, modules: slots, label, prices, filled }
+}
+
+/** A set to take away (Combo Pricing › Edit prices › Remove): every fabric tier of it. */
+export interface ComboSetRef {
+  baseModel: string
+  slotsKey: string
+}
+
+/** What `catalogue_remove_combos` takes: each set once, as the table keys it. */
+export function validateComboRemovals(sets: readonly ComboSetRef[]): Array<{ base_model: string; slots_key: string }> {
+  if (!Array.isArray(sets) || sets.length === 0) throw new EditError('Pick a combo to remove.')
+  if (sets.length > 500) throw new EditError('Remove at most 500 combos at a time.')
+  const out = new Map<string, { base_model: string; slots_key: string }>()
+  for (const s of sets) {
+    const baseModel = String(s?.baseModel ?? '').trim().toUpperCase()
+    const slotsKey = String(s?.slotsKey ?? '').trim()
+    if (!baseModel || baseModel.length > 80 || !slotsKey.startsWith('[') || slotsKey.length > 4000) {
+      throw new EditError('A combo row is incomplete')
+    }
+    out.set(`${baseModel}|${slotsKey}`, { base_model: baseModel, slots_key: slotsKey })
+  }
+  return [...out.values()]
+}

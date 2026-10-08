@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let search = "";
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search) }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search), usePathname: () => "/member" }));
 
 import AppError from "./AppError";
 

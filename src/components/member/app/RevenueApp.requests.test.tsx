@@ -8,6 +8,13 @@ import type { RevenueSource } from "./source";
 import RevenueApp from "./RevenueApp";
 
 // The live source's server actions are never reached: the app is handed a source of its own.
+// RevenueApp reads its path (the Product List is a page of its own, 2026-10-08) and steps there with the router.
+const nav = vi.hoisted(() => ({ router: { push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {}, back: () => {}, forward: () => {} } }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/member",
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  useRouter: () => nav.router,
+}));
 vi.mock("@/app/(member)/member/actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import base from "../base.module.css";
-import { readRoute } from "../route";
+import { PRODUCTS_PATH, readRoute } from "../route";
 import s from "../shell.module.css";
 import { BottomNav, DeskAside } from "./Chrome";
 import f from "./frame.module.css";
@@ -18,7 +18,9 @@ const noop = () => {};
  * page's place holds `children`.
  */
 export default function AppFrame({ children }: { children: ReactNode }) {
-  const { screen } = readRoute(`?${useSearchParams().toString()}`);
+  const fromQuery = readRoute(`?${useSearchParams().toString()}`).screen;
+  // The Product List's page has no `?page=`: no screen of the app is lit while it loads.
+  const screen = usePathname() === PRODUCTS_PATH ? "products" : fromQuery;
   const [android, setAndroid] = useState(false);
   useEffect(() => {
     if (/Android/i.test(navigator.userAgent)) setAndroid(true);

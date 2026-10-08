@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MemberData, MemberMembership, MemberOrgMap, MemberReadContext, QuoteInput } from "@/lib/member/types";
+import type { ProductListAccess } from "@/lib/member/product-access";
+import { setViewAs } from "@/components/layout/view-as-actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import { arenaRankings, type ArenaWeekBrand, type ArenaWeekPicks, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
 import { firstName, greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
-import { useRoute, type Board, type InsightView, type Route, type Screen } from "./route";
+import { PRODUCTS_PATH, appHref, productsHref, useRoute, type Board, type InsightView, type Route, type Screen } from "./route";
+import { ProductShellContext, type ProductShell } from "./product-shell";
 import { addMonths, isLiveMonth, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
 import { useInsightData } from "./insight/useInsightData";
 import { billsView, brandPage, insightMain, kpiView, orderSheet, type InsightInput } from "./insight/insight-model";
@@ -25,7 +29,7 @@ import { arenaKey, boardModel, hubModel, recordModel, type ArenaSub } from "./ar
 import { useArenaData } from "./arena/useArenaData";
 import { demoSource, liveSource, settleRead, type RevenueSource, type TrackRead } from "./source";
 import { useKeyedRead } from "./useKeyedRead";
-import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me } from "./shell/Chrome";
+import { BottomNav, DeskAside, DeskHeader, MobileHeader, ViewingAsBar, type Me, type ModuleId } from "./shell/Chrome";
 import PullRefresh from "./shell/PullRefresh";
 import { RETURN_REFRESH_MS, isStaleAppError, reloader } from "./shell/pull-refresh";
 import StatusBar from "./shell/StatusBar";
@@ -70,8 +74,15 @@ export type Device = "live" | "ios" | "android" | "desktop";
 
 export interface RevenueAppProps {
   initialData: MemberData;
-  /** The page's query string, so the first render matches the server's. */
-  initialSearch: string;
+  /** The page's query string, so the first render matches the server's — read from the URL when absent. */
+  initialSearch?: string;
+  /**
+   * The page the server rendered inside the app: the Product List on
+   * `/member/products` (2026-10-08). The app's own screens ignore it.
+   */
+  children?: ReactNode;
+  /** Shows the Product List in the sidebar — only for an account holding `product_list`. */
+  productList?: ProductListAccess | null;
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -123,10 +134,19 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
   return desk;
 }
 
-export default function RevenueApp({ initialData, initialSearch, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   const source = sourceProp ?? (initialData.demo ? demoSource : liveSource);
   const [data, setData] = useState(initialData);
-  const [route, go] = useRoute(initialSearch);
+  // The server renders the app again only when the Product List refreshes after a save: what it sends
+  // then is newer than what the app holds (the Quote's catalogue among it), so it is taken.
+  useEffect(() => { setData(initialData); }, [initialData]);
+  const searchNow = useSearchParams()?.toString() ?? "";
+  const [baseRoute, go] = useRoute(initialSearch ?? (searchNow ? `?${searchNow}` : ""));
+  // The Product List is a page of its own (`/member/products`), drawn inside the app.
+  const pathname = usePathname();
+  const router = useRouter();
+  const onProducts = pathname === PRODUCTS_PATH;
+  const route = useMemo<Route>(() => (onProducts ? { ...baseRoute, screen: "products", staff: "" } : baseRoute), [onProducts, baseRoute]);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [nfOpen, setNfOpen] = useState(false);
   const [nfTab, setNfTab] = useState<NotifTab>("all");
@@ -257,9 +277,10 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const viewStaff = context?.staffId ?? "";
   const todayKey = fixture || data.demo || !membershipId ? "" : `${membershipId}|${deptView ? "*" : viewStaff}|${period}`;
   // Ids, not the `context` object: a refresh rebuilds it, and this runs the engine. A pull reads it again and
-  // keeps the figure on screen until the new one lands.
-  const todayDept = useKeyedRead<DepartmentIncome>(todayKey, !!todayKey && deptView, gen, () => source.departmentIncome(membershipId, period), track);
-  const todayOwn = useKeyedRead<MemberIncome>(todayKey, !!todayKey && !deptView, gen,
+  // keeps the figure on screen until the new one lands. Not on the Product List: Server Actions run one at a
+  // time, and the engine read would hold its saves behind it (2026-10-08) — Today reads it when it opens.
+  const todayDept = useKeyedRead<DepartmentIncome>(todayKey, !!todayKey && deptView && !onProducts, gen, () => source.departmentIncome(membershipId, period), track);
+  const todayOwn = useKeyedRead<MemberIncome>(todayKey, !!todayKey && !deptView && !onProducts, gen,
     () => source.income(membershipId, period, viewStaff ? { staffId: viewStaff, subDepartmentId: membershipId } : undefined), track);
   const todayIncome = useMemo<{ month?: IncomeMonth; dept?: DepartmentIncome; failed?: boolean } | null>(() => {
     if (!todayKey) return null;
@@ -370,8 +391,20 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     initial: fixture?.quote?.initial,
   });
 
+  // ── the Product List's page, inside the app ──
+  // What it has not saved yet: the app asks before leaving it for one of its own screens, as its own
+  // links and a reload do (ProductWorkspace).
+  const productDraft = useRef({ dirty: false, saving: false });
+  const mayLeaveProducts = useCallback(() => {
+    if (!onProducts) return true;
+    const draft = productDraft.current;
+    if (draft.saving) return false;
+    return !draft.dirty || window.confirm("Discard your unsaved Product List changes and leave this page?");
+  }, [onProducts]);
+
   // ── navigation ──
   const goScreen = useCallback((screen: Screen, extra: Partial<Route> = {}) => {
+    if (!mayLeaveProducts()) return;
     setSheet(null);
     setNfOpen(false);
     setDateOpen(false);
@@ -385,10 +418,36 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     closeProfileSheets();
     if (screen !== "quote" && screen !== "calc") { quote.closeSheet(); quote.setCartOpen(false); quote.setAllOpen(false); }
     quote.setPreviewOpen(false);
-    go({ screen, pf: null, ins: "main", arena: "hub", ...extra });
+    const next: Partial<Route> = { screen, pf: null, ins: "main", arena: "hub", ...extra };
+    if (onProducts) {
+      // From the Product List's page back to the app's own: the router changes the page, the app its screen.
+      go(next, false, false);
+      router.push(appHref({ ...baseRoute, ...next }, window.location.origin), { scroll: false });
+      return;
+    }
+    go(next);
     if (mainRef.current) mainRef.current.scrollTop = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the quote's setters are stable
-  }, [go, closeProfileSheets]);
+  }, [go, closeProfileSheets, mayLeaveProducts, onProducts, router, baseRoute]);
+  const openProducts = useCallback(() => {
+    if (onProducts) return;
+    setSheet(null);
+    setNfOpen(false);
+    setVaOpen(false);
+    closeProfileSheets();
+    quote.closeSheet(); quote.setCartOpen(false); quote.setAllOpen(false); quote.setPreviewOpen(false);
+    router.push(productsHref(baseRoute), { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the quote's setters are stable
+  }, [onProducts, closeProfileSheets, router, baseRoute]);
+  // The module switcher: the portal's other modules are the Principal's views of it (setViewAs).
+  const [, startSwitch] = useTransition();
+  const pickModule = useCallback((id: ModuleId) => {
+    // The design preview draws the menu and goes nowhere, as the prototype's does.
+    if (id === "revenue" || device !== "live" || !mayLeaveProducts()) return;
+    const form = new FormData();
+    form.set("role", id);
+    startSwitch(async () => { await setViewAs(form); });
+  }, [mayLeaveProducts, device]);
   const toInsight = useCallback((view: InsightView, status: BillsStatus = "counted") => {
     if (view === "bills") setBillStatus(status);
     goScreen("insight", { ins: view });
@@ -797,12 +856,19 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const quotePanel = quote.sheet !== null || quote.cartOpen || quote.allOpen || quote.previewOpen;
   const profilePanel = route.screen === "account" && (coPick !== null || honPlace !== null || personPick !== null || reqPick !== null || reqForm !== null || memoPick !== null || pfDateOpen || schemeOpen);
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel;
-  // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures.
-  const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen;
+  // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
+  // nor on the Product List, which holds its edits until Save.
+  const pullable = !data.demo && !fixture && !anyPanel && !nfOpen && !vaOpen && !onProducts;
   // A reload for a newer release loses nothing: no sheet or form open, no brand weeks picked and not saved.
   reloadable.current = pullable && !bwBusy && !bwMonths?.some(m => m.dirty);
-  // View as takes the page column's place too (the prototype's `vaPE` opens the rail).
-  const rail = desk && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
+  // View as takes the page column's place too (the prototype's `vaPE` opens the rail). The Product List
+  // keeps the whole column and makes room inside itself instead (`shift`).
+  const rail = desk && !onProducts && (nfOpen || anyPanel || route.screen === "quote" || vaOpen);
+  const productShell = useMemo<ProductShell>(() => ({
+    shift: desk && (nfOpen || sheet !== null || vaOpen),
+    closePanels: () => { setSheet(null); setNfOpen(false); setVaOpen(false); },
+    setDraft: draft => { productDraft.current = draft; },
+  }), [desk, nfOpen, sheet, vaOpen]);
   const showHeader = route.screen === "today" || route.screen === "calc";
   // Profile's glow runs up into the status bar until the page scrolls (or View as covers it).
   const statusBg = route.screen === "account" && !route.pf && !compact && !vaOpen ? "var(--rv-peach)" : "var(--rv-white)";
@@ -829,7 +895,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
   const onQuote = route.screen === "quote" || route.screen === "calc";
 
   let page: ReactNode;
-  if (route.screen === "today") {
+  if (onProducts) {
+    page = <ProductShellContext.Provider value={productShell}>{children}</ProductShellContext.Provider>;
+  } else if (route.screen === "today") {
     // Today's figures are this month's: a tap opens Insight and the Arena on this month too.
     const insightThisMonth = (view: InsightView) => { setInsKind("monthly"); setInsFrom(period); setBillWeek(null); toInsight(view); };
     const arenaThisMonth = (board?: Board) => {
@@ -935,7 +1003,9 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
     <div className={`${s.screen} ${live ? s.screenLive : s.screenFramed} ${rail ? s.rail : ""}`} style={screenVars} data-platform={android ? "android" : "ios"}>
       {!live && device !== "desktop" && <StatusBar android={android} />}
       <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} onGo={goScreen} onQuote={() => openSheet("brand")}
-        onNotif={toggleNotif} onProfile={() => goScreen("account")} />
+        onNotif={toggleNotif} onProfile={() => goScreen("account")}
+        products={productList ? { group: productList.group, onOpen: openProducts } : null}
+        modules={principal ? { current: "revenue", onPick: pickModule } : null} />
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
         unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
         onSignOut={() => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); }} />
@@ -946,7 +1016,7 @@ export default function RevenueApp({ initialData, initialSearch, device = "live"
           onProfile={() => goScreen("account")} />
       )}
       <PullRefresh target={mainRef} enabled={pullable} refreshing={refreshing} failed={refreshFailed} onRefresh={pullRefresh} />
-      <main ref={mainRef} className={s.main} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
+      <main ref={mainRef} className={`${s.main} ${onProducts ? s.mainProducts : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
         {page}
       </main>
       {route.screen === "quote" && quote.catalog && (

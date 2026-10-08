@@ -54,3 +54,7 @@
   box-shadow: 0 3px 9px var(--rv-accent-18);
 }
 .errorRef { font-size: calc(11.5px * var(--rv-type)); color: var(--rv-muted); font-variant-numeric: tabular-nums; }
+
+/* Between two pages inside the app (2026-10-08: the Product List is a page of
+   its own): the shell stays up and only the page area waits. */
+.pageWait { position: absolute; inset: 0; display: grid; place-items: center; }

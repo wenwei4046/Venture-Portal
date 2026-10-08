@@ -44,8 +44,11 @@ describe('isSheetRoute', () => {
     }
   })
 
-  it('leaves the Product List in its own workspace', () => {
-    expect(isSheetRoute('/revenue/products')).toBe(false)
+  // 2026-10-08: the Product List moved into the Revenue app; what is left at
+  // its old address is a redirect, under Revenue like the rest.
+  it('keeps the Revenue app — the Product List included — off the portal sheet', () => {
+    expect(isSheetRoute('/member/products')).toBe(false)
+    expect(isSheetRoute('/revenue/products')).toBe(true)
   })
 
   // 2026-10-07 (user: "finance 的整体 background 可以换成和 principal 和 hr 一样"

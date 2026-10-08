@@ -3,6 +3,7 @@ import {
   EditError,
   parseMoney,
   validateComboPrices,
+  validateComboRemovals,
   validateModelEdit,
   validateOptionPrices,
   validateSkuPrices,
@@ -478,5 +479,21 @@ describe('the audit fixes', () => {
       skuOffered: {},
     })
     expect(model.enabled.leg_heights).toEqual(['Default'])
+  })
+})
+
+describe('validateComboRemovals', () => {
+  it('keys each set once, the way the table does', () => {
+    expect(validateComboRemovals([
+      { baseModel: ' 8030 ', slotsKey: '[["1NA"], ["2NA"]]' },
+      { baseModel: '8030', slotsKey: '[["1NA"], ["2NA"]]' },
+    ])).toEqual([{ base_model: '8030', slots_key: '[["1NA"], ["2NA"]]' }])
+  })
+
+  it('refuses nothing, too many, or a row without its key', () => {
+    expect(() => validateComboRemovals([])).toThrow(EditError)
+    expect(() => validateComboRemovals(Array.from({ length: 501 }, (_, i) => ({ baseModel: String(i), slotsKey: '[]' })))).toThrow('at most 500')
+    expect(() => validateComboRemovals([{ baseModel: '', slotsKey: '[]' }])).toThrow('A combo row is incomplete')
+    expect(() => validateComboRemovals([{ baseModel: '8030', slotsKey: '1NA+2NA' }])).toThrow('A combo row is incomplete')
   })
 })

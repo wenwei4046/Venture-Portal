@@ -26,9 +26,12 @@ export type UpdateStep = 'none' | 'prompt' | 'reload'
  * session storage, so a reload loses nothing. NOT the portal: a page like
  * HR › Payroll holds edits until *Save all* without guarding them, and they
  * may have been made long before anybody switched tabs — no check of typing or
- * focus can see those. There a new build is only ever offered.
+ * focus can see those. There a new build is only ever offered — and so it is
+ * on the Product List (`/member/products`, 2026-10-08), which holds its price
+ * edits until Save in the same way.
  */
 export function mayReloadOn(pathname: string): boolean {
+  if (pathname === '/member/products' || pathname.startsWith('/member/products/')) return false
   return pathname === '/member' || pathname.startsWith('/member/')
 }
 

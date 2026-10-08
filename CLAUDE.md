@@ -216,7 +216,9 @@ src/
 │   │   │                              (Fair, …) with 3 views, reached from the
 │   │   │                              SIDEBAR not a tab rail — page.tsx (Commission
 │   │   │                              Calculation) / hierarchy / rules — plus
-│   │   │                              [sub]/[period]/ runs and products/ (Principal).
+│   │   │                              [sub]/[period]/ runs. The Product List left for
+│   │   │                              the Revenue app on 2026-10-08 (/member/products,
+│   │   │                              below); /revenue/products redirects there.
 │   │   │                              **THE ERP NAMES THE FAIR (2026-09-27):** the
 │   │   │                              venues/ register (organiser per venue×month,
 │   │   │                              fair calendar, *same place as…*) is GONE. The
@@ -583,6 +585,58 @@ src/
 │   │   │                              (`assertStaffNotClosed`) or who is off the
 │   │   │                              team, and answers with the holders
 │   │   │                              (`lib/commission/bill-share.ts`). No mig.
+│   │   │                              **THE PRODUCT LIST IS A PAGE OF THE REVENUE
+│   │   │                              APP (2026-10-08, user: 把 product list 直接搬过去
+│   │   │                              revenue view … 只有拥有权限进去的时候，才会看到这个 tab):**
+│   │   │                              `/member/products`, under the route group
+│   │   │                              `(member)/member/(app)` — its layout renders
+│   │   │                              `RevenueApp` around the page (`(app)/page.tsx`
+│   │   │                              is null, `(app)/loading.tsx` keeps the shell
+│   │   │                              up between the two). The app's sidebar shows
+│   │   │                              it under PRINCIPAL only to whoever holds
+│   │   │                              `product_list`
+│   │   │                              (`lib/member/product-access.ts`; a Principal
+│   │   │                              in Revenue View is asked through `getUser()`),
+│   │   │                              the Module switcher beside it (Principal only,
+│   │   │                              `setViewAs`). The portal's `/revenue/products`
+│   │   │                              redirects there and the portal nav lost its
+│   │   │                              row. Drawn to the design handoff
+│   │   │                              (`.design/revenue-app/design_handoff_product_list`,
+│   │   │                              `_components/products.module.css`;
+│   │   │                              `tools/measure-pl.mjs` diffs every element
+│   │   │                              against the prototype — box-sizing and the
+│   │   │                              browser's own input padding are restored where
+│   │   │                              Tailwind's reset changed them). Its code never
+│   │   │                              reaches a member's bundle:
+│   │   │                              `components/member/cost-basis-wording.test.ts`
+│   │   │                              exempts the folder and refuses an import of
+│   │   │                              it. A save `router.refresh()`es the layout, so
+│   │   │                              the Quote's catalogue follows at once. Code
+│   │   │                              moved from `revenue/products` +
+│   │   │                              `revenue/catalogue-actions.ts` to
+│   │   │                              `(app)/products/` (`actions.ts`).
+│   │   │                              **COMBOS ARE OURS (2026-10-08, user: need
+│   │   │                              delete button, then that side no need sync
+│   │   │                              with houzs erp anymore):** `catalogue_combos`
+│   │   │                              holds every combo — the ERP's 76 live rows
+│   │   │                              adopted once (`erp_id`, same model,
+│   │   │                              compartments, tier, name, heights and
+│   │   │                              effective date, so no bill changed), + Add
+│   │   │                              combo makes more (`catalogue_add_combo`), Edit
+│   │   │                              prices › Remove takes a set away
+│   │   │                              (`catalogue_remove_combos`: every tier, and
+│   │   │                              its prices deleted; the row kept with
+│   │   │                              `removed_at` / `removed_by`; 42501 without
+│   │   │                              admin scope, 22023 a set already gone).
+│   │   │                              `catalogue_live_combos` — read by
+│   │   │                              `catalogue_apply_combos` (the run) and
+│   │   │                              `member_catalogue` (the Quote) — is
+│   │   │                              `catalogue_combos` alone; `erp_sofa_combos` is
+│   │   │                              still written by the ingest and read by
+│   │   │                              nothing, so the ERP needs no change. A bill
+│   │   │                              costed at a removed combo keeps that cost
+│   │   │                              until its month is Recosted. Migs
+│   │   │                              `20261008010000` / `020000`.
 │   │   │                              **THE CATALOGUE, MIRRORED — ITEMS ONLY
 │   │   │                              (2026-09-24):** `products/` (Product List)
 │   │   │                              is the Houzs ERP's Products page mirrored
@@ -602,7 +656,8 @@ src/
 │   │   │                              `erp_*` (`erp_products`,
 │   │   │                              `erp_product_models`,
 │   │   │                              `erp_maintenance_options`, `erp_fabrics`,
-│   │   │                              `erp_sofa_combos`) is what the ERP says
+│   │   │                              `erp_sofa_combos` — unread since 2026-10-08,
+│   │   │                              combos are ours) is what the ERP says
 │   │   │                              EXISTS, written only by
 │   │   │                              `ingest_erp_catalogue` (service role, money
 │   │   │                              stripped again on the way in AT ANY DEPTH
@@ -724,7 +779,7 @@ src/
 │   │   │                              v2) on the sales-order feed's key, whole,
 │   │   │                              only when its digest changed.
 │   │   │                              `lib/erp-sync/catalogue.ts`,
-│   │   │                              `revenue/catalogue-actions.ts`, migs
+│   │   │                              `(member)/member/(app)/products/actions.ts`, migs
 │   │   │                              `20260924020000` / `025000` / `030000`.
 │   │   │                              **COSTING SETTING + ADD-ON / KPI ITEMS
 │   │   │                              (2026-09-27):** two more Product List tabs,
@@ -1971,7 +2026,7 @@ Six non-negotiable rules every new/amended page must follow:
 4. **Section headings use `.sect-head`** — medium-weight upright sans title + hairline rule extending right + uppercase mono counter. See `src/app/(portal)/statements/page.tsx` for the canonical pattern.
 5. **Colors via CSS variables only** — no hex outside `globals.css`. Use `text-ink` / `text-num-ink` / `text-graphite` / `bg-paper` / `bg-surface` / `border-hairline` / `text-accent` / `text-danger` / `text-ledger` / `text-alert` / `text-info`.
 6. **A new route folder with child routes gets a `loading.tsx`** that renders `RouteSkeleton` — see Navigation speed under Coding Conventions.
-7. **HR's view sits on the white sheet (2026-09-27, DESIGN.md › "Sheet theme").** Every route under `/dashboard` (all four roles' Overview), `/hr-costing`, `/director-salary`, `/director-pool`, `/revenue` (not `/revenue/products`), `/claims`, `/team` (People) and `/member-admin` — `lib/sheet-routes.ts` — is drawn by PortalFrame on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` only as a surface (buttons, active tab, markers — never text), walnut for the one primary figure. Open such a page with `StatCards`/`StatCard` (`components/sheet/StatCard.tsx`), not a hero or a figure strip; statuses are `.chip`s; a closing total goes in `<tfoot>`. Extending the tone to another section = add its prefix there and convert the page the same way. Reference: `src/app/(portal)/hr-costing/page.tsx`.
+7. **HR's view sits on the white sheet (2026-09-27, DESIGN.md › "Sheet theme").** Every route under `/dashboard` (all four roles' Overview), `/hr-costing`, `/director-salary`, `/director-pool`, `/revenue`, `/claims`, `/team` (People) and `/member-admin` — `lib/sheet-routes.ts` — is drawn by PortalFrame on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` only as a surface (buttons, active tab, markers — never text), walnut for the one primary figure. Open such a page with `StatCards`/`StatCard` (`components/sheet/StatCard.tsx`), not a hero or a figure strip; statuses are `.chip`s; a closing total goes in `<tfoot>`. Extending the tone to another section = add its prefix there and convert the page the same way. Reference: `src/app/(portal)/hr-costing/page.tsx`.
 
 Canonical reference pages (copy these patterns when in doubt):
 - Page header + hero number + ledger table → `src/app/(portal)/fund-out/page.tsx`

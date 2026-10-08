@@ -13,11 +13,17 @@ import { describe, expect, it } from "vitest";
 
 // Vitest runs from the repository root.
 const ROOTS = ["src/components/member", "src/app/(member)"].map(dir => resolve(process.cwd(), dir));
+// The Product List moved into the Revenue app on 2026-10-08, but it is the
+// Principal's page, not a member's: the server refuses it without product_list
+// (lib/member/product-access.ts), nothing a member opens imports it, and it is
+// where the ratio is SET — so it names it.
+const EXEMPT = [resolve(process.cwd(), "src/app/(member)/member/(app)/products")];
 const LEAK = /cost\s*÷|÷\s*0?\.\d|team[- ]cost|cost basis|Revenue Team(?:'s|&apos;s)? cost|company(?:'s|&apos;s)? own margin/i;
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap(name => {
     const path = join(dir, name);
+    if (EXEMPT.includes(path)) return [];
     if (statSync(path).isDirectory()) return sources(path);
     return /\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
   });
@@ -29,6 +35,13 @@ describe("the member app's wording", () => {
       readFileSync(file, "utf8").split(/\r?\n/).flatMap((line, i) =>
         LEAK.test(line) ? [`${relative(process.cwd(), file)}:${i + 1}  ${line.trim()}`] : []));
     expect(hits).toEqual([]);
+  });
+
+  it("keeps the Product List's code out of every member screen", () => {
+    const imports = ROOTS.flatMap(sources).flatMap(file =>
+      readFileSync(file, "utf8").split(/\r?\n/).flatMap((line, i) =>
+        /from\s+["'][^"']*\/products\/(?:_components|load|actions)\b/.test(line) ? [`${relative(process.cwd(), file)}:${i + 1}  ${line.trim()}`] : []));
+    expect(imports).toEqual([]);
   });
 
   it("would catch the sentences it replaced", () => {

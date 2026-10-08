@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ICON, Svg } from "../icons";
 import type { Screen } from "../route";
 import s from "../shell.module.css";
@@ -100,19 +101,74 @@ const DESK_NAV: { id: Screen; label: string; d: string }[] = [
   { id: "account", label: "Profile", d: ICON.user },
 ];
 
+/** The portal's modules, in the switcher's order, and the dot each wears. */
+export type ModuleId = "finance" | "principal" | "hr" | "revenue";
+const MODULES: { id: ModuleId; label: string; dot: string }[] = [
+  { id: "finance", label: "Finance", dot: s.moduleDotFinance },
+  { id: "principal", label: "Principal", dot: s.moduleDotPrincipal },
+  { id: "hr", label: "HR", dot: s.moduleDotHr },
+  { id: "revenue", label: "Revenue team", dot: s.moduleDotRevenue },
+];
+
+/**
+ * The foot of the sidebar (2026-10-08): which part of the portal this is, and
+ * the others a Principal can switch to. The menu opens upward; a click outside
+ * it closes it.
+ */
+function ModuleSwitcher({ current, onPick }: { current: ModuleId; onPick: (id: ModuleId) => void }) {
+  const [open, setOpen] = useState(false);
+  const name = MODULES.find(m => m.id === current)?.label ?? "";
+  return (
+    <div className={s.module}>
+      {open && (
+        <>
+          <div className={s.moduleScrim} onClick={() => setOpen(false)} />
+          <div className={s.moduleMenu} role="menu" aria-label="Switch module">
+            <span className={s.moduleMenuLabel}>SWITCH MODULE</span>
+            {MODULES.map(m => {
+              const on = m.id === current;
+              return (
+                <button key={m.id} type="button" role="menuitemradio" aria-checked={on} className={`${s.moduleRow} ${on ? s.moduleRowOn : ""}`}
+                  onClick={() => { setOpen(false); if (!on) onPick(m.id); }}>
+                  <span className={`${s.moduleDot} ${m.dot}`} />
+                  <span className={s.moduleRowLabel}>{m.label}</span>
+                  <Svg d={ICON.check} size={15} sw={2.4} stroke="var(--rv-accent)" style={{ opacity: on ? 1 : 0 }} />
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      <button type="button" className={s.moduleButton} aria-label="Switch module" aria-expanded={open} onClick={() => setOpen(v => !v)}>
+        <Svg d={ICON.modules} size={17} sw={1.8} stroke="var(--rv-sub)" />
+        <span className={s.moduleText}>
+          <span className={s.moduleLabel}>MODULE</span>
+          <span className={s.moduleName}>{name}</span>
+        </span>
+        <Svg d={ICON.chevronUp} size={15} sw={2.2} stroke="var(--rv-sub)" />
+      </button>
+    </div>
+  );
+}
+
 /** Desktop: the 240px sidebar. */
-export function DeskAside({ active, count, notifOpen, me, onGo, onQuote, onNotif, onProfile }: {
+export function DeskAside({ active, count, notifOpen, me, products, modules, onGo, onQuote, onNotif, onProfile }: {
   active: Screen;
   count: number;
   notifOpen: boolean;
   /** Absent while /member is still loading (`AppLoading`): no card at the foot. */
   me?: Me;
+  /** The Product List row under its group label — only for an account holding `product_list`. */
+  products?: { group: string; onOpen: () => void } | null;
+  /** The module switcher — a Principal's, who can open the other modules. */
+  modules?: { current: ModuleId; onPick: (id: ModuleId) => void } | null;
   onGo: (screen: Screen) => void;
   onQuote: () => void;
   onNotif: () => void;
   onProfile: () => void;
 }) {
   const tab = active === "calc" ? "quote" : active;
+  const productsOn = active === "products";
   return (
     <aside className={s.aside}>
       <button className={s.asideLogo} onClick={() => onGo("today")}>
@@ -131,7 +187,16 @@ export function DeskAside({ active, count, notifOpen, me, onGo, onQuote, onNotif
         <Svg d={ICON.bell} size={20} sw={1.8} /><span className={s.asideNotifLabel}>Notifications</span>
         {count > 0 && <span className={s.asideCount}>{count}</span>}
       </button>
+      {products && (
+        <>
+          <span className={s.asideGroup}>{products.group}</span>
+          <button className={`${s.asideNav} ${productsOn ? s.asideNavOn : ""}`} onClick={products.onOpen} aria-current={productsOn ? "page" : undefined}>
+            <Svg d={ICON.cube} size={20} sw={1.8} />Product List
+          </button>
+        </>
+      )}
       <div className={s.asideSpacer} />
+      {modules && <ModuleSwitcher current={modules.current} onPick={modules.onPick} />}
       {me && (
         <button className={s.asideMe} onClick={onProfile}>
           <span className={s.asideAvatar}>{me.ini}</span>
