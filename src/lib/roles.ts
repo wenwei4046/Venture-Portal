@@ -1,5 +1,6 @@
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
+import { AUDIT_READ_KEYS } from '@/lib/audit/read-keys'
 
 // What each part of the portal needs.
 //
@@ -115,7 +116,16 @@ export function canAccessTeam(u: PermissionHolder): boolean {
 }
 
 export function canAccessAuditLog(u: PermissionHolder): boolean {
+  // The whole history, and Audit Log › Access (who read what).
   return can(u, 'audit_log')
+}
+
+export function canSeeAuditChanges(u: PermissionHolder): boolean {
+  // Audit Log › Changes (2026-10-08): anybody whose permissions open the
+  // history of some table — Finance its Treasury side, HR its People and
+  // Payroll side. Which changes they then see is the database's call
+  // (audit_changes(), table by table, value by value).
+  return can(u, ...AUDIT_READ_KEYS)
 }
 
 export function canAccessReconciliation(u: PermissionHolder): boolean {

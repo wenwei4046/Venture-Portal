@@ -64,6 +64,21 @@ yesterday, one begun today changed or deleted where it stands, another
 sub-department's row refused). Run only these checks with
 `npm run test:kpi-add-ons --prefix tests/member-sql`.
 
+The default command ends with `validate-app-audit.mjs` (the app-wide history,
+2026-10-08). It applies `20261008190000` verbatim over PR1's `audit_events` and
+trigger (its md5 is the migration's guard), the old `config_audit_log` with rows
+and the triggers that wrote it, and one table of each kind the register sorts.
+Its 96 checks cover the register (people-only tables fire for a signed-in
+person only, a table left out says why, a stray trigger on one is switched
+off), the old log folded in (rows copied, one group per old save, its triggers
+switched off — nothing dropped), who is recorded (a person, the server naming
+its person, the database), what is kept (no-op and updated_at-only saves are
+not; wide tables keep what changed; the ERP's raw document is never copied),
+a payroll voucher's family needing Payroll payouts, and reading by the reader's
+own permissions — tables by `read_keys`, salary / NRIC / bank blanked by
+`current_sensitive_fields()`, filters and pages. Run only these checks with
+`npm run test:app-audit --prefix tests/member-sql`.
+
 Expected final output:
 
 ```text

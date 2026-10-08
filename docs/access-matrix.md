@@ -4,6 +4,17 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-08 — The app-wide history (Audit Log › Changes)
+Every change people make through the portal is kept (`audit_events`, as `audit_tables`
+says — CLAUDE.md › THE APP-WIDE HISTORY), and READING IT FOLLOWS THE READER'S OWN
+PERMISSIONS: a table's changes are listed only to holders of one of its `read_keys`
+(Finance: Treasury, Payments, Billing, Pools, Accounting; HR: Payroll, People, Directors,
+Revenue, Member services; `audit_log` = the Principal: everything), a payroll voucher's
+only with Payroll payouts or HR Costing, and salary / NRIC / bank values only where the
+reader's title (or account kind) may see them — blanked otherwise. Nobody reads the
+table directly; `audit_changes()` decides. Audit Log › Access (who read what) stays
+`audit_log` only. A department head reads no history until own / dept scopes reach RLS.
+---
 ⚡ AMENDMENT 2026-10-08 — Permission templates (People Management › Permissions)
 The four roles below are no longer what a person gets. A TITLE points at a permission
 TEMPLATE: function × action (view create edit approve void export manage) × scope

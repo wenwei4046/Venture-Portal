@@ -4818,3 +4818,39 @@ pre.perm-keylist {
   font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 11px; color: rgb(var(--ink)); cursor: pointer;
 }
 .invite-cell:hover { background: rgb(var(--accent)); }
+
+/* ── Audit Log › Changes (2026-10-08) ──
+   A save's records, each with its fields as a two-column list: the field,
+   then before → after (Changed) or the value (Added / Removed). DESIGN.md ›
+   Audit log. */
+/* A save can run long; its When and Who stay at its top (over the sheet's
+   middle-aligned ledger cells). */
+table.ledger-table.audit-saves td { vertical-align: top; }
+.audit-change + .audit-change { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgb(var(--hairline)); }
+.audit-change-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; line-height: 1.5; }
+.audit-row-link { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgb(var(--hairline)); }
+.audit-row-link:hover { text-decoration-color: currentColor; }
+.audit-fields {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+  column-gap: 14px;
+  row-gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.audit-fields > li { display: contents; }
+.audit-field { color: rgb(var(--graphite)); }
+.audit-was { color: rgb(var(--graphite)); text-decoration: line-through; text-decoration-color: rgb(var(--graphite) / 0.5); }
+.audit-now { font-weight: 600; }
+.audit-hidden { color: rgb(var(--muted)); font-size: 11px; font-style: normal; }
+.audit-more { margin-top: 8px; font-size: 12px; }
+.audit-more > summary { cursor: pointer; color: rgb(var(--graphite)); }
+.audit-more > summary:hover { color: rgb(var(--ink)); }
+.audit-recorded > summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+@media (max-width: 767px) {
+  .audit-fields { grid-template-columns: minmax(0, 1fr); }
+  .audit-field { margin-top: 4px; font-size: 11px; }
+}

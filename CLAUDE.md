@@ -2071,14 +2071,52 @@ HR cannot promote anybody, themselves included, by retitling. Writers are RPCs
 `permission_template_create`, `permission_title_set_template`,
 `permission_user_cells_set`, `permission_user_clear_legacy`); a save that
 changes a cell somebody has their own value on asks keep-or-reset per person.
-Every change is in `audit_events` (trigger `audit_row_change(keycols,
-ignorecols)`, one txid per save; History on the Permissions tab,
-`permission_history()`, `lib/permission-history.ts`) — the general form of
-`config_audit_log`, which the app-wide audit step folds in. Old per-key
-`user_permissions` still apply on top (carrie's 3 denies) until cleared on
-her card. NEXT: PR2 actions enforced, PR3 own/dept into RLS, PR4 masking —
+Every change is in `audit_events` (one txid per save; History on the
+Permissions tab, `permission_history()`, `lib/permission-history.ts`). Old
+per-key `user_permissions` still apply on top (carrie's 3 denies) until cleared
+on her card. NEXT: PR2 actions enforced, PR3 own/dept into RLS, PR4 masking —
 then `permission_cell_keys` goes. Migs `20261008110000`–`130000`,
 `tests/member-sql/validate-permission-templates.mjs`.
+
+**THE APP-WIDE HISTORY (2026-10-08; user: 在 portal 里人手改的资料全部要有 audit
+history（谁、什么时候、改前/改后）… ERP 自动送进来的大量资料不用逐行记，但人手在上面做
+的改动要记; and 这个 audit log 基本上就是跟着自己的权限 … Finance 没有 HR 那边的
+permission，同样他就不会看到 HR 的 audit log).** Every table of the app has ONE
+line in `audit_tables` (187): `mode` all (every insert / update / delete) ·
+people (only a signed-in person's change — the ERP-fed `sales_orders`,
+`sales_order_lines`, `sales_import_batches`, Open Bill suggestions,
+`comm_upsales`, the ERP's fairs / venues / organisers; trigger `WHEN
+(auth.uid() IS NOT NULL)`, so the feed costs nothing) · none (with a `reason`:
+logs that are a record already, the ERP catalogue mirror, statutory
+schedules, run statements, screen layouts, the unmerged CRM's tables). The
+trigger `audit_row_change()` (no arguments — it reads the line) keeps who
+(`actor_id` = auth.uid(); `actor_source` portal / server / database; a server
+write names its person via `actor_column`, the member's invoice upload), the
+row's key, before / after (`omit_columns` never copied — the ERP's `raw`, run
+and close snapshots; `diff_only` UPDATEs keep only changed + key + label
+columns on the wide tables), `changed` (updated_at / updated_by / version
+never count) and `needs` (a payroll voucher, its sources / attachments /
+approval and the pool rows its payment wrote need Payroll payouts or HR
+Costing — the line `lib/payroll-vouchers.ts` draws). **A NEW TABLE = one
+`SELECT audit_register('t', 'Label', 'Area', '{read_keys}' …)` in its own
+migration** — `src/lib/audit/registry.test.ts` fails otherwise, and so does
+the next audit migration's coverage check. **Reading follows the reader's own
+permissions:** nobody selects `audit_events` (grant revoked, PR1's policy
+closed); `audit_changes()` returns only tables whose `read_keys` the caller
+holds (`audit_log` = all), drops what `needs` a key they lack, and blanks
+`salary_columns` / `nric_columns` / `bank_columns` their title may not see
+(`current_sensitive_fields()`: template's sensitive fields, else Principal / HR
+bank+NRIC, Finance bank; salary = `salary_individual`) — the column names come
+back in `masked`. A department head reads none yet (own / dept = PR3).
+`config_audit_log`'s 44 rows were copied in (one negative txid per old save),
+its 8 triggers DISABLED, `log_config_change()` left unused — nothing is
+dropped (the MCP refuses any `DROP` text; use CREATE OR REPLACE TRIGGER /
+DISABLE TRIGGER / ALTER POLICY). UI: Audit Log is a sidebar group — **Changes**
+(`/audit-log`, `canSeeAuditChanges` = any key in `lib/audit/read-keys.ts`) and
+**Access** (`/audit-log/access`, `audit_log`; old `?resource=` links
+redirect). `lib/audit/changes.ts` (saves, fields, values), `lib/audit/refs.ts`
+(ids → names under the reader's session), mig `20261008190000`,
+`tests/member-sql/validate-app-audit.mjs`.
 
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
