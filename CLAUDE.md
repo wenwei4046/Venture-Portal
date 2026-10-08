@@ -2177,6 +2177,34 @@ why (`undecidable` on PendingApprovals). hr_costing / director_salary / revenue
 keys' Approve rows moved to the `approvals` key (UPDATE, not DELETE — the MCP
 refuses DELETE): hr@ approves no payroll run, as before. Mig `20261009010000`.
 
+**THE DATABASE ASKS FOR THE ACTION TOO (2026-10-09, PR3a).** A table's row
+policies opened it to whoever held ANY key of its domain (`has_scope(ARRAY
+['treasury'])`), and a View cell opens a key — so through the API a template
+that only reads Treasury raised payment vouchers and a Director who sees the
+roster wrote payroll. Every table a domain policy lets somebody write now also
+has a RESTRICTIVE policy per command, `needs_action_insert / _update / _delete`
+→ `may_write(table, command)` → `has_any_action(actions)` over the row of
+`permission_table_writes` (TS twin `TABLE_WRITES`, lib/permission-table-writes.ts;
+`fn.action` or `fn.action:dept` / `:own`). Restrictive = only takes away. Each
+list is every way the APP writes that table under the caller's own session: the
+gate of each server action writing it straight, of each SECURITY INVOKER function
+it calls (the Revenue / catalogue / ladder RPCs — `INVOKER_WRITES` in the test),
+and of each INVOKER trigger writing on its behalf (a voucher marks its invoice
+paid, so every voucher writer is on invoices UPDATE). DEFINER functions meet no
+row policy (postgres owns tables and functions, BYPASSRLS) — they ask for their
+own action next (PR3b). `permission-table-writes.test.ts` holds the twin, scans
+every `.from('t').insert/update/upsert/delete` and `.rpc(invoker)` in src/ with
+its gates (own function, else its callers across imports) and fails when a gate
+lets in an action the table does not ask for, or a new domain table is written
+unregistered; the migration's guard refuses a domain write policy left without
+its restrictive one. A NEW table a domain policy opens: rows in
+`permission_table_writes` + `SELECT permission_writes_guard('t')` in its
+migration. `WRITES_WITHOUT_ACTION`: table_layout_defaults only. Residual, said
+out loud: a table's UPDATE cannot tell edit from void from approve (an approver
+may update a voucher), and an action that writes a table as a side effect may
+write it straight (Claims · Approve raises the claim's voucher). Mig
+`20261009020000`, `tests/member-sql/validate-table-writes.mjs`.
+
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
 (`getMemberUser`); the portal's `getUser` ignores it. Before, switching one tab
