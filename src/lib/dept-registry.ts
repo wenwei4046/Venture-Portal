@@ -142,9 +142,17 @@ export function primeDeptRegistry(registry: DeptRegistryRow[]): void {
   }
 }
 
+/** Zero rows is never the truth — a department is never deleted
+ *  (`departments_no_delete`) — it is a read RLS answered with nothing (no
+ *  session: `departments_all_select` is `auth.uid() IS NOT NULL`) or one that
+ *  failed. Priming it would hide every extra department from every request on
+ *  the server until the next refresh, so it keeps the registry it has
+ *  (2026-10-08: a sign-in landing on a due refresh took IT and Revenue
+ *  Department off Dept Pool's bank breakdown — RM 254,269.80 for 507,330.16 —
+ *  and left settle attribution folding them into Venture). */
 export async function primeDeptRegistryFromDb(supabase: Db): Promise<DeptRegistryRow[]> {
   const registry = await fetchDeptRegistry(supabase)
-  primeDeptRegistry(registry)
+  if (registry.length > 0) primeDeptRegistry(registry)
   return registry
 }
 
