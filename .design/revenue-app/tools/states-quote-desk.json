@@ -1,0 +1,10 @@
+[
+  { "name": "quote-desk", "attrs": { "platform": "desktop", "screen": "quote" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=quote" },
+  { "name": "quote-desk-cart", "attrs": { "platform": "desktop", "screen": "quote", "cartOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=quote",
+    "appActions": [{ "click": "button:has-text('View or change')" }] },
+  { "name": "quote-desk-mattress", "attrs": { "platform": "desktop", "screen": "quote", "mattressSheet": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=quote&sheet=mattress" },
+  { "name": "quote-desk-all", "attrs": { "platform": "desktop", "screen": "quote", "quoteAllOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=quote",
+    "appActions": [{ "click": "button:has-text('All Akemi models')" }] },
+  { "name": "quote-desk-sofa", "attrs": { "platform": "desktop", "screen": "quote", "quoteBrand": "ZANOTTI", "sofaSheet": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=quote&brand=ZANOTTI&sheet=sofa" },
+  { "name": "calc-desk", "attrs": { "platform": "desktop", "screen": "calc" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=calc" }
+]

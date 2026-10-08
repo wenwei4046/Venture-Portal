@@ -1,5 +1,8 @@
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
+import { AUDIT_READ_KEYS } from '@/lib/audit/read-keys'
+import { canSeeApprovals } from '@/lib/approval-domains'
+import type { ActionHolder } from '@/lib/permission-actions'
 
 // What each part of the portal needs.
 //
@@ -14,6 +17,15 @@ import { can, type PermissionHolder } from '@/lib/permissions'
 
 export function canAccessTreasury(u: PermissionHolder): boolean {
   return can(u, 'treasury')
+}
+
+export function canSeePayrollPayouts(u: PermissionHolder): boolean {
+  // What ONE named person is paid, as the treasury side shows it: a salary or
+  // statutory voucher, its print, the payroll bank file, Payroll Requests.
+  // Treasury alone stops short of it (2026-10-02, the finance executive) —
+  // such an account gets payroll as one total per batch (lib/payroll-vouchers).
+  // Whoever runs payroll in HR Costing sees it regardless: the vouchers are theirs.
+  return can(u, 'payroll_payouts', 'hr_costing')
 }
 
 export function canAccessBilling(u: PermissionHolder): boolean {
@@ -85,8 +97,10 @@ export function canAccessCategories(u: PermissionHolder): boolean {
   return can(u, 'categories')
 }
 
-export function canApprove(u: PermissionHolder): boolean {
-  return can(u, 'approvals')
+export function canApprove(u: ActionHolder): boolean {
+  // The queue opens for whoever may see it or decide anything in it — the
+  // queue's own Approve or a domain's (2026-10-09, lib/approval-domains.ts).
+  return canSeeApprovals(u)
 }
 
 export function canSeeIndividualSalary(u: PermissionHolder): boolean {
@@ -106,7 +120,16 @@ export function canAccessTeam(u: PermissionHolder): boolean {
 }
 
 export function canAccessAuditLog(u: PermissionHolder): boolean {
+  // The whole history, and Audit Log › Access (who read what).
   return can(u, 'audit_log')
+}
+
+export function canSeeAuditChanges(u: PermissionHolder): boolean {
+  // Audit Log › Changes (2026-10-08): anybody whose permissions open the
+  // history of some table — Finance its Treasury side, HR its People and
+  // Payroll side. Which changes they then see is the database's call
+  // (audit_changes(), table by table, value by value).
+  return can(u, ...AUDIT_READ_KEYS)
 }
 
 export function canAccessReconciliation(u: PermissionHolder): boolean {
@@ -135,6 +158,7 @@ export function getRoleLabel(role: UserRole): string {
     hr: 'HR',
     dept_manager: 'Dept Manager',
     revenue_member: 'Revenue Member',
+    staff: 'Staff',
   }
   return labels[role]
 }

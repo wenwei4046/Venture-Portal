@@ -1,8 +1,14 @@
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { formatMoney } from '@/lib/utils'
+import { allocatorSummary } from '@/lib/allocator-sheet'
+import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import AllocatorTabs from './_components/AllocatorTabs'
+import AllocatorPeriod from './_components/AllocatorPeriod'
 import type {
   AllocatorData, CoOpt, StaffRow, CategoryRow, TemplateRow, TxnRow, AllocInvoiceRow,
 } from './_components/types'
@@ -23,7 +29,7 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const sp = await searchParams
-  const period = /^\d{4}-\d{2}$/.test(sp.period ?? '') ? sp.period! : dayjs().format('YYYY-MM')
+  const period = /^\d{4}-\d{2}$/.test(sp.period ?? '') ? sp.period! : officeMonth()
   const pd = `${period}-01`
   const ref = `ALC-${period.replace('-', '')}`
 
@@ -48,10 +54,17 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     supabase.from('alloc_staff_splits').select('staff_id, company_id, department_id, pct'),
     // ALL snapshot rows — the Calculate headcount picker offers every saved
     // month (user 2026-08-13: bill one month on another month's list).
-    supabase
-      .from('alloc_staff_history')
-      .select('period_month, company_id, department_id, pct, status')
-      .order('period_month', { ascending: false }),
+    // Every one, in pages once past PostgREST's 1000-row cap (2026-10-08: 310
+    // rows, 80–90 more a month): the months past it would vanish from the
+    // picker. A month's rows keep the order they always came in while the
+    // read fits (fetchAllRowsAsWritten); a failed read still offers none.
+    fetchAllRowsAsWritten((page) => {
+      const q = supabase
+        .from('alloc_staff_history')
+        .select('period_month, company_id, department_id, pct, status')
+        .order('period_month', { ascending: false })
+      return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+    }).then((data) => ({ data }), () => ({ data: null })),
     supabase.from('alloc_categories').select('id, name, coa_code').order('name'),
     supabase.from('alloc_templates').select('id, name, default_method, default_amount, category_id, status').order('name'),
     supabase.from('alloc_template_splits').select('template_id, company_id, pct'),
@@ -67,8 +80,18 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
       .like('reference_no', `${ref}%`)
       // Voided invoices (2026-09-15) neither lock the allocation nor count as live.
       .neq('status', 'voided'),
-    // READ-ONLY peek at HR's allocation months, for the one-click import.
-    supabase.from('hr_staff_allocation').select('period_month').order('period_month', { ascending: false }),
+    // READ-ONLY peek at HR's allocation months, for the one-click import —
+    // every row, paged (2026-10-08: ~25–30 a month; past the 1000-row cap the
+    // older months would drop out). Only the distinct months are kept, so the
+    // pages' `id` tiebreak changes nothing; a failed read still offers none.
+    fetchAllRows((lo, hi) =>
+      supabase
+        .from('hr_staff_allocation')
+        .select('period_month')
+        .order('period_month', { ascending: false })
+        .order('id', { ascending: true })
+        .range(lo, hi),
+    ).then((data) => ({ data }), () => ({ data: null })),
     supabase.from('alloc_company_settings').select('company_id, enabled'),
     supabase
       .from('chart_of_accounts')
@@ -228,19 +251,63 @@ export default async function BillingAllocatorPage({ searchParams }: Props) {
     invoices: invoiceRows,
   }
 
+  // The sheet (2026-10-07; the user approved the allocator sample): the month
+  // beside the title, four cards — what the month allocated, what still has
+  // to be billed, what is billed, what HV keeps — then the counted tabs.
+  const summary = allocatorSummary(txnRows, invoiceRows)
+  const monthName = dayjs(pd).format('MMMM')
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
   return (
     <div>
       <div className="page-head">
-        <div>
-          <div className="page-eyebrow"><em>I.</em> TREASURY · BILLING ALLOCATOR</div>
+        <div className="shrink-0">
+          <div className="page-eyebrow"><em>I.</em> BILLING · ALLOCATOR</div>
           <h1 className="page-title">Billing Allocator</h1>
         </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
+          <AllocatorPeriod period={period} />
+        </div>
       </div>
-      <p className="font-serif italic text-muted text-sm mb-6 max-w-3xl">
-        HV 垫付的共同费用,按 Headcount / Percentage / Equal / Custom 分摊给各子公司。
-        算好存档,再一键开成 draft invoice(每家一张,去 Invoice 页复核后 issue)。
-        HV 自己的份只显示、不开单。
-      </p>
+
+      <StatCards label="Billing Allocator">
+        <StatCard
+          tone="primary"
+          label={`Allocated · ${monthName}`}
+          value={formatMoney(summary.allocated)}
+          icon="layers"
+          note={
+            summary.txnCount === 0
+              ? 'nothing allocated yet'
+              : `${plural(summary.txnCount, 'expense', 'expenses')} · ${plural(summary.batchCount, 'batch', 'batches')}`
+          }
+        />
+        <StatCard
+          tone={summary.toBill > 0 ? 'alert' : 'default'}
+          label="To bill"
+          value={formatMoney(summary.toBill)}
+          icon="clock"
+          note={
+            summary.toBillCount > 0
+              ? `${plural(summary.toBillCount, 'expense', 'expenses')} not yet billed · ${plural(summary.toBillTargets, 'company', 'companies')}`
+              : summary.txnCount === 0
+                ? 'nothing to bill'
+                : 'every allocation billed'
+          }
+        />
+        <StatCard
+          label="Billed"
+          value={formatMoney(summary.billed)}
+          icon="receipt"
+          note={
+            summary.invoiceCount === 0
+              ? 'no invoices'
+              : `${plural(summary.invoiceCount, 'invoice', 'invoices')} · ${plural(summary.billedCount, 'expense', 'expenses')}`
+          }
+        />
+        <StatCard label="HV own share" value={formatMoney(summary.ownShare)} icon="building" note="kept by HV · not billed" />
+      </StatCards>
+
       <AllocatorTabs data={data} />
     </div>
   )

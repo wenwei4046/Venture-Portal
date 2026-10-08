@@ -9,8 +9,8 @@ interface Props {
   amount: number
   bankBalance: number | null
   bankName: string | null
-  isPrincipal: boolean
-  isFinance: boolean
+  /** What the reader may do (2026-10-08, PR2) — each the action its Server Action asks. */
+  can: { create: boolean; edit: boolean; void: boolean; approve: boolean }
   submitForApproval: (formData: FormData) => Promise<void>
   approveVoucher: (formData: FormData) => Promise<void>
   voidVoucher: (formData: FormData) => Promise<void>
@@ -25,14 +25,24 @@ interface Props {
   voucherType?: string
 }
 
+// Drawn INSIDE the voucher page's navy panel (2026-10-02). These used to be a
+// section of their own under the audit trail and the attachments — a screen and
+// a half down from the amount they act on (user: "这个 pv 点开看 detail 也是很
+// 乱"). What each state offers, and what each button does, is unchanged.
+const NOTE = 'deal-side-note rounded-md px-3 py-2.5 font-sans text-[12.5px] leading-relaxed'
+const PRIMARY =
+  'deal-side-btn w-full rounded-md px-4 py-2.5 font-sans text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+const SECOND =
+  'deal-side-btn2 block w-full rounded-md px-3 py-2 text-center font-sans text-[13.5px] transition-colors disabled:opacity-50'
+const QUIET = 'deal-side-link font-sans text-[12.5px] transition-colors disabled:opacity-50'
+
 export default function VoucherActions({
   voucherId,
   status,
   amount,
   bankBalance,
   bankName,
-  isPrincipal,
-  isFinance,
+  can,
   submitForApproval,
   approveVoucher,
   voidVoucher,
@@ -72,6 +82,13 @@ export default function VoucherActions({
     })
   }
 
+  const isReceipt = direction === 'credit'
+  const result = message ? (
+    <p className={`${NOTE} ${message.type === 'error' ? 'bad' : 'ok'}`} role={message.type === 'error' ? 'alert' : 'status'}>
+      {message.text}
+    </p>
+  ) : null
+
   // Status-driven rendering
   if (status === 'paid' || status === 'voided') {
     // Paid receipts (credit) void via voidPaidReceipt; paid payments (debit)
@@ -84,162 +101,147 @@ export default function VoucherActions({
             ? reversePaidPayment
             : undefined
         : undefined
-    const canReverse = !!reverseFn
-    const isReceipt = direction === 'credit'
+    const canReverse = !!reverseFn && can.void
     const confirmText = isReceipt
       ? '确认作废这张已付收据?会反冲银行、池、总账,并把发票退回未收。'
       : '确认反转这张已付付款?会退回银行、反冲总账与池子,凭证转为作废。之后可重开一张正确的。'
     const buttonLabel = isReceipt ? '作废收据 · Void receipt' : '反转付款 · Reverse payment'
     const pendingLabel = isReceipt ? '作废中…' : '反转中…'
     return (
-      <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">
-        <p className="font-serif italic text-graphite text-sm">
-          This voucher has been <em className={status === 'paid' ? 'text-ledger' : 'text-danger'}>{status}</em>.
-          {canReverse ? '' : ' No further actions available.'}
+      <div className="mt-4 grid gap-2.5">
+        <p className={`${NOTE} ${status === 'paid' ? 'ok' : 'bad'}`}>
+          {status === 'paid'
+            ? `${isReceipt ? '已入账' : '已付款'}。银行、池、总账都已经记了。`
+            : '已作废。不再算进银行、池和总账。'}
         </p>
+        {result}
         {canReverse ? (
-          <div className="mt-4">
-            {message ? (
-              <p className={`text-sm font-sans mb-3 ${message.type === 'error' ? 'text-danger' : 'text-ledger'}`}>{message.text}</p>
-            ) : null}
-            {confirmAction === 'approve' ? (
+          confirmAction === 'approve' ? (
+            <div className={`${NOTE} bad`}>
+              <p className="mb-2.5">{confirmText}</p>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-sans text-danger">{confirmText}</span>
                 <button
                   type="button"
                   disabled={isPending}
                   onClick={() => handleAction(reverseFn!)}
-                  className="bg-danger hover:opacity-90 text-white font-serif italic text-sm px-4 py-2 rounded-md transition-opacity disabled:opacity-50"
+                  className="deal-side-danger-solid rounded-md px-3.5 py-1.5 font-sans text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {isPending ? pendingLabel : '确认'}
                 </button>
-                <button type="button" onClick={() => setConfirmAction(null)} className="text-sm font-sans text-muted hover:text-ink">取消</button>
+                <button type="button" onClick={() => setConfirmAction(null)} className={QUIET}>
+                  取消
+                </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => { setMessage(null); setConfirmAction('approve') }}
-                className="bg-surface hover:bg-surface-2 border border-danger text-danger font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-              >
-                {buttonLabel}
-              </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setMessage(null)
+                setConfirmAction('approve')
+              }}
+              className="deal-side-danger w-full rounded-md px-3 py-2 font-sans text-[13.5px] transition-colors"
+            >
+              {buttonLabel}
+            </button>
+          )
         ) : null}
       </div>
     )
   }
 
   return (
-    <section className="border-t border-hairline pt-8 max-w-3xl">
-      <h2 className="font-serif text-xl text-ink mb-4">Actions</h2>
-
-      {/* Draft: Finance and Principal can edit, submit or void. Principal used
+    <div className="mt-4 grid gap-2.5">
+      {/* Draft: whoever raises submits it, whoever edits edits it, whoever
+          voids voids it (2026-10-08, PR2 — each its own cell). Principal used
           to be blocked from Submit because no_self_approval left the card
           unapprovable (PV-0111, 2026-07-24) — mig 20260806000000 lifted that,
           so Principal may now submit and approve their own voucher. */}
-      {status === 'draft' && isFinance ? (
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => handleAction(submitForApproval)}
-              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
-            >
+      {status === 'draft' ? <p className={`${NOTE} plain`}>还是草稿，还没送批。</p> : null}
+      {status === 'draft' ? (
+        <>
+          {can.create ? (
+            <button type="button" disabled={isPending} onClick={() => handleAction(submitForApproval)} className={PRIMARY}>
               {isPending ? 'Submitting…' : 'Submit for approval'}
             </button>
-            <Link
-              href={`/payments/${voucherId}/edit`}
-              className="border border-hairline text-graphite hover:text-ink hover:bg-surface text-sm font-serif italic px-4 py-2 rounded-md transition-colors"
-            >
+          ) : null}
+          {can.edit ? (
+            <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
               Edit
             </Link>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => handleAction(voidVoucher)}
-              className="text-sm text-muted hover:text-danger font-sans transition-colors px-2"
-            >
+          ) : null}
+          {can.void ? (
+            <button type="button" disabled={isPending} onClick={() => handleAction(voidVoucher)} className={QUIET}>
               Void
             </button>
-          </div>
-        </div>
+          ) : null}
+        </>
       ) : null}
 
       {/* Pending: Principal can approve; Finance can void */}
       {status === 'pending_approval' ? (
         <>
-          {isPrincipal && !confirmAction ? (
-            <div>
+          {can.approve && !confirmAction ? (
+            <>
               {/* Bank balance info for Principal */}
               {isNoCashPayroll ? (
-                <div className="mb-4 p-3 rounded-md text-sm bg-surface border border-hairline">
-                  <span className="font-serif italic text-graphite">
-                    Payroll funding — books the salary expense and draws the department pools;
-                    the bank is <em>not</em> charged now (cash leaves when staff are paid). Short
-                    pools go negative (预支) — that&apos;s allowed.
-                  </span>
-                </div>
+                <p className={`${NOTE} plain`}>
+                  Payroll funding — books the salary expense and draws the department pools; the bank is{' '}
+                  <strong>not</strong> charged now (cash leaves when staff are paid). Short pools go negative
+                  (预支) — that&apos;s allowed.
+                </p>
               ) : bankBalance !== null && bankName ? (
-                <div className={`mb-4 p-3 rounded-md text-sm ${bankBalance < amount ? 'bg-danger-bg border border-danger' : 'bg-surface border border-hairline'}`}>
-                  <span className="font-serif text-graphite">{bankName} balance: </span>
-                  <span className={`font-mono tabular font-medium ${bankBalance < amount ? 'text-danger' : 'text-ledger'}`}>
+                <p className={`${NOTE} ${bankBalance < amount ? 'bad' : 'plain'}`}>
+                  {bankName} balance:{' '}
+                  <span className="font-mono tabular font-medium">
                     RM {bankBalance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
                   </span>
                   {bankBalance < amount ? (
-                    <span className="font-serif italic text-danger ml-2">
-                      — insufficient for RM {amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} payment
-                    </span>
+                    <> — insufficient for RM {amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} payment</>
                   ) : null}
-                </div>
+                </p>
               ) : null}
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={bankShortBlocks}
-                  onClick={() => setConfirmAction('approve')}
-                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {bankShortBlocks ? 'Insufficient balance' : 'Approve'}
-                </button>
-              </div>
-            </div>
+              <button type="button" disabled={bankShortBlocks} onClick={() => setConfirmAction('approve')} className={PRIMARY}>
+                {bankShortBlocks ? 'Insufficient balance' : 'Approve'}
+              </button>
+            </>
           ) : null}
 
-          {isPrincipal && confirmAction === 'approve' ? (
-            <div className="bg-surface border border-hairline rounded-md p-6">
-              <h3 className="font-serif text-lg text-ink mb-2">Confirm approval</h3>
-              <p className="font-serif italic text-graphite text-sm mb-4">
-                Approving <em>pays this voucher immediately</em> — bank balance, Dept Pool,
-                and GL journal all update in the same step. <em>This cannot be undone.</em>
+          {can.approve && confirmAction === 'approve' ? (
+            <div className={`${NOTE} plain`}>
+              <h3 className="font-sans text-sm font-semibold mb-1.5">Confirm approval</h3>
+              <p className="mb-3">
+                Approving <strong>pays this voucher immediately</strong> — bank balance, Dept Pool, and GL journal all
+                update in the same step. <strong>This cannot be undone.</strong>
               </p>
-              <div className="mb-4">
-                <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
-                  Notes <span className="text-muted font-normal">(optional)</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
-                  placeholder="Any context for the audit trail"
-                />
-              </div>
-              <div className="flex items-center gap-3">
+              <label className="block text-xs font-sans font-medium mb-1.5" htmlFor="approval-notes">
+                Notes <span className="font-normal opacity-70">(optional)</span>
+              </label>
+              <textarea
+                id="approval-notes"
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="deal-side-field w-full rounded-md px-3 py-2 text-sm"
+                placeholder="Any context for the audit trail"
+              />
+              <div className="mt-3 grid gap-2">
                 <button
                   type="button"
                   disabled={isPending}
                   onClick={() => handleAction(approveVoucher, { notes })}
-                  className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
+                  className={PRIMARY}
                 >
                   {isPending ? 'Approving & paying…' : 'Approve & Pay'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setConfirmAction(null); setNotes('') }}
-                  className="text-sm text-graphite hover:text-ink font-sans transition-colors"
+                  onClick={() => {
+                    setConfirmAction(null)
+                    setNotes('')
+                  }}
+                  className={QUIET}
                 >
                   Cancel
                 </button>
@@ -247,74 +249,62 @@ export default function VoucherActions({
             </div>
           ) : null}
 
-          {isFinance && !isPrincipal ? (
-            <div>
-              <div className="bg-surface border border-hairline rounded-md p-4 mb-3">
-                <p className="font-serif italic text-graphite text-sm">
-                  Awaiting Principal approval. <em>You can edit details or void the voucher until it&apos;s approved.</em>
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  href={`/payments/${voucherId}/edit`}
-                  className="border border-hairline text-graphite hover:text-ink hover:bg-surface text-sm font-serif italic px-4 py-2 rounded-md transition-colors"
-                >
-                  Edit
-                </Link>
-                {returnToDraft ? (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleAction(returnToDraft)}
-                    className="border border-hairline text-graphite hover:text-ink hover:bg-surface text-sm font-serif italic px-4 py-2 rounded-md transition-colors disabled:opacity-50"
-                    title="单退回草稿、审批卡关掉,可重新 submit(交错账号时用)"
-                  >
-                    退回 Draft
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => handleAction(voidVoucher)}
-                  className="text-sm text-muted hover:text-danger font-sans transition-colors px-2"
-                >
+          {!can.approve && (can.edit || can.void) ? (
+            <>
+              <p className={NOTE}>等 Principal 批准。批准之前还可以改，或者作废。</p>
+              {can.edit ? (
+                <div className={`grid gap-2 ${returnToDraft ? 'grid-cols-2' : ''}`}>
+                  <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
+                    Edit
+                  </Link>
+                  {returnToDraft ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleAction(returnToDraft)}
+                      className={SECOND}
+                      title="单退回草稿、审批卡关掉,可重新 submit(交错账号时用)"
+                    >
+                      退回 Draft
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {can.void ? (
+                <button type="button" disabled={isPending} onClick={() => handleAction(voidVoucher)} className={QUIET}>
                   Void this voucher
                 </button>
-              </div>
-            </div>
+              ) : null}
+            </>
           ) : null}
 
-          {/* Principal sees Edit alongside Approve, before they confirm */}
-          {isPrincipal && !confirmAction ? (
-            <div className="mt-2 flex items-center gap-4">
-              <Link
-                href={`/payments/${voucherId}/edit`}
-                className="text-sm text-graphite hover:text-accent font-serif italic"
-              >
-                Edit voucher details
+          {/* An approver who also edits sees Edit alongside Approve, before they confirm */}
+          {can.approve && can.edit && !confirmAction ? (
+            <div className={`grid gap-2 ${returnToDraft ? 'grid-cols-2' : ''}`}>
+              <Link href={`/payments/${voucherId}/edit`} className={SECOND}>
+                Edit
               </Link>
               {returnToDraft ? (
                 <button
                   type="button"
                   disabled={isPending}
                   onClick={() => handleAction(returnToDraft)}
-                  className="text-sm text-graphite hover:text-accent font-serif italic disabled:opacity-50"
+                  className={SECOND}
                   title="交错账号时用:单退回草稿,审批卡关掉,再用对的账号重新 submit"
                 >
-                  退回 Draft · Return to draft
+                  退回 Draft
                 </button>
               ) : null}
             </div>
           ) : null}
+
+          {!can.approve && !can.edit && !can.void ? <p className={NOTE}>等 Principal 批准。</p> : null}
         </>
       ) : null}
 
-      {/* Message */}
-      {message ? (
-        <div className={`mt-4 text-sm font-serif italic ${message.type === 'success' ? 'text-ledger' : 'text-danger'}`}>
-          {message.text}
-        </div>
-      ) : null}
-    </section>
+      {status === 'approved' ? <p className={`${NOTE} plain`}>已批准。</p> : null}
+
+      {result}
+    </div>
   )
 }

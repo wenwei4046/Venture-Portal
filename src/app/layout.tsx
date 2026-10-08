@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Noto_Sans_SC, Chivo_Mono } from 'next/font/google'
 import NavProgress from '@/components/layout/NavProgress'
 import PwaRegister from '@/components/pwa/PwaRegister'
+import UpdatePrompt from '@/components/pwa/UpdatePrompt'
 import './globals.css'
 
 // Typography — loaded via next/font for zero-CLS self-hosting.
@@ -106,6 +107,9 @@ export default function RootLayout({
             the palette dropped in August. After {children} so a skeleton's
             count is in before the line decides a navigation is over. */}
         <NavProgress />
+        {/* "A new version is ready" — an app left open across a release
+            (installed apps are resumed, not reloaded) hears about it here. */}
+        <UpdatePrompt />
       </body>
     </html>
   )

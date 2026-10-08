@@ -5,8 +5,12 @@ import { resolveArGlCode } from '@/lib/ar-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { officeDate } from '@/lib/office-clock'
+import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requireApprover, requirePermission } from '@/lib/auth'
+import { decision } from '@/lib/approval-domains'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
@@ -56,7 +60,7 @@ async function interBillingNatureSplitsForMirror(
 // ─── Create payment voucher (Finance) ────────────────────────────────────────
 
 async function createPaymentVoucherInner(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const voucherType = formData.get('voucher_type') as string
@@ -208,7 +212,7 @@ async function createPaymentVoucherInner(formData: FormData) {
   // Generate voucher number. Debit (outgoing money) → HV-PV-YYYYMM-NNNN
   // (Payment Voucher). Credit (incoming money) → HV-OR-YYYYMM-NNNN
   // (Official Receipt). mig 252 renamed historical credit rows to match.
-  const period = dayjs().format('YYYYMM')
+  const period = officeTime().format('YYYYMM') // the office's month, not UTC's
   const { count } = await supabase
     .from('payment_vouchers')
     .select('*', { count: 'exact', head: true })
@@ -773,7 +777,7 @@ export async function createPaymentVoucher(
 // ─── Submit for approval (Finance) ───────────────────────────────────────────
 
 export async function submitForApproval(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -827,7 +831,7 @@ export async function submitForApproval(formData: FormData) {
 // card; whoever then clicks Submit for approval becomes the new submitter.
 // Nothing financial has posted at pending stage, so this is bookkeeping-free.
 export async function returnVoucherToDraft(formData: FormData) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -850,7 +854,7 @@ export async function returnVoucherToDraft(formData: FormData) {
 // the money + marks the voucher paid in the same action.
 
 export async function approveVoucher(formData: FormData) {
-  const user = await requirePermission('approvals')
+  const user = await requireApprover()
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -861,7 +865,7 @@ export async function approveVoucher(formData: FormData) {
   // approvals-queue path. RPC takes approval_id, so look it up first.
   const { data: approvalReq, error: arErr } = await supabase
     .from('approval_requests')
-    .select('id, group_id')
+    .select('id, group_id, request_type, submitted_by')
     .eq('reference_id', id)
     .eq('reference_table', 'payment_vouchers')
     .eq('status', 'pending')
@@ -870,6 +874,9 @@ export async function approveVoucher(formData: FormData) {
   if (arErr || !approvalReq) {
     throw new Error('Voucher has no pending approval request')
   }
+  // Treasury · Approve (or the queue's), never your own unless you are the Principal.
+  const verdict = decision(user, [approvalReq.request_type], [approvalReq.submitted_by])
+  if (!verdict.may) throw new Error(verdict.why)
   if (approvalReq.group_id) {
     throw new Error('Voucher is part of a combined approval — approve it from the Approvals queue.')
   }
@@ -903,7 +910,7 @@ export async function approveVoucher(formData: FormData) {
 // Transaction-specific links (invoice/loan/fund_source/repayment_breakdown) are
 // deliberately NOT copied — a copy is a new expense, not a re-run of a repayment.
 export async function copyPaymentVoucher(formData: FormData): Promise<void> {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const sourceId = (formData.get('voucher_id') as string) ?? ''
@@ -911,13 +918,15 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
 
   const { data: src, error: srcErr } = await supabase
     .from('payment_vouchers')
-    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool')
+    .select('voucher_type, direction, amount, payee_name, payee_company_id, bank_account_id, description, payment_method, target_pool, reference_type')
     .eq('id', sourceId)
     .single()
   if (srcErr || !src) throw new Error('Source voucher not found')
+  // A copy carries the payee and the amount into a draft the caller can read.
+  if (isPayrollReference(src.reference_type) && !canSeePayrollPayouts(user)) throw new Error('Source voucher not found')
 
   // New voucher number — same scheme as createPaymentVoucher.
-  const period = dayjs().format('YYYYMM')
+  const period = officeTime().format('YYYYMM') // the office's month, not UTC's
   const { count } = await supabase.from('payment_vouchers').select('*', { count: 'exact', head: true })
   const seq = (count ?? 0) + 1
   const prefix = src.direction === 'credit' ? 'HV-OR-' : 'HV-PV-'
@@ -977,7 +986,7 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
 }
 
 export async function updatePaymentVoucher(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1232,6 +1241,44 @@ export async function updatePaymentVoucher(formData: FormData) {
   redirect(`/payments/${id}`)
 }
 
+// ─── Amend a PAID voucher's date (Finance) ──────────────────────────────────
+// User 2026-10-02: "这个日期我录错了怎么办？能自己改吗？". A draft or pending
+// voucher is re-dated with Edit; a paid one — and a receipt is paid the moment
+// it is made — had only void + record again. amend_voucher_date moves the
+// voucher, every journal entry it posted, and the repayment rows its approval
+// wrote, to the right day, and notes it on each. Amount, bank and pools stay.
+// The RPC guards roles, period locks (both months), bank reconciliation
+// matches, and payroll vouchers (those are HR Payment's to re-date).
+export async function amendVoucherDate(
+  formData: FormData,
+): Promise<{ error?: string; old?: string; newDate?: string }> {
+  await requireAction('treasury', 'edit')
+  const supabase = await createClient()
+
+  const id = ((formData.get('id') as string) ?? '').trim()
+  const newDate = ((formData.get('new_date') as string) ?? '').trim()
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+  if (!id) return { error: 'Voucher id is required' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: '选一个日期' }
+  if (!reason) return { error: '写一句原因(会留在记录里)' }
+
+  const { data, error } = await supabase.rpc('amend_voucher_date' as never, {
+    p_voucher_id: id,
+    p_new_date: newDate,
+    p_reason: reason,
+  } as never)
+  if (error) return { error: error.message }
+
+  const res = (data ?? {}) as { old?: string; new?: string }
+  revalidatePath(`/payments/${id}`)
+  revalidatePath('/payments')
+  revalidatePath('/receipts')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
+  return { old: res.old, newDate: res.new ?? newDate }
+}
+
 // ─── Reassign GL account on an approved/paid voucher (Finance) ──────────────
 // User 2026-08-24: "gl account 放错，我希望approve 了我还能改". Edits the
 // posted journal lines IN PLACE via the reassign_voucher_gl_account RPC —
@@ -1243,7 +1290,7 @@ export async function reassignVoucherGlAccount(
   formData: FormData,
 ): Promise<{ error?: string; changed?: number }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'edit')
     const supabase = await createClient()
 
     const id = ((formData.get('id') as string) ?? '').trim()
@@ -1275,7 +1322,7 @@ export async function reassignVoucherGlAccount(
 // ─── Void voucher (Finance, only draft/pending) ─────────────────────────────
 
 export async function voidVoucher(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -1318,7 +1365,7 @@ export async function voidVoucher(formData: FormData) {
 // a wrong receipt can be undone. Steps: reverse bank cache, reverse each linked
 // GL entry, reverse the pool credits, un-settle the invoice(s), mark voided.
 export async function voidPaidReceipt(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1344,14 +1391,14 @@ export async function voidPaidReceipt(formData: FormData) {
   const origDate =
     typeof v.payment_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.payment_date)
       ? v.payment_date
-      : dayjs().format('YYYY-MM-DD')
+      : officeDate()
   const { data: lockRow } = await supabase
     .from('period_locks')
     .select('id')
     .eq('period_month', dayjs(origDate).startOf('month').format('YYYY-MM-DD'))
     .eq('is_locked', true)
     .maybeSingle()
-  const reversalDate = lockRow ? dayjs().format('YYYY-MM-DD') : origDate
+  const reversalDate = lockRow ? officeDate() : origDate
 
   // 1) Reverse bank cache (the receipt had added to it). Via bump_bank_balance
   // RPC (mig 20260610000000) — the old direct update was silently blocked by
@@ -1478,7 +1525,7 @@ export async function voidPaidReceipt(formData: FormData) {
 // pointer to the right flow — reversing them generically would leave their
 // downstream records (loans, payroll accruals, claims, dept requests) dangling.
 export async function reversePaidPayment(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -1522,14 +1569,14 @@ export async function reversePaidPayment(formData: FormData) {
   const origDate =
     typeof v.payment_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.payment_date)
       ? v.payment_date
-      : dayjs().format('YYYY-MM-DD')
+      : officeDate()
   const { data: lockRow } = await supabase
     .from('period_locks')
     .select('id')
     .eq('period_month', dayjs(origDate).startOf('month').format('YYYY-MM-DD'))
     .eq('is_locked', true)
     .maybeSingle()
-  const reversalDate = lockRow ? dayjs().format('YYYY-MM-DD') : origDate
+  const reversalDate = lockRow ? officeDate() : origDate
 
   // 1) Reverse bank cache — the payment REDUCED it, so add it back. Via
   //    bump_bank_balance RPC (bank_accounts UPDATE is principal-only under RLS).
@@ -1752,7 +1799,7 @@ export async function getAttachmentPreviewUrls(
 export async function deleteVoucherAttachment(
   attachmentId: string,
 ): Promise<{ voucherId: string }> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
   if (!attachmentId) throw new Error('attachment id is required')
 
@@ -1794,9 +1841,15 @@ const ALLOWED_MIME = [
 ]
 const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', '.doc', '.csv']
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+// A file can be ADDED to a voucher until it is voided — including after it is
+// approved or paid (2026-10-05: two paid PVs had been made without their
+// receipts; user: "做第 2 条"). Nothing is ever REMOVED from a decided voucher:
+// the delete RPC and the storage DELETE policy both stop at pending_approval.
+const UPLOADABLE_STATUSES = ['draft', 'pending_approval', 'approved', 'paid']
+const UNDECIDED_STATUSES = ['draft', 'pending_approval']
 
 export async function uploadVoucherAttachment(formData: FormData): Promise<{ count: number }> {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const voucherId = (formData.get('voucher_id') as string) ?? ''
@@ -1810,9 +1863,10 @@ export async function uploadVoucherAttachment(formData: FormData): Promise<{ cou
     .single()
 
   if (!voucher) throw new Error('Voucher not found')
-  if (!['draft', 'pending_approval'].includes(voucher.status)) {
+  if (!UPLOADABLE_STATUSES.includes(voucher.status)) {
     throw new Error(`Cannot upload attachments when voucher status is "${voucher.status}"`)
   }
+  const afterDecision = !UNDECIDED_STATUSES.includes(voucher.status)
 
   const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
   if (files.length === 0) throw new Error('No files provided')
@@ -1857,6 +1911,20 @@ export async function uploadVoucherAttachment(formData: FormData): Promise<{ cou
     }
 
     uploaded++
+  }
+
+  // Something added to a voucher that was already decided: the row says who
+  // and when, and this is the entry the Audit log reads. The files are in
+  // place either way, so a failure here is reported, not thrown.
+  if (afterDecision) {
+    const { error: logErr } = await supabase.from('access_log').insert({
+      user_id: user.id,
+      action: 'add_attachment',
+      resource_type: 'payment_voucher',
+      resource_id: voucherId,
+      metadata: { voucher_status: voucher.status, count: uploaded, files: files.map((f) => f.name) },
+    })
+    if (logErr) console.error('add_attachment audit row failed:', voucherId, logErr.message)
   }
 
   revalidatePath(`/payments/${voucherId}`)

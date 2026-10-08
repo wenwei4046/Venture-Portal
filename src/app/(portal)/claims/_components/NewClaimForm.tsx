@@ -51,19 +51,11 @@ export default function NewClaimForm() {
     // The sheet's form panel: white fields on a tinted card. The effect above
     // toggles `shake-once` on the node itself, so className stays constant.
     <form ref={formRef} action={handleSubmit} className="bg-surface-2 border border-hairline rounded-card p-6 max-w-lg">
-      <h3 className="text-md font-bold mb-4">New Claim</h3>
+      <h3 className="text-md font-bold mb-4">New pool claim</h3>
+      {/* Pool claims only (2026-10-08): a member's own claim is sent from the
+          Revenue app and decided in People › Member services. */}
+      <input type="hidden" name="claim_type" value="project" />
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1.5">Type</label>
-          <select
-            name="claim_type"
-            required
-            className="w-full px-3 py-2 bg-surface border border-hairline rounded-control text-sm focus:outline-none focus:border-accent-border"
-          >
-            <option value="benefit">Benefit Claim</option>
-            <option value="project">Pool Claim</option>
-          </select>
-        </div>
         <div>
           <label className="block text-sm font-medium mb-1.5">Claimant Name</label>
           <input

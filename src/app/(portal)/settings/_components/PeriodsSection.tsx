@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { closePeriod, reopenPeriod } from '../actions'
 
 interface LockRow {
@@ -29,7 +30,7 @@ export default function PeriodsSection({ locks }: Props) {
   }, [locks])
 
   const months = useMemo(() => {
-    const now = dayjs().startOf('month')
+    const now = officeTime().startOf('month') // the office's month, on the server too
     const list: { period: string; label: string; isFuture: boolean; isCurrent: boolean }[] = []
     for (let i = -11; i <= 0; i++) {
       const m = now.add(i, 'month')
@@ -98,7 +99,7 @@ export default function PeriodsSection({ locks }: Props) {
             {months.map((m) => {
               const lock = lockMap.get(m.period)
               const isLocked = !!lock?.is_locked
-              const closedAt = lock?.closed_at ? dayjs(lock.closed_at).format('D MMM YYYY') : '—'
+              const closedAt = lock?.closed_at ? officeTime(lock.closed_at).format('D MMM YYYY') : '—'
               const showNoteEditor = notesFor === m.period
               return (
                 <tr key={m.period} className="border-b border-hairline last:border-0 align-top">

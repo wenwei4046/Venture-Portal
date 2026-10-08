@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { officeDayStart, officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 
@@ -45,8 +46,8 @@ export default async function DeptPnlView({ deptId, deptName, period }: Props) {
       .select('amount, description, created_at')
       .eq('department_id', deptId)
       .eq('transaction_type', 'inter_billing_out')
-      .gte('created_at', monthStart)
-      .lt('created_at', nextMonth)
+      .gte('created_at', officeDayStart(monthStart))
+      .lt('created_at', officeDayStart(nextMonth))
       .order('created_at', { ascending: false }),
 
     // Pending inter-billing: invoices billed TO this dept that haven't been
@@ -67,8 +68,8 @@ export default async function DeptPnlView({ deptId, deptName, period }: Props) {
       .select('amount')
       .eq('department_id', deptId)
       .eq('transaction_type', 'expense_out')
-      .gte('created_at', monthStart)
-      .lt('created_at', nextMonth),
+      .gte('created_at', officeDayStart(monthStart))
+      .lt('created_at', officeDayStart(nextMonth)),
   ])
 
   const revenue = (revenueRows ?? []).reduce((s, r) => s + Number(r.total_amount), 0)
@@ -166,7 +167,7 @@ export default async function DeptPnlView({ deptId, deptName, period }: Props) {
                 {(settledExpenseRows ?? []).map((r, i) => (
                   <tr key={i} className="border-b border-hairline last:border-0">
                     <td className="py-3 pr-4 font-mono text-xs text-muted">
-                      {dayjs(r.created_at).format('D MMM YYYY')}
+                      {officeTime(r.created_at).format('D MMM YYYY')}
                     </td>
                     <td className="py-3 pr-4 font-serif italic text-graphite">
                       {r.description ?? '—'}

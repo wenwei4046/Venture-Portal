@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildFundSummaryXlsx } from './_format/xlsx'
 import { FundSummaryPdf } from './_format/pdf'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  await requirePermission('reports')
+  await requireAction('reports', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
     invoicePoolBalance,
   }
 
-  const filename = `fund-summary-${dayjs().format('YYYYMMDD')}`
+  const filename = `fund-summary-${officeTime().format('YYYYMMDD')}`
   if (format === 'xlsx') {
     return exportXlsxResponse({ filename, buffer: buildFundSummaryXlsx(data) })
   }

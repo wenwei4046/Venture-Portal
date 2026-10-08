@@ -24,6 +24,8 @@
  * next.config.ts) and thrown away by any Server Action that revalidates.
  */
 
+import { markWarmed } from './route-freshen'
+
 interface Prefetcher {
   prefetch: (href: string) => void
 }
@@ -82,6 +84,8 @@ export function warmRoute(router: Prefetcher, href: string): void {
     // router.prefetch defaults to a FULL prefetch in the App Router — the page
     // itself, not just its loading boundary.
     router.prefetch(href)
+    // How old the warmed page is, for the refresh behind a click on it (lib/route-freshen.ts).
+    markWarmed(new URL(href, window.location.href).pathname, performance.now())
   } catch {
     // A warm is a guess; it must never surface an error.
   }
@@ -111,4 +115,98 @@ export function cancelWarmIntent(): void {
     clearTimeout(intentTimer)
     intentTimer = null
   }
+}
+
+// ── the pages somebody opens most, warmed while the portal sits idle (2026-10-08) ──
+//
+// User: 切换到另外一个 tab 都非常的慢. Hover only warms the link the pointer rests on;
+// the first click of a session on anything else still waited for the server
+// (0.3–1.1 s on prod). So the browser remembers which pages this person opens,
+// and when the portal has sat idle for a moment it renders their usual few —
+// one at a time, the most-visited first, never an audited page, never on a
+// data-saver connection — and keeps them five minutes
+// (`experimental.staleTimes.static`). A click on one is then instant, and the
+// page refreshes itself behind the click (components/layout/RouteFreshener.tsx).
+// Bounded on purpose: 2026-09-09's warm-everything-on-load was ~24 full renders
+// per hard load and every button queued behind them.
+
+const VISITS_KEY = 'vp-nav-visits'
+/** How many pages are kept in the tally. */
+const VISITS_KEPT = 30
+/** At most this many pages are warmed per idle spell. */
+export const IDLE_WARM_MAX = 3
+/** A page is somebody's usual once they have opened it this many times. */
+export const IDLE_WARM_MIN_VISITS = 2
+/** Quiet this long (no navigation) before anything is warmed. */
+export const IDLE_WARM_AFTER_MS = 2000
+/** Between two warms, so they never arrive at the server together. */
+export const IDLE_WARM_GAP_MS = 700
+
+interface Storage {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+}
+
+function tally(storage: Storage | null): Record<string, number> {
+  if (!storage) return {}
+  try {
+    const parsed = JSON.parse(storage.getItem(VISITS_KEY) ?? '{}') as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(Object.entries(parsed).filter(([, n]) => typeof n === 'number' && Number.isFinite(n))) as Record<string, number>
+  } catch {
+    return {}
+  }
+}
+
+function browserStorage(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null
+  }
+}
+
+/** One more visit to `path` (a pathname, no query), on this browser only. */
+export function recordVisit(path: string, storage: Storage | null = browserStorage()): void {
+  if (!storage || !path.startsWith('/')) return
+  const counts = tally(storage)
+  counts[path] = (counts[path] ?? 0) + 1
+  const kept = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, VISITS_KEPT)
+  try {
+    storage.setItem(VISITS_KEY, JSON.stringify(Object.fromEntries(kept)))
+  } catch {
+    // Private mode or a full disk: nothing is warmed beyond the hovered link.
+  }
+}
+
+/**
+ * The pages to warm now: links this person can see in the nav (`hrefs`), the
+ * most-visited first, opened at least IDLE_WARM_MIN_VISITS times, never the
+ * page on screen or an audited one.
+ */
+export function usualPages(hrefs: readonly string[], currentPath: string, storage: Storage | null = browserStorage(), max = IDLE_WARM_MAX): string[] {
+  const counts = tally(storage)
+  const seen = new Set<string>()
+  const candidates: { href: string; n: number }[] = []
+  for (const href of hrefs) {
+    const path = href.split('?')[0]
+    if (seen.has(href) || path === currentPath || isAuditedRoute(path)) continue
+    seen.add(href)
+    const n = counts[path] ?? 0
+    if (n >= IDLE_WARM_MIN_VISITS) candidates.push({ href, n })
+  }
+  return candidates.sort((a, b) => b.n - a.n).slice(0, max).map((c) => c.href)
+}
+
+/**
+ * Warm `hrefs` one after another, IDLE_WARM_GAP_MS apart, after IDLE_WARM_AFTER_MS
+ * of quiet. Returns a cancel for when the person moves on first.
+ */
+export function warmWhenIdle(router: Prefetcher, hrefs: readonly string[]): () => void {
+  const timers: ReturnType<typeof setTimeout>[] = []
+  if (!connectionAllows()) return () => {}
+  hrefs.forEach((href, i) => {
+    timers.push(setTimeout(() => warmRoute(router, href), IDLE_WARM_AFTER_MS + i * IDLE_WARM_GAP_MS))
+  })
+  return () => timers.forEach(clearTimeout)
 }

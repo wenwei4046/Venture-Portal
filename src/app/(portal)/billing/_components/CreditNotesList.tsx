@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { formatMoney } from '@/lib/utils'
 import { approveCreditNote, deleteCreditNote, voidCreditNote } from '../actions'
 
@@ -79,13 +79,15 @@ export default function CreditNotesList({ rows }: { rows: CreditNoteRow[] }) {
   }
 
   return (
-    <section className="mt-10">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="font-serif text-xl text-ink">Credit notes</h2>
-        <span className="font-serif italic text-muted text-xs">
-          Draft CNs wait for Principal approval; approving posts the credit and reduces the invoice balance.
-        </span>
+    <section className="fin-queue mt-10">
+      <div className="sect-head">
+        <h2>Credit notes</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{rows.length} CN{rows.length === 1 ? '' : 'S'}</span>
       </div>
+      <p className="font-serif italic text-muted text-xs -mt-2 mb-3">
+        Draft CNs wait for Principal approval; approving posts the credit and reduces the invoice balance.
+      </p>
 
       {error ? (
         <div className="mb-3 bg-danger/10 border border-danger/30 text-danger rounded-md px-3 py-2 text-sm font-sans">
@@ -115,7 +117,7 @@ export default function CreditNotesList({ rows }: { rows: CreditNoteRow[] }) {
                   <td className="py-2 px-3 font-mono text-xs text-ink whitespace-nowrap">
                     <div>{cn.credit_note_no ?? cn.id.slice(0, 8)}</div>
                     <div className="text-muted">
-                      {cn.created_at ? dayjs(cn.created_at).format('DD MMM YYYY') : ''}
+                      {cn.created_at ? officeTime(cn.created_at).format('DD MMM YYYY') : ''}
                     </div>
                   </td>
                   <td className="py-2 px-3 font-mono text-xs text-graphite whitespace-nowrap">

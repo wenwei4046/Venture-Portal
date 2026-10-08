@@ -2,14 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 
 export async function generateDeptRequestPv(args: {
   requestId: string
   payFromAccountId: string
   paymentMethod: string
 }) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   if (!args.payFromAccountId) throw new Error('Bank account is required')
@@ -31,7 +31,7 @@ export async function generateDeptRequestPv(args: {
 // stage-1 AP-accrual JE, voids a pending PV + its approval if one exists,
 // and flips the request to cancelled. Refuses if the PV is already paid.
 export async function cancelDeptRequest(formData: FormData) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   const requestId = (formData.get('request_id') as string) ?? ''

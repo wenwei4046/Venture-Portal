@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeToday } from '@/lib/office-time'
 import { postJournalEntry } from '@/lib/journal'
 import { validateDisbursementAccount } from '@/lib/loan-disbursement'
 import {
@@ -26,7 +27,7 @@ import type { Json } from '@/lib/supabase/database.types'
 export type CreateLoanResult = { error: string } | undefined
 
 export async function createLoan(formData: FormData): Promise<CreateLoanResult> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -117,7 +118,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
     .from('base_rate_history')
     .select('base_rate, effective_from, effective_to')
     .not('approved_at', 'is', null)
-    .lte('effective_from', dayjs().format('YYYY-MM-DD'))
+    .lte('effective_from', officeToday())
     .order('effective_from', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -209,7 +210,7 @@ export async function createLoan(formData: FormData): Promise<CreateLoanResult> 
 // ─── Record repayment (Finance) ───────────────────────────────────────────────
 
 export async function recordRepayment(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -228,7 +229,7 @@ export async function recordRepayment(formData: FormData) {
   if (!paymentDate) {
     throw new Error('Payment date is required')
   }
-  if (dayjs(paymentDate).isAfter(dayjs(), 'day')) {
+  if (dayjs(paymentDate).isAfter(officeToday(), 'day')) {
     throw new Error('Payment date cannot be in the future')
   }
 
@@ -390,7 +391,7 @@ export async function recordRepayment(formData: FormData) {
 // proven recordRepayment logic (one call per non-zero type). Mirrors the
 // outgoing payment form's "this is a loan repayment" option.
 export async function recordLoanRepaymentReceived(formData: FormData) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const loanId = (formData.get('loan_id') as string) ?? ''
   const paymentDate = (formData.get('payment_date') as string) ?? ''
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -442,7 +443,7 @@ export async function setLoanRepaymentStart(
   id: string,
   month: string
 ): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Loan id is required' }
@@ -468,7 +469,7 @@ export async function setLoanMinPayInterest(
   id: string,
   value: boolean
 ): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Loan id is required' }
@@ -493,7 +494,7 @@ export async function setLoanMinPayInterest(
 // Built after a Hookka repayment landed on the wrong loan — void here, then
 // re-record on the right one.
 export async function voidRepayment(formData: FormData): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   const repaymentId = (formData.get('repayment_id') as string) ?? ''
@@ -522,7 +523,7 @@ export async function voidRepayment(formData: FormData): Promise<{ error: string
 export async function amendRepayment(
   formData: FormData,
 ): Promise<{ error?: string; old?: number; newAmount?: number }> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const repaymentId = ((formData.get('repayment_id') as string) ?? '').trim()
@@ -548,13 +549,48 @@ export async function amendRepayment(
   return { old: Number(res.old ?? 0), newAmount: Number(res.new ?? newAmount) }
 }
 
+// ─── Amend a recorded repayment's DATE (2026-10-02) ──────────────────────────
+// User: "这个日期我录错了怎么办？能自己改吗？" — the same in-place fix as the
+// amount, for the day. One atomic RPC moves the repayments row and its one GL
+// entry (transaction date + period, audit note stamped); the amount, the bank
+// and the pool are not touched. It refuses a closed month, a future date and a
+// repayment already matched in a bank reconciliation.
+export async function amendRepaymentDate(
+  formData: FormData,
+): Promise<{ error?: string; old?: string; newDate?: string }> {
+  await requireAction('treasury', 'edit')
+  const supabase = await createClient()
+
+  const repaymentId = ((formData.get('id') as string) ?? '').trim()
+  const newDate = ((formData.get('new_date') as string) ?? '').trim()
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+  if (!repaymentId) return { error: 'Repayment id is required' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: '选一个日期' }
+  if (!reason) return { error: '写一句原因(会留在记录里)' }
+
+  const { data, error } = await supabase.rpc('amend_loan_repayment_date' as never, {
+    p_repayment_id: repaymentId,
+    p_new_date: newDate,
+    p_reason: reason,
+  } as never)
+  if (error) return { error: error.message }
+
+  const res = (data ?? {}) as { old?: string; new?: string }
+  revalidatePath('/receipts')
+  revalidatePath('/fund-out')
+  revalidatePath('/repayment-schedule')
+  revalidatePath('/reports')
+  revalidatePath('/dashboard')
+  return { old: res.old, newDate: res.new ?? newDate }
+}
+
 // ─── Amend an active loan (Principal — self-service, direct apply) ────────────
 // Principal is the top approval authority, so edits apply immediately via the
 // amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the
 // fields the form sends are changed. Finance-initiated edits that route through
 // the approval queue are a separate follow-up.
 export async function amendLoan(formData: FormData): Promise<{ error: string } | undefined> {
-  await requirePermission('override')
+  await requireAction('treasury', 'approve')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -595,7 +631,7 @@ export async function amendLoan(formData: FormData): Promise<{ error: string } |
 // Principal-only like amendLoan, but the months before the chosen one keep
 // their old terms (treasury_terms_history + lib/treasury-terms).
 export async function amendLoanFrom(formData: FormData): Promise<{ error: string } | undefined> {
-  await requirePermission('override')
+  await requireAction('treasury', 'approve')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -650,7 +686,7 @@ export async function amendLoanFrom(formData: FormData): Promise<{ error: string
 export async function setLoanFundingSource(
   formData: FormData
 ): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -682,7 +718,7 @@ export async function setLoanFundingSource(
 //                        and reverses the bank/venture-pool/JE side.
 
 export async function cancelLoan(formData: FormData) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -781,7 +817,7 @@ export async function listPayableLoans() {
 // ─── Export loan portfolio as CSV ─────────────────────────────────────────────
 
 export async function exportLoansCSV(): Promise<string> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'export')
   const supabase = await createClient()
 
   const { data: loans } = await supabase

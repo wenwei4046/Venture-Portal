@@ -12,10 +12,10 @@
 // names must match the statement's labels exactly.
 
 import React from 'react'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import type { PositionRow } from '@/lib/counterparty-statement'
 import { buildXlsxBuffer, type XlsxSectionBreak } from '@/lib/export/excel'
@@ -54,7 +54,7 @@ function payoffLabel(item: PositionRow): string {
 }
 
 export async function GET(request: Request) {
-  await requirePermission('reports')
+  await requireAction('reports', 'export')
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { rows: allRows } = await fetchCounterpartyStatement(supabase)
 
@@ -129,7 +129,7 @@ export async function GET(request: Request) {
   rows.push(...totalRows)
 
   const single = wanted && wanted.size === 1 ? [...wanted][0].replace(/[^\w-]+/g, '_') : null
-  const filename = `company-statement-${single ? `${single}-` : ''}${dayjs().format('YYYYMMDD')}`
+  const filename = `company-statement-${single ? `${single}-` : ''}${officeTime().format('YYYYMMDD')}`
 
   if (format === 'xlsx') {
     return exportXlsxResponse({
@@ -179,7 +179,7 @@ export async function GET(request: Request) {
     element: (
       <PdfDocument
         title="Company Statement"
-        periodLabel={`As at ${dayjs().format('D MMM YYYY')}`}
+        periodLabel={`As at ${officeTime().format('D MMM YYYY')}`}
         orientation="landscape"
       >
         <PdfTable columns={columns} rows={pdfRows} numberFormat="money" rowKinds={rowKinds} repeatHeader />

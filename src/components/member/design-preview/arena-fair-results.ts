@@ -1,6 +1,11 @@
 import type { FairEvent, Standing } from "./arena-model";
 
-export type FairPlacementStatus = "placed" | "unplaced" | "pending";
+/**
+ * `offweek` (live, 2026-10-03): ranked on a booth's board like anybody — its
+ * `position` is the place held there — but not the one board a week whose
+ * place earns points.
+ */
+export type FairPlacementStatus = "placed" | "unplaced" | "pending" | "offweek";
 
 export interface FairPlacementResult {
   eventId: string;
@@ -12,6 +17,14 @@ export interface FairPlacementResult {
   /** Nonfinite source sales remain nonfinite while pending; never turn missing data into zero. */
   sales: number;
   status: FairPlacementStatus;
+  /** The booth's brand on a live board; null for a fictional venue. */
+  brand: string | null;
+  /** Placed at this booth by guess — the brand week is not picked yet and still open. */
+  unconfirmed: boolean;
+  /** Placed by guess after the week closed: auto-located. */
+  autoLocated: boolean;
+  /** The last day the week's brand can be picked. */
+  closesOn: string | null;
 }
 
 export interface FairPlacementSummary {
@@ -24,6 +37,8 @@ export interface FairPlacementSummary {
   unplaced: number;
   pending: number;
   fairCount: number;
+  /** Boards they are ranked on with no points — never in the medal counts or fairCount. */
+  offWeek: number;
   results: FairPlacementResult[];
 }
 
@@ -55,7 +70,7 @@ export function summarizeFairResults(
   for (const person of people) {
     if (!summaries.has(person.id)) summaries.set(person.id, {
       id: person.id, name: person.name, first: 0, second: 0, third: 0, other: 0,
-      unplaced: 0, pending: 0, fairCount: 0, results: [],
+      unplaced: 0, pending: 0, fairCount: 0, offWeek: 0, results: [],
     });
   }
 
@@ -88,14 +103,21 @@ export function summarizeFairResults(
   for (const { event, rows } of orderedEvents) {
     for (const [id, recorded] of rows) {
       const summary = summaries.get(id)!;
-      const result = recorded.conflict
-        ? { status: "pending" as const, position: null }
-        : placement(recorded.row);
+      const result: { status: FairPlacementStatus; position: number | null } = recorded.row.offWeek
+        // The place stands; only its points belong to the brand week's board.
+        ? { status: "offweek", position: recorded.conflict ? null : placement(recorded.row).position }
+        : recorded.conflict
+          ? { status: "pending", position: null }
+          : placement(recorded.row);
       summary.results.push({
         eventId: event.id, venue: event.venue, start: event.start, end: event.end,
         weekId: event.weekId ?? null, ...result,
         sales: recorded.salesConflict ? Number.NaN : recorded.row.value,
+        brand: event.brand ?? null, unconfirmed: recorded.row.unconfirmed === true,
+        autoLocated: recorded.row.autoLocated === true, closesOn: event.closesOn ?? null,
       });
+      // Ranked there, but the week's points — and its medal — are the scoring board's.
+      if (result.status === "offweek") { summary.offWeek++; continue; }
       summary.fairCount++;
       if (result.status === "pending") summary.pending++;
       else if (result.status === "unplaced") summary.unplaced++;

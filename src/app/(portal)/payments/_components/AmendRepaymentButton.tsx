@@ -15,13 +15,19 @@ export default function AmendRepaymentButton({
   repaymentId,
   currentAmount,
   label,
+  autoOpen = false,
+  hideTrigger = false,
 }: {
+  /** Opened from the row's menu (2026-10-02): the dialog starts open and the
+   *  component draws no trigger of its own. */
+  autoOpen?: boolean
+  hideTrigger?: boolean
   repaymentId: string
   currentAmount: number
   label: string
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [amount, setAmount] = useState(currentAmount.toFixed(2))
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -51,19 +57,21 @@ export default function AmendRepaymentButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true)
-          setDone(null)
-          setError(null)
-          setAmount(currentAmount.toFixed(2))
-        }}
-        className="ml-2 text-xs text-muted hover:text-accent font-serif italic"
-        title="金额录错用这个:直接改这笔还款的金额,GL/银行/池自动同步并留注记"
-      >
-        改金额
-      </button>
+      {hideTrigger ? null : (
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(true)
+            setDone(null)
+            setError(null)
+            setAmount(currentAmount.toFixed(2))
+          }}
+          className="ml-2 text-xs text-muted hover:text-accent font-serif italic"
+          title="金额录错用这个:直接改这笔还款的金额,GL/银行/池自动同步并留注记"
+        >
+          改金额
+        </button>
+      )}
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" {...backdropDismiss(() => !isPending && setOpen(false))}>

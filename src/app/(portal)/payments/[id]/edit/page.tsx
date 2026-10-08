@@ -1,8 +1,12 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
 import EditPaymentForm from './_components/EditPaymentForm'
+import { fetchDeptRegistry } from '@/lib/dept-registry'
+import { registryPoolOptions } from '@/lib/payment-pools'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -20,7 +24,7 @@ interface SourceRow {
 }
 
 export default async function EditPaymentPage({ params }: Props) {
-  await requirePermission('treasury')
+  const user = await requireAction('treasury', 'edit')
   const { id } = await params
   const supabase = await createClient()
 
@@ -31,6 +35,8 @@ export default async function EditPaymentPage({ params }: Props) {
     .single()
 
   if (!voucher) notFound()
+  // As on the voucher's own page: payroll does not open without Payroll payouts.
+  if (isPayrollReference(voucher.reference_type) && !canSeePayrollPayouts(user)) notFound()
 
   // Only editable in draft / pending_approval — otherwise bounce back to detail
   if (voucher.status !== 'pending_approval' && voucher.status !== 'draft') {
@@ -56,6 +62,7 @@ export default async function EditPaymentPage({ params }: Props) {
     { data: bankAccounts },
     { data: glAccounts },
     { data: fundSourceRow },
+    deptRegistry,
   ] = await Promise.all([
     supabase
       .from('payment_voucher_sources')
@@ -72,6 +79,9 @@ export default async function EditPaymentPage({ params }: Props) {
     voucher.fund_source_id
       ? supabase.from('fund_sources').select('account_code').eq('id', voucher.fund_source_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    // The departments beyond the core five have pools of their own; the form's
+    // list is built from this, as Create payment's is.
+    fetchDeptRegistry(supabase).catch(() => []),
   ])
 
   const sourceRows: SourceRow[] = (sources ?? []).map((s) => ({
@@ -131,6 +141,7 @@ export default async function EditPaymentPage({ params }: Props) {
           repayment_breakdown: voucher.repayment_breakdown as { principal: number; interest: number; penalty: number } | null,
         }}
         initialSources={sourceRows}
+        extraPools={registryPoolOptions(deptRegistry)}
         fundSourceAccount={(fundSourceRow as { account_code: string | null } | null)?.account_code ?? null}
         initialCreditAccountCode={initialCreditAccountCode}
         companies={companies ?? []}

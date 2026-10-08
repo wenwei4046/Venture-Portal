@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
+import { officeDay } from '@/lib/office-time'
 import SortableTable from '@/components/SortableTable'
+import { useRowLinks } from '@/components/row-links'
+import { SheetIcon } from '@/components/sheet/SheetIcon'
 import AmendRepaymentButton from './AmendRepaymentButton'
+import AmendDateButton from './AmendDateButton'
 
 /**
  * Row shape consumed by VouchersTable. The parent server page is
@@ -23,13 +25,21 @@ export interface VoucherRow {
   poolLabel: string
   description: string | null
   paymentOrCreatedDate: string // ISO; client formats for display
-  /** Override for the View link — synthetic rows (loan repayments, fund-in
+  /** Override for the page a row opens — synthetic rows (loan repayments, fund-in
    *  receipts on /receipts) point at their own module instead of /payments. */
   href?: string
+  /** Set when this row's DATE can be corrected in place (2026-10-02): a paid
+   *  voucher that is not payroll's, or a loan repayment received directly.
+   *  `id` is the voucher's or the repayment's own id; `date` is YYYY-MM-DD. */
+  amendDate?: { kind: 'voucher' | 'repayment'; id: string; date: string }
   /** Rows sharing a batchKey collapse into one summary line (user 2026-09-15
    *  "hr 的 payroll voucher 我不想要显示这么多"): payroll disbursements are
    *  one voucher per person, 26 a month, and drowned the ledger. */
   batchKey?: string
+  /** A payroll batch standing as its total, for an account that may not see
+   *  one person's pay (2026-10-02 — lib/payroll-vouchers.ts). The server sends
+   *  this row INSTEAD of the batch's vouchers; it opens nothing. */
+  locked?: boolean
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -83,13 +93,43 @@ function groupBatches(rows: VoucherRow[]): { plain: VoucherRow[]; batches: Batch
 export default function VouchersTable({
   rows,
   collapseBatches = true,
+  layoutId = 'payments.vouchers',
+  layoutTitle = 'Payments',
+  canSetDefault = false,
 }: {
+  /** What the Columns panel calls this table. */
+  layoutTitle?: string
+  /** The viewer may set the arrangement on show as everyone's default (2026-10-07). */
+  canSetDefault?: boolean
+  /** Names the table for the saved column layout — Payments and Receipts
+   *  are arranged separately. */
+  layoutId?: string
   rows: VoucherRow[]
   /** false = render every row flat (used for the expanded members and when a
    *  text search is active, so a searched-for person is not hidden). */
   collapseBatches?: boolean
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // 2026-10-02: the View column is gone (user: "view … 可以 remove,我希望双击
+  // 点开"). A double-click opens the row; a right-click offers the same, and
+  // 改金额 on the rows that have it. That dialog is mounted once, for the row
+  // that asked — not in every row, as the link beside View was.
+  const [amend, setAmend] = useState<{ row: VoucherRow; nonce: number } | null>(null)
+  const [redate, setRedate] = useState<{ row: VoucherRow; nonce: number } | null>(null)
+  const links = useRowLinks<VoucherRow>({
+    href: (v) => v.href ?? `/payments/${v.id}`,
+    title: (v) => `${v.voucher_no ?? v.catLabel} · ${v.status.replace('_', ' ')}`,
+    // Synthetic loan-repayment rows (id 'rpy-<repayment uuid>') get an
+    // in-place amount fix (user 2026-09-03: "不能直接点开 receipt 的单去 edit?").
+    more: (v) => [
+      ...(v.amendDate
+        ? [{ key: 'redate', label: '改日期', hint: '日期录错时用', onSelect: () => setRedate({ row: v, nonce: Date.now() }) }]
+        : []),
+      ...(v.id.startsWith('rpy-')
+        ? [{ key: 'amend', label: '改金额', hint: '金额录错时用', onSelect: () => setAmend({ row: v, nonce: Date.now() }) }]
+        : []),
+    ],
+  })
   const { plain, batches } = collapseBatches ? groupBatches(rows) : { plain: rows, batches: [] as Batch[] }
   const toggle = (key: string) =>
     setExpanded((prev) => {
@@ -122,13 +162,13 @@ export default function VouchersTable({
                   </span>
                   <span className="flex items-baseline gap-4 shrink-0">
                     <span className="font-mono text-sm font-semibold">−{formatMoney(b.total).replace('RM ', '')}</span>
-                    <span className="font-mono text-xs text-graphite">{b.latest ? dayjs(b.latest).format('D MMM') : ''}</span>
+                    <span className="font-mono text-xs text-graphite">{b.latest ? officeDay(b.latest).format('D MMM') : ''}</span>
                     <span className="text-xs font-serif italic text-accent">{open ? '收起' : '展开'}</span>
                   </span>
                 </button>
                 {open ? (
                   <div className="px-3 pb-3 pt-1 bg-paper">
-                    <VouchersTable rows={b.members} collapseBatches={false} />
+                    <VouchersTable rows={b.members} collapseBatches={false} layoutId={layoutId} layoutTitle={layoutTitle} />
                   </div>
                 ) : null}
               </div>
@@ -138,6 +178,12 @@ export default function VouchersTable({
       ) : null}
       {plain.length === 0 && batches.length > 0 ? null : (
         <SortableTable<VoucherRow>
+      layoutId={layoutId}
+      layoutTitle={layoutTitle}
+      canSetDefault={canSetDefault}
+      onRowOpen={links.onRowOpen}
+      onRowContextMenu={links.onRowContextMenu}
+      rowOpens={(v) => !v.locked}
       rows={plain}
       getRowKey={(v) => v.id}
       // Date (not voucher #) so unnumbered synthetic rows interleave
@@ -148,6 +194,7 @@ export default function VouchersTable({
       columns={[
         {
           key: 'voucher_no',
+          group: '基本',
           label: 'Voucher #',
           render: (v) => v.voucher_no ?? '—',
           sortValue: (v) => v.voucher_no ?? '',
@@ -155,6 +202,7 @@ export default function VouchersTable({
         },
         {
           key: 'catLabel',
+          group: '入账',
           label: 'Category',
           render: (v) => v.catLabel,
           sortValue: (v) => v.catLabel,
@@ -163,6 +211,7 @@ export default function VouchersTable({
         },
         {
           key: 'poolLabel',
+          group: '入账',
           label: 'Pool',
           render: (v) => v.poolLabel,
           sortValue: (v) => v.poolLabel,
@@ -171,14 +220,28 @@ export default function VouchersTable({
         },
         {
           key: 'payee_name',
+          group: '基本',
           label: 'Payee',
-          render: (v) => v.payee_name,
+          render: (v) =>
+            v.locked ? (
+              // The name is the whole of what this row says, month last: it wraps
+              // rather than being cut at the column's width.
+              <span className="whitespace-normal" title={`${v.payee_name} · 这个帐号看不到里面每个人的明细`}>
+                <span className="inline-block w-3 mr-1.5 align-[-1px] text-muted [&>svg]:w-3 [&>svg]:h-3">
+                  <SheetIcon name="lock" />
+                </span>
+                {v.payee_name}
+              </span>
+            ) : (
+              v.payee_name
+            ),
           sortValue: (v) => v.payee_name,
           filterable: true,
           cellClassName: 'font-serif text-[15px] text-ink truncate max-w-[200px]',
         },
         {
           key: 'description',
+          group: '基本',
           label: 'Description',
           render: (v) => {
             const d = v.description?.trim()
@@ -193,6 +256,7 @@ export default function VouchersTable({
         },
         {
           key: 'amount',
+          group: '金额',
           label: 'Amount',
           align: 'right',
           render: (v) => (
@@ -205,6 +269,7 @@ export default function VouchersTable({
         },
         {
           key: 'status',
+          group: '基本',
           label: 'Status',
           render: (v) => (
             <em className={`font-serif text-sm ${STATUS_STYLES[v.status] ?? 'text-muted'}`}>
@@ -217,41 +282,40 @@ export default function VouchersTable({
         },
         {
           key: 'date',
+          group: '基本',
           label: 'Date',
-          align: 'right',
-          render: (v) => dayjs(v.paymentOrCreatedDate).format('D MMM'),
+          // A payment date as it is, a creation moment on the office clock: on
+          // the machine's clock the server (UTC) and the browser printed two
+          // different days for one voucher (2026-10-08, lib/office-time.ts).
+          render: (v) => officeDay(v.paymentOrCreatedDate).format('D MMM'),
           sortValue: (v) => new Date(v.paymentOrCreatedDate),
           cellClassName: 'text-graphite',
-        },
-        {
-          key: 'action',
-          label: '',
-          sortable: false,
-          align: 'right',
-          render: (v) => (
-            <span className="whitespace-nowrap">
-              <Link
-                href={v.href ?? `/payments/${v.id}`}
-                className="text-sm text-accent hover:text-accent-hover font-serif italic"
-              >
-                View
-              </Link>
-              {/* Synthetic loan-repayment rows (id 'rpy-<repayment uuid>') get
-                  an in-place amount fix (user 2026-09-03: "不能直接点开
-                  receipt 的单去edit?"). */}
-              {v.id.startsWith('rpy-') ? (
-                <AmendRepaymentButton
-                  repaymentId={v.id.slice(4)}
-                  currentAmount={v.amount}
-                  label={v.catLabel}
-                />
-              ) : null}
-            </span>
-          ),
         },
       ]}
         />
       )}
+      {links.menu}
+      {amend ? (
+        <AmendRepaymentButton
+          key={`${amend.row.id}:${amend.nonce}`}
+          autoOpen
+          hideTrigger
+          repaymentId={amend.row.id.slice(4)}
+          currentAmount={amend.row.amount}
+          label={amend.row.catLabel}
+        />
+      ) : null}
+      {redate?.row.amendDate ? (
+        <AmendDateButton
+          key={`${redate.row.id}:${redate.nonce}`}
+          autoOpen
+          hideTrigger
+          kind={redate.row.amendDate.kind}
+          id={redate.row.amendDate.id}
+          currentDate={redate.row.amendDate.date}
+          label={redate.row.voucher_no ?? `${redate.row.catLabel} · ${redate.row.payee_name}`}
+        />
+      ) : null}
     </div>
   )
 }

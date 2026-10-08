@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { formatMoney } from '@/lib/utils'
 
 export interface InvoiceDetail {
@@ -54,6 +55,10 @@ interface Props {
   receipts?: InvoiceReceiptRow[]
   /** Credit notes raised against this invoice (any status). */
   creditNotes?: InvoiceCnRow[]
+  /** Opened from the row — a double-click, or 打开 in its menu (2026-10-02):
+   *  the popup starts open and the component draws no trigger of its own. */
+  autoOpen?: boolean
+  hideTrigger?: boolean
 }
 
 /**
@@ -72,8 +77,10 @@ export default function InvoiceDetailButton({
   categoryLabels = {},
   receipts = [],
   creditNotes = [],
+  autoOpen = false,
+  hideTrigger = false,
 }: Props) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const label = invoice.invoice_no ?? invoice.id.slice(0, 8)
 
   const isPaid = invoice.status === 'paid' || invoice.status === 'paid_via_netting'
@@ -96,13 +103,15 @@ export default function InvoiceDetailButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="font-mono text-xs text-graphite hover:text-accent transition-colors underline-offset-2 hover:underline cursor-pointer"
-      >
-        {label}
-      </button>
+      {hideTrigger ? null : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="font-mono text-xs text-graphite hover:text-accent transition-colors underline-offset-2 hover:underline cursor-pointer"
+        >
+          {label}
+        </button>
+      )}
 
       {open && (
         <div
@@ -274,7 +283,7 @@ export default function InvoiceDetailButton({
 
               {invoice.created_at ? (
                 <div className="pt-3 border-t border-hairline font-mono text-[11px] text-muted">
-                  Created {dayjs(invoice.created_at).format('D MMM YYYY · HH:mm')}
+                  Created {officeTime(invoice.created_at).format('D MMM YYYY · HH:mm')}
                 </div>
               ) : null}
             </div>

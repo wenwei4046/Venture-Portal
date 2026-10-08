@@ -44,12 +44,33 @@ describe('isSheetRoute', () => {
     }
   })
 
-  it('leaves the Product List in its own workspace', () => {
-    expect(isSheetRoute('/revenue/products')).toBe(false)
+  // 2026-10-08: the Product List moved into the Revenue app; what is left at
+  // its old address is a redirect, under Revenue like the rest.
+  it('keeps the Revenue app — the Product List included — off the portal sheet', () => {
+    expect(isSheetRoute('/member/products')).toBe(false)
+    expect(isSheetRoute('/revenue/products')).toBe(true)
   })
 
-  it('leaves the rest of the portal as it is', () => {
-    for (const path of ['/payments', '/approvals', '/reports/ledger', '/settings', '/hr-costingx', '/revenue-x', '/teams', '/dashboards']) {
+  // 2026-10-07 (user: "finance 的整体 background 可以换成和 principal 和 hr 一样"
+  // → "做 A 先"): Finance's pages — and the department manager's My Billing
+  // and OPEX — sit on the sheet as well, the pages themselves unchanged for now.
+  it('puts Finance’s pages on the sheet too, detail routes included', () => {
+    for (const path of [
+      '/approvals', '/approvals/abc', '/approvals/payroll-run/abc',
+      '/payments', '/payments/new', '/payments/abc', '/payments/abc/edit', '/payments/payroll-requests',
+      '/receipts', '/statements', '/statements/monthly', '/statements/abc',
+      '/billing', '/billing/contracts/new', '/billing-allocator', '/invoice-pool',
+      '/daily-bank', '/fund-in', '/fund-in/abc', '/fund-out', '/fund-out/abc', '/ba', '/overdue', '/repayment-schedule',
+      '/dept-pool', '/dept-pool/marketing', '/venture-pool', '/opex', '/my-billing',
+      '/reports/ledger', '/reports/monthly-pnl', '/reports/company-statement',
+      '/reconciliation', '/reconciliation/journal-entries', '/audit-log', '/settings',
+    ]) {
+      expect(isSheetRoute(path), path).toBe(true)
+    }
+  })
+
+  it('does not mistake a lookalike prefix for a listed one', () => {
+    for (const path of ['/hr-costingx', '/revenue-x', '/teams', '/dashboards', '/paymentsx', '/bax', '/report']) {
       expect(isSheetRoute(path), path).toBe(false)
     }
   })

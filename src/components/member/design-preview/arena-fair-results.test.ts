@@ -105,6 +105,24 @@ describe("Fair placement history", () => {
     expect(events).toEqual(snapshot);
   });
 
+  // Live booth boards (2026-10-03): a seller is ranked on every board they sold
+  // at, and only the brand week's place earns (user: 能算积分的只有一个 … 依然会
+  // 显示属于那个名次).
+  it("keeps an off-week place in the weekly results without counting it as a medal", () => {
+    const summaries = summarizeFairResults([
+      event("akemi", "2026-09-27", [standing("james", 1, 27888)], { brand: "AKEMI" }),
+      event("zanotti", "2026-09-27", [standing("wei", 1, 52006), { ...standing("james", 2, 30000), offWeek: true }, standing("anthony", 3, 25606)], { brand: "ZANOTTI" }),
+    ], [person("james"), person("wei"), person("anthony")]);
+    const james = summaries.find(row => row.id === "james")!;
+    expect(james).toMatchObject({ first: 1, second: 0, fairCount: 1, offWeek: 1, unplaced: 0, pending: 0 });
+    expect(james.results.map(result => [result.brand, result.status, result.position])).toEqual([
+      ["AKEMI", "placed", 1], ["ZANOTTI", "offweek", 2],
+    ]);
+    // Anthony is third there: James's place stands, it just earns him nothing.
+    expect(summaries.find(row => row.id === "anthony")).toMatchObject({ third: 1, fairCount: 1 });
+    expect(summaries.find(row => row.id === "wei")).toMatchObject({ first: 1, fairCount: 1, offWeek: 0 });
+  });
+
   it("sorts medal summaries by first/second/third count then name and keeps results chronological", () => {
     const summaries = summarizeFairResults([
       event("late", "2026-09-13", [standing("gold", 1), standing("silver", 2), standing("bronze", 3)]),

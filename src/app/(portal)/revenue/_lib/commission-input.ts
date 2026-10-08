@@ -6,6 +6,8 @@ import { fetchAllRows, fetchByKeys } from '@/lib/paginate'
 import { monthsBefore } from '@/lib/commission/engine'
 import { toEngineInput } from '@/lib/commission/run-payload'
 import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/director-pay'
+import { carriesInto } from '@/lib/commission/carry'
+import { officeToday } from '@/lib/office-time'
 import { loadMonthOrders } from './month-orders'
 import type {
   CostRatioRow,
@@ -96,7 +98,7 @@ export interface CommissionInputOptions {
    * card. Absent, they are read here when a director's incentive needs them,
    * so the close the server recomputes judges the same figure.
    */
-  monthOrders?: readonly { cancelled: boolean; marginRevenue: number }[]
+  monthOrders?: readonly { cancelled: boolean; commissionable: number }[]
 }
 
 /**
@@ -112,7 +114,8 @@ export async function loadCommissionInput(
   options: CommissionInputOptions = {},
 ): Promise<CommissionInputContext> {
   const asAt = periodEnd(period)
-  const currentDate = new Date().toISOString().slice(0, 10)
+  // The rules in force today — the office's today; the ISO string's date is UTC's.
+  const currentDate = officeToday()
   const supabase = existingClient ?? (await createClient()) as unknown as SupabaseClient
   const schemes = await readRows<SchemeRow>('the commission scheme', (from, to) =>
     supabase.from('comm_schemes')
@@ -157,7 +160,7 @@ export async function loadCommissionInput(
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, marginBands, hierarchy, upsales, currentHierarchyRows,
     currentKpiItems, currentKpiThresholds, currentOpenBillRules, cutover, openBillThisMonth,
-    costRatios, heads, directorRows, directorPayRows] = await Promise.all([
+    costRatios, heads, directorRows, directorPayRows, standingCloses, appliedRuns] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -252,6 +255,14 @@ export async function loadCommissionInput(
       "the directors' pay", (from, to) =>
         supabase.from('comm_director_pay').select('staff_id, fixed_amount, sales_threshold, incentive_amount')
           .eq('scheme_id', scheme.id).order('staff_id').range(from, to)),
+    // Who has been closed for which month: a bill of an earlier month is this
+    // month's to pay only once its own month is closed for its salesperson.
+    readRows<{ staff_id: string; period_month: string }>('the closes', (from, to) =>
+      supabase.from('comm_salesperson_closes').select('staff_id, period_month')
+        .eq('sub_department_id', scheme.sub_department_id).is('reopened_at', null).order('id').range(from, to)),
+    readRows<{ period_month: string }>('the applied runs', (from, to) =>
+      supabase.from('comm_runs').select('period_month')
+        .eq('sub_department_id', scheme.sub_department_id).in('status', ['applied', 'locked']).order('id').range(from, to)),
   ])
 
   const releasedOrderNos = releases.filter(row => row.run_id !== options.replayRunId).map(row => row.order_no)
@@ -260,14 +271,24 @@ export async function loadCommissionInput(
   // 2026-09-26): its bills never ride into a run — June to August 2026 would
   // otherwise all be paid again in September.
   const settledElsewhere = (order: SalesOrderRow) => cutover !== null && order.period_month < cutover
-  const orderRows = [...thisMonth, ...earlier.filter(order => !releasedSet.has(order.order_no) && !settledElsewhere(order))]
+  // An earlier month's unpaid bill rides in only once that month is closed for
+  // its salesperson (lib/commission/carry.ts, 2026-10-06): before, October's
+  // page counted every September bill a second time while September was still
+  // being closed. A replayed run still shows the earlier bills it paid.
+  const paysHere = carriesInto(period, {
+    closes: standingCloses.map(row => ({ staffId: row.staff_id, periodMonth: row.period_month })),
+    appliedRuns: appliedRuns.map(row => row.period_month),
+  })
+  const paidByReplay = new Set(options.replayRunId ? releases.filter(row => row.run_id === options.replayRunId).map(row => row.order_no) : [])
+  const carried = (order: SalesOrderRow) => paidByReplay.has(order.order_no) || paysHere({ staffId: order.staff_id, periodMonth: order.period_month })
+  const orderRows = [...thisMonth, ...earlier.filter(order => !releasedSet.has(order.order_no) && !settledElsewhere(order) && carried(order))]
   const orderIds = orderRows.map(order => order.id)
   const lookBack = Math.max(0, ...ranks.map(rank => (rank.consecutive_months ?? 1) - 1))
   const priorPeriods = Array.from({ length: lookBack }, (_, index) => monthsBefore(period, index + 1))
   const [lines, openBillTags, shares, priorRuns] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
-        .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, description2, variants:raw->variants')
+        .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
         .in('order_id', chunk).order('id').range(from, to)),
     readByKeys<OpenBillTagRow>('Open Bill picks', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank')

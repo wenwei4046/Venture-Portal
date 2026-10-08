@@ -1,9 +1,9 @@
 import Link from 'next/link'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import ImportStaffWizard from './_components/ImportStaffWizard'
 
 export default async function ImportStaffPage() {
-  await requirePermission('team')
+  await requireAction('team', 'create')
 
   return (
     <div>

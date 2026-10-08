@@ -15,16 +15,18 @@ import {
   quoteLineKey,
 } from "./catalog";
 import {
-  lineSurcharge,
+  lineCharge,
   OptionPrices,
+  sofaSetCharges,
   unitPrice,
+  type ChargePart,
   type OptionPrice,
   type PriceCell,
 } from "@/lib/catalogue/pricing";
 import { pickCombo, spreadComboTotal, type PricedCombo } from "@/lib/catalogue/combos";
 import { costBasisOf, costDivisorFor } from "@/lib/commission/cost-basis";
 import { indexKpiItems, kpiItemLabel, orderKpiHits, type KpiLine } from "@/lib/commission/kpi";
-import { buildChoicesFor, buildError, buildKey, buildLines, kindOf } from "./build";
+import { buildChoicesFor, buildError, buildKey, buildLines, frameBuildError, frameBuildText, kindOf } from "./build";
 
 /** Decimal money enters the engine as integer cents; tier comparisons use unrounded ratios. */
 export function cents(raw: string): number | null {
@@ -42,7 +44,7 @@ export function teamCostCents(unitCost: number, costDivisor: number): number {
 /**
  * What the portal charges beyond each SKU's own price — server-only, read
  * from the Product List with the SKUs (`member_catalogue`, priced): the
- * Maintenance surcharges, the combos a sofa build may match, and each model's
+ * Maintenance option charges, the combos a sofa build may match, and each model's
  * dropdowns so a choice outside them is refused. Absent (the demo) = no
  * options, no combos, no check.
  */
@@ -58,7 +60,7 @@ function quoteInputKey(input: QuoteInput): string {
     .map((line) => [quoteLineKey(line), line.quantity] as const)
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   return JSON.stringify([
-    "quote-input-v4",
+    "quote-input-v5",
     input.schemeId,
     lines,
     cents(input.price),
@@ -70,14 +72,42 @@ function quoteInputKey(input: QuoteInput): string {
 interface CostedLine {
   line: QuoteLine;
   product: MemberProduct;
-  /** The SKU's own price at the build (grid cell or flat), RM; null = unpriced. */
+  /** The SKU's own price at the build (grid cell or flat), RM; null = unpriced. No option adds to it (2026-10-06). */
   unit: number | null;
-  /** What the build's options add per unit, RM. */
-  surcharge: number;
+  /** What a bed frame's options are CHARGED per unit, RM — out of the margin. A sofa is charged per set, not here. */
+  charge: number;
+  chargeParts: ChargePart[];
   /** A grid SKU whose grid does not come in the build's seat height. */
   noHeight: boolean;
   /** The line at its combo's share, in cents, when a combo matched it. */
   comboCents: number | null;
+}
+
+/** A line's charge and its parts; nothing charged when there is no bed frame build. */
+function chargeOf(c: { amount: number; parts: ChargePart[] } | null): { charge: number; chargeParts: ChargePart[] } {
+  return c ? { charge: c.amount, chargeParts: c.parts } : { charge: 0, chargeParts: [] };
+}
+
+/** `leg 6"` / `Hydraulic` — an option charged, as the quote's breakdown says it. */
+const CHARGE_WORD: Record<ChargePart["pool"], string> = {
+  bedframe_divan_heights: "divan ",
+  bedframe_leg_heights: "leg ",
+  bedframe_gaps: "gap ",
+  bedframe_total_heights: "total height ",
+  bedframe_specials: "",
+  sofa_leg_heights: "leg ",
+  sofa_specials: "",
+};
+const chargeWord = (p: ChargePart) => `${CHARGE_WORD[p.pool]}${p.value}`;
+
+/** The sofa a module belongs to — its base model, as the combos and the run group a bill's sofa lines. */
+function sofaGroupOf(product: MemberProduct): string {
+  return (product.baseModel ?? product.code.split("-")[0] ?? "").trim().toUpperCase() || product.id;
+}
+
+/** A bed frame line's build: its own (2026-10-05), else the cart's. */
+function frameBuildOf(line: QuoteLine, build: QuoteBuild | undefined) {
+  return line.bedframe ?? build?.bedframe;
 }
 
 function gridOf(product: MemberProduct): PriceCell[] {
@@ -87,8 +117,9 @@ function gridOf(product: MemberProduct): PriceCell[] {
 /**
  * Every line at the portal's prices, the way the run costs a sales line
  * (catalogue_line_cost + catalogue_apply_combos, migration 20260924030000):
- * the SKU's price at the build's seat height and tier, plus its options'
- * surcharges, times quantity; then each sofa's modules that cover one of its
+ * the SKU's price at the build's seat height and tier, times quantity — no
+ * option adds to a cost any more (2026-10-06: every option priced on
+ * Maintenance is CHARGED to the customer); then each sofa's modules that cover one of its
  * model's priced combos are costed at the combo's price instead, spread over
  * the matched lines in proportion to their own costs — the ERP's rule, where
  * the combo always wins and mixed quantities keep their own costs.
@@ -107,22 +138,18 @@ function costLines(
       grid.length ? build?.tier ?? null : null,
     );
     const kind = kindOf(product);
-    const facts =
-      kind === "SOFA"
-        ? { leg: build?.leg ?? null, divan: null, total: null, specials: build?.specials ?? [] }
-        : kind === "BEDFRAME"
-          ? {
-              leg: build?.bedframe?.leg ?? null,
-              divan: build?.bedframe?.divan ?? null,
-              total: build?.bedframe?.total ?? null,
-              specials: build?.bedframe?.specials ?? [],
-            }
-          : null;
+    const frame = kind === "BEDFRAME" ? frameBuildOf(line, build) : undefined;
     return {
       line,
       product,
       unit: priced.price,
-      surcharge: facts && pricing ? lineSurcharge(kind, facts, prices).amount : 0,
+      // A bed frame's divan, leg, gap, total height and specials are charged per frame.
+      ...chargeOf(kind === "BEDFRAME" && pricing
+        ? lineCharge(kind, {
+            divan: frame?.divan ?? null, leg: frame?.leg ?? null, gap: frame?.gap ?? null,
+            total: frame?.total ?? null, specials: frame?.specials ?? [],
+          }, prices)
+        : null),
       noHeight: grid.length > 0 && priced.how !== "grid",
       comboCents: null,
     };
@@ -153,7 +180,7 @@ function costLines(
     const sets = [...quantities][0];
     const own = matched.map((i) => {
       const l = lines[i];
-      return l.unit === null ? 0 : Math.round((l.unit + l.surcharge) * 100) * l.line.quantity;
+      return l.unit === null ? 0 : Math.round(l.unit * 100) * l.line.quantity;
     });
     const shares = spreadComboTotal(own, Math.round(hit.price * 100) * sets);
     matched.forEach((i, k) => {
@@ -216,7 +243,7 @@ function cartKpiLines(
   return selected.map(({ line, product }, i) => {
     const kind = kindOf(product);
     const specials =
-      kind === "SOFA" ? build?.specials : kind === "BEDFRAME" ? build?.bedframe?.specials : undefined;
+      kind === "SOFA" ? build?.specials : kind === "BEDFRAME" ? frameBuildOf(line, build)?.specials : undefined;
     return { id: String(i), itemGroup: kind, productCode: product.code, qty: line.quantity, specials };
   });
 }
@@ -227,14 +254,24 @@ function cartKpiLines(
  * threshold t is cost ÷ (1 − t) — never cost × (1 + t) (user 2026-09-12: 33%
  * on 1,000 is 1,000 ÷ 0.67 = 1,492.54, not 1,330).
  *
- * A cart that carries KPI items (2026-09-27) is judged on its MAIN price: the
- * items' amount K is paid flat as KPI, so margin = (price − K − cost) ÷
- * (price − K), and the price that reaches t is K + cost ÷ (1 − t).
+ * `price` is the SELLING price the member keys (the prototype's keypad,
+ * 2026-10-05): what the customer pays for the products. Two things ride ON
+ * TOP of it, out of the margin, and the run reads the bill the same way:
+ *   - the KPI items the customer buys (2026-09-27), paid flat as KPI — the
+ *     bill's sales are price + K and its main sales, the margin's, price;
+ *   - what the options are CHARGED (user 2026-10-04; every option priced on
+ *     Maintenance since 2026-10-06): a bed frame's per frame, a sofa's ONCE
+ *     PER SOFA however many pieces — paid the ordinary rate, in the
+ *     commission, out of the margin.
+ * A KPI item given FREE is not on top: the customer pays nothing for it, so
+ * its amount comes off the price — margin = (price − Kgift − cost) ÷
+ * (price − Kgift), and the price that reaches t is Kgift + cost ÷ (1 − t).
+ * The customer pays price + K + charges + additional charges.
  *
  * A line's cost is the portal's own price for it (user 2026-09-24: every
  * margin is measured against the Product List's prices): the SKU's price at
- * the build's seat height and fabric tier, plus what the build's options add,
- * with a sofa's matched combo costed as the combo — `costLines`, the twin of
+ * the build's seat height and fabric tier — no option adds to it — with a
+ * sofa's matched combo costed as the combo — `costLines`, the twin of
  * how the run costs the same sale once the ERP books it.
  */
 export function calculateQuote(
@@ -262,7 +299,7 @@ export function calculateQuote(
   });
   const divisor = rules.costDivisor;
   if (!Number.isFinite(divisor) || divisor <= 0)
-    return invalid("The cost rule for this department is not configured.");
+    return invalid("The margin rules for this department are not configured.");
   // A SKU may carry its own ratio (Product List › Costing Setting).
   const basis = costBasisOf(divisor, rules.costRatios ?? []);
   const divisorOf = (product: MemberProduct) => costDivisorFor(product.code, basis);
@@ -354,6 +391,14 @@ export function calculateQuote(
       buildChoicesFor(selected.map(({ product }) => product!), pricing.models),
     );
     if (buildProblem) return invalid(buildProblem);
+    // Each bed frame built on its own (2026-10-05): FOC, or what it is charged for.
+    for (const { line, product } of selected) {
+      if (!line.bedframe) continue;
+      const problem = frameBuildError(line.bedframe, product!, pricing.models);
+      if (problem) return invalid(problem);
+    }
+  } else if (selected.some(({ line, product }) => line.bedframe && kindOf(product!) !== "BEDFRAME")) {
+    return invalid("Only a bed frame is built with a divan, leg, gap and total height. Choose the product again.");
   }
   const costed = costLines(
     selected.map(({ line, product }) => ({ line, product: product! })),
@@ -370,7 +415,7 @@ export function calculateQuote(
     costed.some(
       (l) =>
         l.comboCents === null &&
-        (l.unit == null || !Number.isFinite(l.unit) || l.unit < 0 || l.unit + l.surcharge < 0),
+        (l.unit == null || !Number.isFinite(l.unit) || l.unit < 0),
     )
   )
     return invalid(
@@ -381,28 +426,50 @@ export function calculateQuote(
       sum +
       (l.comboCents !== null
         ? Math.round(l.comboCents / divisorOf(l.product))
-        : teamCostCents(l.unit! + l.surcharge, divisorOf(l.product)) * l.line.quantity),
+        : teamCostCents(l.unit!, divisorOf(l.product)) * l.line.quantity),
     0,
   );
   if (!Number.isSafeInteger(cost))
     return invalid("The cart amount is outside the supported range.");
-  // The cart's KPI items: their amount is paid flat as KPI, so the margin is
-  // the main sales' — the run judges the bill on the same (2026-09-27).
+  // The cart's KPI items, paid flat as KPI (2026-09-27). One the customer
+  // BUYS rides on top of the selling price; one given FREE costs the customer
+  // nothing, so its amount comes off the price — the margin is the rest's,
+  // as the run judges the bill.
   const kpiIndex = indexKpiItems(rules.kpiItems ?? []);
   const kpiHits = orderKpiHits(
     { lines: cartKpiLines(selected.map(({ line, product }) => ({ line, product: product! })), input.build) },
     kpiIndex,
   );
-  const kpiFound = kpiHits.reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
-  // Paid only when the price covers them, as the run pays them (coverKpi):
-  // otherwise the whole price is the sale and no KPI is paid.
-  const covered = price - kpiFound >= 0;
-  const kpi = covered ? kpiFound : 0;
-  const main = price - kpi;
+  const giftLines = new Set(selected.flatMap(({ line }, i) => (line.gift ? [String(i)] : [])));
+  const kpiGift = kpiHits.filter((hit) => giftLines.has(hit.lineId)).reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
+  const kpiOnTop = kpiHits.filter((hit) => !giftLines.has(hit.lineId)).reduce((sum, hit) => sum + Math.round(hit.amount * 100), 0);
+  const main = price - kpiGift;
   if (main <= 0)
     return invalid(
-      `The KPI items (RM ${(kpi / 100).toFixed(2)}) take the whole price. Raise it to see a margin.`,
+      `The free KPI items (RM ${(kpiGift / 100).toFixed(2)}) take the whole price. Raise it to see a margin.`,
     );
+  // What the options are charged (user 2026-10-04, every option since 2026-10-06): on
+  // top of the price, in the commission, out of the margin on both sides — a bed
+  // frame's per frame, a sofa's once per sofa (the cart's one sofa build on every
+  // piece; the pieces of one base model are one sofa, as the run groups a bill).
+  const charged = costed.filter((l) => l.charge > 0);
+  const sofaSets = pricing
+    ? sofaSetCharges(
+        costed
+          .filter((l) => kindOf(l.product) === "SOFA")
+          .map((l) => ({
+            group: sofaGroupOf(l.product),
+            qty: l.line.quantity,
+            leg: input.build?.leg ?? null,
+            specials: input.build?.specials ?? [],
+          })),
+        new OptionPrices(pricing.options),
+      )
+    : [];
+  const sofaNames = new Map(costed.map((l) => [sofaGroupOf(l.product), l.product.name] as const));
+  const charge =
+    charged.reduce((sum, l) => sum + Math.round(l.charge * 100) * l.line.quantity, 0) +
+    sofaSets.reduce((sum, s) => sum + Math.round(s.total * 100), 0);
   const margin = ((main - cost) / main) * 100,
     band = brand
       ? bandFor(margin, bands)
@@ -417,7 +484,7 @@ export function calculateQuote(
   // A displayed percentage may round up to a threshold while still being below it.
   const boundary =
     next && Number(margin.toFixed(2)) >= next.threshold
-      ? `Actual margin is just below ${next.threshold}%. Add RM ${((kpi + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7) - price) / 100).toFixed(2)} to reach it.`
+      ? `Actual margin is just below ${next.threshold}%. Add RM ${((kpiGift + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7) - price) / 100).toFixed(2)} to reach it.`
       : null;
   const target = bands
     .filter((b) => b.kind === "incentive" && margin + 1e-10 >= b.threshold)
@@ -462,13 +529,28 @@ export function calculateQuote(
     margin,
     ...band,
     nextPrice: next
-      ? (kpi + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7)) / 100
+      ? (kpiGift + Math.ceil(cost / (1 - next.threshold / 100) - 1e-7)) / 100
       : null,
     nextThreshold: next?.threshold ?? null,
     boundary,
-    kpiAmount: kpi / 100,
+    kpiAmount: (kpiGift + kpiOnTop) / 100,
     kpiItems: kpiHits.map((hit) => ({ label: kpiItemLabel(hit.item), qty: hit.qty, amount: hit.amount })),
-    kpiNotPaid: covered ? 0 : kpiFound / 100,
+    addOnAmount: kpiOnTop / 100,
+    optionCharge: charge / 100,
+    optionCharges: [
+      ...charged.map((l) => ({
+        label: [l.product.name, ...l.chargeParts.map(chargeWord)].join(" · "),
+        qty: l.line.quantity,
+        amount: (Math.round(l.charge * 100) * l.line.quantity) / 100,
+      })),
+      // A sofa once per sofa: qty = how many sofas.
+      ...sofaSets.map((s) => ({
+        label: [sofaNames.get(s.group) ?? s.group, ...s.parts.map(chargeWord)].join(" · "),
+        qty: s.sets,
+        amount: s.total,
+      })),
+    ],
+    customerPays: (price + kpiOnTop + charge + delivery) / 100,
     version: productVersions(selected.map(({ product }) => product!)),
     inputKey: quoteInputKey(input),
     suggestions,
@@ -499,20 +581,27 @@ export function customerQuote(
   const lines = input.lines.map((l, index) => {
     const p = selected[index];
     const name = [p.brand, p.name].filter(Boolean).join(" ");
-    return `${l.gift ? "Free gift" : "Product"} · ${name} / ${p.size}${p.color ? " / " + p.color : ""} × ${l.quantity}`;
+    // A bed frame built on its own says how (2026-10-05).
+    const frame = l.bedframe && kindOf(p) === "BEDFRAME" ? frameBuildText(l.bedframe) : "";
+    return `${l.gift ? "Free gift" : "Product"} · ${name} / ${p.size}${p.color ? " / " + p.color : ""}${frame ? ` (${frame})` : ""} × ${l.quantity}`;
   });
   const build = buildLines(input.build, {
     sofaGrid: selected.some(hasGrid),
     sofa: selected.some((p) => kindOf(p) === "SOFA"),
-    bedframe: selected.some((p) => kindOf(p) === "BEDFRAME"),
+    bedframe: selected.some((p, i) => kindOf(p) === "BEDFRAME" && !input.lines[i].bedframe),
   });
+  const addOns = result.addOnAmount ?? 0;
+  const options = result.optionCharge ?? 0;
+  const total = result.customerPays ?? result.price + addOns + options + result.delivery;
   return [
     "HOUZS VENTURE · Product quotation",
     ...lines,
     ...build,
     `Selling price: RM ${result.price.toFixed(2)}`,
+    ...(addOns > 0 ? [`Add-on items: RM ${addOns.toFixed(2)}`] : []),
+    ...(options > 0 ? [`Option charges: RM ${options.toFixed(2)}`] : []),
     `Additional charges: RM ${result.delivery.toFixed(2)}`,
-    `Total: RM ${(result.price + result.delivery).toFixed(2)}`,
+    `Total: RM ${total.toFixed(2)}`,
     "Tax and other service charges: as stated in the confirmed order terms.",
     "Availability, delivery date and quote validity: subject to the final confirmed order.",
   ].join("\n");

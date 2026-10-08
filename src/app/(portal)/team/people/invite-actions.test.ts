@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   deleteUser: vi.fn(),
   revalidatePath: vi.fn(),
 }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({ auth: { admin: { createUser: mocks.createUser, deleteUser: mocks.deleteUser } } }),
@@ -18,34 +18,31 @@ import { inviteUser } from './invite-actions'
 
 type Row = Record<string, unknown>
 
+const ONG = '5f0c2a8e-1b2c-4d3e-8f4a-0b1c2d3e4f5a'
+
 function database() {
   const tables: Record<string, Row[]> = {
     users: [],
-    departments: [{ id: 'revenue', name: 'Revenue Department', payroll_source: 'commission' }],
-    titles: [
-      { id: 'head-title', is_department_head: true },
-      { id: 'member-title', is_department_head: false },
-    ],
-    hr_staff_costs: [
-      { id: 'principal', employee_name: 'Principal', departments: { name: 'Director Office', payroll_source: 'fixed' } },
-      { id: 'existing', employee_name: 'Existing Director', user_id: null, department_id: 'revenue', title_id: 'head-title' },
-    ],
+    hr_staff_costs: [{
+      id: ONG, employee_name: 'ONG SIEW LAN', user_id: null, status: 'active', department_id: 'finance',
+      titles: { name: 'SENIOR ACCOUNT EXECUTIVE', template_id: 'tpl-maker', permission_templates: { name: 'Finance · Maker', base_role: 'finance' } },
+    }],
   }
   const writes: Array<{ table: string; row: Row; id?: unknown }> = []
-  const selections: Array<{ table: string; columns: string }> = []
-  const state = { titleReadError: false }
+  const state = { insertError: null as null | { message: string }, rpcError: null as null | { message: string } }
+  const rpc = vi.fn(async () => ({ data: null, error: state.rpcError }))
   const from = vi.fn((table: string) => {
     const filters: Array<[string, unknown]> = []
     let patch: Row | null = null
-    const result = () => {
-      const error = table === 'titles' && state.titleReadError ? { message: 'Permission denied' } : null
-      return { data: error ? [] : tables[table].filter(row => filters.every(([key, value]) => row[key] === value)), error }
-    }
     const query = {
-      select: (columns: string) => { selections.push({ table, columns }); return query },
+      select: () => query,
       eq: (key: string, value: unknown) => { filters.push([key, value]); return query },
-      maybeSingle: async () => { const response = result(); return { ...response, data: response.data[0] ?? null } },
-      insert: async (row: Row) => { writes.push({ table, row }); return { error: null } },
+      maybeSingle: async () => ({ data: tables[table].find(row => filters.every(([k, v]) => row[k] === v)) ?? null, error: null }),
+      insert: async (row: Row) => {
+        if (state.insertError) return { error: state.insertError }
+        writes.push({ table, row })
+        return { error: null }
+      },
       update: (row: Row) => { patch = row; return query },
       then: (resolve: (value: { error: null }) => unknown) => {
         if (patch) writes.push({ table, row: patch, id: filters.find(([key]) => key === 'id')?.[1] })
@@ -54,81 +51,80 @@ function database() {
     }
     return query
   })
-  return { tables, writes, selections, state, from }
+  return { tables, writes, state, from, rpc }
 }
 
-function form(overrides: Record<string, string> = {}) {
-  const data = new FormData()
-  for (const [key, value] of Object.entries({
-    name: 'Revenue Director', email: 'director@example.test', password: 'test-password',
-    role: 'hr', department_id: 'revenue', title_id: 'head-title', reports_to: 'principal',
-    ...overrides,
-  })) data.set(key, value)
-  return data
-}
+const invite = (overrides: Record<string, unknown> = {}) =>
+  inviteUser({ staffId: ONG, email: 'Siew@Houzs.com', password: 'Hv-7k2m9q', ...overrides })
 
-describe('invite reporting preflight for Revenue department heads', () => {
+describe('inviting somebody on the roster', () => {
   let db: ReturnType<typeof database>
   beforeEach(() => {
     vi.clearAllMocks()
     db = database()
-    mocks.requirePermission.mockResolvedValue({ id: 'actor' })
+    mocks.requirePermission.mockResolvedValue({
+      id: 'principal',
+      permissions: ['team_invite', 'permissions_manage'],
+      actions: { 'accounts.view': 'all', 'accounts.create': 'all', 'accounts.manage': 'all' },
+    })
     mocks.createClient.mockResolvedValue(db)
     mocks.createUser.mockResolvedValue({ data: { user: { id: 'new-user' } }, error: null })
   })
 
-  it('allows a newly selected head title to report to a company manager', async () => {
-    await inviteUser(form())
-    expect(mocks.requirePermission).toHaveBeenCalledWith('team_invite')
-    expect(mocks.createUser).toHaveBeenCalledOnce()
-    expect(db.writes.find(write => write.table === 'hr_staff_costs')).toMatchObject({
-      row: { title_id: 'head-title', reports_to: 'principal', department_id: 'revenue' },
-    })
-    expect(db.selections).toContainEqual({ table: 'titles', columns: 'is_department_head' })
+  it('creates the login with the account kind their title’s template hands out, and attaches it', async () => {
+    expect(await invite()).toEqual({ ok: true, name: 'ONG SIEW LAN', email: 'siew@houzs.com' })
+    expect(mocks.requirePermission).toHaveBeenCalledWith('accounts', 'create')
+    expect(db.writes).toEqual([
+      { table: 'users', row: { id: 'new-user', email: 'siew@houzs.com', name: 'ONG SIEW LAN', role: 'finance', department_id: 'finance' } },
+      { table: 'hr_staff_costs', row: { user_id: 'new-user', email: 'siew@houzs.com' }, id: ONG },
+    ])
+    expect(db.rpc).not.toHaveBeenCalled()
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/team', 'layout')
   })
 
-  it('uses an existing director’s saved title when the invite leaves title and department blank', async () => {
-    await inviteUser(form({ staff_id: 'existing', title_id: '', department_id: '' }))
-    expect(mocks.createUser).toHaveBeenCalledOnce()
-    const write = db.writes.find(write => write.table === 'hr_staff_costs')
-    expect(write).toMatchObject({ id: 'existing', row: { reports_to: 'principal', user_id: 'new-user' } })
-    expect(write?.row).not.toHaveProperty('title_id')
-    expect(db.selections.find(selection => selection.table === 'hr_staff_costs')?.columns).toContain('title_id')
+  it('saves the cells changed for this person alone', async () => {
+    const cells = [{ function_key: 'audit_log', action: 'view', scope: 'all' }]
+    expect((await invite({ cells })).ok).toBe(true)
+    expect(db.rpc).toHaveBeenCalledWith('permission_user_cells_set', { p_user: 'new-user', p_cells: cells })
   })
 
-  it('uses the chosen head title when the existing roster title is an ordinary member', async () => {
-    db.tables.hr_staff_costs[1].title_id = 'member-title'
-    await inviteUser(form({ staff_id: 'existing' }))
-    expect(mocks.createUser).toHaveBeenCalledOnce()
-    expect(db.writes.find(write => write.table === 'hr_staff_costs')).toMatchObject({
-      id: 'existing', row: { title_id: 'head-title', reports_to: 'principal' },
-    })
+  it('refuses per-person cells from somebody who may invite but not manage permissions', async () => {
+    mocks.requirePermission.mockResolvedValue({ id: 'hr', permissions: ['team_invite'], actions: { 'accounts.view': 'all', 'accounts.create': 'all' } })
+    const result = await invite({ cells: [{ function_key: 'audit_log', action: 'view', scope: 'all' }] })
+    expect(result).toEqual({ ok: false, reason: expect.stringContaining('Only whoever manages permissions') })
+    expect(mocks.createUser).not.toHaveBeenCalled()
   })
 
   it.each([
-    ['new member', {}],
-    ['existing director changing to a member title', { staff_id: 'existing' }],
-  ])('rejects a %s crossing the commission boundary before creating credentials', async (_label, overrides) => {
-    await expect(inviteUser(form({ ...overrides, title_id: 'member-title', is_department_head: 'true' })))
-      .rejects.toThrow('commission upline')
+    ['a title with no template', () => { (db.tables.hr_staff_costs[0].titles as Row).permission_templates = null }, 'has no permission template yet'],
+    ['no title at all', () => { db.tables.hr_staff_costs[0].titles = null }, 'has no title yet'],
+    ['somebody with a login already', () => { db.tables.hr_staff_costs[0].user_id = 'someone' }, 'already has a login'],
+    ['somebody who has left', () => { db.tables.hr_staff_costs[0].status = 'inactive' }, 'no longer active'],
+    ['an email already in use', () => { db.tables.users.push({ id: 'x', email: 'siew@houzs.com' }) }, 'already has an account'],
+  ])('refuses %s before any credential exists', async (_label, arrange, reason) => {
+    arrange()
+    const result = await invite()
+    expect(result).toEqual({ ok: false, reason: expect.stringContaining(reason) })
     expect(mocks.createUser).not.toHaveBeenCalled()
     expect(db.writes).toEqual([])
   })
 
-  it.each([
-    ['unavailable', false, 'missing-title', 'That title is no longer available'],
-    ['unreadable', true, 'head-title', 'Could not check their reporting title'],
-  ])('fails before creating credentials when the effective title is %s', async (_label, readError, titleId, message) => {
-    db.state.titleReadError = readError
-    await expect(inviteUser(form({ title_id: titleId }))).rejects.toThrow(message)
-    expect(mocks.createUser).not.toHaveBeenCalled()
-    expect(db.writes).toEqual([])
+  it('answers a bad form with the drawer’s own words, not a throw', async () => {
+    expect(await invite({ password: '123' })).toEqual({ ok: false, reason: 'Password must be at least 6 characters' })
+    expect(await invite({ staffId: '' })).toEqual({ ok: false, reason: 'Pick somebody from the roster' })
   })
 
-  it('requires invite permission before reading title facts or creating credentials', async () => {
-    mocks.requirePermission.mockRejectedValueOnce(new Error('Permission denied'))
-    await expect(inviteUser(form())).rejects.toThrow('Permission denied')
+  it('deletes the credential again when a later step fails', async () => {
+    db.state.rpcError = { message: 'cannot be set that way' }
+    const result = await invite({ cells: [{ function_key: 'audit_log', action: 'view', scope: 'all' }] })
+    expect(result).toEqual({ ok: false, reason: expect.stringContaining('cannot be set that way') })
+    expect(mocks.deleteUser).toHaveBeenCalledWith('new-user')
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('requires the invite permission before reading anything', async () => {
+    mocks.requirePermission.mockRejectedValueOnce(new Error('NEXT_REDIRECT'))
+    await expect(invite()).rejects.toThrow('NEXT_REDIRECT')
     expect(mocks.createClient).not.toHaveBeenCalled()
-    expect(mocks.createUser).not.toHaveBeenCalled()
   })
 })

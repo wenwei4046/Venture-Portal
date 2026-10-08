@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { issueStatement, markStatementPaid } from '../actions'
@@ -41,7 +43,8 @@ export default async function StatementDetailPage({ params }: Props) {
   const invoiceLines = lineList.filter((l) => l.line_type === 'invoice')
   const contraLines = lineList.filter((l) => l.line_type === 'contra')
 
-  const canFinanceAct = user.role === 'finance' || user.role === 'principal'
+  // Issue and Mark paid move the statement along: Treasury · Edit (2026-10-08, PR2).
+  const canFinanceAct = canDo(user, 'treasury', 'edit')
   const isDraft = statement.status === 'draft'
   const isIssued = statement.status === 'issued'
 
@@ -62,7 +65,7 @@ export default async function StatementDetailPage({ params }: Props) {
           </div>
           <h1 className="page-title">{company?.name ?? '—'}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {company?.short_code} · Created <em>{dayjs(statement.created_at).format('D MMMM YYYY')}</em>
+            {company?.short_code} · Created <em>{officeTime(statement.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -234,7 +237,7 @@ export default async function StatementDetailPage({ params }: Props) {
           </div>
           {statement.issued_at ? (
             <p className="font-mono text-xs text-muted mt-3">
-              Issued {dayjs(statement.issued_at).format('D MMM YYYY HH:mm')}
+              Issued {officeTime(statement.issued_at).format('D MMM YYYY HH:mm')}
             </p>
           ) : null}
         </section>

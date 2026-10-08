@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { formatMoney } from '@/lib/utils'
 import { approveRequestGroup, rejectRequestGroup } from '../actions'
 import BatchDetailsModal from './BatchDetailsModal'
@@ -129,7 +129,7 @@ export default function CombinedApprovalCard({
           </span>
         </div>
         <div className="font-mono text-xs text-muted">
-          {dayjs(createdAt).format('D MMM HH:mm')}
+          {officeTime(createdAt).format('D MMM HH:mm')}
         </div>
       </div>
 

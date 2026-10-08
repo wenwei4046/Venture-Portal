@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatIntlDate } from '@/lib/utils'
+import { OFFICE_TZ } from '@/lib/office-clock'
 import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
 import { normalisePayLine, payLineKind, payLineLabel } from '@/lib/revenue-pay-lines'
 import { round2 } from '@/lib/payroll-funding'
@@ -81,7 +82,7 @@ export default async function PayslipPage({ params }: PageProps) {
   const { data: lineRows, error: lineError } = row.source === 'commission' && (payLineEarnings > 0 || payLineDeductions > 0)
     ? await supabase
         .from('revenue_pay_lines')
-        .select('id, staff_id, kind, description, amount, version')
+        .select('id, staff_id, kind, description, amount, version, claim_id')
         .eq('staff_id', staffId)
         .eq('period_month', period)
         .order('sort_order')
@@ -242,7 +243,7 @@ export default async function PayslipPage({ params }: PageProps) {
               <ResetStaffStatutoryButton
                 payrollId={row.id}
                 overridden={true}
-                overriddenLabel={dayjs(row.statutory_overridden_at).format('D MMM YYYY HH:mm')}
+                overriddenLabel={officeTime(row.statutory_overridden_at).format('D MMM YYYY HH:mm')}
               />
             ) : null}
           </div>
@@ -294,7 +295,7 @@ export default async function PayslipPage({ params }: PageProps) {
             {row.status === 'paid' && ' · This payslip is final.'}
           </div>
           <div className="font-mono text-xs mt-1">
-            Generated {new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Generated {formatIntlDate(new Date(), { day: 'numeric', month: 'short', year: 'numeric', timeZone: OFFICE_TZ })}
             {' · '}HOUZS Venture Portal
           </div>
         </div>

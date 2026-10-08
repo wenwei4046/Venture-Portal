@@ -713,7 +713,7 @@ before any of it counts (user, 2026-08-31).
 C1 = PR(S) × effectiveRate(S)
 ```
 
-### 4.3 C2 — KPI items (Product List › Add-on / KPI Items, 2026-09-27)
+### 4.3 C2 — KPI items (Rules › KPI items; 2026-09-27, on Rules since 2026-10-08)
 
 A KPI item is a **SKU** from the SKU Master (a pillow, a protector) or a
 **special** from Maintenance — a bed frame's *HB Straight*, a sofa's *Wooden
@@ -759,10 +759,19 @@ the same amount off a quote before it judges the margin, and says so.
 Items are **dated**: an added item starts today; a new amount — or a removal —
 of an item begun before today closes it yesterday and opens today's
 (`catalogue_save_kpi_items`, one transaction), so a month already run keeps the
-amount it was run at; the run reads the list as at the month's end. The
-switch (`enable_kpi`) and the threshold ladder stay on Rules, where the KPI
-items tab is read-only since. Modelled as a ladder, not a single threshold, so
-a `Tier 2` can be added later without a schema change.
+amount it was run at; the run reads the list as at the month's end. Modelled
+as a ladder, not a single threshold, so a `Tier 2` can be added later without a
+schema change.
+
+**Set on Rules since 2026-10-08** (user: *"rules 这里是用来算薪水的 … product
+list 是拿来 set costing 的"*). The Product List's *Add-on / KPI Items* tab is
+gone; the items, their amounts and the threshold ladder are ONE tab, Rules ›
+**KPI items** (section XI, the last of the rail), set by Principal and HR like
+every rule (`revenue/kpi-actions.ts` → the same writer). The user was asked
+whether the threshold should become per item (*Cable RM 30, 10 cables → +RM 20
+each*) and kept the ladder as it is: every KPI unit of the month together,
+a % on the whole KPI amount — 12 cables at RM 30 with Tier 1 (10 · 20%) pay
+RM 360 + 20% = RM 432. How a bill is found to carry an item is unchanged.
 
 ### 4.4 C3 — Open Bill (1st / 2nd / 3rd bill of the event day)
 
@@ -1191,8 +1200,9 @@ checks and its words are that file's. No migration.
 ### 4.14 Possible double claims — and why each one is there (2026-09-30)
 
 **The check** (2026-09-26, `revenue_possible_double_claims`): a paper number
-(`sales_orders.bill_ref` — the first number in the ERP's `customer_so_no`, else
-the order's own) on more than one bill a run could pay or already paid. A
+(`sales_orders.bill_ref` — the first number in the ERP's Ref No., else the
+order's own; the Ref No. is `customer_so_no`, else `ref` since 2026-10-03,
+§4.15) on more than one bill a run could pay or already paid. A
 "Checked — separate sales" answer covers exactly the bills it was given for; a
 new bill under the number asks again.
 
@@ -1206,7 +1216,7 @@ closes, the cutover — existing tables, the viewer's own session) and
 
 | Verdict | When | What to do |
 |---|---|---|
-| **Would pay twice** (`paid_again`) | one bill is already claimed — on a claim form, in a month before the cutover, by an applied run, or inside a salesperson's close — and another is still payable | same sale → *Don't count this bill* on the payable copy; different sale → its paper number is wrong in the ERP |
+| **Would pay twice** (`paid_again`) | one bill is already claimed — on a claim form, in a month before the cutover, by an applied run, or inside a salesperson's close — and another is still payable | same sale → *Don't count this bill* on the payable copy; different sale → its Ref No. in the ERP carries the wrong paper number |
 | **Same sale twice** (`copy`) | both payable; identical goods and value, or, under one salesperson, two or more of customer / fair / what earns / deposit / items alike and nothing against | take the copy out, unless the customer bought twice |
 | **One sale, two documents** (`split`) | opened in the ERP within the hour or numbered one after the other, no goods in common | mark checked — each document earns only on its own lines |
 | **Second bill on the paper** (`second_sale`) | the same customer (or none to tell), days apart | an add-on should earn only what was added; a separate purchase → mark checked |
@@ -1235,6 +1245,245 @@ claim-form bills keyed into the ERP on 28 Sep with the same deposits (HC11568's
 extra RM 1,056 is transport); HC13241 — MELVIN's two documents three minutes
 apart with nothing in common; PG10457 — SHAWN's customer ROY again twenty days
 later at another fair, nothing paid yet.
+
+### 4.15 The paper beside the document — Ref No. (2026-10-03)
+
+**Two numbers per sale.** At a fair the customer signs a handwritten bill —
+HC13369. Days later the back office keys it into the ERP as a sales order with
+a number of its own — HC-SO-2609-400 — and types the paper's number into the
+order's **Ref No.** A bill in the portal is the ERP's document (its number
+links, sorts and pays); the Ref No. is how a bill is checked back against the
+paper, and the paper number in it is what §4.14 matches on (user: follow erp
+sales order number, but with reference hc123123 (which is paper sales order
+number)).
+
+**Which field.** The ERP keeps two: its order forms write *Ref No.* into
+`customer_so_no` (an order the ERP opened itself has `ref` NULL — every one
+since 2026-09-08); `ref` holds AutoCount's copy on the orders brought over,
+equal to `customer_so_no` on all but a handful. `sales_order_ref_no(header)` is
+THE Ref No.: `customer_so_no`, else `ref` — the form's field first, because an
+edit lands there and leaves an old `ref` behind (the ERP's own header shows
+`ref` first, and so the old number, on such an order). `ref` second because one
+comment in the ERP still calls `customer_so_no` transitional; if the ERP ever
+wrote `ref` instead, a check reading `customer_so_no` alone would match nothing
+and Double claims would go quiet without a word. `sales_orders.bill_ref` reads
+it (changed in place, PG 17 `SET EXPRESSION`; not one of 1,116 bills moved),
+and so does `erp_sync_note_adjustment`, which reads `bill_ref` now rather than
+working the paper out again.
+
+| Where | What it shows |
+|---|---|
+| **Ref No.** column | the first optional column after *Sales order* — All bills, a salesperson's Personal / Overriding / Below deposit, the month's Below deposit and Open Bill tabs, *Not counted*; the Ref No. as typed (`ref_no`). A cell naming several papers ("HC11589+HC12443": the customer's other paper after this one's own) adds *Checked as HC11589*. The search boxes find a bill by it |
+| Cannot be checked | `paper_no` NULL: an ERP document with no Ref No. (*No Ref No. in the ERP*) or one that names no paper — "-", "ZNT", "6760" (*Not a paper number*). Said on the row, and listed on the Double claims tab as *N bills of {month} cannot be checked* (live, worth something: the bills the check could pay) |
+| The bill's page | its header leads with *Ref HC13369* |
+| A bill worked out by hand | its own number is its paper (August's claim-form rows) |
+
+`ref_no(sales_orders)` / `paper_no(sales_orders)` are computed fields (PostgREST
+selects them by name); `revenue_month_orders` returns both. Mig
+`20261003170000`. On 2026-10-03 September had 15 ERP bills the check could not
+read — 12 with no Ref No. at all, and "-", "ZNT", "6760" — 9 of them live and
+worth something.
+
+### 4.16 Sales exhibition — one brand at one fair (2026-10-03)
+
+**What an exhibition is** (user 2026-10-03): 这个 venue 本身其实应该换成 sales
+exhibition … 我做 Akemi，然后在哪个 venue（比如 Mid Valley）、什么 organizer
+（比如 Big Home）、什么日期 … 同一个日期里，可能会在同一个 venue、同一个
+organizer，但是是不同的 brand（比如 Dunlopillo）。所以其实我是看 brand 来区分
+那一场 exhibition 的 result. An exhibition is a **brand at a fair** — the ERP's own
+grain (one `public.projects` row per brand booth: MVEC SOUTHKEY 18–20 Sep MLE is
+projects 344 + 345) and the Arena's (it ranks the team by brand). The month's tab
+was *Sales by venue*, one row per FAIR, which folded a fair's booths together.
+
+**The rule** (`salesByExhibition`, `lib/exhibitions.ts`):
+
+| Part | Read from |
+|---|---|
+| The fair — venue, days, organiser | the bill's `fair_event_id`, the ERP's pick (§14, `erp_sync_fair`). A bill no fair claims falls back to its canonical place and reads *Not linked* |
+| The brand | 1. the **booth** the salesperson picked when opening the bill in the ERP (`raw.fair.brand`, while the bill's fair IS that pick — `fair_source = 'erp'` — and the project is not cancelled), as the portal's code (`DUNLOPILLO` → `DUNLOP`, the twin of `erp_sync_brand_code`); 2. else the bill's own `sales_orders.brand_code` — its goods, or the brand the salesperson named in the ERP for goods that name none (a bed frame alone); 3. else *No brand* |
+
+The booth wins over the goods (user 2026-10-03): 如果有一些单本身选了那一场
+venue、organizer，还有 event 是 Akemi，但是他开的 order 可能是在 Akemi 的 booth
+那边卖 Dunlopillo 的枕头 … 其实还是会落在他选的那个 venue、那个 fair 那一边.
+So a Dunlopillo pillow sold at the Akemi booth is the Akemi exhibition's, and
+September's six Akemi bills written on the Sunway Carnival Dunlopillo project are
+Dunlopillo's (five of them typed KLCC or AEON NILAI — if that pick is wrong, it is
+fixed in the ERP). Only the grouping follows the booth: the margin ladder, the
+ledger's *Brand* column and the Arena's brand ranking still read `brand_code`.
+`exhibitionBrandOf` in `lib/exhibitions.ts`; the booth is read beside each bill's
+fair by `_lib/order-fairs.ts`.
+
+Every live bill sits in exactly one row, matched or not, so the tab adds up to the
+*Total sales value* card. A row's venue opens exactly its bills on All bills:
+`?fair=<id>&brand=<code>` (a fair is matched on its own, whatever venue its bills
+typed), `?venue=<place>&fair=none&brand=…` for a place no fair claims, and
+`brand=none` for bills with no brand. `?view=venue` still opens the tab. No
+migration.
+
+September 2026 on 2026-10-03: 31 venue rows became 50 exhibitions — AKEMI 24,
+ZANOTTI 13, DUNLOP 2, ERGOTEX 2, no brand 9 — still 357 bills and RM 1,981,717.60.
+PENANG WATERFRONT 25–27 Sep MLE, for one, is ZANOTTI RM 139,804 (28 bills) +
+AKEMI RM 105,470 (19) + one bill with no brand; SUNWAY CARNIVAL 25–29 Sep is
+DUNLOP RM 140,208 (29) + ZANOTTI RM 64,614 (11) + AKEMI RM 4,588 (1, placed by
+the calendar from its venue, no booth).
+
+**The Arena ranks booth by booth too** (2026-10-03, `member_arena_booth_history`).
+Its *Championship & Fair results* ranked each FAIR with every booth together; now
+each booth is ranked on its own, however few people worked it (user: 人少也算),
+and a seller's figure is what they sold at that booth — 100k at the Akemi booth of
+the Big Home fair at Mid Valley, never with the 10k written elsewhere that week.
+
+- **Every bill is on a board.** A booth's board holds everything written there —
+  the bills picked at it, bills with no pick from sellers who worked it that week,
+  and (ten old bills on 2026-10-03, RM 45,876) the fair's no-brand board for bills
+  nothing names a brand for. The boards add up to the old whole-fair totals.
+- **Ranked everywhere, points once a week** (user: 一个人在一周里，只可以在一个
+  地方参与第一、第二、第三、第四、第五名的排名 — then: 他应该是要上榜 … 你照样
+  上榜，只是你上榜了没有拿到积分 … 就是能算积分的只有一个 — then: 30 千本身在
+  那个 booth 的排行榜上可能是第三名，所以还是会显示第三名 … 依然会显示属于那个
+  名次，而不是直接不算名次). A seller is ranked on every board they sold at, like
+  anybody, and those behind them move down. The one place a week that earns points
+  (`scoring`) is at the booth of the brand they pick for that week in *My brand
+  weeks* — one dropdown per fair weekend (the Monday–Sunday week a fair opens in,
+  named by its Friday; September 2026 has four, October five), stored in
+  `member_arena_brand_weeks.picks` (`member_arena_save_brand_week_picks`) — at the
+  fair with the most bills for it. Every other place shows *No points*
+  (`offWeekOrders` / `offWeekSales`). Medal counts and the Highest Fair Record
+  read scoring places only.
+- **A week closes seven days after its fair** (user: 在这一边我建议加一道锁，就是
+  在结束之后的一个星期 … 7 号是最后一天，那就从 7 号开始多给 7 天时间让他们去填，
+  没有填就 closing 了): `member_arena_week_closes_on` = the last day of that
+  week's fairs + 7 (a week with no fair: its Sunday + 7). September 2026's weeks
+  closed on 13, 20 and 27 September and 6 October (Sunway Carnival ran to the
+  29th). The member's own save refuses to change a closed week.
+- **A week nobody picked** counts the brand the seller opened the most bills for
+  that week (开最多单的那个 brand), then the most sales: *Unconfirmed* while the
+  week is open, *Auto-located* once it closes — and the board shows which. On
+  2026-10-03 none of the 32 Revenue sellers had a member login, so every finish
+  started that way; the guess matched the ERP's booth attendance lists except for
+  two people (Penang 25–27 Sep: LAWRENCE is on the Akemi list but wrote as many
+  bills at Zanotti; Sunway Carnival: PEI FEN).
+- **After it closes, only the ERP or the back office changes it** (除非是 ERP 那边
+  改，或者是后台这边改): the ERP by changing which booth the bills were picked at;
+  the back office in two places, both any week, closed ones too — the Principal's
+  view of one member, where *Member brand weeks* is an editor
+  (`member_principal_save_brand_week_picks`, mig `20261003190000`), and, for HR,
+  **People › Member services › Brand weeks**: a department's month on one grid,
+  every member and every week, each cell saying what is stored (*Picked*,
+  *Unconfirmed · AKEMI*, *Auto-located · AKEMI*, *No bills*) and the booths the
+  member wrote at that week with their bills, the one that earns the points marked;
+  one Save for every member changed. Whoever reviews member requests may use it
+  (`member_is_manager('member_requests_manage')`: HR and the Principal) —
+  `member_admin_brand_weeks` / `member_admin_save_brand_weeks`, mig
+  `20261003210000`. Every save now records who made it
+  (`member_arena_brand_weeks.updated_by`), and the grid says *Saved 3 Oct · HR
+  Manager* or *by the member*.
+- **A bill with no ERP booth pick** (before the fair picker, or a fair placed by a
+  person or the calendar) counts at its seller's booth that week.
+- **Highest Fair Record** is the best single scoring booth.
+
+On 2026-10-03 data: 38 fairs became 66 booth boards (7 of them no-brand); RM
+4,331,895 on the old boards = the same RM 4,331,895 on the booth boards, of which
+RM 4,179,185 earns points and RM 152,710 (29 bills) is ranked with no points;
+nobody scores twice in a week. Penang 25–27 Sep: Akemi — JAMES SEOW 27,888 · LUCAS
+23,949 · KAR JUN 21,476; Zanotti — WEI PIN 52,006 · ANTHONY 25,606 · ADRIAN
+24,188 … with LUCAS 6th, SALLY 7th and JAMES SEOW 8th there, no points
+(mig `20261003200000`; the ranking itself is `lib/member/arena-history.ts`).
+
+### 4.17 A bed frame's options — charged, not costed (2026-10-05)
+
+The user, deciding how the member Quote sells a bed frame (2026-10-04): its
+divan, leg and gap show ONE "FOC" choice plus the options that carry a charge —
+*"如果是 free、没有填任何价钱的话，那边就会变成 FOC。除非我有填特定的尺寸，比如 16 寸需要
+100 块，这样它就会出现 FOC 跟 16 寸"* — and that charge *"本身不会算进 margin 里面，而是算
+commission amount 来的 … 跟 KPI item 也不一样 … 只会给普通 commission"*. Total height the
+same (2026-10-05: *"没 set 的话就没有，有 set 的话就和其他的一样不算 margin 但是有给 normal
+comm"*); specials stay as they were.
+
+- **What a charge is.** A bed frame's divan height, leg height, gap or total
+  height priced on Product List › Maintenance above zero (the column reads
+  *Charge (RM)* there; 0 or blank = FOC). It is the customer's price for the
+  option, paid on top of the selling price. A bed frame's specials, and a sofa's
+  leg height and specials, were still a COST surcharge (*Surcharge (RM)*) until
+  2026-10-06 — now charges too (§4.18). A sofa's seat size carries no price
+  (CHECKs on `catalogue_option_prices`).
+- **On a sales line.** `option_charge_amount` = qty × Σ the line's divan, leg,
+  gap and total height charges, read from its `raw.variants` / `description2` like every option
+  (`catalogue_line_option_charge`), filled where the cost is: on every line that
+  lands and by Recost — a hand-costed line too, a charge being a price.
+- **In the money.** The bill's commissionable sales keep the charge — the rate is
+  paid on it like the rest of the bill, and the override climbs on it. Its
+  margin does not see it on either side: the margin revenue is main sales −
+  charges, and the cost never had the option in it. Never a KPI item.
+  RM 10,000 bill with a 6" leg at RM 100 and RM 6,000 of team cost: rate paid on
+  10,000; margin (9,900 − 6,000) ÷ 9,900 = 39.4%.
+- **On the Quote.** Each bed frame line carries its own build: FOC, or an option
+  turned ON for that model on Product List › Modular that Maintenance charges and
+  the ERP still allows (`MemberCatalogueModel.charges`, mig `20261005020000` —
+  user: *"要确保 modular 那一边，选择 Turn ON 的他才会出现在 calculate 的 option。如果没有，
+  他就不会出现"*). ON + charged = "+ RM x"; ON without a charge = FOC; not ON =
+  never offered, exactly as a SKU or model that is not ON never is. One frame
+  built two ways is two lines. The keypad is the selling price; *Bed frame
+  options · not in margin + RM x* and *Customer pays* sit under the margin, like
+  KPI items.
+
+Readers that take it off the margin: the engine's `marginBase`,
+`revenue_month_orders` (`margin_revenue`; `commissionable` unchanged),
+`member_order_facts` (`goods_revenue`; `revenue` unchanged), the bill page.
+Comm Cal's *Commissionable value* card and the director incentive threshold read
+`commissionable`, never the margin revenue. On 2026-10-05 nothing carried a
+price, so every cost, margin and commission stayed what it was — Fair August
+RM 193,427.45 and September RM 160,629.60, person by person, before = after
+(mig `20261005010000`).
+
+### 4.18 Every option price is a charge — a sofa's once per sofa (2026-10-06)
+
+Told that a bed frame's specials and a sofa's leg height and specials were still
+a cost, the user: *"我要那些价钱是不会算进 margin 的，加 100 就一定 default calculator
+100"*; asked how a sofa of three pieces is charged: *"整组 sofa 只加一次"*; and a bed
+frame's specials: *"一样改成向客户加收"*.
+
+- **Every priced pool is a charge.** Whatever Product List › Maintenance prices —
+  a bed frame's divan, leg, gap, total height and specials; a sofa's leg height
+  and specials — is what the customer pays on top: out of the margin on both
+  sides, in the commissionable sales, never KPI (§4.17's rule, for all of them).
+  No option adds to a line's cost any more (`catalogue_line_surcharge` answers
+  0), and no price is negative (CHECK `catalogue_option_prices_charge_not_negative`
+  on every pool — the ERP's "No Side Panel −RM 40" can no longer be keyed).
+- **A bed frame, per frame.** `option_charge_amount` = qty × (its divan, leg, gap,
+  total height and each distinct special), on its own line as it lands
+  (`catalogue_line_option_charge` → `catalogue_line_charge`, 7 arguments).
+- **A sofa, once per sofa.** The ERP writes one line per module, so a sofa line is
+  charged nothing as it lands; at commit, beside the combos
+  (`sales_order_lines_apply_combos` → `catalogue_apply_sofa_charges`), an
+  order's sofa lines are grouped by base model — the combos' grouping, one sofa a
+  model — every distinct leg height and special any piece names is charged once,
+  times the sets: the smallest line quantity (2A-LHF ×2 + CNR ×2 + 2A-RHF ×2 is two
+  sofas; ×1 / ×2 / ×1 is one sofa with two middle pieces). The set's total is
+  spread over its lines in proportion to their sales, the rounding to the dearest
+  (`cost_detail.charges` + `charge_set`); Recost does the same. RM 8,338 for a
+  five-piece 8030 with Nylon Fabric at RM 50: RM 50 once, not RM 250.
+- **On the Quote.** A sofa's *Leg height* is offered as a bed frame's heights are:
+  FOC plus the legs turned ON on Modular that Maintenance charges (*Once per sofa ·
+  not in margin*). A special — a sofa's or a bed frame's — is offered only when
+  Maintenance charges it, a chip with its "+ RM x" (user, the same day: *"if there
+  is no price written in Maintenance, then just don't show it, just show the one
+  have price"*): turned ON with no price, it is not on the Quote, and the server
+  refuses it on a bed frame (`frameBuildError`). Step 2 and the customer quote
+  say *Option charges*; the calculator's twin is `sofaSetCharges`
+  (lib/catalogue/pricing.ts) — the cart's one sofa build on every piece of a model.
+  A bill from the ERP is another matter: an unpriced special on it is simply free.
+- **One reader.** The snapshot and the quote both read the models through
+  `catalogueModelsOf` (lib/member/priced-catalogue.ts), which kept only a bed
+  frame's height charges until the same day — so the live sofa sheet never showed
+  its *Leg height* row (5030's 5" at RM 200 was priced and invisible). It keeps
+  each kind's charges now: a bed frame's heights and specials, a sofa's leg and
+  specials. The server charged correctly throughout (it prices from the pools).
+- **Nothing moved.** `catalogue_option_prices` was empty on 2026-10-06: a dry run
+  re-priced every line since August (5,177) with no cost or charge moving. With
+  test prices (sofa 6" leg RM 100, Nylon Fabric RM 50, bed frame HYDRAULIC RM 300)
+  September would have charged 7 bed frame lines and 42 of its 95 sofa bills,
+  RM 2,200 in all — rolled back. Mig `20261006050000`.
 
 ## 5. Tax — Withholding instead of PCB
 
@@ -1497,6 +1746,8 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 >
 > **Tabbed 2026-09-05.** The sections are a tab rail on the header's rule —
 > `?tab=scheme|ladder|groups|kpi|thresholds|open-bill|brands|promotion|ranks`
+> (2026-10-08: `thresholds` folded into `kpi`, which moved to the end, after
+> `directors`; an old `?tab=thresholds` opens it)
 > — one section on screen at a time, the numerals kept on the section heads.
 > *+ Generate new sub-department* moved into the header's action slot and
 > opens its panel above the active tab. Section IX, the salespeople, moved to
@@ -1508,7 +1759,8 @@ PCB 0, WHT 200, net 9,800, then back to 0).
 > rules, Title ladder and Ranks are always there; every other tab is a table
 > one switch on Scheme rules reads, and it appears only while that switch is
 > on (user, on IR's page: "上面的 tab 是 depend on 我 turn on 它才会跳出来"):
-> KPI item allowance → Item groups, KPI items, KPI threshold ladder; Open
+> KPI item allowance → Item groups, KPI items (with the threshold ladder, and
+> since 2026-10-08 also while an item or a rung is recorded); Open
 > Bill bonus → Open Bill rates; Below-margin penalty *or* Monthly margin
 > incentive → Brands & margin bands (one brand ladder holds both kinds of
 > rung). Promotion criteria has no switch — it is recorded policy — so it
@@ -1598,7 +1850,9 @@ OTHER              [ ]              2,210.00
 **IV. KPI items** — pick from the ERP's product codes; qty and value from last
 month shown so the cost of a rate is visible before it is saved. *(2026-09-27:
 set on Product List › Add-on / KPI Items — SKUs and Maintenance specials,
-effective-dated; this tab lists them read-only. §4.3.)*
+effective-dated; this tab listed them read-only. 2026-10-08: set HERE again —
+section XI, the last tab, with the ladder (V) under the items; the Product
+List tab is gone. §4.3.)*
 
 ```
 ITEM CODE                     NAME                    KPI AMOUNT   ACTIVE   JULY QTY
@@ -1608,7 +1862,7 @@ AK- ESSENTIAL BOLSTER         Soft Bolster              30.00       [ ]        4
                                                         [ + add item code ]
 ```
 
-**V. KPI threshold ladder** — `TIER · MIN QTY · BONUS %` (Tier 1 · 10 · 20%).
+**V. KPI threshold ladder** — `TIER · MIN QTY · BONUS %` (Tier 1 · 10 · 20%). *(On the KPI items tab, under the items, since 2026-10-08.)*
 
 **VI. Open Bill rates** — `1st 50% · 2nd 40% · 3rd 30%`.
 

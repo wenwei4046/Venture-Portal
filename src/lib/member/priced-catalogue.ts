@@ -5,7 +5,9 @@ import type {
   CostCell,
   CostOption,
   MemberCatalogueModel,
+  MemberModelCharges,
   MemberModelOptions,
+  OptionCharge,
   MemberProduct,
 } from "./types";
 
@@ -38,6 +40,27 @@ function optionList(v: unknown): string[] {
   });
 }
 
+/**
+ * What each kind may be charged for: a bed frame's divan, leg, gap and total
+ * height (20261005010000) and its specials, a sofa's leg height and specials
+ * (20261006050000 — every Maintenance price is the customer's).
+ */
+const CHARGE_KEYS = {
+  BEDFRAME: ["divan_heights", "leg_heights", "gaps", "total_heights", "specials"],
+  SOFA: ["leg_heights", "specials"],
+} as const;
+
+/** `[{ value, charge }]`, each a short value and a charge above zero — anything else is dropped. */
+function chargeList(v: unknown): OptionCharge[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x) => {
+    if (!isRow(x)) return [];
+    const value = text(x.value, 80);
+    const charge = money(x.charge);
+    return value && value.trim() && charge !== null && charge > 0 ? [{ value, charge }] : [];
+  });
+}
+
 /** The model dropdowns, as the snapshot and the quote both carry them. */
 export function catalogueModelsOf(raw: unknown): MemberCatalogueModel[] {
   if (!Array.isArray(raw)) return [];
@@ -52,7 +75,13 @@ export function catalogueModelsOf(raw: unknown): MemberCatalogueModel[] {
       const list = optionList(src[key]);
       if (list.length) options[key] = list;
     }
-    return [{ id, kind, options }];
+    const charges: MemberModelCharges = {};
+    const chargeSrc = isRow(m.charges) ? m.charges : {};
+    for (const key of CHARGE_KEYS[kind]) {
+      const list = chargeList(chargeSrc[key]);
+      if (list.length) charges[key] = list;
+    }
+    return [Object.keys(charges).length ? { id, kind, options, charges } : { id, kind, options }];
   });
 }
 

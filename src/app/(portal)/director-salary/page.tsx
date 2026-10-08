@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import {
   calculateDirectorGap,
@@ -15,6 +16,7 @@ import {
   type GapDirector,
 } from '@/lib/director-gap'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import CTCInputGrid from './_components/CTCInputGrid'
 import CompleteDirectorSalaryButton from './_components/CompleteDirectorSalaryButton'
@@ -47,7 +49,9 @@ interface ByCompanyRow {
 }
 
 export default async function DirectorSalaryPage({ searchParams }: Props) {
-  await requirePermission('director_salary')
+  const user = await requirePermission('director_salary')
+  // Importing InfoTech's file changes the month: Director Salary · Edit (2026-10-08, PR2).
+  const canEditMonth = canDo(user, 'director_salary', 'edit')
   const supabase = await createClient()
 
   const { period: rawPeriod, tab: rawTab } = await searchParams
@@ -244,16 +248,18 @@ export default async function DirectorSalaryPage({ searchParams }: Props) {
                   {directorState.withFinance > 0 || directorState.completed > 0 ? 'View submission →' : 'Complete →'}
                 </Link>
               </p>
-              <Link
-                href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
-                className="self-start sm:self-auto shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-              >
-                Import InfoTech →
-              </Link>
+              {canEditMonth ? (
+                <Link
+                  href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
+                  className="self-start sm:self-auto shrink-0 bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+                >
+                  Import InfoTech →
+                </Link>
+              ) : null}
             </div>
 
             {actualRows.length === 0 ? (
-              <DirectorPayrollEmptyState period={period} />
+              <DirectorPayrollEmptyState period={period} canImport={canEditMonth} />
             ) : (
               <DirectorPayrollActualGrid rows={actualRows} period={period} />
             )}
@@ -432,7 +438,7 @@ function SubmissionTab({
           </p>
           {submitted && submission ? (
             <p className="sheet-subtitle">
-              Billing snapshot {dayjs(submission.submitted_at).format('D MMM YYYY HH:mm')} · Finance sees these totals +
+              Billing snapshot {officeTime(submission.submitted_at).format('D MMM YYYY HH:mm')} · Finance sees these totals +
               the per-subsidiary split on Billing
             </p>
           ) : null}
@@ -809,7 +815,7 @@ function directorPayrollState(rows: Array<{ status: string; completed_at: string
   const paid = count('paid')
   const withFinance = submitted + paid
   const last = rows.map(r => r.completed_at).filter((x): x is string => !!x).sort().pop()
-  const when = last ? dayjs(last).format('D MMM YYYY HH:mm') : ''
+  const when = last ? officeTime(last).format('D MMM YYYY HH:mm') : ''
   if (rows.length === 0 || (draft === rows.length)) {
     return { draft, completed, submitted, paid, withFinance, heading: 'Not completed yet', detail: '', chip: null }
   }

@@ -1,9 +1,14 @@
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import {
+  fetchInterBillingCashFlow,
+  interBillTransferAccount,
+  payrollCustodyAccount,
+} from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import type { MatrixRow } from '@/lib/monthly-matrix'
 import { segmentFilterFor } from '../../_components/report-segments'
@@ -13,30 +18,35 @@ import { MatrixPdf } from '@/lib/export/matrix-pdf'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
-  const user = await requirePermission('dept_reports')
+  const user = await requireAction('dept_reports', 'export', 'dept')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
-  const period = /^\d{4}-\d{2}$/.test(periodRaw) ? periodRaw : dayjs().format('YYYY-MM')
+  const period = /^\d{4}-\d{2}$/.test(periodRaw) ? periodRaw : officeMonth()
   const segment = url.searchParams.get('segment') ?? ''
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
   const supabase = await createClient()
-  const [lines, accounts, { data: banks }, inSaved, outSaved] = await Promise.all([
+  // Per-segment only — cancels across segments, so drop it when consolidated
+  // (dept managers have no segment param but ARE one segment via RLS); there
+  // the bridge is not read at all, and elsewhere it starts beside the journal
+  // read with the bank codes still pending (2026-10-08).
+  const consolidated = user.role !== 'dept_manager' && !segment
+  const bankCodesRead = Promise.resolve(
+    supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
+  ).then(({ data: banks }) => new Set((banks ?? []) as unknown as string[]))
+  const [lines, accounts, bankCodes, ib, inSaved, outSaved] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    supabase.rpc('bank_gl_codes' as never), // codes only; dept_managers can't read bank_accounts
+    bankCodesRead,
+    consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
     readReportLayout(supabase, 'cash_flow_in'),
     readReportLayout(supabase, 'cash_flow_out'),
   ])
-  const bankCodes = new Set((banks ?? []) as unknown as string[])
-  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  // Per-segment only — cancels across segments, so drop it when consolidated
-  // (dept managers have no segment param but ARE one segment via RLS).
-  const ibLines = user.role !== 'dept_manager' && !segment ? [] : ib.lines
+  const ibLines = ib ? ib.lines : []
   // Same shape as the Cash Flow STATEMENT (the reference view), month columns.
-  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, ib.account, ib.payrollAccount], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
+  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, interBillTransferAccount, payrollCustodyAccount], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
   const nCols = data.columns.length
   const rows: MatrixRow[] = [
     ...buildSideMatrixRows(data.inflow, inSaved as ReportLayout | null, nCols, 'in', 'Total money in', data.inflowTotalByCol),

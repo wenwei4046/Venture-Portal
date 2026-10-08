@@ -10,6 +10,7 @@
 
 import type { Metadata } from 'next'
 import PrintButton from './PrintButton'
+import { OFFICE_TZ } from '@/lib/office-clock'
 import { requirePermission } from '@/lib/auth'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
 import {
@@ -94,7 +95,7 @@ export default async function DirectorPoolPrintPage({ searchParams }: Props) {
   const gb = data.settings.gbPct
   const bi = r2(100 - gb)
   const sv = data.settings.savingPct
-  const generated = new Date().toLocaleString('en-MY', { dateStyle: 'long', timeStyle: 'short' })
+  const generated = new Date().toLocaleString('en-MY', { dateStyle: 'long', timeStyle: 'short', timeZone: OFFICE_TZ })
   // The company that transfers its allowance separately, for labelling.
   const exclName = data.companies.find((c) => c.excludeFromPay)?.name ?? 'Houzs Venture'
 

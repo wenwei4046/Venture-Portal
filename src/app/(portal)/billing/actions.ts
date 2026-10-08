@@ -5,8 +5,9 @@ import { resolveArGlCode } from '@/lib/ar-accounts'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requireAnyAction, requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeTime, officeToday } from '@/lib/office-time'
 import { postJournalEntry } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { validateConsolidation, poolAttributions, segmentForBillingMode, lineAttributions } from '@/lib/invoice-settlement'
@@ -157,7 +158,7 @@ async function assertBillingModeSupported(
 export type BillableToKind = 'subsidiary' | 'director' | 'dept_pool' | 'freetext'
 
 export async function createManualInvoice(formData: FormData): Promise<void> {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
 
   // Item 5: 4-way billable target. Subsidiary still uses the existing
@@ -258,7 +259,7 @@ export interface InvoiceLineInput {
 // invoice (header + line items + who-to-bill + mode) as a fresh draft, then
 // edit the amount / description via the inline Edit modal before issuing.
 export async function copyInvoice(formData: FormData): Promise<void> {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
 
   const sourceId = (formData.get('invoice_id') as string) ?? ''
@@ -272,7 +273,7 @@ export async function copyInvoice(formData: FormData): Promise<void> {
   if (srcErr || !src) throw new Error('Source invoice not found')
 
   // New draft lands in the CURRENT billing month (copy last month → bill this).
-  const period = dayjs().startOf('month').format('YYYY-MM-DD')
+  const period = officeTime().startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
 
   const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', { p_period: period })
@@ -290,7 +291,7 @@ export async function copyInvoice(formData: FormData): Promise<void> {
       base_amount: src.base_amount,
       total_amount: src.total_amount,
       status: 'draft',
-      invoice_date: dayjs().format('YYYY-MM-DD'),
+      invoice_date: officeToday(),
       due_date: null,
       description: src.description,
       reference_no: src.reference_no,
@@ -352,7 +353,7 @@ export async function createMultiLineInvoice(
     lines: InvoiceLineInput[]
   },
 ): Promise<{ id: string; invoice_no: string | null }> {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
 
   if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
@@ -478,6 +479,14 @@ export interface DirectorCtcRow {
   shortCode: string
   name: string
   totalCtc: number
+  /** The same total the way HR keyed it — the invoice's lines (2026-10-06,
+   *  lib/director-ctc-lines). Per company, never per director. */
+  basic: number
+  kpi: number
+  allowance: number
+  epf: number
+  socso: number
+  eis: number
 }
 
 export async function fetchDirectorCtcByCompany(
@@ -499,6 +508,12 @@ export async function fetchDirectorCtcByCompany(
     shortCode: r.company_short_code,
     name: r.company_name,
     totalCtc: Number(r.total_ctc),
+    basic: Number(r.basic),
+    kpi: Number(r.kpi),
+    allowance: Number(r.allowance),
+    epf: Number(r.epf_er),
+    socso: Number(r.socso_er),
+    eis: Number(r.eis_er),
   }))
 }
 
@@ -569,7 +584,7 @@ export async function fetchStaffAllocationByCompany(
 export async function generateMonthlyInvoices(
   formData: FormData
 ): Promise<GenerateInvoicesResult> {
-  await requirePermission('billing')
+  await requireAction('billing', 'create')
   const supabase = await createClient()
 
   const rawPeriod = (formData.get('period_month') as string) ?? ''
@@ -615,7 +630,7 @@ export async function generateMonthlyInvoices(
 // ─── Create marketing project contract (Finance) ────────────────────────────
 
 export async function createContract(formData: FormData) {
-  const user = await requirePermission('billing', 'my_billing')
+  const user = await requireAnyAction(['billing', 'create'], ['my_billing', 'create', 'dept'])
   const supabase = await createClient()
 
   const companyId = (formData.get('company_id') as string) ?? ''
@@ -692,7 +707,7 @@ export async function createContract(formData: FormData) {
 // ─── Update marketing project contract (Finance) ────────────────────────────
 
 export async function updateContract(formData: FormData) {
-  await requirePermission('billing')
+  await requireAction('billing', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -730,7 +745,7 @@ export async function updateContract(formData: FormData) {
 // ─── Credit Notes (Finance creates, Principal approves) ─────────────────────
 
 export async function createCreditNote(formData: FormData) {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
 
   const invoiceId = (formData.get('invoice_id') as string) ?? ''
@@ -796,7 +811,7 @@ export async function createCreditNote(formData: FormData) {
   // Mint CN number under advisory lock (mig 227). Replaces the old
   // SELECT count(*) + 1 pattern which collided under concurrent creates.
   const { data: creditNoteNo, error: mintErr } = await supabase.rpc('mint_credit_note_no', {
-    p_period: dayjs().format('YYYY-MM-DD'),
+    p_period: officeToday(),
   })
   if (mintErr || !creditNoteNo) {
     throw new Error(`Failed to mint credit note number: ${mintErr?.message ?? 'unknown'}`)
@@ -839,7 +854,7 @@ export async function voidIssuedInvoices(payload: {
   ids: string[]
   reason: string
 }): Promise<{ voided: string[] }> {
-  await requirePermission('billing')
+  await requireAction('billing', 'void')
   const supabase = await createClient()
 
   const ids = [...new Set((payload.ids ?? []).map((s) => s.trim()).filter(Boolean))]
@@ -887,7 +902,7 @@ export async function voidIssuedInvoices(payload: {
 // ─── Delete draft invoice (Finance — soft to recover from mistakes) ───────
 
 export async function deleteDraftInvoice(formData: FormData): Promise<void> {
-  await requirePermission('billing')
+  await requireAction('billing', 'edit')
   const supabase = await createClient()
 
   const id = String(formData.get('id') ?? '').trim()
@@ -924,7 +939,7 @@ export async function deleteDraftInvoice(formData: FormData): Promise<void> {
 // them = delete + recreate. Per user request 2026-05-27.
 
 export async function updateDraftInvoice(formData: FormData): Promise<void> {
-  await requirePermission('billing')
+  await requireAction('billing', 'edit')
   const supabase = await createClient()
 
   const id = String(formData.get('id') ?? '').trim()
@@ -1067,7 +1082,7 @@ export async function updateDraftInvoiceFull(payload: {
   freetextEmail?: string
   lines: InvoiceLineInput[]
 }): Promise<void> {
-  await requirePermission('billing')
+  await requireAction('billing', 'edit')
   const supabase = await createClient()
 
   if (!payload.id) throw new Error('Invoice id is required')
@@ -1168,6 +1183,157 @@ export async function updateDraftInvoiceFull(payload: {
   revalidatePath('/statements')
 }
 
+// ─── Full ISSUED-invoice edit (Finance, 2026-10-07) ─────────────────────────
+// User: "invoice edit 我要全部都可以改". The same form as a draft's edit, for an
+// invoice that is already issued. Its AR-accrual entry, posted at issue, is
+// corrected IN PLACE — same entry_no — by amend_issued_invoice, which also
+// owns the guards: money already received fixes the amount, the payer and
+// the period; approved credit notes cap the total; the entry's month before
+// and after must be open; the entry must balance. This side resolves the
+// entry's accounts exactly as the issue did (the customer's receivable
+// account, each line's revenue account) and refuses the shapes that post more
+// than one entry — a department recharge (inter-billing expense as well) and
+// a consolidated payroll invoice (one entry per segment) — which keep 改
+// account, a credit note, or void and re-issue.
+export async function updateIssuedInvoiceFull(payload: {
+  id: string
+  billableType: BillableToKind
+  billingMode: CreateInvoiceMode
+  period: string // YYYY-MM
+  invoiceDate: string
+  dueDate: string
+  referenceNo: string
+  headerDescription: string
+  companyId?: string
+  departmentId?: string
+  freetextName?: string
+  freetextAddress?: string
+  freetextPhone?: string
+  freetextEmail?: string
+  lines: InvoiceLineInput[]
+  /** Goes on the audit trail and the entry's description. */
+  reason: string
+}): Promise<{ entryNo: string | null }> {
+  await requireAction('billing', 'edit')
+  const supabase = await createClient()
+
+  const reason = (payload.reason ?? '').trim()
+  if (!reason) throw new Error('A reason is required (it goes on the audit trail)')
+  if (!payload.id) throw new Error('Invoice id is required')
+  if (!['subsidiary', 'director', 'dept_pool', 'freetext'].includes(payload.billableType)) {
+    throw new Error(`Unsupported billable_to_type: ${payload.billableType}`)
+  }
+  if (payload.billableType === 'dept_pool') {
+    throw new Error('A department recharge posts an inter-billing expense entry as well — change it with 改 account, a credit note, or void and re-issue')
+  }
+  // Not a CreateInvoiceMode, but a generated invoice could still arrive here.
+  if ((payload.billingMode as string) === 'payroll_consolidated') {
+    throw new Error('A consolidated payroll invoice posts one entry per department — change it with 改 account, a credit note, or void and re-issue')
+  }
+  if (payload.billableType === 'subsidiary' && !payload.companyId) throw new Error('Subsidiary is required')
+  if (
+    (payload.billableType === 'director' || payload.billableType === 'freetext') &&
+    !payload.freetextName?.trim()
+  ) {
+    throw new Error('Billable party name is required')
+  }
+  if (!payload.period) throw new Error('Period is required')
+  if (!payload.lines || payload.lines.length === 0) {
+    throw new Error('At least one line item is required')
+  }
+  for (let i = 0; i < payload.lines.length; i++) {
+    const ln = payload.lines[i]
+    if (!Number.isFinite(ln.amount) || ln.amount <= 0) {
+      throw new Error(`Line ${i + 1}: amount must be a positive number`)
+    }
+    if (payload.lines.length >= 2 && !ln.description.trim()) {
+      throw new Error(`Line ${i + 1}: description is required (with 2+ lines)`)
+    }
+  }
+
+  const { data: inv } = await supabase
+    .from('invoices')
+    .select('id, invoice_no, status, period_month, total_amount, billing_mode, billable_to_type, company_id, billable_to_department_id, billable_to_freetext_name, settlement_voucher_id, invoice_date')
+    .eq('id', payload.id)
+    .single()
+  if (!inv) throw new Error('Invoice not found')
+  if (!['issued', 'paid', 'paid_via_netting'].includes(inv.status)) {
+    throw new Error(`Invoice ${inv.invoice_no ?? inv.id} is ${inv.status} — a draft is edited normally`)
+  }
+  if (inv.billable_to_type === 'dept_pool') {
+    throw new Error('A department recharge posts an inter-billing expense entry as well — change it with 改 account, a credit note, or void and re-issue')
+  }
+  const { data: oldLines } = await supabase.from('invoice_lines').select('segment').eq('invoice_id', payload.id)
+  if (inv.billing_mode === 'payroll_consolidated' || (oldLines ?? []).some((l) => (l as { segment?: string | null }).segment)) {
+    throw new Error('A consolidated payroll invoice posts one entry per department — change it with 改 account, a credit note, or void and re-issue')
+  }
+
+  await assertBillingModeSupported(supabase, payload.billingMode)
+  await assertPeriodOpen(supabase, inv.period_month)
+  const period = dayjs(payload.period).startOf('month').format('YYYY-MM-DD')
+  if (period !== inv.period_month) await assertPeriodOpen(supabase, period)
+
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const lines = payload.lines.map((l, i) => ({
+    line_no: i + 1,
+    description: l.description.trim(),
+    amount: r2(Number(l.amount)),
+    category_code: l.categoryCode.trim() || null,
+  }))
+  const total = r2(lines.reduce((s, l) => s + l.amount, 0))
+  const isParty = payload.billableType === 'director' || payload.billableType === 'freetext'
+  const header = {
+    period_month: period,
+    billing_mode: payload.billingMode,
+    total_amount: total,
+    invoice_date: payload.invoiceDate || null,
+    due_date: payload.dueDate || null,
+    description: payload.headerDescription.trim() || null,
+    reference_no: payload.referenceNo.trim() || null,
+    billable_to_type: payload.billableType,
+    company_id: payload.billableType === 'subsidiary' ? (payload.companyId ?? null) : null,
+    billable_to_department_id: null,
+    billable_to_freetext_name: isParty ? (payload.freetextName?.trim() ?? null) : null,
+    billable_to_freetext_address: payload.billableType === 'freetext' ? payload.freetextAddress?.trim() || null : null,
+    billable_to_freetext_phone: payload.billableType === 'freetext' ? payload.freetextPhone?.trim() || null : null,
+    billable_to_freetext_email: payload.billableType === 'freetext' ? payload.freetextEmail?.trim() || null : null,
+  }
+
+  // The entry as the issue would post it today: dated by the invoice, Dr the
+  // customer's receivable account for the total, Cr each line's account.
+  const jeDate = invoiceJeDate(header.invoice_date, period, officeToday())
+  const arCode = await resolveArGlCode(supabase, {
+    companyId: header.company_id,
+    departmentId: null,
+    freetext: header.billable_to_freetext_name,
+  })
+  const journalLines: Array<{ account_code: string; debit: number | null; credit: number | null; description: string }> = [
+    { account_code: arCode, debit: total, credit: null, description: `AR — invoice ${inv.invoice_no ?? ''}`.trim() },
+  ]
+  for (const l of lines) {
+    journalLines.push({
+      account_code: await resolveRevenueGlCode(supabase, l.category_code, payload.billingMode),
+      debit: null,
+      credit: l.amount,
+      description: l.description || 'Line item',
+    })
+  }
+
+  const { data, error } = await supabase.rpc('amend_issued_invoice' as never, {
+    p_invoice_id: payload.id,
+    p_header: header,
+    p_lines: lines,
+    p_journal: { transaction_date: jeDate, lines: journalLines },
+    p_reason: reason,
+  } as never)
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  revalidatePath('/reports')
+  return { entryNo: (data as { entry_no?: string | null } | null)?.entry_no ?? null }
+}
+
 // ─── Consolidated invoice settlement (Finance) ─────────────────────────────
 // Settle N issued invoices of the SAME payer into ONE Official Receipt voucher.
 // Cross-payer selections are rejected (one receipt = one company). Replaces the
@@ -1181,7 +1347,7 @@ export async function settleInvoicesConsolidated(payload: {
    *  receipts are accepted until it is fully collected. */
   partialAmount?: number
 }): Promise<{ voucherId: string; voucherNo: string; settledCount: number; total: number; isPartial: boolean }> {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
 
   if (!payload.invoiceIds?.length) throw new Error('No invoices selected')
@@ -1544,7 +1710,7 @@ export async function generateConsolidatedPayrollInvoices(
   periodMonth: string,
   categoryCode: string | null,
 ): Promise<{ generated: number; companies: string[] }> {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
@@ -1741,7 +1907,7 @@ export async function fetchPayrollBillingDelta(
 export async function generatePayrollAdjustmentInvoices(
   periodMonth: string,
 ): Promise<{ generated: string[]; overBilled: string[]; missingInvoice: string[] }> {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
@@ -1987,7 +2153,7 @@ export async function generateOwnShareInvoice(
   /** This run only. Omit to bill back exactly what the registry says. */
   segments?: string[] | null,
 ): Promise<{ generated: number; total: number }> {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'create')
   const supabase = await createClient()
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
@@ -2089,7 +2255,7 @@ export async function generateOwnShareInvoice(
 }
 
 export async function approveInvoice(formData: FormData) {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -2134,7 +2300,7 @@ export async function approveInvoice(formData: FormData) {
     const jeDate = invoiceJeDate(
       (inv as { invoice_date?: string | null }).invoice_date,
       inv.period_month,
-      dayjs().format('YYYY-MM-DD'),
+      officeToday(),
     )
     // Consolidated payroll invoice: each line carries its own gl_segment, so
     // post ONE AR-accrual JE PER segment (Dr 3030 dept-subtotal / Cr revenue per
@@ -2261,7 +2427,7 @@ export async function approveInvoice(formData: FormData) {
           transactionDate: invoiceJeDate(
             (inv as { invoice_date?: string | null }).invoice_date,
             inv.period_month,
-            dayjs().format('YYYY-MM-DD'),
+            officeToday(),
           ),
           // The EXPENSE belongs to the PAYING dept's P&L, not the
           // invoice's billing_mode segment (user 2026-06-11). The internal
@@ -2296,7 +2462,7 @@ export async function approveInvoice(formData: FormData) {
 }
 
 export async function approveInvoicesForPeriod(formData: FormData) {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'edit')
   const supabase = await createClient()
 
   const rawPeriod = (formData.get('period_month') as string) ?? ''
@@ -2325,7 +2491,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
   // Mig 200/P1-6a: post AR accrual per newly-issued invoice.
   // transaction_date = the INVOICE date (user 2026-06-11): a May-31 invoice
   // bulk-issued on June 4 must land in May's P&L, not June's.
-  const todayStr = dayjs().format('YYYY-MM-DD')
+  const todayStr = officeToday()
   for (const row of draftInvoices ?? []) {
     const amount = Number(row.total_amount ?? 0)
     if (amount <= 0) continue
@@ -2479,7 +2645,7 @@ export async function approveInvoicesForPeriod(formData: FormData) {
 // the CN's own pool segment, then flips the parent invoice to paid if the
 // receipts already on file cover total − approved CNs.
 export async function approveCreditNote(formData: FormData) {
-  const user = await requirePermission('override')
+  const user = await requireAction('treasury', 'approve')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -2525,7 +2691,7 @@ export async function approveCreditNote(formData: FormData) {
 
   try {
     await postJournalEntry(supabase, {
-      transactionDate: dayjs().format('YYYY-MM-DD'),
+      transactionDate: officeToday(),
       segment,
       description: `Credit note ${cn.credit_note_no ?? cn.id.slice(0, 8)} against invoice ${inv.invoice_no ?? inv.id.slice(0, 8)} — ${cn.reason}`,
       referenceType: 'credit_note',
@@ -2580,7 +2746,7 @@ export async function reassignInvoiceGlAccount(
   formData: FormData,
 ): Promise<{ error?: string; changed?: number; oldAccount?: string }> {
   try {
-    await requirePermission('billing')
+    await requireAction('billing', 'edit')
     const supabase = await createClient()
 
     const id = ((formData.get('id') as string) ?? '').trim()
@@ -2635,7 +2801,7 @@ export async function reassignInvoiceGlAccount(
 // triggers) filters status='approved', so the voided CN falls out of the
 // numbers automatically.
 export async function voidCreditNote(formData: FormData) {
-  const user = await requirePermission('billing')
+  const user = await requireAction('billing', 'void')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -2675,7 +2841,7 @@ export async function voidCreditNote(formData: FormData) {
         .eq('entry_id', e.id)
       if (!lines || lines.length === 0) continue
       const reversalId = await postJournalEntry(supabase, {
-        transactionDate: dayjs().format('YYYY-MM-DD'),
+        transactionDate: officeToday(),
         segment: (e.segment as string) ?? undefined,
         description: `VOID ${cn.credit_note_no ?? cn.id.slice(0, 8)}: reversal of ${e.description ?? ''}`.trim(),
         referenceType: 'credit_note_void',
@@ -2731,7 +2897,7 @@ export async function voidCreditNote(formData: FormData) {
 // Draft CNs can be binned by Finance (same UX as draft invoices) — nothing
 // has posted yet. Approved CNs are permanent: they carry a JE.
 export async function deleteCreditNote(formData: FormData) {
-  await requirePermission('billing')
+  await requireAction('billing', 'edit')
   const supabase = await createClient()
 
   const id = formData.get('id') as string

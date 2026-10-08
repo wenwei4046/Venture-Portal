@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchByKeys } from '@/lib/paginate'
+import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 import type { HandExclusion } from '@/lib/commission/bill-exclusion'
 import type { BrandOption } from '@/lib/commission/bill-brand'
 
@@ -70,6 +70,15 @@ export interface MonthOrder {
   openBillAuto: boolean | null
   depositRequired: number | null
   depositMet: boolean
+  /**
+   * The paper beside the document (2026-10-03): the ERP's Ref No. as typed —
+   * the handwritten bill's number, HC13369 on HC-SO-2609-400; customer_so_no,
+   * else ref — and the paper number the double-claim check reads from it, null
+   * when it names none (`ref_no` / `paper_no`, mig 20261003170000;
+   * `lib/commission/paper-ref.ts`).
+   */
+  refNo: string | null
+  paperNo: string | null
 }
 
 interface Row {
@@ -110,6 +119,8 @@ interface Row {
   open_bill_auto: boolean | null
   deposit_required: number | string | null
   deposit_met: boolean
+  ref_no: string | null
+  paper_no: string | null
 }
 
 export async function loadMonthOrders(
@@ -117,12 +128,26 @@ export async function loadMonthOrders(
   subDepartmentId: string,
   period: string,
 ): Promise<MonthOrder[]> {
-  const { data, error } = await supabase.rpc('revenue_month_orders', {
-    p_sub_department_id: subDepartmentId,
-    p_period: period,
-  })
-  if (error) throw new Error(`Could not read the month's orders: ${error.message}`)
-  return ((data ?? []) as Row[]).map(r => ({
+  // One row per bill, and PostgREST caps a function's rows at 1000 like any
+  // read (2026-10-08: ~370 bills in September) — past it the month's last
+  // days would silently drop off every list and total built on this. Asked as
+  // before while it fits; a capped answer is read again in pages, in the
+  // function's own order (date, sequence, number) with the bill's id last.
+  const data = await fetchAllRowsAsWritten<Row>((page) => {
+    const q = supabase.rpc('revenue_month_orders', {
+      p_sub_department_id: subDepartmentId,
+      p_period: period,
+    })
+    return page
+      ? q
+          .order('order_date')
+          .order('sequence_in_day', { nullsFirst: false })
+          .order('order_no')
+          .order('order_id')
+          .range(page.from, page.to)
+      : q
+  }, "Could not read the month's orders")
+  return data.map(r => ({
     orderId: r.order_id,
     orderNo: r.order_no,
     orderDate: r.order_date,
@@ -160,6 +185,9 @@ export async function loadMonthOrders(
     openBillAuto: r.open_bill_auto,
     depositRequired: r.deposit_required === null ? null : Number(r.deposit_required),
     depositMet: r.deposit_met,
+    // Absent until 20261003170000 is applied: the column then reads as unknown.
+    refNo: r.ref_no ?? null,
+    paperNo: r.paper_no ?? null,
   }))
 }
 

@@ -1,9 +1,9 @@
 # DESIGN.md — HOUZS Venture Portal
 
 **Version:** 3.10
-**Last updated:** 2026-09-27
+**Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.11 (Sheet theme on HR's whole view — Overview and People included / Walnut shell / approved Product List workspace, with its two settings tabs) — single source of truth for all UI work
+**Status:** v3.17 (approvals by domain: a row you may not decide has no tick) / v3.16 (every button follows its own cell of the permission matrix) / v3.15 (Audit Log › Changes: the app-wide history, each reader's own areas) / v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -26,6 +26,39 @@ every person / account page and form under it, Member Services, Hierarchy,
 Roles, Permissions). `lib/sheet-routes.ts` lists the prefixes; extending the
 tone to the rest of the portal is adding a prefix there and converting the
 page (below).
+
+**v3.12 (2026-10-07) — Finance's view, by prefix only.** The user asked for
+Finance's background to match the Principal's and HR's ("做 A 先"), so every
+remaining portal route moved onto the sheet: Approvals, Payments, Receipt,
+Invoice / Statements, Service Billing, Billing Allocator, Invoice Pool, Daily
+Bank, Fund IN / OUT, Bank BA, Overdue, Repayment Schedule, Dept Pool, Venture
+Pool, OPEX, My Billing, Reports, Reconciliation, Journal Entries, Audit Log,
+Settings. The sheet, its lettering, buttons and tables apply through the
+overrides; those pages' anatomy is not yet rebuilt — a walnut hero or a figure
+strip stays until the page is converted per the steps below, one page at a
+time as the user picks them. **Converted so far:** Payments and Receipts
+(`VoucherLedger`, 2026-10-07 — four summary cards, counted tabs, one toolbar,
+a section head over the table); Approvals (2026-10-07 — four cards, the
+pending queue and the recent decisions as `SortableTable`s with one decision
+bar under the queue for what is ticked; on a phone a row is Description +
+Amount with the number and who / when as small print, and the arrow opens
+Type / Pool / Category / Payee / Pay by / Attachments (thumbnails) / Submitted
+and the voucher); Service Billing = Invoice (`BillingView`, 2026-10-07 — the
+month beside the title, every control in a captioned action band, four cards,
+the payroll basis folded above the invoices with its figures on the fold, the
+invoices as a tabbed `SortableTable` with a decision bar) and the monthly
+Statements (four cards, a section per month); the Billing Allocator
+(2026-10-07 — the month beside the title, four cards Allocated / To bill /
+Billed / HV own share, a counted rail Calculate · Records · Staff · Setup,
+the records as a `SortableTable` with the split as one column per company —
+the user's pick over chips — HV's own share the last column in grey and the
+batch as a chip, a By company table with each target's share / billed / to
+bill / invoices, Calculate's preview as a table). On a phone the `.fin-queue`
+pages set the opened row's labels in the card-label face and the row's one
+action (Settle) as an orange pill; Finance's and the Principal's tab bar reads
+in English. The user compared a Harbour-blue accent for
+Finance's sheet with the orange and kept the orange ("我发现橘色比较好看"): the
+sheet has one accent for every department.
 
 **What it is.** PortalFrame draws, for those routes, the content column inset
 10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline
@@ -100,118 +133,57 @@ selector>`, so it has exactly the specificity of the rule it replaces: a page's
 own utilities keep the power they had. Don't add a sheet rule with more weight
 than its base.
 
-### Product List workspace — approved 2026-09-24
+### Product List — a page of the Revenue app (v3.13, 2026-10-08)
 
-The user's approved Product List design supersedes the older restrictions on
-white surfaces and warm accents **within `/revenue/products` and its visible
-shell**. Since 2026-09-27 the same tokens are the sheet theme's (above) on HR's
-view; the Product List is the one route that also re-tones the shell.
-`.product-theme` scopes the tokens in `globals.css`; the user's theme preference
-is not rewritten.
+The Product List left the portal for the Revenue app: `/member/products`,
+inside the app's own shell (`RevenueApp`, the `[data-revenue-app]` palette),
+drawn to the Claude Design handoff *design_handoff_product_list* — its README
+is the spec, `prototype/ProductList.dc.html` the source of truth (both kept in
+`.design/revenue-app/`). The portal's light `.product-theme` workspace
+(approved 2026-09-24) is gone with it; `/revenue/products` redirects.
 
-- Keep the existing light brown sidebar and greeting bar (`#DED7CA`), on a
-  light neutral gray base (`#F3F3F1`). The content panel and inputs are white.
-- Use the lighter orange (`#E99A53`) for actions, active tab rules and markers.
-  The current sidebar item has a pale orange background (`#FFF4E7`) and a narrow
-  orange marker. It is not a solid orange block.
-- **All text is standard black (`#000000`)**, including the sidebar, title,
-  buttons, placeholders, labels, prices and supporting copy. Establish hierarchy
-  with surfaces, spacing and weight. Status remains explicit in words and can
-  use coloured borders/backgrounds; it must not depend on coloured text.
-- Place category chips and search/model/tier controls in one shallow gray
-  filter panel (`#F6F6F4`), with a divider between the two rows. Keep the main
-  Product List tabs outside this panel.
-- Use a stronger table header (`#EBE7E0`), subtle white / `#F7F7F5` alternating
-  rows, and a footer. The wide sheets scroll internally in both directions,
-  with a sticky header and a frozen first column: Combo Pricing fills the
-  remaining window, SKU Master (and Costing gaps) take a whole screen — see
-  *One screen* below; on mobile a fixed-height window.
-- **Lists scroll with the page (2026-09-27).** Modular and Maintenance only grow
-  downward, so they grow with their rows and the page's own scrollbar moves them,
-  as the ERP's Products page does — no box inside the page. A table there keeps
-  its header stuck to the top of the page and scrolls sideways inside its card
-  only while it is wider than the card. `productTabScroll` names each tab's mode;
-  a new tab that only grows downward belongs on the page.
-- SKU Master is for finding SKUs and maintaining prices: omit pricing summary
-  cards, calculator labels/filters, category ratios and the long introduction.
-  Sofa prices remain the ERP-ordered size columns and P1/P2/P3 tiers. Sofa,
-  Mattress and Bedframe — whose models gather several SKUs — each carry a model
-  filter, as on the ERP; the other categories are one SKU per model and do not.
-  Preserve raw size labels, but omit the `DEFAULT` size and flat
-  fallback price columns. Omit Status throughout SKU Master. Hidden saved
-  defaults and fallback prices survive edits to visible prices; other product
-  categories retain their ordinary Price column.
-- Retain portal-owned price writes, permission checks and existing pricing
-  semantics. No ERP source price becomes a portal cost through this restyle.
-- Modular is a board of model cards grouped by category, in the ERP's order, and
-  **inside a category by branding** (2026-09-27): the ERP's branding — the
-  model's own, else its SKUs' — named by the brand register's code when the
-  register knows it (DUNLOPILLO sits under DUNLOP, the word on its cards), A→Z,
-  the unbranded together last as *No branding*. Each run of cards opens on a
-  small heading: the eyebrow's orange dash (grey for *No branding*), the
-  branding in caps and its count, then a hairline to the edge. A category where
-  nothing is branded has no such headings. A heading counts its whole group
-  even while *Show more* holds some cards back, and ‹ › steps through the
-  models in the order they are drawn. The margin ladder chosen in a model's
-  window never moves its card — the branding is the ERP's fact
-  (`modular-board.ts`). A card opens the model in a floating one-sheet window
-  with fixed save/cancel controls; on phones the window fills the screen. Empty
-  ERP allowlists are unrestricted; empty portal selections mean none. Keep
-  inactive saved selections visible so they can be removed.
-- Maintenance keeps the ERP's Bedframe/Sofa pool order and values, with a separate
-  fabric view. An option pool has no search box — the largest holds about twenty
-  values and the ERP's Maintenance lists have none; the fabric view keeps its
-  search and tier filters. Fabrics expose both category tiers, using the shared
-  tier and then P2 when a category mapping is absent. All rows remain reachable
-  with Load more.
-- Combo Pricing retains module slots, alternatives, repeated modules, tiers and
-  effective dates. Match equivalent size keys without losing their raw labels or
-  historical price columns. A blank clears a price; zero remains a stored zero.
-- Preserve drafts across filters and require a keep/discard choice before tab or
-  model switches. Disable competing actions while a save is running. Save errors
-  retain edits, and partially successful maintenance batches retry only failures.
-- Costing gaps is a searchable work list with reason filters and a direct SKU
-  lookup. Sum lines and revenue; do not sum per-code bill counts, which overlap.
-- **Two settings tabs close the rail (2026-09-27): Costing Setting and Add-on /
-  KPI Items.** Both are per sub-department — the filter panel holds one row of
-  sub-department chips (`?sub=`, carried from one of the two tabs to the other;
-  switching with unsaved changes asks keep/discard like a tab switch) — and
-  both scroll with the page. Under the panel a card holds the sub-department's
-  own figure: the ratio every SKU's cost is divided by, with a worked RM 1,000
-  example, or the KPI switch — On on the ledger green wash, Off on the amber
-  one — and a link to Rules, where it is set. Then the workspace's own rhythm:
-  heading and count, *Edit ratios* / *Edit items*, then *Cancel changes* and
-  *Save N changes*. While editing, a peach picker panel sits above the table:
-  a search that shows nothing until something is typed (twenty results at
-  most, *narrow the search* beyond), what is already listed marked *On the
-  list*; Costing Setting ticks SKUs and adds them at one ratio, Add-on / KPI
-  Items adds one at a time from SKU Master, Bed frame specials or Sofa
-  specials, at the amount typed beside the search. Added rows land at the top
-  on the peach wash with a NEW chip; a row being removed fades and says so,
-  with *Keep* to undo. Nothing is written until Save; a failed save keeps
-  every draft, and a good one keeps them on screen, read-only, until the
-  refreshed list arrives — never the list from before the save.
-- **One screen, not the remainder (2026-09-27).** SKU Master and Costing gaps
-  hold the count row, its notes and the table in a stage exactly one screen tall
-  (`.sku-stage`) instead of the space the filters leave: the page scrolls again,
-  one turn of the wheel slides the filters away and the table fills the screen.
-  A downward wheel over the table moves the page first, so rows never scroll
-  inside a frame whose bottom is below the screen; upward is the browser's own.
-  Phones keep the fixed-height window.
-- **The columns are the reader's (2026-09-27).** On those two tables a header
-  dragged onto another swaps their places (an orange bar shows where it lands)
-  and a header's right edge drags wider or narrower; double-clicking the edge
-  fits the column to its widest cell; from the keyboard ←/→ on the focused edge
-  resizes and Alt+←/→ moves. Whichever column stands first is the frozen one; a
-  sofa's seat-size prices stay behind the rest, in the ERP's order. The table
-  opens at its natural widths and then holds them, so widening one column never
-  squeezes another — a blank last column takes the slack. Each table (and the
-  sofa sheet apart) keeps its layout in this browser only, in a cookie scoped to
-  the Product List so the server renders it; *Reset columns* in the footer puts
-  it back. `ColumnTable` / `useColumnLayout`.
-
-The light workspace remains light when opened from a dark-mode route so black
-text retains contrast. The preference still applies when leaving Product List.
+- **Shell.** The app's desktop sidebar shows **Product List** (cube icon) under
+  a group label — PRINCIPAL for the Principal, MANAGEMENT for another holder of
+  `product_list`; nobody else sees the row. Active row: #FFF1E6, ink #BD4A19,
+  650 (the README's — the prototype reads undefined variables there and shows a
+  grey browser button). Above the profile card the **Module** switcher
+  (Principal only) opens Finance / Principal / HR / Revenue team.
+- **Page.** Eyebrow REVENUE / PRODUCTS with its dash, the Georgia title,
+  `Principal only · Fair and IR` on the right; the six tabs on the header's
+  rule (SKU Master · Modular · Maintenance · Combo Pricing · Costing gaps ·
+  Costing Setting — *Add-on / KPI Items*, the seventh, became Rules › KPI items
+  on 2026-10-08). The tab holding unsaved edits carries a
+  dot; leaving it asks in a bar under the rail, and the app's own nav confirms.
+- **Values.** Every colour is a `--rv-*` token and every size the prototype's
+  (`_components/products.module.css`, primitives in `_components/ui.tsx`).
+  Tailwind's reset is undone where it changes the prototype's boxes: elements
+  the prototype draws content-box (a picker row's 46px is inside its padding, a
+  module tile's 26px inside its border), an input's own 1px 2px padding, the
+  browser's #757575 placeholder. `.design/revenue-app/tools/measure-pl.mjs`
+  measures the same elements on the prototype and the live page and lists
+  every difference; what remains is data (column widths), state, the
+  sidebar row above and Modular's board below. Weight 650 renders as 650 here
+  (Inter variable); the prototype file loads only Inter 400–700, so it shows 700.
+- **Motion.** As the prototype: a right-hand panel of the app (notifications,
+  Profile) shifts the page 432px in 320ms `cubic-bezier(.2,.8,.2,1)`; a
+  floating window fades its scrim in 220ms and rises from
+  `translateY(14px) scale(.98)` in 260ms on the same curve; a toggle's knob
+  moves in 160ms; the new-combo window appears without motion. Reduced motion
+  turns them off.
+- **Tables.** Wide sheets scroll in their own 560px window with a sticky header
+  and a frozen first column; the lists grow with the page. Columns can still be
+  dragged and resized (`ColumnTable`, a cookie scoped to `/member/products`).
+- **Modular's board — the one place it leaves the prototype (2026-10-08).**
+  The prototype laid white model cards on the white page, a 1.5px #EBDDD2 edge
+  apart, and a not-offered card on #FBF7F3 — ΔL* 2.6 off white, which nobody
+  sees; the user found the board flat. Each category now sits on a sand tray
+  (`--rv-sand`, radius 18, padding 16/16/18, its dark head inside, the brand
+  rule in `--rv-line-strong` so it still reads there). An offered model is a
+  white card, a 1px `--rv-line` edge and a soft lift (`0 1px 2px` + `0 4px
+  12px` of ink at 8% / 5%), 6.4 L* above the tray; a not-offered one is an
+  empty slot — transparent, 1.5px dashed `--rv-muted`, no lift, its *Not
+  offered* pill outlined. Hover deepens the lift (a slot washes white
+  instead), 160ms; the open card is the prototype's.
 
 ### Shared portal rules
 
@@ -736,8 +708,11 @@ The bar shows the month **as saved**: a draft on the screen (unsaved Open Bill p
 - **Both panels speak the workbench's table design**, not the bordered-surface vocabulary they had above the cards: `.sectionHeading` + `.subtitle`, a four-figure `.summaryGrid`, `.tableFrame` / `.table` with a sticky first column, primary *Pay in {month}* and ghost *Not a change* / *Undo*.
 - **A double claim is a card that answers "why?" first** (`double-claims.module.css`): a mono paper-number pill, a verdict `.chip` (danger — *Would pay twice*, *Same sale twice*; alert — *Second bill on the paper*, *Same number only*; info — *One sale, two documents*; ledger — *Settled*), the card's own 4px left rule in the same tone, a 15px one-sentence headline; **Why it is here** — the findings as a bulleted list with accent markers; **What to do** in an accent-bg box; the bills **side by side** — one column per bill, labels in a sticky first column, a *Match* column (`✓ Same` ledger · `≠ Differs` danger · `? Can't tell` info, the gap in small print under it), cells that wrap and sit at the top, never cut to the ledger's 520px scroll height; then a **History** timeline per bill on `--surface-2` — a dot and a hairline spine per event, mono time above the sentence, green dot for paid, red for not paid yet. The card closes on *Checked — separate sales* (a `.button`, bottom right). The tab opens on a *Would be paid twice* total and four figures: to check · would pay twice · probably separate · checked.
 - The months list's *N possible double claims* is a link to that month's tab, and a bill opened from the tab leads back with **← Double claims**.
+- **What the check cannot see is named, not left out** (2026-10-03): the month's bills whose Ref No. names no paper number sit under the cards in an alert-tone `<details>` (`.unreadable`, the `.carried` block's paper) — *N bills of September 2026 cannot be checked · RM X* and one line of why in the summary; open, one sentence of what to do and a small table (Bill · Ref No. · Salesperson · Sales value). They do not count on the tab's badge: nothing there is a claim.
 
-**2026-09-27 — the workbench stands in the URL.** Every step inside it is a history entry, pushed the same way as a tab: `?view=` names the cut (`kpi` · `open` · `deposit` · `venue`; none is Total Sales Orders), `?person=` the salesperson whose ledger is open and `?orders=` which of their tables (`overriding` · `deposit`; none is Personal). Not `?tab=` — on this page that is the mid-page rail's. The table's search box, brand and sort ride along as `?q=` / `?brand=` / `?sort=`, written with `replaceState` as they change, so they never add an entry. Opening a bill therefore leaves an entry that says whose ledger it was, and Back lands there (it used to land on the list of people). A bill's link carries the way back (`?from=`), and the bill's page puts it first on its header — **← ANTHONY** (or *← Below deposit*), then *All bills* — as a `ReturnLink`: an ordinary link that steps Back instead when the previous history entry is that very page, so returning never stacks the ledger on top of itself. `lib/commission/workbench-nav.ts` owns the keys and checks `?from=` (a month page of the same sub-department, nothing else). The ledger's column choice is kept for the month in the tab's session.
+**2026-10-03 — Sales by venue becomes Sales exhibition.** A result is read by the brand at a fair, not by the hall (user: 我是看 brand 来区分那一场 exhibition 的 result) — the same venue, organiser and days with another brand is another exhibition. The tab (`?view=exhibition`; an old `?view=venue` link still opens it) keeps the workbench table design and gains a sticky first column **Brand** before Venue · Event · Organizer · Salespeople · Bills · Sales value: one row per brand's booth at each fair, biggest first — a bill sits under the booth picked in the ERP whatever its goods, so the Brand here can differ from the ledger's Brand column, which is the goods'. Bills that name no brand read *No brand*, a place no fair claims *Not linked*, both in the muted tone. The toolbar adds a brand `<select>` beside the search — *All brands*, the brands on the tab, *No brand* last — written to `?brand=` like the ledger's, and the `tfoot` counts *exhibitions*. A row's venue opens exactly its bills on All bills (`?fair=…&brand=…`), whose header names the exhibition — *ZANOTTI · PENANG WATERFRONT CONVENTION CENTRE*, then *Every bill of this exhibition — MLE · 25–27 Sep* — and leads back with **← Sales exhibition**.
+
+**2026-09-27 — the workbench stands in the URL.** Every step inside it is a history entry, pushed the same way as a tab: `?view=` names the cut (`kpi` · `open` · `deposit` · `exhibition`, `venue` before 2026-10-03; none is Total Sales Orders), `?person=` the salesperson whose ledger is open and `?orders=` which of their tables (`overriding` · `deposit`; none is Personal). Not `?tab=` — on this page that is the mid-page rail's. The table's search box, brand and sort ride along as `?q=` / `?brand=` / `?sort=`, written with `replaceState` as they change, so they never add an entry. Opening a bill therefore leaves an entry that says whose ledger it was, and Back lands there (it used to land on the list of people). A bill's link carries the way back (`?from=`), and the bill's page puts it first on its header — **← ANTHONY** (or *← Below deposit*), then *All bills* — as a `ReturnLink`: an ordinary link that steps Back instead when the previous history entry is that very page, so returning never stacks the ledger on top of itself. `lib/commission/workbench-nav.ts` owns the keys and checks `?from=` (a month page of the same sub-department, nothing else). The ledger's column choice is kept for the month in the tab's session.
 
 Tabs are for the **sections of one view**. Choosing between *views* of a thing (Comm Cal / Staff Hierarchy / Rules of a sub-department, the four People pages) is navigation and lives in the sidebar — see the 2026-09-01 removals in `nav-config.ts`.
 
@@ -972,7 +947,7 @@ The same menu sits on a salesperson's ledger on Comm Cal's month (2026-09-27) �
 
 *Share this bill…* (2026-09-30) is the menu's first write, above *Don't count*, on every bill a menu opens on. Its small line reads *With another salesperson — a part each*, or the holders once shared (*ADRIAN 50% · ANTHONY 50%*). It opens an adjacent form panel in the confirmation's paper: the heading *Share ORDER*, one sentence (whose bill it is; each holder is paid on their part at their own rate and their upline earns the override on it), **Share with** — a select of the sub-department's team, the owner never offered, somebody already holding a part marked *— holds 50%*, somebody closed this month greyed *— closed for September 2026* — and **Their part** — a number field with a trailing %, 50 to start, or the holder's own part, or half of what the owner still keeps. A line under them says what Save would leave (*ADRIAN 50% · ANTHONY 50%*) or why it cannot (*That leaves ADRIAN nothing — the owner always keeps a part.*); then Cancel and **Save** (the peach primary row, `.menu button.primary`; Enter in the field saves too); then, once shared, a *Shared now* group of *Stop sharing with ANTHONY* rows (*ADRIAN takes the 50% back*). The select starts with the focus (`data-autofocus` — `MenuPanel` focuses it before the first button, and Tab walks selects too). The table then says what happened above itself — *ORDER is shared: ADRIAN 50% · ANTHONY 50%.* — with **Open ANTHONY** (on Comm Cal: that ledger, where the part now sits; the line stays) and *Undo* (`BillShareNotice`). A paid month, or anybody on the bill closed, shows the row disabled with the reason; the menu's heading names every holder (`ORDER · ADRIAN + ANTHONY`).
 
-On the ledger a shared bill is one row per holder, each their own part: under the order number a peach tag says whose bill it is from the row's holder (`From ADRIAN's bill` / `Shared with ANTHONY`, `.shareNote`), the **Sales person** column (the ledger's first optional column, 2026-09-30) names every holder on a line of their own with their part in mono (`.holders`, the ledger's own person in bold), and Sales value reads *50% of RM 8,250.00* under the part. A bill with one salesperson shows just the name. Overriding names the downline in its own column and skips Sales person. The bill's page header reads *shared ADRIAN 50% · ANTHONY 50%* where it names the salesperson.
+On the ledger a shared bill is one row per holder, each their own part: under the order number a peach tag says whose bill it is from the row's holder (`From ADRIAN's bill` / `Shared with ANTHONY`, `.shareNote`), the **Sales person** column (an optional column since 2026-09-30, after *Ref No.* since 2026-10-03) names every holder on a line of their own with their part in mono (`.holders`, the ledger's own person in bold), and Sales value reads *50% of RM 8,250.00* under the part. A bill with one salesperson shows just the name. Overriding names the downline in its own column and skips Sales person. The bill's page header reads *shared ADRIAN 50% · ANTHONY 50%* where it names the salesperson.
 
 Two rules the canvas keeps that the rest of the page does not: a card dropped
 on empty ground **stays there** (remembered per browser and scheme in
@@ -1093,8 +1068,14 @@ A navigation that keeps its page on screen — a `?tab=` switch, a link nothing 
 Rules:
 
 - **Every route folder with child routes has a `loading.tsx` that renders `RouteSkeleton`.** Next commits a navigation at once only when the part of the tree that changes sits under a loading boundary of its own — the one in the deepest folder the two URLs share (`/team/people` → `/team/hierarchy` needs `team/loading.tsx`). Without it the page being left stays frozen until the server answers: 0.2–1.4 s of a dead click on production before v3.8. `src/app/route-boundaries.test.ts` fails when a folder lacks one.
-- **A page already in memory opens with no skeleton at all**: visited in the last 30 s (`staleTimes.dynamic`, `next.config.ts`), or warmed because the pointer rested 120 ms on its sidebar link (`lib/nav-warm.ts` — one link at a time, never a page that writes the audit log as it renders). Inside a page the same warm is `WarmLink` (`components/layout/WarmLink.tsx`): a month on Comm Cal, a month on HR › Payment's rail — the links somebody picks one after another, to pages that take a server round trip to render. React keeps a skeleton up for at least 300 ms once it shows, so the warm is what makes a fast page feel instant.
+- **A page already in memory opens with no skeleton at all**: visited in the last five minutes (`staleTimes.dynamic`, `next.config.ts`; 30 s until 2026-10-08), warmed because the pointer rested 120 ms on its sidebar link, or one of the person's usual pages warmed while the portal sat idle (`lib/nav-warm.ts` — one link at a time, three at most, never a page that writes the audit log as it renders). **And it brings itself up to date (2026-10-08)**: a page shown from memory is read again behind itself the moment it lands (`RouteFreshener`, `lib/route-freshen.ts`) — no skeleton, no dimming, no line; the figures that moved since swap in where they stand. A page the server rendered for the click (a skeleton showed, or its payload was fetched) is already current and is left alone. Inside a page the same warm is `WarmLink` (`components/layout/WarmLink.tsx`): a month on Comm Cal, a month on HR › Payment's rail — the links somebody picks one after another, to pages that take a server round trip to render. React keeps a skeleton up for at least 300 ms once it shows, so the warm is what makes a fast page feel instant.
 - **Motion here is feedback, never decoration.** Each of the four answers a click or reports a wait; none plays at rest. Under `prefers-reduced-motion` the line appears without travelling and everything else lands at its end state.
+
+### Update prompt (2026-10-06 — every surface)
+
+When a release lands while the portal or the member app is open, an **ink pill** drops in at the top centre (`calc(safe-area-top + 10px)`), over the progress line, sheets and tab bars (`z-index: 90`): **A new version is ready.** · **Update** · **×** (*Not now*). Update reloads the page; × hides the pill until the app next comes back to the screen. The pill is `--ink` with `--paper` text, and the Update button is the pill turned inside out (`--paper` on `--ink`), so the dark theme inverts it with no colour of its own. It drops 8 px and fades in over 220 ms (none under reduced motion), `role="status"`, and it is never printed.
+
+When it shows (`components/pwa/UpdatePrompt.tsx`, `lib/app-update.ts`): the app asks the server which build is live on load, on every return to the screen, when the network comes back and every five minutes while in view — a HEAD to `/sw.js`, whose `X-App-Version` is the build's own name. It **never reloads by itself while somebody is looking**. In the **Revenue app only**, back after 30 minutes or more away, it loads the new build at once — unless the focus was still in a field or something was typed in the ten minutes before leaving, when it only offers. Its screens are read from the server and the quote is kept in the tab's session storage, so a reload loses nothing there. **The portal is only ever offered the new build**: a page like HR › Payroll holds edits until *Save all*, and an edit made long before the tab was left is invisible to any check — the person presses Update when their work is saved. A page that guards unsaved changes (`beforeunload`) still asks before any reload.
 
 ### `.page-head` example (mandatory shape)
 
@@ -1158,6 +1139,124 @@ Rules:
 
 ## Component Vocabulary
 
+### Permission matrix (2026-10-08 — People Management › Permissions, the invite drawer, a person's card)
+
+Drawn to the Claude Design handoff *design_handoff_people_permissions* (kept
+outside the repo; `.design/people-permissions/` in a worktree). Classes in
+`globals.css` under *Permissions*, every value the prototype's mapped onto the
+sheet's tokens:
+
+- **Page.** People Management's head is `.page-head.tabbed` with
+  `SlidingTabs variant="control"`: *People {active}* · *Permissions
+  {templates}* (`?tab=permissions`, pushState). The intro line (12px) changes
+  with the tab. A `.sheet-notice` with *Dismiss* reports a save or a new login.
+- **Rail** (`.perm-rail`, 260px, sticky): `.perm-band` head (*PERMISSION
+  TEMPLATES* · count), one `.perm-rail-item` per template — name (13px, 600
+  when selected), a `.perm-sod` chip when maker and checker meet, mono meta
+  *N keys · N titles · N people*, the titles in `--card-label`. Selected =
+  `aria-current`: accent-bg wash + inset 3px accent bar. Foot: *+ New
+  template* → an inline form (Name · What it is for · Start from: nothing
+  ticked or a copy of a template).
+- **Frame** (`.perm-frame`): head (*TEMPLATE · key* eyebrow,
+  `.sheet-heading`, `.sheet-subtitle`, *Used by* `.perm-chip`s → Hierarchy ›
+  Roles; *Discard changes* link + the orange *Save template* / disabled
+  *Saved*); `.perm-legend` (Own / Dept / All swatches); `.perm-warn` (SoD);
+  `table.perm-matrix` — section rows with a mono tally, function rows (label
+  + mono key with its scopes), seven 68px action columns; `.perm-sensitive`
+  (three checkbox cards); `.perm-keys` (*N permission keys* · *Show keys* →
+  `pre.perm-keylist`).
+- **Cell** (`.perm-cell`, 52×24, radius 5, mono): `·` dashed hairline ·
+  `.own` white · `.dept` accent-bg + accent border · `.all` accent fill,
+  600 · `.na` the hatched `--perm-hatch` gradient. `.small` 42×20 in the
+  compact matrix (drawer, person card); `.changed` = a 2px walnut ring, a
+  cell set for this person alone. A cell is a `<button>` only when it can be
+  changed; its `aria-label` says *Function · Action: value*.
+- **Held for now** (portal, not in the drawing): beside the keys, *N held for
+  now · Why* opens `.perm-held` (alert wash) listing each granted cell that
+  opens nothing yet and why. A page still opens on its module key, so a View
+  cell is in force only where its key cannot reach further than it says;
+  since v3.16 every other cell is asked for by the writes themselves, so it is
+  held only while its function's pages stay closed to the template or it
+  reaches less far than they ask (Claims · Create asks Own, My Billing ·
+  Create Dept, the rest All). A cell nothing acts on yet (Revenue · Approve,
+  Venture Pool · Create) is not listed — there is nothing to hold.
+- **Titles on this template**: a 15px/600 heading on a hairline rule with
+  *N PEOPLE*, a `ledger-table tight` — Title (+ mono `L{n}`) · Department ·
+  People · Personal exceptions (mono *SR hr_costing.export:✕*) · Template (a
+  select that moves the title at once). *Titles with no template yet* repeats
+  the table for titles on none.
+- **Keep or reset** (not in the drawing): saving a template that changes a cell
+  somebody has their own value on opens a dialog — one row per person and
+  cell (theirs, the template's before → after) with a *Keep theirs | Reset*
+  pair, *Keep everybody's* / *Reset everybody to the template*, then *Save
+  template* / *Back*.
+- **History** (not in the drawing): *Show history* reads every save — When
+  (office time) · Who · What changed, a line per change, six then *Show all*.
+
+**Invite drawer** (`.drawer-scrim` walnut 28% + `.drawer-panel`, 640px,
+fixed 10px from the edges, radius 16, the modal shadow): the page eyebrow,
+Georgia 26px *Invite user* / *Invite {NAME}*, the no-email-step line, a 28px ✕.
+Three `.drawer-step` panels (surface-2, radius 12, mono step numbers):
+**01 The person** — a search over a list grouped by department
+(`.drawer-band`: walnut left bar) of active people without a login
+(`.drawer-pick` rows: mono tile, name/title, code), or, picked, a white card
+(42px tile, *HV011 · no login yet*, *Change person*) over a read-only grid
+(Department · Title + L · Reports to · Permission template); **02 The login**
+— email, and one bordered password group (mono input · *Show/Hide* ·
+*Generate* → `Hv-` + seven) over a three-segment `.pw-seg` meter; **03 What
+they can do** — the accent info box (*Template X, from the title Y …*) over the
+compact matrix (only the functions they have, *Show all N functions*), the
+walnut-ring legend and *N held for now*. Foot: orange *Create account*
+(disabled until the first blocker clears), *Cancel*, the blocker in 11px.
+On a roster row an active person with no login shows `.invite-cell`
+(*Invite*, the row-Save treatment) in Last seen.
+
+**Hierarchy › Roles** is the titles table as a fourth tab (*Roles {n}*), with
+**Level** (mono `L{n}`) and **Permission template** (an underlined *Name →*
+link to People Management › Permissions on that template) columns.
+
+### Audit log — Changes (2026-10-08 — Audit Log › Changes, the app-wide history)
+
+Who changed what, when, before and after, for every table people change
+(`audit_tables`; CLAUDE.md › THE APP-WIDE HISTORY). Audit Log is a sidebar
+group — **Changes** (`/audit-log`) for anybody whose permissions open some
+area of the history, **Access** (`/audit-log/access`, who read what) for the
+Principal — never a tab rail between them. Each reader sees their own areas
+only; the page says so in its intro rather than hiding it.
+
+- **Head**: `.page-head`, eyebrow *ADMIN · AUDIT LOG · CHANGES*, title
+  *Changes*, a `.sheet-subtitle` of what is shown and why some values are not.
+- **Summary cards** (`StatCards`): *Saves today* (primary, *Last {time}*),
+  *Changes · 7 days*, *People · 7 days*, *Areas you read* (*5 of 12* + the
+  areas, links to the register fold).
+- **Filters**: one `.sheet-toolbar` GET form — Area · Record (optgroups per
+  area, only the reader's) · Who (*Anybody* / *System — ERP feed, server,
+  migrations* / the people who changed something they can see) · From · To,
+  the orange *Show* and *Clear*. Every control is keyed by its value. A
+  record's own history (`?table=&row=`) adds a `.sheet-notice` naming it, with
+  *Show every record*.
+- **The list** (`.sect-head` *Latest changes* / *Changes found* + *N SAVES · N
+  RECORDS*, then `table.ledger-table.audit-saves`): one row per SAVE (a
+  database transaction) — When (mono, office time; seconds on hover) · Who
+  (+ an 11px *via* line: *ERP feed or server job*, *database (a migration)*,
+  *through the server*) · What changed. Cells sit at the top. Each record is a
+  `.audit-change`: a chip (*Added* ledger · *Changed* info · *Removed*
+  danger, with its dot), the record's label in 600, its name as an underlined
+  link to that record's history, then `.audit-fields` — a two-column grid,
+  field (graphite) and value: *before → after* (`.audit-was` struck through,
+  `.audit-now` 600) for a change; the row's values for an add (or struck for a
+  removal), eight then *All N fields*. A value the reader's title may not see
+  reads *changed — hidden from your title*; an add / removal counts them (*3
+  values hidden from your title*). Six records per save, then *All N records
+  of this save* (`<details>`). Values: money 2-dp with brackets for negatives,
+  a rate with every decimal, a month column as *Sep 2026*, a date *15 Sep
+  2026*, a moment in office time, an id by the name behind it (read under the
+  reader's own session, else `#1a2b3c4d`). Paging: *Older →* / *← Newest*.
+- **What this history keeps**: a closing `<details id="recorded">` — every
+  register line the reader may read (Area · Record + mono table name · Kept:
+  *Every change* / *People's changes only* / *Not recorded* · Why not). On a
+  phone the field grid stacks to one column.
+
 ### Closing — a lock you can see (2026-09-27 — Revenue › Comm Cal's month)
 
 A salesperson's month is **closed** when somebody has checked it: their
@@ -1209,28 +1308,31 @@ mono address + Copy; Last delivery — `formatAgo`, ticking), and text actions
 (accent "Replace key", danger "Unlink"). No test button here: the ERP's own
 page proves the key. `src/app/(portal)/revenue/_components/ErpLinkPanel.tsx`.
 
-### Product List — the mirror beside the portal's decisions (2026-09-24 — Revenue › Product List)
+### Product List — the mirror beside the portal's decisions (2026-09-24; in the Revenue app since 2026-10-08)
 
-The ERP's Products catalogue is presented in the approved light workspace
-defined under Implementation rules above. A plain tab rail contains *SKU
-Master* · *Modular* · *Maintenance* · *Combo Pricing* · *Costing gaps*.
-Switching uses `?tab=`; the server loads the selected tab. Tab counts, summary
-cards and the long mirror introduction are omitted. A short notice reports
-an unsuccessful catalogue delivery when relevant.
+What the ERP says EXISTS is plain text (code, description, model, category,
+the ERP's allowed options); what the portal DECIDES is an input — a price (a
+right-aligned cell input, amber while edited), a tick, a toggle. A mirror row's
+state is a chip in its first cell: NEW, Inactive, Removed. Filters sit in one
+panel above each table (category chips, a ruled row of search / select /
+segmented Tier). Modular opens a model in a floating window — its SKUs and each
+option list as tick tiles, *Select all* / *Clear all* per section, Save, Save &
+next, and the guard before leaving unsaved edits. A price moves margins only
+from the moment it is saved — a landed month waits for Recost.
 
-THE SPLIT IS VISIBLE: what the ERP says EXISTS is plain text (code, description,
-model, category, the ERP's allowed options as chips); what the portal DECIDES
-is an input — a price (`.num` right-aligned, `MONEY_INPUT`), a tick, a chip that
-toggles. Row status uses explicit black text: **New**, **Inactive** (off in
-the ERP), or **Removed from ERP** (retired, retained for historical references).
-Filters sit in the shared gray `.sku-filters` panel above the
-`.ledger-table.sku-table` — a bounded window on the wide sheets, the page's own
-scroll on the lists (Modular, Maintenance). Modular opens a model in
-`ModelEditor` — its SKUs (compartments / sizes) and each option list as tick
-chips, what the ERP allows first and anything ticked here that it no longer
-allows after. Saving reports the result; a price moves margins only
-from that moment — a landed month waits for Recost.
-`src/app/(portal)/revenue/products/_components/`.
+**Combo Pricing is the portal's own (2026-10-08).** One row per set, a column
+band per fabric tier; *+ Add combo* opens the new-combo window (model,
+compartments with steppers, THIS SET strip, a price per fabric × seat height
+with each module total under it). *Edit prices* adds a **Remove** column that
+stays in view on the right while the sheet scrolls sideways — the costing
+tables' pattern: Remove (#A3371A) marks the set (row at 55%, a REMOVING chip,
+its prices read-only), Keep (#BD4A19) unmarks, Save takes the marked sets away
+with their prices and saves the rest.
+In the new-combo window, a module whose other side the model also has is
+followed by one more card for the pair — its name (`1A(R)`) over *LHF / RHF* —
+whose pieces may be either side; the THIS SET chip writes the sides in the
+muted weight after the name, as a module tile does (2026-10-08).
+`src/app/(member)/member/(app)/products/_components/`.
 
 ### Revenue member C release (2026-09-16)
 
@@ -1289,6 +1391,147 @@ points, inferred Fair boundaries or preview scoring policies run against live da
 `/member/preview?design=live` provides the responsive layout with clearly labelled
 sample data behind the existing preview access gate; it is not an authenticated
 member snapshot.
+
+### The Revenue app — built to the prototype (2026-10-05)
+
+`/member` is now `components/member/app/RevenueApp.tsx`, rebuilt screen by screen
+from the user's Claude Design prototype (Revenue Mobile, kept outside the repo).
+The prototype is the source of truth for layout, colour and wording, and every
+button in it does something; the NUMBERS never come from it — margin bands per
+brand, the Revenue cost divisor, KPI, Championship points and claim rates are
+VP's. The member C release above describes the screens this replaced.
+
+- **Palette** — its own tokens, `--rv-*` under `[data-revenue-app]` in
+  `globals.css` (peach glow, walnut honours card, metals, tree colours). Nothing
+  in the app writes a hex; the portal's walnut tokens are not used inside it.
+  Tailwind's preflight is undone for the app (`app/base.module.css`), and the
+  portal's global `h1` / input / 44px phone-input rules stop at its edge.
+- **Shell** — Today · Insight · Quote · Arena · Profile on a phone; on a desktop
+  (`@container rv`, 1024px+) a 240px sidebar, the page, and a 400px panel rail
+  that sheets, View as and the quote calculator open into. Sheets slide up on a
+  phone and sit in the rail on a desktop.
+- **Checked against the prototype** — every page and sheet is screenshotted on
+  the prototype's own data (`/member/preview?app=proto&device=ios|android|desktop`)
+  beside the prototype itself and diffed; a tab is done when its states differ by
+  ≤ 0.05% (the desktop header's date is the usual remainder).
+- **Never says how the cost is made up** (2026-10-05, user: wording like that
+  leaks our info) — the prototype's note under the quote's *Additional fee* is
+  gone, and Insight's bills and brand footnotes, the Arena's margin board and
+  the Commission scheme sheet keep the rest of their sentence without "team
+  cost (cost ÷ 0.7)" / "the Revenue Team's cost". The in-repo prototype and its
+  copy deck were changed to match, and `components/member/cost-basis-wording.
+  test.ts` fails on any such line in the member app.
+- **Where it deliberately differs** — phone inputs stay 16px (iOS zooms on less);
+  a figure the scheme does not pay says so (*KPI · Not counted*, *Commission
+  only*) instead of RM 0.00; a request HR sent back has *Update and send again*;
+  Profile keeps *Install the app* where the browser can install (the prototype has
+  no row for it); forms start empty where the prototype pre-picked an example.
+- **Phone type one step smaller** (2026-10-06, user: on a phone the text read a
+  size too big) — every font-size is the prototype's px times `--rv-type`: 1 on a
+  desktop, .92 on a phone (`.screen` in `app/shell.module.css`), so 13px reads 12
+  and *Hello, …* 25.8 instead of 28. Spacing, icons and control heights stay the
+  prototype's, and inputs stay 16px. A new size is written
+  `calc(Npx * var(--rv-type))`; `app/type-scale.test.ts` fails on a plain px. The
+  prototype comparison (`.design/revenue-app/tools/shoot-app.mjs`) draws the app
+  at `--rv-type: 1`, so it still checks the layout against the prototype.
+- **While it loads, and when it cannot** (2026-10-06, user: not the old
+  *Preparing your Revenue workspace…* / *Unable to load your workspace* pages) —
+  `/member`'s `loading.tsx` and `error.tsx` draw the app's own frame
+  (`app/shell/AppFrame.tsx`): the phone header where the app has one (Today —
+  the wordmark alone, held at the capsule's 46px so nothing moves when the app
+  lands), the real bottom bar lit on the URL's tab, the sidebar and an empty top
+  bar on a desktop. The frame is `inert`. Where the page will be: one 28px
+  spinner (`--rv-accent` on `--rv-orange-bg`) while it loads (`AppLoading`); when
+  it cannot (`AppError`), a 52px `--rv-red-bg` circle with an alert icon,
+  *Couldn't open the Revenue app*, one line on what to do, *Try again* (the
+  app's primary button — a fresh load, not `reset`, so a release the page
+  predates comes with it) and the error's server reference (*Ref …*, the Next
+  digest) for finding it in the logs. The prototype has neither state; these
+  are ours. (The old pages' beige band and scroll were `.login`'s 8vh margin
+  collapsing through `.workspace`.) Held on screen at
+  `/member/preview?app=loading|error&page=…`.
+- **Directors stand side by side** — the prototype's family chart (Team &
+  capacity) drew ONE director above the line of uplines. A sub-department with
+  two (Fair: KRIS and PETER) is one level, labelled `DIRECTORS`: the cards in a
+  row 24px apart, a bar under them and one line down to the top of the tree —
+  the portal's director rail, in the app's tree colours. Stacked, they read as
+  one reporting to the other. When that row would start off a phone's screen,
+  the chart opens on its middle instead of its left edge; with one director it
+  is exactly the prototype.
+- **A row's sheet on a desktop is a peek** (2026-10-06) — the sheets that show one
+  row of the page behind them (a bill on Insight, an order's commission, a finish,
+  a person on Team, a request, a memo — `peek` on `Sheet`) leave that page live
+  beside the rail: clicking another row swaps what the panel shows in one click,
+  and any other click on the page still closes it and does what it says. The
+  prototype's desktop dim was transparent but still covered the page, so the first
+  click on another bill only closed the panel (user: 点一次它其实是先关掉右边的
+  bar). Pickers (month, sub-department, brand) keep the covering dim; a phone keeps
+  the dim for every sheet.
+- **A sofa's leg height and specials** (2026-10-06, user: the revamp had left
+  them out) — the sofa sheet adds *Leg height* and *Specials* after *Fabric*.
+  The same day every option priced on Maintenance became the customer's, so
+  *Leg height* is drawn as a bed frame's heights are: an *FOC · Free of charge*
+  chip plus each leg turned ON on Modular that Maintenance charges (*6" · + RM
+  100*), captioned *Once per sofa · not in margin*; no charged leg, no row.
+  *Specials* are toggle chips, each with its *+ RM x* under the name, captioned
+  *Once per sofa · not in margin* — and only a special Maintenance charges is a
+  chip (user, same day: "if there is no price … just don't show it"): turned ON
+  with no price, it is not shown; none charged, no row. One build makes every
+  sofa in the cart, so only what every sofa model in it was turned ON for is
+  offered. A bed frame's *Specials* row is the same (*Charged on top · not in
+  margin*).
+  A special is named in words, so its chip grows to them (`.chipWords`). The
+  customer quote's *Sofa build* line names them, a bed frame line carries its
+  own build in brackets, and the card's **Total** is step 2's *Customer pays*:
+  *Add-on items* and *Option charges* rows sit above the fee when there are any
+  (step 2's line reads *Option charges · not in margin*).
+- **The app is the live month (2026-10-06)** — the prototype's Today on 3 October
+  read *September · Estimated income*; the user wants the month on the calendar,
+  so Today (the hero, its three figures, *Your Arena*), Insight, the Arena and
+  My income all open on the current month, and a tap from Today opens Insight or
+  the Arena on it. The month still being closed is one tap away in the date
+  sheet, marked *Live*; the bell's news of a settled month opens that month.
+  While the engine works the figure out the hero reads *RM —* / *Working out
+  October's commission…*, never the fixed salary alone.
+- **The family chart fits real names** — the prototype's chart was a fixed
+  580px with the direct reports spread across all of it, and its cards are
+  buttons, which never wrap in this app (`button{white-space:nowrap}`, the
+  prototype's own rule). Its data never noticed; ours did: two people below sat
+  at the two edges of a phone and *Senior Revenue Specialist* ran out of its card
+  and off the screen. Now the chart is as wide as its widest row and never
+  narrower than the screen (`.chart` `width: max-content; min-width: 100%`), a
+  direct report keeps a 145px column (the prototype's 580 shared by four, so four
+  are drawn exactly as before) and fewer stay together under the member; a card's
+  name and title wrap inside it; a dashed card under a direct report grows to its
+  text from the prototype's 112px up to its column (137px) and wraps past that.
+- **Pull to refresh (2026-10-06)** — nothing on screen changes on its own. A
+  drag down from the top of the page past 64px (finger ÷ 2) and let go reads
+  everything again: a 38px white dot with the refresh arc comes out from under
+  the header, turns accent once armed, rests 52px down spinning while the reads
+  run, and the page underneath stays exactly as it was — no "Loading…" — until
+  the new data swaps in. A refresh that could not read leaves the page and says
+  *Couldn't refresh. Pull down to try again.* in a walnut pill for 4s. Coming
+  back after 10 minutes away refreshes once the same way. Not while a sheet is
+  open; the browser's own pull-to-reload is switched off on the app — so when
+  the server no longer knows the page's actions (a release went out since it
+  was opened), the pull loads the whole page again instead: the new app and
+  its data. Never over something unsaved (a form, brand weeks not saved); then
+  the pill asks for another pull.
+- **Opens on what the phone kept (2026-10-08)** — the app opens on the figures
+  it showed last time (kept on the phone per account) and reads everything again
+  behind them: the pull's dot rests spinning while they load, exactly as for a
+  pull, and each figure swaps in as it lands. A first open on a phone, with
+  nothing kept, fills in as before.
+- **Loading is never a zero (2026-10-08)** — a figure on its way is a soft
+  shimmering bar where it will stand (white at 14–30 % on the hero gradient and
+  every board colour, 1.3 s, still under reduced motion): Today's income, Sales /
+  Margin / KPI and the four Arena boards; the Arena hub's cards and a board's
+  hero, whose line reads *Loading the board…*. A board somebody has no place on
+  says **Not ranked yet** in words where the number goes (13px on Today's tiles,
+  17px on the hub, 22px in a board's hero) — the big dash it showed looked like
+  a bar still loading, and "RM 0k · No sales yet" while loading looked like a
+  month with no sales. The Quote with no catalogue yet says *Loading the
+  catalogue…*.
 
 ### Revenue Arena design comparison (2026-09-13, revised proposal)
 
@@ -2134,6 +2377,11 @@ Use `useStickySelection(scope, visibleIds)` — see
 `approvals/_components/PendingApprovals.tsx`. Lists whose detail view is a
 modal (billing's `InvoicesList`) never unmount and need none of this.
 
+A row the reader may see but not decide (2026-10-09, approvals by domain: the
+Executive office's whole queue, a Checker's payroll run, anybody's own
+request) has no tick: the cell shows a muted `—` whose title says why
+(`undecidable`), and select-all skips it.
+
 ---
 
 ## Responsive (mobile shipped 2026-08-31)
@@ -2338,6 +2586,13 @@ Add `@axe-core/react` in dev and `eslint-plugin-jsx-a11y` in CI.
 | Form input | ISO `2026-04-09` | mono |
 | Period | "April 2026" | serif |
 
+A month is always three letters — *Sep*, never *Sept*. `formatDate()` (dayjs)
+writes it so; a page that needs an `Intl` format for a locale's order or clock
+goes through `formatIntlDate()` (`lib/utils.ts`), because en-GB and en-MY spell
+September *Sept* in current ICU and every other month in three letters
+(2026-10-03: the Arena's Fair results read *closed on 13 Sept* beside its brand
+weeks' *Closed 13 Sep*).
+
 ### Bilingual canonical labels
 
 | English | 中文 |
@@ -2403,6 +2658,35 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-09 v3.17 (Approvals by domain)** — the queue opens for whoever may see it (Approvals · View, its own key) or decide anything in it (a domain's Approve: Treasury, HR Costing, Director Salary). A row the reader may not decide — outside their Approve, or one they raised (the Principal excepted) — has a muted `—` instead of a tick, with why on hover; a request's page says *Awaiting sign-off* instead of its buttons; a voucher's *Approve* follows the same rule. See "Multi-select — ticks outlive a drill-down".
+- **2026-10-08 v3.16 (Every action takes effect)** — a button is drawn only for somebody who holds the cell its Server Action asks for: *Create payment*, *Record new loan*, *+ New Entry*, *+ Add person*, *Import InfoTech* (Create); *Edit*, *Mark paid*, *Issue* (Edit); *Void*, *Withdraw*, *Request cancellation*, a repayment's reversal (Void); *Amend terms* (Treasury · Approve); a voucher's *Approve* (Approvals · Approve); the loans CSV (Export). A Finance · Maker sees *Submit* and *Edit* on a draft voucher and no *Void*; a Checker sees *Approve* alone. Nothing moves for the four shared accounts — their keys still allow every action they did. The matrix's *held for now* now reads the same rule. See "Permission matrix".
+- **2026-10-08 v3.15 (Audit Log › Changes)** — every change people make through the portal is listed: one row per save, each record it touched with its fields before → after, filtered by area, record, person and dates, a record's own history a click away. The reader sees only the areas their permissions open, and salary / NRIC / bank values only where their title may. Audit Log becomes a sidebar group: Changes (`/audit-log`) and Access (`/audit-log/access`, the old page; old links redirect). See "Audit log — Changes".
+- **2026-10-08 (Navigation · instant revisits that stay current)** — a page visited in the last five minutes (was 30 s) opens from memory with no wait, then quietly reads itself again and swaps in whatever moved; the pages each person opens most are rendered ahead while the portal sits idle (three at most, one at a time). See "Navigation feedback".
+- **2026-10-08 (Revenue app · opens on what the phone kept)** — opening the app shows last time's figures at once and refreshes behind them (the pull's dot spins); a figure still loading is a shimmering placeholder, never a zero or a dash, and a board with no place says *Not ranked yet*. See *Opens on what the phone kept* and *Loading is never a zero* in the Revenue app section.
+- **2026-10-08 (Product List · Modular's board)** — the model cards get depth against the page (user: the cards and the background had no layering): every category sits on a sand tray, an offered model is a white card lifted off it, a not-offered one an empty dashed slot with an outlined pill; hover deepens the lift. Chosen from two looks shown side by side (the other kept the page white and gave each card a firmer edge and a foot strip). The one place the page leaves the prototype. See "Product List — a page of the Revenue app".
+- **2026-10-08 v3.14 (People Management revamp)** — Permissions moves into People Management as its second tab: permission templates in a 260px rail, the selected one's matrix (function × action, each cell Own · Dept · All, hatched where the function has no such action), its sensitive fields, its keys, the titles on it with a select that moves a title at once, *+ New template*, *N held for now · Why*, a keep-or-reset dialog for people with their own cells, and the History. Invite user becomes a right-hand drawer (the person from the roster, the login, what they can do) opened from the head or a roster row's *Invite*. Roles becomes Hierarchy's fourth tab with Level and Permission template columns. A person's card shows their template's compact matrix with their own cells ringed in walnut. The sidebar's Roles and Permissions rows are gone. See "Permission matrix".
+- **2026-10-08 (Rules · KPI items)** — which items count as KPI moved off the Product List (its *Add-on / KPI Items* tab is gone; `?tab=kpi` redirects) onto Revenue › Rules: **KPI items** is the last tab of the rail (section XI), shown while *KPI item allowance* is on or anything is recorded on it. On the sheet: the section head and hint; an amber `.sheet-warning` while the switch is off, its *Scheme rules* link opening that tab; an *Add an item from* `.sheet-toolbar` — the Brands tab's pills (SKU Master · Bed frame specials · Sofa specials), a search box (a SKU is searched on the server, twenty at a time with *Showing 20 of N*; a special filters the pool) and *Amount RM* for the next pick — over a bordered result list (*Add* / an *On the list* chip / an amber *Off in the ERP* chip); then a `.table-frame` ledger (Item · Name · Kind · Counted · KPI amount · RM as an input · Remove / Keep / Take off; *New* (accent) and *Coming off* (danger) chips, an amber *Gone from the ERP* chip, a retyped amount on a peach wash) whose foot counts items and changes beside *Cancel* and the orange *Save N changes*; under it the **Threshold ladder** (the old tab V, rows saved one by one). The Scheme rules row *KPI item allowance* links to the tab. The screen-reader 'Remove' header is anchored to its cell (`relative`): absolutely placed, it escaped the table's scroll box and widened a phone's page by 46px.
+- **2026-10-08 (Product List · either side)** — the new-combo window offers a left/right pair as one more compartment card (`1A(R)` · *LHF / RHF*): a piece of it may be either side, saved as the ERP writes such a slot. Its THIS SET chip carries the sides in the muted weight. See "Product List — the mirror beside the portal's decisions".
+- **2026-10-08 v3.13 (Product List · in the Revenue app)** — the Product List moves from the portal into the Revenue app (`/member/products`), redrawn to the *design_handoff_product_list* prototype in the app's own palette: the app's sidebar row under PRINCIPAL (only for `product_list`) and the Module switcher, the seven tabs on the header's rule with a dot for unsaved edits and a leave bar, one filter panel per tab, the prototype's tables, cards, floating windows and motion, and Combo Pricing's *+ Add combo* window. Combos become the portal's own the same day, and *Edit prices* gains a Remove column that stays in view on the right (Remove / Keep, a REMOVING chip, the set taken away with its prices on Save). Tailwind's reset is undone where it would change the prototype's boxes (content-box rows and tiles, inputs' own 1px 2px padding, the #757575 placeholder); `tools/measure-pl.mjs` diffs every element against the prototype. The portal's `.product-theme` workspace and its CSS are gone. See "Product List — a page of the Revenue app".
+- **2026-10-06 (Product List · Modular window)** — a model's window no longer shows *Margin ladder* and *Calculator section* for a model whose brand the ERP already names, nor for a rider: a ZANOTTI sofa's panel is just *Revenue calculator* and *Free gift*. The two dropdowns come back, between those two, only for a mattress or a sofa whose ERP branding is no brand the portal knows (MYLATEX, or none), and there the ladder is *Required* (its help names the ERP's branding). See "Product List — a page of the Revenue app".
+- **2026-10-06 (Revenue app · only priced specials)** — on the Quote, a bed frame's or sofa's *Specials* row shows only the specials Maintenance charges, each with its *+ RM x*; one turned ON on Modular with no price is not shown, and the captions are always *Charged on top · not in margin* / *Once per sofa · not in margin* (*Optional* and *For every sofa in this quote* are gone). The sofa's *Leg height* row — FOC + the charged legs — now shows on the live app too: the catalogue reader had kept only a bed frame's charges. Maintenance's *Specials* notes say a blank or 0 is not offered.
+- **2026-10-06 (Revenue app · when it cannot load)** — the Revenue app's error page is no longer the old *HOUZS VENTURE · Unable to load your workspace* page (same beige band): it is the same frame as the loading screen with, in the middle, a red alert circle, *Couldn't open the Revenue app*, *Try again* (a fresh load) and the error's *Ref* for the logs. See *While it loads, and when it cannot*.
+- **2026-10-06 (Revenue app · while it loads)** — opening or refreshing the Revenue app no longer shows the old *HOUZS VENTURE · Preparing your Revenue workspace…* page (with a beige band above it and a page that scrolled): it shows the app's own frame — the phone header on Today, the bottom bar lit on the tab being opened (the sidebar on a desktop) — and one orange spinner where the page will be. When the app lands, nothing in the frame moves. See *While it loads, and when it cannot*.
+- **2026-10-06 (Revenue app · pull to refresh)** — the minute's background refresh is gone: the app changes only when pulled (or on return after 10 minutes away). The pull's dot, its armed and spinning states and the *Couldn't refresh* pill are under *Pull to refresh* in the Revenue app section.
+- **2026-10-06 (update prompt)** — every surface gains *A new version is ready* · Update · ×: an ink pill at the top centre when a release lands while the app is open (installed apps are resumed from memory, so a phone could keep last week's build — and its reads fail once a release replaces its Server Actions). In the Revenue app, after 30+ minutes away it reloads on return unless a form was being filled; the portal only ever offers it (a payroll grid may hold edits not yet saved). See *Update prompt*.
+- **2026-10-06 (Revenue app · phone type one step smaller)** — on a phone every text in the Revenue app is one step smaller than the prototype's: each font-size is the prototype's px times `--rv-type`, .92 on a phone (13px → 12, the greeting 28px → 25.8) and 1 on a desktop, which is unchanged. Spacing, icons, control heights and the 16px inputs stay as they were. One number tunes it (`.screen` in `app/shell.module.css`); `app/type-scale.test.ts` keeps every size on it. See *The Revenue app — built to the prototype*.
+- **2026-10-06 (every option price is a charge)** — Product List › Maintenance: every priced pool reads *Charge (RM)* / *Edit charges*, with a note per pool (per frame, or once per sofa); a negative price is refused. The Quote: a sofa's *Leg height* is FOC + the charged legs (*Once per sofa · not in margin*), every special chip carries its *+ RM x*, and step 2 / the customer quote say *Option charges*. Comm Cal's bill page says a sofa line's share: *incl. RM 10.00 for Nylon Fabric — RM 50.00 once for the sofa, spread over its 5 pieces*.
+- **2026-10-06 (Revenue app · family chart on a phone)** — Team & capacity on a phone put KAR JUN's two direct reports at the two edges of the screen, and MELVIN CHONG's *Senior Revenue Specialist* ran out of his card and off it: the chart was a fixed 580px with the reports spread across it, and the cards (buttons) never wrapped. The chart now takes the width of its widest row (never less than the screen), a report keeps a 145px column so fewer sit together under the member, card text wraps, and the dashed cards below grow to their text (112–137px). Four reports — the prototype — are drawn exactly as before; its dashed cards are a few px wider, because their text used to run past the border. See *The family chart fits real names*.
+- **2026-10-06 (Revenue app · sofa leg height & specials)** — the Quote's sofa sheet regains the old builder's *Leg height* and *Specials* (only what Modular turned ON for every sofa model in the cart), as chips after *Fabric*; specials' chips wrap their words (`.chipWords`, bed frame specials too). The customer quote names the sofa build and each bed frame's own build, and its Total now equals step 2's *Customer pays* (*Add-on items* / *Bed frame options* rows when present). See *A sofa's leg height and specials*.
+- **2026-10-06 (Revenue app · a row's sheet on a desktop)** — on a desktop, clicking another bill while one is open in the right-hand panel shows that bill at once; it used to take two clicks, the first only closing the panel. The same for every sheet that shows one row of the page beside it (Commission by order, My honours, Team & capacity, Requests, Memos). A click elsewhere on the page still closes the panel, and now also does what was clicked; the list scrolls under the mouse wheel while the panel is open. Pickers and phone sheets are unchanged (see *The Revenue app — built to the prototype*).
+- **2026-10-06 (Revenue app · directors side by side)** — Team & capacity's *Your Revenue family* drew Fair's two directors one above the other (KRIS, then PETER, then the member), as if PETER reported to KRIS. A level now holds peers: `DIRECTORS` over KRIS and PETER in one row (`.peers` / `.peer`, 156px a card), joined under their cards by the same 2px bar the direct reports hang from, one line down to the next level. One director is drawn exactly as before. On a phone, a row that would start off-screen opens the chart on its middle. See *Directors stand side by side*.
+- **2026-10-05 (Revenue app · no cost basis)** — the quote's step 2 ends at the *Additional fee* field: the grey note under it ("Fees such as delivery or disposal … Margin uses the Fair team cost basis (cost ÷ 0.7).") is gone. Insight's bills footnote, its brand footnote, the Arena's margin-board basis and the Commission scheme sheet's note lose only their "team cost (cost ÷ 0.7)" / "Revenue Team's cost" clause. See *Never says how the cost is made up*.
+- **2026-10-05 (Revenue app · Profile finished)** — the two Profile chips the prototype left without a page now lead somewhere: **My brand weeks** is a page of the app's own parts (a block per month, a row per fair weekend: *Week N* and its days, four brand buttons — the picked one in the accent fill — and a note: *Open until 11 Oct* / *Closed 13 Sep · auto-located: Akemi* in amber, then the booth's venue), one *Save brand weeks* button; **Commission scheme** is a sheet built from the person sheet (avatar, *Rate · Fixed salary · Since* cells, then each brand's margin ladder as rows with the range on the right). My income on a claim-form month says *Claim form month · portal's working*. People › Member services gains **Claim rates**: three fields (base, rate per spot, Airbnb per person per night) over a ledger table of regions with their spots and what the route pays, *Add region*, Discard / Save.
+- **2026-10-05 (the Revenue app)** — `/member` is rebuilt to the Claude Design prototype (see *The Revenue app — built to the prototype*): Today, Insight, Quote (bed frame options as customer charges), Arena (Championship points, booth-by-booth Fair results) and Profile (My income live from Comm Cal until the close, Commission by order, My honours, Team & capacity, Requests with RQ numbers and claim forms, Memos, View as). Its own `--rv-*` palette under `[data-revenue-app]`; every rule number is VP's.
+- **2026-10-03 (brand weeks back office · Sep)** — People › Member services gains a **Brand weeks** tab after *Capacity & waiting list* (the portal page only, for whoever reviews member requests — HR and the Principal): a `.sheet-toolbar` (Department, Month, Refresh — locked while changes are unsaved, with a line saying so) over a `.table-frame` ledger table. **Member** first (name, title, *No member login*, *Saved 3 Oct · HR Manager* or *· by the member*), then one column per fair weekend (*Week 1* · *4–6 Sep* · *Closed 13 Sep* / *Open until 6 Oct*). Each cell is a brand `<select>` (*Not picked* · Akemi · Dunlopillo · Zanotti · Ergotex) over two 11px lines: what is stored — *Picked*, *Unconfirmed · ZANOTTI*, *Auto-located · AKEMI*, *No bills*, or *No DUNLOP booth this week — no place scores* — and the booths written at that week with their bills (*AKEMI 5 · ZANOTTI 2*), the one that earns the points bold over an orange underline, each booth's title giving venue, bills and sales. A changed cell takes the peach wash with an orange left edge and reads *Changed · not saved yet*; the frame's foot counts *N of M weeks picked · N changes not saved* beside **Discard** and the orange **Save N changes**, which saves every changed member at once and reads the month again. Every closed week stays settable here. Dates: a month is three letters everywhere (*Sep*, not *Sept*) — see "Date format".
+- **2026-10-03 (Arena booths)** — Member app › Arena: *My brand weeks* is one row per fair weekend — **Week N**, *Weekend of 4–6 Sep* under it, and a brand `<select>` (*Not picked* · Akemi · Dunlopillo · Zanotti · Ergotex; 44px, the arena's hue-1 surface) — replacing the four −/+ steppers and the 4 / 5 weeks toggle; the line under them counts *N of M weeks picked*, and the Arena home card says the same. Each row says when its week closes — *Open until 6 Oct*, *Closed 13 Sep*, *Closed 27 Sep · auto-located: ZANOTTI* — and a closed week's select is disabled for the member; with every week closed the Save button gives way to a line saying the back office changes them. In the Principal's view of a member the same form is the back office: the member's name as an `h2`, a *Back office · any week can be changed here, closed ones too* line, every select live. *Championship & Fair results* ranks booth by booth: each weekly result reads *AKEMI · MID VALLEY*, a finish placed by guess carries a small secondary-tone *Unconfirmed · pick the brand week by 6 Oct* or, once the week has closed, *Auto-located · the brand week closed on 13 Sep*. A seller is ranked on every board they sold at but only one place a week earns points, so a board off their brand week appears in their weekly list with its real place in the finish chip (*8th*) — the medal colour withheld — and *No points · not this week's scoring booth* under the venue; the medal card's remainder line counts *Other booths, no points*. Notes join the unplaced-bills one — how many finishes wait on a brand week, how many were auto-located, and what is ranked with no points. The Highest Fair Record names the booth.
+- **2026-10-03 (sales exhibition)** — Comm Cal's month: *Sales by venue* becomes **Sales exhibition** — one row per brand at each fair (a sticky **Brand** column first, then Venue · Event · Organizer · Salespeople · Bills · Sales value), a brand filter beside the search, the `tfoot` counting exhibitions. A row's venue opens exactly that exhibition's bills on All bills, whose header names it (*BRAND · VENUE*, organiser · days under it) and leads back with *← Sales exhibition*. See "Tabbed pages".
+- **2026-10-03 (Ref No.)** — Every list of bills on Comm Cal carries **Ref No.** — the handwritten bill's number (HC13369) beside the ERP's own (HC-SO-2609-400), the field the ERP labels *Ref No.* — as the first optional column after the sticky *Sales order*: All bills, a salesperson's Personal / Overriding / Below deposit, the month's Below deposit and Open Bill tabs, and *Not counted* (user: follow erp sales order number, but with reference hc123123). The cell is the Ref No. as typed (`PaperRefCell`); a cell carrying several papers adds a muted *Checked as HC12443* (the number double claims match on), and a bill the check cannot match says so in the alert tone — *No Ref No. in the ERP* or, under a Ref No. that names no paper, *Not a paper number*. The search boxes find a bill by it; the bill page's header leads with *Ref HC13369*. The Double claims tab names the month's bills it cannot check, in an alert-tone `<details>` with their own small table. See "Tabbed pages".
 - **2026-09-30 (payroll: every figure a field)** — HR › Payroll's Deductions group gains EPF EE · SOCSO EE · EIS EE · PCB as `.pg-in` fields beside Unpaid · Deduct · SKBBK, and the Employer group's EPF · SOCSO · EIS become fields too (user: 在这个 payroll tab 那边，所有的东西基本上都应该是可以被 editable 的). A figure somebody typed keeps an accent dot (`.pg-in.manual`, legend *typed over JADUAL*) and stays through later edits until *Reset statutory to JADUAL* (⋯ menu, paycheck). The paycheck window's read-only *Computed · ER / EE* column becomes an Employer section of fields over a Computed block of pro-rata, cost to company, gross and net. The row's ▾ is gone — the name and the ⋯ menu's *Open paycheck* already opened the same window. See "Payroll grid".
 - **2026-09-30 (the split follows the payroll)** — HR › Billing Allocation reads like the Payroll grid it belongs to: its cards come in the grid's order, each carries the person's payroll status chip, and a card past draft freezes with a one-line way back at its foot instead of *+ Company* / *Save*. See "Payroll batches".
 - **2026-09-30 (department mode)** — A department is a cost center or centralized, and says so: the `.dept-mode` strip under the page head of HR Costing, Service Billing, Director Pool and the new Revenue › Department page, and a *Mode* column in Settings › Departments — the same pill switch everywhere, asking inline before it acts. Billing Allocation lists cost-center people only and names the centralized departments it leaves out. See "Payroll batches".
@@ -2414,15 +2698,15 @@ If adding a new component to vocabulary, update this doc first.
 - **2026-09-27 (second payroll)** — HR › Payroll's row menu gains *Second payroll…* beside *Resubmit…*: the same unlock, recorded as a planned second payment (a sub-department that pays on the 15th) rather than a correction. The status chip, the header's status line, the Submit confirmation, *Submitted to Finance* and Finance's request labels name each kind (`1 resubmit · 1 second payroll`). See "Payroll batches".
 - **2026-09-27 (unified Payroll)** — HR › Payroll holds everybody's pay and moves it person by person. The grid gains a frozen **Status** column (`td.pg-status`, offsets `.l0`–`.l5`), a ⋯ and right-click menu per row (*Resubmit…*), a *Director* band, and a selection bar of *Complete / Unlock / Delete*; the header's *Submit to Finance · N* stays pressable after every batch, *Total Close* sits beside it, and a new **Submitted to Finance** section lists each batch with its funding. Director Salary's *Submit to Finance* is *Complete*; Comm Cal's payroll bar (no button since the entry below) gains one line — a salesperson sent from here shows on *HR › Payroll →* as Completed — and names a Total Closed month as such. See "Payroll batches".
 - **2026-09-27 (night)** — The payroll bar sends nothing. Its whole-month *Send RM X to payroll* / *Update payroll* / *Take back* lived a few hours: the user's Send is per salesperson (tick five and send them, or send everybody not yet sent — somebody already sent is never sent again), which is the per-person close's, not a card about the month. The bar keeps its state, its reasons by name, the draft note and *This month pays*; `.payrollActions` / `.payrollConfirm` / `.payrollDone` / `.payrollError` went with the button.
-- **2026-09-27 v3.11** — Product List gains **Costing Setting** and **Add-on / KPI Items**, per sub-department: a chip row for the sub-department, a card for its own figure (the cost ratio at work on RM 1,000, or the KPI switch with a link to Rules), and a peach picker panel above the table while editing. Both scroll with the page. See "Product List workspace".
+- **2026-09-27 v3.11** — Product List gains **Costing Setting** and **Add-on / KPI Items**, per sub-department: a chip row for the sub-department, a card for its own figure (the cost ratio at work on RM 1,000, or the KPI switch with a link to Rules), and a peach picker panel above the table while editing. Both scroll with the page. See "Product List — a page of the Revenue app".
 - **2026-09-27 (close)** — Comm Cal's month can be **closed** salesperson by salesperson: ticks in the list's first column, a close bar above it (progress, *Close N ticked* / *Close the N still open* / *Reopen N* behind an inline confirm strip, green once everybody is closed), a **CLOSED** tag and the locked figures on a closed row, and *Close NAME* / *Close & next →* in the empty middle of the ledger's walnut header, which turns into a green CLOSED stamp with *Reopen*. See "Closing — a lock you can see".
 - **2026-09-27 (later)** — Comm Cal's workbench stands in the URL (`?view=` · `?person=` · `?orders=`, search / brand / sort as `?q=` `?brand=` `?sort=`), so Back from a bill returns to the salesperson's ledger it was opened from; bill links carry `?from=` and the bill page's header leads with **← NAME** (`ReturnLink`, which steps Back when that is where the reader came from), then *All bills*. The bill context menu joins a salesperson's Personal / Overriding / Below deposit tables and the month's Below deposit tab. See "Tabbed pages" and "Bill context menu".
 - **2026-09-27 v3.10** — The sheet reaches the rest of HR's sidebar: the **Overview** and **People**. `/dashboard` is one route for every role, so all four dashboards moved together and each now opens on a page head and summary cards — Principal / Finance: Venture Pool (primary, the old walnut hero), Pool, Lent out and the approvals queue; HR: Employment list, Payroll (primary), Director salary, HR Pool balance, each opening where the work is done; a department manager: Pool balance (primary) and the month's five figures. The approval lists, the margin panel (two small ledgers closing on Net spread / Net interest), the subsidiaries (now with an *All subsidiaries* total), alerts and bank accounts (total in the foot) became the month's tables; Billing & dept pool and Director salary became card rows. People: the roster opens on cards (Active staff primary) above one `.sheet-toolbar`; the person pages, forms and InfoTech import, Hierarchy (the Revenue hierarchy's toolbar, chips for statuses), Roles (department band rows, `.band-row`), Permissions and Member Services follow the same rules. See "Sheet theme".
 - **2026-09-27 (night)** — A pencil on a folded box. Comm Cal's *Salary calculation · current preview* keeps its `<details>` fold and gains a 30px outlined icon button pinned to the box's top-right corner (a sibling of the details, never inside the summary). It opens an editor inside the box, above the table: an orange-bordered white panel of one-row lines — type select · description · `RM` amount (mono, right-aligned) · ✕ — then *+ Add line* on the left and *Cancel* / *Save lines* (the accent button) on the right. The table below recomputes as the lines are typed, and a pay line in it is marked by a 3px orange rule on its first cell. Where the month can no longer change the pencil stays, dimmed (`aria-disabled`), and pressing it says why. On a phone a line takes two rows: the type beside its ✕, then description and amount.
 - **2026-09-27 (payroll bar)** — Comm Cal's month says what payroll holds. The folded *Payroll & source tools* section at the foot of the month (saved-run hero, warnings, *Recompute & sync payroll*, Open Bill cost / Upsales & drops rail, payroll adjustments) is removed; a **payroll bar** under the summary cards names the state (not sent · in payroll · moved since · closed · settled by hand) with a 4px tone rule and dot, lists what stops a send by name, carries one amount-bearing action (*Send RM X to payroll* / *Update payroll to RM X*) plus a ghost *Take back* with inline confirm, and holds the month's switches in a grey foot row. *Drops and upsells the ERP found* gains a *Paid in {month}* list with Undo. A salesperson's ledger keeps its per-bill button, now the real *Don't count* (a ghost button; the notice above the table carries Undo), and *Show not counted* opens a small table under the ledger with *Count again* per bill. The Brand column names the bill's own brand only. See "The payroll bar" under Tabbed pages.
-- **2026-09-27 (evening)** — Product List › Modular splits each category by branding. Under the category's chip every branding gets its own run of cards and a small heading (orange dash, the branding and its count, a hairline): Mattress reads AKEMI · DUNLOP · ERGOTEX · MYLATEX · *No branding*, Sofa ZANOTTI · *No branding*, and Accessory finds its AK- and DL- pieces by their SKUs' branding. The unbranded close the category together under a grey dash; a category with no branding at all is drawn as before. Category and branding headings count their whole group, and ‹ › follows the drawn order. See "Product List workspace".
-- **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List workspace".
-- **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List workspace".
+- **2026-09-27 (evening)** — Product List › Modular splits each category by branding. Under the category's chip every branding gets its own run of cards and a small heading (orange dash, the branding and its count, a hairline): Mattress reads AKEMI · DUNLOP · ERGOTEX · MYLATEX · *No branding*, Sofa ZANOTTI · *No branding*, and Accessory finds its AK- and DL- pieces by their SKUs' branding. The unbranded close the category together under a grey dash; a category with no branding at all is drawn as before. Category and branding headings count their whole group, and ‹ › follows the drawn order. See "Product List — a page of the Revenue app".
+- **2026-09-27** — Product List: SKU Master and Costing gaps get a table one screen tall. Their count row, notes and table sit in `.sku-stage` (100vh less the greeting bar and the page's padding) instead of the space the filters leave, the page scrolls again, and a downward wheel over the table moves the page first until the stage fills the screen. Their columns become the reader's (`ColumnTable`): drag a header onto another to swap them (orange insertion bar), drag a header's right edge to resize (a divider shows on hover), double-click it to fit, ←/→ and Alt+←/→ from the keyboard, *Reset columns* in the footer. The first column is always the frozen one; the table opens at its natural widths and then holds them (fixed layout, a blank last column takes the slack). Kept per table in the browser. See "Product List — a page of the Revenue app".
+- **2026-09-27 (later)** — Product List lists scroll with the page. Modular and Maintenance grow with their rows and the portal's own scrollbar moves them, as on the ERP's Products page; only the wide sheets (SKU Master, Combo Pricing) keep the fixed window dragged both ways (`productTabScroll`, `data-scroll` on `.product-page`). A page-scrolled table's header sticks to the top of the page — its panel is `overflow: clip`, never `hidden`, which would be a scroll box — and `PageScrolledTable` scrolls it sideways inside its card only while it is wider than the card (always on a phone). Maintenance's option pools have no search box; Fabrics keeps its own. SKU Master's model filter joins Mattress and Bedframe. See "Product List — a page of the Revenue app".
 - **2026-09-27 v3.9** — The sheet theme, HR's view first. Every page under HR Costing, Director Salary, Director Pool, Revenue (bar the Product List) and Claims sits on one white sheet in Comm Cal's month's tone: black lettering, orange `#E99A53` for actions / active tabs / markers only, walnut for the one dark object, summary cards (`StatCard`) instead of heroes and figure strips, the month's table on every `.ledger-table`, the month's tabs on every `SlidingTabs`, statuses as chips. The shell keeps its colours. PortalFrame draws the sheet (`lib/sheet-routes.ts`); the month page's workbench module no longer draws its own. The ledger skeleton opens with empty cards on these routes, and the month page's *Bills of another month's fair* (`FairMovesPanel`, the same day) is drawn in the sheet's vocabulary. See "Sheet theme".
 - **2026-09-27** — Revenue › Venues removed: the ERP names every bill's fair (venue, organiser, days), so there is nothing left to type. The one person's step it held — moving bills into their fair's month — is a panel on the month page, *Bills of another month's fair* (`FairMovesPanel`), in the same bordered-surface vocabulary as *Drops and upsells the ERP found*: a serif heading with a mono alert count, an italic explanation, one `.ledger-table` (Bill · Salesperson · Fair · Move · Sales value, the move's status as a small mono label), and one accent button *Move the N confirmed*.
 - **2026-09-26 (later)** — Comm Cal's month in one table design. *Below deposit* and *Sales by venue* join the workbench's rail (Total Sales Orders · KPI Items · Open Bill · Below deposit · Sales by venue), both in the workbench table (`.tableFrame` / `.table`, sticky first and answer columns, `tfoot`, `.tableFooter`); a salesperson's page gains *Below deposit* beside Personal / Overriding; the Total Sales Orders table gains *Group sales* between Commissionable value and Upsell, with the run's promotion preview as `.badge` tags under the rank. The saved run's `.ledger-table`, the *Waiting on a deposit* section and *Sales by person* are gone, and Sales by venue lost its organiser dropdown and *same place as…*. See "Tabbed pages".

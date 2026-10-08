@@ -1,10 +1,14 @@
-import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllJournalLines, fetchCoaAccounts } from '@/lib/gl-reports'
 import { buildMonthlyCashFlowSides, buildSideMatrixRows } from '@/lib/cash-flow-custom'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import {
+  fetchInterBillingCashFlow,
+  interBillTransferAccount,
+  payrollCustodyAccount,
+} from '@/lib/inter-billing-cash-flow'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import type { MatrixRow } from '@/lib/monthly-matrix'
 import { segmentFilterFor } from '../_components/report-segments'
@@ -25,33 +29,38 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const supabase = await createClient()
 
   const params = await searchParams
-  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : dayjs().format('YYYY-MM')
+  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   // Dept managers see ONLY their own segment (RLS) — force empty + hide picker.
   const isDeptMgr = user.role === 'dept_manager'
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
 
+  // Internal-transfer bridge: per-segment only — it cancels across segments,
+  // so the consolidated view must not carry it (same rule as the statement),
+  // and there it is not read at all (2026-10-08).
+  const consolidated = !isDeptMgr && !segment
+
+  // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts,
+  // which zeroed their Cash Flow) — codes only, no balances. Shared with the
+  // bridge, which starts beside the journal read instead of after it.
+  const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
+    ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
+  )
   // Same two layouts the Cash Flow STATEMENT uses — the statement is the
   // reference, this view just adds month columns (user 2026-07-30: "monthly
   // cash flow 和 cash flow 显示的是一样,以 cash flow 为准").
-  const [lines, accounts, { data: banks }, inSaved, outSaved] = await Promise.all([
+  const [lines, accounts, bankCodes, ib, inSaved, outSaved] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    // bank GL codes via RPC (dept_managers are RLS-blocked from bank_accounts,
-    // which zeroed their Cash Flow) — codes only, no balances.
-    supabase.rpc('bank_gl_codes' as never),
+    bankCodesRead,
+    consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
     readReportLayout(supabase, 'cash_flow_in'),
     readReportLayout(supabase, 'cash_flow_out'),
   ])
-  const bankCodes = new Set((banks ?? []) as unknown as string[])
-  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  // Internal-transfer bridge: per-segment only — it cancels across segments,
-  // so the consolidated view must not carry it (same rule as the statement).
-  const consolidated = !isDeptMgr && !segment
-  const ibLines = consolidated ? [] : ib.lines
+  const ibLines = ib ? ib.lines : []
 
-  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, ib.account, ib.payrollAccount], bankCodes, {
+  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, interBillTransferAccount, payrollCustodyAccount], bankCodes, {
     year,
     throughMonth,
     segment: segmentFilterFor(segment),

@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.pl-scroll::-webkit-scrollbar{width:8px;height:8px}.pl-scroll::-webkit-scrollbar-thumb{background:#E2CFC1;border-radius:4px}.pl-scroll::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+<div style="position:relative;width:100%;height:100%;overflow:hidden;background:#FFFFFF;font-family:Inter,system-ui,sans-serif;color:#3F2B22;">
+<div class="pl-scroll" style="position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:28px 32px 56px;padding-right:{{ padR }};box-sizing:border-box;transition:padding 320ms cubic-bezier(.2,.8,.2,1);"><div style="display:flex;flex-direction:column;gap:18px;">
+
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;">
+<div style="display:flex;flex-direction:column;gap:6px;">
+<span style="display:flex;align-items:center;gap:10px;font-family:'Chivo Mono',Menlo,monospace;font-size:10px;font-weight:500;letter-spacing:.16em;color:#3F2B22;"><span style="width:22px;height:2px;background:#BD4A19;"></span>REVENUE / PRODUCTS</span>
+<h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:36px;font-weight:400;letter-spacing:-.025em;line-height:1.18;">Product List</h1>
+</div>
+<span style="font-size:12.5px;color:#806B60;">Principal only · Fair and IR</span>
+</div>
+
+<nav style="display:flex;gap:2px;border-bottom:1px solid #EBDDD2;overflow-x:auto;scrollbar-width:none;">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="7"><button onClick="{{ t.onClick }}" style="flex:0 0 auto;height:44px;padding:0 14px;border:0;background:transparent;color:{{ t.ink }};font-size:14px;font-weight:{{ t.fw }};box-shadow:inset 0 -2px 0 {{ t.rule }};display:flex;align-items:center;gap:7px;">{{ t.label }}<sc-if value="{{ t.dot }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:50%;background:#BD4A19;"></span></sc-if></button></sc-for>
+</nav>
+
+<sc-if value="{{ leave }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:14px;padding:12px 14px 12px 16px;border-radius:14px;background:#FFF0CC;border:1px solid #E1B04F;">
+<span style="flex:1;font-size:14px;color:#4A3110;">{{ leaveText }}</span>
+<button onClick="{{ keepEditing }}" style="height:36px;padding:0 14px;border-radius:10px;border:1px solid #E1B04F;background:#FFFFFF;color:#4A3110;font-size:13.5px;font-weight:650;">Keep editing</button>
+<button onClick="{{ discardLeave }}" style="height:36px;padding:0 14px;border-radius:10px;border:0;background:#4E2F20;color:#FFFFFF;font-size:13.5px;font-weight:650;">Discard and switch</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;border-radius:16px;background:#FBF6F2;border:1px solid #EBDDD2;">
+<sc-if value="{{ hasChips }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+<sc-if value="{{ hasChipLabel }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;font-weight:650;letter-spacing:.08em;color:#806B60;margin-right:4px;">{{ chipLabel }}</span></sc-if>
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="8"><button onClick="{{ c.onClick }}" style="height:32px;padding:0 13px;border-radius:16px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.ink }};font-size:13px;font-weight:{{ c.fw }};display:flex;align-items:center;gap:6px;">{{ c.label }}<sc-if value="{{ c.hasN }}" hint-placeholder-val="{{ false }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#BD4A19;color:#FFFFFF;font-size:10.5px;font-weight:700;line-height:18px;text-align:center;">{{ c.n }}</span></sc-if></button></sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ hasChips2 }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:12px;border-top:1px solid #EBDDD2;">
+<sc-for list="{{ chips2 }}" as="c" hint-placeholder-count="5"><button onClick="{{ c.onClick }}" style="height:30px;padding:0 12px;border-radius:9px;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.ink }};font-size:12.5px;font-weight:{{ c.fw }};display:flex;align-items:center;gap:6px;">{{ c.label }}<sc-if value="{{ c.hasN }}" hint-placeholder-val="{{ false }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#BD4A19;color:#FFFFFF;font-size:10.5px;font-weight:700;line-height:18px;text-align:center;">{{ c.n }}</span></sc-if></button></sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ hasControls }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:{{ ctlPT }};border-top:{{ ctlBT }};">
+<sc-if value="{{ hasSearch }}" hint-placeholder-val="{{ true }}">
+<label style="flex:1 1 280px;min-width:220px;display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:10px;border:1px solid #E2CFC1;background:#FFFFFF;box-sizing:border-box;">
+<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#806B60" stroke-width="1.6"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="m13 13 4 4"></path></svg>
+<input value="{{ q }}" onChange="{{ onQ }}" placeholder="{{ qPh }}" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:14px;color:#3F2B22;">
+</label>
+</sc-if>
+<sc-for list="{{ selects }}" as="s" hint-placeholder-count="0">
+<label style="display:flex;align-items:center;gap:8px;height:40px;padding:0 4px 0 12px;border-radius:10px;border:1px solid #E2CFC1;background:#FFFFFF;box-sizing:border-box;">
+<span style="font-size:12.5px;color:#806B60;">{{ s.label }}</span>
+<select value="{{ s.val }}" onChange="{{ s.onCh }}" style="height:36px;border:0;outline:0;background:transparent;font:inherit;font-size:13.5px;font-weight:600;color:#3F2B22;padding-right:4px;"><sc-for list="{{ s.opts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+</label>
+</sc-for>
+<sc-if value="{{ hasTier }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:8px;height:40px;padding:0 4px 0 12px;border-radius:10px;border:1px solid #E2CFC1;background:#FFFFFF;box-sizing:border-box;">
+<span style="font-size:12.5px;color:#806B60;">{{ tierLabel }}</span>
+<div style="display:flex;gap:2px;padding:2px;border-radius:8px;background:#F5EBE3;">
+<sc-for list="{{ tierOpts }}" as="o"><button onClick="{{ o.onClick }}" style="height:28px;min-width:36px;padding:0 9px;border-radius:6px;border:0;background:{{ o.bg }};box-shadow:{{ o.sh }};color:{{ o.ink }};font-size:12.5px;font-weight:650;">{{ o.l }}</button></sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasFig }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:20px 22px;border-radius:18px;background:{{ fig.bg }};border:1px solid {{ fig.bd }};">
+<div style="display:flex;flex-direction:column;gap:6px;min-width:0;">
+<span style="font-size:12px;font-weight:650;letter-spacing:.1em;color:{{ fig.eyeInk }};">{{ fig.eye }}</span>
+<div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+<sc-if value="{{ fig.showBig }}" hint-placeholder-val="{{ true }}"><span style="font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1;color:{{ fig.bigInk }};">{{ fig.big }}</span></sc-if>
+<sc-if value="{{ fig.inp }}" hint-placeholder-val="{{ false }}"><input value="{{ fig.val }}" onChange="{{ fig.onCh }}" inputMode="decimal" style="width:110px;height:44px;padding:0 12px;border-radius:10px;border:1.5px solid #BD4A19;background:#FFFFFF;font:inherit;font-size:24px;font-weight:700;color:#3F2B22;outline:0;box-sizing:border-box;"></sc-if>
+<span style="font-size:14px;color:#3F2B22;">{{ fig.after }}</span>
+</div>
+<span style="font-size:13px;line-height:1.5;color:#806B60;">{{ fig.sub }}</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+<sc-if value="{{ fig.hasEx }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:#FFFFFF;border:1px solid #EBDDD2;">
+<div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:11.5px;color:#806B60;">Product List cost</span><span style="font-size:15px;font-weight:650;">RM 1,000.00</span></div>
+<span style="font-size:15px;color:#806B60;">÷ {{ fig.ratio }} =</span>
+<div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:11.5px;color:#806B60;">Revenue Team cost</span><span style="font-size:15px;font-weight:700;color:#BD4A19;">{{ fig.ex }}</span></div>
+</div>
+</sc-if>
+<sc-if value="{{ fig.hasLink }}" hint-placeholder-val="{{ false }}"><a href="#" style="font-size:13.5px;font-weight:650;color:#BD4A19;text-decoration:none;">{{ fig.link }}</a></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasHeading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:-8px;">
+<h2 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;letter-spacing:-.02em;">{{ headingT }}</h2>
+<span style="font-size:13px;color:#806B60;">{{ headingSub }}</span>
+<sc-if value="{{ readOnly }}" hint-placeholder-val="{{ false }}"><span style="height:22px;padding:0 9px;border-radius:11px;background:#F5EBE3;color:#4E2F20;font-size:11.5px;font-weight:650;line-height:22px;">Read only</span></sc-if>
+</div>
+</sc-if>
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-height:40px;">
+<p style="margin:0;font-size:14px;color:#3F2B22;"><strong style="font-weight:700;">{{ act.n }}</strong> {{ act.rest }}</p>
+<div style="display:flex;gap:8px;align-items:center;">
+<sc-if value="{{ act.hasHint }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:#806B60;">{{ act.hint }}</span></sc-if>
+<sc-if value="{{ act.hasLink }}" hint-placeholder-val="{{ false }}"><button onClick="{{ act.onLink }}" style="height:38px;padding:0 14px;border-radius:10px;border:1px solid #E2CFC1;background:#FFFFFF;color:#4E2F20;font-size:13.5px;font-weight:650;">{{ act.link }}</button></sc-if>
+<sc-if value="{{ act.showEdit }}" hint-placeholder-val="{{ true }}"><button onClick="{{ act.onEdit }}" style="height:38px;padding:0 16px;border-radius:10px;border:0;background:#BD4A19;color:#FFFFFF;font-size:13.5px;font-weight:650;display:flex;align-items:center;gap:8px;"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m12.5 3.5 4 4M3 17l1-5L13.5 2.5a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2L8 16l-5 1Z"></path></svg>{{ act.editLabel }}</button></sc-if>
+<sc-if value="{{ act.editing }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ act.onCancel }}" style="height:38px;padding:0 14px;border-radius:10px;border:1px solid #E2CFC1;background:#FFFFFF;color:#4E2F20;font-size:13.5px;font-weight:650;">{{ act.cancelLabel }}</button>
+<button onClick="{{ act.onSave }}" style="height:38px;padding:0 16px;border-radius:10px;border:0;background:{{ act.saveBg }};color:{{ act.saveInk }};font-size:13.5px;font-weight:650;">{{ act.saveLabel }}</button>
+</sc-if>
+</div>
+</div>
+
+<sc-if value="{{ hasNote }}" hint-placeholder-val="{{ false }}"><p style="margin:-8px 0 0;font-size:13px;line-height:1.5;color:#806B60;text-wrap:pretty;max-width:880px;">{{ note }}</p></sc-if>
+<sc-if value="{{ hasNotice }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:11px 14px;border-radius:12px;background:{{ noticeBg }};color:{{ noticeInk }};font-size:13.5px;line-height:1.45;">{{ notice }}</p></sc-if>
+
+<sc-if value="{{ hasPicker }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:16px;background:#FFF5EC;border:1px solid #F6D7C0;">
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+<span style="font-size:12px;font-weight:650;letter-spacing:.1em;color:#BD4A19;">{{ pk.title }}</span>
+<sc-if value="{{ pk.hasSrc }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:2px;padding:2px;border-radius:9px;background:#F6E8DD;margin-left:auto;">
+<sc-for list="{{ pk.srcs }}" as="o"><button onClick="{{ o.onClick }}" style="height:30px;padding:0 11px;border-radius:7px;border:0;background:{{ o.bg }};box-shadow:{{ o.sh }};color:{{ o.ink }};font-size:12.5px;font-weight:650;">{{ o.l }}</button></sc-for>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+<label style="flex:1 1 280px;display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:10px;border:1px solid #E2CFC1;background:#FFFFFF;box-sizing:border-box;">
+<svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#806B60" stroke-width="1.6"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="m13 13 4 4"></path></svg>
+<input value="{{ pk.q }}" onChange="{{ pk.onQ }}" placeholder="{{ pk.ph }}" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:14px;color:#3F2B22;">
+</label>
+<label style="display:flex;align-items:center;gap:8px;height:40px;padding:0 10px 0 12px;border-radius:10px;border:1px solid #E2CFC1;background:#FFFFFF;box-sizing:border-box;">
+<span style="font-size:12.5px;color:#806B60;">{{ pk.amtLabel }}</span>
+<input value="{{ pk.amt }}" onChange="{{ pk.onAmt }}" placeholder="{{ pk.amtPh }}" inputMode="decimal" style="width:84px;border:0;outline:0;background:transparent;font:inherit;font-size:14px;font-weight:650;color:#3F2B22;text-align:right;">
+</label>
+<sc-if value="{{ pk.hasAddAll }}" hint-placeholder-val="{{ false }}"><button onClick="{{ pk.onAddAll }}" style="height:40px;padding:0 16px;border-radius:10px;border:0;background:{{ pk.addBg }};color:{{ pk.addInk }};font-size:13.5px;font-weight:650;">{{ pk.addAll }}</button></sc-if>
+</div>
+<sc-if value="{{ pk.hasMsg }}" hint-placeholder-val="{{ true }}"><p style="margin:0;font-size:13px;color:#806B60;">{{ pk.msg }}</p></sc-if>
+<sc-if value="{{ pk.hasRes }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;border-radius:12px;background:#FFFFFF;border:1px solid #F1E7DF;overflow:hidden;">
+<sc-for list="{{ pk.res }}" as="r"><div style="display:flex;align-items:center;gap:12px;min-height:46px;padding:6px 12px;border-top:1px solid {{ r.rule }};">
+<sc-if value="{{ r.hasTick }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.onTick }}" aria-label="Tick" style="flex:0 0 20px;width:20px;height:20px;padding:0;border-radius:6px;border:1.5px solid {{ r.tbd }};background:{{ r.tbg }};display:grid;place-items:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="opacity:{{ r.top }};"><path d="m5 12 5 5L20 7"></path></svg></button></sc-if>
+<span style="flex:0 0 190px;font-size:13.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.code }}</span>
+<span style="flex:1;min-width:0;font-size:13px;color:#806B60;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.desc }}</span>
+<sc-if value="{{ r.on }}" hint-placeholder-val="{{ false }}"><span style="height:22px;padding:0 9px;border-radius:11px;background:#F5EBE3;color:#4E2F20;font-size:11.5px;font-weight:650;line-height:22px;">On the list</span></sc-if>
+<sc-if value="{{ r.hasAdd }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.onAdd }}" style="height:30px;padding:0 12px;border-radius:8px;border:1px solid #E2CFC1;background:#FFFFFF;color:#BD4A19;font-size:12.5px;font-weight:650;">Add</button></sc-if>
+</div></sc-for>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasTable }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:16px;border:1px solid #EBDDD2;overflow:hidden;background:#FFFFFF;">
+<div class="pl-scroll" style="overflow:auto;max-height:{{ T.maxH }};">
+<table style="border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px;">
+<thead>
+<sc-if value="{{ T.hasBands }}" hint-placeholder-val="{{ false }}">
+<tr><sc-for list="{{ T.bands }}" as="b"><th colSpan="{{ b.span }}" style="position:sticky;top:0;left:{{ b.left }};z-index:{{ b.z }};height:34px;padding:0 14px;background:#F5EBE3;border-bottom:1px solid #EBDDD2;box-shadow:{{ b.edge }};text-align:{{ b.al }};font-size:12px;font-weight:700;letter-spacing:.06em;color:#4E2F20;white-space:nowrap;">{{ b.l }}</th></sc-for></tr>
+</sc-if>
+<tr><sc-for list="{{ T.cols }}" as="h" hint-placeholder-count="6"><th style="position:sticky;top:{{ h.top }};left:{{ h.left }};z-index:{{ h.z }};height:42px;padding:0 14px;background:#F7F0EA;border-bottom:1px solid #EBDDD2;box-shadow:{{ h.edge }};text-align:{{ h.al }};font-size:11.5px;font-weight:700;letter-spacing:.07em;color:#806B60;white-space:nowrap;min-width:{{ h.w }};">{{ h.l }}</th></sc-for></tr>
+</thead>
+<tbody>
+<sc-for list="{{ T.rows }}" as="r" hint-placeholder-count="8"><tr style="opacity:{{ r.op }};">
+<sc-for list="{{ r.cells }}" as="c"><td colSpan="{{ c.span }}" style="position:{{ c.pos }};left:0;z-index:{{ c.z }};background:{{ c.bg }};box-shadow:{{ c.edge }};padding:{{ c.pad }};border-bottom:1px solid #F1E7DF;text-align:{{ c.al }};font-size:{{ c.fs }};font-weight:{{ c.fw }};color:{{ c.ink }};white-space:{{ c.ws }};vertical-align:middle;text-decoration:{{ c.deco }};">
+<sc-if value="{{ c.hasT }}" hint-placeholder-val="{{ true }}">{{ c.t }}</sc-if>
+<sc-if value="{{ c.hasChip }}" hint-placeholder-val="{{ false }}"><span style="display:inline-block;margin-left:8px;height:20px;padding:0 8px;border-radius:10px;background:{{ c.chipBg }};color:{{ c.chipInk }};font-size:11px;font-weight:700;line-height:20px;letter-spacing:.03em;text-decoration:none;vertical-align:1px;">{{ c.chip }}</span></sc-if>
+<sc-if value="{{ c.hasSub }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;font-weight:400;color:#806B60;margin-top:2px;white-space:normal;">{{ c.sub }}</div></sc-if>
+<sc-if value="{{ c.inp }}" hint-placeholder-val="{{ false }}"><input value="{{ c.val }}" onChange="{{ c.onCh }}" placeholder="—" inputMode="decimal" style="width:{{ c.inW }};height:34px;padding:0 10px;border-radius:8px;border:1px solid {{ c.inBd }};background:{{ c.inBg }};font:inherit;font-size:13.5px;font-weight:600;color:#3F2B22;text-align:right;outline:0;box-sizing:border-box;"></sc-if>
+<sc-if value="{{ c.hasLk }}" hint-placeholder-val="{{ false }}"><button onClick="{{ c.onLk }}" style="height:28px;padding:0;border:0;background:transparent;color:{{ c.lkInk }};font-size:13px;font-weight:650;text-decoration:none;">{{ c.lk }}</button></sc-if>
+<sc-if value="{{ c.hasTiles }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"><sc-for list="{{ c.tiles }}" as="tl"><sc-if value="{{ tl.plus }}" hint-placeholder-val="{{ false }}"><span style="color:#C9B8AC;font-weight:600;">+</span></sc-if><span style="display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:7px;background:#F7F0EA;border:1px solid #EBDDD2;font-size:12.5px;font-weight:650;color:#4E2F20;">{{ tl.code }}<sc-if value="{{ tl.hasAlt }}" hint-placeholder-val="{{ false }}"><span style="font-weight:500;color:#806B60;">{{ tl.alt }}</span></sc-if><sc-if value="{{ tl.hasN }}" hint-placeholder-val="{{ false }}"><span style="color:#BD4A19;">{{ tl.n }}</span></sc-if></span></sc-for></div></sc-if>
+</td></sc-for>
+</tr></sc-for>
+<sc-if value="{{ T.isEmpty }}" hint-placeholder-val="{{ false }}"><tr><td colSpan="{{ T.span }}" style="padding:40px 14px;text-align:center;color:#806B60;font-size:14px;">{{ T.empty }}</td></tr></sc-if>
+</tbody>
+</table>
+</div>
+<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-height:46px;padding:8px 16px;background:#FBF6F2;border-top:1px solid #EBDDD2;font-size:12.5px;color:#806B60;box-sizing:border-box;">
+<span>{{ T.foot }}</span>
+<sc-if value="{{ T.hasMore }}" hint-placeholder-val="{{ false }}"><button onClick="{{ T.onMore }}" style="height:30px;padding:0 12px;border-radius:8px;border:1px solid #E2CFC1;background:#FFFFFF;color:#4E2F20;font-size:12.5px;font-weight:650;">{{ T.more }}</button></sc-if>
+<span style="flex:1;"></span>
+<sc-if value="{{ T.hasFootNote }}" hint-placeholder-val="{{ false }}"><span>{{ T.footNote }}</span></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMod }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:28px;">
+<sc-for list="{{ board }}" as="g"><section style="display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="height:28px;padding:0 12px;border-radius:14px;background:#4E2F20;color:#FFFFFF;font-size:13px;font-weight:650;line-height:28px;">{{ g.name }}</span><span style="font-size:13px;color:#806B60;">{{ g.count }}</span></div>
+<sc-for list="{{ g.groups }}" as="b"><div style="display:flex;flex-direction:column;gap:10px;">
+<sc-if value="{{ b.hasHead }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:10px;"><span style="width:16px;height:2px;background:{{ b.dash }};"></span><span style="font-size:12px;font-weight:700;letter-spacing:.1em;color:#4E2F20;">{{ b.label }}</span><span style="font-size:12px;color:#806B60;">{{ b.count }}</span><span style="flex:1;height:1px;background:#EBDDD2;"></span></div></sc-if>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;">
+<sc-for list="{{ b.cards }}" as="m"><button onClick="{{ m.onClick }}" style="display:flex;flex-direction:column;gap:6px;padding:14px 14px 12px;border-radius:14px;border:1.5px solid {{ m.bd }};background:{{ m.bg }};text-align:left;white-space:normal;color:#3F2B22;box-shadow:{{ m.sh }};">
+<span style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;"><strong style="font-size:15px;font-weight:700;letter-spacing:-.01em;">{{ m.code }}</strong><span style="height:20px;padding:0 8px;border-radius:10px;background:{{ m.stBg }};color:{{ m.stInk }};font-size:11px;font-weight:650;line-height:20px;white-space:nowrap;">{{ m.state }}</span></span>
+<sc-if value="{{ m.hasName }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;color:#806B60;">{{ m.name }}</span></sc-if>
+<span style="display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:#806B60;"><span>{{ m.ladder }}</span><span>{{ m.skus }}</span><sc-if value="{{ m.hasFlag }}" hint-placeholder-val="{{ false }}"><span style="color:#A46312;font-weight:650;">{{ m.flag }}</span></sc-if></span>
+</button></sc-for>
+</div>
+</div></sc-for>
+</section></sc-for>
+<sc-if value="{{ boardEmpty }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:40px 0;text-align:center;color:#806B60;font-size:14px;">No models match these filters.</p></sc-if>
+</div>
+</sc-if>
+
+</div>
+</div>
+
+<div style="position:absolute;inset:0;z-index:4;display:flex;align-items:stretch;justify-content:center;padding:24px 28px;box-sizing:border-box;background:rgba(40,25,18,.38);opacity:{{ edOp }};pointer-events:{{ edPE }};transition:opacity 220ms ease;">
+<div onClick="{{ backdrop }}" style="position:absolute;inset:0;"></div>
+<aside role="dialog" aria-modal="true" style="position:relative;flex:1 1 auto;min-width:0;max-width:1180px;display:flex;flex-direction:column;background:#FFFFFF;border-radius:18px;box-shadow:0 24px 60px rgba(40,25,18,.28);overflow:hidden;transform:{{ edX }};transition:transform 260ms cubic-bezier(.2,.8,.2,1);">
+<sc-if value="{{ hasEd }}" hint-placeholder-val="{{ false }}">
+<header style="flex:0 0 auto;display:flex;gap:16px;align-items:flex-start;padding:20px 22px 16px 24px;border-bottom:1px solid #EBDDD2;background:#FBF6F2;">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;">
+<span style="display:flex;align-items:center;gap:10px;font-family:'Chivo Mono',Menlo,monospace;font-size:10px;font-weight:500;letter-spacing:.16em;color:#3F2B22;"><span style="width:22px;height:2px;background:#BD4A19;"></span>{{ ed.eye }}</span>
+<h2 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.2;">{{ ed.code }}<sc-if value="{{ ed.hasName }}" hint-placeholder-val="{{ false }}"><span style="font-weight:500;color:#806B60;"> · {{ ed.name }}</span></sc-if></h2>
+<div style="display:flex;flex-wrap:wrap;gap:6px;"><sc-for list="{{ ed.metaChips }}" as="mc"><span style="height:24px;padding:0 10px;border-radius:12px;border:1px solid {{ mc.bd }};background:{{ mc.bg }};color:{{ mc.ink }};font-size:12px;font-weight:{{ mc.fw }};line-height:22px;box-sizing:border-box;white-space:nowrap;">{{ mc.l }}</span></sc-for></div>
+</div>
+<div style="display:flex;gap:6px;flex:0 0 auto;">
+<button onClick="{{ ed.prev }}" aria-label="Previous model" style="width:36px;height:36px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;display:grid;place-items:center;padding:0;opacity:{{ ed.prevOp }};"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"></path></svg></button>
+<button onClick="{{ ed.next }}" aria-label="Next model" style="width:36px;height:36px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;display:grid;place-items:center;padding:0;opacity:{{ ed.nextOp }};"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+<button onClick="{{ ed.close }}" aria-label="Close" style="width:36px;height:36px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;display:grid;place-items:center;padding:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+</div>
+</header>
+<div class="pl-scroll" style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 24px 26px;display:flex;flex-direction:column;gap:22px;">
+<sc-if value="{{ ed.hasNote }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:10px 14px;border-radius:10px;background:#FFF5EC;color:#4E2F20;font-size:13px;line-height:1.45;">{{ ed.note }}</p></sc-if>
+<div style="display:flex;flex-direction:column;gap:10px;">
+<div style="display:grid;grid-template-columns:auto minmax(200px,280px);justify-content:start;gap:32px;align-items:start;padding:16px;border-radius:14px;background:#FBF6F2;border:1px solid #EBDDD2;">
+<div style="display:flex;flex-direction:column;gap:8px;min-width:0;">
+<span style="font-size:11px;font-weight:700;letter-spacing:.07em;color:#806B60;">REVENUE CALCULATOR</span>
+<button onClick="{{ ed.toggleOffered }}" style="align-self:flex-start;display:flex;align-items:center;gap:10px;height:38px;padding:0 14px 0 5px;border-radius:19px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13.5px;font-weight:600;"><span style="position:relative;flex:0 0 40px;width:40px;height:26px;border-radius:13px;background:{{ ed.trk }};transition:background 160ms;"><span style="position:absolute;top:3px;left:{{ ed.knob }};width:20px;height:20px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(63,43,34,.25);transition:left 160ms;"></span></span>{{ ed.offTxt }}</button>
+</div>
+<sc-for list="{{ ed.fields }}" as="f"><label style="display:flex;flex-direction:column;gap:8px;min-width:0;">
+<span style="font-size:11px;font-weight:700;letter-spacing:.07em;color:#806B60;">{{ f.label }}</span>
+<select value="{{ f.val }}" onChange="{{ f.onCh }}" style="width:100%;min-width:0;height:38px;padding:0 10px;border-radius:9px;border:1px solid {{ f.bd }};background:#FFFFFF;font:inherit;font-size:13.5px;color:#3F2B22;box-sizing:border-box;"><sc-for list="{{ f.opts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+<sc-if value="{{ f.hasHelp }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:1.4;color:{{ f.helpInk }};">{{ f.help }}</span></sc-if>
+</label></sc-for>
+</div>
+<p style="margin:0;padding:10px 14px;border-radius:10px;background:{{ ed.sumBg }};color:{{ ed.sumInk }};font-size:13px;line-height:1.45;">{{ ed.summary }}</p>
+</div>
+<sc-for list="{{ ed.sections }}" as="sec"><section style="display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;align-items:center;gap:10px;"><h3 style="margin:0;font-size:15px;font-weight:700;">{{ sec.title }}</h3><span style="height:22px;padding:0 9px;border-radius:11px;background:#F5EBE3;color:#4E2F20;font-size:11.5px;font-weight:600;line-height:22px;">{{ sec.count }}</span><span style="flex:1;"></span>
+<button onClick="{{ sec.all }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;height:32px;font-size:12.5px;">Select all</button>
+<button onClick="{{ sec.none }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;height:32px;font-size:12.5px;">Clear all</button></div>
+<div style="display:grid;grid-template-columns:{{ sec.cols }};gap:8px;">
+<sc-for list="{{ sec.tiles }}" as="tl"><button onClick="{{ tl.onClick }}" style="display:flex;align-items:flex-start;gap:10px;min-width:0;min-height:46px;padding:11px 12px;border-radius:10px;border:1px solid {{ tl.bd }};background:{{ tl.bg }};text-align:left;white-space:normal;color:#3F2B22;opacity:{{ tl.op }};box-sizing:border-box;">
+<span style="flex:0 0 18px;width:18px;height:18px;margin-top:1px;border-radius:4px;border:1.5px solid {{ tl.cbd }};background:{{ tl.cbg }};box-sizing:border-box;display:grid;place-items:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" style="opacity:{{ tl.chk }};"><path d="m5 12 5 5L20 7"></path></svg></span>
+<span style="display:flex;flex-direction:column;gap:3px;min-width:0;overflow-wrap:anywhere;"><span style="font-size:13.5px;font-weight:650;line-height:1.3;">{{ tl.main }}</span><sc-if value="{{ tl.hasSub }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#806B60;">{{ tl.sub }}</span></sc-if><sc-if value="{{ tl.hasTag }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:700;color:#A46312;">{{ tl.tag }}</span></sc-if></span>
+</button></sc-for>
+</div>
+</section></sc-for>
+<sc-if value="{{ ed.isBed }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:12px;line-height:1.5;color:#806B60;">On the Quote, a divan, leg, gap or total height turned on here is offered with its charge from Maintenance. One turned on with no charge is FOC; one not turned on is never offered.</p></sc-if>
+</div>
+<footer style="flex:0 0 auto;border-top:1px solid #EBDDD2;padding:12px 22px 12px 24px;background:#FFFFFF;">
+<sc-if value="{{ ed.guard }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:8px;">
+<span style="flex:1;min-width:0;font-size:13.5px;"><strong>{{ ed.code }}</strong> has unsaved changes.</span>
+<button onClick="{{ ed.keep }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;">Keep editing</button>
+<button onClick="{{ ed.discard }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;">Discard</button>
+<button onClick="{{ ed.saveGo }}" style="height:36px;padding:0 14px;border-radius:9px;border:0;background:#BD4A19;color:#FFFFFF;font-size:13px;font-weight:650;">{{ ed.saveGoLabel }}</button>
+</div>
+</sc-if>
+<sc-if value="{{ ed.noGuard }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:center;gap:8px;">
+<span style="flex:1;min-width:0;font-size:13px;font-weight:{{ ed.stFw }};color:{{ ed.stInk }};">{{ ed.status }}</span>
+<button onClick="{{ ed.close }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;">Cancel</button>
+<button onClick="{{ ed.save }}" style="height:36px;padding:0 16px;border-radius:9px;border:0;background:{{ ed.saveBg }};color:{{ ed.saveInk }};font-size:13px;font-weight:650;">Save</button>
+<button onClick="{{ ed.saveNext }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;border-color:#E99A53;color:#BD4A19;opacity:{{ ed.snOp }};">{{ ed.snLabel }}</button>
+</div>
+</sc-if>
+</footer>
+</sc-if>
+</aside>
+</div>
+<sc-if value="{{ hasNc }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:5;display:flex;align-items:stretch;justify-content:center;padding:24px 28px;box-sizing:border-box;background:rgba(40,25,18,.38);">
+<div onClick="{{ nc.close }}" style="position:absolute;inset:0;"></div>
+<aside role="dialog" aria-modal="true" style="position:relative;flex:1 1 auto;min-width:0;max-width:980px;display:flex;flex-direction:column;background:#FFFFFF;border-radius:18px;box-shadow:0 24px 60px rgba(40,25,18,.28);overflow:hidden;">
+<header style="flex:0 0 auto;display:flex;gap:16px;align-items:flex-start;padding:20px 22px 16px 24px;border-bottom:1px solid #EBDDD2;background:#FBF6F2;">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;">
+<span style="display:flex;align-items:center;gap:10px;font-family:'Chivo Mono',Menlo,monospace;font-size:10px;font-weight:500;letter-spacing:.16em;color:#3F2B22;"><span style="width:22px;height:2px;background:#BD4A19;"></span>COMBO PRICING · NEW SET</span>
+<h2 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.2;">{{ nc.title }}<sc-if value="{{ nc.hasModel }}" hint-placeholder-val="{{ false }}"><span style="font-weight:500;color:#806B60;"> · Model {{ nc.modelLabel }}</span></sc-if></h2>
+</div>
+<button onClick="{{ nc.close }}" aria-label="Close" style="width:36px;height:36px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;display:grid;place-items:center;padding:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+</header>
+<div class="pl-scroll" style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 24px 26px;display:flex;flex-direction:column;gap:24px;">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:16px;border-radius:14px;background:#FBF6F2;border:1px solid #EBDDD2;">
+<label style="display:flex;flex-direction:column;gap:8px;min-width:0;"><span style="font-size:11px;font-weight:700;letter-spacing:.07em;color:#806B60;">SOFA MODEL</span>
+<select value="{{ nc.model }}" onChange="{{ nc.onModel }}" style="width:100%;height:38px;padding:0 10px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;font:inherit;font-size:13.5px;color:#3F2B22;box-sizing:border-box;"><sc-for list="{{ nc.models }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select></label>
+<label style="display:flex;flex-direction:column;gap:8px;min-width:0;"><span style="font-size:11px;font-weight:700;letter-spacing:.07em;color:#806B60;">SET NAME</span>
+<input value="{{ nc.label }}" onChange="{{ nc.onLabel }}" placeholder="{{ nc.labelPh }}" style="width:100%;height:38px;padding:0 10px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;font:inherit;font-size:13.5px;color:#3F2B22;box-sizing:border-box;outline:0;"></input>
+<span style="font-size:12px;color:#806B60;">Blank uses the compartments as the name.</span></label>
+</div>
+<section style="display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;align-items:center;gap:10px;"><h3 style="margin:0;font-size:15px;font-weight:700;">Compartments</h3><span style="height:22px;padding:0 9px;border-radius:11px;background:#F5EBE3;color:#4E2F20;font-size:11.5px;font-weight:600;line-height:22px;">{{ nc.pieceCount }}</span><span style="flex:1;"></span><button onClick="{{ nc.clearPcs }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;height:32px;font-size:12.5px;">Clear all</button></div>
+<sc-if value="{{ nc.noModel }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:22px;border-radius:12px;border:1px dashed #E2CFC1;text-align:center;font-size:13.5px;color:#806B60;">Pick a sofa model to see its compartments.</p></sc-if>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;">
+<sc-for list="{{ nc.pcs }}" as="p"><div style="display:flex;align-items:center;gap:10px;min-width:0;padding:10px 10px 10px 12px;border-radius:10px;border:1px solid {{ p.bd }};background:{{ p.bg }};box-sizing:border-box;">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;"><span style="font-size:13.5px;font-weight:650;">{{ p.size }}</span><span style="font-size:12px;color:#806B60;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ p.code }}</span></span>
+<div style="display:flex;align-items:center;border:1px solid #E2CFC1;border-radius:9px;background:#FFFFFF;overflow:hidden;">
+<button onClick="{{ p.dec }}" aria-label="Remove one" style="width:30px;height:30px;border:0;background:transparent;color:{{ p.decInk }};font-size:16px;font-weight:600;padding:0;">−</button>
+<span style="min-width:22px;text-align:center;font-size:13.5px;font-weight:700;color:{{ p.nInk }};">{{ p.n }}</span>
+<button onClick="{{ p.inc }}" aria-label="Add one" style="width:30px;height:30px;border:0;background:transparent;color:#BD4A19;font-size:16px;font-weight:600;padding:0;">+</button>
+</div></div></sc-for>
+</div>
+<sc-if value="{{ nc.hasLine }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:12px 14px;border-radius:10px;background:#FFF5EC;">
+<span style="font-size:11px;font-weight:700;letter-spacing:.07em;color:#806B60;margin-right:4px;">THIS SET</span>
+<sc-for list="{{ nc.line }}" as="t"><span style="display:flex;align-items:center;gap:6px;"><sc-if value="{{ t.plus }}" hint-placeholder-val="{{ false }}"><span style="color:#A08E82;font-weight:600;">+</span></sc-if><span style="height:26px;padding:0 10px;border-radius:7px;border:1px solid #E99A53;background:#FFFFFF;font-size:13px;font-weight:650;line-height:24px;box-sizing:border-box;">{{ t.t }}</span></span></sc-for>
+</div></sc-if>
+</section>
+<section style="display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;align-items:center;gap:10px;"><h3 style="margin:0;font-size:15px;font-weight:700;">Price per set (RM)</h3><span style="flex:1;"></span><button onClick="{{ nc.copySum }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;height:32px;font-size:12.5px;opacity:{{ nc.copyOp }};">Copy module totals</button></div>
+<div style="overflow-x:auto;border:1px solid #EBDDD2;border-radius:12px;">
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+<thead><tr><th style="padding:10px 14px;text-align:left;background:#FBF6F2;border-bottom:1px solid #EBDDD2;font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;font-weight:500;letter-spacing:.1em;color:#806B60;">FABRIC TIER</th><sc-for list="{{ nc.heights }}" as="h"><th style="padding:10px 14px;text-align:right;background:#FBF6F2;border-bottom:1px solid #EBDDD2;font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;font-weight:500;letter-spacing:.1em;color:#806B60;">SEAT {{ h }}</th></sc-for></tr></thead>
+<tbody><sc-for list="{{ nc.rows }}" as="r"><tr><td style="padding:10px 14px;border-top:1px solid {{ r.rule }};font-weight:700;white-space:nowrap;">Fabric {{ r.t }}</td>
+<sc-for list="{{ r.cells }}" as="c"><td style="padding:8px 14px;border-top:1px solid {{ r.rule }};text-align:right;vertical-align:top;"><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+<input value="{{ c.v }}" onChange="{{ c.on }}" placeholder="{{ c.ph }}" inputMode="decimal" style="width:120px;height:34px;padding:0 10px;border-radius:8px;border:1px solid {{ c.bd }};background:{{ c.bg }};font:inherit;font-size:13.5px;font-weight:600;text-align:right;color:#3F2B22;box-sizing:border-box;outline:0;"></input>
+<span style="font-size:11.5px;color:#A08E82;white-space:nowrap;">{{ c.sum }}</span></div></td></sc-for></tr></sc-for></tbody>
+</table></div>
+<p style="margin:0;font-size:12.5px;line-height:1.5;color:#806B60;">{{ nc.rule }}</p>
+</section>
+</div>
+<footer style="flex:0 0 auto;border-top:1px solid #EBDDD2;padding:12px 22px 12px 24px;background:#FFFFFF;">
+<sc-if value="{{ nc.guard }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;">
+<span style="flex:1;min-width:0;font-size:13.5px;">Discard this new combo?</span>
+<button onClick="{{ nc.keep }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;">Keep editing</button>
+<button onClick="{{ nc.discard }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;">Discard</button></div></sc-if>
+<sc-if value="{{ nc.noGuard }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:8px;">
+<span style="flex:1;min-width:0;font-size:13px;font-weight:{{ nc.stFw }};color:{{ nc.stInk }};">{{ nc.status }}</span>
+<button onClick="{{ nc.close }}" style="height:36px;padding:0 13px;border-radius:9px;border:1px solid #E2CFC1;background:#FFFFFF;color:#3F2B22;font-size:13px;font-weight:600;">Cancel</button>
+<button onClick="{{ nc.save }}" style="height:36px;padding:0 16px;border-radius:9px;border:0;background:{{ nc.saveBg }};color:{{ nc.saveInk }};font-size:13px;font-weight:650;">Add combo</button></div></sc-if>
+</footer>
+</aside>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;1200px&quot;,&quot;height&quot;:&quot;840px&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sku&quot;,&quot;modular&quot;,&quot;maintenance&quot;,&quot;combos&quot;,&quot;gaps&quot;,&quot;costing&quot;,&quot;kpi&quot;],&quot;default&quot;:&quot;sku&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;skuCategory&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;&quot;,&quot;SOFA&quot;,&quot;MATTRESS&quot;,&quot;BEDFRAME&quot;],&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;openModel&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;editing&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;shift&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;newCombo&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;onPanel&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+const CAT = { SOFA: 'Sofa', BEDFRAME: 'Bedframe', ACCESSORY: 'Accessory', SOFA_ACCESSORY: 'Sofa Accessory', MATTRESS: 'Mattress', BEDLINES: 'Bedlines', DINING: 'Dining', DIFFUSER: 'Diffuser', CARPET: 'Carpet', SERVICE: 'Service' };
+const CATS = Object.keys(CAT);
+const MULTI = new Set(['SOFA', 'MATTRESS', 'BEDFRAME']);
+const HEIGHTS = ['28"', '30"', '32"'];
+const TIERS = ['P1', 'P2', 'P3'];
+const SUBS = [['fair', 'Fair'], ['ir', 'IR']];
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rm = n => 'RM ' + fmt(n);
+const num = t => { const s = String(t ?? '').trim().replace(/,/g, ''); if (!s) return null; const n = Number(s); return isFinite(n) ? n : NaN; };
+const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? '' : 's'}`;
+const BRANDING = b => b === 'DUNLOPILLO' ? 'DUNLOP' : b;
+
+function buildSkus() {
+  const out = []; let i = 0;
+  const add = o => out.push({ id: 's' + (i++), price: null, grid: null, brand: null, size: '', name: '', isNew: false, ...o });
+  const sofa = { '00830': ['1S', '2S', '3S'], '00909': ['1S', '2S', '3S'], '00913': ['1S', '2S', '3S', 'L', 'CNR'], 'VERONA': ['1A', '2A-LHF', '2A-RHF', 'CNR'] };
+  const base = { '1S': 900, '2S': 1500, '3S': 1950, 'L': 1400, 'CNR': 820, '1A': 980, '2A-LHF': 1620, '2A-RHF': 1620 };
+  Object.entries(sofa).forEach(([m, sz]) => sz.forEach(z => {
+    let grid = null;
+    if (m !== '00830') { grid = {}; HEIGHTS.forEach((h, hi) => TIERS.forEach((t, ti) => { grid[h + '|' + t] = Math.round((base[z] + hi * 60) * [1, 1.12, 1.25][ti] / 10) * 10; })); }
+    add({ code: `${m}-${z}`, desc: `SOFA ${m} ${z}`, model: m, name: m === 'VERONA' ? 'Verona modular' : '', cat: 'SOFA', brand: 'ZANOTTI', size: z, grid, isNew: m === 'VERONA' && z === '1A' });
+  }));
+  [['AK-ULTIMATE', 'AKEMI', 2100, 'ULTIMATE'], ['AK-SERENE', 'AKEMI', 1450, 'SERENE'], ['EG-ORTHO', 'ERGOTEX', 1680, 'ORTHO PLUS'], ['EG-COOLMAX', 'ERGOTEX', 1990, 'COOLMAX'], ['DL-ROYAL', 'DUNLOPILLO', 2600, 'ROYAL LATEX']].forEach(([m, b, p, n]) =>
+    [['S', 'Single', '(3FT)', .62], ['SS', 'Super Single', '(3.5FT)', .75], ['Q', 'Queen', '(5FT)', 1], ['K', 'King', '(6FT)', 1.18]].forEach(([z, l, d, k]) =>
+      add({ code: `${m} (${z})`, desc: `${n} MATTRESS ${d}`, model: m, cat: 'MATTRESS', brand: b, size: l, price: m === 'EG-COOLMAX' && z === 'SS' ? null : Math.round(p * k / 10) * 10, isNew: m === 'EG-COOLMAX' })));
+  [['1025', 680], ['2210', 820], ['OSLO', 1150]].forEach(([m, p]) =>
+    [['S', 'Single', '(3FT) (90X190CM)', .7], ['Q', 'Queen', '(5FT) (152X190CM)', 1], ['K', 'King', '(6FT) (183X190CM)', 1.15], ['SK', 'Super King', '(200X200CM)', 1.3]].forEach(([z, l, d, k]) =>
+      add({ code: `${m}-(${z})`, desc: `${m} BEDFRAME ${d}`, model: m, name: m === 'OSLO' ? 'Oslo divan' : '', cat: 'BEDFRAME', size: l, price: m === '2210' && z === 'SK' ? null : Math.round(p * k / 10) * 10 })));
+  [['AK-PILLOW-LATEX', 'AKEMI LATEX PILLOW', 'ACCESSORY', 'AKEMI', 95], ['AK-PILLOW-MEMORY', 'AKEMI MEMORY FOAM PILLOW', 'ACCESSORY', 'AKEMI', 110], ['PROTECTOR-Q', 'WATERPROOF PROTECTOR QUEEN', 'ACCESSORY', null, 68], ['PROTECTOR-K', 'WATERPROOF PROTECTOR KING', 'ACCESSORY', null, 78],
+    ['SOFA-CUSHION', 'SCATTER CUSHION 45CM', 'SOFA_ACCESSORY', null, 35], ['ARM-TRAY', 'WOODEN ARM TRAY', 'SOFA_ACCESSORY', null, 60], ['BEDSHEET-Q', 'TENCEL FITTED SHEET QUEEN', 'BEDLINES', null, 120], ['DUVET-K', 'MICROFIBRE DUVET KING', 'BEDLINES', null, null],
+    ['DT-ALBA-6S', 'ALBA DINING SET 6 SEATER', 'DINING', null, 1680], ['DF-200', 'REED DIFFUSER 200ML', 'DIFFUSER', null, 28], ['CP-160X230', 'WOOL CARPET 160X230', 'CARPET', null, 420], ['SVC-DELIVERY', 'DELIVERY KLANG VALLEY', 'SERVICE', null, 0], ['SVC-DISPOSAL', 'OLD MATTRESS DISPOSAL', 'SERVICE', null, 0]
+  ].forEach(([c, d, cat, b, p]) => add({ code: c, desc: d, model: c, cat, brand: b, price: p }));
+  return out;
+}
+
+const POOLS = {
+  Bedframe: [['bedframe_divan_heights', 'Divan Heights', true, true], ['bedframe_total_heights', 'Total Heights', true, true], ['bedframe_gaps', 'Gaps', true, true], ['bedframe_leg_heights', 'Leg Heights', true, true], ['bedframe_specials', 'Specials', true, false]],
+  Sofa: [['sofa_sizes', 'Sizes', false, false], ['sofa_leg_heights', 'Leg Heights', true, false], ['sofa_specials', 'Specials', true, false]],
+};
+const POOLMETA = Object.fromEntries(Object.entries(POOLS).flatMap(([sec, ps]) => ps.map(([p, l, pr, ch]) => [p, { sec, label: l, priced: pr, charge: ch }])));
+function buildOptions() {
+  const o = (v, label, price = null, extra = {}) => ({ v, label, price, active: true, removed: false, isNew: false, ...extra });
+  return {
+    bedframe_divan_heights: [o('8"', '8 inch divan', 0), o('10"', '10 inch divan', 30), o('12"', '12 inch divan', 50), o('14"', '14 inch divan', 80, { isNew: true })],
+    bedframe_total_heights: [o('20"', '20 inch total'), o('24"', '24 inch total', 20), o('28"', '28 inch total', 35), o('30"', '30 inch total', 40)],
+    bedframe_gaps: [o('4"', '4 inch gap', 0), o('8"', '8 inch gap', 10), o('12"', '12 inch gap', 20)],
+    bedframe_leg_heights: [o('No Leg', 'No leg', 0), o('2"', '2 inch leg', 0), o('4"', '4 inch leg', 15), o('6"', '6 inch leg', 100)],
+    bedframe_specials: [o('HB Straight', 'Straight headboard', 0), o('Right Drawer', 'Drawer, right side', 50), o('Left Drawer', 'Drawer, left side', 50), o('No Side Panel', 'Without side panel', -40), o('Storage Lift', 'Gas-lift storage', 180), o('Wingback', 'Wingback headboard', null, { active: false })],
+    sofa_sizes: [o('28"', 'Seat height 28 inch'), o('30"', 'Seat height 30 inch'), o('32"', 'Seat height 32 inch')],
+    sofa_leg_heights: [o('Default', 'Default leg', 0), o('4"', '4 inch leg', 15), o('6"', '6 inch leg', 25)],
+    sofa_specials: [o('Nylon Fabric', 'Nylon fabric upgrade', 80), o('Right Drawer', 'Drawer under right arm', 60), o('Right Drawer (10")', 'Deep drawer, right', 70), o('Wooden Arm', 'Solid wood arm', 120), o('USB Port', 'USB charging port', 45)],
+  };
+}
+const FABRICS = [
+  ['FB-LX101', 'LINEN BLEND OATMEAL', 'LUXE', 'Linen', 'PRICE_1', null, 'PRICE_1'], ['FB-LX104', 'LINEN BLEND SLATE', 'LUXE', 'Linen', 'PRICE_1', null, 'PRICE_1'], ['FB-VL220', 'VELVET MOSS', 'VELOUR', 'Velvet', 'PRICE_2', 'PRICE_3', 'PRICE_2'],
+  ['FB-VL228', 'VELVET RUST', 'VELOUR', 'Velvet', 'PRICE_2', 'PRICE_3', 'PRICE_2'], ['FB-TC310', 'TECH CLOTH SAND', 'EASYCARE', 'Tech cloth', null, null, 'PRICE_2'], ['FB-TC318', 'TECH CLOTH GRAPHITE', 'EASYCARE', 'Tech cloth', null, null, null],
+  ['FB-LT402', 'SEMI-ANILINE LEATHER COGNAC', 'NAPPA', 'Leather', 'PRICE_3', 'PRICE_3', 'PRICE_3'], ['FB-LT409', 'SEMI-ANILINE LEATHER BLACK', 'NAPPA', 'Leather', 'PRICE_3', 'PRICE_3', 'PRICE_3'], ['FB-BC510', 'BOUCLE IVORY', 'NUBE', 'Boucle', 'PRICE_2', 'PRICE_2', null],
+].map(([code, desc, series, cat, st, bt, pt], i) => ({ code, desc, series, cat, sofa: st, bed: bt, shared: pt, removed: i === 5 }));
+
+function buildCombos() {
+  const sets = [
+    ['00913', '', '3+2', [['3S'], ['2S']], HEIGHTS, TIERS],
+    ['00913', '', '3+2+1', [['3S'], ['2S'], ['1S']], HEIGHTS, TIERS],
+    ['00913', '', 'L-shape', [['3S'], ['L']], HEIGHTS, TIERS],
+    ['VERONA', 'Verona modular', 'R1 corner', [['2A-LHF', '2A-RHF'], ['CNR'], ['2A-RHF', '2A-LHF']], ['30"', '32"'], ['P1', 'P2']],
+    ['VERONA', 'Verona modular', 'Long sofa', [['2A-LHF'], ['1A', null, 2], ['2A-RHF']], ['30"', '32"'], ['P1', 'P2']],
+  ];
+  const out = [];
+  sets.forEach(([model, mn, label, slots, hs, ts], si) => ts.forEach((t, ti) => {
+    const prices = {}; hs.forEach((h, hi) => { prices[h] = si === 1 && ti === 2 ? null : Math.round((3100 + si * 600 + hi * 140) * [1, 1.1, 1.22][ti] / 10) * 10; });
+    out.push({ key: `${model}|${label}`, model, modelName: mn, label, slots: slots.map(([c, alt, n]) => ({ code: c, alt: alt || '', n: n || 1 })), tier: t, heights: hs, prices, isNew: si === 4 });
+  }));
+  return out;
+}
+const GAPS = [
+  ['EG-COOLMAX (SS)', 'COOLMAX MATTRESS (3.5FT)', 'MATTRESS', 'ERGOTEX', 9, 7, 11842, 'unpriced', true],
+  ['00830-3S', 'SOFA 00830 3S', 'SOFA', 'ZANOTTI', 6, 6, 21900, 'unpriced', true],
+  ['2210-(SK)', '2210 BEDFRAME (200X200CM)', 'BEDFRAME', null, 4, 4, 6380, 'unpriced', true],
+  ['VERONA-CNR', 'SOFA VERONA CNR', 'SOFA', 'ZANOTTI', 3, 2, 5460, 'no_height', true],
+  ['AK-TOPPER-Q', 'AKEMI TOPPER QUEEN', 'ACCESSORY', 'AKEMI', 5, 5, 2475, 'not_in_sku_master', false],
+  ['DUVET-K', 'MICROFIBRE DUVET KING', 'BEDLINES', null, 7, 6, 1953, 'unpriced', true],
+  ['SVC-STAIR', 'STAIRCASE CARRY CHARGE', 'SERVICE', null, 11, 11, 880, 'not_in_sku_master', false],
+  ['00909-2S', 'SOFA 00909 2S', 'SOFA', 'ZANOTTI', 1, 1, 3350, 'error', true],
+].map(([code, product, group, brand, lines, bills, revenue, reason, inSku]) => ({ code, product, group, brand, lines, bills, revenue, reason, inSku }));
+const REASONS = { not_in_sku_master: 'Missing from SKU Master', unpriced: 'Price needed', no_height: 'Seat size not matched', error: 'Pricing error' };
+
+const TAB_LIST = [['sku', 'SKU Master'], ['modular', 'Modular'], ['maintenance', 'Maintenance'], ['combos', 'Combo Pricing'], ['gaps', 'Costing gaps'], ['costing', 'Costing Setting'], ['kpi', 'Add-on / KPI Items']];
+const LADDERS = [['AKEMI', 'Akemi'], ['ERGOTEX', 'Ergotex'], ['DUNLOPILLO', 'Dunlopillo'], ['ZANOTTI', 'Zanotti']];
+const CALC = ['Mattress', 'Bed frame', 'Sofa', 'Accessory'];
+const OPTKEYS = {
+  SOFA: [['sizes', 'sofa_sizes', 'Seat height'], ['leg', 'sofa_leg_heights', 'Leg height'], ['specials', 'sofa_specials', 'Specials']],
+  BEDFRAME: [['divan', 'bedframe_divan_heights', 'Divan height'], ['total', 'bedframe_total_heights', 'Total height'], ['gaps', 'bedframe_gaps', 'Gap'], ['leg', 'bedframe_leg_heights', 'Leg height'], ['specials', 'bedframe_specials', 'Specials']],
+};
+const KIND = { sku: ['SKU', 'Per unit'], bedframe_specials: ['Bed frame special', 'Per bed frame'], sofa_specials: ['Sofa special', 'Once per sofa bill'] };
+
+function buildModels(skus, opts) {
+  const by = new Map();
+  skus.forEach(s => { const k = s.cat + '|' + s.model; if (!by.has(k)) by.set(k, []); by.get(k).push(s); });
+  const notOffered = new Set(['00830', 'OSLO', 'EG-COOLMAX', 'DT-ALBA-6S', 'CP-160X230']);
+  return [...by.values()].map(list => {
+    const f = list[0], ok = OPTKEYS[f.cat] || [];
+    const off = !notOffered.has(f.model);
+    const opt = {}; ok.forEach(([k, p]) => { opt[k] = off ? opts[p].filter(o => o.active && !(k === 'specials' && o.v === 'Storage Lift')).map(o => o.v) : []; });
+    return { id: 'm-' + f.model, code: f.model, name: f.name, cat: f.cat, branding: f.brand ? BRANDING(f.brand) : null, derived: f.brand, ladder: null, calc: null, gift: null, offered: off,
+      skuOn: Object.fromEntries(list.map(s => [s.id, off])), opt, isNew: f.model === 'EG-COOLMAX', skuNew: list.some(s => s.isNew), active: f.model !== 'DT-ALBA-6S', skus: list.map(s => s.id) };
+  });
+}
+
+function cell(o) {
+  return { t: '', hasT: o.t != null && o.t !== '', sub: '', hasSub: !!o.sub, chip: '', hasChip: !!o.chip, chipBg: '#F5EBE3', chipInk: '#4E2F20', inp: false, val: '', onCh: () => {}, inW: '110px', inBd: '#E2CFC1', inBg: '#FFFFFF',
+    lk: '', hasLk: !!o.lk, onLk: () => {}, lkInk: '#BD4A19', tiles: [], hasTiles: !!(o.tiles && o.tiles.length), span: 1, pos: 'static', z: 0, bg: '#FFFFFF', edge: 'none', pad: '11px 14px', al: 'left', fs: '13.5px', fw: 400, ink: '#3F2B22', ws: 'nowrap', deco: 'none', ...o };
+}
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    const skus = buildSkus(), opts = buildOptions();
+    const find = c => skus.find(s => s.code === c).id;
+    this.state = {
+      tab: this.props.tab || 'sku', leave: null, notice: null,
+      skus, opts, models: buildModels(skus, opts), combos: buildCombos(),
+      sCat: this.props.skuCategory || null, sQ: '', sModel: '', sTier: 'P2', sEdit: false, sDr: {}, sLimit: 40,
+      mCat: null, mQ: '', mShow: 'all', open: null, ed: null, edGuard: null, edNote: null,
+      xPool: 'bedframe_divan_heights', xEdit: false, xDr: {}, xQ: '', xSofaT: '', xBedT: '', xGone: false,
+      cQ: '', cModel: '', cTier: 'all', cEdit: false, cDr: {}, nc: this.props.newCombo ? { model: 'VERONA', label: '', pcs: { '1A': 1, '2A-LHF': 1, 'CNR': 1 }, pr: { 'P1#30"': '3980', 'P2#30"': '4380' }, guard: false, err: '' } : null,
+      gQ: '', gReason: '',
+      sub: 'fair',
+      cost: { fair: { div: 0.7, rows: [{ id: find('DL-ROYAL (Q)'), r: 0.6 }, { id: find('DL-ROYAL (K)'), r: 0.6 }, { id: find('AK-PILLOW-LATEX'), r: 0.65 }] }, ir: { div: 0.72, rows: [] } },
+      kEn: { fair: true, ir: false },
+      kpi: { fair: [{ id: 'k1', src: 'bedframe_specials', code: 'HB Straight', name: 'Straight headboard', amt: 200 }, { id: 'k2', src: 'sku', code: 'PROTECTOR-Q', name: 'WATERPROOF PROTECTOR QUEEN', amt: 30 }, { id: 'k3', src: 'sku', code: 'AK-PILLOW-LATEX', name: 'AKEMI LATEX PILLOW', amt: 15 }, { id: 'k4', src: 'sofa_specials', code: 'Nylon Fabric', name: 'Nylon fabric upgrade', amt: 40 }], ir: [] },
+      rEdit: false, rDiv: null, rDr: {}, rAdd: [], rDel: [], rQ: '', rTick: [], rPick: '',
+      kEdit: false, kDr: {}, kAdd: [], kDel: [], kSrc: 'bedframe_specials', kQ: '', kAmt: '',
+    };
+    if (this.props.openModel) { const m = this.state.models.find(x => x.code === this.props.openModel); if (m) { this.state.tab = 'modular'; this.state.open = m.id; this.state.ed = this.draftOf(m); } }
+    if (this.props.editing && this.state.tab === 'costing') { this.state.rEdit = true; this.state.rQ = 'pillow'; this.state.rPick = '0.65'; }
+  }
+  componentDidUpdate(prev) {
+    if (this.props.shift && !prev.shift && this.state.open) this.setState({ open: null, ed: null, edGuard: null });
+  }
+  draftOf(m) { return { offered: m.offered, ladder: m.ladder, calc: m.calc, gift: m.gift, skuOn: { ...m.skuOn }, opt: Object.fromEntries(Object.entries(m.opt).map(([k, v]) => [k, [...v]])) }; }
+  changes(m, d) {
+    if (!m || !d) return 0; let n = 0;
+    if (m.offered !== d.offered) n++; if (m.ladder !== d.ladder) n++; if (m.calc !== d.calc) n++; if (m.gift !== d.gift) n++;
+    m.skus.forEach(id => { if (!!m.skuOn[id] !== !!d.skuOn[id]) n++; });
+    Object.keys(m.opt).forEach(k => { const a = new Set(m.opt[k]), b = new Set(d.opt[k]); a.forEach(v => { if (!b.has(v)) n++; }); b.forEach(v => { if (!a.has(v)) n++; }); });
+    return n;
+  }
+  dirty(s = this.state) {
+    if (s.tab === 'sku') return new Set(Object.keys(s.sDr).map(k => k.split('|')[0])).size;
+    if (s.tab === 'maintenance') return Object.values(s.xDr).reduce((a, p) => a + Object.keys(p).length, 0);
+    if (s.tab === 'combos') return new Set(Object.keys(s.cDr).map(k => k.split('#')[0])).size + (this.ncDirty(s.nc) ? 1 : 0);
+    if (s.tab === 'modular') return s.open ? this.changes(s.models.find(m => m.id === s.open), s.ed) : 0;
+    if (s.tab === 'costing') return this.costDirty(s).n;
+    if (s.tab === 'kpi') return this.kpiDirty(s).n;
+    return 0;
+  }
+  ncDirty(nc) { return !!nc && (!!nc.model || !!nc.label.trim() || Object.values(nc.pcs).some(n => n > 0) || Object.values(nc.pr).some(v => String(v).trim())); }
+  resetDrafts() { return { nc: null, sEdit: false, sDr: {}, xEdit: false, xDr: {}, cEdit: false, cDr: {}, open: null, ed: null, edGuard: null, edNote: null, rEdit: false, rDiv: null, rDr: {}, rAdd: [], rDel: [], rQ: '', rTick: [], rPick: '', kEdit: false, kDr: {}, kAdd: [], kDel: [], kQ: '', kAmt: '' }; }
+  ask(kind, to) {
+    if (this.dirty() > 0) { this.setState({ leave: { kind, to } }); return; }
+    this.doLeave({ kind, to });
+  }
+  doLeave(l) {
+    const extra = l.kind === 'tab' ? { tab: l.to } : l.kind === 'sub' ? { sub: l.to } : l.kind === 'sku' ? { tab: 'sku', sQ: l.to, sCat: null, sModel: '' } : {};
+    this.setState({ ...this.resetDrafts(), leave: null, notice: null, ...extra });
+  }
+  costDirty(s) {
+    if (!s.rEdit) return { n: 0 };
+    const c = s.cost[s.sub]; let n = 0;
+    if (s.rDiv !== null && num(s.rDiv) !== c.div) n++;
+    n += s.rAdd.length + s.rDel.length;
+    c.rows.forEach(r => { const d = s.rDr[r.id]; if (d !== undefined && !s.rDel.includes(r.id) && num(d) !== r.r) n++; });
+    return { n };
+  }
+  kpiDirty(s) {
+    if (!s.kEdit) return { n: 0 };
+    let n = s.kAdd.length + s.kDel.length;
+    s.kpi[s.sub].forEach(i => { const d = s.kDr[i.id]; if (d !== undefined && !s.kDel.includes(i.id) && num(d) !== i.amt) n++; });
+    return { n };
+  }
+  costRange(sku) {
+    if (!sku) return null;
+    if (sku.price != null) return [sku.price, sku.price];
+    if (sku.grid) { const v = Object.values(sku.grid); return [Math.min(...v), Math.max(...v)]; }
+    return null;
+  }
+
+  renderVals() {
+    const s = this.state, set = o => this.setState(o);
+    const D = this.dirty();
+    const tabs = TAB_LIST.map(([k, l]) => { const on = s.tab === k; return { label: l, ink: on ? '#BD4A19' : '#4E2F20', fw: on ? 650 : 500, rule: on ? '#BD4A19' : 'transparent', dot: on && D > 0, onClick: () => { if (!on) this.ask('tab', k); } }; });
+    const chip = (label, on, onClick, n) => ({ label, onClick, bd: on ? '#BD4A19' : '#E2CFC1', bg: on ? '#FFF1E6' : '#FFFFFF', ink: on ? '#BD4A19' : '#3F2B22', fw: on ? 650 : 500, n: n || 0, hasN: !!n });
+    const seg = (opts, val, f) => opts.map(([v, l]) => ({ l, bg: val === v ? '#FFFFFF' : 'transparent', sh: val === v ? '0 1px 2px rgba(63,43,34,.14)' : 'none', ink: val === v ? '#BD4A19' : '#806B60', onClick: () => f(v) }));
+    const sel = (label, val, opts, f) => ({ label, val, opts: opts.map(([v, l]) => ({ v, l })), onCh: e => f(e.target.value) });
+    const NOTICE = { ok: ['#E8F3ED', '#24513B'], err: ['#F8E1D8', '#A3371A'] };
+    let V = { chips: [], hasChips: false, hasChipLabel: false, chipLabel: '', chips2: [], hasChips2: false, hasSearch: false, q: '', onQ: () => {}, qPh: '', selects: [], hasTier: false, tierLabel: 'Tier', tierOpts: [], hasFig: false, fig: {}, hasHeading: false, headingT: '', headingSub: '', readOnly: false,
+      act: { n: '', rest: '', hasHint: false, hint: '', hasLink: false, link: '', onLink: () => {}, showEdit: false, editLabel: '', onEdit: () => {}, editing: false, cancelLabel: 'Cancel', onCancel: () => {}, saveLabel: '', onSave: () => {}, saveBg: '#BD4A19', saveInk: '#FFFFFF' },
+      hasNote: false, note: '', hasPicker: false, pk: {}, hasTable: false, T: { cols: [], rows: [], bands: [], hasBands: false, maxH: 'none', foot: '', hasMore: false, more: '', onMore: () => {}, footNote: '', hasFootNote: false, isEmpty: false, empty: '', span: 1 }, isMod: false, board: [], boardEmpty: false };
+    const saveBtn = n => ({ saveBg: n ? '#BD4A19' : '#F1E7DF', saveInk: n ? '#FFFFFF' : '#A08E82' });
+    const col = (l, w, al = 'left', first = false) => ({ l, w: w + 'px', al, top: '0', left: first ? '0' : 'auto', z: first ? 3 : 2, edge: first ? 'inset -1px 0 0 #EBDDD2' : 'none' });
+    const stripe = i => i % 2 ? '#FBF7F3' : '#FFFFFF';
+    const first = (o, bg) => cell({ pos: 'sticky', z: 1, edge: 'inset -1px 0 0 #EBDDD2', bg, fw: 650, ...o });
+    const inCell = (val, onCh, bg, edited) => cell({ inp: true, val, onCh: e => onCh(e.target.value), al: 'right', pad: '6px 10px', bg, inBd: edited ? '#BD4A19' : '#E2CFC1', inBg: edited ? '#FFF5EC' : '#FFFFFF' });
+    const skuById = new Map(s.skus.map(x => [x.id, x]));
+
+    if (s.tab === 'sku') {
+      const cats = CATS.filter(c => s.skus.some(x => x.cat === c));
+      V.chips = [chip('All', s.sCat === null, () => set({ sCat: null, sModel: '', sLimit: 40 })), ...cats.map(c => chip(CAT[c], s.sCat === c, () => set({ sCat: c, sModel: '', sLimit: 40 })))]; V.hasChips = true;
+      V.hasSearch = true; V.q = s.sQ; V.onQ = e => set({ sQ: e.target.value, sLimit: 40 }); V.qPh = 'Search product code or description…';
+      const sofa = s.sCat === 'SOFA';
+      let models = [];
+      if (s.sCat && MULTI.has(s.sCat)) models = [...new Set(s.skus.filter(x => x.cat === s.sCat).map(x => x.model))].sort();
+      if (models.length > 1) V.selects = [sel('Model', s.sModel, [['', 'All models'], ...models.map(m => [m, m])], v => set({ sModel: v }))];
+      if (sofa) { V.hasTier = true; V.tierOpts = seg(TIERS.map(t => [t, t]), s.sTier, v => set({ sTier: v })); }
+      const q = s.sQ.trim().toLowerCase();
+      const shown = s.skus.filter(x => (!s.sCat || x.cat === s.sCat) && (!s.sModel || x.model === s.sModel) && (!q || [x.code, x.desc, x.model, x.brand, x.size].some(v => (v || '').toLowerCase().includes(q))));
+      const vis = shown.slice(0, s.sLimit);
+      const n = D;
+      V.act = { ...V.act, n: shown.length.toLocaleString(), rest: `SKU${shown.length === 1 ? '' : 's'}${s.sModel ? ' · Model ' + s.sModel : ''}${sofa ? ' · ' + s.sTier : ''}`, showEdit: !s.sEdit, editLabel: 'Edit prices', onEdit: () => set({ sEdit: true, notice: null }), editing: s.sEdit, onCancel: () => set({ sEdit: false, sDr: {} }),
+        saveLabel: n ? `Save ${plural(n, 'SKU')}` : 'Save changes', ...saveBtn(n),
+        onSave: () => { if (!n) return; const skus = s.skus.map(x => { let y = x; Object.entries(s.sDr).forEach(([k, v]) => { const [id, h, t] = k.split('|'); if (id !== x.id) return; const val = num(v); if (h === 'flat') y = { ...y, price: val }; else y = { ...y, grid: { ...(y.grid || {}), [h + '|' + t]: val } }; }); return y; }); set({ skus, sDr: {}, sEdit: false, notice: ['ok', `${plural(n, 'SKU')} saved. New sales lines use these prices. To update an existing month, recost its orders in Comm Cal.`] }); } };
+      if (s.sEdit) { V.hasNote = true; V.note = 'Blank clears a price; 0 is a zero price. Changes across models and tiers are saved together.'; }
+      const cols = [col('PRODUCT CODE', 170, 'left', true), col('DESCRIPTION', 260), col('MODEL', 120)];
+      if (sofa) cols.push(col('CATEGORY', 90), col('TIER', 70), ...HEIGHTS.map(h => col('SEAT ' + h, 120, 'right')));
+      else cols.push(col('SIZE', 130), col('BRAND', 110), col('PRICE (RM)', 130, 'right'));
+      const rows = vis.map((x, i) => {
+        const bg = stripe(i);
+        const cells = [first({ t: x.code, chip: x.isNew ? 'NEW' : '' }, bg), cell({ t: x.desc, fw: 600, bg }), cell({ t: x.model, sub: x.name, bg })];
+        if (sofa) {
+          cells.push(cell({ t: CAT[x.cat], bg }), cell({ t: s.sTier, bg }));
+          HEIGHTS.forEach(h => { const k = `${x.id}|${h}|${s.sTier}`, cur = x.grid ? x.grid[h + '|' + s.sTier] : null;
+            cells.push(s.sEdit ? inCell(s.sDr[k] ?? (cur == null ? '' : String(cur)), v => set({ sDr: { ...s.sDr, [k]: v } }), bg, s.sDr[k] !== undefined) : cell({ t: fmt(cur), al: 'right', bg, ink: cur == null ? '#A08E82' : '#3F2B22', fw: 600 })); });
+        } else {
+          const k = `${x.id}|flat`, isGrid = !!x.grid;
+          cells.push(cell({ t: x.size || CAT[x.cat], bg }), cell({ t: x.brand || 'rider', ink: x.brand ? '#3F2B22' : '#806B60', bg }));
+          if (isGrid) cells.push(cell({ lk: 'View prices', onLk: () => set({ sCat: 'SOFA', sModel: x.model }), al: 'right', bg }));
+          else if (s.sEdit) cells.push(inCell(s.sDr[k] ?? (x.price == null ? '' : String(x.price)), v => set({ sDr: { ...s.sDr, [k]: v } }), bg, s.sDr[k] !== undefined));
+          else cells.push(cell({ t: fmt(x.price), al: 'right', fw: 600, ink: x.price == null ? '#A08E82' : '#3F2B22', bg }));
+        }
+        return { op: 1, cells };
+      });
+      V.hasTable = true; V.T = { ...V.T, cols, rows, maxH: '560px', foot: `${vis.length} of ${shown.length.toLocaleString()} SKUs shown`, hasMore: shown.length > vis.length, more: `Show ${Math.min(40, shown.length - vis.length)} more`, onMore: () => set({ sLimit: s.sLimit + 40 }), isEmpty: !shown.length, empty: 'No SKUs match these filters.', span: cols.length, hasFootNote: true, footNote: sofa ? 'Seat sizes follow the ERP order. Switch tier to price P1, P2 and P3.' : 'Rider: no ladder of its own; the mattress or sofa in the cart decides.' };
+    }
+
+    if (s.tab === 'modular') {
+      const cats = CATS.filter(c => s.models.some(m => m.cat === c));
+      V.chips = [chip('All', s.mCat === null, () => set({ mCat: null })), ...cats.map(c => chip(CAT[c], s.mCat === c, () => set({ mCat: c })))]; V.hasChips = true;
+      V.hasSearch = true; V.q = s.mQ; V.onQ = e => set({ mQ: e.target.value }); V.qPh = 'Search model, name, brand or SKU…';
+      V.selects = [sel('Show', s.mShow, [['all', 'All models'], ['offered', 'Offered'], ['not', 'Not offered'], ['new', 'New models or SKUs']], v => set({ mShow: v }))];
+      const q = s.mQ.trim().toLowerCase();
+      const match = s.models.filter(m => (!s.mCat || m.cat === s.mCat) && (s.mShow !== 'offered' || m.offered) && (s.mShow !== 'not' || !m.offered) && (s.mShow !== 'new' || m.isNew || m.skuNew)
+        && (!q || [m.code, m.name, m.branding, ...m.skus.map(id => skuById.get(id).code)].some(v => (v || '').toLowerCase().includes(q))));
+      const order = [];
+      V.board = cats.filter(c => match.some(m => m.cat === c)).map(c => {
+        const list = match.filter(m => m.cat === c);
+        const brands = [...new Set(list.map(m => m.branding).filter(Boolean))].sort();
+        const groups = (brands.length ? [...brands, null] : [undefined]).map(b => ({ b, ms: list.filter(m => b === undefined || m.branding === b) })).filter(g => g.ms.length);
+        return { name: CAT[c], count: plural(list.length, 'model'), groups: groups.map(g => ({ hasHead: g.b !== undefined, label: g.b || 'NO BRANDING', dash: g.b ? '#BD4A19' : '#C9B8AC', count: plural(g.ms.length, 'model'),
+          cards: g.ms.map(m => { order.push(m.id); const on = s.open === m.id, ticked = m.skus.filter(id => m.skuOn[id]).length, rider = !m.derived && !m.ladder && ['BEDFRAME', 'ACCESSORY', 'SOFA_ACCESSORY', 'BEDLINES', 'SERVICE', 'DIFFUSER', 'CARPET'].includes(m.cat);
+            const flag = !m.active ? 'Inactive' : m.isNew ? 'New model' : m.skuNew ? 'New SKU' : '';
+            return { code: m.code, name: m.name, hasName: !!m.name, state: m.offered ? 'Offered' : 'Not offered', stBg: m.offered ? '#E8F3ED' : '#F5EBE3', stInk: m.offered ? '#24513B' : '#806B60',
+              ladder: m.ladder || m.derived ? (LADDERS.find(l => l[0] === (m.ladder || m.derived)) || [0, m.ladder])[1] : rider ? 'Rider' : 'No ladder', skus: `${ticked} / ${plural(m.skus.length, 'SKU')}`, flag, hasFlag: !!flag,
+              bd: on ? '#BD4A19' : '#EBDDD2', bg: on ? '#FFF5EC' : m.offered ? '#FFFFFF' : '#FBF7F3', sh: on ? '0 6px 18px rgba(189,74,25,.12)' : 'none',
+              onClick: () => { if (s.open === m.id) return; if (s.open && D > 0) { set({ edGuard: { kind: 'open', id: m.id } }); return; } this.props.onPanel && this.props.onPanel(); set({ open: m.id, ed: this.draftOf(m), edGuard: null, edNote: null, notice: null }); } }; }) })) };
+      });
+      this._order = order;
+      V.isMod = true; V.boardEmpty = !match.length;
+      V.act = { ...V.act, n: match.length.toLocaleString(), rest: `models${s.mCat ? ' · ' + CAT[s.mCat] : ''}`, hasHint: true, hint: 'Open a model to set what the Quote may offer of it.' };
+    }
+
+    if (s.tab === 'maintenance') {
+      const fab = s.xPool === 'fabrics', meta = POOLMETA[s.xPool];
+      const cnt = p => Object.keys(s.xDr[p] || {}).length;
+      V.chips = [...Object.keys(POOLS).map(sec => chip(sec, meta && meta.sec === sec, () => set({ xPool: POOLS[sec][0][0], xQ: '' }))), chip('Fabrics', fab, () => set({ xPool: 'fabrics' }))]; V.hasChips = true;
+      if (meta) { V.chips2 = POOLS[meta.sec].map(([p, l]) => chip(l, s.xPool === p, () => set({ xPool: p }), cnt(p))); V.hasChips2 = true; }
+      V.hasHeading = true; V.headingT = fab ? 'Fabrics' : `${meta.sec} · ${meta.label}`; V.readOnly = !fab && !meta.priced;
+      const gone = s.xGone;
+      if (fab) {
+        V.hasSearch = true; V.q = s.xQ; V.onQ = e => set({ xQ: e.target.value }); V.qPh = 'Search fabric code, series or description…';
+        const topt = [['', 'All tiers'], ['PRICE_1', 'P1'], ['PRICE_2', 'P2'], ['PRICE_3', 'P3'], ['unassigned', 'Unassigned category']];
+        V.selects = [sel('Sofa tier', s.xSofaT, topt, v => set({ xSofaT: v })), sel('Bedframe tier', s.xBedT, topt, v => set({ xBedT: v })), sel('Catalogue', gone ? 'all' : 'cur', [['cur', 'Current records'], ['all', 'Include removed']], v => set({ xGone: v === 'all' }))];
+        const eff = (t, sh) => t || sh || 'PRICE_2', lab = (t, sh) => { const e = eff(t, sh).replace('PRICE_', 'P'); return t ? e : `${e} · ${sh ? 'shared' : 'default'}`; };
+        const mt = (t, sh, f) => !f || (f === 'unassigned' ? !t : eff(t, sh) === f);
+        const q = s.xQ.trim().toLowerCase();
+        const all = FABRICS.filter(f => gone || !f.removed), list = all.filter(f => (!q || [f.code, f.desc, f.series, f.cat].some(v => v.toLowerCase().includes(q))) && mt(f.sofa, f.shared, s.xSofaT) && mt(f.bed, f.shared, s.xBedT));
+        V.headingSub = `${list.length} of ${all.length} fabrics`;
+        V.act = { ...V.act, n: '', rest: '' };
+        V.hasNote = true; V.note = 'Sofa and Bedframe mappings override the shared ERP tier independently. With neither mapping nor shared tier, P2 is used.';
+        const cols = [col('FABRIC CODE', 130, 'left', true), col('DESCRIPTION', 240), col('SERIES', 100), col('CATEGORY', 110), col('SOFA TIER', 120), col('BEDFRAME TIER', 130), col('STATUS', 90)];
+        V.hasTable = true; V.T = { ...V.T, cols, span: cols.length, rows: list.map((f, i) => { const bg = stripe(i); return { op: f.removed ? .6 : 1, cells: [first({ t: f.code }, bg), cell({ t: f.desc, bg }), cell({ t: f.series, bg }), cell({ t: f.cat, bg }), cell({ t: lab(f.sofa, f.shared), bg }), cell({ t: lab(f.bed, f.shared), bg }), cell({ t: f.removed ? 'Removed' : 'Active', bg })] }; }), foot: `${list.length} of ${list.length} fabrics shown`, isEmpty: !list.length, empty: 'No fabrics match these filters.' };
+      } else {
+        const rows = s.opts[s.xPool].filter(o => gone || !o.removed);
+        V.selects = [];
+        V.headingSub = plural(rows.length, 'option');
+        const n = D, pools = Object.keys(s.xDr).filter(p => cnt(p)).length;
+        V.act = { ...V.act, n: '', rest: '', showEdit: meta.priced && !s.xEdit, editLabel: meta.charge ? 'Edit charges' : 'Edit surcharges', onEdit: () => set({ xEdit: true, notice: null }), editing: s.xEdit, cancelLabel: 'Cancel changes', onCancel: () => set({ xEdit: false, xDr: {} }),
+          saveLabel: n ? `Save ${plural(n, 'price')}` : 'Save changes', ...saveBtn(n),
+          onSave: () => { if (!n) return; const opts = { ...s.opts }; Object.entries(s.xDr).forEach(([p, vals]) => { opts[p] = opts[p].map(o => vals[o.v] !== undefined ? { ...o, price: num(vals[o.v]) } : o); }); set({ opts, xDr: {}, xEdit: false, notice: ['ok', `${plural(n, 'price')} saved.`] }); } };
+        V.hasNote = true;
+        V.note = (meta.charge ? 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote. Out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC.' : meta.priced ? 'Portal surcharge (RM) added to the cost when this option is chosen. Blank adds nothing; 0 is a zero surcharge.' : 'ERP choices only. This pool has no surcharge; model availability is set on Modular.')
+          + (s.xEdit && n ? ` ${plural(n, 'unsaved change')} across ${plural(pools, 'pool')}; Save includes them all.` : '');
+        const cols = [col('OPTION VALUE', 150, 'left', true), col('DESCRIPTION', 260), ...(meta.priced ? [col(meta.charge ? 'CHARGE (RM)' : 'SURCHARGE (RM)', 150, 'right')] : []), col('STATUS', 120)];
+        V.hasTable = true; V.T = { ...V.T, cols, span: cols.length, foot: `${rows.length} of ${rows.length} options shown`, isEmpty: !rows.length, empty: 'No options match these filters.',
+          rows: rows.map((o, i) => { const bg = stripe(i), dr = (s.xDr[s.xPool] || {})[o.v];
+            const pc = !meta.priced ? [] : [s.xEdit ? inCell(dr ?? (o.price == null ? '' : String(o.price)), v => set({ xDr: { ...s.xDr, [s.xPool]: { ...(s.xDr[s.xPool] || {}), [o.v]: v } } }), bg, dr !== undefined)
+              : cell({ t: o.price == null ? (meta.charge ? 'FOC' : '—') : o.price < 0 ? `(${fmt(-o.price)})` : fmt(o.price), al: 'right', fw: 600, ink: o.price == null ? '#806B60' : '#3F2B22', bg })];
+            return { op: o.active ? 1 : .6, cells: [first({ t: o.v }, bg), cell({ t: o.label, bg }), ...pc, cell({ t: o.removed ? 'Removed' : o.active ? 'Active' : 'Inactive', chip: o.isNew ? 'NEW' : '', bg })] }; }) };
+      }
+    }
+
+    if (s.tab === 'combos') {
+      V.hasSearch = true; V.q = s.cQ; V.onQ = e => set({ cQ: e.target.value }); V.qPh = 'Search combo or module…';
+      const models = [...new Map(s.combos.map(c => [c.model, c.modelName ? `${c.model} · ${c.modelName}` : c.model]))];
+      V.selects = [sel('Model', s.cModel, [['', 'All models'], ...models], v => set({ cModel: v }))];
+      V.hasTier = true; V.tierOpts = seg([['all', 'All'], ...TIERS.map(t => [t, t])], s.cTier, v => set({ cTier: v }));
+      const q = s.cQ.trim().toLowerCase();
+      const shown = s.combos.filter(c => (!s.cModel || c.model === s.cModel) && (s.cTier === 'all' || c.tier === s.cTier) && (!q || [c.model, c.modelName, c.label, ...c.slots.map(x => x.code)].some(v => (v || '').toLowerCase().includes(q))));
+      const setKeys = [...new Set(shown.map(c => c.key))];
+      const bands = TIERS.filter(t => shown.some(c => c.tier === t));
+      const n = D;
+      V.act = { ...V.act, hasLink: !s.cEdit, link: '+ Add combo', onLink: () => set({ nc: { model: s.cModel, label: '', pcs: {}, pr: {}, guard: false, err: '' }, notice: null }), n: setKeys.length.toLocaleString(), rest: `set${setKeys.length === 1 ? '' : 's'}${s.cModel ? ' · Model ' + s.cModel : ''} · price per set (RM)`, showEdit: !s.cEdit, editLabel: 'Edit prices', onEdit: () => set({ cEdit: true, notice: null }), editing: s.cEdit, onCancel: () => set({ cEdit: false, cDr: {} }),
+        saveLabel: n ? `Save ${plural(n, 'combo')}` : 'Save changes', ...saveBtn(n),
+        onSave: () => { if (!n) return; const combos = s.combos.map(c => { const pr = { ...c.prices }; Object.entries(s.cDr).forEach(([k, v]) => { const [ck, h] = k.split('#'); if (ck === c.key + '|' + c.tier) pr[h] = num(v); }); return { ...c, prices: pr }; }); set({ combos, cDr: {}, cEdit: false, notice: ['ok', `${plural(n, 'combo')} saved. New sales lines use these prices. To update an existing month, recost its orders in Comm Cal.`] }); } };
+      if (s.cEdit) { V.hasNote = true; V.note = 'Blank clears a price. Zero is stored; only a positive combo price replaces module prices. In edit mode you can paste a block copied from Excel.'; }
+      const cols = [col('SET', 160, 'left', true), col('WHAT IS IN IT', 280), ...bands.flatMap(t => HEIGHTS.map((h, i) => ({ ...col(h, 104, 'right'), top: '34px', edge: i === 0 ? 'inset 1px 0 0 #EBDDD2' : 'none' })))];
+      cols[0].top = '34px'; cols[1].top = '34px';
+      const rows = [];
+      models.filter(([m]) => setKeys.some(k => k.startsWith(m + '|'))).forEach(([m, ml]) => {
+        const keys = setKeys.filter(k => k.startsWith(m + '|'));
+        rows.push({ op: 1, cells: [first({ t: 'Model ' + ml, bg: '#F5EBE3', fw: 700, fs: '13px' }, '#F5EBE3'), cell({ t: plural(keys.length, 'set'), span: 1 + bands.length * HEIGHTS.length, bg: '#F5EBE3', ink: '#806B60', fs: '13px' })] });
+        keys.forEach((k, i) => {
+          const bg = stripe(i), any = shown.find(c => c.key === k);
+          const tiles = []; any.slots.forEach((sl, j) => tiles.push({ plus: j > 0, code: sl.code, alt: sl.alt ? 'or ' + sl.alt : '', hasAlt: !!sl.alt, n: '×' + sl.n, hasN: sl.n > 1 }));
+          const cells = [first({ t: any.label, chip: any.isNew ? 'NEW' : '', sub: plural(any.slots.reduce((a, x) => a + x.n, 0), 'piece') }, bg), cell({ tiles, hasTiles: true, ws: 'normal', bg })];
+          bands.forEach(t => HEIGHTS.forEach((h, hi) => {
+            const c = shown.find(x => x.key === k && x.tier === t), edge = hi === 0 ? 'inset 1px 0 0 #EBDDD2' : 'none';
+            if (!c || !c.heights.includes(h)) { cells.push(cell({ bg: '#F1E7DF', edge })); return; }
+            const dk = `${k}|${t}#${h}`, cur = c.prices[h];
+            cells.push(s.cEdit ? { ...inCell(s.cDr[dk] ?? (cur == null ? '' : String(cur)), v => set({ cDr: { ...s.cDr, [dk]: v } }), bg, s.cDr[dk] !== undefined), inW: '92px', edge } : cell({ t: fmt(cur), al: 'right', fw: 600, ink: cur == null ? '#A08E82' : '#3F2B22', bg, edge }));
+          }));
+          rows.push({ op: 1, cells });
+        });
+      });
+      V.hasTable = true; V.T = { ...V.T, cols, rows, span: cols.length, hasBands: true, maxH: '560px',
+        bands: [{ l: '\u00a0', span: 2, left: '0', z: 3, al: 'left', edge: 'none' }, ...bands.map(t => ({ l: 'FABRIC ' + t, span: HEIGHTS.length, left: 'auto', z: 2, al: 'center', edge: 'inset 1px 0 0 #EBDDD2' }))],
+        foot: `${plural(setKeys.length, 'set')} · ${shown.length} of ${s.combos.length} combos shown`, hasFootNote: true, footNote: 'Shaded boxes are sizes the ERP does not offer for that set.', isEmpty: !setKeys.length, empty: 'No combos match these filters.' };
+    }
+
+    if (s.tab === 'gaps') {
+      V.hasHeading = true; V.headingT = 'Costing gaps'; V.headingSub = 'Sales from 1 Aug 2026 up to, but not including, 1 Nov 2026.';
+      V.hasSearch = true; V.q = s.gQ; V.onQ = e => set({ gQ: e.target.value }); V.qPh = 'Search code, product or brand…';
+      V.selects = [sel('Reason', s.gReason, [['', 'All reasons'], ...Object.entries(REASONS)], v => set({ gReason: v }))];
+      const q = s.gQ.trim().toLowerCase();
+      const list = GAPS.filter(g => (!s.gReason || g.reason === s.gReason) && (!q || [g.code, g.product, g.group, g.brand].some(v => (v || '').toLowerCase().includes(q)))).sort((a, b) => b.revenue - a.revenue);
+      const lines = list.reduce((a, g) => a + g.lines, 0), rev = list.reduce((a, g) => a + g.revenue, 0);
+      V.act = { ...V.act, n: list.length.toLocaleString(), rest: `codes · ${lines} sales lines · ${rm(rev)} revenue`, hasLink: true, link: 'Open SKU Master', onLink: () => this.ask('tab', 'sku') };
+      const cols = [col('ITEM CODE', 160, 'left', true), col('PRODUCT', 230), col('GROUP', 100), col('LINES', 70, 'right'), col('BILLS', 70, 'right'), col('REVENUE (RM)', 120, 'right'), col('REASON', 170), col('NEXT STEP', 260)];
+      V.hasTable = true; V.T = { ...V.T, cols, span: cols.length, maxH: '560px', foot: `${list.length} of ${list.length} codes shown`, hasFootNote: true, footNote: 'Bills are counted per code; the same bill may appear in several rows.', isEmpty: !list.length, empty: 'No costing gaps match these filters.',
+        rows: list.map((g, i) => { const bg = stripe(i), priced = g.reason === 'unpriced' && s.skus.some(x => x.code === g.code && (x.price != null || x.grid));
+          const next = priced ? cell({ t: 'Price now available. Recost the affected orders in Comm Cal.', ws: 'normal', ink: '#24513B', bg }) : !g.inSku ? cell({ t: 'Check this code in the ERP catalogue.', ws: 'normal', ink: '#806B60', bg }) : cell({ lk: 'Review SKU price →', onLk: () => this.ask('sku', g.code), bg });
+          return { op: 1, cells: [first({ t: g.code }, bg), cell({ t: g.product, ws: 'normal', bg }), cell({ t: CAT[g.group] || g.group, bg }), cell({ t: String(g.lines), al: 'right', bg }), cell({ t: String(g.bills), al: 'right', bg }), cell({ t: fmt(g.revenue), al: 'right', fw: 650, bg }),
+            cell({ t: REASONS[g.reason], chip: '', bg, ink: g.reason === 'error' ? '#A3371A' : '#3F2B22' }), next] }; }) };
+    }
+
+    if (s.tab === 'costing' || s.tab === 'kpi') {
+      V.chips = SUBS.map(([k, l]) => chip(l, s.sub === k, () => { if (s.sub !== k) this.ask('sub', k); })); V.hasChips = true; V.hasChipLabel = true; V.chipLabel = 'SUB-DEPARTMENT';
+    }
+
+    if (s.tab === 'costing') {
+      const c = s.cost[s.sub], subName = SUBS.find(x => x[0] === s.sub)[1];
+      const dv = s.rDiv === null ? c.div : num(s.rDiv), shownDiv = dv && dv > 0 ? dv : c.div;
+      const r4 = n => Number(n).toFixed(4).replace(/0{1,2}$/, '');
+      V.hasFig = true; V.fig = { bg: '#FBF6F2', bd: '#EBDDD2', eye: `${subName.toUpperCase()} · COST RATIO`, eyeInk: '#BD4A19', showBig: !s.rEdit, big: r4(c.div), bigInk: '#3F2B22', inp: s.rEdit, val: s.rDiv ?? r4(c.div), onCh: e => set({ rDiv: e.target.value }), after: 'divides every SKU’s cost',
+        sub: `The Revenue Team’s cost is the Product List cost divided by this ratio. Every margin in the calculator, the month and the run is judged against it. SKUs below divide by a ratio of their own.`, hasEx: true, ratio: r4(shownDiv), ex: rm(1000 / shownDiv), hasLink: false, link: '' };
+      const lines = [...s.rAdd.map(id => ({ id, saved: null })), ...c.rows.map(r => ({ id: r.id, saved: r }))];
+      const n = D;
+      V.hasHeading = true; V.headingT = 'SKUs at their own ratio'; V.headingSub = plural(c.rows.length, 'SKU');
+      V.act = { ...V.act, n: '', rest: '', showEdit: !s.rEdit, editLabel: 'Edit ratios', onEdit: () => set({ rEdit: true, notice: null }), editing: s.rEdit, cancelLabel: 'Cancel changes', onCancel: () => set(this.resetDrafts()),
+        saveLabel: n ? `Save ${plural(n, 'change')}` : 'Save changes', ...saveBtn(n),
+        onSave: () => {
+          if (!n) return;
+          const blank = s.rAdd.find(id => !(s.rDr[id] || '').trim()); if (blank) { set({ notice: ['err', `${skuById.get(blank).code}: give it a ratio, or take it off the list.`] }); return; }
+          const bad = [...s.rAdd, ...Object.keys(s.rDr)].find(id => { const v = num(s.rDr[id]); return s.rDr[id] !== undefined && !(v > 0 && v <= 10); }); if (bad) { set({ notice: ['err', `${skuById.get(bad).code}: "${s.rDr[bad]}" is not a ratio above 0 and at most 10.`] }); return; }
+          if (s.rDiv !== null && !(num(s.rDiv) > 0 && num(s.rDiv) <= 10)) { set({ notice: ['err', `"${s.rDiv}" is not a ratio above 0 and at most 10.`] }); return; }
+          const rows = [...s.rAdd.map(id => ({ id, r: num(s.rDr[id]) })), ...c.rows.filter(r => !s.rDel.includes(r.id)).map(r => s.rDr[r.id] !== undefined ? { ...r, r: num(s.rDr[r.id]) } : r)];
+          set({ ...this.resetDrafts(), cost: { ...s.cost, [s.sub]: { div: s.rDiv !== null ? num(s.rDiv) : c.div, rows } }, notice: ['ok', 'Saved. The calculator judges margins at these ratios from now on; a month already computed moves when its run is computed again.'] });
+        } };
+      if (s.rEdit) {
+        const onList = new Set(lines.map(l => l.id)), q = s.rQ.trim().toLowerCase();
+        const matches = q ? s.skus.filter(x => [x.code, x.desc, x.model, CAT[x.cat]].some(v => (v || '').toLowerCase().includes(q))) : [];
+        const shown = matches.slice(0, 20), ticks = s.rTick.filter(id => !onList.has(id));
+        const pr = num(s.rPick), okR = pr > 0 && pr <= 10;
+        V.hasPicker = true; V.pk = { title: 'ADD SKUS AT A RATIO OF THEIR OWN', hasSrc: false, srcs: [], q: s.rQ, onQ: e => set({ rQ: e.target.value }), ph: 'Search SKU code, description or model…', amtLabel: 'Ratio', amt: s.rPick, amtPh: '0.60', onAmt: e => set({ rPick: e.target.value }),
+          hasAddAll: true, addAll: ticks.length ? `Add ${ticks.length} at ${okR ? s.rPick : '…'}` : 'Tick SKUs to add', addBg: ticks.length && okR ? '#BD4A19' : '#F1E7DF', addInk: ticks.length && okR ? '#FFFFFF' : '#A08E82',
+          onAddAll: () => { if (!ticks.length) return; if (!okR) { set({ notice: ['err', s.rPick.trim() ? `"${s.rPick}" is not a ratio above 0 and at most 10.` : 'Type the ratio the ticked SKUs are divided by, such as 0.6.'] }); return; } const dr = { ...s.rDr }; ticks.forEach(id => { dr[id] = s.rPick.trim(); }); set({ rAdd: [...ticks, ...s.rAdd], rDr: dr, rTick: [], notice: null }); },
+          hasMsg: !q || matches.length > 20 || !matches.length, msg: !q ? 'Type to find SKUs. Nothing shows until you search.' : !matches.length ? 'No SKU matches.' : `Showing 20 of ${matches.length}. Narrow the search to see the rest.`,
+          hasRes: shown.length > 0, res: shown.map((x, i) => { const on = onList.has(x.id), t = s.rTick.includes(x.id); return { rule: i ? '#F1E7DF' : 'transparent', hasTick: !on, onTick: () => set({ rTick: t ? s.rTick.filter(y => y !== x.id) : [...s.rTick, x.id] }), tbd: t ? '#BD4A19' : '#C9B8AC', tbg: t ? '#BD4A19' : '#FFFFFF', top: t ? 1 : 0, code: x.code, desc: x.desc, on, hasAdd: false, onAdd: () => {} }; }) };
+      }
+      const cols = [col('SKU CODE', 170, 'left', true), col('DESCRIPTION', 230), col('CATEGORY', 100), col('PRODUCT LIST COST', 150, 'right'), col('RATIO', 110, 'right'), col('TEAM COST', 160, 'right'), ...(s.rEdit ? [col('\u00a0', 110, 'right')] : [])];
+      V.hasTable = true; V.T = { ...V.T, cols, span: cols.length, foot: `${plural(lines.length, 'SKU')} · every other SKU divides by ${r4(shownDiv)}`, isEmpty: !lines.length, empty: `Every ${subName} SKU divides by ${r4(c.div)}.`,
+        rows: lines.map((l, i) => {
+          const x = skuById.get(l.id), isNew = !l.saved, del = s.rDel.includes(l.id), bg = isNew ? '#FFF5EC' : stripe(i);
+          const rng = this.costRange(x), dr = s.rDr[l.id], rr = dr !== undefined ? num(dr) : l.saved ? l.saved.r : null, rOk = rr > 0;
+          const tc = rng && rOk ? (rng[0] === rng[1] ? fmt(rng[0] / rr) : `${fmt(rng[0] / rr)} – ${fmt(rng[1] / rr)}`) : '—';
+          const cells = [first({ t: x.code, chip: isNew ? 'NEW' : del ? 'REMOVING' : '', chipBg: isNew ? '#BD4A19' : '#F8E1D8', chipInk: isNew ? '#FFFFFF' : '#A3371A', deco: 'none' }, bg), cell({ t: x.desc, bg, deco: del ? 'line-through' : 'none' }), cell({ t: CAT[x.cat], bg }),
+            cell({ t: rng ? (rng[0] === rng[1] ? fmt(rng[0]) : `${fmt(rng[0])} – ${fmt(rng[1])}`) : 'No price', al: 'right', bg, ink: rng ? '#3F2B22' : '#A08E82' }),
+            s.rEdit && !del ? { ...inCell(dr ?? (l.saved ? String(l.saved.r) : ''), v => set({ rDr: { ...s.rDr, [l.id]: v } }), bg, dr !== undefined && (!l.saved || num(dr) !== l.saved.r)), inW: '84px' } : cell({ t: rr ? r4(rr) : '—', al: 'right', fw: 650, bg }),
+            cell({ t: tc, al: 'right', fw: 650, ink: '#BD4A19', bg })];
+          if (s.rEdit) cells.push(cell({ al: 'right', bg, lk: isNew ? 'Take off' : del ? 'Keep' : 'Remove', lkInk: del ? '#BD4A19' : '#A3371A',
+            onLk: () => isNew ? set({ rAdd: s.rAdd.filter(y => y !== l.id), rDr: Object.fromEntries(Object.entries(s.rDr).filter(([k]) => k !== l.id)) }) : set({ rDel: del ? s.rDel.filter(y => y !== l.id) : [...s.rDel, l.id] }) }));
+          return { op: del ? .55 : 1, cells };
+        }) };
+    }
+
+    if (s.tab === 'kpi') {
+      const en = s.kEn[s.sub], subName = SUBS.find(x => x[0] === s.sub)[1], items = s.kpi[s.sub];
+      V.hasFig = true; V.fig = { bg: en ? '#E8F3ED' : '#FFF0CC', bd: en ? '#B7DBC7' : '#E1B04F', eye: `${subName.toUpperCase()} · KPI`, eyeInk: en ? '#24513B' : '#A46312', showBig: true, big: en ? 'On' : 'Off', bigInk: en ? '#24513B' : '#A46312', inp: false, val: '', onCh: () => {},
+        after: en ? 'KPI items are paid flat' : 'KPI items are not paid', sub: en ? 'When a bill carries an item below, its amount comes off the bill’s sales and is paid flat as KPI. The monthly quantity bonus stays on Rules.' : 'The list is kept, but no amount comes off a bill or is paid until KPI is switched on in Rules.', hasEx: false, ratio: '', ex: '', hasLink: true, link: 'Set on Rules →' };
+      const lines = [...s.kAdd.map(a => ({ ...a, isNew: true })), ...items];
+      const n = D;
+      V.hasHeading = true; V.headingT = 'Add-on / KPI items'; V.headingSub = plural(items.length, 'item');
+      V.act = { ...V.act, n: '', rest: '', showEdit: !s.kEdit, editLabel: 'Edit items', onEdit: () => set({ kEdit: true, notice: null }), editing: s.kEdit, cancelLabel: 'Cancel changes', onCancel: () => set(this.resetDrafts()),
+        saveLabel: n ? `Save ${plural(n, 'change')}` : 'Save changes', ...saveBtn(n),
+        onSave: () => {
+          if (!n) return;
+          const bad = lines.find(l => !s.kDel.includes(l.id) && s.kDr[l.id] !== undefined && !(num(s.kDr[l.id]) >= 0)); if (bad) { set({ notice: ['err', `${bad.code}: type the KPI amount in RM, 0 or more.`] }); return; }
+          const next = [...s.kAdd.map(a => ({ ...a, amt: num(s.kDr[a.id]) || 0 })), ...items.filter(i => !s.kDel.includes(i.id)).map(i => s.kDr[i.id] !== undefined ? { ...i, amt: num(s.kDr[i.id]) } : i)];
+          set({ ...this.resetDrafts(), kpi: { ...s.kpi, [s.sub]: next }, notice: ['ok', 'Saved. New bills carrying these items pay their amount flat as KPI.'] });
+        } };
+      if (s.kEdit) {
+        const taken = new Set(lines.filter(l => !s.kDel.includes(l.id)).map(l => l.src + ':' + l.code.toUpperCase())), q = s.kQ.trim().toLowerCase();
+        const res = s.kSrc === 'sku' ? (q ? s.skus.filter(x => [x.code, x.desc, x.model].some(v => (v || '').toLowerCase().includes(q))).map(x => ({ code: x.code, desc: x.desc })) : [])
+          : s.opts[s.kSrc].filter(o => !o.removed && (!q || o.v.toLowerCase().includes(q) || o.label.toLowerCase().includes(q))).map(o => ({ code: o.v, desc: o.label }));
+        const shown = res.slice(0, 20);
+        V.hasPicker = true; V.pk = { title: 'ADD AN ITEM', hasSrc: true, srcs: seg([['sku', 'SKU Master'], ['bedframe_specials', 'Bed frame specials'], ['sofa_specials', 'Sofa specials']], s.kSrc, v => set({ kSrc: v, kQ: '' })),
+          q: s.kQ, onQ: e => set({ kQ: e.target.value }), ph: s.kSrc === 'sku' ? 'Search SKU code or description…' : 'Filter specials…', amtLabel: 'Amount RM', amt: s.kAmt, amtPh: '0.00', onAmt: e => set({ kAmt: e.target.value }), hasAddAll: false, addAll: '', addBg: '', addInk: '', onAddAll: () => {},
+          hasMsg: (s.kSrc === 'sku' && !q) || !res.length || res.length > 20, msg: s.kSrc === 'sku' && !q ? 'Type to find SKUs. Nothing shows until you search.' : !res.length ? 'Nothing matches.' : `Showing 20 of ${res.length}. Narrow the search to see the rest.`,
+          hasRes: shown.length > 0, res: shown.map((r, i) => { const on = taken.has(s.kSrc + ':' + r.code.toUpperCase()); return { rule: i ? '#F1E7DF' : 'transparent', hasTick: false, onTick: () => {}, tbd: '', tbg: '', top: 0, code: r.code, desc: r.desc, on, hasAdd: !on,
+            onAdd: () => { const id = 'n' + Date.now(); set({ kAdd: [{ id, src: s.kSrc, code: r.code, name: r.desc, amt: 0 }, ...s.kAdd], kDr: { ...s.kDr, [id]: s.kAmt.trim() }, notice: null }); } }; }) };
+      }
+      const cols = [col('ITEM', 170, 'left', true), col('NAME', 230), col('KIND', 140), col('COUNTED', 150), col('KPI AMOUNT (RM)', 150, 'right'), ...(s.kEdit ? [col('\u00a0', 100, 'right')] : [])];
+      V.hasTable = true; V.T = { ...V.T, cols, span: cols.length, foot: plural(lines.length, 'item'), hasFootNote: true, footNote: 'A special rides on its bed frame or sofa line; it is not a product of its own.', isEmpty: !lines.length, empty: `${subName} has no KPI items yet.`,
+        rows: lines.map((l, i) => {
+          const del = s.kDel.includes(l.id), bg = l.isNew ? '#FFF5EC' : stripe(i), dr = s.kDr[l.id], [kind, counted] = KIND[l.src];
+          const cells = [first({ t: l.code, chip: l.isNew ? 'NEW' : del ? 'REMOVING' : '', chipBg: l.isNew ? '#BD4A19' : '#F8E1D8', chipInk: l.isNew ? '#FFFFFF' : '#A3371A' }, bg), cell({ t: l.name, bg, deco: del ? 'line-through' : 'none', ws: 'normal' }), cell({ t: kind, bg }), cell({ t: counted, bg, ink: '#806B60' }),
+            s.kEdit && !del ? { ...inCell(dr ?? (l.isNew ? '' : String(l.amt)), v => set({ kDr: { ...s.kDr, [l.id]: v } }), bg, dr !== undefined && (l.isNew || num(dr) !== l.amt)), inW: '96px' } : cell({ t: fmt(l.amt), al: 'right', fw: 650, bg })];
+          if (s.kEdit) cells.push(cell({ al: 'right', bg, lk: l.isNew ? 'Take off' : del ? 'Keep' : 'Remove', lkInk: del ? '#BD4A19' : '#A3371A',
+            onLk: () => l.isNew ? set({ kAdd: s.kAdd.filter(a => a.id !== l.id) }) : set({ kDel: del ? s.kDel.filter(y => y !== l.id) : [...s.kDel, l.id] }) }));
+          return { op: del ? .55 : 1, cells };
+        }) };
+    }
+
+    // Model editor panel
+    const m = s.open ? s.models.find(x => x.id === s.open) : null, d = s.ed;
+    let ed = {};
+    if (m && d) {
+      const order = this._order || [], idx = order.indexOf(m.id), hasPrev = idx > 0, hasNext = idx >= 0 && idx < order.length - 1, ch = this.changes(m, d);
+      const go = id => { const nm = s.models.find(x => x.id === id); set({ open: id, ed: this.draftOf(nm), edGuard: null, edNote: null }); };
+      const request = l => { if (ch) { set({ edGuard: l }); return; } perform(l); };
+      const perform = l => { if (l.kind === 'close') set({ open: null, ed: null, edGuard: null, edNote: null }); else if (l.kind === 'open') go(l.id); else { const t = order[idx + l.dir]; if (t) go(t); } };
+      const save = after => {
+        const models = s.models.map(x => x.id === m.id ? { ...x, ...d, skuOn: { ...d.skuOn }, opt: d.opt } : x);
+        const last = after.kind === 'step' && !hasNext;
+        const base = { models, notice: ['ok', last ? `${m.code} saved. That was the last model in this list.` : `${m.code} saved. Calculator selections are updated.`], edGuard: null, edNote: null };
+        if (after.kind === 'step' && (after.dir === 1 ? hasNext : hasPrev)) { const nm = models.find(x => x.id === order[idx + after.dir]); set({ ...base, open: nm.id, ed: this.draftOf(nm) }); }
+        else if (after.kind === 'open') { const nm = models.find(x => x.id === after.id); set({ ...base, open: nm.id, ed: this.draftOf(nm) }); }
+        else set({ ...base, open: null, ed: null });
+      };
+      const pd = p => set({ ed: { ...d, ...p } });
+      const rider = ['BEDFRAME', 'ACCESSORY', 'SOFA_ACCESSORY', 'BEDLINES', 'SERVICE', 'DIFFUSER', 'CARPET', 'DINING'].includes(m.cat);
+      const lad = d.ladder || m.derived, isRider = d.ladder === 'RIDER' || (!d.ladder && !m.derived && rider), missing = !isRider && !lad;
+      const defCalc = { MATTRESS: 'Mattress', BEDFRAME: 'Bed frame', SOFA: 'Sofa' }[m.cat] || 'Accessory';
+      const liveSkus = m.skus.map(id => skuById.get(id)), ticked = liveSkus.filter(x => d.skuOn[x.id]).length;
+      const ok = OPTKEYS[m.cat] || [];
+      const tile = (main, sub, tag, on, onClick, disabled) => ({ main, sub, hasSub: !!sub, tag, hasTag: !!tag, onClick: disabled ? () => {} : onClick, bd: on ? '#E99A53' : '#E2CFC1', bg: on ? '#FFF5EC' : '#FFFFFF', cbd: on ? '#BD4A19' : '#C9B8AC', cbg: on ? '#BD4A19' : '#FFFFFF', chk: on ? 1 : 0, op: disabled ? .5 : 1 });
+      const skuTitle = m.cat === 'SOFA' ? 'Compartments' : MULTI.has(m.cat) ? 'Sizes' : 'SKUs';
+      const sections = [{ title: skuTitle, count: `${ticked} / ${liveSkus.length}`, cols: 'repeat(auto-fill,minmax(160px,1fr))', all: () => pd({ skuOn: Object.fromEntries(m.skus.map(id => [id, true])) }), none: () => pd({ skuOn: Object.fromEntries(m.skus.map(id => [id, false])) }),
+        tiles: liveSkus.map(x => tile(x.size || x.code, x.size ? x.code : '', x.isNew ? 'NEW' : '', !!d.skuOn[x.id], () => pd({ skuOn: { ...d.skuOn, [x.id]: !d.skuOn[x.id] } }))) },
+        ...ok.map(([k, p, l]) => { const vals = s.opts[p].filter(o => !o.removed), on = d.opt[k] || [];
+          return { title: l, count: `${on.length} / ${vals.length}`, cols: k === 'specials' ? 'repeat(auto-fill,minmax(230px,1fr))' : 'repeat(auto-fill,minmax(110px,1fr))', all: () => pd({ opt: { ...d.opt, [k]: vals.filter(o => o.active).map(o => o.v) } }), none: () => pd({ opt: { ...d.opt, [k]: [] } }),
+            tiles: vals.map(o => { const isOn = on.includes(o.v); return tile(o.v, '', o.active ? '' : 'Inactive in ERP', isOn, () => pd({ opt: { ...d.opt, [k]: isOn ? on.filter(v => v !== o.v) : [...on, o.v] } }), !o.active && !isOn); }) }; })];
+      const summary = !d.offered ? ['#F5EBE3', '#4E2F20', 'Not offered. Members cannot quote this model.'] : missing ? ['#F8E1D8', '#A3371A', 'Offered, but members will not see it until a margin ladder is chosen.']
+        : ['#E8F3ED', '#24513B', `Members can quote ${[`${ticked} of ${liveSkus.length} ${skuTitle.toLowerCase()}`, ...ok.map(([k, , l]) => `${(d.opt[k] || []).length} ${l.toLowerCase()}`)].join(' · ')}.`];
+      const g = s.edGuard;
+      ed = {
+        eye: `MODULAR${idx >= 0 ? ` · ${idx + 1} OF ${order.length}` : ''}`, code: m.code, name: m.name, hasName: !!m.name,
+        metaChips: [[CAT[m.cat]], [m.branding ? 'ERP branding · ' + m.branding : 'No ERP branding'], [plural(liveSkus.length, 'SKU')], ...(!m.active ? [['Inactive in ERP', 1]] : []), ...(m.isNew ? [['New model', 1]] : [])].map(([l, f]) => ({ l, bd: f ? '#E1B04F' : '#E2CFC1', bg: f ? '#FFF0CC' : '#FFFFFF', ink: f ? '#4A3110' : '#3F2B22', fw: f ? 650 : 500 })),
+        prev: () => hasPrev && request({ kind: 'step', dir: -1 }), next: () => hasNext && request({ kind: 'step', dir: 1 }), prevOp: hasPrev ? 1 : .4, nextOp: hasNext ? 1 : .4, close: () => request({ kind: 'close' }),
+        hasNote: !!s.edNote, note: s.edNote || '',
+        toggleOffered: () => { const on = !d.offered, untouched = on && Object.values(d.skuOn).every(v => !v) && Object.values(d.opt).every(v => !v.length);
+          if (untouched) set({ ed: { ...d, offered: true, skuOn: Object.fromEntries(m.skus.map(id => [id, true])), opt: Object.fromEntries(ok.map(([k, p]) => [k, s.opts[p].filter(o => o.active).map(o => o.v)])) }, edNote: 'Selected the current SKUs and allowed options. Untick anything the calculator should not offer.' });
+          else pd({ offered: on }); },
+        trk: d.offered ? '#387557' : '#D9CABD', knob: d.offered ? '19px' : '3px', offTxt: d.offered ? 'Offered' : 'Not offered',
+        fields: [
+          { label: 'FREE GIFT', val: d.gift === null ? '' : d.gift ? 'yes' : 'no', bd: '#E2CFC1', bg: '#FFFFFF', opts: [{ v: '', l: (d.calc || defCalc) === 'Accessory' ? 'May be a gift (default)' : 'Not a gift (default)' }, { v: 'yes', l: 'May be a gift' }, { v: 'no', l: 'Not a gift' }], onCh: e => pd({ gift: e.target.value === '' ? null : e.target.value === 'yes' }), hasHelp: false, help: '', helpInk: '' },
+        ],
+        sumBg: summary[0], sumInk: summary[1], summary: summary[2], sections, isBed: m.cat === 'BEDFRAME',
+        guard: !!g, noGuard: !g, keep: () => set({ edGuard: null }), discard: () => { set({ edGuard: null }); perform(g); }, saveGo: () => save(g), saveGoLabel: g && g.kind === 'close' ? 'Save and close' : 'Save and continue',
+        status: ch ? `${plural(ch, 'unsaved change')}` : 'No unsaved changes', stInk: ch ? '#BD4A19' : '#806B60', stFw: ch ? 650 : 400,
+        save: () => ch && save({ kind: 'close' }), ...(() => { const b = saveBtn(ch); return { saveBg: b.saveBg, saveInk: b.saveInk }; })(),
+        saveNext: () => ch ? save({ kind: 'step', dir: 1 }) : hasNext && perform({ kind: 'step', dir: 1 }), snLabel: ch ? 'Save & next ›' : 'Next ›', snOp: ch || hasNext ? 1 : .45,
+      };
+    }
+
+    const nt = s.notice;
+    let nc = {};
+    if (s.nc) {
+      const N = s.nc, up = o => set({ nc: { ...N, err: '', ...o } });
+      const sofaSkus = s.skus.filter(x => x.cat === 'SOFA');
+      const mods = [...new Map(sofaSkus.map(x => [x.model, x.name ? `${x.model} · ${x.name}` : x.model]))];
+      const own = sofaSkus.filter(x => x.model === N.model);
+      const picked = own.filter(x => (N.pcs[x.size] || 0) > 0);
+      const pieces = picked.reduce((a, x) => a + N.pcs[x.size], 0);
+      const lineTxt = picked.map(x => (N.pcs[x.size] > 1 ? N.pcs[x.size] + '×' : '') + x.size).join(' + ');
+      const sumOf = (t, h) => { if (!picked.length) return null; let a = 0; for (const x of picked) { const p = x.grid && x.grid[h + '|' + t]; if (p == null) return null; a += p * N.pcs[x.size]; } return a; };
+      const prices = {}; let bad = false, filled = 0;
+      TIERS.forEach(t => HEIGHTS.forEach(h => { const v = num(N.pr[t + '#' + h]); if (Number.isNaN(v)) bad = true; else if (v != null && v > 0) { filled++; prices[t + '#' + h] = v; } }));
+      const label = N.label.trim() || lineTxt;
+      const dup = !!N.model && picked.length > 0 && s.combos.some(c => c.model === N.model && c.slots.length && c.slots.map(x => (x.n > 1 ? x.n + '×' : '') + x.code).sort().join('+') === picked.map(x => (N.pcs[x.size] > 1 ? N.pcs[x.size] + '×' : '') + x.size).sort().join('+'));
+      const nameTaken = !!N.model && s.combos.some(c => c.model === N.model && c.label.toLowerCase() === label.toLowerCase());
+      const problem = !N.model ? 'Pick a sofa model.' : pieces < 2 ? 'Add at least two compartments.' : bad ? 'A price is not a number.' : !filled ? 'Fill at least one price.' : dup ? 'This model already has a combo with these compartments.' : nameTaken ? `Model ${N.model} already has a set called "${label}".` : '';
+      const close = () => this.ncDirty(N) ? up({ guard: true }) : set({ nc: null });
+      nc = { title: label || 'New combo', hasModel: !!N.model, modelLabel: (mods.find(m => m[0] === N.model) || [, N.model])[1], model: N.model,
+        models: [{ v: '', l: 'Choose a model…' }, ...mods.map(([v, l]) => ({ v, l }))], onModel: e => up({ model: e.target.value, pcs: {} }),
+        label: N.label, labelPh: lineTxt || 'e.g. 3+2', onLabel: e => up({ label: e.target.value }),
+        noModel: !N.model, pieceCount: plural(pieces, 'piece'), clearPcs: () => up({ pcs: {} }),
+        pcs: own.map(x => { const n = N.pcs[x.size] || 0; return { size: x.size, code: x.code, n, bd: n ? '#E99A53' : '#E2CFC1', bg: n ? '#FFF5EC' : '#FFFFFF', nInk: n ? '#3F2B22' : '#A08E82', decInk: n ? '#3F2B22' : '#D9C9BC',
+          inc: () => up({ pcs: { ...N.pcs, [x.size]: n + 1 } }), dec: () => n && up({ pcs: { ...N.pcs, [x.size]: n - 1 } }) }; }),
+        hasLine: picked.length > 0, line: picked.map((x, i) => ({ plus: i > 0, t: (N.pcs[x.size] > 1 ? N.pcs[x.size] + ' × ' : '') + x.size })),
+        heights: HEIGHTS, copyOp: picked.length ? 1 : .45,
+        copySum: () => { if (!picked.length) return; const pr = { ...N.pr }; TIERS.forEach(t => HEIGHTS.forEach(h => { const v = sumOf(t, h); if (v != null && !String(pr[t + '#' + h] || '').trim()) pr[t + '#' + h] = String(v); })); up({ pr }); },
+        rows: TIERS.map((t, ti) => ({ t, rule: ti ? '#F1E7DF' : 'transparent', cells: HEIGHTS.map(h => { const k = t + '#' + h, v = N.pr[k] ?? '', sm = sumOf(t, h), nv = num(v), isBad = Number.isNaN(nv);
+          return { v, on: e => up({ pr: { ...N.pr, [k]: e.target.value } }), ph: sm != null ? String(sm) : '—', sum: sm != null ? 'Modules ' + fmt(sm) : 'Not sold', bd: isBad ? '#C2412D' : String(v).trim() ? '#E99A53' : '#E2CFC1', bg: String(v).trim() ? '#FFF5EC' : '#FFFFFF' }; }) })),
+        rule: picked.length ? `When a sales line for Model ${N.model} has exactly ${lineTxt}, it uses this set price for its fabric tier and seat height instead of adding up the module prices. Leave a box blank if that size is not sold as this set.` : 'When a sales line has exactly these compartments, it uses the set price for its fabric tier and seat height instead of adding up the module prices.',
+        guard: !!N.guard, noGuard: !N.guard, keep: () => up({ guard: false }), discard: () => set({ nc: null }), close,
+        status: N.err || (problem && (N.model || pieces) ? problem : `${plural(pieces, 'piece')} · ${filled} of ${TIERS.length * HEIGHTS.length} prices filled`), stInk: N.err ? '#C2412D' : '#806B60', stFw: N.err ? 650 : 500,
+        saveBg: problem ? '#F1E7DF' : '#BD4A19', saveInk: problem ? '#A08E82' : '#FFFFFF',
+        save: () => { if (problem) { up({ err: problem }); return; }
+          const mn = (own[0] && own[0].name) || '', slots = picked.map(x => ({ code: x.size, alt: '', n: N.pcs[x.size] }));
+          const add = TIERS.filter(t => HEIGHTS.some(h => prices[t + '#' + h])).map(t => { const hs = HEIGHTS.filter(h => prices[t + '#' + h]); return { key: `${N.model}|${label}`, model: N.model, modelName: mn, label, slots, tier: t, heights: hs, prices: Object.fromEntries(hs.map(h => [h, prices[t + '#' + h]])), isNew: true }; });
+          set({ combos: [...s.combos, ...add], nc: null, cModel: N.model, cTier: 'all', cQ: '', notice: ['ok', `${label} added to Model ${N.model} with ${plural(filled, 'price')}. New sales lines with these compartments use it.`] }); } };
+    }
+    const hasControls = V.hasSearch || V.selects.length > 0 || V.hasTier;
+    return {
+      ...V, tabs, ed, nc, hasNc: !!s.nc, hasEd: !!(m && d), edX: m && d ? 'translateY(0) scale(1)' : 'translateY(14px) scale(.98)', edOp: m && d ? 1 : 0, edPE: m && d ? 'auto' : 'none', backdrop: () => { if (ed.close) ed.close(); },
+      padR: this.props.shift ? '432px' : '32px',
+      hasFilters: V.hasChips || hasControls, hasControls, ctlPT: V.hasChips || V.hasChips2 ? '12px' : '0', ctlBT: V.hasChips || V.hasChips2 ? '1px solid #EBDDD2' : '0',
+      leave: !!s.leave, leaveText: s.leave ? `You have ${plural(D, 'unsaved change')}. Discard ${D === 1 ? 'it' : 'them'} and ${s.leave.kind === 'sub' ? 'open ' + SUBS.find(x => x[0] === s.leave.to)[1] : s.leave.kind === 'sku' ? 'open SKU Master' : 'open ' + TAB_LIST.find(x => x[0] === s.leave.to)[1]}?` : '',
+      keepEditing: () => set({ leave: null }), discardLeave: () => this.doLeave(s.leave),
+      hasNotice: !!nt, notice: nt ? nt[1] : '', noticeBg: nt ? NOTICE[nt[0]][0] : '', noticeInk: nt ? NOTICE[nt[0]][1] : '',
+    };
+  }
+}
+</script>
+</body>
+</html>

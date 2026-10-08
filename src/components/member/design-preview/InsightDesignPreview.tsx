@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { formatIntlDate } from "@/lib/utils";
 import { Icon, initials } from "../MemberUI";
 import { fairs, people, brands, getPerson, getFair, selectOrders, summarize, summarizeBrandMargins, summarizeKpi, venueRanking, marginImpact, tierLabels, type InsightOrder, type InsightPeriod, type InsightTier } from "./insight-model";
 import shell from "./InsightShell.module.css";
@@ -17,7 +18,7 @@ const screens: Screen[] = ["insight", "insight-member", "insight-orders", "insig
 const defaults: Route = { screen: "insight", scope: "personal", person: "jia", period: "month", fair: "all", brand: "all", tier: "all", query: "", order: "", lens: "margin", quantity: "any" };
 const money = (value: number) => `RM ${new Intl.NumberFormat("en-MY", { maximumFractionDigits: 0 }).format(value)}`;
 const percent = (value: number | null) => value === null ? "—" : `${value.toFixed(1)}%`;
-const dateLabel = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const dateLabel = (date: string) => formatIntlDate(new Date(`${date}T00:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" }, "en-GB");
 const periodLabel = (period: InsightPeriod) => period === "month" ? "September 2026" : "Last week · 31 Aug–6 Sep";
 const tiers: (InsightTier | "all")[] = ["all", "tier2", "tier1", "standard", "low", "unknown"];
 const statusLabels = { estimated: "Estimated", pending: "Pending", settled: "Settled", paid: "Paid" };

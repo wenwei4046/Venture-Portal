@@ -33,6 +33,12 @@ export interface Standing extends Candidate {
   /** Brand shares apply monthly; longer periods sum the monthly contributions. */
   brandShare?: number | null;
   contributionBase?: number; contributionIncentive?: number; contributionPoints?: number;
+  /** Live Fair results (2026-10-03): placed at a booth by guess, not by the brand week they picked — the week still open. */
+  unconfirmed?: boolean;
+  /** …and once the week has closed: auto-located for good. */
+  autoLocated?: boolean;
+  /** On this board with their sales and no placing — not their scoring booth this week. */
+  offWeek?: boolean;
 }
 /** Known, assigned zero activity stays visible in last place but receives zero points. */
 export function awardRanking(candidates: Candidate[]): Standing[] {
@@ -128,7 +134,11 @@ interface PersonFact {
   id: string; name: string; sales: number; profit: number; margin: number; kpi: number;
   brands: Record<BrandCode, BrandFact>;
 }
-export interface FairEvent { id: string; label: string; venue: string; start: string; end: string; week?: number; weekId?: string; rows: Standing[] }
+export interface FairEvent { id: string; label: string; venue: string; start: string; end: string; week?: number; weekId?: string; rows: Standing[];
+  /** Live Fair results rank a brand's booth (2026-10-03); the fictional fixtures rank a venue. */
+  brand?: string | null;
+  /** The last day the week's brand can be picked. */
+  closesOn?: string | null }
 function makeMonth(month: number, department: string) {
   const people = department === "ir" ? PEOPLE.slice(0, 8) : PEOPLE;
   const facts: PersonFact[] = people.map(([id, name]) => ({ id, name, sales: 0, profit: 0, margin: 0, kpi: 0,

@@ -6,6 +6,18 @@ Categories: Core (4), Treasury (5), Statements (3), Billing (2 — Phase 2), Dir
 Total RLS policies: 130 (see `supabase/migrations/20260101000011_rls.sql`)
 Dashboard aggregation: single `dashboard_summary()` RPC returning JSONB (see `20260101000013_functions.sql` + `20260101000016_dashboard_subsidiaries.sql`)
 ---
+⚡ AMENDMENT 2026-10-08 — The app-wide history (mig `20261008190000`)
+`audit_tables` — one row per table of the app (187): table_name PK, label, area, mode
+(all / people / none), read_keys text[], key_columns, label_columns, ignore_columns,
+omit_columns, diff_only, salary_columns, nric_columns, bank_columns, needs_rule,
+actor_column, reason (required when mode = none). Written by `audit_register()` in
+migrations — a new table registers itself in its own migration.
+`audit_events` (PR1, `20261008120000`) gains `actor_source` (portal / server / database)
+and `needs` text[]; written only by the trigger `audit_row_change()` (attached as
+`audit_<table>`), read only through `audit_changes()` / `audit_overview()` /
+`permission_history()`. `config_audit_log` is SUPERSEDED: its 44 rows were copied into
+`audit_events` and its triggers disabled.
+---
 1. CORE TABLES
 1.1 users
 ```sql

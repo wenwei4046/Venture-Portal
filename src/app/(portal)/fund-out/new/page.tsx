@@ -1,13 +1,13 @@
 import Link from 'next/link'
-import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { officeToday } from '@/lib/office-time'
+import { requireAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { Company } from '@/types'
 import { bsAccountsForDisbursement } from '@/lib/loan-disbursement'
 import NewLoanForm from '../_components/NewLoanForm'
 
 export default async function NewLoanPage() {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const [
@@ -21,7 +21,7 @@ export default async function NewLoanPage() {
       .from('base_rate_history')
       .select('base_rate, quarter, effective_from')
       .not('approved_at', 'is', null)
-      .lte('effective_from', dayjs().format('YYYY-MM-DD'))
+      .lte('effective_from', officeToday())
       .order('effective_from', { ascending: false })
       .limit(1)
       .maybeSingle(),

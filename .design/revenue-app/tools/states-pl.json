@@ -1,0 +1,17 @@
+[
+  { "name": "pl-sku", "attrs": { "product-tab": "sku" } },
+  { "name": "pl-sku-sofa", "attrs": { "product-tab": "sku", "product-category": "SOFA" } },
+  { "name": "pl-sku-edit", "attrs": { "product-tab": "sku" }, "actions": [{ "click": "button:has-text('Edit prices')" }] },
+  { "name": "pl-modular", "attrs": { "product-tab": "modular" } },
+  { "name": "pl-modular-open", "attrs": { "product-tab": "modular", "product-model": "1025" } },
+  { "name": "pl-maintenance", "attrs": { "product-tab": "maintenance" } },
+  { "name": "pl-maintenance-fabrics", "attrs": { "product-tab": "maintenance" }, "actions": [{ "click": "button:has-text('Fabrics')" }] },
+  { "name": "pl-combos", "attrs": { "product-tab": "combos" } },
+  { "name": "pl-combos-new", "attrs": { "product-tab": "combos", "product-new-combo": "true" } },
+  { "name": "pl-gaps", "attrs": { "product-tab": "gaps" } },
+  { "name": "pl-costing", "attrs": { "product-tab": "costing" } },
+  { "name": "pl-costing-edit", "attrs": { "product-tab": "costing", "product-editing": "true" } },
+  { "name": "pl-kpi", "attrs": { "product-tab": "kpi" } },
+  { "name": "pl-kpi-edit", "attrs": { "product-tab": "kpi" }, "actions": [{ "click": "button:has-text('Edit items')" }] },
+  { "name": "pl-module-menu", "attrs": { "product-tab": "sku" }, "actions": [{ "click": "button[aria-label='Switch module']" }] }
+]

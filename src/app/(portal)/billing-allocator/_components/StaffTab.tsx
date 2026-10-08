@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import {
   saveAllocStaff, deleteAllocStaff, saveAllocSnapshot, importAllocStaffFromHr,
@@ -389,7 +389,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
                   快照 · {snapView.period}
                   {snapView.savedAt ? (
                     <span className="ml-2 font-mono text-xs text-muted">
-                      存于 {dayjs(snapView.savedAt).format('YYYY-MM-DD HH:mm')}
+                      存于 {officeTime(snapView.savedAt).format('YYYY-MM-DD HH:mm')}
                     </span>
                   ) : null}
                 </div>
@@ -483,6 +483,7 @@ export default function StaffTab({ data }: { data: AllocatorData }) {
       {/* List — SortableTable: search, click-to-sort headers, newest first.
           Active only by default; the toggle reveals inactive. */}
       <SortableTable
+        layoutId="billing-allocator.staff"
         rows={showInactive ? data.staff : data.staff.filter((s) => s.status === 'active')}
         getRowKey={(s) => s.id}
         defaultSort={{ key: 'added', dir: 'desc' }}
@@ -589,12 +590,13 @@ function staffColumns(
       sortValue: (s) => (s.createdAt ? new Date(s.createdAt) : null),
       render: (s) => (
         <span className="font-mono text-xs text-graphite whitespace-nowrap">
-          {s.createdAt ? dayjs(s.createdAt).format('YYYY-MM-DD') : '—'}
+          {s.createdAt ? officeTime(s.createdAt).format('YYYY-MM-DD') : '—'}
         </span>
       ),
     },
     {
       key: 'actions',
+      pinned: 'end',
       label: '',
       sortable: false,
       align: 'right',

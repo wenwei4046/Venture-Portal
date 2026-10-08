@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import {
@@ -16,7 +16,7 @@ import {
 // ─── Generate monthly statements (Finance) ───────────────────────────────────
 
 export async function generateStatements(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const periodMonth = (formData.get('period_month') as string) ?? ''
@@ -280,7 +280,7 @@ export async function generateStatements(formData: FormData) {
 // Issuing or marking paid MUST NOT write to any pool ledger.
 
 export async function issueStatement(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -319,7 +319,7 @@ export async function issueStatement(formData: FormData) {
 // DO NOT add any hv_fund / dept_pool / invoice_payout_pool writes here.
 
 export async function markStatementPaid(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''

@@ -1,0 +1,57 @@
+/*
+ * Every sheet in the app. On a phone it rises from the bottom over a dimmed
+ * page (translateY 105% → 0, 320ms); on desktop the same sheet is a 400px
+ * panel under the top bar that slides in from the right with no dim, and the
+ * page moves left to make room (`.rail` in shell.module.css).
+ */
+.layer { position: absolute; inset: 0; pointer-events: none; }
+.layerOpen { pointer-events: auto; }
+
+.dim { position: absolute; inset: 0; opacity: 0; transition: opacity 240ms ease; }
+.dimOpen { opacity: 1; }
+.dimA { background: var(--rv-dim); }
+.dimB { background: var(--rv-dim-brown); }
+.dimC { background: var(--rv-dim-35); }
+.dimD { background: var(--rv-dim-40); }
+
+.panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  box-shadow: none;
+  border-left: 0;
+  height: var(--sheet-h, auto);
+  max-height: var(--sheet-max, none);
+  background: var(--rv-white);
+  border-radius: 28px 28px 0 0;
+  box-sizing: border-box;
+  transform: translateY(105%);
+  transition: transform 320ms cubic-bezier(.2,.8,.2,1);
+}
+.panelOpen { transform: translateY(0); }
+.panelScroll { overflow-y: auto; scrollbar-width: none; }
+.panelScroll::-webkit-scrollbar { display: none; }
+
+/* the grey grabber at the top of a phone sheet */
+.handle { align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--rv-handle); }
+
+@container rv (min-width: 1024px) {
+  .dimA, .dimB, .dimC, .dimD { background: transparent; }
+  .panel {
+    left: calc(100% - 400px);
+    right: 0;
+    bottom: 0;
+    top: 60px;
+    border-left: 1px solid var(--rv-line);
+    height: auto;
+    max-height: none;
+    border-radius: 0;
+    transform: translateX(105%);
+  }
+  .panelOpen { transform: translateX(0); }
+  /* A peek (Sheet.tsx) lets the page beside it take clicks: only its panel catches them. */
+  .layer.peek { pointer-events: none; }
+  .peek .panelOpen { pointer-events: auto; }
+}

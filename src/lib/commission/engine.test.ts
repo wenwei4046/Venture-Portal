@@ -16,6 +16,7 @@ import {
   marginPctOf,
   monthsBefore,
   orderProductRevenue,
+  orderRevenueSplit,
   penaltyBandFor,
   resolveRank,
   type RankFigures,
@@ -766,7 +767,7 @@ describe('KPI items', () => {
   })
 })
 
-// ─── KPI items a bill carries (Product List › Add-on / KPI Items) ───────────
+// ─── KPI items a bill carries (Rules › KPI items) ────────────────────────────
 
 describe('KPI items a bill carries — the flat allowance, 2026-09-27', () => {
   const HB_STRAIGHT = { source: 'option' as const, optionPool: 'bedframe_specials' as const, optionValue: 'HB Straight', kpiAmount: 200 }
@@ -1117,6 +1118,31 @@ describe('margin base', () => {
     expect(base.revenue).toBe(9_800)
     expect(base.cost).toBe(7_400)
     expect(marginPctOf(base)).toBeCloseTo(2_400 / 9_800, 10)
+  })
+
+  // A bed frame's divan, leg and gap the customer pays for (user 2026-10-04):
+  // out of the margin on both sides, still in the sales the rate is paid on.
+  it('takes what a bed frame’s options were charged off the margin, and only off the margin', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 10_000, 6_000],
+      ['BEDFRAME', 'BF1', 1, 2_100, 1_000],
+    ])
+    o.lines[1].optionCharge = 100
+    const base = marginBase(o.lines, kpiIndex, groupIndex)
+    expect(base.revenue).toBe(12_000)
+    expect(base.cost).toBe(7_000)
+    expect(marginPctOf(base)).toBeCloseTo(5_000 / 12_000, 10)
+    // The rate is still paid on all of it.
+    expect(orderRevenueSplit(o, kpiIndex, groupIndex).main).toBe(12_100)
+  })
+
+  it('a charge on a line the scheme does not pay on is not taken off anything', () => {
+    const o = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 10_000, 6_000],
+      ['OTHER', 'BF-ODD', 1, 300, 100],
+    ])
+    o.lines[1].optionCharge = 100
+    expect(marginBase(o.lines, kpiIndex, groupIndex).revenue).toBe(10_000)
   })
 
   it('returns null when any line in scope has no cost', () => {

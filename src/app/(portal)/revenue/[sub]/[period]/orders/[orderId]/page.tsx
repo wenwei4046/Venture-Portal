@@ -20,13 +20,14 @@ import {
 } from '@/lib/commission/engine'
 import { kpiItemLabel, lineSpecialsOf } from '@/lib/commission/kpi'
 import { toKpiItems, type CostRatioRow, type KpiItemRow } from '@/lib/commission/run-payload'
-import { costProvenance } from '@/lib/catalogue/provenance'
+import { chargeText, costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
 import ReturnLink from '@/components/layout/ReturnLink'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { describeExclusion } from '@/lib/commission/bill-exclusion'
 import { parseWorkbenchReturn } from '@/lib/commission/workbench-nav'
 import { holdersLine, holdersOf } from '@/lib/commission/bill-share'
+import { paperRef } from '@/lib/commission/paper-ref'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 
@@ -86,6 +87,8 @@ interface LineRow {
   line_amount: number | string
   brand_code: string | null
   cost_amount: number | string | null
+  /** What the customer paid for a bed frame's divan, leg, gap and total height (20261005010000; absent before it). */
+  option_charge_amount?: number | string | null
   /** Which rule priced it (catalogue / catalogue_combo / manual / the pre-2026-09-24 chain). */
   cost_source?: string | null
   /** How it was priced, or why nothing could — 20260924030000; absent before it. */
@@ -133,7 +136,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       // The FK is named: since sales_order_shares (20260924010000) joins
       // sales_orders to hr_staff_costs as well, a bare `hr_staff_costs (…)`
       // is ambiguous to PostgREST (PGRST201) and the page read no order.
-      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, excluded_reason, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
+      // `ref_no` / `paper_no` are computed fields (20261003170000): the ERP's
+      // Ref No. and the paper number the double-claim check reads from it.
+      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, excluded_reason, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, source, ref_no, paper_no, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -162,6 +167,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     staff_id: string | null
     synced_at: string | null
     raw: { payments?: PaymentRow[] } | null
+    source: string
+    ref_no: string | null
+    paper_no: string | null
     hr_staff_costs: { employee_name: string; employee_code: string | null } | null
   } | null
 
@@ -266,9 +274,15 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     lineAmount: Number(l.line_amount),
     brandCode: l.brand_code ?? undefined,
     costAmount: l.cost_amount === null ? undefined : Number(l.cost_amount),
+    optionCharge: Number(l.option_charge_amount ?? 0) || undefined,
     specials: lineSpecialsOf(l.item_group, l.description2, l.raw?.variants),
   }))
   const classed = lines.map((l, i) => ({ line: l, cls: classifyLine(salesLines[i], groupIndex) }))
+  // What its bed frames' divan, leg, gap and total height were charged (2026-10-05): in the
+  // commissionable sales, out of the margin on both sides — as marginBase() reads it.
+  const charged = classed
+    .filter(c => c.cls === 'commissionable')
+    .reduce((a, c) => a + Number(c.line.option_charge_amount ?? 0), 0)
 
   // The bill, split the way the run splits it: its commissionable lines, less
   // what its KPI items take off (paid flat as KPI instead).
@@ -306,6 +320,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
   const payments = Array.isArray(order.raw?.payments) ? order.raw.payments : []
 
+  // The paper beside the document (2026-10-03): the ERP's Ref No., beside its
+  // own number the way the ERP prints it. A bill worked out by hand is its paper.
+  const paper = order.source === 'erp_sync' ? paperRef(order.ref_no, order.paper_no) : null
+
   const backLabel = !back
     ? null
     : back.personId
@@ -329,6 +347,21 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           </div>
           <h1 className="page-title">{order.order_no}</h1>
           <p className="text-sm mt-3">
+            {paper ? (
+              <>
+                {paper.kind === 'missing' ? (
+                  <span className="text-alert">No Ref No. in the ERP — double claims cannot be checked</span>
+                ) : (
+                  <>
+                    Ref <span className="font-mono">{paper.text}</span>
+                    {paper.kind === 'unreadable' ? (
+                      <span className="text-alert"> (not a paper number — double claims cannot be checked)</span>
+                    ) : null}
+                  </>
+                )}
+                {' · '}
+              </>
+            ) : null}
             {order.customer_name ?? 'no customer name'} ·{' '}
             {holders ? `shared ${holdersLine(holders)}` : order.hr_staff_costs?.employee_name ?? `${order.agent_name} (unmatched)`} ·{' '}
             {formatDate(order.order_date)}
@@ -385,7 +418,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           label="Commissionable"
           value={formatMoney(commissionable)}
           icon="coin"
-          note={split.kpiAmount !== 0 ? `Product lines less ${formatMoney(split.kpiAmount)} of KPI items` : 'Product lines only'}
+          note={[
+            split.kpiAmount !== 0 ? `Product lines less ${formatMoney(split.kpiAmount)} of KPI items` : 'Product lines only',
+            charged !== 0 ? `${formatMoney(charged)} of it charged for bed frame options` : null,
+          ].filter(Boolean).join(' · ')}
         />
         <StatCard
           label="Paid"
@@ -409,7 +445,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               ? 'Keyed by hand — it wins over the line costs'
               : baseMissing > 0
                 ? `${baseMissing} of ${goodsLines.length} commissionable lines have no cost, so the bill cannot be judged`
-                : 'Every commissionable line carries a cost'
+                : charged !== 0
+                  ? `On the sales less ${formatMoney(charged)} charged for bed frame options`
+                  : 'Every commissionable line carries a cost'
           }
           tone={margin === null ? 'danger' : undefined}
         />
@@ -509,7 +547,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               {classed.map(({ line: l, cls }) => {
                 const amount = Number(l.line_amount)
                 const lineCost = l.cost_amount === null ? null : Number(l.cost_amount)
-                const lineMargin = lineCost === null || amount === 0 ? null : (amount - lineCost) / amount
+                const lineCharge = Number(l.option_charge_amount ?? 0)
+                // A charge is the customer's price for an option: the line's margin is on the rest.
+                const lineMargin = lineCost === null || amount - lineCharge === 0 ? null : (amount - lineCharge - lineCost) / (amount - lineCharge)
                 return (
                   <LedgerRow key={l.id}>
                     <td className="font-mono text-xs">{l.line_no}</td>
@@ -541,7 +581,14 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                     </td>
                     <td className="num m-hide" data-label="Qty">{Number(l.qty).toLocaleString()}</td>
                     <td className="num m-hide" data-label="Unit">{formatMoney(Number(l.unit_price))}</td>
-                    <td className="num">{formatMoney(amount)}</td>
+                    <td className="num">
+                      {formatMoney(amount)}
+                      {lineCharge !== 0 ? (
+                        <div className="font-sans text-[11px] mt-0.5 whitespace-normal" title="Charged to the customer on top: out of the margin, in the commission">
+                          incl. {formatMoney(lineCharge)} {chargeText(l.cost_detail)}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="num m-hide" data-label="Cost">
                       {lineCost === null ? <span className="neg">none</span> : formatMoney(lineCost)}
                       {(() => {
@@ -581,6 +628,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           Commissionable {formatMoney(commissionable)} · KPI items {formatMoney(split.kpiAmount)} · not commissionable{' '}
           {formatMoney(excluded)}. A KPI item&apos;s amount comes off the bill&apos;s sales and is paid flat as KPI
           instead of a rate; transport and disposal earn nothing either way.
+          {charged !== 0
+            ? ` What its bed frames' divan, leg, gap and total height were charged (${formatMoney(charged)}) earns the rate like the rest of the bill and is left out of its margin on both sides.`
+            : ''}
           {split.uncovered
             ? ' Its sales do not cover the KPI items it carries, so none is paid on it — it is paid as sales.'
             : ''}

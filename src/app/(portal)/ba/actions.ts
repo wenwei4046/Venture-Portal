@@ -12,12 +12,12 @@
 //     account 6001 Interest Expense - BA, venture_pool source row.
 // No JE is posted from here, so nothing double-books.
 
-import dayjs from 'dayjs'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requirePermission } from '@/lib/auth'
 import { calcBa } from '@/lib/ba'
 import { createMultiLineInvoice } from '../billing/actions'
 import { createPaymentVoucher } from '../payments/actions'
@@ -46,7 +46,7 @@ export interface BaInput {
 
 export async function createBa(input: BaInput): Promise<{ error?: string; id?: string }> {
   try {
-    const user = await requirePermission('treasury')
+    const user = await requireAction('treasury', 'create')
     const supabase = await baClient()
 
     if (!(input.faceAmount > 0)) return { error: 'Face amount must be greater than 0' }
@@ -110,7 +110,7 @@ async function liveInterestDocs(
 
 export async function updateBa(id: string, input: BaInput): Promise<{ error?: string }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'edit')
     const supabase = await baClient()
 
     if (!(input.faceAmount > 0)) return { error: 'Face amount must be greater than 0' }
@@ -148,7 +148,7 @@ export async function updateBa(id: string, input: BaInput): Promise<{ error?: st
 
 export async function deleteBa(id: string): Promise<{ error?: string }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'void')
     const supabase = await baClient()
 
     const docs = await liveInterestDocs(supabase, id)
@@ -179,7 +179,7 @@ export async function setBaStatus(
   status: 'active' | 'settled' | 'cancelled',
 ): Promise<{ error?: string }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'edit')
     const supabase = await baClient()
     const { error } = await supabase
       .from('ba_facilities')
@@ -195,7 +195,7 @@ export async function setBaStatus(
 
 export async function setBaNotes(id: string, notes: string): Promise<{ error?: string }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'edit')
     const supabase = await baClient()
     const { error } = await supabase
       .from('ba_facilities')
@@ -216,7 +216,7 @@ export async function setBaLimit(
   limitAmount: number,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requirePermission('treasury')
+    const user = await requireAction('treasury', 'edit')
     const supabase = await baClient()
     if (!(limitAmount >= 0)) return { error: 'Limit must be 0 or more' }
     const { error } = await supabase
@@ -256,7 +256,7 @@ export async function uploadBaAttachment(
   formData: FormData,
 ): Promise<{ error?: string }> {
   try {
-    const user = await requirePermission('treasury')
+    const user = await requireAction('treasury', 'edit')
     const supabase = await baClient()
 
     const file = formData.get('file') as File | null
@@ -315,7 +315,7 @@ export async function getBaAttachmentUrl(
 
 export async function deleteBaAttachment(attachmentId: string): Promise<{ error?: string }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'edit')
     const supabase = await baClient()
     const { data: att } = await supabase
       .from('ba_attachments')
@@ -392,7 +392,7 @@ export async function extractBaFromDocument(
   formData: FormData,
 ): Promise<{ error?: string; fields?: BaExtractedFields }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'create')
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return {
@@ -494,7 +494,7 @@ export async function generateBaInvoice(
   baId: string,
 ): Promise<{ error?: string; invoiceNo?: string | null }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'create')
     const supabase = await baClient()
 
     const { data: ba } = await supabase.from('ba_facilities').select('*').eq('id', baId).maybeSingle()
@@ -542,8 +542,8 @@ export async function generateBaInvoice(
     const { invoice_no } = await createMultiLineInvoice({
       billableType: ba.borrower_company_id ? 'subsidiary' : 'freetext',
       billingMode: 'venture_attribution',
-      period: dayjs().format('YYYY-MM'),
-      invoiceDate: dayjs().format('YYYY-MM-DD'),
+      period: officeMonth(),
+      invoiceDate: officeToday(),
       dueDate: (ba.maturity_date as string) ?? '',
       referenceNo: ref,
       headerDescription: `BA ${label} interest — ${borrowerLabel}`,
@@ -568,7 +568,7 @@ export async function generateBaPv(
   paymentDate: string,
 ): Promise<{ error?: string; voucherNo?: string | null }> {
   try {
-    await requirePermission('treasury')
+    await requireAction('treasury', 'create')
     const supabase = await baClient()
 
     const { data: ba } = await supabase.from('ba_facilities').select('*').eq('id', baId).maybeSingle()

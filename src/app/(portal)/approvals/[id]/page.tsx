@@ -1,7 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
+import { canSeeApprovals, decision } from '@/lib/approval-domains'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import {
@@ -49,6 +52,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
     .single()
 
   if (error || !approval) notFound()
+  const verdict = decision(user, [approval.request_type], [approval.submitted_by])
 
   const { data: submitter } = await supabase
     .from('users')
@@ -90,6 +94,15 @@ export default async function ApprovalDetailPage({ params }: Props) {
   if (approval.request_type === 'payment_voucher' && approval.reference_id) {
     voucherContext = await getVoucherDetailContext(supabase, approval.reference_id)
   }
+  // The request for a payroll voucher is titled with who is paid what, and
+  // shows the voucher under it: not without Payroll payouts (2026-10-02).
+  if (
+    voucherContext &&
+    isPayrollReference(voucherContext.voucher.reference_type) &&
+    !canSeePayrollPayouts(user)
+  ) {
+    notFound()
+  }
 
   // Issue #4 pre-check: Debit voucher with insufficient bank balance should not
   // be approvable — otherwise the approval action will throw mid-flight, and
@@ -105,10 +118,10 @@ export default async function ApprovalDetailPage({ params }: Props) {
   return (
     <div>
       <Link
-        href={user.role === 'principal' ? '/approvals' : '/dashboard'}
+        href={canSeeApprovals(user) ? '/approvals' : '/dashboard'}
         className="text-sm text-muted hover:text-accent font-sans transition-colors"
       >
-        ← {user.role === 'principal' ? 'Back to Approvals' : 'Back to Overview'}
+        ← {canSeeApprovals(user) ? 'Back to Approvals' : 'Back to Overview'}
       </Link>
 
       <div className="page-head">
@@ -120,7 +133,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
             {approval.description ?? 'Approval request'}
           </h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            Submitted by <em>{submitter?.name ?? 'Unknown'}</em> on {dayjs(approval.created_at).format('D MMMM YYYY HH:mm')}
+            Submitted by <em>{submitter?.name ?? 'Unknown'}</em> on {officeTime(approval.created_at).format('D MMMM YYYY HH:mm')}
           </p>
         </div>
         <ApprovalStatus status={approval.status} />
@@ -383,15 +396,15 @@ export default async function ApprovalDetailPage({ params }: Props) {
 
       {/* ───────── Action buttons / read-only status ───────── */}
       {isPending ? (
-        user.role !== 'principal' ? (
+        !verdict.may ? (
           <div className="bg-surface border border-hairline rounded-md p-4 max-w-3xl">
             <p className="font-serif italic text-graphite text-sm">
-              Awaiting Principal sign-off. <em>You can track the status here.</em>
+              Awaiting sign-off. <em>You can track the status here.</em>
             </p>
           </div>
         ) : (
-          // Self-approval allowed (user 2026-08-06: "principal submit 要自己
-          // 能approve") — no more own-submission banner.
+          // Who decides goes by domain (2026-10-09): the Principal may approve
+          // their own (user 2026-08-06), anybody else never their own.
           <ApprovalActions
             approvalId={approval.id}
             requestType={approval.request_type as ApprovalRequestTypeLocal}
@@ -410,7 +423,7 @@ export default async function ApprovalDetailPage({ params }: Props) {
             <em className={approval.status === 'approved' ? 'text-ledger' : 'text-danger'}>
               {approval.status}
             </em>{' '}
-            on {dayjs(approval.approved_at).format('D MMM YYYY HH:mm')}.
+            on {officeTime(approval.approved_at).format('D MMM YYYY HH:mm')}.
           </p>
         </div>
       )}

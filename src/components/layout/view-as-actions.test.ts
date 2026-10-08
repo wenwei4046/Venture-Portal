@@ -5,6 +5,8 @@ import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE } from '@/lib/view-as'
 const mocks = vi.hoisted(() => ({
   authUser: { id: 'principal-id' } as { id: string } | null,
   row: { role: 'principal', is_active: true } as { role: string; is_active: boolean } | null,
+  // What current_permissions() answers for the REAL account.
+  perms: ['view_switch'] as string[],
   set: vi.fn(), delete: vi.fn(), cookies: vi.fn(),
 }))
 vi.mock('next/headers', () => ({ cookies: mocks.cookies }))
@@ -12,6 +14,7 @@ vi.mock('next/navigation', () => ({ redirect: (path: string) => { throw new Erro
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: mocks.authUser } }) },
+    rpc: async () => ({ data: mocks.perms }),
     from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: mocks.row }) }) }) }),
   }),
 }))
@@ -20,6 +23,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.authUser = { id: 'principal-id' }
   mocks.row = { role: 'principal', is_active: true }
+  mocks.perms = ['view_switch']
   mocks.cookies.mockResolvedValue({ set: mocks.set, delete: mocks.delete })
 })
 
@@ -67,11 +71,14 @@ describe('setViewAs', () => {
   })
 
   it.each([
-    { row: { role: 'hr', is_active: true }, destination: '/dashboard' },
-    { row: { role: 'revenue_member', is_active: true }, destination: '/member' },
-    { row: { role: 'principal', is_active: false }, destination: '/login' },
-  ])('refuses changing views for $row.role active=$row.is_active', async ({ row, destination }) => {
+    { row: { role: 'hr', is_active: true }, perms: [], destination: '/dashboard' },
+    { row: { role: 'revenue_member', is_active: true }, perms: [], destination: '/member' },
+    { row: { role: 'principal', is_active: false }, perms: ['view_switch'], destination: '/login' },
+    // Full access (2026-10-08): a principal-kind account without view_switch.
+    { row: { role: 'principal', is_active: true }, perms: ['approvals', 'treasury'], destination: '/dashboard' },
+  ])('refuses changing views for $row.role active=$row.is_active holding $perms', async ({ row, perms, destination }) => {
     mocks.row = row
+    mocks.perms = perms
     await expect(setViewAs(form('principal', '/member-admin'))).rejects.toThrow(`REDIRECT:${destination}`)
     expect(mocks.cookies).not.toHaveBeenCalled()
     expect(mocks.set).not.toHaveBeenCalled()

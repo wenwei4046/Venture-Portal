@@ -5,6 +5,10 @@ import { redirect } from 'next/navigation'
 import type { User, UserRole } from '@/types'
 import { VIEW_AS_COOKIE, honouredViewAs, type ViewSurface } from '@/lib/view-as'
 import { can, type Permission } from '@/lib/permissions'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { actionsFromJson, actionsFromKeys, canDo, type FunctionKey } from '@/lib/permission-actions'
+import { approvableTypes, canSeeApprovals } from '@/lib/approval-domains'
+import type { Action, Scope } from '@/lib/permission-matrix'
 
 // Per-request dedup. Middleware, layout, and Server Actions all converge
 // on getUser(); wrapping with React.cache() collapses the Supabase calls
@@ -31,17 +35,22 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // rather than taken from current_permissions(), whose answer is about the
   // real account. The cookie is read first so that lookup shares the round
   // trip below instead of being a third one behind it (2026-09-11); it is
-  // honoured only once the row proves a Principal — and the Revenue View only
-  // in the member app (lib/view-as.ts, 2026-09-27).
+  // honoured only for an account that holds `view_switch` (Ultimate full
+  // access, 2026-10-08 — it was the Principal role) — and the Revenue View
+  // only in the member app (lib/view-as.ts, 2026-09-27).
   const viewAs = honouredViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value, surface)
 
-  const [{ data }, { data: perms }, masked] = await Promise.all([
+  const [{ data }, { data: perms }, { data: acts }, masked] = await Promise.all([
     supabase.from('users').select('*').eq('id', authUserId).single(),
     // Resolved in the database because that is where the answer lives: an
     // explicit per-person row, then the holder's title, then their role's
     // defaults. RLS derives its scopes from the same set, so the page and its
     // queries cannot disagree.
     supabase.rpc('current_permissions'),
+    // What they may DO and how far (2026-10-08, PR2): their template's cells,
+    // or their keys as actions — lib/permission-actions.ts. postdates
+    // database.types.ts.
+    (supabase as unknown as { rpc: (fn: string) => PromiseLike<{ data: unknown }> }).rpc('current_actions'),
     viewAs
       ? supabase.from('role_default_permissions').select('permission_key').eq('role', viewAs)
       : null,
@@ -50,18 +59,25 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   const row = data as (Omit<User, 'permissions'> | null)
   if (!row || !row.is_active) return null
 
-  const user: User = { ...row, permissions: (perms as string[] | null) ?? [] }
+  const user: User = { ...row, permissions: (perms as string[] | null) ?? [], actions: actionsFromJson(acts) }
+  // Switching views is its own permission since 2026-10-08: Ultimate full
+  // access has it, Full access is everything else without it. Read off the
+  // REAL account's keys — a masked session keeps it, so it can switch back.
+  const canSwitchView = user.permissions.includes('view_switch')
 
-  if (user.role === 'principal' && viewAs && masked) {
+  if (canSwitchView && viewAs && masked) {
+    const maskedKeys = (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key)
     return {
       ...user,
       role: viewAs,
-      actualRole: 'principal',
-      permissions: (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key),
+      actualRole: user.role,
+      canSwitchView,
+      permissions: maskedKeys,
+      actions: actionsFromKeys(maskedKeys, viewAs),
     }
   }
 
-  return user
+  return { ...user, canSwitchView }
 })
 
 /** The caller, anywhere but the member app: the portal, `/`, print pages. */
@@ -75,6 +91,16 @@ export function getUser(): Promise<User | null> {
  */
 export function getMemberUser(): Promise<User | null> {
   return loadUser('member')
+}
+
+/**
+ * The account as it is — no view mask, whatever the portal was left in. Only
+ * the Product List asks (lib/member/product-access.ts): the Revenue app shows a
+ * Principal as the Principal in every view, so an HR or Finance view left on in
+ * the portal must not quietly take the Product List away there (2026-10-08).
+ */
+export function getAccountUser(): Promise<User | null> {
+  return loadUser('account')
 }
 
 export async function requireAuth(): Promise<User> {
@@ -98,6 +124,81 @@ export async function requireAuth(): Promise<User> {
 export async function requirePermission(...keys: Permission[]): Promise<User> {
   const user = await requireAuth()
   if (!can(user, ...keys)) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/**
+ * The gate a WRITE stands behind (2026-10-08, PR2): the action it is, at least
+ * this far — `requireAction('treasury', 'create')`, `requireAction('claims',
+ * 'approve', 'dept')`. Holding the function's page (its module key) is part of
+ * it (canDo). Several pairs means OR, like requirePermission's keys.
+ *
+ * Redirects like requirePermission: the button that calls it is not drawn for
+ * somebody who may not, so reaching here without the action is a stale page or
+ * a hand-made request, and the dashboard is the honest answer to either.
+ */
+export async function requireAction(fn: FunctionKey, action: Action, scope: Scope = 'all'): Promise<User> {
+  const user = await requireAuth()
+  if (!canDo(user, fn, action, scope)) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/** requireAction for a write reachable as either of two actions. */
+export async function requireAnyAction(...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>): Promise<User> {
+  const user = await requireAuth()
+  if (!wants.some(([fn, action, scope]) => canDo(user, fn, action, scope ?? 'all'))) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/**
+ * The approval queue's decisions (2026-10-09, PR2b): anybody whose Approve
+ * reaches some kind of request — the queue's own, or a domain's (Treasury,
+ * HR Costing, Director Salary; lib/approval-domains.ts). Each request is then
+ * asked about on its own, as the database's approver_may() asks.
+ */
+export async function requireApprover(): Promise<User> {
+  const user = await requireAuth()
+  if (approvableTypes(user).length === 0) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/** The approval queue's pages: whoever may see it (Approvals · View) or decide anything in it. */
+export async function requireApprovalQueue(): Promise<User> {
+  const user = await requireAuth()
+  if (!canSeeApprovals(user)) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/**
+ * requirePermission, for a surface that is about what one named person is
+ * paid: Payroll Requests, the payroll bank file, the Invoice Pool. Treasury
+ * reaches those only with Payroll payouts on top (2026-10-02 — see
+ * canSeePayrollPayouts in lib/roles.ts).
+ */
+export async function requirePayrollPayouts(...keys: Permission[]): Promise<User> {
+  const user = await requirePermission(...keys)
+  if (!canSeePayrollPayouts(user)) {
+    redirect('/dashboard')
+  }
+  return user
+}
+
+/** requireAnyAction, for a write about what one named person is paid (requirePayrollPayouts). */
+export async function requirePayrollPayoutsAction(
+  ...wants: Array<[FunctionKey, Action] | [FunctionKey, Action, Scope]>
+): Promise<User> {
+  const user = await requireAnyAction(...wants)
+  if (!canSeePayrollPayouts(user)) {
     redirect('/dashboard')
   }
   return user

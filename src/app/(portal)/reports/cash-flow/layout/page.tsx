@@ -8,11 +8,12 @@
 // movement, so you only ever arrange accounts that really appear.
 
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { buildCashFlow, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import { interBillTransferAccount, payrollCustodyAccount } from '@/lib/inter-billing-cash-flow'
 import { defaultSideLayout } from '@/lib/cash-flow-sections'
 import { ancestorChain, readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import ReportLayoutEditor, { type GroupMeta } from '../../_components/ReportLayoutEditor'
@@ -28,7 +29,7 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
   const supabase = await createClient()
 
   const params = await searchParams
-  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : dayjs().format('YYYY-MM')
+  const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
 
   const [lines, accounts, { data: banks }, inSaved, outSaved] = await Promise.all([
     fetchAllJournalLines(supabase),
@@ -38,8 +39,10 @@ export default async function CashFlowStatementLayoutPage({ searchParams }: Prop
     readReportLayout(supabase, 'cash_flow_out'),
   ])
   const bankCodes = new Set((banks ?? []) as unknown as string[])
-  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  const coa = [...accounts, ib.account, ib.payrollAccount]
+  // The bridge's two synthetic accounts — constants. Its LINES were never used
+  // here (the consolidated view has none), so the bridge is no longer read for
+  // them (2026-10-08: it was two more round trips after the journal read).
+  const coa = [...accounts, interBillTransferAccount, payrollCustodyAccount]
 
   // Consolidated view = no bridge lines (matches the statement).
   const cf = buildCashFlow(

@@ -12,7 +12,9 @@ const TABS = [
   { key: 'voided', label: 'Voided' },
 ]
 
-export default function PaymentTabs() {
+/** `counts` — how many vouchers sit under each tab, shown beside its label
+ *  (2026-10-07, the sheet's tabs). */
+export default function PaymentTabs({ counts }: { counts?: Partial<Record<string, number>> }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -20,7 +22,7 @@ export default function PaymentTabs() {
 
   return (
     <SlidingTabs
-      items={TABS}
+      items={TABS.map((t) => ({ ...t, count: counts?.[t.key] }))}
       active={current}
       onTabChange={(key) => {
         const params = new URLSearchParams(searchParams.toString())

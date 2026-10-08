@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import { fetchAllRowsAsWritten } from '@/lib/paginate'
 
 export default async function JournalPage() {
   await requirePermission('reconciliation')
@@ -18,15 +19,22 @@ export default async function JournalPage() {
 
   const entryList = entries ?? []
 
-  // Fetch lines for displayed entries
+  // Fetch lines for displayed entries — every one (2026-10-08). The longest
+  // entry has 19 lines (a manual JV); fifty like it would be 950, and an
+  // unranged read stops at PostgREST's 1000 rows without a word. Asked as
+  // before while it fits — an entry's lines share one moment, so their order
+  // is the one they came in — and paged, `id` breaking those ties, once not.
   const entryIds = entryList.map((e) => e.id)
-  const { data: allLines } = entryIds.length > 0
-    ? await supabase
-        .from('journal_lines')
-        .select('*, chart_of_accounts!inner(name)')
-        .in('entry_id', entryIds)
-        .order('created_at')
-    : { data: [] }
+  const allLines = entryIds.length > 0
+    ? await fetchAllRowsAsWritten((page) => {
+        const q = supabase
+          .from('journal_lines')
+          .select('*, chart_of_accounts!inner(name)')
+          .in('entry_id', entryIds)
+          .order('created_at')
+        return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+      }).catch(() => null)
+    : []
 
   const linesByEntry = new Map<string, typeof allLines>()
   for (const line of allLines ?? []) {

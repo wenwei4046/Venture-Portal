@@ -22,7 +22,13 @@ export default function ReassignInvoiceGlButton({
   currentCategory,
   categories,
   postedAccounts = [],
+  autoOpen = false,
+  hideTrigger = false,
 }: {
+  /** Opened from the row menu (2026-10-02): the dialog starts open and the
+   *  component draws no trigger of its own. */
+  autoOpen?: boolean
+  hideTrigger?: boolean
   invoiceId: string
   invoiceNo: string | null
   currentCategory: string | null
@@ -34,7 +40,7 @@ export default function ReassignInvoiceGlButton({
   postedAccounts?: Array<{ code: string; amount: number }>
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(autoOpen)
   const [oldAccount, setOldAccount] = useState(currentCategory ?? '')
   const multi = postedAccounts.length > 1
   const [picked, setPicked] = useState<string[]>(() => postedAccounts.map((a) => a.code))
@@ -70,17 +76,19 @@ export default function ReassignInvoiceGlButton({
 
   return (
     <>
-      <button
-        onClick={() => {
-          setOpen(true)
-          setDone(null)
-          setError(null)
-        }}
-        className="text-xs text-muted hover:text-accent font-serif italic"
-        title="开单后 income account 放错用这个:直接把已过账的 GL 行移去对的科目,发票 category 一起更新,自动留审计注记"
-      >
-        改 account
-      </button>
+      {hideTrigger ? null : (
+        <button
+          onClick={() => {
+            setOpen(true)
+            setDone(null)
+            setError(null)
+          }}
+          className="text-xs text-muted hover:text-accent font-serif italic"
+          title="开单后 income account 放错用这个:直接把已过账的 GL 行移去对的科目,发票 category 一起更新,自动留审计注记"
+        >
+          改 account
+        </button>
+      )}
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/45 p-4" {...backdropDismiss(() => !isPending && setOpen(false))}>

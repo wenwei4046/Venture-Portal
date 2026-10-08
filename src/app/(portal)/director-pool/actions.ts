@@ -6,7 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { calcAll, computeContra, r2 } from '@/lib/director-pool-engine'
 import { loadDirectorPoolData } from '@/lib/director-pool-data'
 
@@ -19,7 +19,7 @@ export async function saveDpSettings(patch: {
   billingStartMonth?: string | null
   allowStatUntil?: string | null
 }): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const update: {
     updated_at: string
@@ -40,7 +40,7 @@ export async function saveDpSettings(patch: {
 }
 
 export async function saveDpDirectorWeight(directorId: string, weight: number): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const { error } = await supabase.from('dp_directors').update({ weight }).eq('id', directorId)
   if (error) throw new Error(`Failed to save weight: ${error.message}`)
@@ -48,7 +48,7 @@ export async function saveDpDirectorWeight(directorId: string, weight: number): 
 }
 
 export async function addDpMonth(month: string): Promise<{ id: string }> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('dp_months')
@@ -70,7 +70,7 @@ export async function updateDpMonth(
     allow_excl_full_payout?: boolean
   },
 ): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   // Full payout month never counts billing into Total Pay (HTML behaviour)
   const update = { ...patch }
@@ -81,7 +81,7 @@ export async function updateDpMonth(
 }
 
 export async function deleteDpMonth(monthId: string): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const { error } = await supabase.from('dp_months').delete().eq('id', monthId)
   if (error) throw new Error(`Failed to delete month: ${error.message}`)
@@ -90,7 +90,7 @@ export async function deleteDpMonth(monthId: string): Promise<void> {
 
 /** Clears one month's NUMBERS (company inputs + keyed director inputs) but keeps the month row. */
 export async function clearDpMonthData(monthId: string): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const { error: iErr } = await supabase.from('dp_inputs').delete().eq('month_id', monthId)
   if (iErr) throw new Error(`Failed to clear inputs: ${iErr.message}`)
@@ -105,7 +105,7 @@ export async function upsertDpInput(
   field: 'salary' | 'kpi' | 'allowance',
   value: number,
 ): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const row: { month_id: string; company_id: string; salary?: number; kpi?: number; allowance?: number } = {
     month_id: monthId,
@@ -134,7 +134,7 @@ export async function upsertDpDirectorInput(
   field: DpDirectorInputField,
   value: number | null,
 ): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const patch: {
     month_id: string
@@ -166,7 +166,7 @@ export interface ContraSummaryLine {
 }
 
 export async function performDpContra(): Promise<ContraSummaryLine[]> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const data = await loadDirectorPoolData()
   if (!data.months.length) return []
@@ -215,7 +215,7 @@ export async function performDpContra(): Promise<ContraSummaryLine[]> {
 }
 
 export async function resetDpContra(): Promise<void> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   const supabase = await createClient()
   const { error: dErr } = await supabase.from('dp_contra').delete().gte('amount', -1e15)
   if (dErr) throw new Error(`Reset contra failed: ${dErr.message}`)
@@ -272,7 +272,7 @@ export type ImportOutcome = ({ ok: true } & ImportResult) | { ok: false; error: 
  * masks thrown server-action messages, which makes import errors undebuggable.
  */
 export async function importDpJson(jsonText: string, year: number): Promise<ImportOutcome> {
-  await requirePermission('director_pool')
+  await requireAction('director_pool', 'edit')
   try {
     const result = await runImport(jsonText, year)
     revalidatePath(PATH)

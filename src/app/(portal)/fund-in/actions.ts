@@ -4,13 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import type { FundSourceType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
 import { buildTermsSegments, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, termsForFundSource } from '@/lib/treasury-terms-data'
+import { remainingPeriods } from '@/lib/loan-monitor'
 
 // ─── Amend an ACTIVE fund source (Principal — self-service, direct apply) ─────
 // Principal is the top approval authority, so edits apply immediately via the
@@ -18,7 +20,7 @@ import { fetchTermsHistory, termsForFundSource } from '@/lib/treasury-terms-data
 // Only the fields the form sends are changed. The existing updateFundSource
 // path stays for pending_approval edits by Finance.
 export async function amendFundSource(formData: FormData): Promise<{ error: string } | undefined> {
-  await requirePermission('override')
+  await requireAction('treasury', 'approve')
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
@@ -63,7 +65,7 @@ export async function amendFundSource(formData: FormData): Promise<{ error: stri
 // one keep their old terms — the RPC files them into treasury_terms_history
 // and the record carries the new terms from that month (lib/treasury-terms).
 export async function amendFundSourceFrom(formData: FormData): Promise<{ error: string } | undefined> {
-  await requirePermission('override')
+  await requireAction('treasury', 'approve')
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
@@ -114,7 +116,7 @@ export async function revertTermsChange(
   kind: 'loan' | 'fund_source',
   id: string,
 ): Promise<{ error: string } | undefined> {
-  await requirePermission('override')
+  await requireAction('treasury', 'approve')
   const supabase = await createClient()
   if (!id) return { error: 'Record id is required' }
   const { error } = await supabase.rpc('revert_terms_change', { p_record_kind: kind, p_record_id: id })
@@ -143,7 +145,7 @@ interface CreateFundSourceInput {
 const VALID_TYPES: FundSourceType[] = ['subsidiary', 'director_loan', 'department_pool', 'outsource']
 
 export async function createFundSource(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const raw: CreateFundSourceInput = {
@@ -199,7 +201,7 @@ export async function createFundSource(formData: FormData) {
   if (!raw.effective_date) {
     throw new Error('Effective date is required (interest accrues from this date)')
   }
-  if (dayjs(raw.effective_date).isAfter(dayjs(), 'day')) {
+  if (dayjs(raw.effective_date).isAfter(officeToday(), 'day')) {
     throw new Error('Effective date cannot be in the future')
   }
   // Repayment date is OPTIONAL too — only checked when provided.
@@ -211,11 +213,18 @@ export async function createFundSource(formData: FormData) {
 
   // ── Balance validation for department_pool ──
   if (raw.source_type === 'department_pool') {
-    // Find department_id from from_id, then check dept_pool balance
-    const { data: deptBalance } = await supabase
-      .from('dept_pools')
-      .select('amount, transaction_type')
-      .eq('department_id', raw.from_id)
+    // Find department_id from from_id, then check dept_pool balance — over
+    // every row the pool has ever had, in 1000-row pages (2026-10-08): a
+    // balance summed from a read PostgREST stopped at 1000 rows is wrong
+    // without a word. A failed read still counts as an empty pool, as before.
+    const deptBalance = await fetchAllRows((lo, hi) =>
+      supabase
+        .from('dept_pools')
+        .select('amount, transaction_type')
+        .eq('department_id', raw.from_id)
+        .order('id')
+        .range(lo, hi),
+    ).catch(() => null)
 
     const balance = (deptBalance ?? []).reduce((sum, row) => {
       return sum + (row.transaction_type === 'np_in' ? Number(row.amount) : -Number(row.amount))
@@ -359,7 +368,7 @@ export async function createFundSource(formData: FormData) {
 export type FundSourceActionResult = { error: string } | undefined
 
 export async function updateFundSource(formData: FormData): Promise<FundSourceActionResult> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const id = (formData.get('id') as string) ?? ''
@@ -386,7 +395,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
     return { error: 'Repayment period must be at least 1 month' }
   }
   if (!effectiveDate) return { error: 'Effective date is required' }
-  if (dayjs(effectiveDate).isAfter(dayjs(), 'day')) {
+  if (dayjs(effectiveDate).isAfter(officeToday(), 'day')) {
     return { error: 'Effective date cannot be in the future' }
   }
   if (!repaymentDate) return { error: 'Repayment date is required' }
@@ -485,7 +494,7 @@ export async function updateFundSource(formData: FormData): Promise<FundSourceAc
 // approval card in one transaction — Finance's own RLS can't touch
 // approval_requests, so this must not be done with inline updates.
 export async function withdrawFundSource(id: string): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -510,7 +519,7 @@ export async function setFundSourceRepaymentStart(
   id: string,
   month: string
 ): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -536,7 +545,7 @@ export async function setFundSourceMinPayInterest(
   id: string,
   value: boolean
 ): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -560,7 +569,7 @@ export async function setFundSourceNotes(
   id: string,
   notes: string
 ): Promise<{ error: string } | undefined> {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   if (!id) return { error: 'Fund source id is required' }
@@ -579,7 +588,7 @@ export async function setFundSourceNotes(
 // ─── Cancel Fund Source (requires Principal approval) ────────────────────────
 
 export async function cancelFundSource(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'void')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -620,7 +629,7 @@ export async function cancelFundSource(formData: FormData) {
 }
 
 export async function markFundSourceMatured(formData: FormData) {
-  const user = await requirePermission('treasury')
+  const user = await requireAction('treasury', 'edit')
   const supabase = await createClient()
 
   const id = formData.get('id') as string
@@ -665,6 +674,14 @@ export interface PayableFundSource {
   total_periods: number
   periods_paid: number
   remaining_periods: number
+  /** The lender's FULL name, for the two-step picker's party button — the
+   *  label above abbreviates a company to its short code. */
+  lender?: string
+  /** 子公司 / 董事 / 部门 / 外部 — a word beside the name on that button. */
+  lender_kind?: string
+  /** The day the money came in (YYYY-MM-DD) — the picker lists a lender's
+   *  deals oldest first. */
+  effective_date?: string | null
   /** GL account the source is owed on (fund_sources.account_code, e.g. 4054);
    *  null on legacy rows without one. */
   account_code?: string | null
@@ -759,8 +776,17 @@ export async function listPayableFundSources(
       let monthlyPayment = Number(o.monthly_payment)
       let monthlyInterest = months > 0 ? Number((amount * rate).toFixed(2)) : 0
       let monthlyPrincipal = Number((monthlyPayment - monthlyInterest).toFixed(2))
-      let periodsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
-      let remaining = Math.max(0, months - periodsPaid)
+      // Installments are counted in MONEY — principal repaid ÷ one installment —
+      // not in months that saw a payment: one payment can cover many. (HC's
+      // 300k was paid 22 at once and went on reading "22 of 36 left" beside a
+      // balance of one installment, 2026-10-02.) The Loan Monitor's rule. A
+      // source with no lock-in has no installments; it keeps the month count,
+      // which only orders the list.
+      const monthsPaid = periodsPaidMap.get(o.fund_source_id)?.size ?? 0
+      let remaining = o.lock_in_months
+        ? remainingPeriods(amount, months, Number(o.total_principal_paid ?? 0))
+        : Math.max(0, months - monthsPaid)
+      let periodsPaid = o.lock_in_months ? months - remaining : monthsPaid
       let termsFrom: string | null = null
       const meta = sourceById.get(o.fund_source_id)
       if (meta) {
@@ -769,7 +795,7 @@ export async function listPayableFundSources(
           principalByMonth.get(o.fund_source_id) ?? {},
         )
         if (termsChanged(segs)) {
-          const seg = currentSegment(segs, dayjs().format('YYYY-MM'))
+          const seg = currentSegment(segs, officeMonth())
           rate = seg.rate
           months = seg.months ?? months
           monthlyPrincipal = seg.principalPerMonth
@@ -785,17 +811,30 @@ export async function listPayableFundSources(
       // "Director" fallback that earlier versions showed for any row without
       // a from_company_id).
       let counterparty: string
+      // The same party, spelled out and classified, for the picker (2026-10-02).
+      let lender: string
+      let lenderKind: string
       if (o.source_type === 'department_pool' && o.from_department_id) {
         counterparty = departmentMap.get(o.from_department_id) ?? 'Department'
+        lender = counterparty
+        lenderKind = '部门'
       } else if (o.from_company_id) {
         const company = companyMap.get(o.from_company_id)
         counterparty = company ? `${company.short_code ?? company.name}` : 'Company'
+        lender = company?.name ?? counterparty
+        lenderKind = '子公司'
       } else if (o.from_director_id) {
         counterparty = directorMap.get(o.from_director_id) ?? 'Director'
+        lender = counterparty
+        lenderKind = '董事'
       } else if (freetextMap.get(o.fund_source_id)) {
         counterparty = freetextMap.get(o.fund_source_id) as string
+        lender = counterparty
+        lenderKind = '外部'
       } else {
         counterparty = 'Director'
+        lender = counterparty
+        lenderKind = '董事'
       }
       const label = `${counterparty} · RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · ${months}mo`
 
@@ -818,6 +857,9 @@ export async function listPayableFundSources(
         settled_in_month: !(statusMap.get(o.fund_source_id) === 'active' && Number(o.outstanding) > 0),
         account_code: accountMap.get(o.fund_source_id) ?? null,
         terms_from: termsFrom,
+        lender,
+        lender_kind: lenderKind,
+        effective_date: meta?.effective_date ?? null,
       }
     })
     .sort((a, b) => b.remaining_periods - a.remaining_periods)

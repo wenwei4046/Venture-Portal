@@ -130,6 +130,22 @@ describe('toEngineInput', () => {
     expect(input.orders[0].lines[0].costAmount).toBe(6000)
   })
 
+  // 2026-10-05: what a bed frame's divan, leg and gap were charged.
+  it('carries a line’s option charge, and nothing at all for a line without one', () => {
+    const input = toEngineInput(baseRows({
+      orders: [order({
+        sales_order_lines: [
+          { id: 'line-1', item_group: 'MATTRESS', product_code: 'MAT-01', product_name: 'Mattress', qty: '1.000',
+            line_amount: '10000.00', brand_code: 'AKEMI', cost_amount: '6000.00', option_charge_amount: '0.00' },
+          { id: 'line-2', item_group: 'BEDFRAME', product_code: 'BF-01', product_name: 'Bed frame', qty: '2.000',
+            line_amount: '4200.00', brand_code: null, cost_amount: '2000.00', option_charge_amount: '200.00' },
+        ],
+      })],
+    }))
+    expect(input.orders[0].lines[0]).not.toHaveProperty('optionCharge')
+    expect(input.orders[0].lines[1].optionCharge).toBe(200)
+  })
+
   it('carries each rung\'s title, and the title a person holds, into the engine', () => {
     const input = toEngineInput(
       baseRows({

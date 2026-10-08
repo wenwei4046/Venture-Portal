@@ -7,13 +7,16 @@ interface Props {
   voucherId: string
   voucherStatus: string
   canUpload: boolean
+  /** The voucher is already approved or paid: files can still be added — never
+   *  removed — and each addition is logged (2026-10-05). The box says so. */
+  late?: boolean
 }
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.xlsx,.xls,.docx,.doc,.csv'
 const CLIENT_MAX_BYTES = 10 * 1024 * 1024
 const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.docx', '.doc', '.csv']
 
-export default function AttachmentUploader({ voucherId, voucherStatus, canUpload }: Props) {
+export default function AttachmentUploader({ voucherId, voucherStatus, canUpload, late = false }: Props) {
   const [selected, setSelected] = useState<File[]>([])
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -23,12 +26,10 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
 
   if (!canUpload) {
     return (
-      <div className="border border-hairline rounded-md bg-surface-2/40 p-4 mb-4">
-        <p className="font-serif italic text-muted text-sm">
-          Attachments are locked once the voucher is {voucherStatus.replace('_', ' ')}. To change,
-          revert or void this voucher first.
-        </p>
-      </div>
+      // No box of its own: it sits inside the voucher page's 附件 card (2026-10-02).
+      <p className="font-sans text-muted text-sm">
+        Attachments are locked once the voucher is {voucherStatus.replace('_', ' ')}.
+      </p>
     )
   }
 
@@ -80,11 +81,16 @@ export default function AttachmentUploader({ voucherId, voucherStatus, canUpload
   }
 
   return (
-    <div className="border border-hairline rounded-md bg-surface p-5 mb-4">
+    <div className="border border-hairline rounded-md bg-paper p-4">
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="font-serif text-md text-ink">Add attachments</h3>
         <span className="font-mono text-xs text-muted">PDF, image, Excel, Word, CSV · ≤ 10 MB</span>
       </div>
+      {late ? (
+        <p className="mb-3 font-sans text-sm text-graphite" data-testid="late-note">
+          这张凭单已经{voucherStatus === 'paid' ? '付款' : '批准'}：附件只能加、不能删，加了会记录是谁、什么时候加的。
+        </p>
+      ) : null}
 
       <div className="space-y-3">
         <div>

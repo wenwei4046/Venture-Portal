@@ -3,6 +3,8 @@ import {
   EditError,
   parseMoney,
   validateComboPrices,
+  validateComboRemovals,
+  validateNewCombo,
   validateModelEdit,
   validateOptionPrices,
   validateSkuPrices,
@@ -332,14 +334,34 @@ describe('validateOptionPrices', () => {
     })
   })
 
-  it('a surcharge may be negative — the ERP’s No Side Panel takes RM 40 off', () => {
-    expect(validateOptionPrices('bedframe_specials', [{ value: 'No Side Panel', price: '-40' }]).upserts).toEqual([
-      { pool: 'bedframe_specials', value: 'No Side Panel', price: -40 },
+  // 2026-10-06: every price on Maintenance is what the customer pays — never negative,
+  // a special or a sofa's leg as much as a bed frame's divan.
+  it.each(['bedframe_specials', 'sofa_leg_heights', 'sofa_specials'])('refuses a negative price on %s — a charge is never negative', pool => {
+    expect(() => validateOptionPrices(pool, [{ value: 'No Side Panel', price: '-40' }])).toThrow('a price cannot be negative')
+  })
+
+  it('prices a special and a sofa’s leg — what the customer pays for them', () => {
+    expect(validateOptionPrices('bedframe_specials', [{ value: 'Hydraulic', price: '300' }]).upserts).toEqual([
+      { pool: 'bedframe_specials', value: 'Hydraulic', price: 300 },
+    ])
+    expect(validateOptionPrices('sofa_leg_heights', [{ value: '6"', price: '100' }]).upserts).toEqual([
+      { pool: 'sofa_leg_heights', value: '6"', price: 100 },
     ])
   })
 
-  it.each(['bedframe_gaps', 'sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
+  it.each(['sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
     expect(() => validateOptionPrices(pool, [{ value: '12"', price: '5' }])).toThrow('That list carries no price')
+  })
+
+  // 2026-10-05: a bed frame's gap is charged to the customer, like its divan and leg.
+  it('prices a gap — what the customer pays for it', () => {
+    expect(validateOptionPrices('bedframe_gaps', [{ value: '12"', price: '20' }]).upserts).toEqual([
+      { pool: 'bedframe_gaps', value: '12"', price: 20 },
+    ])
+  })
+
+  it.each(['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_gaps', 'bedframe_total_heights'])('a charge on %s cannot be negative', pool => {
+    expect(() => validateOptionPrices(pool, [{ value: '6"', price: '-10' }])).toThrow('a price cannot be negative')
   })
 
   it.each(['', 'mattress_sizes', 'Sofa_specials', 'sofa-specials', 'bedframe_', 'sofa_specials; drop', 'sofa_Specials'])(
@@ -349,8 +371,8 @@ describe('validateOptionPrices', () => {
     },
   )
 
-  it('checks a pool’s shape only — the foreign key to erp_maintenance_options refuses one that does not exist', () => {
-    expect(validateOptionPrices('sofa_armrests', [{ value: 'x', price: '1' }]).upserts).toHaveLength(1)
+  it('refuses a pool it does not know — only the priced pools carry a price', () => {
+    expect(() => validateOptionPrices('sofa_armrests', [{ value: 'x', price: '1' }])).toThrow('That list carries no price')
   })
 
   it('refuses an option with no value', () => {
@@ -458,5 +480,37 @@ describe('the audit fixes', () => {
       skuOffered: {},
     })
     expect(model.enabled.leg_heights).toEqual(['Default'])
+  })
+})
+
+describe('validateComboRemovals', () => {
+  it('keys each set once, the way the table does', () => {
+    expect(validateComboRemovals([
+      { baseModel: ' 8030 ', slotsKey: '[["1NA"], ["2NA"]]' },
+      { baseModel: '8030', slotsKey: '[["1NA"], ["2NA"]]' },
+    ])).toEqual([{ base_model: '8030', slots_key: '[["1NA"], ["2NA"]]' }])
+  })
+
+  it('refuses nothing, too many, or a row without its key', () => {
+    expect(() => validateComboRemovals([])).toThrow(EditError)
+    expect(() => validateComboRemovals(Array.from({ length: 501 }, (_, i) => ({ baseModel: String(i), slotsKey: '[]' })))).toThrow('at most 500')
+    expect(() => validateComboRemovals([{ baseModel: '', slotsKey: '[]' }])).toThrow('A combo row is incomplete')
+    expect(() => validateComboRemovals([{ baseModel: '8030', slotsKey: '1NA+2NA' }])).toThrow('A combo row is incomplete')
+  })
+})
+
+describe('validateNewCombo — a piece may be either side (2026-10-08)', () => {
+  const base = { baseModel: ' 2376 ', label: '1A(R) + 1NA', prices: { PRICE_2: { '30': 1900 } } }
+
+  it('keeps a slot of the modules it may be, trimmed, as the ERP writes one', () => {
+    expect(validateNewCombo({ ...base, modules: [[' 1A(R)(LHF) ', '1A(R)(RHF)'], ['1NA']] }).modules)
+      .toEqual([['1A(R)(LHF)', '1A(R)(RHF)'], ['1NA']])
+  })
+
+  it('refuses an empty piece, more than four, or one module twice', () => {
+    expect(() => validateNewCombo({ ...base, modules: [[], ['1NA']] })).toThrow('Each piece is one compartment.')
+    expect(() => validateNewCombo({ ...base, modules: [['A', 'B', 'C', 'D', 'E'], ['1NA']] })).toThrow('A compartment may be one of four modules at most.')
+    expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', ' 1A(LHF)'], ['1NA']] })).toThrow('A compartment names the same module twice.')
+    expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', 'a "b'], ['1NA']] })).toThrow('is not a compartment code')
   })
 })

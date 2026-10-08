@@ -35,9 +35,19 @@ describe('RouteSkeleton', () => {
     expect(container.querySelectorAll('.stat-card').length).toBeGreaterThan(0)
   })
 
-  it('keeps the figure strip everywhere else', () => {
+  // Since 2026-10-07 Finance's pages are on the sheet too (lib/sheet-routes),
+  // and since 2026-10-08 the Product List is in the Revenue app: a portal path
+  // off the list is the one place left without it.
+  it('keeps the figure strip where there is no sheet', () => {
+    nav.pathname = '/somewhere-else'
     const { container } = render(<RouteSkeleton />)
     expect(container.querySelector('.stat-card')).toBeNull()
+  })
+
+  it('opens a Finance page on the sheet with summary cards as well', () => {
+    nav.pathname = '/payments'
+    const { container } = render(<RouteSkeleton />)
+    expect(container.querySelectorAll('.stat-card').length).toBeGreaterThan(0)
   })
 
   it('counts itself in for as long as it is on screen', () => {

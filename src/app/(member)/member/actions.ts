@@ -5,17 +5,28 @@ import type { MemberReadContext, QuoteInput } from "@/lib/member/types";
 export type { AdminMemberInput, AdminMemberData } from "@/lib/member/server";
 import {
   loadMemberData,
+  loadMemberCatalogue,
   loadMemberInsight,
+  loadMemberInsightRange,
+  loadMemberOrderBook,
   loadMemberOrgMap,
   calculateMemberQuote as calculate,
   submitMemberRequest as submit,
   acknowledgeMemberMemo as acknowledge,
+  cancelMemberRequest as cancel,
+  loadMemberRequestHistory,
+  loadMemberClaimRates,
+  loadPrincipalMemoReceipts,
+  loadMemberIncome,
+  loadDepartmentIncome,
+  loadMemberHonours,
   adminMemberAction as administer,
   type AdminMemberCommand,
 } from "@/lib/member/server";
 
-export async function refreshMemberData() {
-  const data = await loadMemberData();
+/** `lite`: the Revenue app's pull — everything but the Quote's catalogue (fetchMemberCatalogue). */
+export async function refreshMemberData(options: { lite?: boolean } = {}) {
+  const data = await loadMemberData({ lite: options?.lite === true });
   return data.configured
     ? { ok: true as const, data }
     : {
@@ -24,8 +35,17 @@ export async function refreshMemberData() {
           data.message ?? "Your member profile has not been configured yet.",
       };
 }
+export async function fetchMemberCatalogue() {
+  return loadMemberCatalogue();
+}
 export async function fetchMemberInsight(period?: string, context?: MemberReadContext) {
   return loadMemberInsight(period, context);
+}
+export async function fetchMemberOrderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberOrderBook(subDepartmentId, from, until, context);
+}
+export async function fetchMemberInsightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberInsightRange(subDepartmentId, from, until, context);
 }
 export async function fetchMemberOrgMap(context?: Pick<MemberReadContext, "subDepartmentId">) {
   return loadMemberOrgMap(context);
@@ -40,6 +60,32 @@ export async function submitMemberRequest(form: FormData) {
     revalidatePath("/claims");
   }
   return result;
+}
+export async function fetchMemberRequestHistory(id: string) {
+  return loadMemberRequestHistory(id);
+}
+export async function cancelMemberRequest(id: string) {
+  const result = await cancel(id);
+  if (result.ok) {
+    revalidatePath("/member");
+    revalidatePath("/claims");
+  }
+  return result;
+}
+export async function fetchPrincipalMemoReceipts(staffId: string) {
+  return loadPrincipalMemoReceipts(staffId);
+}
+export async function fetchMemberIncome(subDepartmentId: string, period: string, context?: MemberReadContext) {
+  return loadMemberIncome(subDepartmentId, period, context);
+}
+export async function fetchDepartmentIncome(subDepartmentId: string, period: string) {
+  return loadDepartmentIncome(subDepartmentId, period);
+}
+export async function fetchMemberHonours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
+  return loadMemberHonours(subDepartmentId, from, until, context);
+}
+export async function fetchMemberClaimRates() {
+  return loadMemberClaimRates();
 }
 export async function acknowledgeMemberMemo(id: string, ack: boolean) {
   const result = await acknowledge(id, ack);

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { fetchAllRows } from '@/lib/paginate'
@@ -31,7 +32,7 @@ export default async function RepaymentSchedulePage({
   // same every month; the "done / settled / this-month interest" figures come
   // from repayment dates in the selected month, so past months read correctly.
   const { month } = await searchParams
-  const nowYM = dayjs().format('YYYY-MM')
+  const nowYM = officeMonth()
   const currentYM = /^\d{4}-\d{2}$/.test(month ?? '') ? month! : nowYM
   const isCurrentMonth = currentYM === nowYM
   const monthLabel = dayjs(`${currentYM}-01`).format('MMM YYYY')

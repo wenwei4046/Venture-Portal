@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { backdropDismiss } from '@/components/modal-dismiss'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import { createDeptInvoice } from '../actions'
 
 // Dept-manager 开单 (2026-08-20): creates a DRAFT invoice for the manager's
@@ -29,7 +29,7 @@ export default function CreateDeptInvoiceButton({ deptName, companies, contracts
   const [companyId, setCompanyId] = useState('')
   const [freetext, setFreetext] = useState('')
   const [contractId, setContractId] = useState('')
-  const [period, setPeriod] = useState(dayjs().format('YYYY-MM'))
+  const [period, setPeriod] = useState(officeMonth())
   const [amount, setAmount] = useState('')
   const [invoiceDate, setInvoiceDate] = useState('')
   const [description, setDescription] = useState('')
@@ -38,7 +38,7 @@ export default function CreateDeptInvoiceButton({ deptName, companies, contracts
     setCompanyId('')
     setFreetext('')
     setContractId('')
-    setPeriod(dayjs().format('YYYY-MM'))
+    setPeriod(officeMonth())
     setAmount('')
     setInvoiceDate('')
     setDescription('')

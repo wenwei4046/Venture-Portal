@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney, formatMoneyBare, getPeriodMonth } from '@/lib/utils'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import PCBInput from './_components/PCBInput'
 import EditableDeduction from './_components/EditableDeduction'
@@ -103,7 +104,7 @@ export default async function PayoutDetailPage({ params, searchParams }: Props) 
   const allowanceLine = allowancePortion
   const isOverridden = !!payout.statutory_overridden_at
   const overriddenLabel = payout.statutory_overridden_at
-    ? dayjs(payout.statutory_overridden_at).format('D MMM YYYY HH:mm')
+    ? officeTime(payout.statutory_overridden_at).format('D MMM YYYY HH:mm')
     : ''
 
   const statusChip =

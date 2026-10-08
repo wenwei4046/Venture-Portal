@@ -8,7 +8,7 @@
 
 import type { UserRole } from '@/types'
 import { can, type PermissionHolder } from '@/lib/permissions'
-import { PRODUCT_LIST_PATH, REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
+import { REVENUE_DEPARTMENT_PATH, revenuePath } from '@/lib/revenue'
 import {
   canAccessAuditLog,
   canAccessCategories,
@@ -19,7 +19,6 @@ import {
   canAccessDirectorSalary,
   canAccessMyBilling,
   canAccessOpex,
-  canAccessProductList,
   canAccessReconciliation,
   canAccessReports,
   canAccessRevenue,
@@ -28,6 +27,7 @@ import {
   canAccessTreasury,
   canAccessVenturePool,
   canApprove,
+  canSeeAuditChanges,
 } from '@/lib/roles'
 
 /**
@@ -37,7 +37,8 @@ import {
  * are about somebody having ONE department of their own, which no permission
  * expresses.
  */
-export type NavViewer = PermissionHolder & { role: UserRole }
+/** The signed-in account, as the menus read it: its keys, its role, and (since PR2) what it may do. */
+export type NavViewer = PermissionHolder & { role: UserRole; actions?: Readonly<Record<string, 'own' | 'dept' | 'all'>> }
 
 export interface NavItem {
   href: string
@@ -242,11 +243,10 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // in the sidebar. Fair itself stays a link, so one click still lands on
     // Commission Calculation the way it did before.
     //
-    // The Product List and Venues are the two department-wide children:
-    // `comm_products`, `comm_venues` and `comm_organisers` carry no scheme, so
-    // one of each serves every sub-department. What a product costs stays with
-    // the Principal; the venue register is HR's, because naming the organiser
-    // of a fair is part of reading the month.
+    // The Product List was the department-wide child here until 2026-10-08,
+    // when it moved into the Revenue app (user: it is set for the Revenue
+    // team's margins, so it belongs to their view — `/member/products`, under
+    // PRINCIPAL in that app's sidebar, for whoever holds `product_list`).
     {
       label: 'Revenue',
       section: 'Departments',
@@ -276,7 +276,6 @@ export function buildNavEntries(data: NavData): NavEntry[] {
             { href: revenuePath(s.slug, 'rules'), label: 'Rules', visible: canAccessRevenue },
           ],
         })),
-        { href: PRODUCT_LIST_PATH, label: 'Product List', visible: canAccessProductList },
         // Venues went on 2026-09-27: the ERP names every bill's fair — venue,
         // organiser and days — so nothing about a fair is typed here any more.
         // The department as a whole (2026-09-30): its mode, cost center or
@@ -294,7 +293,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // the roster alongside Marketing and Revenue — but people are not one more
     // department, they are who every department is made of.
     //
-    // Flat, not a group: four pages, one section header, no chevron to open
+    // Flat, not a group: three pages, one section header, no chevron to open
     // first. The sidebar is also the only way between them — the tab rail that
     // used to sit on all of them came out with this move, the same way the
     // Revenue sub-department views did.
@@ -303,12 +302,13 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // 2026-09-03, when the user asked for them apart: Roles is what a title IS
     // (its department), Permissions is what it may DO. The ladder (Levels)
     // sat on Roles for two days and moved to Hierarchy on 2026-09-05, as a
-    // second tab beside the chart that obeys it.
+    // second tab beside the chart that obeys it. And on 2026-10-08 (the Claude
+    // Design handoff, the People Management revamp) both left the sidebar:
+    // Permissions is People Management's second tab (permission templates),
+    // Roles is Hierarchy's fourth. Their old addresses redirect there.
     { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
     { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => v.role === 'principal' || can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
-    { href: '/team/roles', label: 'Roles', section: 'People', visible: isHRorPrincipal },
-    { href: '/team/permissions', label: 'Permissions', section: 'People', visible: isHRorPrincipal },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },
@@ -336,7 +336,18 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     },
     { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
     { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Reports & Admin', visible: canAccessTreasury },
-    { href: '/audit-log', label: 'Audit Log', section: 'Reports & Admin', visible: canAccessSettings },
+    // The app-wide history (2026-10-08): Changes for whoever's permissions
+    // open some area of it — each reader sees only those areas — and Access
+    // (who read what) for the Principal, as before.
+    {
+      label: 'Audit Log',
+      section: 'Reports & Admin',
+      visible: canSeeAuditChanges,
+      children: [
+        { href: '/audit-log', label: 'Changes', exact: true, visible: canSeeAuditChanges },
+        { href: '/audit-log/access', label: 'Access', visible: canAccessAuditLog },
+      ],
+    },
     // Settings tabs flattened into the group (user 2026-06-10). Finance only
     // gets Chart of Account (the categories tab they can edit) + Base Rate
     // History; the other tabs are Principal-only.
@@ -438,24 +449,30 @@ export interface TabDef {
 }
 
 const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
+  // An account wholly on its title's template (2026-10-08): what it may open
+  // differs person to person, so the bar promises only the Overview and More
+  // carries the rest.
+  staff: [
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
+  ],
   revenue_member: [
     { href: '/member', label: 'My account', icon: 'home' },
   ],
   // The daily money loop. Invoice / Fund In-Out / reports / settings are all
   // one tap away under More.
   principal: [
-    { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/approvals', label: '审批', icon: 'approve', badge: true },
-    { href: '/payments', label: '付款', icon: 'out', notPaths: ['/payments/new'] },
-    { href: '/receipts', label: '收款', icon: 'in' },
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
+    { href: '/approvals', label: 'Approvals', icon: 'approve', badge: true },
+    { href: '/payments', label: 'Payments', icon: 'out', notPaths: ['/payments/new'] },
+    { href: '/receipts', label: 'Receipts', icon: 'in' },
   ],
   // Finance cannot approve, so the freed slot goes to Invoice — the thing
   // they open next after posting a payment or receipt.
   finance: [
-    { href: '/dashboard', label: '总览', icon: 'home' },
-    { href: '/payments', label: '付款', icon: 'out', notPaths: ['/payments/new'] },
-    { href: '/receipts', label: '收款', icon: 'in' },
-    { href: '/statements', label: '发票', icon: 'invoice', exact: true },
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
+    { href: '/payments', label: 'Payments', icon: 'out', notPaths: ['/payments/new'] },
+    { href: '/receipts', label: 'Receipts', icon: 'in' },
+    { href: '/statements', label: 'Invoices', icon: 'invoice', exact: true },
   ],
   // HR never touches the treasury ledgers; their loop is payroll → staff →
   // director salary.
@@ -477,6 +494,12 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
 
 export function tabsForRole(role: UserRole): TabDef[] {
   return TABS_BY_ROLE[role] ?? TABS_BY_ROLE.dept_manager
+}
+
+/** The fifth tab's label. Finance's and the Principal's bar reads in English
+ *  (2026-10-07, user: "下面还是华语字体"); HR's and a department manager's as it was. */
+export function moreTabLabel(role: UserRole): string {
+  return role === 'finance' || role === 'principal' || role === 'staff' ? 'More' : '更多'
 }
 
 /** Path prefixes already reachable from the tab bar — the More sheet dims

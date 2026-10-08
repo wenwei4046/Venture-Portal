@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { requirePermission } from '@/lib/auth'
+import { officeMonth } from '@/lib/office-time'
+import { requireAction } from '@/lib/auth'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
@@ -8,6 +9,11 @@ import NewPaymentForm from '../_components/NewPaymentForm'
 import LoanRepaymentReceivedForm from '../_components/LoanRepaymentReceivedForm'
 import { listPayableFundSources } from '../../fund-in/actions'
 import { invoicePoolForBillingMode } from '@/lib/cfo-reports'
+import { fetchDeptRegistry } from '@/lib/dept-registry'
+import { registryPoolOptions } from '@/lib/payment-pools'
+import { fetchAllRows } from '@/lib/paginate'
+import { loanInstallmentCount } from '@/lib/installment-count'
+import { fetchTermsHistory, isLoanPrincipal, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 
 // Settlement routing: when a sub pays an invoice, the money logically lands
 // in the dept pool that generated the service. Delegates to the canonical
@@ -26,7 +32,7 @@ interface Props {
 }
 
 export default async function NewPaymentPage({ searchParams }: Props) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'create')
   const supabase = await createClient()
 
   const { invoice_id: invoiceId, preset, mode, return_to: returnToRaw } = await searchParams
@@ -38,14 +44,25 @@ export default async function NewPaymentPage({ searchParams }: Props) {
   // Dedicated flow: record a loan repayment RECEIVED (sub → HV).
   if (mode === 'loan_repayment') {
     const [{ data: loans }, { data: loanOut }, { data: cos }, { data: banks }, { data: suspenseAccts }, { data: suspenseLines }] = await Promise.all([
-      supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months, repayment_terms, disbursement_date').eq('status', 'active'),
-      supabase.from('loan_outstanding').select('loan_id, outstanding'),
+      supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months, repayment_terms, disbursement_date, compound_interest, repayment_start_month, terms_effective_from').eq('status', 'active'),
+      supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
       supabase.from('companies').select('id, short_code, name'),
       supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
       // Interest-in-Suspense leaves + their live balances, so the form can
       // offer "draw down the suspense" instead of booking income twice.
       supabase.from('chart_of_accounts').select('code, name').eq('parent_code', '3060').eq('is_active', true),
-      supabase.from('journal_lines').select('account_code, debit, credit, journal_entries!inner(is_reversed)').like('account_code', '306%'),
+      // Every suspense line ever posted, in 1000-row pages (2026-10-08): these
+      // are running balances, and a balance summed from a read PostgREST
+      // stopped at 1000 rows is short without a word. A failed read still
+      // shows no suspense, as before.
+      fetchAllRows((lo, hi) =>
+        supabase
+          .from('journal_lines')
+          .select('account_code, debit, credit, journal_entries!inner(is_reversed)')
+          .like('account_code', '306%')
+          .order('id', { ascending: true })
+          .range(lo, hi),
+      ).then((data) => ({ data }), () => ({ data: null })),
     ])
     const suspenseBalance = new Map<string, number>()
     for (const l of (suspenseLines ?? []) as unknown as Array<{
@@ -66,7 +83,37 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       }) ?? null
     }
     const outMap = new Map((loanOut ?? []).map((o) => [o.loan_id as string, Number(o.outstanding)]))
+    const principalPaidMap = new Map((loanOut ?? []).map((o) => [o.loan_id as string, Number(o.total_principal_paid ?? 0)]))
     const coMap = new Map((cos ?? []).map((c) => [c.id as string, c]))
+    // 期数 / 还剩 for the picker (2026-10-02). A loan whose terms changed
+    // mid-life counts from the segment in force now, which needs its principal
+    // repayments month by month — read only for those loans.
+    const loanIds = (loans ?? []).map((l) => l.id as string)
+    const termsHistory = await fetchTermsHistory(supabase, 'loan', loanIds)
+    const changedIds = (loans ?? [])
+      .filter((l) => termsHistory.has(l.id as string) || l.terms_effective_from != null)
+      .map((l) => l.id as string)
+    const changedRepayments =
+      changedIds.length === 0
+        ? []
+        : await fetchAllRows((lo, hi) =>
+            supabase
+              .from('repayments')
+              .select('loan_id, amount, payment_date, payment_type')
+              .in('loan_id', changedIds)
+              .order('id', { ascending: true })
+              .range(lo, hi),
+          )
+    const principalByMonth = principalPaidByMonth(
+      changedRepayments.map((rp) => ({
+        id: rp.loan_id as string,
+        amount: Number(rp.amount),
+        payment_date: rp.payment_date as string,
+        payment_type: (rp.payment_type as string | null) ?? 'principal',
+      })),
+      isLoanPrincipal,
+    )
+    const currentYM = officeMonth()
     const loanOptions = (loans ?? [])
       .map((l) => {
         const co = l.company_id ? coMap.get(l.company_id as string) : null
@@ -81,6 +128,20 @@ export default async function NewPaymentPage({ searchParams }: Props) {
         return {
           id: l.id as string,
           outstanding,
+          // The picker shows these as columns; the one-line label is kept for
+          // anything that still wants a single string.
+          borrower: (co?.name as string | undefined) ?? (co?.short_code as string | undefined) ?? '—',
+          principal: Number(l.principal),
+          ratePct: Math.round(Number(l.effective_rate) * 100 * 1000) / 1000,
+          date: disb ?? null,
+          source: src ?? null,
+          // null = no fixed term (unscheduled, compounding): nothing to count.
+          periods: loanInstallmentCount({
+            terms: termsForLoan(l, termsHistory.get(l.id as string) ?? []),
+            principalPaid: principalPaidMap.get(l.id as string) ?? 0,
+            principalByMonth: principalByMonth.get(l.id as string),
+            currentYM,
+          }),
           label: `${co?.short_code ?? co?.name ?? '—'} · RM ${Number(l.principal).toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(Number(l.effective_rate) * 100).toFixed(3)}%/mo · 欠 ${outstanding.toLocaleString('en-MY', { minimumFractionDigits: 2 })}${idBits}`,
           // Offer the suspense route only when that leaf actually holds a balance.
           suspenseCode: susp && (suspenseBalance.get(susp.code as string) ?? 0) > 0.005 ? (susp.code as string) : null,
@@ -110,6 +171,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
     { data: bankAccounts },
     { data: accountRows },
     payableFundSources,
+    deptRegistry,
   ] = await Promise.all([
     supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
@@ -120,7 +182,12 @@ export default async function NewPaymentPage({ searchParams }: Props) {
       .order('type')
       .order('code'),
     listPayableFundSources().catch(() => []),
+    fetchDeptRegistry(supabase).catch(() => []),
   ])
+  // Departments provisioned after the core five (IT, Revenue Department) have a
+  // pool of their own, and the database resolves it — pool_key_to_segment —
+  // but the form's pool list was a literal, so neither could be picked.
+  const extraPools = registryPoolOptions(deptRegistry)
 
   let invoicePreset: {
     id: string
@@ -268,6 +335,7 @@ export default async function NewPaymentPage({ searchParams }: Props) {
 
       <NewPaymentForm
         returnTo={returnTo}
+        extraPools={extraPools}
         companies={companies ?? []}
         bankAccounts={bankAccounts ?? []}
         accounts={(accountRows ?? []).map((a) => ({

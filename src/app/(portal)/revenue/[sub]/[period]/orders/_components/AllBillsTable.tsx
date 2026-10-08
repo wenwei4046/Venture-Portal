@@ -8,6 +8,7 @@ import { brandOutcomeMessage, type BillBrandAction, type BrandOption } from '@/l
 import { billShareAction, holdersOf, type BillShareAction } from '@/lib/commission/bill-share'
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
+import PaperRefCell from '../../_components/PaperRefCell'
 import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillShareOutcome } from './BillContextMenu'
 import BillCountNotice from './BillCountNotice'
 import BillShareNotice from './BillShareNotice'
@@ -19,6 +20,13 @@ import { useBillMenu } from './useBillMenu'
 export interface BillRow {
   orderId: string
   orderNo: string
+  /**
+   * The paper beside the document (2026-10-03): the ERP's Ref No. — the
+   * handwritten bill's number, HC13369 on HC-SO-2609-400 — and the paper
+   * number the double-claim check reads from it (`paper-ref.ts`).
+   */
+  refNo: string | null
+  paperNo: string | null
   href: string
   orderDate: string
   eventDate: string
@@ -72,11 +80,13 @@ export interface BillRow {
 }
 
 type Column =
-  | 'salesperson' | 'date' | 'customer' | 'venue' | 'event' | 'organizer' | 'location' | 'brand'
+  | 'ref' | 'salesperson' | 'date' | 'customer' | 'venue' | 'event' | 'organizer' | 'location' | 'brand'
   | 'category' | 'sales' | 'commissionable' | 'paid' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 
+// Ref No. (2026-10-03, user: follow erp sales order number, but with reference
+// …): the handwritten bill's number, beside the ERP's, to check a bill back.
 const COLUMNS: [Column, string][] = [
-  ['salesperson', 'Salesperson'], ['date', 'Date'], ['customer', 'Customer'], ['venue', 'Venue'],
+  ['ref', 'Ref No.'], ['salesperson', 'Salesperson'], ['date', 'Date'], ['customer', 'Customer'], ['venue', 'Venue'],
   ['event', 'Event'], ['organizer', 'Organizer'], ['location', 'Sales location'], ['brand', 'Brand'],
   ['category', 'Category'], ['sales', 'Sales value'], ['commissionable', 'Commissionable value'],
   ['paid', 'Paid'], ['margin', 'Margin'],
@@ -139,7 +149,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
       .filter(r => showExcluded || !r.cancelled)
       .filter(r => !brand || r.brands.includes(brand))
       .filter(r => !q || [
-        r.orderNo, r.customerName, r.venue, r.venuePlace, r.organizer, r.eventName,
+        r.orderNo, r.refNo, r.customerName, r.venue, r.venuePlace, r.organizer, r.eventName,
         r.staff?.name, r.staff?.code, r.agent?.name, ...r.shares.map(sh => sh.name), ...r.brands, ...r.categories,
       ].some(v => v?.toLowerCase().includes(q)))
       .sort((a, b) => {
@@ -211,6 +221,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
 
   function cell(r: BillRow, key: Column) {
     switch (key) {
+      case 'ref': return <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />
       case 'salesperson': return salesperson(r)
       case 'date': return <>{r.orderDate}{r.sequenceInDay ? <small className={s.muted}>#{r.sequenceInDay} of the day</small> : null}</>
       case 'customer': return r.customerName ?? <span className={s.muted}>—</span>
@@ -245,7 +256,7 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
 
   return <div className={s.workspace}>
     <div className={s.toolbar}>
-      <input className={s.search} aria-label="Search bills" placeholder="Search order, salesperson, customer, venue or brand…"
+      <input className={s.search} aria-label="Search bills" placeholder="Search order, Ref No., salesperson, customer, venue or brand…"
         value={query} onChange={e => setQuery(e.target.value)} />
       <select aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}>
         <option value="">All brands</option>{brands.map(b => <option key={b}>{b}</option>)}

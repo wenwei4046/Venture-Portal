@@ -14,8 +14,17 @@
 // department manager each get their own dashboard under `/dashboard` — so all
 // four moved onto the sheet together.
 //
-// The Product List keeps its own workspace (`.product-theme`), which re-tones
-// the shell as well and decides its own scrolling per tab (`productTabScroll`).
+// 2026-10-07 — Finance's view followed (user: "finance 的整体 background 可以换成
+// 和 principal 和 hr 一样", option A, "做 A 先"): every page Finance reads, and
+// the department manager's My Billing and OPEX, are listed too. Only the
+// route moved — the sheet, its lettering, buttons and tables apply through the
+// `:where(.sheet-theme)` overrides; a page's own anatomy (a walnut hero, a
+// figure strip) is not yet rebuilt into summary cards, so it stays as it was
+// until that page is converted (DESIGN.md › "How a page is built on it").
+//
+// The Product List kept a workspace of its own here until 2026-10-08, when it
+// moved into the Revenue app (`/member/products`): every portal page now sits
+// on the sheet.
 
 /** Route prefixes that render on the sheet — a prefix covers its whole subtree. */
 export const SHEET_ROUTE_PREFIXES = [
@@ -29,10 +38,29 @@ export const SHEET_ROUTE_PREFIXES = [
   // account's page, reached from the roster) live under /team.
   '/team',
   '/member-admin',
+  // Finance's view (2026-10-07), in sidebar order.
+  '/approvals',
+  '/payments',
+  '/receipts',
+  '/statements',
+  '/billing',
+  '/billing-allocator',
+  '/invoice-pool',
+  '/daily-bank',
+  '/fund-in',
+  '/fund-out',
+  '/ba',
+  '/overdue',
+  '/repayment-schedule',
+  '/dept-pool',
+  '/venture-pool',
+  '/opex',
+  '/my-billing',
+  '/reports',
+  '/reconciliation',
+  '/audit-log',
+  '/settings',
 ] as const
-
-/** Routes under a prefix that keep a workspace of their own. */
-const OWN_WORKSPACE = ['/revenue/products']
 
 function under(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(prefix + '/')
@@ -41,6 +69,5 @@ function under(pathname: string, prefix: string): boolean {
 /** Does this page render on the white sheet? */
 export function isSheetRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false
-  if (OWN_WORKSPACE.some((p) => under(pathname, p))) return false
   return SHEET_ROUTE_PREFIXES.some((p) => under(pathname, p))
 }

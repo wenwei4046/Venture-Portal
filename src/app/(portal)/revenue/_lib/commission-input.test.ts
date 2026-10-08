@@ -134,10 +134,37 @@ describe('authoritative commission input', () => {
     const settled = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)
     expect(settled.input.orders.map(row => row.id)).toEqual(['current'])
 
-    // Earlier, August is the portal's own month again: its unpaid bills ride.
+    // Earlier, August is the portal's own month again: once it is closed for
+    // its salesperson, its unpaid bills ride.
     data.comm_cutovers = [{ sub_department_id: 'sub-1', first_paid_month: '2026-08-01' }]
+    data.comm_salesperson_closes = [{ id: 'close-1', sub_department_id: 'sub-1', staff_id: 'person-a', period_month: '2026-08-01', reopened_at: null }]
     const carried = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)
     expect(carried.input.orders.map(row => row.id)).toEqual(['current', 'carry', 'older-paid'])
+  })
+
+  // 2026-10-06: with nobody closed for September, October's page counted all
+  // 357 September bills a second time (Fair RM 185,329.41 for RM 24,834.81).
+  it("pays an earlier month's unpaid bill only once that month is closed for its salesperson", async () => {
+    const data = fixture()
+    data.comm_order_releases = []
+    data.sales_orders = [order('current'), order('a-aug', '2026-08-01'), order('b-aug', '2026-08-01', { staff_id: 'person-b' })]
+    const ids = async () => (await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)).input.orders.map(row => row.id)
+
+    // August still open for both: its bills are August's to pay.
+    expect(await ids()).toEqual(['current'])
+
+    // Person A closed for August: what that close did not pay is September's.
+    data.comm_salesperson_closes = [{ id: 'close-a', sub_department_id: 'sub-1', staff_id: 'person-a', period_month: '2026-08-01', reopened_at: null }]
+    expect(await ids()).toEqual(['current', 'a-aug'])
+
+    // A reopened close closes nothing.
+    data.comm_salesperson_closes = [{ id: 'close-a', sub_department_id: 'sub-1', staff_id: 'person-a', period_month: '2026-08-01', reopened_at: '2026-09-02T00:00:00Z' }]
+    expect(await ids()).toEqual(['current'])
+
+    // The whole month's run applied closes it for everybody.
+    data.comm_salesperson_closes = []
+    data.comm_runs = [...fixture().comm_runs, { id: 'run-aug', sub_department_id: 'sub-1', period_month: '2026-08-01', status: 'applied' }]
+    expect(await ids()).toEqual(['current', 'a-aug', 'b-aug'])
   })
 
   it('pays Open Bill in a month set on for itself, whatever Rules say (open for August, not September)', async () => {
@@ -190,7 +217,7 @@ describe('authoritative commission input', () => {
     await expect(loadCommissionInput('2026-09-01', 'sub-1', db.client)).rejects.toThrow('Could not read KPI items')
   })
 
-  // Product List › Costing Setting and › Add-on / KPI Items (2026-09-27).
+  // Product List › Costing Setting and Rules › KPI items (2026-09-27).
   it("reads the scheme's SKU ratios, its KPI specials, and the specials a line carries", async () => {
     const data = fixture()
     data.comm_cost_ratios = [{ scheme_id: 'scheme-1', erp_product_id: 'mfg-1', product_code: 'SOFA-1', ratio: '0.6000' }]

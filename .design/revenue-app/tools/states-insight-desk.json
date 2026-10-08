@@ -1,0 +1,14 @@
+[
+  { "name": "insight-desk", "attrs": { "platform": "desktop", "screen": "insight" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight" },
+  { "name": "insight-desk-team", "attrs": { "platform": "desktop", "screen": "insight", "insightTab": "team" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight",
+    "appActions": [{ "click": "button:has-text('My team')" }] },
+  { "name": "insight-desk-date", "attrs": { "platform": "desktop", "screen": "insight", "dateOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight",
+    "appActions": [{ "click": "main button:has-text('Sep 2026')" }] },
+  { "name": "insight-desk-bills", "attrs": { "platform": "desktop", "screen": "insight", "insightView": "bills" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight&view=bills" },
+  { "name": "insight-desk-order", "attrs": { "platform": "desktop", "screen": "insight", "insightView": "bills", "soOpen": "true" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight&view=bills",
+    "appActions": [{ "click": "button:has-text('SO-2609-0118')" }] },
+  { "name": "insight-desk-kpi", "attrs": { "platform": "desktop", "screen": "insight", "insightView": "kpi" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight&view=kpi" },
+  { "name": "insight-desk-brand", "attrs": { "platform": "desktop", "screen": "insight", "insightView": "brand" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight&view=brand" },
+  { "name": "insight-desk-tiers", "attrs": { "platform": "desktop", "screen": "insight", "insightView": "brand" }, "w": 1440, "h": 900, "url": "/member/preview?app=proto&device=desktop&page=insight&view=brand",
+    "actions": [{ "click": "button:has-text('All 7 margin tiers')" }], "appActions": [{ "click": "button:has-text('All 7 margin tiers')" }] }
+]

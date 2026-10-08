@@ -29,7 +29,9 @@ export default async function LoginPage({
       .eq("id", data.user.id)
       .maybeSingle();
     if (!profile?.is_active) {
-      await supabase.auth.signOut();
+      // Only the session this sign-in just opened. An inactive account is
+      // refused on every request anyway, and a failed read looks the same.
+      await supabase.auth.signOut({ scope: "local" });
       return { error: "Your account is not active. Please contact HR." };
     }
 

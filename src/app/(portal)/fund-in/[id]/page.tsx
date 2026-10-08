@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare, formatDate } from '@/lib/utils'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
@@ -11,6 +13,10 @@ import WithdrawButton from './_components/WithdrawButton'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
 import MinPayInterestToggle from './_components/MinPayInterestToggle'
 import NotesEditor from './_components/NotesEditor'
+import RecordRepaymentForm from './_components/RecordRepaymentForm'
+import { fetchDeptRegistry } from '@/lib/dept-registry'
+import { paymentPoolOptions, registryPoolOptions } from '@/lib/payment-pools'
+import { INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT } from '@/lib/repayment-source-rows'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
 import { allTermsChanges, buildTermsSegments, currentSegment, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
@@ -53,7 +59,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const termsHistory = await fetchTermsHistory(supabase, 'fund_source', [source.id])
   const repRows = (repayments ?? []).map((r) => ({ id: source.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
   const termsSegments = buildTermsSegments(termsForFundSource(source, termsHistory.get(source.id) ?? []), principalPaidByMonth(repRows, isFundSourcePrincipal).get(source.id) ?? {})
-  const termsChanges = allTermsChanges(termsSegments, { currentYM: dayjs().format('YYYY-MM'), paidByMonth: paidByMonthByType(repRows, isFundSourcePrincipal).get(source.id) ?? {} })
+  const termsChanges = allTermsChanges(termsSegments, { currentYM: officeMonth(), paidByMonth: paidByMonthByType(repRows, isFundSourcePrincipal).get(source.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation (cancelFundSource files a
   // tier_change approval). Finance can't see /approvals (principal-only), so
@@ -146,10 +152,16 @@ export default async function FundSourceDetailPage({ params }: Props) {
   const isMatured = source.status === 'matured'
   const isRepaid = source.status === 'repaid'
   const isPending = source.status === 'pending_approval'
-  const canFinanceEdit = user.role === 'finance' || user.role === 'principal'
+  // Each button asks for the action its Server Action asks (2026-10-08, PR2):
+  // recording a repayment raises a voucher, Edit edits, Withdraw and
+  // cancellation void, and amending a booked fund source is Treasury · Approve.
+  const canRaise = canDo(user, 'treasury', 'create')
+  const canFinanceEdit = canDo(user, 'treasury', 'edit')
+  const canVoid = canDo(user, 'treasury', 'void')
+  const canAmend = canDo(user, 'treasury', 'approve')
 
   const maturityDays = source.maturity_date
-    ? dayjs(source.maturity_date).diff(dayjs(), 'day')
+    ? dayjs(source.maturity_date).diff(officeToday(), 'day')
     : null
 
   // Outstanding balance from view (falls back to original amount if no repayments)
@@ -163,10 +175,37 @@ export default async function FundSourceDetailPage({ params }: Props) {
   // changed mid-life, the current segment's figure (rate × principal still
   // owed when it began).
   const monthlyInterest = termsChanged(termsSegments)
-    ? currentSegment(termsSegments, dayjs().format('YYYY-MM')).interestPerMonth
+    ? currentSegment(termsSegments, officeMonth()).interestPerMonth
     : Number(source.amount) * Number(source.cost_rate)
 
   const repaymentsList = repayments ?? []
+
+  // Record repayment (2026-10-02): the form below files the same voucher
+  // Create payment does in loan-repayment mode, so it needs the banks, the
+  // pools and which of the three default accounts actually exist.
+  const canRecordRepayment = canRaise && (isActive || isMatured) && outstanding > 0
+  const repaymentAccounts = [source.account_code, INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT].filter(
+    (c): c is string => Boolean(c),
+  )
+  const [{ data: repayBanks }, { data: repayAccounts }, repayRegistry] = canRecordRepayment
+    ? await Promise.all([
+        supabase
+          .from('bank_accounts')
+          .select('id, bank_name, account_number, current_balance')
+          .eq('status', 'active')
+          .order('is_primary', { ascending: false }),
+        supabase.from('chart_of_accounts').select('code').eq('is_active', true).in('code', repaymentAccounts),
+        fetchDeptRegistry(supabase).catch(() => []),
+      ])
+    : [{ data: null }, { data: null }, []]
+  // This month's instalment to start from: what is due less its interest,
+  // never more than what is still owed. An open-ended source (no lock-in) has
+  // no instalment — the view prices it as ONE period, i.e. the whole balance —
+  // so it starts at interest only and Finance types whatever principal is
+  // actually going back.
+  const monthlyPrincipal = source.lock_in_months
+    ? Math.max(0, Math.min(outstanding, Math.round((monthlyPayment - monthlyInterest) * 100) / 100))
+    : 0
 
   return (
     <div>
@@ -186,11 +225,11 @@ export default async function FundSourceDetailPage({ params }: Props) {
           </div>
           <h1 className="page-title">{fromLabel}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded <em>{dayjs(source.created_at).format('D MMMM YYYY')}</em>
+            {fromSubLabel}{fromSubLabel ? ' · ' : ''}Recorded <em>{officeTime(source.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {user.role === 'principal' && isActive ? (
+          {canAmend && isActive ? (
             <Link
               href={`/fund-in/${source.id}/edit`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -406,13 +445,36 @@ export default async function FundSourceDetailPage({ params }: Props) {
         )}
       </section>
 
-      {/* ───────── Repayment info (read-only — payments happen in /payments) ───────── */}
-      {(isActive || isMatured) ? (
+      {/* ───────── Record repayment — the same entry a loan has on Fund out ───────── */}
+      {canRecordRepayment ? (
+        <section className="mb-12 border-t border-hairline pt-8">
+          <div className="sect-head">
+            <h2>Record repayment</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">FINANCE · PRINCIPAL + INTEREST + PENALTY</span>
+          </div>
+          <RecordRepaymentForm
+            fundSourceId={source.id}
+            lender={fromLabel}
+            lenderCompanyId={source.from_company_id ?? null}
+            accountCode={source.account_code ?? null}
+            outstanding={outstanding}
+            monthlyPrincipal={monthlyPrincipal}
+            monthlyInterest={Math.round(monthlyInterest * 100) / 100}
+            bankAccounts={(repayBanks ?? []).map((b) => ({
+              id: b.id as string,
+              bank_name: b.bank_name as string,
+              account_number: (b.account_number as string | null) ?? '',
+              current_balance: Number(b.current_balance ?? 0),
+            }))}
+            pools={paymentPoolOptions(registryPoolOptions(repayRegistry))}
+            activeAccounts={(repayAccounts ?? []).map((a) => a.code as string)}
+          />
+        </section>
+      ) : (isActive || isMatured) ? (
         <section className="mb-12 bg-accent-bg border border-accent-border rounded-md p-4 max-w-3xl">
           <p className="font-serif italic text-accent text-sm">
-            To make a repayment on this fund source, go to{' '}
-            <Link href="/payments/new" className="underline hover:text-accent-hover">Payments → Create payment</Link>{' '}
-            and select &quot;Loan repayment&quot;. All payments require Principal approval.
+            Repayments on this fund source are recorded by Finance and need Principal approval.
           </p>
         </section>
       ) : null}
@@ -424,7 +486,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
           <p className="font-serif text-md text-ink">
             Repaid on{' '}
             <em className="font-serif italic text-ledger">
-              {dayjs(source.repaid_at).format('D MMM YYYY')}
+              {officeTime(source.repaid_at).format('D MMM YYYY')}
             </em>
             {repaidByName ? (
               <> by <em className="font-serif italic text-ledger">{repaidByName}</em></>
@@ -450,7 +512,7 @@ export default async function FundSourceDetailPage({ params }: Props) {
       />
 
       <div className="mt-8">
-        <TermsTimeline kind="fund_source" recordId={source.id} segments={termsSegments} changes={termsChanges} canRevert={user.role === 'principal' && source.status === 'active'} />
+        <TermsTimeline kind="fund_source" recordId={source.id} segments={termsSegments} changes={termsChanges} canRevert={canAmend && source.status === 'active'} />
       </div>
 
       <NotesEditor sourceId={source.id} current={(source.notes as string | null) ?? null} />
@@ -465,12 +527,12 @@ export default async function FundSourceDetailPage({ params }: Props) {
             </div>
             <p className="text-xs text-muted mt-1 italic font-serif">
               Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
-              {dayjs(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
+              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
               Approvals; the deposit reverses (bank, Venture Pool, GL) and is marked cancelled.
             </p>
           </div>
         </section>
-      ) : canFinanceEdit && isPending ? (
+      ) : (canFinanceEdit || canVoid) && isPending ? (
         <section className="border-t border-hairline pt-8">
           <div className="sect-head">
             <h2>Actions</h2>
@@ -478,20 +540,22 @@ export default async function FundSourceDetailPage({ params }: Props) {
             <span className="count">EDITABLE UNTIL PRINCIPAL APPROVES</span>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <Link
-              href={`/fund-in/${source.id}/edit`}
-              className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
-            >
-              Edit fund source
-            </Link>
-            <WithdrawButton id={source.id} />
+            {canFinanceEdit ? (
+              <Link
+                href={`/fund-in/${source.id}/edit`}
+                className="text-sm text-accent hover:text-accent-hover font-serif italic border border-hairline px-4 py-2 rounded-md transition-colors inline-block"
+              >
+                Edit fund source
+              </Link>
+            ) : null}
+            {canVoid ? <WithdrawButton id={source.id} /> : null}
           </div>
           <p className="text-xs text-muted mt-2 italic font-serif">
             Fix typos, wrong amount, wrong rate, or wrong dates while the request is still pending. Locks once Principal approves.
             Submitted the whole thing by mistake? Withdraw it directly — no Principal needed.
           </p>
         </section>
-      ) : canFinanceEdit && isActive ? (
+      ) : canVoid && isActive ? (
         <section className="border-t border-hairline pt-8">
           <div className="sect-head">
             <h2>Actions</h2>

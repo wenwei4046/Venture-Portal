@@ -163,6 +163,168 @@
   --arena-medal-silver-mid: 180 174 164;
   --arena-medal-silver-deep: 107 100 90;
 }
+/* ─── Revenue app (2026-10-04) ───
+   The member app as drawn in Claude Design (`Revenue Mobile.dc.html`). Every
+   value is the prototype's own, copied literally — the design is signed off
+   pixel for pixel, so nothing here is rounded or mapped onto the portal set.
+   Components read these through `var(--rv-*)`; no hex lives anywhere else. */
+[data-revenue-app] {
+  color-scheme: light;
+  /* ink */
+  --rv-ink: #3F2B22;
+  --rv-sub: #806B60;
+  --rv-brown: #4E2F20;
+  --rv-accent: #BD4A19;
+  --rv-red: #A3371A;
+  --rv-amber: #A46312;
+  --rv-green: #387557;
+  --rv-white: #FFFFFF;
+  --rv-black: #000000;
+  /* rules */
+  --rv-line: #EBDDD2;
+  --rv-line-strong: #E2CFC1;
+  --rv-rule: #F1E7DF;
+  --rv-handle: #E3D6CC;
+  /* fills */
+  --rv-sand: #F5EBE3;
+  --rv-cream: #FFF5EC;
+  --rv-peach-bg: #FFF0E4;
+  --rv-green-bg: #E8F3ED;
+  --rv-amber-bg: #FFF0CC;
+  --rv-red-bg: #F8E1D8;
+  --rv-orange-bg: #FFE5CF;
+  --rv-active: #FFF1E6;
+  --rv-desk: #FBF6F2;
+  --rv-peach: #F6B48A;
+  --rv-blush: #F0DDCE;
+  --rv-gold: #E1B04F;
+  --rv-gold-tint: #FFF4D9;
+  --rv-gold-sub: #6B4A1C;
+  --rv-green-pale: #D9EDE2;
+  --rv-unread: #FFFBF7;
+  --rv-rose: #F6D7C0;
+  --rv-cream-2: #FFF6EF;
+  --rv-line-tan: #D9C7BA;
+  /* Insight: tones, the margin ladder and its bar, KPI shades */
+  --rv-neutral-bg: #F7F3EF;
+  --rv-none-bg: #FAF7F4;
+  --rv-wait-bg: #FFF8E6;
+  --rv-tier-top: #2E6249;
+  --rv-tier-inc: #6FAA8A;
+  --rv-tier-ref: #C9BBAE;
+  --rv-tier-pen1: #E7A08A;
+  --rv-tier-pen2: #D9775A;
+  --rv-tier-deep: #1E4532;
+  --rv-zone-pen2: #E7B3A2;
+  --rv-zone-pen1: #F1CDBF;
+  --rv-zone-low: #F6DFAE;
+  --rv-zone-ref: #E9E1D8;
+  --rv-zone-inc: #B7DBC7;
+  --rv-kpi-ink: #24513B;
+  --rv-kpi-4: #4E8A6B;
+  --rv-kpi-5: #679E80;
+  --rv-kpi-6: #86B79C;
+  --rv-kpi-7: #A8CDB8;
+  --rv-kpi-8: #CBE3D5;
+  --rv-kpi-9: #E2F0E8;
+  /* Arena: silver and bronze medals, the podium steps, an empty count */
+  --rv-silver-bg: #F2F0EB;
+  --rv-silver: #B4AEA4;
+  --rv-silver-ink: #6B645A;
+  --rv-bronze: #BA855D;
+  --rv-bronze-ink: #7A4B35;
+  --rv-step-2: #DAD5CC;
+  --rv-step-2-ink: #4A443C;
+  --rv-step-3: #D3A07A;
+  --rv-step-3-ink: #4A2A1A;
+  --rv-muted: #C9B8AC;
+  --rv-pill: #F7F0EA;
+  --rv-radio: #CDBCAE;
+  --rv-placeholder: #757575;
+  /* translucent */
+  --rv-ink-06: rgba(63,43,34,.06);
+  --rv-ink-08: rgba(63,43,34,.08);
+  --rv-ink-14: rgba(63,43,34,.14);
+  --rv-ink-15: rgba(63,43,34,.15);
+  --rv-ink-18: rgba(63,43,34,.18);
+  --rv-ink-20: rgba(63,43,34,.2);
+  --rv-accent-18: rgba(189,74,25,.18);
+  --rv-accent-20: rgba(189,74,25,.20);
+  --rv-accent-30: rgba(189,74,25,.3);
+  --rv-brown-18: rgba(78,47,32,.18);
+  --rv-green-18: rgba(56,117,87,.18);
+  --rv-gold-28: rgba(225,176,79,.28);
+  --rv-white-14: rgba(255,255,255,.14);
+  --rv-white-16: rgba(255,255,255,.16);
+  --rv-white-20: rgba(255,255,255,.2);
+  --rv-white-24: rgba(255,255,255,.24);
+  --rv-white-30: rgba(255,255,255,.3);
+  --rv-white-35: rgba(255,255,255,.35);
+  --rv-white-55: rgba(255,255,255,.55);
+  --rv-amber-12: rgba(164,99,18,.12);
+  --rv-black-38: rgba(0,0,0,.38);
+  --rv-black-06: rgba(0,0,0,.06);
+  --rv-dim: rgba(40,25,18,.45);
+  --rv-dim-brown: rgba(78,47,32,.42);
+  --rv-dim-35: rgba(40,25,18,.35);
+  --rv-dim-40: rgba(40,25,18,.4);
+  /* the income hero (`hero-style="grad"`) */
+  --rv-hero-grad: linear-gradient(140deg,#F2995E 0%,#D9622A 55%,#B8461A 100%);
+  --rv-hero-sub: #FFE6D6;
+  --rv-hero-good: #DDF5E7;
+  /* Profile (2026-10-05): the peach glow, My honours' walnut card and metal
+     medals, the family chart, a request's audit notes */
+  --rv-profile-glow: linear-gradient(180deg,#F6B48A 0%,#FFD9BC 70%,#FFFFFF 100%);
+  --rv-ink-05: rgba(63,43,34,.05);
+  --rv-ink-10: rgba(63,43,34,.10);
+  --rv-ink-25: rgba(63,43,34,.25);
+  --rv-white-12: rgba(255,255,255,.12);
+  --rv-black-15: rgba(0,0,0,.15);
+  --rv-black-30: rgba(0,0,0,.3);
+  --rv-honour-grad: linear-gradient(165deg,#5A3626 0%,#3F2B22 62%,#2E1F18 100%);
+  --rv-honour-glow: radial-gradient(closest-side,rgba(225,176,79,.32),rgba(225,176,79,0));
+  --rv-gold-45: rgba(225,176,79,.45);
+  --rv-gold-18: rgba(225,176,79,.18);
+  --rv-gold-label: #F3D27E;
+  --rv-gold-line: #F3DFB0;
+  --rv-gold-coin: radial-gradient(circle at 35% 30%,#FFF1C2,#E1B04F 60%,#B9862C);
+  --rv-metal-gold: radial-gradient(circle at 35% 30%,#FFF4CC,#E9BC57 55%,#B9862C);
+  --rv-metal-gold-ink: #4A3110;
+  --rv-metal-silver: radial-gradient(circle at 35% 30%,#FFFFFF,#CFCAC2 55%,#8F897F);
+  --rv-metal-silver-ink: #3D3832;
+  --rv-metal-silver-label: #E4E0DA;
+  --rv-metal-bronze: radial-gradient(circle at 35% 30%,#FBE3CF,#C98F65 55%,#8C5A3A);
+  --rv-metal-bronze-ink: #3E2416;
+  --rv-metal-bronze-label: #E4B793;
+  --rv-tree-bg: linear-gradient(180deg,#FBF7F3,#FFFFFF);
+  --rv-paper-warm: #FBF7F3;
+  --rv-tree-line: #D9CABD;
+  --rv-tree-guide: #E3D6CC;
+  --rv-tree-level: #A08E82;
+  --rv-note-bg: #FAF6F2;
+  --rv-cancel-line: #F1C5B4;
+  /* the desktop sidebar's foot and the Product List (2026-10-08,
+     design_handoff_product_list) */
+  --rv-faint: #A08E82;
+  --rv-module-finance: #3C6E8F;
+  --rv-ink-16: rgba(63,43,34,.16);
+  --rv-accent-soft: #E99A53;
+  --rv-accent-12: rgba(189,74,25,.12);
+  --rv-err-strong: #C2412D;
+  --rv-warn-ink: #4A3110;
+  --rv-seg-track: #F6E8DD;
+  --rv-step-off: #D9C9BC;
+  --rv-dim-38: rgba(40,25,18,.38);
+  --rv-window-shadow: rgba(40,25,18,.28);
+  /* the simulated device a preview draws around the app */
+  --rv-frame: #1C1A19;
+  --rv-frame-ring: #3A3634;
+  --rv-android-ink: #1D1B1A;
+  --rv-android-cam: #111111;
+}
+/* The Revenue app refreshes on its own pull (2026-10-06): the browser's pull-to-reload would load the whole page again. */
+html:has([data-revenue-app]) { overscroll-behavior-y: none; }
+
 /* Real devices supply these insets; simulated device chrome lives outside the iframe. */
 [data-arena-design] > [data-arena-chrome] {
   position: sticky;
@@ -527,6 +689,76 @@ h3.font-serif { font-size: 15px; font-weight: 500; font-style: normal; }
   opacity: 0.9;
 }
 
+/* A new version (2026-10-06): components/pwa/UpdatePrompt.tsx, docs/DESIGN.md ›
+   "Update prompt". One ink pill at the top of every surface — the portal, the
+   member app, the installed app — above the progress line, sheets and tab bars.
+   The button is the pill turned inside out (paper on ink), so it reads in the
+   dark theme too without a colour of its own. */
+.update-prompt {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  padding: 5px 5px 5px 16px;
+  border-radius: 999px;
+  background: rgb(var(--ink));
+  color: rgb(var(--paper));
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.3;
+  animation: update-prompt-in 220ms ease-out;
+}
+.update-prompt-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.update-prompt-go {
+  flex: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+  font-weight: 600;
+  cursor: pointer;
+}
+.update-prompt-later {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: rgb(var(--paper) / 0.7);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.update-prompt-later:hover {
+  color: rgb(var(--paper));
+}
+@keyframes update-prompt-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-prompt {
+    animation: none;
+  }
+}
+
 /* While a navigation has not committed yet (html[data-nav-pending], set by
    NavProgress) the page being left dims — after a beat, so a navigation that
    commits at once never shows it. */
@@ -773,9 +1005,9 @@ html[data-nav-pending] .route-surface {
 }
 
 /* ───────── Motion: input focus glow ───────── */
-input:not([type="checkbox"]):not([type="radio"]):focus,
-textarea:focus,
-select:focus {
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *)),
+textarea:focus:not(:where([data-revenue-app] *)),
+select:focus:not(:where([data-revenue-app] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;
@@ -1341,7 +1573,7 @@ tr:hover .icon-btn { opacity: 1; }
   text-transform: none;
   letter-spacing: 0.01em;
 }
-h1:not(.sr-only), .page-title {
+h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title {
   font-family: var(--font-display);
   font-weight: 400;
   font-style: normal;
@@ -1606,7 +1838,7 @@ table.ledger-table tr.lt-detail {
   .statement-amount, .num-hero { font-size: 23px; }
 }
 @media (max-width: 680px) {
-  h1:not(.sr-only), .page-title { font-size: 30px; }
+  h1:not(.sr-only):not(:where([data-revenue-app] *)), .page-title { font-size: 30px; }
   .statement-amount, .num-hero { font-size: 21px; }
 }
 
@@ -1636,16 +1868,21 @@ table.ledger-table tr.lt-detail {
   select,
   textarea {
     font-size: 16px !important;
+  }
+  /* The Revenue app keeps the prototype's own control heights. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *)),
+  select:not(:where([data-revenue-app] *)),
+  textarea:not(:where([data-revenue-app] *)) {
     min-height: 44px;
   }
   /* Checkboxes stay small but get a bigger hit area via padding on the label
      in the markup; bump the box itself to the platform minimum. */
-  input[type='checkbox'],
-  input[type='radio'] {
+  input[type='checkbox']:not(:where([data-revenue-app] *)),
+  input[type='radio']:not(:where([data-revenue-app] *)) {
     width: 18px;
     height: 18px;
   }
-  textarea {
+  textarea:not(:where([data-revenue-app] *)) {
     min-height: 88px;
   }
   /* Money inputs inside a folded table panel are laid out by width utility
@@ -3249,785 +3486,6 @@ table.payroll-grid tfoot td.num.sub { font-weight: 500; color: rgb(var(--graphit
   }
 }
 
-/* Product List's approved light workspace (2026-09-24). The page keeps the
-   existing brown chrome, with neutral work surfaces and softer orange accents.
-   These tokens are scoped: other portal routes keep their current palette. */
-.product-theme {
-  color-scheme: light;
-  --paper: 243 243 241;
-  --surface: 255 255 255;
-  --surface-2: 247 247 245;
-  --hairline: 229 228 223;
-  --chrome: 222 215 202;
-  --ink: 0 0 0;
-  --num-ink: 0 0 0;
-  --graphite: 0 0 0;
-  --muted: 0 0 0;
-  --accent: 233 154 83;
-  --accent-hover: 221 139 66;
-  --accent-bg: 255 244 231;
-  --accent-border: 233 154 83;
-  --walnut: 233 154 83;
-  --ledger-bg: 222 240 232;
-  --alert-bg: 249 238 214;
-  --danger-bg: 250 228 224;
-  --info-bg: 238 235 231;
-  --product-text: 0 0 0;
-  --product-filter: 246 246 244;
-  --product-divider: 226 224 218;
-  --product-table-head: 235 231 224;
-  --product-table-rule: 207 197 183;
-  --product-table-border: 216 210 200;
-  --product-row-hover: 255 245 233;
-  --product-footer: 251 251 250;
-  --product-scrollbar: 160 142 125;
-}
-
-/* All lettering is standard black by request, including labels, placeholders,
-   money, notices and the two chrome panels. State still has its text label and
-   coloured surface/border; no text colour utility can silently restore brown. */
-.product-theme,
-.product-theme * {
-  color: rgb(var(--product-text)) !important;
-}
-.product-theme ::placeholder {
-  color: rgb(var(--product-text));
-  opacity: 1;
-}
-.product-theme .sidebar-contrast {
-  --chrome: 222 215 202;
-  --accent: 233 154 83;
-  --accent-bg: 255 244 231;
-  --accent-border: 233 154 83;
-}
-.product-theme .sidebar-contrast .nav-link:hover {
-  background: rgb(var(--accent-bg));
-}
-.product-theme .sidebar-contrast .bg-accent-bg {
-  background: rgb(var(--accent-bg));
-}
-.product-theme :is(button, a, input, select, textarea):focus-visible {
-  outline: 2px solid rgb(var(--product-text));
-  outline-offset: 3px;
-}
-.product-content {
-  height: 100%;
-  padding: 10px;
-}
-.product-page {
-  min-width: 0;
-  min-height: 100%;
-  padding: 24px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 16px;
-  background: rgb(var(--surface));
-}
-.product-page.product-page-workspace {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 620px;
-}
-.product-page .page-head.tabbed {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
-  padding: 0 0 18px;
-  margin: 0;
-}
-.product-page .page-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-}
-.product-page .page-eyebrow em {
-  display: inline-block;
-  width: 22px;
-  height: 2px;
-  background: rgb(var(--accent));
-}
-.product-back-link {
-  align-self: center;
-  padding: 7px 12px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 6px;
-  white-space: nowrap;
-  font-size: 12px;
-}
-.product-back-link:hover { background: rgb(var(--surface-2)); }
-.product-tabs {
-  display: flex;
-  flex-shrink: 0;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  border-bottom: 1px solid rgb(var(--product-divider));
-  margin-bottom: 18px;
-}
-.product-tabs button {
-  padding: 10px 13px;
-  border-bottom: 3px solid transparent;
-  border-radius: 6px 6px 0 0;
-  white-space: nowrap;
-  font-size: 12px;
-}
-.product-tabs button:hover { background: rgb(var(--surface-2)); }
-.product-tabs button[aria-current="page"] {
-  font-weight: 600;
-  background: rgb(var(--accent-bg));
-  border-bottom-color: rgb(var(--accent));
-}
-.product-tabs[aria-busy="true"] { cursor: progress; }
-.product-sync-notice, .sku-notice {
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 8px;
-  padding: 9px 12px;
-  margin-bottom: 12px;
-  flex-shrink: 0;
-  background: rgb(var(--accent-bg));
-}
-.sku-notice[data-tone="error"] { border-color: rgb(var(--danger)); }
-.sku-master {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
-.sku-filters {
-  flex-shrink: 0;
-  padding: 14px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 10px;
-  background: rgb(var(--product-filter));
-}
-.sku-categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding-bottom: 13px;
-  border-bottom: 1px solid rgb(var(--product-divider));
-}
-.sku-chip {
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 999px;
-  background: rgb(var(--surface));
-  padding: 6px 12px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.sku-chip:hover { border-color: rgb(var(--accent)); }
-.sku-chip[aria-pressed="true"] {
-  border-color: rgb(var(--accent));
-  background: rgb(var(--accent-bg));
-  font-weight: 600;
-}
-.sku-filter-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-  padding-top: 13px;
-}
-.sku-search { position: relative; flex: 1 1 260px; min-width: 0; }
-.sku-search svg { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); pointer-events: none; }
-.sku-search input {
-  width: 100%;
-  height: 38px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 6px;
-  background: rgb(var(--surface));
-  padding: 0 12px 0 38px;
-}
-.sku-model-filter, .sku-tier-filter {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 12px;
-}
-.sku-model-filter select, .sku-catalogue-filter select {
-  background: rgb(var(--surface));
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 6px;
-  padding: 8px 28px 8px 10px;
-  max-width: 190px;
-}
-.sku-tier-options {
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 999px;
-  background: rgb(var(--surface));
-}
-.sku-tier-options button {
-  min-width: 36px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-.sku-tier-options button[aria-pressed="true"] {
-  background: rgb(var(--accent));
-  font-weight: 600;
-}
-.sku-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-  gap: 9px 14px;
-  padding: 14px 0;
-}
-.sku-count { font-size: 12px; }
-.sku-count strong { font-weight: 600; }
-.sku-action-buttons { display: flex; align-items: center; gap: 8px; }
-.sku-primary-button, .sku-secondary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border: 1px solid rgb(var(--accent));
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  background: rgb(var(--accent));
-}
-.sku-primary-button:hover { background: rgb(var(--accent-hover)); }
-.sku-secondary-button { background: rgb(var(--surface)); border-color: rgb(var(--hairline)); }
-.sku-secondary-button:hover { background: rgb(var(--surface-2)); }
-.sku-action-buttons button:disabled { cursor: not-allowed; background: rgb(var(--surface-2)); border-color: rgb(var(--hairline)); }
-.sku-edit-note { flex-shrink: 0; margin-bottom: 12px; font-size: 12px; }
-.sku-table-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 240px;
-  min-width: 0;
-  border: 1px solid rgb(var(--product-table-border));
-  border-radius: 9px;
-  overflow: hidden;
-}
-.sku-table-window {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(var(--product-scrollbar)) rgb(var(--product-filter));
-}
-.sku-table-window:focus-visible { outline: 2px solid rgb(var(--product-text)); outline-offset: -2px; }
-.product-page table.sku-table {
-  width: 100%;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 12px;
-}
-.product-page table.sku-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  height: 42px;
-  padding: 10px 14px;
-  background: rgb(var(--product-table-head));
-  border-bottom: 1px solid rgb(var(--product-table-rule));
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.045em;
-  white-space: nowrap;
-}
-.product-page table.sku-table tbody tr { background: rgb(var(--surface)); }
-.product-page table.sku-table tbody tr:nth-child(even) { background: rgb(var(--surface-2)); }
-.product-page table.sku-table tbody tr:hover { background: rgb(var(--product-row-hover)); }
-.product-page table.sku-table td {
-  padding: 11px 14px;
-  height: 44px;
-  border-bottom: 1px solid rgb(var(--hairline));
-  vertical-align: middle;
-  font-size: 12px;
-}
-.product-page table.sku-table .sku-code-column {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  min-width: 174px;
-  border-right: 1px solid rgb(var(--product-table-border));
-  background: inherit;
-  white-space: nowrap;
-}
-.product-page table.sku-table thead .sku-code-column {
-  z-index: 3;
-  background: rgb(var(--product-table-head));
-}
-.sku-description { min-width: 240px; font-weight: 500; }
-.product-page table.sku-table .num { min-width: 112px; white-space: nowrap; }
-.sku-model-name { display: block; margin-top: 2px; font-size: 11px; white-space: nowrap; }
-.sku-price-input {
-  width: 112px;
-  padding: 6px 8px;
-  background: rgb(var(--surface));
-  border: 1px solid rgb(var(--product-table-border));
-  border-radius: 5px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.sku-grid-link { white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
-.sku-status { font-size: 11px; white-space: nowrap; }
-.product-page table.sku-table .sku-empty { height: 160px; text-align: center; }
-.sku-table-footer {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  padding: 9px 14px;
-  border-top: 1px solid rgb(var(--product-table-border));
-  background: rgb(var(--product-footer));
-  font-size: 11px;
-}
-.sku-catalogue-filter { display: flex; align-items: center; gap: 8px; }
-.sku-catalogue-filter select { padding-top: 4px; padding-bottom: 4px; font-size: 11px; }
-.sku-load-more { text-decoration: underline; text-underline-offset: 3px; }
-/* The screen stage (user 2026-09-27: "这个框架本身太小了"). SKU Master and
-   Costing gaps hold their count row, notes and table in one stage exactly a
-   screen tall: <main> is 100vh less the 70px greeting bar, and 45px is the
-   page's padding under the stage plus 10px of air above it. The page scrolls
-   again, so one turn of the wheel slides the filters away and the table fills
-   the screen — the ERP's tables freeze the same way. A downward wheel over the
-   table moves the page first (`usePageFirstWheel`). */
-.product-content:has(.sku-stage) { display: flex; flex-direction: column; height: auto; min-height: 100%; }
-.product-page.product-page-workspace:has(.sku-stage) { flex: 1 0 auto; height: auto; }
-.sku-stage {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: max(440px, calc(100vh - 115px));
-}
-/* Columns the reader lays out (ColumnTable, user 2026-09-27). The first paint
-   is the auto layout; once its widths are read the table is fixed, a blank
-   last column takes the slack and a cell clips instead of pushing. */
-.product-page table.sku-table[data-layout="fixed"] { table-layout: fixed; }
-.product-page table.sku-table[data-layout="fixed"] :is(th, td) {
-  min-width: 0;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  overflow-wrap: anywhere;
-}
-.product-page table.sku-table[data-layout="fixed"] .sku-price-input { width: 100%; max-width: 112px; }
-.product-page table.sku-table[data-layout="fixed"] .sku-model-name { overflow: hidden; text-overflow: ellipsis; }
-.product-page table.sku-table[data-fitting] :is(th, td) { white-space: nowrap; text-overflow: clip; }
-.product-page table.sku-table[data-fitting] .sku-price-input { width: 112px; }
-.product-page table.sku-table .sku-nowrap { white-space: nowrap; }
-.product-page table.sku-table .sku-col-code { min-width: 174px; }
-.product-page table.sku-table .sku-frozen-column {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  border-right: 1px solid rgb(var(--product-table-border));
-  background: inherit;
-}
-.product-page table.sku-table thead .sku-frozen-column { z-index: 3; background: rgb(var(--product-table-head)); }
-.product-page table.sku-table .sku-col-filler { padding: 0; }
-.product-page table.sku-table thead th[draggable="true"] { cursor: grab; }
-.product-page table.sku-table thead th[data-dragging] { opacity: 0.45; }
-.sku-col-resize {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 4;
-  width: 9px;
-  cursor: col-resize;
-  touch-action: none;
-}
-.sku-col-resize::after {
-  content: '';
-  position: absolute;
-  top: 8px;
-  right: 3px;
-  bottom: 8px;
-  width: 2px;
-  border-radius: 1px;
-  background: rgb(var(--product-table-rule));
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-.product-page table.sku-table thead th:hover .sku-col-resize::after { opacity: 1; }
-.sku-col-resize:is(:hover, :focus-visible, [data-active])::after { opacity: 1; background: rgb(var(--accent)); }
-.sku-col-resize:focus-visible { outline: 2px solid rgb(var(--product-text)); outline-offset: -2px; }
-.sku-col-drop {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 5;
-  width: 3px;
-  border-radius: 2px;
-  background: rgb(var(--accent));
-  pointer-events: none;
-}
-.sku-col-drop[data-side="before"] { left: 0; }
-.sku-col-drop[data-side="after"] { right: 0; }
-@media (max-width: 767px) {
-  .sku-stage { height: auto; }
-}
-@media print {
-  .sku-stage { height: auto; }
-  .product-page table.sku-table .sku-frozen-column { position: static; }
-  .sku-col-resize { display: none; }
-}
-.product-unsaved-notice, .modular-switch-notice {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  border: 1px solid rgb(var(--accent-border));
-  border-radius: 8px;
-  background: rgb(var(--accent-bg));
-  font-size: 12px;
-}
-.product-page input[type="checkbox"] { accent-color: rgb(var(--accent)); }
-/* Modular: the ERP's category board — one card per model, grouped by category. */
-.modular-board { padding: 16px; background: rgb(var(--product-filter)); }
-.modular-board-empty { padding: 60px 0; text-align: center; font-size: 12px; }
-.modular-group + .modular-group { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgb(var(--product-divider)); }
-.modular-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; font-weight: 400; }
-.modular-group-chip {
-  padding: 3px 10px;
-  border: 1px solid rgb(var(--accent-border));
-  border-radius: 999px;
-  background: rgb(var(--accent-bg));
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.modular-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-.modular-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 10px;
-  background: rgb(var(--surface));
-  text-align: left;
-}
-.modular-card:hover { border-color: rgb(var(--accent)); }
-.modular-card:focus-visible { outline: 2px solid rgb(var(--product-text)); outline-offset: 2px; }
-.modular-card[data-open="true"] { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
-.modular-card[data-offered="false"] { background: rgb(var(--surface-2)); }
-.modular-card-top { display: flex; align-items: center; gap: 8px; }
-.modular-card-top strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
-.modular-card-state { margin-left: auto; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; white-space: nowrap; background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); }
-.modular-card[data-offered="true"] .modular-card-state { background: rgb(var(--ledger-bg)); border-color: transparent; font-weight: 600; }
-.modular-card-name { font-size: 12px; overflow-wrap: anywhere; }
-.modular-card-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; font-size: 11px; }
-.modular-card-meta [data-flag] { font-weight: 600; }
-/* Inside a category, one run of cards per branding (user 2026-09-27): a small
-   heading — the eyebrow's orange dash, the branding and its count, as the
-   category's own heading has, then a hairline to the edge. A→Z; the unbranded
-   close the category under a grey dash, in plain words. */
-.modular-brand + .modular-brand { margin-top: 18px; }
-.modular-brand-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 11px; font-weight: 400; }
-.modular-brand-head::before { content: ''; flex: none; width: 14px; height: 2px; background: rgb(var(--accent)); }
-.modular-brand-head[data-none]::before { background: rgb(var(--product-table-rule)); }
-.modular-brand-name { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; overflow-wrap: anywhere; }
-.modular-brand-head[data-none] .modular-brand-name { letter-spacing: 0; text-transform: none; }
-.modular-brand-rule { flex: 1; min-width: 12px; height: 1px; background: rgb(var(--product-divider)); }
-.modular-brand-count { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-/* Modular: one model in a floating window, on one sheet (design A, 2026-09-26). */
-dialog.modular-win {
-  width: min(1120px, calc(100vw - 48px));
-  max-width: none;
-  max-height: calc(100dvh - 48px);
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 16px;
-  background: rgb(var(--surface));
-  color: rgb(var(--product-text));
-  box-shadow: 0 24px 64px rgb(26 22 19 / 0.28), 0 2px 6px rgb(26 22 19 / 0.1);
-}
-dialog.modular-win[open] { display: flex; }
-dialog.modular-win::backdrop { background: rgb(90 62 43 / 0.42); }
-dialog.modular-win:focus-visible { outline: none; }
-.modular-win-frame { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
-.modular-win-head { display: flex; flex: none; align-items: flex-start; gap: 14px; padding: 16px 16px 14px 22px; background: rgb(var(--product-filter)); border-bottom: 1px solid rgb(var(--product-divider)); }
-.modular-win-eyebrow { display: flex; align-items: center; gap: 10px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
-.modular-win-eyebrow em { display: inline-block; width: 18px; height: 2px; background: rgb(var(--accent)); }
-.modular-win-head h2 { margin-top: 7px; font-size: 21px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
-.modular-win-name { font-weight: 400; }
-.modular-win-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.modular-win-meta span { padding: 2px 8px; border: 1px solid rgb(var(--hairline)); border-radius: 999px; background: rgb(var(--surface)); font-size: 11px; white-space: nowrap; }
-.modular-win-meta [data-flag] { border-color: rgb(var(--product-table-rule)); background: rgb(var(--surface-2)); }
-.modular-win-nav { display: flex; flex: none; gap: 6px; margin-left: auto; }
-.modular-win-icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface)); font-size: 18px; line-height: 1; }
-.modular-win-icon:hover:not(:disabled) { background: rgb(var(--surface-2)); }
-.modular-win-icon:disabled { opacity: 0.35; cursor: not-allowed; }
-.modular-win-body { flex: 1; min-height: 0; overflow: auto; padding: 18px 22px 22px; scrollbar-width: thin; scrollbar-color: rgb(var(--product-scrollbar)) rgb(var(--surface)); }
-.modular-win-body .sku-notice { margin-bottom: 14px; }
-.modular-win-note { margin-bottom: 14px; padding: 9px 12px; border: 1px solid rgb(var(--accent-border)); border-radius: 8px; background: rgb(var(--accent-bg)); font-size: 12.5px; }
-.modular-win-gates {
-  display: grid;
-  grid-template-columns: minmax(200px, 1fr) minmax(210px, 1.2fr) minmax(170px, 0.85fr) minmax(170px, 0.85fr);
-  gap: 12px 16px;
-  padding: 14px 16px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 10px;
-  background: rgb(var(--product-filter));
-}
-.modular-win-field { display: grid; align-content: start; gap: 6px; min-width: 0; }
-.modular-win-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-.modular-win-field select { width: 100%; height: 38px; padding: 0 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: rgb(var(--surface)); }
-.modular-win-field[data-bad] select { border-color: rgb(var(--danger)); box-shadow: 0 0 0 3px rgb(var(--danger) / 0.12); }
-.modular-win-help { font-size: 11.5px; line-height: 1.45; }
-.modular-win-field[data-bad] .modular-win-help { padding-left: 8px; border-left: 2px solid rgb(var(--danger)); }
-.modular-win-switch { display: inline-flex; align-items: center; justify-self: start; gap: 10px; height: 38px; padding: 0 14px 0 6px; border: 1px solid rgb(var(--hairline)); border-radius: 999px; background: rgb(var(--surface)); font-size: 13px; }
-.modular-win-track { position: relative; flex: none; width: 40px; height: 24px; border-radius: 999px; background: rgb(var(--product-table-border)); transition: background 0.15s; }
-.modular-win-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: rgb(var(--surface)); box-shadow: 0 1px 2px rgb(0 0 0 / 0.3); transition: transform 0.15s; }
-.modular-win-switch[aria-checked="true"] { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
-.modular-win-switch[aria-checked="true"] .modular-win-track { background: rgb(var(--accent)); }
-.modular-win-switch[aria-checked="true"] .modular-win-track::after { transform: translateX(16px); }
-.modular-win-summary { margin-top: 10px; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; }
-.modular-win-summary[data-tone="ok"] { background: rgb(var(--ledger-bg)); }
-.modular-win-summary[data-tone="off"] { background: rgb(var(--surface-2)); }
-.modular-win-summary[data-tone="bad"] { background: rgb(var(--danger-bg)); box-shadow: inset 3px 0 0 rgb(var(--danger)); }
-.modular-win-section { margin-top: 6px; }
-.modular-win-section-head { position: sticky; top: -18px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 14px 0 10px; background: rgb(var(--surface)); }
-.modular-win-section-head h3 { font-size: 14px; font-weight: 600; }
-.modular-win-count { padding: 2px 8px; border: 1px solid rgb(var(--hairline)); border-radius: 999px; background: rgb(var(--surface-2)); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.modular-win-section-head .sku-secondary-button { padding: 5px 11px; }
-.modular-win-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 8px; }
-.modular-win-tiles[data-width="short"] { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); }
-.modular-win-tiles[data-width="long"] { grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); }
-.modular-win-tile {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: start;
-  gap: 2px 10px;
-  min-height: 48px;
-  padding: 10px 12px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 8px;
-  background: rgb(var(--surface));
-  cursor: pointer;
-}
-.modular-win-tile:hover { border-color: rgb(var(--product-table-rule)); }
-.modular-win-tile[data-on="true"] { border-color: rgb(var(--accent)); background: rgb(var(--accent-bg)); }
-.modular-win-tile[data-stale] { border-style: dashed; }
-.modular-win-tile[aria-disabled="true"] { cursor: not-allowed; opacity: 0.55; }
-.modular-win-tile:has(input:focus-visible) { outline: 2px solid rgb(var(--product-text)); outline-offset: 2px; }
-.modular-win-tile input { width: 18px; height: 18px; margin: 0; cursor: inherit; }
-.modular-win-tile-main { font-size: 13px; font-weight: 600; line-height: 18px; overflow-wrap: anywhere; }
-.modular-win-tile-sub { grid-column: 2; font-size: 11.5px; overflow-wrap: anywhere; }
-.modular-win-tag { padding: 1px 6px; border: 1px solid rgb(var(--hairline)); border-radius: 4px; background: rgb(var(--surface-2)); font-size: 10.5px; }
-.modular-win-foot { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 16px 12px 22px; background: rgb(var(--product-filter)); border-top: 1px solid rgb(var(--product-divider)); }
-.modular-win-status { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
-.modular-win-status[data-dirty="true"]::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--accent)); }
-.modular-win-buttons { margin-left: auto; }
-.modular-win-next { border-color: rgb(var(--accent)); }
-.modular-win-guard { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 10px; border: 1px solid rgb(var(--accent-border)); border-radius: 8px; background: rgb(var(--alert-bg)); font-size: 12.5px; }
-@media (max-width: 1100px) { .modular-win-gates { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (prefers-reduced-motion: reduce) { .modular-win-track, .modular-win-track::after { transition: none; } }
-.maintenance-pools { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 12px; }
-.maintenance-pool-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
-.maintenance-pool-heading h2 { font-size: 15px; font-weight: 600; }
-.maintenance-readonly, .maintenance-draft-count { display: inline-flex; padding: 3px 7px; border: 1px solid rgb(var(--product-divider)); border-radius: 5px; background: rgb(var(--surface-2)); font-size: 11px; }
-.maintenance-draft-count { background: rgb(var(--accent-bg)); border-color: rgb(var(--accent-border)); }
-.combo-filter-controls { padding-top: 0; }
-/* Combo Pricing is one sheet: a row per set, a column band per fabric tier. */
-.combo-modules { min-width: 320px; max-width: 520px; }
-.combo-recipe { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-.combo-plus { font-weight: 600; }
-.combo-tile {
-  display: inline-flex;
-  align-items: stretch;
-  overflow: hidden;
-  border: 1px solid rgb(var(--product-table-border));
-  border-radius: 6px;
-  background: rgb(var(--surface));
-  white-space: nowrap;
-}
-.combo-tile-code { padding: 3px 7px; font-weight: 600; }
-.combo-tile-alt { display: flex; align-items: center; padding: 3px 7px; border-left: 1px dashed rgb(var(--product-table-border)); font-size: 11px; }
-.combo-tile-count { display: flex; align-items: center; padding: 0 7px; background: rgb(var(--product-table-head)); border-left: 1px solid rgb(var(--product-table-border)); font-weight: 700; }
-.product-page table.sku-table .combo-band { text-align: center; }
-.product-page table.sku-table .combo-band-start { border-left: 1px solid rgb(var(--product-table-rule)); }
-.product-page table.sku-table thead tr:nth-child(2) th { top: 42px; }
-.product-page table.sku-table .combo-size { min-width: 104px; }
-.product-page table.sku-table tbody tr.combo-model-row td {
-  height: 34px;
-  padding-top: 7px;
-  padding-bottom: 7px;
-  background: rgb(var(--product-table-head));
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.045em;
-}
-.product-page table.sku-table th.combo-set-name { padding: 11px 14px; border-bottom: 1px solid rgb(var(--hairline)); text-align: left; font-weight: 400; }
-.product-page table.sku-table td.combo-off {
-  background-image: repeating-linear-gradient(135deg, rgb(var(--product-divider) / .55) 0 1px, transparent 1px 7px);
-}
-.product-page table.sku-table td[data-edited] { background: rgb(var(--accent-bg)); }
-.combo-sheet .sku-price-input { width: 96px; }
-.product-section-heading { margin-bottom: 12px; font-size: 12px; }
-.product-section-heading h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.product-gap-next { min-width: 240px; max-width: 330px; }
-.product-gap-next a { text-decoration: underline; text-underline-offset: 3px; }
-/* Costing Setting · Add-on / KPI Items (2026-09-27). Per sub-department
-   settings on the page, like Maintenance: a filter panel of one chip row, a
-   card holding the sub-department's own figure, the picker while editing
-   (a peach panel — what it adds lands in the table below it), the table. */
-.sku-categories[data-only] { padding-bottom: 0; border-bottom: 0; }
-.sku-filters .product-unsaved-notice { margin: 12px 0 0; }
-.rule-card {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 28px;
-  margin-top: 14px;
-  padding: 14px 18px;
-  border: 1px solid rgb(var(--hairline));
-  border-radius: 10px;
-  background: rgb(var(--surface));
-}
-.rule-card[data-tone="on"] { background: rgb(var(--ledger-bg)); border-color: transparent; }
-.rule-card[data-tone="off"] { background: rgb(var(--alert-bg)); border-color: rgb(var(--accent-border)); }
-.rule-card-figure { display: grid; gap: 4px; min-width: 160px; }
-.rule-card-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-.rule-card-value { font-size: 22px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.rule-card-input { display: inline-flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 600; }
-.rule-card-input .sku-price-input { width: 96px; font-size: 14px; }
-.rule-card p { flex: 1 1 320px; font-size: 12.5px; line-height: 1.5; }
-.rule-card a { text-decoration: underline; text-underline-offset: 3px; }
-.rule-picker {
-  margin-bottom: 14px;
-  padding: 14px;
-  border: 1px solid rgb(var(--accent-border));
-  border-radius: 10px;
-  background: rgb(var(--accent-bg));
-}
-.rule-picker-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px; }
-.rule-picker-head h3 { font-size: 13px; font-weight: 600; }
-.rule-picker-head .sku-search { flex: 1 1 280px; }
-.rule-picker-sources { display: flex; flex-wrap: wrap; gap: 7px; }
-.rule-picker-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px; }
-.rule-picker-field { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap; }
-.rule-picker-field .sku-price-input { width: 96px; }
-.rule-picker-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 14px; margin-top: 10px; }
-.rule-pick-list { overflow: hidden; border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface)); }
-.rule-pick-list > li + li { border-top: 1px solid rgb(var(--hairline)); }
-.rule-pick-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.6fr) auto;
-  align-items: center;
-  gap: 4px 12px;
-  padding: 8px 12px;
-  font-size: 12px;
-}
-label.rule-pick-row { grid-template-columns: 18px minmax(120px, 0.8fr) minmax(0, 1.6fr) auto; cursor: pointer; }
-.rule-pick-row:hover { background: rgb(var(--product-row-hover)); }
-.rule-pick-row[data-disabled] { background: rgb(var(--surface-2)); cursor: default; }
-.rule-pick-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
-.rule-pick-code { font-weight: 600; overflow-wrap: anywhere; }
-.rule-pick-desc { min-width: 0; overflow-wrap: anywhere; }
-.rule-pick-cost { justify-self: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.rule-pick-row .sku-secondary-button { justify-self: end; padding: 5px 12px; }
-.rule-pick-empty, .rule-pick-more { padding: 6px 2px 0; font-size: 12px; }
-.rule-flags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; vertical-align: middle; }
-.rule-flags:empty { display: none; }
-.rule-row-button { font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
-.rule-row-button:disabled { cursor: not-allowed; opacity: 0.5; }
-.product-page table.sku-table tbody tr[data-state="new"] { background: rgb(var(--accent-bg)); }
-.product-page table.sku-table tbody tr[data-state="removing"] td:not(:last-child) { opacity: 0.5; }
-@media (max-width: 767px) {
-  .rule-pick-row { grid-template-columns: minmax(0, 1fr) auto; }
-  label.rule-pick-row { grid-template-columns: 18px minmax(0, 1fr) auto; }
-  .rule-pick-desc { order: 3; grid-column: 1 / -1; }
-  label.rule-pick-row .rule-pick-desc { grid-column: 2 / -1; }
-  .rule-picker-foot { justify-content: flex-start; }
-}
-/* Page scroll (user 2026-09-27). Modular and Maintenance only ever grow
-   downward, so they grow with the page and the portal's own scrollbar moves
-   them, as the ERP's Products page does; the wide sheets (SKU Master, Combo
-   Pricing) keep the fixed window above. `productTabScroll` picks the mode.
-   Nothing between a table and <main> may be a scroll box — the panel CLIPS its
-   corners rather than hides them — so a header sticks to the top of the page.
-   A table wider than its card scrolls sideways inside it (PageScrolledTable).
-   The bottom padding lifts the footer's "Show more" clear of BackToTop. */
-.product-content:has(.product-page[data-scroll="page"]) {
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  min-height: 100%;
-}
-.product-page.product-page-workspace[data-scroll="page"] { flex: 1 0 auto; height: auto; padding-bottom: 80px; }
-.product-page[data-scroll="page"] .sku-table-panel { flex: none; height: auto; min-height: 0; overflow: clip; }
-.product-page[data-scroll="page"] .sku-table-window { flex: none; overflow: visible; scrollbar-gutter: auto; }
-.product-page[data-scroll="page"] .sku-table-window[data-sideways] { overflow-x: auto; }
-@media (max-width: 767px) {
-  .product-page.product-page-workspace[data-scroll="page"] { padding-bottom: 18px; }
-  /* Every table is wider than a phone's card: scroll sideways from the first
-     paint, not only once PageScrolledTable has measured after hydration. */
-  .product-page[data-scroll="page"] .sku-table-window { overflow-x: auto; }
-  .product-content { height: auto; padding: 10px 10px calc(76px + env(safe-area-inset-bottom)); }
-  .product-page { padding: 18px 14px; }
-  .product-page.product-page-workspace { height: auto; min-height: 0; }
-  .product-page .page-title { font-size: 30px; }
-  .product-tabs { gap: 2px; margin-bottom: 14px; }
-  .product-tabs button { padding: 9px 10px; }
-  .sku-filters { padding: 11px; }
-  .sku-filter-controls { gap: 10px; }
-  .sku-search { flex-basis: 100%; }
-  .sku-model-filter { flex: 1; }
-  .sku-model-filter select { min-width: 140px; max-width: 180px; }
-  .sku-tier-options button { min-width: 30px; padding: 4px 7px; }
-  .sku-table-panel { flex: none; height: 460px; }
-  .product-page table.sku-table .sku-code-column { min-width: 145px; }
-  .sku-description { min-width: 210px; }
-  .combo-modules { min-width: 240px; }
-  .sku-action-buttons { flex-wrap: wrap; }
-  .modular-board { padding: 10px; }
-  .modular-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  dialog.modular-win { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; }
-  .modular-win-head { padding: 12px 12px 10px 16px; }
-  .modular-win-head h2 { font-size: 18px; }
-  .modular-win-meta { display: none; }
-  .modular-win-body { padding: 12px 14px 18px; }
-  .modular-win-gates { grid-template-columns: minmax(0, 1fr); padding: 12px; }
-  .modular-win-section-head { top: -12px; }
-  .modular-win-tiles { grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); }
-  .modular-win-tiles[data-width="short"] { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
-  .modular-win-tiles[data-width="long"] { grid-template-columns: minmax(0, 1fr); }
-  .modular-win-foot { padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
-  .modular-win-buttons { width: 100%; margin-left: 0; }
-  .modular-win-buttons button { flex: 1; }
-}
-@media print {
-  .product-content, .product-page.product-page-workspace { height: auto; }
-  .sku-table-panel { height: auto; overflow: visible; }
-  .sku-table-window { overflow: visible; }
-  .product-page[data-scroll="page"] :is(.sku-table-panel, .sku-table-window[data-sideways]) { overflow: visible; }
-  .product-page table.sku-table :is(th, .sku-code-column) { position: static; }
-}
-
 /* ═══════════════════════════════════════════════════════════════════════
    Sheet theme (v3.9, 2026-09-27 — HR's view first)
 
@@ -4246,6 +3704,307 @@ label.rule-pick-row { grid-template-columns: 18px minmax(120px, 0.8fr) minmax(0,
 }
 :where(.sheet-theme) table.ledger-table td button[type='submit'][form].bg-accent:hover:not(:disabled) {
   background: rgb(var(--accent));
+}
+
+/* ── Finance's queues (2026-10-07) ──
+   The Approvals queue first, then the Invoices and the Statements: a table
+   with one bar under it for what is ticked. Everything here hangs off
+   `.fin-queue`, which only Finance's converted pages carry: no other table is
+   touched (user: 别碰到其他的 view). */
+.fin-queue .type-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 4px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--graphite));
+  white-space: nowrap;
+}
+/* A combined approval — a loan and its disbursement, a payroll batch — is one
+   row tagged with how many it holds. */
+.fin-queue .combo-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border: 1px solid rgb(var(--accent));
+  border-radius: 4px;
+  background: rgb(var(--accent-bg));
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--ink));
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+/* A ticked row keeps its wash over the zebra and the hover. */
+.fin-queue table.ledger-table tbody tr.st-selected,
+.fin-queue table.ledger-table tbody tr.st-selected:nth-child(even),
+.fin-queue table.ledger-table tbody tr.st-selected:hover { background: rgb(var(--accent-bg)); }
+/* The whole tick cell is the target, not the 18px box. */
+.fin-queue td.st-tick-cell { padding: 0; }
+.fin-queue .st-tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 8px 0 12px;
+  cursor: pointer;
+}
+.fin-queue .q-desc { display: block; }
+.fin-queue .q-sub { display: none; }
+.fin-queue td.q-foot .num {
+  float: right;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A voucher's files in the phone's panel (AttachmentThumbs): an image as a
+   56px thumbnail, a PDF as a tile, anything else by name. */
+.att-thumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.att-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface-2));
+  overflow: hidden;
+  text-decoration: none !important;
+}
+.att-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.att-thumb.att-pdf span {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgb(var(--graphite));
+}
+.att-file {
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 4px;
+  font-size: 12px;
+  color: rgb(var(--ink));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-file:disabled { opacity: 0.5; }
+
+/* The bar under the queue: what is ticked, and the decision on it. */
+.fin-queue .bulk-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgb(var(--walnut) / 0.35);
+  border-radius: 10px;
+  background: rgb(var(--surface));
+  box-shadow: 0 6px 20px rgb(var(--walnut) / 0.12);
+}
+.fin-queue .bulk-bar-step { flex: 1 1 100%; }
+.fin-queue .bulk-bar-l { font-size: 14px; }
+.fin-queue .bulk-bar-l b {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fin-queue .bulk-bar-l small { color: rgb(var(--graphite)); font-size: 12px; }
+.fin-queue .bulk-bar-r { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.fin-queue :is(.bulk-pri, .bulk-sec, .bulk-danger, .bulk-quiet) {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background-color 0.12s, color 0.12s;
+}
+.fin-queue .bulk-pri { background: rgb(var(--accent)); color: rgb(var(--ink)); }
+.fin-queue .bulk-pri:hover:not(:disabled) { background: rgb(var(--accent-hover)); }
+.fin-queue .bulk-sec { border: 1px solid rgb(var(--hairline)); background: rgb(var(--surface)); color: rgb(var(--ink)); }
+.fin-queue .bulk-sec:hover:not(:disabled) { background: rgb(var(--surface-2)); }
+.fin-queue .bulk-danger { background: rgb(var(--danger)); color: #fff; }
+.fin-queue .bulk-danger:hover:not(:disabled) { opacity: 0.9; }
+.fin-queue .bulk-quiet { padding: 8px 10px; color: rgb(var(--graphite)); }
+.fin-queue .bulk-quiet:hover:not(:disabled) { color: rgb(var(--ink)); }
+.fin-queue :is(.bulk-pri, .bulk-sec, .bulk-danger, .bulk-quiet):disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* The Billing Allocator's records (2026-10-07; the user picked 每家一栏): the
+   split as one column per company with HV's own share — kept, never billed —
+   as the last column in grey; the batch as a chip; a strip above the table
+   for what still has to be billed, with the one button that bills it; and a
+   second line under a description or a bill-to on the desktop. */
+.alloc-sheet .gen-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid rgb(var(--accent));
+  border-radius: 10px;
+  background: rgb(var(--accent-bg));
+  font-size: 13px;
+}
+.alloc-sheet .gen-strip b {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.alloc-sheet .gen-strip small { color: rgb(var(--graphite)); font-size: 12px; }
+.alloc-sheet table.ledger-table :is(th, td).own,
+.alloc-sheet table.ledger-table tbody tr.own > td { color: rgb(var(--graphite)); }
+.alloc-sheet .q-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgb(var(--graphite));
+}
+.alloc-sheet table.ledger-table .chip { white-space: nowrap; }
+.alloc-sheet a.chip { text-decoration: none; }
+.alloc-sheet a.chip:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 767px) {
+  .alloc-sheet .q-meta { display: none; }
+  .alloc-sheet .gen-strip { padding: 10px 12px; font-size: 12px; }
+  .alloc-sheet .gen-strip small { display: none; }
+}
+/* An invoice list's extras: a voided row struck through, Settle as a text
+   link on the desktop and an orange pill on a phone (user: the phone's Settle
+   orange, like the Principal's Approve). */
+.fin-queue table.ledger-table tbody tr.inv-void > td { color: rgb(var(--muted)); text-decoration: line-through; }
+.fin-queue table.ledger-table tbody tr.inv-void > td .chip,
+.fin-queue table.ledger-table tbody tr.inv-void > td input { text-decoration: none; }
+/* The billing page's action band: every control on show, in captioned groups. */
+.act-band {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin: -6px 0 20px;
+  padding: 12px 16px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--sheet-filter, var(--surface-2)));
+}
+.act-group { display: flex; flex-direction: column; gap: 7px; }
+.act-group .cap { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--card-label, var(--graphite))); }
+.act-group .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn-quiet-sheet {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 11px;
+  color: rgb(var(--graphite));
+  white-space: nowrap;
+}
+.btn-quiet-sheet:hover { color: rgb(var(--ink)); background: rgb(var(--surface-2)); }
+/* A folded block of reference tables (the billing page's payroll basis). */
+details.fin-fold {
+  margin: 0 0 26px;
+  padding: 0 16px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+}
+details.fin-fold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  padding: 14px 0;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+details.fin-fold > summary::-webkit-details-marker { display: none; }
+details.fin-fold > summary::before { content: '▸'; font-size: 11px; color: rgb(var(--graphite)); }
+details.fin-fold[open] > summary::before { content: '▾'; }
+details.fin-fold > summary small {
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgb(var(--graphite));
+  font-weight: 400;
+}
+details.fin-fold .fin-fold-inner { padding: 4px 0 18px; }
+
+@media (max-width: 767px) {
+  /* The opened row's labels in the card-label face, not the mono (user: 这个字体好看一点). */
+  .fin-queue .lt-detail-list dt {
+    font-family: var(--font-sans), Inter, system-ui, sans-serif;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: rgb(var(--card-label, var(--graphite)));
+  }
+  .fin-queue .inv-settle {
+    display: inline-block;
+    padding: 7px 12px;
+    border-radius: 6px;
+    background: rgb(var(--accent));
+    color: rgb(var(--ink));
+    font-size: 13px;
+    text-decoration: none !important;
+  }
+  /* On a phone the fold is just a line: no box, so its tables keep the sheet's width. */
+  details.fin-fold { padding: 0; border: 0; border-radius: 0; background: transparent; margin: 0 0 18px; }
+  details.fin-fold > summary { padding: 10px 2px; }
+  details.fin-fold .fin-fold-inner { padding: 0 0 6px; }
+  .act-band { gap: 10px 18px; padding: 10px 12px; }
+}
+
+@media (max-width: 767px) {
+  /* The row is the description, with the number and who / when as small
+     print, and the amount; the arrow opens the rest. */
+  .fin-queue .q-desc { font-size: 13px; line-height: 1.3; }
+  /* In the body face, not the mono: at 10px on a phone the mono read as a
+     typewriter / "华语字体" and the date looked odd (user 2026-10-07). */
+  .fin-queue .q-sub {
+    display: block;
+    margin-top: 4px;
+    font-family: var(--font-sans), Inter, system-ui, -apple-system, sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
+    color: rgb(var(--graphite));
+    font-variant-numeric: tabular-nums;
+  }
+  .fin-queue .q-sub-no { display: block; }
+  .fin-queue .q-sub-by { display: flex; justify-content: space-between; gap: 8px; }
+  .fin-queue .q-sub-by .by { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fin-queue .q-sub-by .on { flex: none; white-space: nowrap; }
+  .fin-queue .q-sub .chip { font-size: 9px; padding: 1px 6px; }
+  .fin-queue .combo-tag { margin-left: 4px; font-size: 8.5px; }
+  .fin-queue td.st-tick-cell { width: 36px; }
+  .fin-queue .st-tick { padding: 0 2px 0 8px; }
+  /* The arrow cell: the whole of it is the button, not the 15px chevron. */
+  .fin-queue table.ledger-table td.lt-toggle { padding: 0; }
+  .fin-queue table.ledger-table td.lt-toggle > button { width: 34px; height: auto; min-height: 44px; margin: 0; }
+  /* The bar sits on the tab bar, not under it. */
+  .fin-queue .bulk-bar {
+    bottom: calc(54px + 8px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 12px;
+    gap: 8px 10px;
+  }
+  .fin-queue .bulk-bar-l { font-size: 12px; }
+  .fin-queue .bulk-bar-l small { display: none; }
+  .fin-queue :is(.bulk-pri, .bulk-sec, .bulk-danger) { padding: 8px 12px; }
 }
 @media (max-width: 767px) {
   :where(.sheet-theme) table.ledger-table:where(:not(.payroll-grid)) thead th { padding: 10px; }
@@ -4733,3 +4492,365 @@ a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb
    its red — it is one class heavier. */
 :where(.sheet-theme) .icon-btn:hover,
 :where(.sheet-theme) .icon-btn:focus-visible { color: rgb(var(--ink)); }
+
+/* ─── SortableTable column layout (2026-10-02) ─────────────────────────────
+   A header with a layoutId can be dragged wider/narrower by its right edge
+   and dragged onto another header to change the order. The handle is a strip
+   on the edge that only shows its line on hover, so a table nobody has
+   touched looks exactly as it did. */
+table.ledger-table thead th.st-th { position: relative; }
+table.ledger-table thead th.st-th[draggable="true"] { cursor: grab; }
+table.ledger-table thead th.st-dragging { opacity: 0.4; }
+table.ledger-table thead th.st-drop-before { box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+table.ledger-table thead th.st-drop-after { box-shadow: inset -3px 0 0 rgb(var(--accent)); }
+.st-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.st-resize::after {
+  content: "";
+  position: absolute;
+  top: 22%;
+  right: 3px;
+  width: 2px;
+  height: 56%;
+  border-radius: 2px;
+  background: transparent;
+}
+th.st-th:hover .st-resize::after { background: rgb(var(--hairline)); }
+.st-resize:hover::after,
+.st-resize:active::after { background: rgb(var(--accent)); }
+/* Once a width has been dragged the table is fixed-layout: a cell keeps to
+   its column and what does not fit is cut with an ellipsis, like a sheet. */
+table.ledger-table.st-fixed th,
+table.ledger-table.st-fixed td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A column whose width cannot be dragged (a tick-box, a row menu) is never
+   cut: with the sheet's wider cell padding the frozen width left the box no
+   room and an ellipsis stood in for it (user 2026-10-07: "这个三个点是什么？"). */
+table.ledger-table.st-fixed :is(th, td).st-nocut {
+  overflow: visible;
+  text-overflow: clip;
+}
+/* On the sheet the handle's line is always there, so the eye finds where to
+   pull (user 2026-10-07: "可以 header 之间有个线条吗？"): a 1px rule in the
+   header band's rule colour; orange and 2px while the handle itself is under
+   the pointer. The th-hover rule above outranks `.st-resize:hover::after`,
+   so the sheet's handle-hover rules are written at that specificity. */
+:where(.sheet-theme) .st-resize::after {
+  top: 24%;
+  right: 4px;
+  width: 1px;
+  height: 52%;
+  border-radius: 0;
+  background: rgb(var(--sheet-table-rule));
+}
+:where(.sheet-theme) th.st-th:hover .st-resize::after { background: rgb(var(--sheet-table-rule)); }
+:where(.sheet-theme) th.st-th .st-resize:hover::after,
+:where(.sheet-theme) th.st-th .st-resize:active::after {
+  right: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgb(var(--accent));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Voucher page (2026-10-02)
+
+   A payment voucher / official receipt opened from the list. It was a page of
+   scattered pieces — amount top-left, payee top-right, pool under a rule,
+   status in the corner, the buttons past the audit trail (user: "这个 pv 点开看
+   detail 也是很乱"). It is now laid out like New loan / New fund source: cards
+   on the left, and the navy panel on the right carrying what the voucher IS and
+   what can be done to it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* A page title that is a NUMBER. Page titles are Georgia, and Georgia's figures
+   are old-style — 3 4 5 7 9 hang below the line, 0 1 2 stop at x-height — which
+   is handsome in a sentence and reads as a fault in "HV-OR-202609-0443" (user:
+   "receipt 也是字体你看怪怪的"). A number is set in the figures' own face. */
+h1.title-number {
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+@media (max-width: 680px) {
+  h1.title-number { font-size: 21px; }
+}
+
+/* The status beside that number: the house chip, a size up. */
+.chip.lg { font-size: 12px; padding: 3px 10px; }
+
+/* The navy panel as a RECORD's summary rather than a form's preview. Same
+   tokens (.cf-scope); a record has a status and several things that can be
+   done to it, so it needs a few pieces the preview never did. */
+.deal-side-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid rgb(var(--cf-navy-ink) / 0.3);
+  color: rgb(var(--cf-navy-ink));
+}
+.deal-side-chip.wait { border-color: rgb(var(--cf-gold) / 0.55); background: rgb(var(--cf-gold) / 0.18); color: rgb(var(--cf-gold-ink)); }
+.deal-side-chip.ok { border-color: rgb(110 190 150 / 0.55); background: rgb(110 190 150 / 0.2); color: rgb(190 230 210); }
+.deal-side-chip.bad { border-color: rgb(240 150 140 / 0.6); background: rgb(240 150 140 / 0.16); color: rgb(246 184 176); }
+.deal-side-in { color: rgb(190 230 210); }
+.deal-side-note {
+  border: 1px solid rgb(var(--cf-gold) / 0.45);
+  background: rgb(var(--cf-gold) / 0.13);
+  color: rgb(var(--cf-gold-ink));
+}
+.deal-side-note.ok { border-color: rgb(110 190 150 / 0.5); background: rgb(110 190 150 / 0.15); color: rgb(190 230 210); }
+.deal-side-note.bad { border-color: rgb(240 150 140 / 0.55); background: rgb(240 150 140 / 0.14); color: rgb(246 184 176); }
+.deal-side-note.plain { border-color: rgb(var(--cf-navy-ink) / 0.2); background: rgb(var(--cf-navy-2)); color: rgb(var(--cf-navy-ink) / 0.85); }
+.deal-side-btn2 {
+  border: 1px solid rgb(var(--cf-navy-ink) / 0.28);
+  background: rgb(var(--cf-navy-ink) / 0.07);
+  color: rgb(var(--cf-navy-ink));
+}
+.deal-side-btn2:hover:not(:disabled) { background: rgb(var(--cf-navy-ink) / 0.15); }
+.deal-side-danger { border: 1px solid rgb(240 150 140 / 0.6); background: transparent; color: rgb(246 184 176); }
+.deal-side-danger:hover:not(:disabled) { background: rgb(240 150 140 / 0.14); }
+.deal-side-danger-solid { border: 1px solid rgb(var(--danger)); background: rgb(var(--danger)); color: #fff; }
+.deal-side-field {
+  border: 1px solid rgb(var(--cf-navy-ink) / 0.28);
+  background: rgb(var(--cf-navy-2));
+  color: rgb(var(--cf-navy-ink));
+}
+.deal-side-field::placeholder { color: rgb(var(--cf-navy-ink) / 0.5); }
+.deal-side-field:focus { outline: none; border-color: rgb(var(--cf-gold)); }
+
+/* What happened to the voucher, in order: a dot per step, joined by a line that
+   is coloured as far as the voucher has got. */
+.trail-steps { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.trail-step { position: relative; padding: 17px 10px 0 0; font-size: 13px; }
+.trail-step::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgb(var(--hairline));
+}
+.trail-step::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(var(--surface));
+  border: 2px solid rgb(var(--hairline));
+}
+.trail-step:last-child::before { display: none; }
+.trail-step.done::after { background: rgb(var(--accent)); border-color: rgb(var(--accent)); }
+.trail-step.joined::before { background: rgb(var(--accent)); }
+.trail-step.bad::after { background: rgb(var(--danger)); border-color: rgb(var(--danger)); }
+
+/* ── Permissions: templates × function × action × scope (2026-10-08) ─────────
+   The People Management revamp (Claude Design handoff, DESIGN.md › "Permission
+   matrix"). Every value is the prototype's, mapped back onto the sheet's own
+   tokens — the frames are the sheet's table frames, the cells its accent
+   washes, the drawer the modal panel. */
+.sheet-theme { --perm-hatch: 239 238 234; }
+.perm-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .perm-layout { grid-template-columns: minmax(0, 1fr); } }
+.perm-rail {
+  position: sticky; top: 0; overflow: hidden;
+  border: 1px solid rgb(var(--sheet-table-border)); border-radius: 10px; background: rgb(var(--surface));
+}
+@media (max-width: 1000px) { .perm-rail { position: static; } }
+.perm-band {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid rgb(var(--sheet-table-rule)); background: rgb(var(--sheet-table-head));
+}
+.perm-band .label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+.perm-band .n { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; }
+.perm-rail-list { max-height: 640px; overflow-y: auto; }
+.perm-rail-item {
+  display: block; width: 100%; padding: 11px 14px; text-align: left; cursor: pointer;
+  border: 0; border-bottom: 1px solid rgb(var(--hairline)); background: rgb(var(--surface)); color: rgb(var(--ink));
+}
+.perm-rail-item:hover { background: rgb(var(--sheet-row-hover)); }
+.perm-rail-item[aria-current='true'] { background: rgb(var(--accent-bg)); box-shadow: inset 3px 0 0 rgb(var(--accent)); }
+.perm-rail-item .name { font-size: 13px; font-weight: 500; }
+.perm-rail-item[aria-current='true'] .name { font-weight: 600; }
+.perm-rail-item .meta { display: block; margin-top: 3px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; line-height: 1.5; }
+.perm-rail-item .titles { display: block; margin-top: 3px; font-size: 11px; line-height: 1.45; color: rgb(var(--card-label)); }
+.perm-rail-foot { padding: 10px 12px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--sheet-filter)); }
+.perm-sod {
+  margin-left: auto; padding: 1px 6px; border-radius: 99px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px;
+  background: rgb(var(--alert-bg)); color: rgb(var(--alert)); border: 1px solid rgb(var(--alert) / 0.4);
+}
+.perm-frame { overflow: hidden; border: 1px solid rgb(var(--sheet-table-border)); border-radius: 10px; background: rgb(var(--surface)); }
+.perm-frame-head {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid rgb(var(--hairline));
+}
+.perm-eyebrow { margin-bottom: 4px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.perm-chip {
+  padding: 2px 8px; border-radius: 99px; border: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2));
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; white-space: nowrap; cursor: pointer; color: rgb(var(--ink));
+}
+.perm-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 10px 20px; font-size: 11px;
+  border-bottom: 1px solid rgb(var(--hairline)); background: rgb(var(--sheet-filter));
+}
+.perm-legend .swatch { width: 38px; height: 20px; font-size: 10px; cursor: default; }
+.perm-warn {
+  margin: 14px 20px 0; padding: 10px 14px; border-radius: 8px; font-size: 12px; line-height: 1.6;
+  border: 1px solid rgb(var(--card-alert-bar)); background: rgb(var(--card-alert-icon-bg));
+}
+.perm-matrix-wrap { padding: 14px 20px 20px; overflow-x: auto; }
+table.perm-matrix { width: 100%; min-width: 680px; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+table.perm-matrix th {
+  width: 68px; padding: 8px 4px; text-align: center; border-bottom: 1px solid rgb(var(--sheet-table-rule));
+  background: rgb(var(--sheet-table-head)); font-size: 10px; font-weight: 600; letter-spacing: 0.045em; text-transform: uppercase;
+}
+table.perm-matrix th:first-child { width: auto; padding: 8px 10px; text-align: left; border-radius: 6px 0 0 0; }
+table.perm-matrix th:last-child { border-radius: 0 6px 0 0; }
+table.perm-matrix td.section {
+  padding: 14px 10px 6px; border-bottom: 1px solid rgb(var(--sheet-divider));
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+}
+table.perm-matrix td.section .tally { margin-left: 8px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-weight: 400; }
+table.perm-matrix tr.fn > td { padding: 5px 4px; text-align: center; border-bottom: 1px solid rgb(var(--perm-hatch)); }
+table.perm-matrix tr.fn > td:first-child { padding: 6px 10px; text-align: left; }
+table.perm-matrix tr.fn.zebra { background: rgb(var(--sheet-foot)); }
+table.perm-matrix .fn-label { font-size: 12.5px; font-weight: 500; }
+table.perm-matrix .fn-key { margin-top: 1px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; color: rgb(var(--card-label)); }
+/* The compact matrix: the invite drawer and a person's card. */
+table.perm-matrix.compact { min-width: 0; font-size: 11.5px; background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 8px; overflow: hidden; }
+table.perm-matrix.compact th { width: 52px; padding: 6px 2px; border-bottom: 1px solid rgb(var(--hairline)); font-size: 9px; letter-spacing: 0.03em; border-radius: 0; }
+table.perm-matrix.compact th:first-child { padding: 6px 8px; font-size: 9.5px; letter-spacing: 0.045em; }
+table.perm-matrix.compact tr.fn > td { padding: 3px 2px; }
+table.perm-matrix.compact tr.fn > td:first-child { padding: 4px 8px; white-space: nowrap; }
+table.perm-matrix.compact tr.fn.zebra { background: transparent; }
+/* A cell: · Own Dept All, or hatched where the function has no such action. */
+.perm-cell {
+  display: inline-grid; place-items: center; width: 52px; height: 24px; padding: 0; border-radius: 5px;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; line-height: 1;
+  cursor: pointer; user-select: none; color: rgb(var(--ink) / 0.35);
+  border: 1px dashed rgb(var(--hairline)); background: transparent;
+}
+.perm-cell.own { color: rgb(var(--ink)); background: rgb(var(--surface)); border: 1px solid rgb(var(--sheet-table-border)); }
+.perm-cell.dept { color: rgb(var(--ink)); background: rgb(var(--accent-bg)); border: 1px solid rgb(var(--accent)); }
+.perm-cell.all { color: rgb(var(--ink)); background: rgb(var(--accent)); border: 1px solid rgb(var(--accent)); font-weight: 600; }
+.perm-cell.na {
+  cursor: default; color: transparent; border: 1px solid transparent;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, rgb(var(--perm-hatch)) 4px 5px);
+}
+.perm-cell.small { width: 42px; height: 20px; font-size: 9.5px; }
+.perm-cell.changed { box-shadow: 0 0 0 2px rgb(var(--walnut)); }
+.perm-cell:disabled { cursor: default; }
+.perm-cell:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 1px; }
+.perm-sensitive { padding: 16px 20px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--sheet-foot)); }
+.perm-sensitive .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 767px) { .perm-sensitive .grid3 { grid-template-columns: minmax(0, 1fr); } }
+.perm-sensitive label {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; cursor: pointer;
+  border: 1px solid rgb(var(--hairline)); border-radius: 8px; background: rgb(var(--surface));
+}
+.perm-sensitive input[type='checkbox'] { width: 16px; height: 16px; margin: 1px 0 0; flex: none; accent-color: rgb(var(--accent)); }
+.perm-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 20px; border-top: 1px solid rgb(var(--hairline)); font-size: 11px; }
+pre.perm-keylist {
+  margin: 0; padding: 12px 20px 16px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--surface-2));
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; line-height: 1.7; white-space: pre-wrap;
+}
+.perm-link {
+  padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgb(var(--ink) / 0.35);
+}
+.perm-link:hover { text-decoration-color: rgb(var(--ink)); }
+.perm-held { padding: 10px 20px 14px; border-top: 1px solid rgb(var(--hairline)); background: rgb(var(--alert-bg) / 0.45); font-size: 11.5px; line-height: 1.6; }
+.perm-held li { margin-top: 2px; }
+/* The invite drawer: a right-hand panel over a walnut scrim. */
+.drawer-scrim { position: fixed; inset: 0; z-index: 40; background: rgb(var(--scrim) / 0.28); }
+.drawer-panel {
+  position: fixed; top: 10px; right: 10px; bottom: 10px; z-index: 41; width: 640px; max-width: calc(100vw - 20px);
+  display: flex; flex-direction: column; overflow: hidden; font-size: 13px; color: rgb(var(--ink));
+  background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 16px;
+  box-shadow: 0 10px 40px rgb(var(--ink) / 0.15);
+}
+.drawer-step { padding: 16px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(var(--surface-2)); }
+.drawer-step > h2 {
+  display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 1px solid rgb(var(--hairline)); font-size: 14px; font-weight: 600;
+}
+.drawer-step > h2 .n { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; font-weight: 500; }
+.drawer-label { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.025em; }
+.drawer-input {
+  width: 100%; padding: 8px 12px; font-size: 13px; outline: none;
+  background: rgb(var(--surface)); border: 1px solid rgb(var(--hairline)); border-radius: 6px;
+}
+.drawer-input:focus { border-color: rgb(var(--accent)); }
+.drawer-pick { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgb(var(--perm-hatch)); }
+.drawer-pick:hover { background: rgb(var(--sheet-row-hover)); }
+.drawer-band {
+  padding: 6px 12px; background: rgb(var(--sheet-table-head)); border-left: 3px solid rgb(var(--walnut));
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+}
+.pw-seg { width: 22px; height: 4px; border-radius: 2px; background: rgb(var(--hairline)); }
+.pw-seg.weak { background: rgb(var(--danger)); }
+.pw-seg.fair { background: rgb(var(--card-alert-bar)); }
+.pw-seg.strong { background: rgb(var(--ledger)); }
+/* The roster row's Invite: the sheet's row-Save treatment. */
+.invite-cell {
+  padding: 3px 10px; border: 1px solid rgb(var(--accent)); border-radius: 6px; background: rgb(var(--surface));
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-size: 11px; color: rgb(var(--ink)); cursor: pointer;
+}
+.invite-cell:hover { background: rgb(var(--accent)); }
+
+/* ── Audit Log › Changes (2026-10-08) ──
+   A save's records, each with its fields as a two-column list: the field,
+   then before → after (Changed) or the value (Added / Removed). DESIGN.md ›
+   Audit log. */
+/* A save can run long; its When and Who stay at its top (over the sheet's
+   middle-aligned ledger cells). */
+table.ledger-table.audit-saves td { vertical-align: top; }
+.audit-change + .audit-change { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgb(var(--hairline)); }
+.audit-change-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; line-height: 1.5; }
+.audit-row-link { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgb(var(--hairline)); }
+.audit-row-link:hover { text-decoration-color: currentColor; }
+.audit-fields {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+  column-gap: 14px;
+  row-gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.audit-fields > li { display: contents; }
+.audit-field { color: rgb(var(--graphite)); }
+.audit-was { color: rgb(var(--graphite)); text-decoration: line-through; text-decoration-color: rgb(var(--graphite) / 0.5); }
+.audit-now { font-weight: 600; }
+.audit-hidden { color: rgb(var(--muted)); font-size: 11px; font-style: normal; }
+.audit-more { margin-top: 8px; font-size: 12px; }
+.audit-more > summary { cursor: pointer; color: rgb(var(--graphite)); }
+.audit-more > summary:hover { color: rgb(var(--ink)); }
+.audit-recorded > summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+@media (max-width: 767px) {
+  .audit-fields { grid-template-columns: minmax(0, 1fr); }
+  .audit-field { margin-top: 4px; font-size: 11px; }
+}

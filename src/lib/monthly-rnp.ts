@@ -12,9 +12,41 @@
 // 开单/收回/部门总资金/支出对象 rows were all removed on request.
 
 import dayjs from 'dayjs'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MatrixRow } from './monthly-matrix'
+import { fetchAllRowsAsWritten } from './paginate'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
+
+/**
+ * Every row of rnp_invoice_events (2026-10-08), for the page and its export
+ * alike. The RPC returns a TABLE — a billed row per invoice plus a row per
+ * receipt / credit note — consolidated across every segment, and PostgREST
+ * caps a function's rows at 1000 like any read: past it, the events cut would
+ * silently drop out of 月末未收 and every debtor row.
+ *
+ * Asked as before first (fetchAllRowsAsWritten): the debtor rows keep the
+ * order the function hands its events over in. Only a capped answer is read
+ * again in pages, in a total order — invoice, kind, date, amount; every other
+ * column is the invoice's own, so rows still tied are the same row twice.
+ * A failed read is no events, as it always was.
+ */
+export async function fetchRnpInvoiceEvents(
+  supabase: SupabaseClient,
+  args: { p_segment?: string },
+): Promise<RnpInvoiceEvent[]> {
+  return fetchAllRowsAsWritten<RnpInvoiceEvent>((page) => {
+    const q = supabase.rpc('rnp_invoice_events', args)
+    return page
+      ? q
+          .order('invoice_id')
+          .order('event_kind')
+          .order('event_date')
+          .order('amount')
+          .range(page.from, page.to)
+      : q
+  }).catch(() => [])
+}
 
 /** One row of the rnp_invoice_events RPC. */
 export interface RnpInvoiceEvent {

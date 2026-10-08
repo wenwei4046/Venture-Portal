@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
+import { brandLabel, exhibitionBrandOf, inExhibition, placeOf, NO_BRAND, NO_FAIR } from '@/lib/exhibitions'
 import { buildCommissionWorkbench } from '@/lib/commission/workbench'
 import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
 import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
@@ -22,6 +23,7 @@ import {
   type MonthOrder,
 } from '../../../_lib/month-orders'
 import { loadCommissionWorkbench } from '../../../_lib/commission-workbench'
+import { loadOrderFairs, type OrderFair } from '../../../_lib/order-fairs'
 import { openBillOnFor } from '../../../_lib/open-bill-month'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import workbenchStyles from '../_components/commission-workbench.module.css'
@@ -30,7 +32,7 @@ import AllBillsTable, { type BillRow } from './_components/AllBillsTable'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
-  searchParams: Promise<{ staff?: string; venue?: string; show?: string }>
+  searchParams: Promise<{ staff?: string; venue?: string; brand?: string; fair?: string; show?: string }>
 }
 
 function label(period: string): string {
@@ -53,7 +55,9 @@ function label(period: string): string {
  * it is, and what its lines cost.
  *
  * Filters are links, not state: a person's bills are a URL somebody can send
- * to the person whose bills they are.
+ * to the person whose bills they are. So is an exhibition's (2026-10-03): the
+ * month's *Sales exhibition* rows open here on `?fair=` and `?brand=` — a
+ * brand at a fair — with `?fair=none&venue=` for a place no fair claims.
  *
  * IT IS ALSO WHERE THE OPEN BILL PICK IS MADE (2026-09-16). The pick used to
  * live on its own board, which showed the order number and the value and
@@ -66,7 +70,9 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   await requirePermission('revenue')
   const { sub, period } = await params
   if (!/^\d{4}-\d{2}-01$/.test(period)) notFound()
-  const { staff: staffFilter, venue: venueFilter, show } = await searchParams
+  const { staff: staffFilter, venue: venueFilter, brand: brandFilter, fair: fairFilter, show } = await searchParams
+  const exhibitionFilter = { fair: fairFilter, brand: brandFilter }
+  const exhibition = fairFilter !== undefined || brandFilter !== undefined
 
   const subDept = await requireSubDepartment(sub)
   const supabase = (await createClient()) as unknown as SupabaseClient
@@ -92,12 +98,15 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   // who took a bill out of the month by hand — only an excluded bill can be.
   // …and which bills were given their brand here (2026-09-27): only a live
   // bill can be, and only where the scheme has a ladder to pick from.
-  const [shares, team, exclusions, brandOptions, brandPicks] = await Promise.all([
+  // …and, for one exhibition, the fair and the ERP booth each bill was
+  // written at — the same read the month's Sales exhibition grouped them by.
+  const [shares, team, exclusions, brandOptions, brandPicks, placed] = await Promise.all([
     loadOrderShares(supabase, all.map(o => o.orderId)),
     loadShareTeam(supabase, subDept.schemeId),
     loadOrderExclusions(supabase, all.filter(o => o.cancelled).map(o => o.orderId)),
     loadBrandOptions(supabase, subDept.schemeId),
     loadOrderBrandPicks(supabase, all.filter(o => !o.cancelled).map(o => o.orderId)),
+    exhibition ? loadOrderFairs(supabase, all.map(o => o.orderId)) : Promise.resolve(new Map<string, OrderFair>()),
   ])
   const sharesByOrder = new Map<string, typeof shares>()
   for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
@@ -117,7 +126,12 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       return false
     }
     // The filter is a PLACE, not a spelling: merged venues answer as one.
-    if (venueFilter !== undefined && (o.venueGroupKey ?? '') !== venueFilter) return false
+    if (venueFilter !== undefined && placeOf({ venue: o.venue, groupKey: o.venueGroupKey }) !== venueFilter) return false
+    if (exhibition) {
+      const at = placed.get(o.orderId)
+      const brand = exhibitionBrandOf({ booth: at?.booth ?? null, brandCode: o.brandCode }, brandOptions)
+      if (!inExhibition({ brand, fairId: at?.fairId ?? null }, exhibitionFilter)) return false
+    }
     return true
   })
   // The tiles are the month's money, so they read the live bills only.
@@ -154,10 +168,30 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     : undefined
   const venueName = venueFilter !== undefined
     ? (() => {
-        const hit = all.find(o => (o.venueGroupKey ?? '') === venueFilter)
+        const hit = all.find(o => placeOf({ venue: o.venue, groupKey: o.venueGroupKey }) === venueFilter)
         return hit?.venueGroupName ?? hit?.venue ?? '(no venue)'
       })()
     : null
+
+  // One exhibition, opened from the month's Sales exhibition (2026-10-03): its
+  // brand, then its place — a fair's own place, whatever venue its bills typed
+  // — and the fair's organiser and days under it.
+  const atFair = fairFilter !== undefined && fairFilter !== NO_FAIR
+  const fairMeta = atFair && base0[0] ? eventOf.get(base0[0].orderId) : undefined
+  const exhibitionTitle = exhibition
+    ? [
+        brandFilter !== undefined ? brandLabel(brandFilter === NO_BRAND ? null : brandFilter) : null,
+        atFair ? (fairMeta?.fair?.venueName ?? null) : venueName,
+      ].filter(Boolean).join(' · ') || null
+    : null
+  const exhibitionNote = !exhibition
+    ? null
+    : atFair
+      ? `Every bill of this exhibition${fairMeta && (fairMeta.organizer || fairMeta.eventName)
+        ? ` — ${[fairMeta.organizer, fairMeta.eventName].filter(Boolean).join(' · ')}` : ''}`
+      : fairFilter === NO_FAIR
+        ? 'Every bill written here that no fair claims — it is placed by fixing the event on the order in the ERP'
+        : brandFilter === NO_BRAND ? 'Every bill this month that names no brand' : 'Every bill of this brand this month'
 
   const total = rows.reduce((a, o) => a + o.orderTotal, 0)
   const held = rows.filter(o => !o.cancelled && !o.depositMet)
@@ -191,13 +225,15 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     return {
       orderId: o.orderId,
       orderNo: o.orderNo,
+      refNo: o.refNo,
+      paperNo: o.paperNo,
       href: revenuePath(subDept.slug, period, 'orders', o.orderId),
       orderDate: o.orderDate,
       eventDate: o.eventDate,
       sequenceInDay: o.sequenceInDay,
       customerName: o.customerName,
       venue: o.venue,
-      venueHref: o.venue ? keep({ venue: o.venueGroupKey ?? '', staff: undefined }) : null,
+      venueHref: o.venue ? keep({ venue: placeOf({ venue: o.venue, groupKey: o.venueGroupKey }), staff: undefined }) : null,
       // Only when the document's spelling is not the place's own.
       venuePlace: o.venueGroupName && venueKey(o.venue) !== o.venueGroupKey ? o.venueGroupName : null,
       eventName: eventOf.get(o.orderId)?.eventName ?? null,
@@ -208,7 +244,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       orderTotal: o.orderTotal,
       // What the live calculation says earns; a bill it never saw (cancelled,
       // or the calculation failed) falls back to the lines in paying groups.
-      commissionable: paid?.commissionable ?? o.marginRevenue,
+      commissionable: paid?.commissionable ?? o.commissionable,
       paidAmount: o.paidAmount,
       depositShort: o.depositRequired !== null && !o.depositMet ? o.depositRequired : null,
       marginPct: o.marginPct,
@@ -257,7 +293,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     }
   })
 
-  const filtered = Boolean(staffFilter) || venueFilter !== undefined
+  const filtered = Boolean(staffFilter) || venueFilter !== undefined || exhibition
   return (
     <div className={workbenchStyles.page}>
       <div className="page-head">
@@ -269,7 +305,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
             {person?.employeeName ??
               // Somebody who only holds SHARES this month owns no bill to read a name from.
               shares.find(sh => sh.staffId === staffFilter)?.name ??
-              (staffFilter === 'unmatched' ? 'Unmatched bills' : venueName ?? 'Sales orders')}
+              (staffFilter === 'unmatched' ? 'Unmatched bills' : exhibitionTitle ?? venueName ?? 'Sales orders')}
           </h1>
           {filtered ? (
             <p className="text-sm mt-3">
@@ -277,7 +313,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
                 ? `${person?.employeeCode ? person.employeeCode + ' · ' : ''}every bill of theirs this month, and every bill shared with them`
                 : null}
               {staffFilter === 'unmatched' ? 'Bills whose ERP agent is not yet a salesperson here, so they pay nobody' : null}
-              {venueName && !staffFilter ? 'Every bill written at this venue' : null}
+              {exhibitionNote && !staffFilter ? exhibitionNote : null}
+              {venueName && !staffFilter && !exhibition ? 'Every bill written at this venue' : null}
             </p>
           ) : null}
         </div>
@@ -290,11 +327,12 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
               All bills
             </Link>
           ) : null}
+          {/* An exhibition's bills lead back to the tab they were opened from. */}
           <Link
-            href={revenuePath(subDept.slug, period)}
+            href={exhibition ? `${revenuePath(subDept.slug, period)}?view=exhibition` : revenuePath(subDept.slug, period)}
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
           >
-            ← The month
+            {exhibition ? '← Sales exhibition' : '← The month'}
           </Link>
         </div>
       </div>

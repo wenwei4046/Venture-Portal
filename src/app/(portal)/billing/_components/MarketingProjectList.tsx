@@ -28,9 +28,13 @@ interface Props {
 // dept with real P&L — these contracts feed the Marketing dept pool.
 export default function MarketingProjectList({ contracts, companyMap, canCreate, headerAction }: Props) {
   return (
-    <section className="border-t border-hairline pt-8">
-      <div className="flex items-baseline justify-between mb-4 gap-4">
-        <h2 className="font-serif text-xl text-ink">Marketing Projects</h2>
+    <section className="fin-queue mt-10">
+      <div className="sect-head">
+        <h2>Marketing projects</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{contracts.filter((c) => c.status === 'active').length} ACTIVE</span>
+      </div>
+      <div className="flex items-baseline justify-end mb-4 gap-4">
         <div className="flex items-baseline gap-4">
           {headerAction}
           {canCreate && (

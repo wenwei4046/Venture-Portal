@@ -68,6 +68,7 @@ export async function fetchReceiptExtras(supabase: SupabaseClient): Promise<Vouc
       description: r.notes ?? `Loan ${r.payment_type} repayment${c ? ` — ${c.name}` : ''}`,
       paymentOrCreatedDate: r.payment_date,
       href: `/fund-out/${r.loan_id}`,
+      amendDate: { kind: 'repayment', id: r.id, date: r.payment_date.slice(0, 10) },
     })
   }
 

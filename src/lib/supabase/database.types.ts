@@ -1156,6 +1156,7 @@ export type Database = {
           description: string | null
           id: string
           payroll_month: string | null
+          payout_route: string | null
           receipt_url: string | null
           source_pool: string | null
           status: Database["public"]["Enums"]["claim_status"]
@@ -1174,6 +1175,7 @@ export type Database = {
           description?: string | null
           id?: string
           payroll_month?: string | null
+          payout_route?: string | null
           receipt_url?: string | null
           source_pool?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
@@ -1192,6 +1194,7 @@ export type Database = {
           description?: string | null
           id?: string
           payroll_month?: string | null
+          payout_route?: string | null
           receipt_url?: string | null
           source_pool?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
@@ -5701,6 +5704,7 @@ export type Database = {
           created_at: string
           updated_by: string
           updated_at: string
+          claim_id: string | null
         }
         Insert: {
           id?: string
@@ -5715,6 +5719,7 @@ export type Database = {
           created_at?: string
           updated_by: string
           updated_at?: string
+          claim_id?: string | null
         }
         Update: {
           id?: string
@@ -5729,6 +5734,7 @@ export type Database = {
           created_at?: string
           updated_by?: string
           updated_at?: string
+          claim_id?: string | null
         }
         Relationships: [
           { foreignKeyName: "revenue_pay_lines_staff_id_fkey"; columns: ["staff_id"]; isOneToOne: false; referencedRelation: "hr_staff_costs"; referencedColumns: ["id"] },
@@ -6978,6 +6984,7 @@ export type Database = {
           level_id: string | null
           name: string
           sort_order: number
+          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -6990,6 +6997,7 @@ export type Database = {
           level_id?: string | null
           name: string
           sort_order?: number
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -7002,6 +7010,7 @@ export type Database = {
           level_id?: string | null
           name?: string
           sort_order?: number
+          template_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -7138,6 +7147,64 @@ export type Database = {
           },
           {
             foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      table_layout_defaults: {
+        Row: {
+          layout: Json
+          set_at: string
+          set_by: string | null
+          table_id: string
+        }
+        Insert: {
+          layout: Json
+          set_at?: string
+          set_by?: string | null
+          table_id: string
+        }
+        Update: {
+          layout?: Json
+          set_at?: string
+          set_by?: string | null
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "table_layout_defaults_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_table_layouts: {
+        Row: {
+          layout: Json
+          table_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          layout: Json
+          table_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          layout?: Json
+          table_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_table_layouts_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -7645,6 +7712,28 @@ export type Database = {
         Args: { p_new_type: string; p_old: string }
         Returns: Json
       }
+      claim_create_payment_voucher: {
+        Args: { p_bank: string; p_claim: string; p_method: string }
+        Returns: string
+      }
+      claim_payment_queue: {
+        Args: never
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by_name: string | null
+          claim_id: string
+          claim_type: string
+          claimant_name: string
+          department: string | null
+          description: string | null
+          request_no: string | null
+          source_pool: string | null
+          voucher_id: string | null
+          voucher_no: string | null
+          voucher_status: string | null
+        }[]
+      }
       close_approvals_for_voided_voucher: {
         Args: { p_voucher_id: string }
         Returns: number
@@ -7939,6 +8028,13 @@ export type Database = {
           submitted_by_name: string
         }[]
       }
+      gl_net_by_account: {
+        Args: { p_before: string; p_codes?: string[] }
+        Returns: {
+          account_code: string
+          net: number
+        }[]
+      }
       has_perm: { Args: { p_key: string }; Returns: boolean }
       has_scope: { Args: { p_scopes: string[] }; Returns: boolean }
       hr_dashboard_summary: { Args: { p_period?: string }; Returns: Json }
@@ -8022,6 +8118,18 @@ export type Database = {
         Returns: Database["public"]["Enums"]["gl_segment"]
       }
       post_journal_entry: {
+        Args: {
+          p_created_by: string
+          p_description: string
+          p_lines: Json
+          p_reference_id: string
+          p_reference_type: string
+          p_segment?: Database["public"]["Enums"]["gl_segment"]
+          p_transaction_date: string
+        }
+        Returns: string
+      }
+      post_journal_entry_as_caller: {
         Args: {
           p_created_by: string
           p_description: string
@@ -8492,7 +8600,7 @@ export type Database = {
       statement_direction: "receivable" | "payable"
       statement_line_type: "invoice" | "contra"
       statement_status: "draft" | "issued" | "paid" | "partial" | "overdue"
-      user_role: "principal" | "finance" | "hr" | "dept_manager" | "revenue_member"
+      user_role: "principal" | "finance" | "hr" | "dept_manager" | "revenue_member" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8814,7 +8922,7 @@ export const Constants = {
       statement_direction: ["receivable", "payable"],
       statement_line_type: ["invoice", "contra"],
       statement_status: ["draft", "issued", "paid", "partial", "overdue"],
-      user_role: ["principal", "finance", "hr", "dept_manager", "revenue_member"],
+      user_role: ["principal", "finance", "hr", "dept_manager", "revenue_member", "staff"],
     },
   },
 } as const

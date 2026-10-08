@@ -1,69 +1,44 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import type { AllocatorData, TxnRow } from './types'
 import CalculateTab from './CalculateTab'
 import RecordsTab from './RecordsTab'
 import StaffTab from './StaffTab'
 import SetupTab from './SetupTab'
 
-const TABS = [
-  { key: 'calc', label: '计算 · Calculate' },
-  { key: 'records', label: '记录 · Records' },
-  { key: 'staff', label: '名单 · Staff' },
-  { key: 'setup', label: '模板 · Setup' },
-] as const
+type TabKey = 'calc' | 'records' | 'staff' | 'setup'
 
-type TabKey = (typeof TABS)[number]['key']
-
-// One workspace per month. The month input navigates by ?period= only, which
-// keeps this client subtree mounted — so the landing tab (seeded from the
-// month's records), a record being corrected and a half-typed Calculate draft
-// all carried over into the next month. Keyed on the month the server
-// rendered, the workspace starts fresh for it (a draft typed for one month is
-// dropped rather than filed under another).
+// One workspace per month. The month picker (AllocatorPeriod, in the page
+// head) navigates by ?period= only, which keeps this client subtree mounted —
+// so the landing tab (seeded from the month's records), a record being
+// corrected and a half-typed Calculate draft all carried over into the next
+// month. Keyed on the month the server rendered, the workspace starts fresh
+// for it (a draft typed for one month is dropped rather than filed under
+// another).
 export default function AllocatorTabs({ data }: { data: AllocatorData }) {
   return <AllocatorTabsBody key={data.period} data={data} />
 }
 
 function AllocatorTabsBody({ data }: { data: AllocatorData }) {
-  const router = useRouter()
-  const pathname = usePathname()
   const [tab, setTab] = useState<TabKey>(data.txns.length > 0 ? 'records' : 'calc')
-  // A record being corrected: Records' 改 loads it into Calculate; saving
+  // A record being corrected: Records' Edit loads it into Calculate; saving
   // there overwrites the original (same ALC number).
   const [editTxn, setEditTxn] = useState<TxnRow | null>(null)
 
+  // The sheet's counted rail (2026-10-07): Records by the month's records,
+  // Staff by the people on the list, Setup by the templates.
+  const items = [
+    { key: 'calc', label: 'Calculate' },
+    { key: 'records', label: 'Records', count: data.txns.length },
+    { key: 'staff', label: 'Staff', count: data.staff.filter((s) => s.status === 'active').length },
+    { key: 'setup', label: 'Setup', count: data.templates.length },
+  ]
+
   return (
     <div>
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-        <div className="flex items-center gap-1.5">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={`px-3.5 py-1.5 rounded-md text-sm font-serif italic border transition-colors ${
-                tab === t.key
-                  ? 'bg-ink text-paper border-ink'
-                  : 'bg-surface text-graphite border-hairline hover:text-ink'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wide text-muted font-sans">Period</span>
-          <input
-            type="month"
-            value={data.period}
-            onChange={(e) => e.target.value && router.push(`${pathname}?period=${e.target.value}`)}
-            className="px-3 py-1.5 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
-          />
-        </div>
-      </div>
+      <SlidingTabs items={items} active={tab} onTabChange={(key) => setTab(key as TabKey)} variant="control" />
 
       {tab === 'calc' ? (
         <CalculateTab

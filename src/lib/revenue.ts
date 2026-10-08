@@ -35,8 +35,22 @@ export function revenuePath(slug: string, ...segments: Array<string | number>): 
   return ['/revenue', slug, ...segments].join('/')
 }
 
-/** Item code → unit cost + brand. Department-wide, so it sits outside a slug. */
-export const PRODUCT_LIST_PATH = '/revenue/products'
+/**
+ * Item code → unit cost + brand. Department-wide, so it sits outside a slug —
+ * and since 2026-10-08 in the Revenue app, not on the HR side (the old
+ * `/revenue/products` redirects here).
+ */
+export const PRODUCT_LIST_PATH = '/member/products'
+
+/** The Product List opened on a tab (`sku` is the first), a search, a sub-department. */
+export function productListPath(open: { tab?: string | null; q?: string | null; sub?: string | null } = {}): string {
+  const q = new URLSearchParams()
+  if (open.tab && open.tab !== 'sku') q.set('tab', open.tab)
+  if (open.sub) q.set('sub', open.sub)
+  if (open.q) q.set('q', open.q)
+  const s = q.toString()
+  return s ? `${PRODUCT_LIST_PATH}?${s}` : PRODUCT_LIST_PATH
+}
 
 /** The Revenue Department as a whole: its mode (2026-09-30), later its pool. */
 export const REVENUE_DEPARTMENT_PATH = '/revenue/department'

@@ -1,6 +1,18 @@
 import type { NextConfig } from 'next'
 
+// The build's own name (2026-10-06). An installed app is resumed from memory,
+// not reloaded, so a phone could run last week's build for days — and Next
+// recalculates every Server Action's id per build, so that old copy's reads
+// start failing the moment a release lands. The name is baked into the
+// browser's bundle (NEXT_PUBLIC_APP_VERSION) and answered on /sw.js
+// (X-App-Version, below); components/pwa/UpdatePrompt compares the two and
+// offers the new one. Empty off Vercel: a local or CI build never prompts.
+const APP_VERSION = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || ''
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: APP_VERSION,
+  },
   experimental: {
     // Voucher attachments (transfer slips / invoices / scanned PDFs) are sent
     // through the Server Action body. The default cap is 1 MB — a scanned PDF
@@ -11,23 +23,28 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '4mb',
     },
-    // The client router's memory (2026-09-26). `dynamic`: a page visited in
-    // the last 30 s opens again from memory — no server round trip — the way
-    // the Houzs ERP's 30 s query cache makes a revisit instant. `static`: a
-    // page warmed on hover (lib/nav-warm.ts), or by the phone tab bar, is
-    // reused for 30 s rather than Next's default 5 minutes, so nothing shown
-    // from memory is older than half a minute. A Server Action that
-    // revalidates a path or sets a cookie throws the whole memory away, and
-    // every write in the portal does one or the other before it redirects
-    // (checked 2026-09-26) — so your own edits always show at once.
+    // The client router's memory. `dynamic`: a page visited in the last five
+    // minutes (from its last visit) opens again from memory — no server round
+    // trip; `static`: a page warmed on hover or while the portal sat idle
+    // (lib/nav-warm.ts), or by the phone tab bar, is reused for five minutes.
+    // 30 s until 2026-10-08 (user: 切换到另外一个 tab 都非常的慢), when a page shown
+    // from memory started being read again behind itself
+    // (components/layout/RouteFreshener.tsx): it is on screen at once, and the
+    // server's new render swaps in a moment later — memory makes it instant,
+    // the refresh keeps it current. A Server Action that revalidates a path or
+    // sets a cookie still throws the whole memory away, and every write in the
+    // portal does one or the other before it redirects (checked 2026-09-26) —
+    // so your own edits always show at once.
     staleTimes: {
-      dynamic: 30,
-      static: 30,
+      dynamic: 300,
+      static: 300,
     },
   },
 
   // The service worker must never be served from a cache, or a fix to it
-  // reaches phones days late. (public/sw.js, the installable app.)
+  // reaches phones days late. (public/sw.js, the installable app.) It also
+  // says which build is live — never cached, and every deployment's own copy
+  // — which is what UpdatePrompt asks with a HEAD request.
   async headers() {
     return [
       {
@@ -35,6 +52,7 @@ const nextConfig: NextConfig = {
         headers: [
           { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
           { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          ...(APP_VERSION ? [{ key: 'X-App-Version', value: APP_VERSION }] : []),
         ],
       },
       {

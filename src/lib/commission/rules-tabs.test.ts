@@ -23,12 +23,27 @@ describe('visibleRulesTabs', () => {
     expect(keys(off)).toEqual(['scheme', 'ladder', 'ranks'])
   })
 
-  it('Fair — every switch on, its policy recorded, two directors: all ten, in section order', () => {
-    expect(keys(on, { itemGroups: 7, promotionRules: 10, directors: 2 })).toEqual(RULES_TABS.map(t => t.key))
+  it('Fair — every switch on, its policy recorded, two directors: all nine, in section order', () => {
+    expect(keys(on, { itemGroups: 7, promotionRules: 10, directors: 2, kpiItems: 1, kpiThresholds: 1 }))
+      .toEqual(RULES_TABS.map(t => t.key))
+    expect(RULES_TABS.map(t => t.key)).toEqual(
+      ['scheme', 'ladder', 'groups', 'open-bill', 'brands', 'promotion', 'ranks', 'directors', 'kpi'],
+    )
   })
 
-  it('KPI item allowance brings the three item tables', () => {
-    expect(keys({ ...off, enable_kpi: true })).toEqual(['scheme', 'ladder', 'groups', 'kpi', 'thresholds', 'ranks'])
+  it('KPI item allowance brings the item groups and KPI items — the ladder is on the KPI items tab', () => {
+    expect(keys({ ...off, enable_kpi: true })).toEqual(['scheme', 'ladder', 'groups', 'ranks', 'kpi'])
+  })
+
+  // 2026-10-08: the items moved here from the Product List, where they were
+  // listed whatever the switch said. Fair on that day: KPI off, HB Straight at
+  // RM 250 and Tier 1 (10 units → +20%) recorded.
+  it('KPI items stays at the end of the rail, switch off, while an item or a rung is recorded', () => {
+    expect(keys(off, { ...nothing, kpiItems: 1 })).toEqual(['scheme', 'ladder', 'ranks', 'kpi'])
+    expect(keys(off, { ...nothing, kpiThresholds: 1 })).toEqual(['scheme', 'ladder', 'ranks', 'kpi'])
+    expect(keys(off, { itemGroups: 7, promotionRules: 10, directors: 2, kpiItems: 1, kpiThresholds: 1 }))
+      .toEqual(['scheme', 'ladder', 'groups', 'promotion', 'ranks', 'directors', 'kpi'])
+    expect(keys(off)).not.toContain('kpi')
   })
 
   it('Open Bill bonus brings Open Bill rates', () => {
@@ -46,7 +61,7 @@ describe('visibleRulesTabs', () => {
   })
 
   // 2026-09-27: KRIS and PETER direct Fair, PETER IR — each pays its own.
-  it('Directors has no switch: it shows while the sub-department has a director, last', () => {
+  it('Directors has no switch: it shows while the sub-department has a director, after Ranks', () => {
     expect(keys(off, { ...nothing, directors: 1 })).toEqual(['scheme', 'ladder', 'ranks', 'directors'])
     expect(keys(off)).not.toContain('directors')
   })
@@ -71,5 +86,12 @@ describe('resolveRulesTab', () => {
   it('and for no tab at all, or one that never existed', () => {
     expect(resolveRulesTab(null, ir)).toBe('scheme')
     expect(resolveRulesTab('people', ir)).toBe('scheme')
+  })
+
+  it('a bookmark of the old threshold ladder tab opens KPI items, where the ladder is now', () => {
+    const fair = visibleRulesTabs(off, { ...nothing, kpiItems: 1, kpiThresholds: 1 })
+    expect(resolveRulesTab('thresholds', fair)).toBe('kpi')
+    expect(resolveRulesTab('kpi', fair)).toBe('kpi')
+    expect(resolveRulesTab('thresholds', ir)).toBe('scheme')
   })
 })

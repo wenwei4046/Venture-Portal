@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import type { User } from '@/types'
 import { dropSelectionsForPath } from '@/lib/selection-store'
 import { logPageView } from '@/lib/page-view'
 import { isSheetRoute } from '@/lib/sheet-routes'
-import { isPrincipalAccount } from '@/lib/view-as'
 import { useViewAsSync } from './useViewAsSync'
 import { navRootPaths, type NavData } from './nav-config'
 import Sidebar from './Sidebar'
@@ -14,6 +13,7 @@ import TopBar from './TopBar'
 import BottomTabBar from './BottomTabBar'
 import MoreSheet from './MoreSheet'
 import BackToTop from '@/components/BackToTop'
+import RouteFreshener from './RouteFreshener'
 
 // Portal shell.
 //
@@ -40,7 +40,6 @@ export default function PortalFrame({
   // reading-width cap so the many month columns can use the full content area.
   const pathname = usePathname()
   const wide = pathname?.startsWith('/reports/monthly-') ?? false
-  const productList = pathname === '/revenue/products'
   // The white sheet (DESIGN.md › "Sheet theme"): HR's pages sit on one rounded
   // panel in the Comm Cal month's tone, the shell around it unchanged. Drawn
   // here rather than by each page, so it stays put while one of these pages
@@ -70,10 +69,10 @@ export default function PortalFrame({
   }, [pathname])
 
   // View-as switched in another tab → this shell is drawn in the old view.
-  useViewAsSync(user.role, isPrincipalAccount(user))
+  useViewAsSync(user.role, user.canSwitchView === true)
 
   return (
-    <div className={`flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible${productList ? ' product-theme' : ''}`}>
+    <div className="flex h-screen overflow-hidden bg-paper print:h-auto print:overflow-visible">
       <div className="print:hidden contents">
         <Sidebar viewer={user} navData={navData} />
       </div>
@@ -89,11 +88,9 @@ export default function PortalFrame({
               inserted here settles in — see "Navigation feedback" in
               docs/DESIGN.md. */}
           <div
-            className={productList
-              ? 'route-surface product-content print:p-0'
-              : sheet
-                ? 'route-surface sheet-frame page-enter print:p-0'
-                : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
+            className={sheet
+              ? 'route-surface sheet-frame page-enter print:p-0'
+              : `route-surface ${wide ? 'max-w-none' : 'max-w-[1280px]'} mx-auto px-4 md:px-8 py-6 md:py-10 pb-[calc(54px+24px+env(safe-area-inset-bottom))] md:pb-10 page-enter print:max-w-none print:p-0 print:pb-0`}
           >
             {sheet ? <div className="sheet-theme sheet">{children}</div> : children}
           </div>
@@ -114,6 +111,10 @@ export default function PortalFrame({
       />
 
       <BackToTop />
+      {/* A page answered from the router's memory is read again behind itself (2026-10-08). */}
+      <Suspense fallback={null}>
+        <RouteFreshener />
+      </Suspense>
     </div>
   )
 }

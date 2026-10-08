@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { formatMoneyBare } from '@/lib/utils'
 
 interface Transaction {
@@ -26,11 +27,13 @@ export default function NonBillableList({ transactions, period, canAdd }: Props)
     .reduce((sum, t) => sum + Number(t.amount), 0)
 
   return (
-    <section className="border-t border-hairline pt-8 mt-10">
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-4">
-        <div>
-          <h2 className="font-serif text-xl text-ink">Non-billable · {monthLabel}</h2>
-        </div>
+    <section className="fin-queue mt-10">
+      <div className="sect-head">
+        <h2>Non-billable</h2>
+        <span className="rule" aria-hidden />
+        <span className="count">{transactions.length} · {monthLabel.toUpperCase()}</span>
+      </div>
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-end gap-4 mb-4">
         {canAdd ? (
           <Link
             href="/payments/new?preset=non_billable"
@@ -71,7 +74,7 @@ export default function NonBillableList({ transactions, period, canAdd }: Props)
                 return (
                   <tr key={t.id} className="border-b border-hairline last:border-0">
                     <td className="py-3 px-4 font-mono text-xs text-muted">
-                      {dayjs(t.created_at).format('DD MMM')}
+                      {officeTime(t.created_at).format('DD MMM')}
                     </td>
                     <td className="py-3 px-4">
                       <em

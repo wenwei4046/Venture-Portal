@@ -1156,7 +1156,8 @@ describe("the Revenue Team cost basis (cost ÷ divisor)", () => {
     for (const costDivisor of [0, -0.7, Number.NaN, Number.POSITIVE_INFINITY]) {
       const result = calculateQuote(quote(), singleProduct(50), demoBands, { costDivisor });
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("cost rule");
+      // A member reads this message: it says nothing about how the cost is made up.
+      expect(result.error).toBe("The margin rules for this department are not configured.");
     }
   });
 });

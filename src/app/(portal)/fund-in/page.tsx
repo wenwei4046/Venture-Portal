@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import FundSourceTabs from './_components/FundSourceTabs'
@@ -36,7 +38,9 @@ interface Props {
 }
 
 export default async function FundInPage({ searchParams }: Props) {
-  await requirePermission('treasury')
+  const user = await requirePermission('treasury')
+  // Recording a fund source raises one: Treasury · Create (2026-10-08, PR2).
+  const canRaise = canDo(user, 'treasury', 'create')
   const supabase = await createClient()
   const { status: statusFilter } = await searchParams
 
@@ -84,7 +88,7 @@ export default async function FundInPage({ searchParams }: Props) {
 
   const maturingIn30d = active.filter((s) => {
     if (!s.maturity_date) return false
-    const days = dayjs(s.maturity_date).diff(dayjs(), 'day')
+    const days = dayjs(s.maturity_date).diff(officeToday(), 'day')
     return days >= 0 && days <= 30
   })
 
@@ -146,12 +150,14 @@ export default async function FundInPage({ searchParams }: Props) {
           >
             Repayment Schedule
           </Link>
-          <Link
-            href="/fund-in/new"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            Record new fund source
-          </Link>
+          {canRaise ? (
+            <Link
+              href="/fund-in/new"
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              Record new fund source
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -205,7 +211,7 @@ export default async function FundInPage({ searchParams }: Props) {
 
       {/* ───────── Status tabs ───────── */}
       {sources.length === 0 ? (
-        <EmptyState />
+        <EmptyState canRaise={canRaise} />
       ) : (
         <section>
           <div className="sect-head">
@@ -252,7 +258,7 @@ export default async function FundInPage({ searchParams }: Props) {
   )
 }
 
-function EmptyState() {
+function EmptyState({ canRaise }: { canRaise: boolean }) {
   return (
     <div className="py-16 text-center border border-hairline rounded-md bg-surface">
       <p className="font-serif italic text-graphite text-lg mb-4">
@@ -261,12 +267,14 @@ function EmptyState() {
       <p className="font-serif italic text-muted text-sm mb-6">
         Finance can record the first fund source — subsidiary loan, director loan, or internal pool transfer.
       </p>
-      <Link
-        href="/fund-in/new"
-        className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-      >
-        Record first fund source
-      </Link>
+      {canRaise ? (
+        <Link
+          href="/fund-in/new"
+          className="inline-block bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+        >
+          Record first fund source
+        </Link>
+      ) : null}
     </div>
   )
 }

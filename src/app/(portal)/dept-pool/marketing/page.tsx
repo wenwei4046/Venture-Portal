@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { notFound } from 'next/navigation'
 import { requirePermission } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import DeptPoolTabs from '../_components/DeptPoolTabs'
@@ -161,11 +163,11 @@ export default async function MarketingDeptPoolPage({ searchParams }: Props) {
       ) : null}
 
       {activeTab === 'history' ? (
-        <HistoryTable deptId={marketing.id} filter={historyFilter} />
+        <HistoryTable deptId={marketing.id} filter={historyFilter} seesPayroll={canSeePayrollPayouts(user)} />
       ) : null}
 
       {activeTab === 'pnl' ? (
-        <MarketingPnlView deptId={marketing.id} period={period} />
+        <MarketingPnlView deptId={marketing.id} period={period} seesPayroll={canSeePayrollPayouts(user)} />
       ) : null}
 
       {activeTab === 'request-payment' && canSubmitExpense ? (
@@ -239,7 +241,7 @@ async function RequestCreditTabContent({ deptId }: { deptId: string }) {
                     <LedgerRow key={r.id}>
                       <td>
                         <div className="font-mono text-xs text-muted">
-                          {dayjs(r.requested_at).format('D MMM HH:mm')}
+                          {officeTime(r.requested_at).format('D MMM HH:mm')}
                         </div>
                       </td>
                       <td className="m-hide" data-label="Period">
@@ -359,7 +361,7 @@ async function RequestPaymentTabContent({
                   <LedgerRow key={r.id}>
                     <td>
                       <div className="font-mono text-xs text-muted">
-                        {dayjs(r.requested_at).format('D MMM HH:mm')}
+                        {officeTime(r.requested_at).format('D MMM HH:mm')}
                       </div>
                     </td>
                     <td className="m-hide" data-label="Payee">

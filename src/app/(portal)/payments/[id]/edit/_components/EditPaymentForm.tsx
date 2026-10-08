@@ -7,6 +7,7 @@ import type { AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, seedRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import AccountPicker from '@/components/AccountPicker'
 import { officeDate } from '@/lib/office-clock'
+import { paymentPoolOptions, type PoolOption } from '@/lib/payment-pools'
 
 interface GlAccount {
   code: string
@@ -59,17 +60,11 @@ interface Props {
   statutoryDetailsLocked?: boolean
   /** Salary snapshots preserve the component amounts and chosen receiving accounts. */
   salaryDetailsLocked?: boolean
+  /** Pools of the departments provisioned after the core five, from the
+   *  registry — the same extras Create payment offers (lib/payment-pools). */
+  extraPools?: PoolOption[]
 }
 
-const POOL_OPTIONS = [
-  { value: 'venture_pool', label: 'Venture Pool' },
-  { value: 'dept_pool_hr', label: 'HR Dept Pool' },
-  { value: 'dept_pool_finance', label: 'Finance Dept Pool' },
-  { value: 'dept_pool_director_office', label: 'Director Office Dept Pool' },
-  { value: 'dept_pool_director', label: 'Director Pool' },
-  { value: 'dept_pool_marketing', label: 'Marketing Dept Pool' },
-  { value: 'invoice_payout_pool', label: 'Invoice Payout Pool' },
-]
 
 const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank transfer' },
@@ -100,7 +95,17 @@ const OVERRIDE_TYPES: AccountType[] = [
 export default function EditPaymentForm({
   voucher, initialSources, fundSourceAccount = null, initialCreditAccountCode,
   companies, bankAccounts, glAccounts, statutoryDetailsLocked = false, salaryDetailsLocked = false,
+  extraPools = [],
 }: Props) {
+  // The list Create payment offers, plus whatever pool a saved row already
+  // names. This form carried its own literal of seven pools, so a draft drawn
+  // on a newer department's pool (Revenue Department, 2026-10-05) opened with
+  // its pool blank and could only be saved onto another one.
+  const poolOptions = paymentPoolOptions(extraPools)
+  for (const key of [...initialSources.map((s) => s.pool), voucher.target_pool ?? '']) {
+    if (key && !poolOptions.some((p) => p.value === key)) poolOptions.push({ value: key, label: key.replace(/_/g, ' ') })
+  }
+
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -244,7 +249,7 @@ export default function EditPaymentForm({
             <table className="ledger-table" aria-label="Recorded source accounts">
               <thead><tr><th scope="col">Pool</th><th scope="col">Account</th><th scope="col" className="num">Amount · RM</th></tr></thead>
               <tbody>{initialSources.map((source, index) => <tr key={index}>
-                <td>{POOL_OPTIONS.find((pool) => pool.value === source.pool)?.label ?? source.pool}</td>
+                <td>{poolOptions.find((pool) => pool.value === source.pool)?.label ?? source.pool}</td>
                 <td>{source.account_code}</td><td className="num">{Number(source.amount).toFixed(2)}</td>
               </tr>)}</tbody>
             </table>
@@ -448,7 +453,7 @@ export default function EditPaymentForm({
                       className="flex-1 px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
                     >
                       <option value="">Select pool…</option>
-                      {POOL_OPTIONS.map((p) => (
+                      {poolOptions.map((p) => (
                         <option key={p.value} value={p.value}>{p.label}</option>
                       ))}
                     </select>
@@ -601,7 +606,7 @@ export default function EditPaymentForm({
               className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
             >
               <option value="">Select pool…</option>
-              {POOL_OPTIONS.map((p) => (
+              {poolOptions.map((p) => (
                 <option key={p.value} value={p.value}>{p.label}</option>
               ))}
             </select>

@@ -1,4 +1,5 @@
 import type { BankAccountSelection } from '@/lib/staff-bank-accounts'
+import { officeDay, officeToday } from '@/lib/office-time'
 
 // Pure helpers for the HR Payment page (2026-09-10, proposal B: department
 // board + window). The page reads ONE RPC, payment_cycle(period), and every
@@ -711,10 +712,14 @@ export function cycleTotals(cycle: PaymentCycle, rows: StatutoryRow[]): CycleTot
   }
 }
 
-/** "5 Sep" from an ISO date or timestamp. */
+/**
+ * "5 Sep" from an ISO date or timestamp. A timestamp is the office's day
+ * (Malaysia time): read in UTC, a run submitted at 07:30 in the office was
+ * "submitted" the day before.
+ */
 export function shortDate(iso: string | null | undefined): string {
   if (!iso) return ''
-  const d = new Date(iso.length === 10 ? iso + 'T00:00:00Z' : iso)
+  const d = iso.length === 10 ? new Date(iso + 'T00:00:00Z') : new Date(new Date(iso).getTime() + 8 * 60 * 60 * 1000)
   if (Number.isNaN(d.getTime())) return ''
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]}`
@@ -732,8 +737,8 @@ export function shortDateTime(iso: string | null | undefined): string {
   return `${my.getUTCDate()} ${months[my.getUTCMonth()]} ${hh}:${mm}`
 }
 
-/** Days from today to an ISO date (negative = overdue). */
-export function daysUntil(iso: string, today: Date = new Date()): number {
+/** Days from today (the office's, unless given) to an ISO date (negative = overdue). */
+export function daysUntil(iso: string, today: Date = new Date(`${officeToday()}T00:00:00Z`)): number {
   const t = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
   const [y, m, d] = iso.split('-').map(Number)
   return Math.round((Date.UTC(y, m - 1, d) - t) / 86400000)
@@ -1150,7 +1155,8 @@ export function milestones(i: HeadlineInput): Milestone[] {
     out.push({ key, label, date, state })
   }
 
-  push('submitted', 'Payroll submitted', run?.submitted_at?.slice(0, 10) ?? null, !!run)
+  // The office's day it was submitted on — the timestamp's own date is UTC's.
+  push('submitted', 'Payroll submitted', run?.submitted_at ? officeDay(run.submitted_at).format('YYYY-MM-DD') : null, !!run)
   push('funded-staff', 'Staff funded by Finance', fs?.status === 'completed' ? (fs.pv_date ?? null) : null, fs?.status === 'completed')
   if (dirs.length) push('funded-dirs', 'Directors funded', fd?.status === 'completed' ? (fd.pv_date ?? null) : null, fd?.status === 'completed')
   if (staff.length) {

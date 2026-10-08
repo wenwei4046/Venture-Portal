@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { PAYROLL_STATUTORY_FIELDS } from '@/lib/payroll-grid'
 import type { PayrollRowUpdate } from './actions'
@@ -19,7 +19,7 @@ export async function adjustRevenueCommission(
   input: RevenueCommissionAdjustmentInput,
   rowUpdates?: PayrollRowUpdate,
 ): Promise<void> {
-  await requirePermission('hr_costing')
+  await requireAction('hr_costing', 'edit')
   if (!input || ![input.gross, input.expectedSynced, input.expectedAdjustment].every(Number.isFinite)) {
     throw new Error('Enter valid commission amounts.')
   }

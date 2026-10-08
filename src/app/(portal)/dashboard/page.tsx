@@ -1,9 +1,13 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
-import { resolveLiveApprovalAmounts } from '@/lib/approval-amounts'
+import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approval-amounts'
+import { startRead } from '@/lib/start-read'
+import { fetchAllRows } from '@/lib/paginate'
+import { fetchDeptInvoiceSettlements } from '@/lib/dept-receipt-payment'
 import LedgerRow from '@/components/LedgerRow'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
@@ -138,9 +142,70 @@ export default async function DashboardPage() {
   // would otherwise always land on the treasury dashboard.
   const roleDashboard = user.role === 'hr' || user.role === 'dept_manager'
 
-  const { data: raw, error } = roleDashboard
-    ? { data: null, error: null }
-    : await supabase.rpc('dashboard_summary')
+  // App-layer role, not summary.role: a Principal masked as Finance must get
+  // the Finance dashboard (the RPC reports the real DB role).
+  const isPrincipal = user.role === 'principal'
+  const isFinance = user.role === 'finance'
+
+  // ── The treasury dashboard's reads, started together (2026-10-08) ──────
+  // The bank accounts and Finance's two queues need nothing from
+  // dashboard_summary, yet waited for it and then for one another. They are
+  // asked beside it now, each queue's live amounts the moment its rows are in;
+  // only the Principal's approval refs wait for the summary, which names the
+  // approvals. Each answer is used below, where it always was.
+  const summaryRead = roleDashboard ? null : startRead(supabase.rpc('dashboard_summary'))
+  // Bank accounts (Phase 4: direct query, RLS-gated)
+  const bankAccountsRead = roleDashboard
+    ? null
+    : startRead(
+        supabase
+          .from('bank_accounts')
+          .select('id, bank_name, account_number, current_balance, is_primary, status')
+          .eq('status', 'active')
+          .order('is_primary', { ascending: false }),
+      )
+  // An approval queue and the live amount of each of its rows — read through
+  // to the target row (lib/approval-amounts.ts).
+  const withLiveAmounts = <R extends ApprovalAmountRow>(queue: PromiseLike<{ data: R[] | null }>) =>
+    startRead(
+      Promise.resolve(queue).then(async ({ data }) => ({
+        rows: data,
+        live: await resolveLiveApprovalAmounts(supabase, data ?? []),
+      })),
+    )
+  // Finance sees "Awaiting Principal sign-off" — their own submitted approval_requests
+  // (new_loan, new_contract, advance, etc) still pending Principal decision. This is
+  // the mirror image of Principal's "Pending your hand" — Finance submits, Principal
+  // approves, each sees their own queue on the dashboard.
+  const financePendingRead =
+    !roleDashboard && isFinance
+      ? withLiveAmounts(
+          supabase
+            .from('approval_requests')
+            .select('id, request_type, description, amount, reference_id, reference_table, created_at')
+            .eq('submitted_by', user.id)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false })
+            .limit(10),
+        )
+      : null
+  // Finance sees "Recent actions" — their submitted requests that have been decided
+  const financeRecentRead =
+    !roleDashboard && isFinance
+      ? withLiveAmounts(
+          supabase
+            .from('approval_requests')
+            .select('id, request_type, description, amount, reference_id, reference_table, status, approved_at, created_at')
+            .eq('submitted_by', user.id)
+            .in('status', ['approved', 'rejected'])
+            .order('approved_at', { ascending: false })
+            .limit(5),
+        )
+      : null
+
+  const { data: raw, error } = summaryRead
+    ? await summaryRead
+    : { data: null, error: null }
   if (error) {
     return (
       <div>
@@ -170,10 +235,13 @@ export default async function DashboardPage() {
       // three actions (Import Employment List · Import Payroll · Calculate
       // Director Salary), so the dashboard is three entry cards over the live
       // HR figures. One RPC round-trip (hr_dashboard_summary, mig 283).
-      const period = dayjs().startOf('month').format('YYYY-MM-DD')
+      // The office's month. The summary is asked for it by name: left to its
+      // own default (current_date) it answers in UTC, which on the 1st until
+      // 08:00 in the office is still last month — beside this month's title.
+      const period = officeTime().startOf('month').format('YYYY-MM-DD')
       const periodUrl = `/hr-costing/payroll/${period}`
 
-      const { data: hrRaw } = await supabase.rpc('hr_dashboard_summary')
+      const { data: hrRaw } = await supabase.rpc('hr_dashboard_summary', { p_period: period })
 
       type HrDeptStaff = {
         department_id: string
@@ -237,8 +305,8 @@ export default async function DashboardPage() {
       const directorStatus = director?.status ?? 'not_calculated'
       const directorSubmitted = Boolean(director?.submission)
 
-      const monthLabel = dayjs().format('MMMM YYYY')
-      const monthName = dayjs().format('MMMM')
+      const monthLabel = dayjs(period).format('MMMM YYYY')
+      const monthName = dayjs(period).format('MMMM')
       const deptCount = staffDepts.length
       const directorMode =
         director?.payout_mode === 'fully_paid'
@@ -485,7 +553,7 @@ export default async function DashboardPage() {
         return <UnplacedDashboard message="No department assigned. Contact Principal to set this up." />
       }
 
-      const period = dayjs().startOf('month').format('YYYY-MM-DD')
+      const period = officeTime().startOf('month').format('YYYY-MM-DD')
 
       const { data: dept } = await supabase
         .from('departments')
@@ -522,9 +590,14 @@ export default async function DashboardPage() {
           .order('created_at', { ascending: false })
           .limit(5),
         // My Billing cards (2026-08-20): own-segment invoices via RLS + the
-        // receipts/CN sums RPC → 本月开单 and 未收 figures.
-        supabase.from('invoices').select('id, total_amount, status, period_month').order('id'),
-        supabase.rpc('dept_invoice_settlements' as never, {} as never),
+        // receipts/CN sums RPC → 本月开单 and 未收 figures. Every one of them,
+        // in 1000-row pages (2026-10-08): both are whole-history, and an
+        // invoice past PostgREST's cap would silently drop out of 未收. A
+        // failed read still counts as none, as before.
+        fetchAllRows((lo, hi) =>
+          supabase.from('invoices').select('id, total_amount, status, period_month').order('id').range(lo, hi),
+        ).then((data) => ({ data }), () => ({ data: null })),
+        fetchDeptInvoiceSettlements(supabase as never).then((data) => ({ data }), () => ({ data: null })),
       ])
 
       type NpRow = {
@@ -669,7 +742,7 @@ export default async function DashboardPage() {
                           </td>
                           <td className="num">{formatMoney(Number(r.amount))}</td>
                           <td className="right m-hide font-mono text-xs" data-label="Submitted">
-                            {dayjs(r.created_at).format('D MMM')}
+                            {officeTime(r.created_at).format('D MMM')}
                           </td>
                         </LedgerRow>
                       ))}
@@ -721,7 +794,7 @@ export default async function DashboardPage() {
                             <span className="neg">{formatMoney(-Number(e.amount))}</span>
                           </td>
                           <td className="right font-mono text-xs whitespace-nowrap">
-                            {dayjs(e.created_at).format('D MMM YYYY')}
+                            {officeTime(e.created_at).format('D MMM YYYY')}
                           </td>
                         </tr>
                       ))}
@@ -762,82 +835,66 @@ export default async function DashboardPage() {
   }
 
   const summary = raw as unknown as DashboardSummary
-  const today = dayjs().format('D MMMM YYYY')
+  const today = officeTime().format('D MMMM YYYY')
 
-  // Bank accounts (Phase 4: direct query, RLS-gated)
-  const { data: bankAccounts } = await supabase
-    .from('bank_accounts')
-    .select('id, bank_name, account_number, current_balance, is_primary, status')
-    .eq('status', 'active')
-    .order('is_primary', { ascending: false })
-  const banks = bankAccounts ?? []
-  const totalBankBalance = banks.reduce((sum, b) => sum + Number(b.current_balance), 0)
-
-  const hasAnyData =
-    summary.total_pool > 0 || summary.loans_outstanding > 0
-
-  // App-layer role, not summary.role: a Principal masked as Finance must get
-  // the Finance dashboard (the RPC reports the real DB role).
-  const isPrincipal = user.role === 'principal'
-  const isFinance = user.role === 'finance'
   const pendingApprovals = summary.pending_approvals ?? []
-  const pendingCount = summary.pending_approvals_count ?? 0
-  const subsidiaries = summary.subsidiaries ?? []
-  const alerts = summary.alerts ?? []
 
   // dashboard_summary RPC doesn't return reference_id for pending approvals.
   // Supplementary query so Overview links can deep-link to /approvals/payroll-run/[ref]
   // the same way the Approvals tab does. It also carries the amount through to
   // the target row — the RPC hands back approval_requests.amount, a submit-time
   // snapshot that goes stale the moment the request is edited (see
-  // lib/approval-amounts.ts).
+  // lib/approval-amounts.ts). Asked the moment the summary is in, while the
+  // reads begun beside it finish.
+  const approvalRefsRead =
+    isPrincipal && pendingApprovals.length > 0
+      ? withLiveAmounts(
+          supabase
+            .from('approval_requests')
+            .select('id, amount, reference_id, reference_table')
+            .in(
+              'id',
+              pendingApprovals.map((p: PendingApproval) => p.id),
+            ),
+        )
+      : null
+
+  // Bank accounts (Phase 4: direct query, RLS-gated) — asked beside the summary.
+  const { data: bankAccounts } = bankAccountsRead ? await bankAccountsRead : { data: null }
+  const banks = bankAccounts ?? []
+  const totalBankBalance = banks.reduce((sum, b) => sum + Number(b.current_balance), 0)
+
+  const hasAnyData =
+    summary.total_pool > 0 || summary.loans_outstanding > 0
+
+  const pendingCount = summary.pending_approvals_count ?? 0
+  const subsidiaries = summary.subsidiaries ?? []
+  const alerts = summary.alerts ?? []
+
   const pendingApprovalRefs = new Map<string, string | null>()
   const pendingApprovalAmounts = new Map<string, number | null>()
-  if (isPrincipal && pendingApprovals.length > 0) {
-    const { data: refData } = await supabase
-      .from('approval_requests')
-      .select('id, amount, reference_id, reference_table')
-      .in(
-        'id',
-        pendingApprovals.map((p: PendingApproval) => p.id),
-      )
+  if (approvalRefsRead) {
+    const { rows: refData, live } = await approvalRefsRead
     for (const row of refData ?? []) {
       pendingApprovalRefs.set(row.id, row.reference_id as string | null)
     }
-    const live = await resolveLiveApprovalAmounts(supabase, refData ?? [])
     for (const [id, amt] of live) pendingApprovalAmounts.set(id, amt)
   }
 
-  // Finance sees "Awaiting Principal sign-off" — their own submitted approval_requests
-  // (new_loan, new_contract, advance, etc) still pending Principal decision. This is
-  // the mirror image of Principal's "Pending your hand" — Finance submits, Principal
-  // approves, each sees their own queue on the dashboard.
-  const { data: financePending } = isFinance
-    ? await supabase
-        .from('approval_requests')
-        .select('id, request_type, description, amount, reference_id, reference_table, created_at')
-        .eq('submitted_by', user.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(10)
-    : { data: null }
-  const financePendingLive = await resolveLiveApprovalAmounts(supabase, financePending ?? [])
+  // Finance's two queues (read above, beside the summary). No queue — any
+  // other role — reads as an empty one, exactly as before.
+  const noQueue = { rows: null, live: new Map<string, number | null>() }
+  const { rows: financePending, live: financePendingLive } = financePendingRead
+    ? await financePendingRead
+    : noQueue
   const financePendingList = (financePending ?? []).map((r) => ({
     ...r,
     amount: financePendingLive.get(r.id) ?? null,
   }))
 
-  // Finance sees "Recent actions" — their submitted requests that have been decided
-  const { data: financeRecent } = isFinance
-    ? await supabase
-        .from('approval_requests')
-        .select('id, request_type, description, amount, reference_id, reference_table, status, approved_at, created_at')
-        .eq('submitted_by', user.id)
-        .in('status', ['approved', 'rejected'])
-        .order('approved_at', { ascending: false })
-        .limit(5)
-    : { data: null }
-  const financeRecentLive = await resolveLiveApprovalAmounts(supabase, financeRecent ?? [])
+  const { rows: financeRecent, live: financeRecentLive } = financeRecentRead
+    ? await financeRecentRead
+    : noQueue
   const financeRecentList = (financeRecent ?? []).map((r) => ({
     ...r,
     amount: financeRecentLive.get(r.id) ?? null,
@@ -1074,7 +1131,7 @@ export default async function DashboardPage() {
                               <td className="num">{amt != null ? formatMoney(amt) : '—'}</td>
                               <td className="m-hide" data-label="By">{req.submitted_by_name ?? '—'}</td>
                               <td className="right m-hide font-mono text-xs" data-label="Submitted">
-                                {dayjs(req.created_at).format('D MMM')}
+                                {officeTime(req.created_at).format('D MMM')}
                               </td>
                             </LedgerRow>
                           )
@@ -1139,7 +1196,7 @@ export default async function DashboardPage() {
                                 {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
                               </td>
                               <td className="right m-hide font-mono text-xs" data-label="Submitted">
-                                {dayjs(req.created_at).format('D MMM')}
+                                {officeTime(req.created_at).format('D MMM')}
                               </td>
                             </LedgerRow>
                           ))}
@@ -1202,7 +1259,7 @@ export default async function DashboardPage() {
                                 {req.amount != null ? formatMoney(Number(req.amount)) : '—'}
                               </td>
                               <td className="right m-hide font-mono text-xs" data-label="Decided">
-                                {req.approved_at ? dayjs(req.approved_at).format('D MMM') : dayjs(req.created_at).format('D MMM')}
+                                {officeTime(req.approved_at || req.created_at).format('D MMM')}
                               </td>
                             </LedgerRow>
                           ))}

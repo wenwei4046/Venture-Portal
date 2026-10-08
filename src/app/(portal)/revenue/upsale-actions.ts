@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 
 /**
  * Drops and upsells the ERP finds on settled bills (2026-09-26): each waits in
@@ -45,7 +45,7 @@ async function assertMonthOpen(supabase: SupabaseClient, subDepartmentId: string
  * paid in another month or dismissed. Refused once a run has paid it.
  */
 export async function reopenErpAdjustment(adjustmentId: string): Promise<void> {
-  await requirePermission('revenue')
+  await requireAction('revenue', 'edit')
   const supabase = await client()
 
   const { data: row, error: readError } = await supabase
@@ -108,7 +108,7 @@ export async function reopenErpAdjustment(adjustmentId: string): Promise<void> {
  * document; it is paid in the month somebody says yes.
  */
 export async function confirmErpAdjustment(adjustmentId: string, period: string): Promise<void> {
-  const user = await requirePermission('revenue')
+  const user = await requireAction('revenue', 'edit')
   assertPeriod(period)
   const supabase = await client()
 
@@ -153,7 +153,7 @@ export async function confirmErpAdjustment(adjustmentId: string, period: string)
  * real change is measured from it.
  */
 export async function dismissErpAdjustment(adjustmentId: string): Promise<void> {
-  const user = await requirePermission('revenue')
+  const user = await requireAction('revenue', 'edit')
   const supabase = await client()
 
   const { error } = await supabase

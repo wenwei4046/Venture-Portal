@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ permission: vi.fn(), rpc: vi.fn(), refresh: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.permission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.permission, requireAction: mocks.permission, requireAnyAction: mocks.permission, requirePayrollPayoutsAction: mocks.permission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: mocks.rpc }) }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 vi.mock('server-only', () => ({}))
@@ -22,7 +22,7 @@ describe('employee chart actions', () => {
 
   it('sends a sub-department move as one atomic call and supports an existing destination', async () => {
     expect(await moveEmployee(form({ destination_kind: 'subdepartment', destination_id: 'target' }))).toEqual({ ok: true, note: null })
-    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('revenue')
+    expect(mocks.permission).toHaveBeenCalledExactlyOnceWith('revenue', 'edit')
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('employee_chart_lifecycle', {
       p_action: 'move', p_staff_id: 'person', p_source_scheme_id: 'source',
       p_destination_kind: 'subdepartment', p_destination_id: 'target', p_title_id: null,
@@ -31,9 +31,9 @@ describe('employee chart actions', () => {
     expect(mocks.refresh).toHaveBeenCalledWith('/revenue', 'layout')
   })
 
-  it('requires both permissions for a main-department move and includes its selected title', async () => {
+  it('requires Revenue · Edit and Team · Edit for a main-department move and includes its selected title', async () => {
     await moveEmployee(form({ destination_kind: 'department', destination_id: 'hr', title_id: 'hr-title' }))
-    expect(mocks.permission.mock.calls).toEqual([['revenue'], ['team']])
+    expect(mocks.permission.mock.calls).toEqual([['revenue', 'edit'], ['team', 'edit']])
     expect(mocks.rpc.mock.calls[0][1]).toMatchObject({ p_destination_kind: 'department', p_destination_id: 'hr', p_title_id: 'hr-title' })
   })
 

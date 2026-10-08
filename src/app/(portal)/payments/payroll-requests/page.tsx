@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime, officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePayrollPayouts } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
 import { round2 } from '@/lib/payroll-funding'
 import { topupSummary } from '@/lib/payroll-lifecycle'
@@ -50,7 +51,9 @@ function batchLabel(raw: unknown): string | null {
 }
 
 export default async function PayrollRequestsPage() {
-  await requirePermission('treasury')
+  // What each department's payroll comes to, and a department can be one
+  // person: Treasury WITH Payroll payouts (2026-10-02).
+  await requirePayrollPayouts('treasury')
   const supabase = await createClient()
 
   const [{ data: requests }, { data: banks }] = await Promise.all([
@@ -261,7 +264,7 @@ export default async function PayrollRequestsPage() {
                       </div>
                       <div className="font-serif italic text-graphite text-sm mt-0.5">
                         Requested by {r.requested_by_name} ·{' '}
-                        {dayjs(r.requested_at).format('D MMM HH:mm')}
+                        {officeTime(r.requested_at).format('D MMM HH:mm')}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -292,7 +295,7 @@ export default async function PayrollRequestsPage() {
                     committedTotal={committed}
                     banks={bankOptions}
                     breakdown={breakdown}
-                    defaultDate={dayjs().format('YYYY-MM-DD')}
+                    defaultDate={officeToday()}
                   />
                 </div>
               )

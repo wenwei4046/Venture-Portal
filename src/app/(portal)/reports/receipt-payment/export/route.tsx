@@ -2,8 +2,9 @@
 // the page: the Cash Flow statement grammar PLUS the 未收 To-collect section.
 
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import {
   applyGlRefs,
   buildCashFlow,
@@ -16,7 +17,11 @@ import {
 import { cashFlowBlocks, type ReportBlock } from '@/lib/gl-report-blocks'
 import { buildCashFlowSideSections } from '@/lib/cash-flow-sections'
 import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
-import { fetchInterBillingCashFlow } from '@/lib/inter-billing-cash-flow'
+import {
+  fetchInterBillingCashFlow,
+  interBillTransferAccount,
+  payrollCustodyAccount,
+} from '@/lib/inter-billing-cash-flow'
 import { fetchDeptOutstanding } from '@/lib/dept-receipt-payment'
 import { deptNameToSegment } from '@/lib/billing'
 import { glStatementExportResponse } from '@/lib/export/gl-statement'
@@ -28,10 +33,10 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS + the settlements RPC
   // both scope to it).
-  const user = await requirePermission('dept_reports')
+  const user = await requireAction('dept_reports', 'export', 'dept')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
-  const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
+  const period = url.searchParams.get('period') ?? officeMonth()
   const compare = url.searchParams.get('compare') ?? ''
   const isDeptMgr = user.role === 'dept_manager'
   const segment = isDeptMgr ? '' : (url.searchParams.get('segment') ?? '')
@@ -40,20 +45,39 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createClient()
-  const [rawLines, accounts, glRefs, { data: banks }] = await Promise.all([
+  const consolidated = !isDeptMgr && !segment
+  // 未收 block — dept_manager scoped by the RPC; finance/principal need a
+  // concrete segment (the consolidated export just skips it, like the page).
+  const arSegment = isDeptMgr ? null : segment || null
+
+  // Every read at once, as on the page (2026-10-08): the bridge gets the
+  // pending bank-code read and is skipped where its lines are dropped.
+  const bankCodesRead = Promise.resolve(supabase.rpc('bank_gl_codes' as never)).then(
+    ({ data: banks }) => new Set((banks ?? []) as unknown as string[]),
+  )
+  const [rawLines, accounts, glRefs, bankCodes, ib, inLayoutRaw, outLayoutRaw, arReads] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     fetchGlRefs(supabase),
-    supabase.rpc('bank_gl_codes' as never),
+    bankCodesRead,
+    consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),
+    readReportLayout(supabase, 'cash_flow_in'),
+    readReportLayout(supabase, 'cash_flow_out'),
+    isDeptMgr || arSegment
+      ? Promise.all([
+          fetchDeptOutstanding(supabase as never, { segment: arSegment }),
+          supabase.from('companies').select('id, name'),
+          isDeptMgr && user.department_id
+            ? supabase.from('departments').select('name, segment_key').eq('id', user.department_id).single()
+            : null,
+        ])
+      : null,
   ])
-  const bankCodes = new Set((banks ?? []) as unknown as string[])
-  const ib = await fetchInterBillingCashFlow(supabase, bankCodes)
-  const consolidated = !isDeptMgr && !segment
-  const lines = [...applyGlRefs(rawLines, glRefs), ...(consolidated ? [] : ib.lines)]
+  const lines = [...applyGlRefs(rawLines, glRefs), ...(ib ? ib.lines : [])]
 
   const cf = buildCashFlow(
     lines,
-    [...accounts, ib.account, ib.payrollAccount],
+    [...accounts, interBillTransferAccount, payrollCustodyAccount],
     {
       current: monthPeriod(period),
       previous: monthPeriod(compare || period),
@@ -62,31 +86,21 @@ export async function GET(req: Request) {
     bankCodes,
   )
 
-  const coaWithSynthetic = [...accounts, ib.account, ib.payrollAccount]
-  const [inLayoutRaw, outLayoutRaw] = await Promise.all([
-    readReportLayout(supabase, 'cash_flow_in'),
-    readReportLayout(supabase, 'cash_flow_out'),
-  ])
+  const coaWithSynthetic = [...accounts, interBillTransferAccount, payrollCustodyAccount]
   const blocks = cashFlowBlocks(cf, {
     inflow: buildCashFlowSideSections(cf.inflowLeaves, coaWithSynthetic, inLayoutRaw as ReportLayout | null, '实收 · Money in', 'in'),
     outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '支出 · Money out', 'out'),
   })
 
-  // 未收 block — dept_manager scoped by the RPC; finance/principal need a
-  // concrete segment (the consolidated export just skips it, like the page).
-  const arSegment = isDeptMgr ? null : segment || null
   const arBlocks: ReportBlock[] = []
-  if (isDeptMgr || arSegment) {
-    const [outstanding, { data: companies }] = await Promise.all([
-      fetchDeptOutstanding(supabase as never, { segment: arSegment }),
-      supabase.from('companies').select('id, name'),
-    ])
+  if (arReads) {
+    const [outstanding, { data: companies }, deptRead] = arReads
     const companyMap = new Map(
       ((companies ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]),
     )
     let ownSeg = segment
     if (isDeptMgr && user.department_id) {
-      const { data: dept } = await supabase.from('departments').select('name, segment_key').eq('id', user.department_id).single()
+      const dept = deptRead?.data
       ownSeg = ((dept as { segment_key?: string | null } | null)?.segment_key ?? null) || (deptNameToSegment(dept?.name) ?? '')
     }
     const total = r2(outstanding.reduce((s, o) => s + o.outstanding, 0))

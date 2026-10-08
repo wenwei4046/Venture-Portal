@@ -1,14 +1,32 @@
 import dayjs from 'dayjs'
+import { officeDayStart, officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import PnlCharts from './PnlCharts'
+import { SheetIcon } from '@/components/sheet/SheetIcon'
+import { isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
 
 interface Props {
   deptId: string
   period: string // YYYY-MM-01
+  /** false = the viewer may not see one person's pay (canSeePayrollPayouts):
+   *  payroll vouchers in the history below show as one total per batch. */
+  seesPayroll: boolean
 }
 
-export default async function MarketingPnlView({ deptId, period }: Props) {
+/** A row of the voucher history: a voucher, or the total of a payroll batch. */
+interface HistoryRow {
+  id: string
+  voucher_no: string | null
+  direction: string
+  amount: number
+  payee_name: string | null
+  description: string | null
+  created_at: string
+  locked?: boolean
+}
+
+export default async function MarketingPnlView({ deptId, period, seesPayroll }: Props) {
   const supabase = await createClient()
   const monthStart = dayjs(period).startOf('month').format('YYYY-MM-DD')
   const nextMonth = dayjs(period).add(1, 'month').startOf('month').format('YYYY-MM-DD')
@@ -30,8 +48,8 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       .select('amount')
       .eq('department_id', deptId)
       .in('transaction_type', ['expense_out', 'inter_billing_out'])
-      .gte('created_at', monthStart)
-      .lt('created_at', nextMonth),
+      .gte('created_at', officeDayStart(monthStart))
+      .lt('created_at', officeDayStart(nextMonth)),
   ])
 
   const revenue = (invoiceRows ?? []).reduce((s, r) => s + Number(r.total_amount), 0)
@@ -82,7 +100,7 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       .select('amount, created_at')
       .eq('department_id', deptId)
       .in('transaction_type', ['expense_out', 'inter_billing_out'])
-      .gte('created_at', trendStart),
+      .gte('created_at', officeDayStart(trendStart)),
   ])
 
   const trendMap = new Map<string, { revenue: number; cost: number }>()
@@ -97,7 +115,7 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
     if (row) row.revenue += Number(inv.total_amount)
   }
   for (const e of trendExpenses ?? []) {
-    const k = dayjs(e.created_at).format('YYYY-MM-01')
+    const k = officeTime(e.created_at).format('YYYY-MM-01') // the office's month
     const row = trendMap.get(k)
     if (row) row.cost += Number(e.amount)
   }
@@ -111,10 +129,30 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
   // Pool name convention is `dept_pool_<lowercase>` (see migrations).
   const { data: pvRows } = await supabase
     .from('payment_vouchers')
-    .select('id, voucher_no, direction, amount, payee_name, description, status, created_at')
+    .select('id, voucher_no, direction, amount, payee_name, description, status, created_at, reference_type, voucher_type, payment_date')
     .or('source_pool.eq.dept_pool_marketing,target_pool.eq.dept_pool_marketing')
     .order('created_at', { ascending: false })
     .limit(50)
+
+  // Without Payroll payouts (2026-10-05) a payroll voucher — a department's
+  // statutory contribution, a salary — is one total per batch here, as on
+  // Payments, folded on the server. The viewer is never sent the voucher.
+  const vouchers = pvRows ?? []
+  const history: HistoryRow[] = seesPayroll
+    ? vouchers.map((v) => ({ ...v, amount: Number(v.amount) }))
+    : [
+        ...vouchers.filter((v) => !isPayrollReference(v.reference_type)).map((v) => ({ ...v, amount: Number(v.amount) })),
+        ...lockPayrollBatches(vouchers.filter((v) => isPayrollReference(v.reference_type))).map((b) => ({
+          id: `locked-${b.label}`,
+          voucher_no: null,
+          direction: 'debit',
+          amount: b.total,
+          payee_name: b.label,
+          description: `${b.count} 张 · ${b.statusText} · 只显示总数`,
+          created_at: b.lastCreated,
+          locked: true,
+        })),
+      ].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0))
 
   return (
     <div className="space-y-10">
@@ -139,7 +177,7 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
       {/* PV history */}
       <section>
         <h2 className="font-serif text-xl text-ink mb-1">Payment voucher history</h2>
-        {(pvRows ?? []).length === 0 ? (
+        {history.length === 0 ? (
           <div className="border border-hairline rounded-md bg-surface p-6 text-center">
             <p className="font-serif italic text-muted text-sm">No payment vouchers yet for Marketing.</p>
           </div>
@@ -157,15 +195,15 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {(pvRows ?? []).map((r) => {
+                {history.map((r) => {
                   const isIn = r.direction === 'credit'
                   const signed = isIn ? Number(r.amount) : -Number(r.amount)
                   return (
                     <tr key={r.id} className="border-b border-hairline last:border-0">
                       <td className="py-3 pr-4 font-mono text-xs text-muted">
-                        {dayjs(r.created_at).format('D MMM YYYY')}
+                        {officeTime(r.created_at).format('D MMM YYYY')}
                       </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-graphite">{r.voucher_no}</td>
+                      <td className="py-3 pr-4 font-mono text-xs text-graphite">{r.voucher_no ?? '—'}</td>
                       <td className="py-3 pr-4">
                         <span
                           className={
@@ -177,7 +215,18 @@ export default async function MarketingPnlView({ deptId, period }: Props) {
                           {isIn ? 'In' : 'Out'}
                         </span>
                       </td>
-                      <td className="py-3 pr-4 font-serif italic text-graphite">{r.payee_name ?? '—'}</td>
+                      <td className="py-3 pr-4 font-serif italic text-graphite">
+                        {r.locked ? (
+                          <span title="这个帐号看不到里面每个人的明细">
+                            <span className="inline-block w-3 mr-1.5 align-[-1px] text-muted [&>svg]:w-3 [&>svg]:h-3">
+                              <SheetIcon name="lock" />
+                            </span>
+                            {r.payee_name}
+                          </span>
+                        ) : (
+                          r.payee_name ?? '—'
+                        )}
+                      </td>
                       <td className="py-3 pr-4 font-serif italic text-graphite">{r.description ?? '—'}</td>
                       <td
                         className={

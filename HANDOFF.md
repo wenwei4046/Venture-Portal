@@ -1,5 +1,847 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-07 g (SHIPPED) — Billing Allocator on the sheet (batch 1, page 5)
+
+The sample (`docs/samples/2026-10-07-allocator-sheet-sample.html`, September
+2026's live figures) offered the split as chips (as before) or as one column
+per company; the user picked **每家一栏** and said 照这个做. No Chinese intro
+paragraph; the tabs in English with counts; Staff and Setup untouched
+(already on the sheet as they were).
+
+- `lib/allocator-sheet.ts` (tested): `allocatorSummary` (allocated, to bill =
+  the unbilled allocations' billable share, billed = the locked ones', HV own,
+  batches = distinct live refs, invoices), `matrixColumns` (one column per
+  target the month allocates to — companies in picker order, departments
+  after, HV own last; none for a company the month never touched),
+  `byCompanyRows` (share / billed / to bill / invoices per target, largest
+  first, HV own at the end; "(dept)" stripped, `dept` flag), `batchLabel`.
+- `page.tsx`: eyebrow "I. BILLING · ALLOCATOR", the month picker
+  (`AllocatorPeriod`, new) beside the title, four StatCards (Allocated ·
+  Month primary / To bill — alert while anything is unbilled / Billed / HV
+  own share). `page.test.tsx` mocks the whole data layer.
+- `AllocatorTabs`: `SlidingTabs` control rail Calculate · Records n · Staff
+  n (active) · Setup n (templates); the month input left for the page head.
+- `RecordsTab` (rewritten, `.alloc-sheet.fin-queue`): a `.gen-strip` above
+  the table for what is unbilled ("1 expense not yet billed · RM 1,289.52 to
+  2 companies" + Generate draft invoices →), the records as a `SortableTable`
+  (layoutId `billing-allocator.records`): Txn / Description (second line
+  method · category · HC month) / Amount / one column per company (key
+  `t:<id>`, HV own last, grey) / Batch chip (ledger with the ref, alert "not
+  billed") / Edit · Delete pinned at the end (locked while the batch is
+  live); phone: Description + Amount, small print number · method, batch
+  chip · n shares, the panel carries Split chips, Category, Batch, Edit /
+  Delete. Then a By company `SortableTable` (`billing-allocator.by-company`):
+  Bill to (subsidiary / dept pool / not billed) / Share / Billed / To bill /
+  Invoices as chips linking to invoice-doc (paid ledger, issued alert), footer
+  Billable · billed · to bill · n invoices. The old banner, the chip row and
+  the 各家合计 box are gone.
+- `CalculateTab`: same engine and save path; the headcount source in a
+  `.sheet-toolbar` ("Current list · n active" / "Month snapshot", a warning
+  when another month's list is used), every field labelled (Template /
+  Description / Amount RM / Method / Category), the preview as a table Bill
+  to / Basis / Share with "Billable total · HV own left out" in the foot and
+  "n EXPENSES · HEADCOUNT x.xx" on the section head, Save allocation /
+  Overwrite ALC-…; "+ Add another expense" as a quiet button.
+- CSS (`globals.css`, under the fin-queue block): `.alloc-sheet` rules —
+  `.gen-strip`, `.own` columns in graphite (upright: the sheet has no
+  italics), `.q-meta` second line (hidden on phones), nowrap chips, `a.chip`.
+- Gates: allocator tests 20, full vitest, tsc (the 9 known), next build.
+
+Next: Invoice Pool (sample first), then batches 2–4.
+
+## CHECKPOINT 2026-10-07 f (SHIPPED) — Invoice / Statements on the sheet (batch 1, pages 3–4)
+
+The sample (`docs/samples/2026-10-07-invoice-sheet-sample.html`, v1–v6) went
+through: every head control visible but re-planned (the month with the
+title, the actions in a captioned band From payroll / Create / Export); no
+"Billing progress" table (its figures ride the folded Payroll basis line);
+the payroll basis folded but ABOVE the invoices; the phone's Settle an orange
+pill like the Principal's Approve; the phone tab bar in English; the phone's
+fold unboxed so its tables fit; the opened row's labels in the card-label
+face, not the mono. Then "照这个做".
+
+Discovery: sidebar **Invoice** = `/statements` = `BillingView` (`/billing`
+redirects there), so Invoice and Service Billing are ONE page; the monthly
+list is `/statements/monthly` (sidebar Statements).
+
+- `lib/billing-sheet.ts` (tested): `invoiceSummary` (invoiced without the
+  voided, outstanding after part-payments and CNs, received = paid + part
+  payments), `payrollBillingLines` (each department's payroll cost vs what its
+  invoices bill — the consolidated invoices' lines counted by segment, plus
+  the attribution modes), `payrollBasisSummary` ("HR 4,057 / 5,797 · Director
+  76,996 ✓"), `statementsSummary`.
+- `BillingView`: head = title + `PeriodSelector`; `.act-band` with the three
+  groups (export links moved here from `statements/page.tsx`, which is now
+  just the view); four StatCards (Invoiced · Month primary / Outstanding alert
+  / Received / Payroll basis Submitted·Partly·Pending with HR and Director
+  dates); `<details class="fin-fold">` with the summary line around the
+  Director Salary Submission + Staff Billing Allocation sections; the figure
+  strip, `StatRow` and the five `DeptCostCard`s are gone; `categoryByInvoice`
+  (line accounts joined with +) and `canSetDefault` go to the list.
+  `BillingView.test.tsx` mocks the whole data layer.
+- `InvoicesList`: `.fin-queue` section with a `.sect-head` ("54 INVOICES ·
+  SEPTEMBER 2026 · 2 SELECTED"), `SlidingTabs` by status (All / Issued / Paid
+  / Draft / Voided, counts from the period), `rowClassName` (`st-selected`,
+  `inv-void` struck through), Bill to = code over name (phone small print:
+  number, status chip, date), new Category column, `InvoiceStatus` as a chip,
+  the action column in the phone panel (Settle = `.inv-settle`, a pill on
+  phones), a footer total without the voided, and the `.bulk-bar` under the
+  table (Clear / Print selected / 作废所选 n / Settle n →) replacing the
+  toolbar summary. `invoiceSummary` is not used here (the footer sums).
+- `StatementsPeriodTable`: code over name, status chip, Open → column,
+  footer totals (Invoice · Contra · Net), phone keep = company + net,
+  `openLabel` "Open the statement →", `canSetDefault`. `statements/monthly/
+  page.tsx`: eyebrow II. FUND IN / OUT, Generate + Excel + PDF, four cards,
+  per-month `.sect-head` with the status mix ("ALL DRAFT" / "1 ISSUED · 1
+  PAID"); `page.test.tsx`.
+- `nav-config` `TABS_BY_ROLE`: finance and principal labels in English
+  (Overview / Approvals / Payments / Receipts / Invoices); `moreTabLabel(role)`
+  → More for them, 更多 for HR and dept managers (`BottomTabBar`).
+- CSS: `.approvals-queue` rules renamed `.fin-queue` (the Approvals sections
+  carry both classes); `.inv-void`, `.act-band`/`.act-group`,
+  `.btn-quiet-sheet`, `details.fin-fold` (unboxed on phones), phone-only
+  `.fin-queue .lt-detail-list dt` in the card-label face and `.inv-settle`
+  as an orange pill. `CreditNotesList` / `MarketingProjectList` /
+  `NonBillableList` got `.sect-head` heads.
+- Next in batch 1: Billing Allocator → Invoice Pool (sample first each);
+  then batches 2–4.
+
+## CHECKPOINT 2026-10-07 e (SHIPPED) — An issued invoice is edited in place
+
+User, on an issued Service Billing row (HV-INV-202610-0013, free text,
+marketing project): "invoice edit 我要全部都可以改". Edit was offered for drafts
+only; an issued invoice had 改 account / credit note / void. Agreed ("做"):
+the same full form for issued invoices, the AR-accrual entry corrected IN
+PLACE (user's standing rule: 要直接更改，不是开 JE 补), with a reason.
+
+- Migration `20261007140000_amend_issued_invoice.sql` (applied):
+  `amend_issued_invoice(p_invoice_id, p_header, p_lines, p_journal, p_reason)`
+  — finance/principal; status issued / paid / paid_via_netting; exactly ONE
+  live `journal_entries` row for the invoice (a dept_pool recharge or a
+  consolidated payroll invoice posts more and is refused); rewrites the
+  invoice header, replaces `invoice_lines`, deletes and re-inserts the
+  entry's `journal_lines`, moves the entry's date / period / segment
+  (`derive_journal_segment`) / total and appends `[amended d: reason]` to its
+  description — same id, same entry_no; guards: money received (paid status,
+  `settlement_voucher_id`, or credit vouchers on `invoice_id`) fixes the
+  total, the payer and the period; approved credit notes cap the total;
+  period locks on the entry's old and new month; the entry must balance and
+  equal the total; files `access_log` (`amend_issued_invoice`, before / after
+  / lines / journal). Dry-run on the live invoice inside a rolled-back
+  transaction behaved exactly so.
+- `billing/actions.ts updateIssuedInvoiceFull(payload + reason)`: the draft
+  action's validation, refuses dept_pool (old or new) and
+  payroll_consolidated / segmented lines, both months open, then builds the
+  entry as the issue would — `resolveArGlCode({companyId, freetext})` for the
+  Dr, `resolveRevenueGlCode(category, mode)` per line for the Cr, dated by
+  `invoiceJeDate` — and calls the function. Returns `{ entryNo }`.
+- `EditInvoiceButton` gains `status` and `settled`: "Edit issued invoice", a
+  required Reason field, and with `settled` the bill-to, period, line amounts
+  and add / remove line are disabled (words stay editable). `InvoicesList`
+  offers Edit for issued / paid rows (hint 整张改，JE 原地改) and passes
+  `settled` from the status and `paidByInvoice`.
+- Tests: `actions.amend-issued.test.ts` (8), `InvoiceActions.edit-issued.test.tsx`
+  (5), `InvoicesList.test.tsx` (+1, menus updated).
+
+## CHECKPOINT 2026-10-07 d (SHIPPED) — Approvals on the sheet (batch 1, second page)
+
+The Approvals sample (`docs/samples/2026-10-07-approvals-sheet-sample.html`)
+went through eleven cuts on the user's feedback — English, Voucher # and
+Description as two columns, the phone led by Description + Amount ("手机版本我
+注重是看 amount，description 这些，而且这个是 principal 会 approve 吧"), the
+fixed-390px phone frame, the chevron glyph, the two-line small print — until
+"显示没有问题了". The expand is by the ▾ arrow only (confirmed), the tick and the
+arrow are whole-cell tap targets, and the user asked that only Finance's view
+change ("别碰到其他的 view"): the page's CSS hangs off `.approvals-queue`,
+and the shared table gained opt-in props only. Then "照这个做看看".
+
+- `lib/approval-queue.ts` (pure, tested): `splitVoucherTitle` ("HV-PV-…: text"
+  → number + text, lines joined with ·), `requestTypeLabel`, `buildQueueRows`
+  (a group_id → ONE row: lead voucher's number, `Combined · n`, "approved
+  together with" the loan, amount = the vouchers only — the loan duplicates
+  its disbursement), `queueSummary` (total, items, combined, oldest wait in
+  days, a submitter set's share), `executiveSubmitterIds` (HR's title levels:
+  a login whose staff title sits at a level named Executive or under it),
+  `recentDecisionRows`.
+- `approvals/page.tsx`: four StatCards — Pending · to approve (primary,
+  PV-deduped total), Oldest waiting (alert from 3 days), Submitted by the
+  executive (needs `hr_staff_costs.user_id` → `titles.level_id` →
+  `title_levels`; empty under RLS = "0 of the n"), Decided · 30 days (two head
+  counts). `payment_voucher_sources` is read for the waiting vouchers so the
+  phone's panel can say Pool / Category.
+- `PendingApprovals.tsx` rewritten: `SortableTable` (`approvals.queue`,
+  `canSetDefault` for principal/finance) with a select-all header, a Combined
+  tag, Open → (a group opens `BatchDetailsModal`; read-only when a loan rides
+  along), the bar under the table — Approve n → (confirm + notes + overdraw)
+  and Reject… (reason required) → NEW `rejectRequestsBulk` in actions.ts.
+  `performRejection` / `performGroupRejection` were extracted from
+  `rejectRequest` / `rejectRequestGroup` (same side effects, no redirect
+  inside); the single reject's "use the combined card" message now says to
+  tick the row. `CombinedApprovalCard.tsx` is no longer imported (left in place).
+- `RecentDecisions.tsx` new (`approvals.decisions`): chip per decision, By,
+  Decided, Amount; the phone's small print carries the number and the chip.
+- `SortableTable`: `header` (a node in place of the label), `mobile:
+  'detail-only'` (phone panel only, never a grid column, not in the Columns
+  panel), `rowClassName`, `openLabel`. All opt-in; existing tables unchanged.
+- CSS: `.approvals-queue …` — `.type-tag`, `.combo-tag`, `tr.st-selected`,
+  `.st-tick` (44px tap zone), `.q-sub` small print (phone only), `.bulk-bar`
+  (sticky; on a phone it sits above the 54px tab bar), the arrow button at
+  44px tall on a phone.
+- Tests: `lib/approval-queue.test.ts` (15), `SortableTable.test.tsx` (+5),
+  `actions.reject-bulk.test.ts` (4), `PendingApprovals.test.tsx` (7),
+  `RecentDecisions.test.tsx` (3), `approvals/page.test.tsx` (4).
+- Next in batch 1: Invoice / Statements → Service Billing → Billing Allocator →
+  Invoice Pool, a sample first for each; then batches 2–4.
+- Follow-ups the same day, from the Principal's phone: (1) Service Billing's
+  six head controls ran past the sheet (`BillingView` page-head: actions now
+  `min-w-0 flex-wrap justify-end`, title `shrink-0` — reproduced in a scratch
+  page with the built CSS: `shrink-0` squeezed the title and overflowed; the
+  fix wraps instead); (2) the queue's phone small print was Chivo Mono at 10px
+  and read as a typewriter / "华语字体" — now the body face at 11px
+  (`.approvals-queue .q-sub`); (3) the user picked **B** for reaching the
+  voucher from the phone: the panel now also shows Payee, Pay by ("Bank
+  transfer · Maybank") and Attachments as thumbnails (`AttachmentThumbs`,
+  components/voucher — signed on open through `getAttachmentPreviewUrls`,
+  other files through `getAttachmentSignedUrl`; `page.tsx` reads
+  `payment_vouchers`, `bank_accounts`, `payment_attachments` for the waiting
+  vouchers). Option A (tap the description to open) was not chosen.
+
+## CHECKPOINT 2026-10-07 (SHIPPED) — Finance's pages on the white sheet (option A)
+
+User, with the Principal's Overview open: "finance 的整体 background 可以换成和
+principal 和 hr 一样 · 先确定". The difference was the Sheet theme
+(`lib/sheet-routes.ts`, DESIGN.md v3.9–3.11): HR's view and every role's
+Overview sit on the white sheet; Finance's routes were never listed, so they
+still drew on the plaster. Offered A (list the routes — sheet, black lettering,
+orange buttons and sheet tables come through the `:where(.sheet-theme)`
+overrides; page anatomy untouched) or B (rebuild each page's head into summary
+cards like HR's — 67 pages, several batches). User: "做 A 先".
+
+- `SHEET_ROUTE_PREFIXES` gained every remaining portal root (Approvals …
+  Settings, plus the dept manager's My Billing / OPEX); the Product List keeps
+  its workspace. `sheet-routes.test.ts` lists them; DESIGN.md is v3.12.
+- Known on the sheet until a page is converted: the walnut heroes on Fund IN /
+  Fund OUT / Venture Pool / Dept Pool stay dark (allowed — the one dark
+  object); the Reports' `.cf-report` keeps its own palette; figure strips are
+  not summary cards. The user will say which pages to rebuild (B) after
+  looking.
+
+## CHECKPOINT 2026-10-07 c (SHIPPED) — Payments on the sheet (batch 1, first page) and a table's default arrangement
+
+Option B for Finance's pages, agreed as four batches (Daily Operations → Fund
+In / Out → Departments → Reports & Admin), one before / after sample per batch
+first. The Payments sample (`docs/samples/2026-10-07-payments-sheet-sample.html`, both views and
+an orange / Harbour-blue toggle) was approved as "改版" in ORANGE — the user
+tried a Finance-blue cut and said "我发现橘色比较好看", so the sheet keeps one
+accent for every department; do not build a blue variant.
+
+- `VoucherLedger` (Payments and Receipts alike): the serif figure strip became
+  four `StatCard`s — Total paid / received (primary), Pending approval (alert
+  while anything waits; draft + pending), Approved · to pay / receive (decided,
+  not yet moved), All vouchers / receipts (voided in the note) — the tabs carry
+  counts (`PaymentTabs counts`), the filters are one `.sheet-toolbar`
+  (`PaymentFilters`), and a `.sect-head` ("Payment vouchers" / "Official
+  receipts" · "n of m vouchers") heads the table. Page head, buttons and the
+  table unchanged. Tests in `VoucherLedger.test.tsx`.
+- "我要能定这个 as default": a table can carry a DEFAULT arrangement for everyone.
+  `table_layout_defaults` (migration `20261007110000`, one row per table, read by
+  all, set by principal / finance / hr), `lib/table-layout` (`effectiveLayout`,
+  `fetchDefaultLayout`, `saveDefaultLayout`, a cached copy like the own one),
+  `SortableTable` draws `effective = own ?? default`; Reset drops the own row
+  (back to the default, not the code); the Columns panel offers 设为预设 when
+  `canSetDefault` is passed — `VouchersTable` passes it for finance / principal.
+  Other tables with a layoutId get the button as their pages are converted.
+- Next: the rest of batch 1 — Approvals, Receipt (done with Payments), Invoice /
+  Statements, Service Billing, Billing Allocator, Invoice Pool — sample first.
+
+## CHECKPOINT 2026-10-07 b (SHIPPED) — the tick-box's "…" and a line to pull on
+
+Seen on the Invoice list once it was on the sheet. (1) "这个三个点是什么？": the
+user had dragged a width, so the table is fixed-layout and a cell that does
+not fit is cut with an ellipsis; the sheet's 14px cell padding (12px before)
+left the frozen tick-box column no room for the box, and an "…" stood in for
+it. A column with `resizable: false` now carries `st-nocut` on its th / td and
+is never cut (`SortableTable.test.tsx`). (2) "可以 header 之间有个线条吗？": the
+resize handle only drew its line on hover, so nobody could see where to pull.
+On the sheet the handle's line is always there — 1px in the header band's
+rule colour, orange and 2px while the handle is under the pointer — and only
+where a column can be resized. (The base `.st-resize:hover::after` rule is
+outranked by the th-hover rule and never showed orange; the sheet's hover
+rules are written at the th-hover specificity.)
+
+## CHECKPOINT 2026-10-06 (SHIPPED) — the director CTC invoice is itemised
+
+User: "director 要 bill back 的我要拆 detail 可以吗？" → "可以". HR keys each
+subsidiary's director CTC in components (`director_ctc`: basic, KPI, allowance,
+employer EPF / SOCSO / EIS; `get_director_ctc_by_company` sums them per
+company), but Create Invoice → Subsidiary → Director attribution billed the
+total as ONE line (`createManualInvoice` per subsidiary). Note: the old
+`generate_monthly_invoices` RPC no longer makes director invoices — only
+marketing_project; the director batch comes from that modal.
+
+- `lib/director-ctc-lines.ts` — `directorCtcInvoiceLines(components, amount,
+  period, category)`: Salary (basic) / KPI / Allowance / EPF / SOCSO / EIS,
+  zero lines out, "<Label> - Sep'26" like the payroll invoice; null when
+  `amount` is not the components' sum to the sen (Finance changed the figure,
+  or a multi-pool template sliced it) — that invoice stays one line.
+- `fetchDirectorCtcByCompany` now returns the components (`DirectorCtcRow`);
+  `CreateInvoiceButton` keeps them from the auto-fill and calls
+  `createMultiLineInvoice` (header category NULL, lines carry the category)
+  when the split reads, else `createManualInvoice` as before. The auto-fill
+  note says so. Aggregate per company, never per director (HC = 2 heads, one
+  set of lines). Issue / settle / Director pool routing unchanged: lines have
+  no segment, so `lineAttributions` falls back to the mode's segment
+  (`director`).
+- Tests: `director-ctc-lines.test.ts`, `CreateInvoiceButton.director-split.test.tsx`
+  (first component test of that modal — mocks AccountPicker as a plain select).
+- Data: the five Sep'26 director drafts the user made that morning
+  (HV-INV-202609-0055 … 0059, 2990 / CONTS / DC / HC / HK) got their lines
+  in place from `director_ctc` (totals untouched, header category → NULL,
+  `access_log amend_invoice_lines`). Aug'26 and earlier (paid, one line)
+  were left alone.
+- Follow-up the same day ("对吗？… 确定要 bill 出去的多少？" → "做第 1 条"): the
+  Director OPEX card on Service Billing compared the CTC invoices with the
+  submission's `total_gross` (basic only — no employer statutory, no CTC
+  allowance) and read "5 invoices · over RM 19,396.25" against drafts that
+  matched the submission to the sen (Aug read "over 19,319.15" the same way).
+  `directorBillingTarget(submission)` (lib/billing) = Σ by_company total_ctc,
+  payroll gross only for a legacy snapshot without rows; the card and the
+  summary header use it, and the submission section says "payroll gross X ·
+  billed as CTC Y". The user bills the CTC — same basis as Aug.
+
+## CHECKPOINT 2026-10-05 b (SHIPPED) — Salary / Allowance split of an InfoTech-imported row
+
+User, on HV-INV-202608-0051 (HC, Aug'26 HR adjustment, 8,082.33): "可以帮我检查为什么这样
+bill 吗？", then "拆成 salary/allowance/epf 等等拆对吗？", then "两个都做".
+
+Why the invoice exists: HR set an Aug'26 allocation for the HR department's four
+people on 10/1 18:08 (each 50% HC / 35% CONTS / 15% CAR — the first HR-dept
+allocation since the 2026-09-03 "HR payroll 用自己 pool" ruling); Finance ran
+对数补差 at 18:21 and the HR segment, billed 0, was topped up on HC / CONTS / CAR
+(0051–0053). Sep'26 has an HR allocation too (10/3, two people, 2990 / CAR /
+CONTS). Whether that is a policy change is the user's to say — not asked.
+
+Why the split was wrong (totals, EPF, SOCSO, EIS were right): the InfoTech
+import writes the file's basic, which InfoTech has already prorated for a
+mid-month joiner (4,000 × 22/31 = 2,838.71), keeps the file's gross verbatim,
+and the compute trigger records 22/31 from the hire date. `get_staff_billing_allocation`
+(and `get_staff_own_share_allocation`) multiplied that basic by 22/31 AGAIN, so
+824.14 of basic went out as "Allowance".
+
+- Migration `20261005100000_billing_allocation_imported_basic.sql` (applied
+  live): `source = 'imported'` → basic taken as is; other rows keep the ratio.
+  Verified: only the partial-month imported rows moved, Salary ↔ Allowance only.
+- Issued lines corrected in place, totals untouched, the matching 5050 journal
+  lines moved with them, one `access_log` row per invoice (`amend_invoice_lines`):
+  Aug HR adjustments 0051 HC (Salary 5,776.64 → 6,188.71 / Allowance 1,373.61 → 961.54),
+  0052 CONTS (4,043.64 → 4,332.09 / 961.53 → 673.08), 0053 CAR (1,732.99 → 1,856.61 /
+  412.08 → 288.46); Aug IT on 0035 (2990) and 0036 (CAR): Salary 1,969.04 → 2,104.84
+  and the 135.80 Allowance line removed (the generator writes no zero line, and
+  `invoice_lines.amount > 0`; lines renumbered); Sep Finance on 0046 (2990):
+  1,411.94 → 1,841.66 / 449.72 → 20.00. The Sep DO 3/30 row sits in HV's own
+  share (no own-share invoice for Sep yet), so no other Sep invoice changed.
+- Not touched: HR's payroll rows and the import (HR's), the Jun/Jul Marketing
+  partial-month rows (pool-borne, never invoiced).
+
+Same day, a data correction the user asked for ("这边录错了，是 fund out 给 conts 的" →
+"改"): loan `aeb00ef6` (RM 30,000, 4%/mo, 1 month, disbursed 14 Sep, active) was
+recorded to Carres but is the fund out to The Cont. Changed in place:
+`loans.company_id`, HV-PV-202609-0372 payee name / company / description,
+JE-202609-0694 description and its Dr **3051 → 3053** (Amount due from - The
+Cont), the venture_pool fund_out description, the approval request description.
+Amounts, dates, rate, approval, bank: untouched. `access_log` action
+`amend_loan_borrower`. The same-day fund IN RM 30,000 @ 2%/mo from Carres (4053)
+is right (user confirmed).
+
+## CHECKPOINT 2026-10-05 (SHIPPED) — a file can be added to a voucher after it is paid
+
+User, on two paid PVs (0451, 0452) showing 0 FILES: "这些本来就 attachment 的吗？帮我检查".
+Checked: no `payment_attachments` row, no object in the `payment-attachments` bucket, no
+orphan, and the access log shows them created from /payments/new and never
+uploaded to — the receipts were simply never attached (the same morning's 0453
+got its two PDFs through the voucher page). Note for next time: the
+creation-time upload in `createPaymentVoucher` swallows a storage error silently
+(`if (!uploadError)`, no message); the voucher-page uploader does not.
+
+Offered two ways to add the receipts now; user: "做第 2 条":
+
+- `uploadVoucherAttachment` accepts draft / pending_approval / **approved / paid**
+  (not voided). For approved / paid it writes an `access_log` row
+  (`action add_attachment`, resource_type payment_voucher, metadata: status, count,
+  file names) — best-effort, logged if it fails. Nothing can be REMOVED from a
+  decided voucher: unchanged `delete_voucher_attachment` RPC and the storage DELETE
+  policy both stop at pending_approval, and the page offers no 删除 there.
+- Voucher page: the 附件 card folds the uploader for every status but voided
+  ("补附件" once decided), the uploader says 只能加、不能删、会记录, and
+  `AttachmentList` marks a file uploaded after `approved_at` as 事后补上 (debit
+  vouchers only — a receipt is paid the moment it is made).
+- Tests: `actions.attachments.test.ts`, `AttachmentList.test.tsx`, four cases on the page test.
+
+Also this session (2026-10-02 → 05): the finance executive's login was created by
+the Principal on 2026-10-05 and verified (denies Reports / Department reports /
+Reconciliation, no Payroll payouts); the steps are in checkpoint d below.
+
+## CHECKPOINT 2026-10-02 d (SHIPPED) — 改日期, the office clock, and Payroll payouts
+
+The user confirmed a three-part sample ("照这个做"). All three are on `main`. This supersedes the two
+"asked, NOT built" items of checkpoint c below.
+
+### 1. 改日期 — a wrong date on something posted is corrected in place (e75a7946)
+
+Right-click a row on Payments / Receipts → 改日期 (also beside the date on a paid
+voucher's page). Date + reason. For a **paid** receipt or payment voucher and a
+**received** loan repayment. Not a draft / pending voucher (that is Edit), not a
+payroll voucher (its date is HR Payment's).
+
+- `amend_voucher_date`, `amend_loan_repayment_date` — migration
+  `20261002020000_amend_posted_dates.sql`. SECURITY DEFINER, finance / principal
+  only, the role check written `IS NULL OR NOT IN` (see the finding below),
+  EXECUTE revoked from anon. They move the record, its journal entries
+  (`transaction_date` + `period_month`), the `fund_source_repayments` /
+  auto-synced `repayments` rows a repayment voucher wrote, and leave a note on
+  each. Refused: a future date, the same date, no reason, a closed month (old
+  or new), lines already matched in a bank reconciliation.
+- `AmendDateButton` (payments/_components), `amendVoucherDate` (payments/actions),
+  `amendRepaymentDate` (fund-out/actions). `VoucherRow.amendDate` says which rows
+  have it.
+- Its two tests that ended on a click raced the end of the save (the result
+  shows a moment before `isPending` drops, and Close / 确认改 wait for that).
+  They now wait for the button. The dialog itself was right.
+
+### 2. Times printed by the server are on the office clock (e727a1be)
+
+A server component printing `dayjs(x).format('… HH:mm')` printed UTC on Vercel:
+12:47 read 04:47. `lib/office-time.ts` — `officeTime(x)` is `dayjs(x)` at +08:00,
+so every format string stayed as it was. 28 places in 22 files (approvals, audit
+log, billing requests, dept pool, director salary, fund in / out, HR costing,
+payslip, payroll requests, statements, the invoice / credit note / voucher /
+table PDFs, team activity), plus the two pages that used `toLocaleString`
+(`approvals/payroll-run/[id]`, `print/director-pool`), which now name
+`OFFICE_TZ`.
+
+- **Client components were left alone**: they print the viewer's own time. They
+  still hydrate with a text mismatch when the server's first paint (UTC) differs
+  — React re-renders that boundary on the client. `officeTime` there would
+  remove it (CombinedApprovalCard, PendingApprovals, InvoiceDetailButton,
+  StaffTab, PeopleDirectory, PersonCard, AttachmentList, CommissionWorkbench).
+- Still not done: a moment printed as a DATE only on the server
+  (`dayjs(created_at).format('D MMM YYYY')`) is a day early for anything made
+  between 00:00 and 08:00.
+
+### 3. Payroll payouts — a treasury account that must not see each person's pay
+
+User: "我现在有 finance executive 了，我不希望他看到 payroll detail，也就是每个人的
+payout". The executive's login does not exist yet.
+
+**The permission**: `payroll_payouts` ("Payroll payouts", section Daily, scope
+`none`) — migration `20261002030000_payroll_payouts_permission.sql`, applied.
+Role default: principal only. The finance account that existed that day holds
+it as a **personal grant** (`user_permissions`), so nothing changed for it. A
+finance account created later does not have it. In the app:
+`canSeePayrollPayouts(u)` = `payroll_payouts` OR `hr_costing` (lib/roles.ts) and
+`requirePayrollPayouts(...keys)` (lib/auth.ts).
+
+**What an account with Treasury but without it gets** (all folded or refused on
+the server; nothing person-level is sent to the browser):
+
+| Surface | Without Payroll payouts |
+| --- | --- |
+| `/payments` | each payroll batch is ONE row — "Payroll disbursement Sep 2026 · 26 张 · 只显示总数" — that opens nothing; statutory vouchers fold per body per month ("KWSP Sep 2026"), funding transfers per month. The summary above still totals every voucher. No Payroll Requests button. |
+| `/payments/[id]`, `/payments/[id]/edit` | a payroll voucher is not found |
+| `/payments/voucher-doc` | payroll vouchers dropped from the selection; 404 if none left |
+| `/payments/export` | the same batch rows as the page |
+| `copyPaymentVoucher` | refuses a payroll source |
+| `/hr-costing/payroll/[period]/bank-transfer` | redirect (needs hr_costing, or treasury + payroll_payouts) |
+| `/payments/payroll-requests` + its four actions | redirect |
+| `/invoice-pool` + `requestRelease` | redirect |
+| `/approvals/[id]` | the request of a payroll voucher is not found |
+| `/daily-bank` (+ PDF) | pending payroll is one "Payroll — N vouchers — total only" line per bank; pending and available totals unchanged |
+
+`lib/payroll-vouchers.ts` holds the folding: `isPayrollReference`,
+`payrollBatchLabel` (what and which month — never who, never which department;
+a description in an unknown shape is never used as the name),
+`lockPayrollBatches`, `filterLockedBatches` (a batch is always shown whole: a
+pool or amount filter hides the locked rows, a search matches the batch's name
+only, a status tab keeps a batch that has a voucher in that status).
+`SortableTable` gained `rowOpens` for a row with no page of its own.
+
+**In the database (RLS)** only the tables that are nothing but one person's pay
+were narrowed for a treasury reader without the permission:
+`payroll_voucher_lines`, `payroll_statutory_voucher_lines`, and the finance
+own-department policies on `hr_monthly_payroll` / `hr_staff_costs`. HR's and the
+Principal's reading is untouched. Verified as each role in a rolled-back
+transaction (holder 71 / 110 lines, non-holder 0 / 0, HR and Principal as before,
+`payment_vouchers` 455 visible either way).
+
+**`payment_vouchers` was deliberately NOT narrowed.** Every voucher number is
+"how many vouchers this session can see, plus one" (payments/actions.ts ×2,
+billing/actions.ts, claims/actions.ts, payroll-requests/actions.ts) against
+`UNIQUE (voucher_no)`. An account that could not see the ~140 payroll vouchers
+would collide on every voucher it created. So for vouchers, approval requests,
+dept pool rows and the journal the boundary is the PAGES, not the database:
+
+- A treasury account can still read `payment_vouchers` (payee + amount),
+  `approval_requests`, `dept_pools` and `journal_entries` / `journal_lines`
+  through the API with its own login. The journal's payroll entries name the
+  payee ("PV …: Payroll net Sep 2026 — <name> (<dept>)"); that text is written
+  by HR's payroll RPCs.
+- So the pages that list the journal or the pool rows must be switched off for
+  such an account: **Reports, Department reports, Reconciliation, Dept Pool**.
+  Nothing in code does this — the Principal does, per person (Team › People ›
+  the person › permissions → deny) or by configuring the title (Team ›
+  Permissions). A new finance account gets all four from its role until then.
+- To make it a database boundary: move voucher numbering into a SECURITY
+  DEFINER function (or a sequence), then narrow `pv_select` / `approvals_
+  privileged_select`; the journal would need the payee taken out of the entry
+  text, which is HR's RPC.
+- A department with one person: anything shown per department (Daily Bank's
+  columns, Billing's payroll allocation, a dept pool balance) is that person's.
+  The batch rows fold across departments for that reason; the per-department
+  reports cannot.
+
+**View as Finance** (the Principal's switcher) now shows what a NEW finance
+account sees — locked payroll — because the mask is the role's defaults and the
+grant is personal. It is the way to look at the executive's view.
+
+Not built, not asked: the General Ledger and the other reports made safe for
+such an account (the user: "暂时不需要").
+
+### Dept Pool opened to the finance executive — History folds payroll (2026-10-05, same day, SHIPPED)
+
+User: "department pool 她还是要看到的 … 不给她看 detail / history 罢了不行？" → option A.
+Checked every Dept Pool screen: the index (By department, Per-bank breakdown), a
+department's Overview and P&L (its row list is inter-billing only) are totals;
+the one place that named people was a department's **History** (the HR pool:
+26 / 23 / 18 salary rows a month, "PV HV-PV-…: Payroll disbursement Aug 2026 —
+<person> (<dept>)"; the Director pool had 4 in Jul 2026), and the Marketing
+page's voucher history (4 statutory PVs — department level, which the user
+counts as detail).
+
+- `HistoryTable` takes `seesPayroll` (both callers pass `canSeePayrollPayouts(user)`). When
+  false it looks the rows' vouchers up by the number each row starts with
+  (`poolRowVoucherNo`) and folds payroll's rows with `foldPayrollPoolRows` (lib/payroll-
+  vouchers.ts): one locked line per batch per day per direction — "Payroll
+  disbursement Aug 2026 · 22 笔 · 只显示总数" — standing where its latest member
+  stood. A salary line whose voucher is not found still folds by its own text.
+  Verified on live data: all 71 per-person rows carry a voucher number that
+  resolves to a payroll voucher; 0 PV-prefixed rows resolve to nothing.
+- `MarketingPnlView` takes `seesPayroll` and shows payroll vouchers as locked batch totals.
+- So the Principal denies **three** for the executive: Reports, Department
+  reports, Reconciliation. Dept Pool stays. (The user's own account sees
+  everything as before: it holds payroll_payouts.)
+
+Not touched: the 150 dept_pools rows themselves (RLS treasury scope) — same
+API-level residual as the journal; the pages are the boundary.
+
+### Edit draft PV: the pool list is Create payment's (2026-10-05, SHIPPED)
+
+User: a draft drawn on the Revenue Department pool opened in Edit with its pool
+blank and only the seven old pools to pick from ("只要我 Edit draft PV, 它就强制
+要再 select"). `EditPaymentForm` carried its own literal; Create payment had moved to
+`paymentPoolOptions(registryPoolOptions(deptRegistry))` on 2026-10-02. The edit page now
+loads the registry too and passes `extraPools`; the form also appends any pool a saved
+row names that the list lacks, so a saved choice is never shown blank. The two
+drafts (HV-PV-202610-0456 / 0457) were stored right all along; approving them was
+never at risk (adjustPool resolves `dept_pool_<segment_key>` from the registry).
+That was the last literal pool list noted in the 2026-10-02 handoff.
+
+### Found, NOT fixed — the user DECLINED the fix (2026-10-02: "不需要")
+
+**Role checks that let a caller with no role through.** `IF v_role NOT IN
+('finance', 'principal') THEN RAISE …` passes when `v_role` is NULL (not logged
+in, or deactivated): `NULL NOT IN (…)` is NULL and the IF does not fire. About
+60 SECURITY DEFINER functions in `public` are written that way with no NULL
+guard, and about 50 of them are EXECUTE-able by `anon` (regex count,
+2026-10-02). Proven as `anon` in rolled-back transactions:
+`amend_loan_repayment` reached "Repayment not found", `create_manual_journal_
+voucher` reached "Description is required", `get_staff_billing_allocation`
+returned rows. Among them: amend_fund_source, amend_loan, create_loan_with_
+approval, generate_monthly_invoices, mint_invoice_no,
+reassign_voucher_gl_account, void_issued_invoice, get_director_payout_summary,
+get_payroll_accrual_totals.
+
+Proposed (not applied): `REVOKE EXECUTE … FROM anon, PUBLIC` on every one of
+them — no function body changes, and no anon caller exists in the app (the API
+routes are `/api/erp/v1/*`, the `/api/member-queue` cron and `/api/wasm-health`;
+the admin client is service-role) — then add the NULL guard function by
+function. Many of them are HR's.
+
+**Told to the user in plain words and declined ("不需要").** Do not apply it and do
+not raise it again unasked.
+
+### Creating the finance executive's login (asked 2026-10-02, answered — nothing built)
+
+Only the Principal can: `team_invite` and `permissions_manage` are the Principal's, and the
+Finance Manager's account has neither (nor `team`). Finance has five people on the
+roster — ACCOUNTS ASSISTANT 1, ACCOUNTS EXECUTIVE 2, SENIOR ACCOUNT EXECUTIVE 1,
+ASSISTANT FINANCE MANAGER 1 — none with a login, no title with permissions of
+its own, no email on file.
+
+1. Team › People › open the person › **Invite** (`/team/people/invite?staff=…`, name /
+   department / title prefilled). NOT the "Invite user" button on the list — that
+   files a second roster row with basic_salary 0.
+2. Email, a password (6+, typed by the Principal, no email step — and the portal
+   has no change-password screen), Role **Finance**.
+3. On the person's page, Permissions: **Deny** Dept Pool, Reports, Department
+   reports, Reconciliation. Leave Payroll payouts alone (not inherited; do not
+   Grant). Do this before handing over the password.
+
+**Found on the way, NOT fixed:** the invite form's "Reports to" starts at
+"— Nobody" even for somebody already on the roster, and `inviteUser` writes
+`reports_to` unconditionally — so inviting an existing person without re-picking
+their manager CLEARS their reporting line (`team/people/invite-actions.ts`,
+`InviteUserForm.tsx`). All five Finance people have one today. Fix: prefill the
+select from the roster row, or leave `reports_to` out of the update when blank for
+an existing person. The user was told to re-pick the manager.
+
+## CHECKPOINT 2026-10-02 c — the voucher page rebuilt (SHIPPED); two things asked and NOT built
+
+### Shipped: `/payments/[id]`
+
+User: "这个 pv 点开看 detail 也是很乱 / receipt 也是字体你看怪怪的". Confirmed on a
+before/after sample ("对，照这个做").
+
+- Laid out like New loan / New fund source: numbered cards on the left (付给谁 /
+  收自谁 · 从哪个池出 / 进哪个池 · people on a payroll voucher · statutory lines ·
+  附件, folded until wanted · 记录), and the navy panel on the right with the
+  status, amount, payee, **payment date** (it was shown nowhere), bank, pool,
+  account, the invoices a receipt settled, method — and the actions.
+- `VoucherActions` is drawn inside that panel. What each state offers is
+  unchanged; the paid / voided sentences are new, and its test follows them.
+- The number is `h1.title-number`: page titles are Georgia, whose figures are
+  old-style, which is what looked odd in "HV-OR-202609-0443".
+- Times go through `officeStamp` (`lib/office-clock`). The page printed 04:47
+  for a voucher made at 12:47: server components run in UTC on Vercel.
+  **About 30 other server-rendered files still do** — find them with
+  `grep -rln "format('[^']*HH:mm" src` (approvals, audit log, fund-in/out
+  detail, statements, the PDFs …). Client components are fine. Not fixed.
+- 记录: a receipt shows 建立 → 已入账 (it is booked on the spot; the approved_at
+  it carries is the creator's own). There is no submitted_at / voided_at column,
+  so 送批 shows a time only while pending and 作废 uses updated_at.
+
+### Asked, investigated, NOT built — waiting on the user
+
+**1. A finance executive must not see what each person is paid** ("我不希望他看到
+payroll detail，也就是每个人的 payout"). No such login exists yet (finance has
+one account, the Finance Manager; Finance titles exist with no login). Facts:
+
+- Permissions are per title / per person (`permission_defs`, `title_permissions`,
+  `user_permissions`, `current_permissions()`, `has_perm()` in SQL, Team › Permissions
+  for the Principal). `salary_individual` exists but **nothing checks it**, and its
+  scope is `hr` (holding it opens the HR tables at RLS level).
+- Anyone with a treasury-scope permission reads every payroll voucher. A named
+  person with an amount shows on (sweep by an Explore agent; the gates on the
+  gates were re-checked by hand):
+  - `/payments` — payroll batch unfolds to one PV per person; the folded rows
+    are in the page data even while folded. Per-employee statutory PVs are not
+    folded at all.
+  - `/payments/[id]` and `/payments/[id]/edit` — People on this voucher (name,
+    bank account, net), statutory lines per employee.
+  - `/payments/voucher-doc` (print) and `/payments/export`.
+  - `/hr-costing/payroll/[period]/bank-transfer` — gate is hr_costing OR
+    treasury: name, account, net. Not linked for Finance, reachable by URL.
+  - `/approvals/[id]` — **login only, no permission check**; title is
+    "HV-PV-…: Name — RM net".
+  - `/daily-bank` (+export) — every voucher pending on a day.
+  - `/dept-pool/hr?tab=history` — pool rows "PV …: Payroll net Sep 2026 — Name".
+  - `/reports/ledger` (+export), balance sheet / cash flow / receipt-payment
+    drill-downs, `/reconciliation/journal`, `/reconciliation/[sessionId]` — the
+    journal entry is "PV <no>: Payroll net <Mon YYYY> — <Name> (<Dept>)" and the
+    4070 line "other - <Name> (4070)". All 71 payroll PVs name the payee.
+  - `/invoice-pool` — director code + the director invoice share.
+  Totals only (fine): payroll-requests, payroll-run approvals, dept-pool index,
+  venture pool, P&L / TB / monthly reports, journal-entries, billing, statements.
+  Outside the app, by querying with the login: `hr_cost_submissions.staff_snapshot`,
+  own-department payroll rows, `payroll_salary_entitlements` / `payroll_row_delta`.
+- Proposed, not agreed: a new permission (scope `none`) for payroll payouts, off
+  for the finance role and granted to the present Finance Manager; without it
+  the screens show one line per batch and no names, the detail tables and the
+  bank file are closed in RLS. The journal text is written by HR's payroll
+  RPCs — changing what they write is not this session's to decide.
+
+**2. A date recorded wrong on a posted receipt / loan repayment** ("这个日期我录错了
+怎么办？能自己改吗？"). Today: no in-place edit. A voucher's date is editable only
+while draft / pending; a receipt is paid the moment it is made, so it is
+作废收据 + record again. A loan repayment is 撤销 on the loan page + record
+again. The date lives in `repayments.payment_date` and the journal entry's
+`transaction_date` / `period_month` (JE: reference_type `repayment`, reference_id =
+the LOAN id, matched by type + amount + date, as `amend_loan_repayment` does).
+Proposed: 改日期 beside 改金额, same shape (reason required, both months must be
+open). For a voucher more follows the date (its JEs, pool rows' period_month,
+the invoice) — check each before building.
+
+## CHECKPOINT 2026-10-02 b (SHIPPED) — Columns panel, rows open on a double-click, dates on the left
+
+Same day, second round on the finance tables. User, on three screenshots:
+"应该定在靠左，而不是右" · "view 变这样了，可以 remove，我希望双击点开" · "我希望有
+column categories. 有些我不用显示". Confirmed on a clickable sample ("对，照这个做").
+
+### What a table does now
+
+- **Columns** (toolbar, desktop): a drawer listing the columns under 基本 / 金额 /
+  日期 / 入账, a tick each, a search box, Show all, Reset, Done. Ticks apply at
+  once. Saved with widths and order in the same `user_table_layouts` row
+  (`layout.hidden`), per person per table — **no migration**; a row saved before
+  has no `hidden` and reads as none. Pinned columns (tick box, ⋯) are not
+  listed; the last column on show cannot be unticked; hiding a column drops
+  its value filter. A column names its heading with `group`; the four headings
+  and their order live in `COLUMN_GROUPS` (`lib/table-layout.ts`).
+- **No View column** on Payments, Receipts, Fund in, Fund out, Statements. A
+  double-click opens the row; Tab + Enter does too; a phone gets 打开 → in the
+  row's detail panel. A right-click offers 打开 / 在新分页打开 (what the link
+  could do that a double-click cannot), from `components/row-links.tsx`
+  (`useRowLinks`). **改金额** (received loan repayment, Receipts) moved into that
+  menu; its dialog is mounted once, via `autoOpen` + `hideTrigger`.
+- **Invoices**: a double-click opens the detail popup (the one the invoice
+  number opens), and 打开 is the first item of the row menu.
+- **Alignment**: date columns read from the left (Payments/Receipts Date, Fund
+  in Date + Maturity, Fund out Disbursed, BA Period). Figures stay right, and
+  their HEADINGS are right now too — the th carries `right`, because the
+  ledger-table header rule out-ranks `text-right`. (Not `num`: that also sets
+  the heading in the figures' typeface.)
+
+### Four things found on the way, all fixed in this commit
+
+- A dialog a cell opens is still INSIDE its row (DOM, and React bubbling). So
+  selecting a word in the invoice detail popup, or right-clicking there to
+  copy, counted as a press on the row: the row menu hijacked the right-click
+  (live since 30d95f8b). `pressOnRow` in SortableTable now ignores anything
+  under a `.fixed` / `role=dialog` element inside the row, and portals.
+- Double-clicking an invoice NUMBER flashed the popup open and shut: the first
+  click opens it, the second lands on the backdrop that just appeared under
+  the pointer. `backdropDismiss` ignores a click with `detail > 1` — a click
+  that means "close" always starts a count of its own. Applies to all modals.
+- Tables sharing a `layoutId` (Payments draws each payroll batch as its own
+  table) now change together: `announceLayout` / `onLayoutAnnounced`.
+- `SortableTable.tsx` held a literal NUL byte (the blank-filter sentinel, there
+  since 2026-06-08), so git treated the file as binary and showed no diff of
+  it — this commit included. It is the `\0` escape now, the same string; from
+  the next change on its diffs are readable, and plain grep works on it.
+
+### Left as it is, on purpose
+
+- Fund in on a phone still keeps Type + Date in the grid. That used to fall
+  out of the default (first column + first right-aligned) only because Date
+  was right-aligned; the two are now named with `mobile: 'keep'`.
+- The billing-allocator staff list has the Columns button but no headings
+  (flat list) — that file is the other session's to arrange.
+- A hidden column is still searched by the search box and still sorts if it
+  was the sort column.
+- No drag-to-reorder inside the panel, no named/saved layouts, no pinning —
+  the ERP reference had them; the user asked only for show/hide by category.
+
+### Two follow-ups, the same afternoon
+
+- **Invoices have a Date column** (`4bf71492`; user: "invoice 没有日期"): the
+  invoice date, after Invoice #, with its year, under 日期. All 222 invoices
+  have one. Due date was NOT added — only 118 of 222 carry one.
+- **期数 / 还剩 on the fund-out loan picker** (收到 Loan 还款; user: "可以看到
+  installment 欠多少 total 多少期? 类似 03/06 期"), the same two columns the
+  fund-in picker has. `lib/installment-count.ts` → `loanInstallmentCount`, the
+  Loan Monitor's rule (so the two cannot disagree), counting from the segment
+  in force when terms changed. No fixed term (未定还款 / 无还款方式 / 利滚利) → "—".
+- **The fund-in count was wrong and is corrected**: `listPayableFundSources`
+  counted installments as "months that saw a principal payment". HC's 300k was
+  paid 22 installments in one payment, so it read "还剩 22 / 36" beside a
+  balance of exactly one installment. It is now principal repaid ÷ one
+  installment (`remainingPeriods`, as the Loan Monitor already did): 1 / 36.
+  Display and ordering only — monthly amounts are untouched. The repayment
+  schedule's "N left" follows, and a lock-in source with money still owed can
+  no longer fall out of the scheduled rows once it has had as many payment
+  MONTHS as it has periods.
+
+### Checked
+
+tsc (only the known MemberWorkspace / Commission test errors) · vitest 3981
+passed, 1 known failure (`erp-sync/catalogue.test.ts`) · next build · and in a real
+browser through the esbuild harness (real VouchersTable, FundSourcesTable,
+InvoiceDetailButton; router, server action and Supabase client stubbed):
+double-click, right-click menu, 改金额, Columns hide/search/Done, two tables in
+step, persistence across a reload, and the popup-inside-a-row cases.
+
+## CHECKPOINT 2026-10-02 (SHIPPED) — Finance forms in the deal shell, a two-step loan picker, per-person table layouts, the invoice row menu
+
+Both commits are on main and live on Vercel prod. This is the Finance user's
+session (assisting dev); another session works in the same repo on Revenue / HR.
+
+| commit | what |
+|---|---|
+| `81fcc54c` | Create payment / Create receipt / 收到 Loan 还款 in the deal-form shell; DealPicker; Record repayment on a fund source; registry pools |
+| `30d95f8b` | SortableTable column widths + order per person; RowMenu; the invoice Action cell reduced to one action + ⋯ |
+
+Migration live: `20261002010000_user_table_layouts` (own rows only, RLS on
+auth.uid(); verified as Finance and as Principal in a rolled-back transaction).
+
+### What changed, and what did not
+
+- **NewPaymentForm** is the old file's logic (imports → handleSubmit) with six
+  named edits; only the JSX is new, and its two intricate blocks (source rows,
+  attachments) were sliced out of the old file byte for byte. Every field name
+  and the serialised FormData are pinned by `NewPaymentForm.test.tsx`. The
+  rebuild script is not in the repo — if the form needs another restructure,
+  edit it directly.
+- **DealPicker** (`components/treasury/DealPicker.tsx`): party buttons of equal
+  width carrying the FULL name (user's choice), then that party's deals on one
+  grid template shared by header and rows. Used by 收到 Loan 还款 (fund out) and
+  by Create payment in loan-repayment mode (fund in).
+- **Record repayment on /fund-in/[id]** files the SAME voucher Create payment
+  does in loan-repayment mode (same action, `buildRepaymentSourceRows`), then
+  lands on the draft PV to send for approval — money going out needs the
+  Principal, so unlike Fund out it is not recorded on the spot. An open-ended
+  source (no lock-in) starts at interest only: `fund_source_outstanding.
+  monthly_payment` prices it as ONE period, i.e. the whole balance.
+- **Pools**: Create payment's pool list was a literal, so `dept_pool_it` and
+  `dept_pool_revenue_department` could not be picked although
+  `pool_key_to_segment` resolves both. `lib/payment-pools.ts` now holds the
+  core list and takes the rest from the dept registry. EditPaymentForm still has
+  its own literal copy.
+- **Table layouts** (`lib/table-layout.ts`, `SortableTable` + `layoutId`): on for
+  Invoices, Payments, Receipts, Fund in, Fund out, Statements, BA and the
+  billing-allocator staff list. **Not the General Ledger report** — it is a
+  hand-written table whose total rows use `colSpan={6}`, so reordering does not
+  fit it; width-dragging alone could be added there. The user was told.
+- **Invoice Action cell**: one action (Settle → / Approve & issue) + ⋯; the rest
+  in `components/RowMenu.tsx`, on the ⋯ or a right-click. Edit / Credit note /
+  Reassign are mounted ONCE for the row that asked, via new `autoOpen` +
+  `hideTrigger` props. `CopyInvoiceButton.tsx` and `DeleteInvoiceButton` are no
+  longer rendered anywhere — left in place (not this session's files to delete).
+
+### HR August payroll — DONE
+
+HR filled the August allocation (4 staff × HOUZS Century 50 / The Cont 35 /
+Carres 15; they had to Resubmit each payroll row first, since a split now
+changes only while its payroll row is a draft, then cancel the resubmit). 对数补差
+produced HV-INV-202608-0051 / -0052 / -0053 = 8,082.33 / 5,657.63 / 2,424.70,
+itemised per component, issued on 2026-08-31. August reconciles to zero on all
+13 company × department cells. **They are issued, not yet paid** — HR's pool
+recovers the 16,164.66 when they settle. Do not chase it.
+
+### How the UI was checked without a login
+
+The portal sits behind auth and this session may not sign in, so:
+- forms: a throwaway vitest file rendered each form with testing-library, wrote
+  `document.body.innerHTML` to an HTML file linking `.next/static/css/*.css`,
+  served it on 127.0.0.1 and looked at it in the Browser pane;
+- table: an esbuild bundle of a small harness (SortableTable + RowMenu, alias
+  `@` → src), driven with real PointerEvent / DragEvent / contextmenu from the
+  page. That is what caught the tick-box column jumping from 39px to 60px on the
+  first drag (measured widths were being clamped to the dragging minimum).
+Both are scratch files, not in the repo. The Browser pane's screenshot times out
+when the pane is hidden, and rAF never fires there — wait with setTimeout.
+
+### Still open
+
+- 9月 consolidated payroll invoice: waiting on HR to submit September payroll.
+- Liang / Cont terms change still NOT applied (user: 记起来先、别做先).
+- External customers still share 3039 "AR - Other customers".
+- Director has `own_share_billback = true` but is now `cost_model = centralized`
+  with no `hr_monthly_payroll` rows; if its payroll ever lands there, that tick
+  bills its WHOLE payroll to Venture Office. User was told; left as is.
+- The reference grid the user showed also hides/shows columns ("34 of 67 cols").
+  Not asked for, not built.
+- `vitest run` still has the one pre-existing failure,
+  `src/lib/erp-sync/catalogue.test.ts` (the other session's).
+
 ## CHECKPOINT 2026-09-29 (SHIPPED) — AR per customer, the bill-back switch, settle in place, and an itemised 对数补差
 
 All merged and live on Vercel prod. Migrations applied in this order, each one

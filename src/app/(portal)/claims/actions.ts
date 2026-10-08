@@ -2,15 +2,23 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeDate } from '@/lib/office-clock'
 
+/**
+ * A member's BENEFIT claim is decided in People › Member services since
+ * 2026-10-08 (member_review_claim) — approved once, then paid with the payroll
+ * or by a voucher Finance raises. This page keeps POOL claims only.
+ */
+const BENEFIT_ELSEWHERE = 'A benefit claim is decided in People › Member services'
+
 export async function submitClaim(formData: FormData) {
-  const user = await requirePermission('claims')
+  const user = await requireAction('claims', 'create', 'own')
   const supabase = await createClient()
 
   const claimType = formData.get('claim_type') as 'project' | 'benefit'
+  if (claimType !== 'project') throw new Error(BENEFIT_ELSEWHERE)
   // Phase 7 Step 13: claimant picks a source pool. Defaults to Venture Pool
   // if omitted (keeps submit working for legacy forms).
   const sourcePool = (formData.get('source_pool') as string) || 'venture_pool'
@@ -31,7 +39,7 @@ export async function submitClaim(formData: FormData) {
 }
 
 export async function approveClaim(claimId: string) {
-  const user = await requirePermission('claims_approve')
+  const user = await requireAction('claims', 'approve')
   const supabase = await createClient()
 
   const { data: claim } = await supabase
@@ -41,6 +49,7 @@ export async function approveClaim(claimId: string) {
     .single()
 
   if (!claim) throw new Error('Claim not found')
+  if (claim.claim_type !== 'project') throw new Error(BENEFIT_ELSEWHERE)
   if (claim.status !== 'pending') throw new Error('Claim is not pending')
 
   // Security: prevent self-approval (defense in depth — RLS enforces too).
@@ -50,12 +59,9 @@ export async function approveClaim(claimId: string) {
     throw new Error('Cannot approve your own claim')
   }
 
-  // Finance approves pool claims, HR approves benefit claims
-  if (claim.claim_type === 'project' && user.role !== 'finance' && user.role !== 'principal') {
+  // Finance approves pool claims.
+  if (user.role !== 'finance' && user.role !== 'principal') {
     throw new Error('Only Finance or Principal can approve pool claims')
-  }
-  if (claim.claim_type === 'benefit' && user.role !== 'hr' && user.role !== 'principal') {
-    throw new Error('Only HR or Principal can approve benefit claims')
   }
 
   await assertPeriodOpen(supabase, new Date())
@@ -73,16 +79,16 @@ export async function approveClaim(claimId: string) {
 
   if (claimErr) throw new Error(`Failed to approve: ${claimErr.message}`)
 
-  // BOTH claim types draft a voucher (2026-06-12 — benefit claims previously
-  // terminated at status flips with no voucher, no pool debit, no GL).
-  // Money moves when Principal approves the PV, same as every other payout.
+  // The approval drafts the voucher (2026-06-12). Money moves when Principal
+  // approves the PV, same as every other payout — and the claim turns paid
+  // with it (trigger claims_follow_their_voucher, 2026-10-08).
   if (Number(claim.amount) > 0) {
     const amount = Number(claim.amount)
     const sourcePool = claim.source_pool ?? 'venture_pool'
     const { count } = await supabase
       .from('payment_vouchers')
       .select('*', { count: 'exact', head: true })
-    const period = new Date().toISOString().slice(0, 7).replace('-', '')
+    const period = officeDate().slice(0, 7).replace('-', '') // the office's month, not UTC's
     const voucherNo = `HV-PV-${period}-${String((count ?? 0) + 1).padStart(4, '0')}`
 
     // Default the paying bank to primary — a debit PV approved with NO bank
@@ -157,13 +163,17 @@ export async function approveClaim(claimId: string) {
 }
 
 export async function rejectClaim(claimId: string) {
-  const user = await requirePermission('claims_approve')
+  const user = await requireAction('claims', 'approve')
   const supabase = await createClient()
 
+  // Pool claims only, and only while pending — a benefit claim is decided in
+  // Member services, where the member's request moves with it.
   const { error } = await supabase
     .from('claims')
     .update({ status: 'rejected', approved_by: user.id, approved_at: new Date().toISOString() })
     .eq('id', claimId)
+    .eq('claim_type', 'project')
+    .eq('status', 'pending')
 
   if (error) throw new Error(`Failed to reject: ${error.message}`)
 
@@ -171,7 +181,7 @@ export async function rejectClaim(claimId: string) {
 }
 
 export async function markClaimPaid(claimId: string) {
-  const user = await requirePermission('claims_approve')
+  const user = await requireAction('claims', 'approve')
   const supabase = await createClient()
 
   const { data: claim } = await supabase
@@ -181,14 +191,12 @@ export async function markClaimPaid(claimId: string) {
     .single()
 
   if (!claim) throw new Error('Claim not found')
+  if (claim.claim_type !== 'project') throw new Error(BENEFIT_ELSEWHERE)
   if (claim.status !== 'approved') throw new Error('Only approved claims can be marked as paid')
 
-  // Finance marks pool claims paid, HR marks benefit claims paid
-  if (claim.claim_type === 'project' && user.role !== 'finance' && user.role !== 'principal') {
+  // Finance marks pool claims paid.
+  if (user.role !== 'finance' && user.role !== 'principal') {
     throw new Error('Only Finance or Principal can mark pool claims as paid')
-  }
-  if (claim.claim_type === 'benefit' && user.role !== 'hr' && user.role !== 'principal') {
-    throw new Error('Only HR or Principal can mark benefit claims as paid')
   }
 
   const { error } = await supabase

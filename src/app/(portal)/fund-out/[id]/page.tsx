@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeMonth, officeTime } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { cancelLoan } from '../actions'
@@ -65,7 +67,7 @@ export default async function LoanDetailPage({ params }: Props) {
   const termsHistory = await fetchTermsHistory(supabase, 'loan', [loan.id])
   const repRows = (repayments ?? []).map((r) => ({ id: loan.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
   const termsSegments = buildTermsSegments(termsForLoan(loan, termsHistory.get(loan.id) ?? []), principalPaidByMonth(repRows, isLoanPrincipal).get(loan.id) ?? {})
-  const termsChanges = allTermsChanges(termsSegments, { currentYM: dayjs().format('YYYY-MM'), paidByMonth: paidByMonthByType(repRows, isLoanPrincipal).get(loan.id) ?? {} })
+  const termsChanges = allTermsChanges(termsSegments, { currentYM: officeMonth(), paidByMonth: paidByMonthByType(repRows, isLoanPrincipal).get(loan.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation. Finance can't see /approvals
   // (principal-only), so surface "审批中" here so it doesn't look like the
@@ -84,7 +86,7 @@ export default async function LoanDetailPage({ params }: Props) {
   // Once the terms changed mid-life, the current segment's figure (rate ×
   // principal still owed when it began) is the monthly interest.
   const monthlyInterest = termsChanged(termsSegments)
-    ? currentSegment(termsSegments, dayjs().format('YYYY-MM')).interestPerMonth
+    ? currentSegment(termsSegments, officeMonth()).interestPerMonth
     : outstandingAmount * Number(loan.effective_rate)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
   const totalInterestPaid = Number(outstanding?.total_interest_paid ?? 0)
@@ -98,8 +100,12 @@ export default async function LoanDetailPage({ params }: Props) {
     ? dayjs(loan.disbursement_date).add(tenureMonths, 'month')
     : null
 
-  const isFinanceSide = user.role === 'finance' || user.role === 'principal'
-  const canRecordRepayment = isFinanceSide && loan.status === 'active'
+  // Each button asks for the action its Server Action asks (2026-10-08, PR2):
+  // a repayment is raised, a cancellation or a repayment's reversal voids, and
+  // amending a booked loan is Treasury · Approve.
+  const canVoid = canDo(user, 'treasury', 'void')
+  const canAmend = canDo(user, 'treasury', 'approve')
+  const canRecordRepayment = canDo(user, 'treasury', 'create') && loan.status === 'active'
   // Item 3: Finance can cancel pending OR active loans. Active cancellation
   // requires Principal approval downstream and is blocked when repayments
   // already exist (RPC guards this too).
@@ -107,7 +113,7 @@ export default async function LoanDetailPage({ params }: Props) {
   const isActive = loan.status === 'active'
   const noRepayments = repaymentList.length === 0
   const canCancelLoan =
-    isFinanceSide &&
+    canVoid &&
     (isPendingApproval || (isActive && noRepayments))
 
   return (
@@ -127,11 +133,11 @@ export default async function LoanDetailPage({ params }: Props) {
           </div>
           <h1 className="page-title">{company?.name ?? '—'}</h1>
           <p className="font-serif italic text-graphite text-base mt-3">
-            {company?.short_code} · Created <em>{dayjs(loan.created_at).format('D MMMM YYYY')}</em>
+            {company?.short_code} · Created <em>{officeTime(loan.created_at).format('D MMMM YYYY')}</em>
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {user.role === 'principal' && loan.status === 'active' ? (
+          {canAmend && loan.status === 'active' ? (
             <Link
               href={`/fund-out/${loan.id}/edit`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
@@ -228,7 +234,7 @@ export default async function LoanDetailPage({ params }: Props) {
             <span className="text-ink font-serif italic">{creator?.name ?? '—'}</span>{' '}
             on{' '}
             <span className="font-mono text-muted">
-              {dayjs(loan.created_at).format('D MMM YYYY HH:mm')}
+              {officeTime(loan.created_at).format('D MMM YYYY HH:mm')}
             </span>
           </div>
           {loan.approved_at ? (
@@ -239,7 +245,7 @@ export default async function LoanDetailPage({ params }: Props) {
               </span>{' '}
               on{' '}
               <span className="font-mono text-muted">
-                {dayjs(loan.approved_at).format('D MMM YYYY HH:mm')}
+                {officeTime(loan.approved_at).format('D MMM YYYY HH:mm')}
               </span>
               {loan.disbursement_date ? (
                 <>
@@ -266,7 +272,7 @@ export default async function LoanDetailPage({ params }: Props) {
             </div>
             <p className="text-xs text-muted mt-1 italic font-serif">
               Requested by {((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance'} on{' '}
-              {dayjs(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
+              {officeTime(pendingCancel.created_at).format('D MMM YYYY HH:mm')}. Principal approves it in
               Approvals; the loan reverses (bank, Venture Pool, GL) and is marked cancelled.
             </p>
           </div>
@@ -302,7 +308,7 @@ export default async function LoanDetailPage({ params }: Props) {
             </p>
           </form>
         ) : null}
-        {isActive && !noRepayments && isFinanceSide ? (
+        {isActive && !noRepayments && canVoid ? (
           <p className="text-xs text-muted mt-3 italic font-serif">
             Cannot cancel — {repaymentList.length} repayment
             {repaymentList.length === 1 ? '' : 's'} recorded. Reverse those first.
@@ -341,7 +347,7 @@ export default async function LoanDetailPage({ params }: Props) {
         />
       </section>
 
-      <TermsTimeline kind="loan" recordId={loan.id} segments={termsSegments} changes={termsChanges} canRevert={user.role === 'principal' && loan.status === 'active'} />
+      <TermsTimeline kind="loan" recordId={loan.id} segments={termsSegments} changes={termsChanges} canRevert={canAmend && loan.status === 'active'} />
 
       {/* ───────── Repayment history ───────── */}
       <section className="mb-12">
@@ -366,7 +372,7 @@ export default async function LoanDetailPage({ params }: Props) {
                   <th className="m-hide">Type</th>
                   <th className="right">Amount</th>
                   <th className="m-hide">Notes</th>
-                  {isFinanceSide ? <th className="right m-hide">Action</th> : null}
+                  {canVoid ? <th className="right m-hide">Action</th> : null}
                   <th className="lt-toggle" aria-hidden />
                 </tr>
               </thead>
@@ -385,7 +391,7 @@ export default async function LoanDetailPage({ params }: Props) {
                     <td className="text-sm text-muted italic font-serif m-hide" data-label="Notes">
                       {r.notes ?? '—'}
                     </td>
-                    {isFinanceSide ? (
+                    {canVoid ? (
                       <td className="text-right m-hide">
                         <VoidRepaymentButton
                           repaymentId={r.id as string}

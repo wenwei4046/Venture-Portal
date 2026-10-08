@@ -8,10 +8,10 @@
 // (HV letterhead, bill-to block, amount table) per page.
 
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { exportPdfResponse } from '@/lib/export/response'
 import { InvoiceDocPdf, type InvoiceDocData } from '../_format/invoice-doc-pdf'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 interface InvoiceRow {
   id: string
@@ -62,7 +62,7 @@ function resolveBillTo(
 }
 
 export async function GET(req: Request) {
-  await requirePermission('billing')
+  await requireAction('billing', 'export')
   const url = new URL(req.url)
   const id = url.searchParams.get('id')?.trim() || null
   const idsParam = url.searchParams.get('ids')?.trim() || null
@@ -182,7 +182,7 @@ export async function GET(req: Request) {
   } else if (period) {
     filename = `invoices-${period.replace('-', '')}-batch`
   } else {
-    filename = `invoices-batch-${dayjs().format('YYYYMMDD')}-${docs.length}`
+    filename = `invoices-batch-${officeTime().format('YYYYMMDD')}-${docs.length}`
   }
 
   return exportPdfResponse({ filename, element: <InvoiceDocPdf invoices={docs} /> })

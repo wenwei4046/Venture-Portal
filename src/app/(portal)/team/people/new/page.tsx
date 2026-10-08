@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
 import { listSubDepartments } from '../../../revenue/_lib/sub-departments'
 import AddStaffForm, { type AddStaffDepartment } from '../_components/AddStaffForm'
 
 export default async function NewStaffPage() {
-  await requirePermission('team')
+  await requireAction('team', 'create')
   const supabase = await createClient()
 
   // is_internal=false excludes the hidden 'Venture Office' pseudo-department —

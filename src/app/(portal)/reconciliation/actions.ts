@@ -12,12 +12,13 @@ import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import {
   autoMatch, csvToRows, parseStatementRows,
   type BookLine, type StatementLine,
 } from '@/lib/bank-recon'
 import { looksLikeHlb, parseHlbPdf, type PdfPageItems } from '@/lib/bank-recon-pdf'
+import { fetchAllRows } from '@/lib/paginate'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -25,6 +26,13 @@ async function reconClient(): Promise<SupabaseClient> {
   // bank_recon_* postdate database.types.ts — untyped-client convention.
   return (await createClient()) as unknown as SupabaseClient
 }
+
+// The claimed set — every match row any session holds — is read whole, in
+// 1000-row pages (2026-10-08): it grows with each statement (477 rows today)
+// and an unranged read stops at PostgREST's 1000 rows without a word, so the
+// lines past it would be offered for matching twice. Only ever a set, so the
+// pages' `id` order will do; a failed read still claims nothing, as before.
+const noneOnError = <T,>(read: Promise<T[]>) => read.then((data) => ({ data }), () => ({ data: null }))
 
 /** Book lines on one bank's GL code around the statement month, excluding
  *  lines already claimed by ANY recon session. Signed: debit − credit. */
@@ -46,7 +54,11 @@ async function loadBookLines(
       .gte('journal_entries.transaction_date', from)
       .lte('journal_entries.transaction_date', to)
       .eq('journal_entries.is_reversed', false),
-    supabase.from('bank_recon_matches').select('journal_line_id'),
+    noneOnError(
+      fetchAllRows((lo, hi) =>
+        supabase.from('bank_recon_matches').select('journal_line_id').order('id').range(lo, hi),
+      ),
+    ),
   ])
   if (error) throw new Error(`Failed to load book lines: ${error.message}`)
   const claimedSet = new Set((claimed ?? []).map((c: { journal_line_id: string }) => c.journal_line_id))
@@ -90,7 +102,7 @@ function internalFlipEntries(
 }
 
 export async function uploadStatement(formData: FormData): Promise<{ error: string } | void> {
-  const user = await requirePermission('reconciliation')
+  const user = await requireAction('reconciliation', 'create')
   const supabase = await reconClient()
 
   const bankAccountId = (formData.get('bank_account_id') as string) || ''
@@ -233,7 +245,7 @@ export async function manualMatch(
   statementLineIds: string[],
   journalLineIds: string[],
 ): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'edit')
   const supabase = await reconClient()
 
   const sIds = Array.from(new Set(statementLineIds.filter(Boolean)))
@@ -244,7 +256,15 @@ export async function manualMatch(
   const [{ data: sLines }, { data: jls }, { data: claimed }] = await Promise.all([
     supabase.from('bank_recon_lines').select('id, amount, match_kind').in('id', sIds),
     supabase.from('journal_lines').select('id, debit, credit').in('id', jIds),
-    supabase.from('bank_recon_matches').select('journal_line_id, statement_line_id'),
+    noneOnError(
+      fetchAllRows((lo, hi) =>
+        supabase
+          .from('bank_recon_matches')
+          .select('journal_line_id, statement_line_id')
+          .order('id')
+          .range(lo, hi),
+      ),
+    ),
   ])
   if ((sLines ?? []).length !== sIds.length) return { error: 'Some statement lines were not found' }
   if ((jls ?? []).length !== jIds.length) return { error: 'Some journal lines were not found' }
@@ -309,7 +329,7 @@ export async function contraBookLines(
   sessionId: string,
   journalLineIds: string[],
 ): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'edit')
   const supabase = await reconClient()
 
   const jIds = Array.from(new Set(journalLineIds.filter(Boolean)))
@@ -356,7 +376,7 @@ export async function contraStatementLines(
   sessionId: string,
   statementLineIds: string[],
 ): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'edit')
   const supabase = await reconClient()
 
   const sIds = Array.from(new Set(statementLineIds.filter(Boolean)))
@@ -401,7 +421,7 @@ export async function contraStatementLines(
 
 /** Dissolve a whole match/contra group by its group id. */
 export async function dissolveGroup(groupId: string): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'edit')
   const supabase = await reconClient()
   const { data: members } = await supabase
     .from('bank_recon_matches')
@@ -432,7 +452,7 @@ export async function dissolveGroup(groupId: string): Promise<{ error?: string }
 
 /** Unmatch the WHOLE group containing this statement line. */
 export async function unmatchLine(lineId: string): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'edit')
   const supabase = await reconClient()
   const { data: groups } = await supabase
     .from('bank_recon_matches')
@@ -464,7 +484,7 @@ export async function unmatchLine(lineId: string): Promise<{ error?: string }> {
 }
 
 export async function setLineIgnored(lineId: string, ignored: boolean): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'edit')
   const supabase = await reconClient()
   if (ignored) {
     // An ignored line holds no matches.
@@ -487,7 +507,7 @@ export async function setSessionStatus(
   sessionId: string,
   status: 'open' | 'done',
 ): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'approve')
   const supabase = await reconClient()
   const { error } = await supabase
     .from('bank_recon_sessions')
@@ -500,7 +520,7 @@ export async function setSessionStatus(
 }
 
 export async function deleteSession(sessionId: string): Promise<{ error?: string }> {
-  await requirePermission('reconciliation')
+  await requireAction('reconciliation', 'edit')
   const supabase = await reconClient()
   const { error } = await supabase.from('bank_recon_sessions').delete().eq('id', sessionId)
   if (error) return { error: error.message }

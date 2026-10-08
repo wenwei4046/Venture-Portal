@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requirePermission } from '@/lib/auth'
 import type { InfotechStaffRow } from '@/lib/import/infotech-staff'
 import { buildStaffMatcher } from '@/lib/import/staff-match'
 import { bankNameFromCode } from '@/lib/banks'
@@ -199,7 +199,7 @@ export async function applyInfotechStaffImport(
   deptMissing: number
   failed: Array<{ rowIndex: number; employee_code: string; reason: string }>
 }> {
-  const user = await requirePermission('team')
+  const user = await requireAction('team', 'create')
   const supabase = await createClient()
   const preview = await previewInfotechStaffImport(rows)
 

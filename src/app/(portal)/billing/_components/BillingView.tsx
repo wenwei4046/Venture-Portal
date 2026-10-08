@@ -2,11 +2,16 @@
 // redirect and the /statements page (Invoices landing after the reorder) can
 // share one implementation. All internal component paths are preserved.
 
+import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeDayStart, officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
-import type { CreateInvoiceMode } from '../actions'
+import { directorBillingTarget } from '@/lib/billing'
+import { invoiceSummary, payrollBasisSummary, payrollBillingLines } from '@/lib/billing-sheet'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import type { AccountType } from '@/lib/coa'
 import PeriodSelector from './PeriodSelector'
 import GenerateInvoicesButton from './GenerateInvoicesButton'
@@ -23,86 +28,219 @@ import ReconcilePayrollBillingButton from './ReconcilePayrollBillingButton'
 import GenerateOwnShareInvoiceButton from './GenerateOwnShareInvoiceButton'
 import LedgerRow from '@/components/LedgerRow'
 import DepartmentModeCard from '@/components/department/DepartmentModeCard'
+import { loadDepartmentMode } from '@/lib/department-mode-server'
+import { startRead } from '@/lib/start-read'
+import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 
 interface Props {
   searchParams: Promise<{ period?: string }>
 }
 
-interface DeptSummary {
-  department_id: string
-  staff_count: number
-  total_basic: number
-  total_statutory: number
-  total_allowance: number
-  total_ctc: number
-}
-
 export default async function BillingView({ searchParams }: Props) {
   const user = await requirePermission('billing')
-  // Unified portal (2026-07-16): Principal creates/generates invoices and
-  // contracts with the same buttons Finance sees.
-  const canFinanceCreate = user.role === 'finance' || user.role === 'principal'
+  // Each button asks for the action its Server Action asks (2026-10-08, PR2):
+  // invoices and contracts are Billing · Create; a non-billable payment is a
+  // voucher, Treasury · Create.
+  const canFinanceCreate = canDo(user, 'billing', 'create')
+  const canRaiseVoucher = canDo(user, 'treasury', 'create')
   const supabase = await createClient()
 
   const { period: rawPeriod } = await searchParams
   const period = dayjs(rawPeriod ?? getPeriodMonth()).startOf('month').format('YYYY-MM-DD')
 
-  const periodStart = dayjs(period).startOf('month').toISOString()
-  const periodEnd = dayjs(period).endOf('month').toISOString()
+  // The month's venture-pool movements, by the office's calendar: a bare date
+  // bound is UTC midnight, which put the 1st's first eight hours in last month.
+  const periodStart = officeDayStart(period)
+  const periodEnd = officeTime(periodStart).endOf('month').toISOString()
 
-  const [
-    { data: hrSummary, error: hrSummaryError },
-    { data: marketingContracts },
-    { data: invoices },
-    { data: companies },
-    { data: nonBillableTxns },
-    { data: departments },
-    { data: categories },
-    { data: banks },
-  ] = await Promise.all([
-    supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
-    supabase
-      .from('service_contracts')
-      .select(
-        'id, description, amount, status, start_date, end_date, company_id, approved_by'
-      )
-      .eq('billing_mode', 'marketing_project')
-      .order('created_at', { ascending: false }),
+  // ── Every read the page needs, in two stages (2026-10-08) ─────────────
+  // One after another they were eleven round trips (~690 ms in production),
+  // and Finance's mode switch below only began a twelfth once the page had
+  // every figure. Now everything that needs nothing is asked at once, and what
+  // hangs off the invoices — their lines, receipts, credit notes and batch
+  // settlement vouchers — the moment both invoice lists are in, without
+  // waiting for the rest. The answers are then put together exactly as before.
+  const invoicesRead = startRead(
     supabase
       .from('invoices')
       .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at, settlement_voucher_id')
       .eq('period_month', period)
       .order('billing_mode', { ascending: true }),
-    supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
+  )
+  // 跨月合并结算 (2026-08-20): a payer often clears several months' invoices
+  // with ONE transfer, but this page is period-scoped — fetch OTHER periods'
+  // still-issued invoices too, and InvoicesList reveals them behind a 跨月
+  // toggle so they can be ticked into the same receipt. Period totals stay
+  // period-only.
+  const otherOpenRead = startRead(
     supabase
-      .from('venture_pool')
-      .select('id, created_at, transaction_type, amount, description, reference_table')
-      .gte('created_at', periodStart)
-      .lte('created_at', periodEnd)
-      .order('created_at', { ascending: false }),
-    // is_internal=false — the 'Venture Office' pseudo-dept must not appear in
-    // the invoice "bill to" department picker (it is not a billable dept).
-    supabase.from('departments').select('id, name').eq('is_internal', false).order('name'),
-    // Post-mig 238: payment_categories is gone. Pull every active leaf
-    // account from chart_of_accounts so the invoice "category" picker can
-    // route the credit side anywhere — revenue (5000s), other_income (9000)
-    // for recoveries, or balance-sheet codes (e.g. clearing a receivable
-    // originally booked when HV paid on someone's behalf).
-    // Mig 246 adds parent_code so downstream pickers can hide headers.
-    supabase
-      .from('chart_of_accounts')
-      .select('code, name, type, parent_code')
-      .eq('is_active', true)
-      // By code — sort_order is unset on most rows, which left the pickers in
-      // insertion order (user 2026-09-28: "这个太乱了，应该顺序").
-      .order('code'),
-    // For the batch-settle modal in InvoicesList.
-    supabase
-      .from('bank_accounts')
-      .select('id, bank_name, account_number, gl_account_code, is_primary')
-      .eq('status', 'active')
-      .order('is_primary', { ascending: false }),
+      .from('invoices')
+      .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at')
+      .eq('status', 'issued')
+      .neq('period_month', period)
+      .order('period_month', { ascending: false }),
+  )
+  const firstReads = startRead(
+    Promise.all([
+      supabase.rpc('get_submitted_hr_summary', { p_period: period }).maybeSingle(),
+      supabase
+        .from('service_contracts')
+        .select(
+          'id, description, amount, status, start_date, end_date, company_id, approved_by'
+        )
+        .eq('billing_mode', 'marketing_project')
+        .order('created_at', { ascending: false }),
+      supabase.from('companies').select('id, name, short_code').eq('is_active', true).order('short_code'),
+      supabase
+        .from('venture_pool')
+        .select('id, created_at, transaction_type, amount, description, reference_table')
+        .gte('created_at', periodStart)
+        .lte('created_at', periodEnd)
+        .order('created_at', { ascending: false }),
+      // is_internal=false — the 'Venture Office' pseudo-dept must not appear in
+      // the invoice "bill to" department picker (it is not a billable dept).
+      supabase.from('departments').select('id, name').eq('is_internal', false).order('name'),
+      // Post-mig 238: payment_categories is gone. Pull every active leaf
+      // account from chart_of_accounts so the invoice "category" picker can
+      // route the credit side anywhere — revenue (5000s), other_income (9000)
+      // for recoveries, or balance-sheet codes (e.g. clearing a receivable
+      // originally booked when HV paid on someone's behalf).
+      // Mig 246 adds parent_code so downstream pickers can hide headers.
+      supabase
+        .from('chart_of_accounts')
+        .select('code, name, type, parent_code')
+        .eq('is_active', true)
+        // By code — sort_order is unset on most rows, which left the pickers in
+        // insertion order (user 2026-09-28: "这个太乱了，应该顺序").
+        .order('code'),
+      // For the batch-settle modal in InvoicesList.
+      supabase
+        .from('bank_accounts')
+        .select('id, bank_name, account_number, gl_account_code, is_primary')
+        .eq('status', 'active')
+        .order('is_primary', { ascending: false }),
+      // The live payroll_run's per-dept OPEX totals (payrollSubmitted below).
+      supabase
+        .from('payroll_runs')
+        .select(
+          'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, it_opex_total, revenue_opex_total, director_salary_total, approved_at'
+        )
+        .eq('period_month', period)
+        .neq('status', 'rejected')
+        .maybeSingle(),
+      // Staff billing allocation, dept × company aggregates (allocByDept below).
+      supabase.rpc('get_staff_billing_allocation', { p_period_month: period }),
+      // The Director Payroll Submission snapshot (directorSubmitted below).
+      supabase
+        .from('director_salary_submissions')
+        .select('total_gross, total_payroll_gross, total_invoice, total_saving, director_count, by_company, submitted_at')
+        .eq('period_month', period)
+        .maybeSingle(),
+    ]),
+  )
+  // Finance's mode switch (DepartmentModeCard below), begun with the page's
+  // reads rather than once the page is done. It never throws: a failed read
+  // is logged and the card draws nothing, as before.
+  const departmentModeRead = loadDepartmentMode('finance')
+
+  const [{ data: invoices }, { data: otherOpenRaw }] = await Promise.all([invoicesRead, otherOpenRead])
+  const invoiceList = invoices ?? []
+  const otherOpenInvoices = otherOpenRaw ?? []
+  const invoiceIds = invoiceList.map((i) => i.id)
+  const issuedIds = [
+    ...invoiceList.filter((i) => i.status === 'issued').map((i) => i.id as string),
+    ...otherOpenInvoices.map((i) => i.id as string),
+  ]
+  const allInvoiceIds = [
+    ...invoiceList.map((i) => i.id as string),
+    ...otherOpenInvoices.map((i) => i.id as string),
+  ]
+  const allInvoiceRows = [...(invoices ?? []), ...otherOpenInvoices] as Array<{
+    id: string
+    settlement_voucher_id?: string | null
+  }>
+  const settleVoucherIds = [
+    ...new Set(allInvoiceRows.map((i) => i.settlement_voucher_id).filter(Boolean) as string[]),
+  ]
+  // The other months' open invoices ride along in every list below, so the
+  // ids are not one month's any more: past ~500 the URL fails outright. 100
+  // ids a time (fetchByKeys), and each answer kept as the page always read it.
+  // A failed read still leaves its rows out, as before.
+  const leftOutOnError = <T,>(read: Promise<T[]>) => read.then((data) => ({ data }), () => ({ data: null }))
+  // `created_at DESC` as Postgres sorts it, to the millisecond (NULLS FIRST).
+  // Rows the database already ordered stay where they are: the sort is stable.
+  const newestFirst = (at: string | null | undefined) => (at ? Date.parse(at) : Infinity)
+  const [{ data: lineRows }, paidMap, { data: cnRows }, { data: rcptRows }, { data: svRows }] = await Promise.all([
+    // Line items for this period's invoices — the edit modal mirrors the
+    // multi-line create form, so drafts need their lines prefilled.
+    invoiceIds.length > 0
+      ? supabase
+          .from('invoice_lines')
+          .select('invoice_id, line_no, description, amount, category_code, segment')
+          .in('invoice_id', invoiceIds)
+          .order('line_no')
+      : { data: null },
+    // Σ receipts per issued invoice (paidByInvoice below).
+    fetchPaidByInvoice(supabase as unknown as Parameters<typeof fetchPaidByInvoice>[0], issuedIds),
+    // Credit notes against the listed invoices (cnByInvoice below). The
+    // Credit Notes section lists them newest first, so the chunks' answers are
+    // put back in that order (a stable sort — one chunk is left exactly as is).
+    allInvoiceIds.length
+      ? leftOutOnError(
+          fetchByKeys(allInvoiceIds, (chunk) =>
+            supabase
+              .from('credit_notes')
+              .select('id, credit_note_no, invoice_id, amount, reason, status, category_code, billing_mode, created_at')
+              .in('invoice_id', chunk)
+              .order('created_at', { ascending: false }),
+          ).then((rows) => rows.sort((a, b) => newestFirst(b.created_at) - newestFirst(a.created_at))),
+        )
+      : { data: [] as never[] },
+    // Direct-linked receipts per invoice (receiptsByInvoice below). Every
+    // receipt of one invoice sits in its invoice's chunk, in payment-date
+    // order; a chunk that reaches PostgREST's 1000-row cap is read again in
+    // pages, `id` breaking the date's ties (fetchAllRowsAsWritten).
+    allInvoiceIds.length
+      ? leftOutOnError(
+          fetchByKeys(allInvoiceIds, async (chunk) => ({
+            data: await fetchAllRowsAsWritten((page) => {
+              const q = supabase
+                .from('payment_vouchers')
+                .select('invoice_id, voucher_no, payment_date, amount')
+                .in('invoice_id', chunk)
+                .eq('direction', 'credit')
+                .neq('status', 'voided')
+                .order('payment_date')
+              return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+            }),
+            error: null,
+          })),
+        )
+      : { data: [] as never[] },
+    // The batch settlement voucher each paid invoice points at (same).
+    settleVoucherIds.length > 0
+      ? leftOutOnError(
+          fetchByKeys(settleVoucherIds, (chunk) =>
+            supabase
+              .from('payment_vouchers')
+              .select('id, voucher_no, payment_date, amount')
+              .in('id', chunk),
+          ),
+        )
+      : { data: null },
   ])
+  const [
+    { error: hrSummaryError },
+    { data: marketingContracts },
+    { data: companies },
+    { data: nonBillableTxns },
+    { data: departments },
+    { data: categories },
+    { data: banks },
+    { data: payrollRun },
+    { data: staffAllocRows, error: staffAllocError },
+    { data: directorSubmission },
+  ] = await firstReads
 
   const bankList = (banks ?? []).map((b) => ({
     id: b.id as string,
@@ -110,17 +248,6 @@ export default async function BillingView({ searchParams }: Props) {
     account_number: (b.account_number as string | null) ?? null,
   }))
 
-  // Line items for this period's invoices — the edit modal mirrors the
-  // multi-line create form, so drafts need their lines prefilled.
-  const invoiceIds = (invoices ?? []).map((i) => i.id)
-  const { data: lineRows } =
-    invoiceIds.length > 0
-      ? await supabase
-          .from('invoice_lines')
-          .select('invoice_id, line_no, description, amount, category_code')
-          .in('invoice_id', invoiceIds)
-          .order('line_no')
-      : { data: null }
   const linesByInvoice: Record<string, Array<{ description: string | null; amount: number; category_code: string | null }>> = {}
   for (const l of lineRows ?? []) {
     const arr = linesByInvoice[l.invoice_id] ?? []
@@ -151,48 +278,12 @@ export default async function BillingView({ searchParams }: Props) {
     console.error('get_submitted_hr_summary failed:', hrSummaryError.message)
   }
 
-  const submitted = !!hrSummary
-  const deptSummaries = submitted
-    ? (((hrSummary?.dept_summaries ?? {}) as unknown) as Record<string, DeptSummary>)
-    : null
-
-  const hrTotalCtc = deptSummaries
-    ? Object.values(deptSummaries).reduce(
-        (acc, d) => acc + Number(d?.total_ctc ?? 0),
-        0
-      )
-    : 0
-
   const marketingContractsActive = (marketingContracts ?? []).filter(
     (c) => c.status === 'active'
   ).length
 
-  const invoiceList = invoices ?? []
-  // Voided invoices stay in the list (struck through) but not in the total.
-  const invoiceTotal = invoiceList
-    .filter((i) => i.status !== 'voided')
-    .reduce((acc, i) => acc + Number(i.total_amount), 0)
-
-  // 跨月合并结算 (2026-08-20): a payer often clears several months' invoices
-  // with ONE transfer, but this page is period-scoped — fetch OTHER periods'
-  // still-issued invoices too, and InvoicesList reveals them behind a 跨月
-  // toggle so they can be ticked into the same receipt. Period totals stay
-  // period-only.
-  const { data: otherOpenRaw } = await supabase
-    .from('invoices')
-    .select('id, invoice_no, company_id, period_month, billing_mode, total_amount, status, billable_to_type, billable_to_department_id, billable_to_freetext_name, billable_to_freetext_address, billable_to_freetext_phone, billable_to_freetext_email, description, invoice_date, due_date, reference_no, category_code, created_at')
-    .eq('status', 'issued')
-    .neq('period_month', period)
-    .order('period_month', { ascending: false })
-  const otherOpenInvoices = otherOpenRaw ?? []
-
   // Partial payments: Σ receipts per issued invoice so the list can show
   // part-paid badges and the settle modal collects the REMAINING balance.
-  const issuedIds = [
-    ...invoiceList.filter((i) => i.status === 'issued').map((i) => i.id as string),
-    ...otherOpenInvoices.map((i) => i.id as string),
-  ]
-  const paidMap = await fetchPaidByInvoice(supabase as unknown as Parameters<typeof fetchPaidByInvoice>[0], issuedIds)
   const paidByInvoice: Record<string, number> = {}
   for (const [id, paid] of paidMap) {
     if (paid > 0) paidByInvoice[id] = paid
@@ -202,17 +293,6 @@ export default async function BillingView({ searchParams }: Props) {
   // sums net off the settle balance (cnByInvoice); the full rows power the
   // Credit Notes section below the invoice list. Bounded .in() — one period's
   // invoice ids, same shape as fetchPaidByInvoice above.
-  const allInvoiceIds = [
-    ...invoiceList.map((i) => i.id as string),
-    ...otherOpenInvoices.map((i) => i.id as string),
-  ]
-  const { data: cnRows } = allInvoiceIds.length
-    ? await supabase
-        .from('credit_notes')
-        .select('id, credit_note_no, invoice_id, amount, reason, status, category_code, billing_mode, created_at')
-        .in('invoice_id', allInvoiceIds)
-        .order('created_at', { ascending: false })
-    : { data: [] as never[] }
   const cnByInvoice: Record<string, number> = {}
   for (const cn of cnRows ?? []) {
     if (cn.status !== 'approved') continue
@@ -229,15 +309,6 @@ export default async function BillingView({ searchParams }: Props) {
     string,
     Array<{ voucherNo: string | null; date: string | null; amount: number; batch?: boolean }>
   > = {}
-  const { data: rcptRows } = allInvoiceIds.length
-    ? await supabase
-        .from('payment_vouchers')
-        .select('invoice_id, voucher_no, payment_date, amount')
-        .in('invoice_id', allInvoiceIds)
-        .eq('direction', 'credit')
-        .neq('status', 'voided')
-        .order('payment_date')
-    : { data: [] as never[] }
   const directVoucherNos = new Set<string>()
   for (const r of rcptRows ?? []) {
     const arr = receiptsByInvoice[r.invoice_id as string] ?? []
@@ -249,18 +320,7 @@ export default async function BillingView({ searchParams }: Props) {
     receiptsByInvoice[r.invoice_id as string] = arr
     if (r.voucher_no) directVoucherNos.add(`${r.invoice_id}|${r.voucher_no}`)
   }
-  const allInvoiceRows = [...(invoices ?? []), ...otherOpenInvoices] as Array<{
-    id: string
-    settlement_voucher_id?: string | null
-  }>
-  const settleVoucherIds = [
-    ...new Set(allInvoiceRows.map((i) => i.settlement_voucher_id).filter(Boolean) as string[]),
-  ]
   if (settleVoucherIds.length > 0) {
-    const { data: svRows } = await supabase
-      .from('payment_vouchers')
-      .select('id, voucher_no, payment_date, amount')
-      .in('id', settleVoucherIds)
     const svById = new Map(
       ((svRows ?? []) as Array<{ id: string; voucher_no: string | null; payment_date: string | null; amount: number }>).map(
         (v) => [v.id, v],
@@ -296,40 +356,9 @@ export default async function BillingView({ searchParams }: Props) {
     cnDetailByInvoice[cn.invoice_id as string] = arr
   }
 
-  // Per-mode invoice sums (shown in the cost cards).
-  const marketingTotal = invoiceList
-    .filter((i) => i.billing_mode === 'marketing_project')
-    .reduce((s, i) => s + Number(i.total_amount), 0)
-  const directorOfficeTotal = invoiceList
-    .filter((i) => i.billing_mode === 'director_office_attribution')
-    .reduce((s, i) => s + Number(i.total_amount), 0)
-  const directorAttributionTotal = invoiceList
-    .filter((i) => i.billing_mode === 'director_attribution')
-    .reduce((s, i) => s + Number(i.total_amount), 0)
-  const hrAttributionTotal = invoiceList
-    .filter((i) => i.billing_mode === 'hr_attribution')
-    .reduce((s, i) => s + Number(i.total_amount), 0)
-  const financeAttributionTotal = invoiceList
-    .filter((i) => i.billing_mode === 'finance_attribution')
-    .reduce((s, i) => s + Number(i.total_amount), 0)
-
-  const hrInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'hr_attribution').length
-  const financeInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'finance_attribution').length
-  const directorOfficeInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'director_office_attribution').length
-  const directorAttributionInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'director_attribution').length
-  const marketingInvoiceCount = invoiceList.filter((i) => i.billing_mode === 'marketing_project').length
-
   // Pull the per-dept OPEX totals from the live payroll_run. Since mig 278
   // HR's Submit lands the run directly in status='approved' (approved_at set
   // at submit) — no Principal gate. Rejected rows are reopen history, skip.
-  const { data: payrollRun } = await supabase
-    .from('payroll_runs')
-    .select(
-      'marketing_opex_total, hr_opex_total, finance_opex_total, director_office_total, it_opex_total, revenue_opex_total, director_salary_total, approved_at'
-    )
-    .eq('period_month', period)
-    .neq('status', 'rejected')
-    .maybeSingle()
   const payrollSubmitted = !!payrollRun?.approved_at
   const marketingFromPayroll = payrollSubmitted ? Number(payrollRun?.marketing_opex_total ?? 0) : 0
   const hrFromPayroll = payrollSubmitted ? Number(payrollRun?.hr_opex_total ?? 0) : 0
@@ -345,10 +374,6 @@ export default async function BillingView({ searchParams }: Props) {
   // dept × company aggregates only — no names, no individual salaries — so
   // Finance can read it. Amounts reconcile against the dept OPEX cards: the
   // gap between a dept's OPEX total and its allocated sum is HV's own share.
-  const { data: staffAllocRows, error: staffAllocError } = await supabase.rpc(
-    'get_staff_billing_allocation',
-    { p_period_month: period },
-  )
   if (staffAllocError) {
     console.error('get_staff_billing_allocation failed:', staffAllocError.message)
   }
@@ -385,19 +410,15 @@ export default async function BillingView({ searchParams }: Props) {
   // Director salary is decoupled from the staff run (mig 278/279) — Finance
   // reads the Director Payroll Submission snapshot. Legacy runs (pre-278)
   // still carry director_salary_total, so fall back to that.
-  const { data: directorSubmission } = await supabase
-    .from('director_salary_submissions')
-    .select('total_gross, total_payroll_gross, total_invoice, total_saving, director_count, by_company, submitted_at')
-    .eq('period_month', period)
-    .maybeSingle()
   const directorSubmitted = !!directorSubmission
+  // What Finance bills for director salary is the submission's per-company
+  // CTC, not its payroll gross (2026-10-06: the card read "over RM 19,396.25"
+  // against five drafts that matched the submission to the sen).
   const directorFromPayroll = directorSubmitted
-    ? Number(directorSubmission?.total_gross ?? 0)
+    ? directorBillingTarget(directorSubmission)
     : payrollSubmitted
       ? Number(payrollRun?.director_salary_total ?? 0)
       : 0
-  const directorCostReady =
-    directorSubmitted || (payrollSubmitted && Number(payrollRun?.director_salary_total ?? 0) > 0)
   interface DirectorByCompanyRow {
     company_id: string
     company_name: string
@@ -428,6 +449,33 @@ export default async function BillingView({ searchParams }: Props) {
     return vals.length === 0 ? '—' : formatMoney(vals.reduce((s, v) => s + v, 0))
   }
 
+  // The sheet's cards and the folded payroll basis (lib/billing-sheet.ts).
+  const summary = invoiceSummary(invoiceList, paidByInvoice, cnByInvoice)
+  const basisLines = payrollBillingLines({
+    fromPayroll: {
+      hr: hrFromPayroll,
+      finance: financeFromPayroll,
+      director_office: directorOfficeFromPayroll,
+      it: itFromPayroll,
+      revenue: revenueFromPayroll,
+      director: directorFromPayroll,
+      marketing: marketingFromPayroll,
+    },
+    invoices: invoiceList,
+    lines: (lineRows ?? []).map((l) => ({
+      invoice_id: l.invoice_id,
+      amount: l.amount,
+      segment: (l as { segment?: string | null }).segment ?? null,
+    })),
+  })
+  const payrollBasis = payrollSubmitted && directorSubmitted ? 'Submitted' : payrollSubmitted || directorSubmitted ? 'Partly' : 'Pending'
+  const payrollBasisNote = [
+    `HR ${payrollSubmitted && payrollRun?.approved_at ? officeTime(payrollRun.approved_at).format('D MMM') : 'pending'}`,
+    `Director salary ${directorSubmitted && directorSubmission?.submitted_at ? officeTime(directorSubmission.submitted_at).format('D MMM') : 'pending'}`,
+    `${marketingContractsActive} marketing contract${marketingContractsActive === 1 ? '' : 's'}`,
+  ].join(' · ')
+  const periodMonth = dayjs(period).format('YYYY-MM')
+
   const companyList = companies ?? []
   const companyMap = new Map(
     companyList.map((c) => [c.id, { name: c.name as string, code: c.short_code as string }])
@@ -446,6 +494,19 @@ export default async function BillingView({ searchParams }: Props) {
   // category label resolved server-side so the client list stays dumb.
   const invoiceById = new Map(invoiceList.map((i) => [i.id as string, i]))
   const coaNameByCode = new Map((categories ?? []).map((c) => [c.code as string, c.name as string]))
+  const categoryByInvoice: Record<string, string> = {}
+  for (const inv of invoiceList) {
+    const names = [
+      ...new Set(
+        (linesByInvoice[inv.id] ?? [])
+          .map((l) => (l.category_code ? (coaNameByCode.get(l.category_code) ?? l.category_code) : null))
+          .filter((n): n is string => !!n),
+      ),
+    ]
+    if (names.length > 0) categoryByInvoice[inv.id] = names.join(' + ')
+    else if (inv.category_code) categoryByInvoice[inv.id] = coaNameByCode.get(inv.category_code) ?? inv.category_code
+  }
+  const showBasis = basisLines.length > 0 || (directorSubmitted && directorByCompany.length > 0) || allocByDept.size > 0
   // Section shows the PERIOD's CNs only — other-period invoices are fetched
   // just for the 跨月 settle toggle, their CNs belong to their own month view.
   const creditNoteRows = (cnRows ?? []).filter((cn) => invoiceById.has(cn.invoice_id as string)).map((cn) => {
@@ -472,176 +533,119 @@ export default async function BillingView({ searchParams }: Props) {
   return (
     <div>
       <div className="page-head sticky top-0 z-20 bg-paper pt-2">
-        <div>
+        <div className="shrink-0">
           <div className="page-eyebrow">
             <em>I.</em> BILLING · SERVICE INVOICES
           </div>
           <h1 className="page-title">Service Billing</h1>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Six controls do not fit beside the title on the sheet (user
+            2026-10-07: "超过格子了"): they wrap onto a second line rather than
+            run past the sheet's edge. */}
+        <div className="flex items-center gap-3">
           <PeriodSelector currentPeriod={period} />
-          {canFinanceCreate && (
-            <>
-              <GenerateConsolidatedInvoicesButton
-                currentPeriod={period}
-                categories={categoryList}
-              />
-              <ReconcilePayrollBillingButton currentPeriod={period} />
-              <GenerateOwnShareInvoiceButton
-                currentPeriod={period}
-                categories={categoryList}
-              />
-              <CreateMultiLineInvoiceButton
-                companies={companyList}
-                currentPeriod={period}
-                departments={departments ?? []}
-                categories={categoryList}
-                extraModes={extraModes}
-              />
-              <CreateInvoiceButton
-                companies={companyList}
-                currentPeriod={period}
-                departments={departments ?? []}
-                categories={categoryList}
-                extraModes={extraModes}
-              />
-            </>
-          )}
         </div>
       </div>
 
-      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}
-      <DepartmentModeCard segmentKey="finance" />
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12 pb-12 border-b border-hairline">
-        <div className="lg:col-span-7">
-          <div className="font-serif italic text-accent text-base mb-1">
-            {dayjs(period).format('MMMM YYYY')}
+      {/* Every control on show, in three captioned groups (2026-10-07; the
+          user: all of them visible, but the month, the creating and the
+          exporting no longer in one line). */}
+      <div className="act-band">
+        {canFinanceCreate ? (
+          <>
+            <div className="act-group">
+              <div className="cap">From payroll</div>
+              <div className="btns">
+                <GenerateConsolidatedInvoicesButton currentPeriod={period} categories={categoryList} />
+                <ReconcilePayrollBillingButton currentPeriod={period} />
+                <GenerateOwnShareInvoiceButton currentPeriod={period} categories={categoryList} />
+              </div>
+            </div>
+            <div className="act-group">
+              <div className="cap">Create</div>
+              <div className="btns">
+                <CreateInvoiceButton
+                  companies={companyList}
+                  currentPeriod={period}
+                  departments={departments ?? []}
+                  categories={categoryList}
+                  extraModes={extraModes}
+                />
+                <CreateMultiLineInvoiceButton
+                  companies={companyList}
+                  currentPeriod={period}
+                  departments={departments ?? []}
+                  categories={categoryList}
+                  extraModes={extraModes}
+                />
+              </div>
+            </div>
+          </>
+        ) : null}
+        <div className="act-group">
+          <div className="cap">Export</div>
+          <div className="btns">
+            <Link href={`/statements/export?format=xlsx&period=${periodMonth}`} className="btn-quiet-sheet">
+              Excel
+            </Link>
+            <Link href={`/statements/export?format=pdf&period=${periodMonth}`} className="btn-quiet-sheet" title="Export the invoice list as a single-page table">
+              PDF · list
+            </Link>
+            <Link
+              href={`/billing/invoice-doc?period=${periodMonth}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-quiet-sheet"
+              title="Export each invoice as its own document page (batch PDF)"
+            >
+              PDF · per invoice
+            </Link>
           </div>
-          <div className="statement-amount text-ink">
-            {invoiceList.length > 0
-              ? formatMoney(invoiceTotal)
-              : payrollSubmitted || directorSubmitted
-                ? formatMoney(
-                    marketingFromPayroll +
-                      hrFromPayroll +
-                      financeFromPayroll +
-                      directorOfficeFromPayroll +
-                      itFromPayroll +
-                      revenueFromPayroll +
-                      directorFromPayroll,
-                  )
-                : formatMoney(0)}
-          </div>
-          <div className="font-mono text-xs text-muted mt-2">
-            {invoiceList.length > 0 ? (
-              <>
-                {invoiceList.length} invoice{invoiceList.length === 1 ? '' : 's'}
-                {' · '}
-                <em className="font-serif italic">generated</em>
-              </>
-            ) : payrollSubmitted ? (
-              <>
-                HR submitted · {formatMoney(hrTotalCtc)} HR CTC ·{' '}
-                <em className="font-serif italic">ready for invoice generation</em>
-              </>
-            ) : directorSubmitted ? (
-              <em className="font-serif italic">Director salary submitted — staff payroll pending</em>
-            ) : (
-              <em className="font-serif italic">HR has not submitted this period yet</em>
-            )}
-          </div>
-        </div>
-
-        <div className="lg:col-span-5 space-y-2">
-          <StatRow
-            label="HR snapshot"
-            value={submitted ? 'submitted' : 'pending'}
-            muted={!submitted}
-          />
-          <StatRow
-            label="Marketing contracts"
-            value={`${marketingContractsActive} active`}
-            muted={marketingContractsActive === 0}
-          />
-          <StatRow
-            label="Invoices this period"
-            value={`${invoiceList.length}`}
-            muted={invoiceList.length === 0}
-          />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
-        <DeptCostCard
-          label="HR OPEX"
-          required={hrFromPayroll}
-          invoiced={hrAttributionTotal}
-          invoiceCount={hrInvoiceCount}
-          invoiceMode="hr_attribution"
-          payrollSubmitted={payrollSubmitted}
-          canCreate={canFinanceCreate}
-          companies={companyList}
-          currentPeriod={period}
-          categories={categoryList}
-        />
-        <DeptCostCard
-          label="Finance OPEX"
-          required={financeFromPayroll}
-          invoiced={financeAttributionTotal}
-          invoiceCount={financeInvoiceCount}
-          invoiceMode="finance_attribution"
-          payrollSubmitted={payrollSubmitted}
-          canCreate={canFinanceCreate}
-          companies={companyList}
-          currentPeriod={period}
-          categories={categoryList}
-        />
-        <DeptCostCard
-          label="Director Office OPEX"
-          required={directorOfficeFromPayroll}
-          invoiced={directorOfficeTotal}
-          invoiceCount={directorOfficeInvoiceCount}
-          invoiceMode="director_office_attribution"
-          payrollSubmitted={payrollSubmitted}
-          canCreate={canFinanceCreate}
-          companies={companyList}
-          currentPeriod={period}
-          categories={categoryList}
-        />
-        <DeptCostCard
-          label="Director OPEX"
-          required={directorFromPayroll}
-          invoiced={directorAttributionTotal}
-          invoiceCount={directorAttributionInvoiceCount}
-          invoiceMode="director_attribution"
-          payrollSubmitted={directorCostReady}
-          awaitingNote="awaiting Director Salary submission"
-          canCreate={canFinanceCreate}
-          companies={companyList}
-          currentPeriod={period}
-          categories={categoryList}
-        />
-        <DeptCostCard
-          label="Marketing OPEX"
-          required={marketingFromPayroll}
-          invoiced={marketingTotal}
-          invoiceCount={marketingInvoiceCount}
-          invoiceMode="marketing_project"
-          payrollSubmitted={payrollSubmitted}
-          canCreate={canFinanceCreate}
-          companies={companyList}
-          currentPeriod={period}
-          categories={categoryList}
-          marketingNote
-        />
-      </div>
+      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}      {/* Cost center or centralized — Finance's own switch (2026-09-30). */}
+      <DepartmentModeCard segmentKey="finance" department={departmentModeRead} />
 
-      {/* Director Payroll Submission — per-subsidiary contribution (mig 279).
+      <StatCards label="Service Billing">
+        <StatCard
+          tone="primary"
+          label={`Invoiced · ${dayjs(period).format('MMMM')}`}
+          value={formatMoney(summary.invoiced)}
+          icon="receipt"
+          note={`${summary.invoicedCount} ${summary.invoicedCount === 1 ? 'invoice' : 'invoices'}${
+            summary.voidedCount > 0 ? ` · ${summary.voidedCount} voided left out` : ''
+          }`}
+        />
+        <StatCard
+          tone={summary.outstanding > 0.005 ? 'alert' : 'default'}
+          label="Outstanding"
+          value={formatMoney(summary.outstanding)}
+          icon="clock"
+          note={`${summary.issuedCount} issued${
+            summary.partPaidCount > 0 ? ` · ${summary.partPaidCount} part-paid` : summary.issuedCount > 0 ? ' · nothing part-paid' : ''
+          }`}
+        />
+        <StatCard label="Received" value={formatMoney(summary.received)} icon="bank" note={`${summary.paidCount} paid`} />
+        <StatCard label="Payroll basis" value={payrollBasis} icon="people" note={payrollBasisNote} />
+      </StatCards>
+
+      {/* The payroll basis — what each department's payroll costs and what
+          its invoices bill (the consolidated ones' lines counted by
+          department), with the Director Salary Submission and the Staff
+          Billing Allocation inside, folded (2026-10-07). */}
+      {showBasis ? (
+        <details className="fin-fold">
+          <summary>
+            Payroll basis
+            <small>{basisLines.length > 0 ? `BILLED / FROM PAYROLL — ${payrollBasisSummary(basisLines)}` : 'nothing from payroll yet'}</small>
+          </summary>
+          <div className="fin-fold-inner">
+      {/* Director Payroll Submission — per-subsidiary contribution (mig 279).      {/* Director Payroll Submission — per-subsidiary contribution (mig 279).
           This is what Finance bills each subsidiary for director salary;
           Create Invoice → Director attribution auto-fills from the same data. */}
       {directorSubmitted && directorByCompany.length > 0 && (
-        <section className="mb-12">
+        <section className="mb-8">
           <div className="sect-head">
             <h2>Director Salary Submission</h2>
             <span className="rule" aria-hidden />
@@ -650,9 +654,10 @@ export default async function BillingView({ searchParams }: Props) {
             </span>
           </div>
           <div className="font-mono text-xs text-muted mb-4">
-            Submitted {directorSubmission?.submitted_at ? dayjs(directorSubmission.submitted_at).format('D MMM YYYY HH:mm') : ''} ·{' '}
+            Submitted {directorSubmission?.submitted_at ? officeTime(directorSubmission.submitted_at).format('D MMM YYYY HH:mm') : ''} ·{' '}
             {Number(directorSubmission?.director_count ?? 0)} director{Number(directorSubmission?.director_count ?? 0) === 1 ? '' : 's'} ·{' '}
-            total {formatMoney(Number(directorSubmission?.total_gross ?? 0))}
+            payroll gross {formatMoney(Number(directorSubmission?.total_gross ?? 0))} · billed as CTC{' '}
+            {formatMoney(directorBillingTarget(directorSubmission))}
           </div>
           <div className="overflow-x-auto">
             <table className="ledger-table">
@@ -709,7 +714,7 @@ export default async function BillingView({ searchParams }: Props) {
           the amounts to bill each company for shared-services staff; the
           unallocated remainder stays with HV and is not billed. */}
       {allocByDept.size > 0 && (
-        <section className="mb-12">
+        <section className="mb-4">
           <div className="sect-head">
             <h2>Staff Billing Allocation</h2>
             <span className="rule" aria-hidden />
@@ -798,7 +803,11 @@ export default async function BillingView({ searchParams }: Props) {
         </section>
       )}
 
-      <InvoicesList invoices={invoiceList} extraOpenInvoices={otherOpenInvoices} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} extraModes={extraModes} receiptsByInvoice={receiptsByInvoice} cnDetailByInvoice={cnDetailByInvoice} />
+          </div>
+        </details>
+      ) : null}
+
+      <InvoicesList invoices={invoiceList} extraOpenInvoices={otherOpenInvoices} companyMap={companyMap} departmentMap={departmentMap} period={period} categories={categoryList} bankAccounts={bankList} invoiceLines={linesByInvoice} paidByInvoice={paidByInvoice} cnByInvoice={cnByInvoice} extraModes={extraModes} receiptsByInvoice={receiptsByInvoice} cnDetailByInvoice={cnDetailByInvoice} categoryByInvoice={categoryByInvoice} canSetDefault={canFinanceCreate} />
 
       {creditNoteRows.length > 0 ? <CreditNotesList rows={creditNoteRows} /> : null}
 
@@ -827,7 +836,7 @@ export default async function BillingView({ searchParams }: Props) {
           reference_table: t.reference_table,
         }))}
         period={period}
-        canAdd={canFinanceCreate}
+        canAdd={canRaiseVoucher}
       />
     </div>
   )
@@ -842,113 +851,3 @@ export default async function BillingView({ searchParams }: Props) {
 //      tiny gap indicator if invoiced ≠ required
 // Each card hosts its own "+ Create Invoice" button (compact link style) for
 // Finance, pre-filled with this dept's billing_mode.
-function DeptCostCard({
-  label,
-  required,
-  invoiced,
-  invoiceCount,
-  invoiceMode,
-  payrollSubmitted,
-  awaitingNote,
-  canCreate,
-  companies,
-  currentPeriod,
-  categories,
-  marketingNote,
-}: {
-  label: string
-  required: number
-  invoiced: number
-  invoiceCount: number
-  invoiceMode: CreateInvoiceMode
-  payrollSubmitted: boolean
-  awaitingNote?: string
-  canCreate: boolean
-  companies: Array<{ id: string; name: string; short_code: string }>
-  currentPeriod: string
-  departments?: Array<{ id: string; name: string }>
-  categories?: Array<{
-    code: string
-    label: string
-    type: AccountType
-    parent_code: string | null
-  }>
-  marketingNote?: boolean
-}) {
-  const hasInvoices = invoiceCount > 0
-  const hasRequired = required > 0.005
-  // Main number: invoiced total once invoices exist; otherwise the
-  // approved-payroll target (Finance uses this to know what to bill).
-  // payrollSubmitted gating happens upstream (required is forced to 0 when
-  // Principal hasn't approved), so reaching this branch implies approval.
-  const amount = hasInvoices ? invoiced : required
-  const muted = !hasInvoices && !hasRequired
-
-  let note: string
-  if (!payrollSubmitted) {
-    note = awaitingNote ?? 'awaiting HR costing'
-  } else if (hasInvoices) {
-    const gap = Math.round((required - invoiced) * 100) / 100
-    if (Math.abs(gap) < 0.01) {
-      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'}`
-    } else if (gap > 0) {
-      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · short RM ${gap.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
-    } else {
-      note = `${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · over RM ${(-gap).toLocaleString('en-MY', { minimumFractionDigits: 2 })}`
-    }
-  } else if (marketingNote) {
-    note = 'from payroll — no invoice'
-  } else {
-    note = 'from payroll — no invoice yet'
-  }
-
-  return (
-    <div className="border border-hairline rounded-md bg-surface p-5 flex flex-col">
-      <div className="font-serif italic text-accent text-sm mb-1">{label}</div>
-      <div className={`statement-amount ${muted ? 'text-muted' : 'text-ink'}`}>
-        {formatMoney(amount)}
-      </div>
-      <div className="font-mono text-xs text-muted mt-2">{note}</div>
-      {canCreate && payrollSubmitted && (
-        <div className="mt-3 pt-3 border-t border-hairline">
-          <CreateInvoiceButton
-            companies={companies}
-            currentPeriod={currentPeriod}
-            departments={[]}
-            categories={categories ?? []}
-            prefillMode={invoiceMode}
-            targetAmount={required}
-            alreadyInvoiced={invoiced}
-            compact
-            label="+ Create Invoice"
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StatRow({
-  label,
-  value,
-  muted = false,
-}: {
-  label: string
-  value: string
-  muted?: boolean
-}) {
-  return (
-    <div className="flex items-baseline justify-between font-mono text-sm">
-      <em className="font-serif text-md text-graphite">{label}</em>
-      <span
-        className={
-          muted
-            ? 'font-serif italic text-muted text-sm'
-            : 'font-serif italic text-ink text-sm'
-        }
-      >
-        {value}
-      </span>
-    </div>
-  )
-}

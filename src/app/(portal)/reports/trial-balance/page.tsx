@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { fetchTrialBalance } from '@/lib/cfo-reports'
+import { fetchTrialBalance, isCalendarDay } from '@/lib/cfo-reports'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 
 interface Props {
@@ -14,7 +15,9 @@ export default async function TrialBalancePage({ searchParams }: Props) {
   const supabase = await createClient()
 
   const { as_of: rawAsOf, show_zero: rawShowZero } = await searchParams
-  const asOf = rawAsOf ?? dayjs().format('YYYY-MM-DD')
+  // A hand-typed day that is not one (2026-02-31) opens today, not an error —
+  // the office's today: on the server's clock (UTC) it was yesterday until 08:00.
+  const asOf = isCalendarDay(rawAsOf) ? rawAsOf : officeToday()
   const showZeroBalance = rawShowZero === '1'
 
   const tb = await fetchTrialBalance(supabase, { asOf, showZeroBalance })

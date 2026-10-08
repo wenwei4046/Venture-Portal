@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, formatIntlDate } from '@/lib/utils'
 import type { SalespersonClose } from '@/lib/commission/closes'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
 import c from './close-controls.module.css'
@@ -27,7 +27,7 @@ interface Props {
 }
 
 function stamp(at: string): string {
-  return new Date(at).toLocaleString('en-MY', {
+  return formatIntlDate(new Date(at), {
     day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur',
   })
 }

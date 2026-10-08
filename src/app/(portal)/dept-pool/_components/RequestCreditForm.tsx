@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitRequestCredit } from '../actions'
+import { officeMonth, officeToday } from '@/lib/office-time'
 
 interface Props {
   subsidiaries: { id: string; name: string; short_code: string }[]
@@ -13,8 +14,10 @@ interface LineItem {
   amount: string
 }
 
+// Today and this month in the office. An ISO string's date is UTC's, and this
+// machine's own calendar is UTC's on the server: until 08:00 both were behind.
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  return officeToday()
 }
 
 function plus30(iso: string): string {
@@ -24,8 +27,7 @@ function plus30(iso: string): string {
 }
 
 function currentMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return officeMonth()
 }
 
 export default function RequestCreditForm({ subsidiaries }: Props) {

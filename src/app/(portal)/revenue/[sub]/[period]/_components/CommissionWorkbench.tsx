@@ -13,9 +13,10 @@ import {
   type LedgerSort, type LedgerView, type WorkbenchLocation, type WorkbenchTab,
 } from '@/lib/commission/workbench-nav'
 import { formatMoney } from '@/lib/utils'
+import { revenuePath } from '@/lib/revenue'
 import { computeRevenuePay } from '@/lib/revenue-pay'
 import { personPayLinesLock } from '@/lib/revenue-pay-lines'
-import type { FairSales } from '@/lib/venues'
+import { brandLabel, exhibitionQuery, NO_BRAND, type ExhibitionSales } from '@/lib/exhibitions'
 import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import { excludeOrder, includeOrder, saveOpenBillPicks } from '../../../run-actions'
@@ -35,6 +36,7 @@ import PayrollBar from './PayrollBar'
 import DirectorPayNote from './DirectorPayNote'
 import PersonCloseControl from './PersonCloseControl'
 import UnpricedBillsNotice from './UnpricedBillsNotice'
+import PaperRefCell from './PaperRefCell'
 import { useSalespersonCloses } from './useSalespersonCloses'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
@@ -43,18 +45,22 @@ import c from './close-controls.module.css'
 type Tab = WorkbenchTab
 const TABS: [Tab, string][] = [
   ['sales', 'Total Sales Orders'], ['kpi', 'KPI Items'], ['open', 'Open Bill'],
-  ['deposit', 'Below deposit'], ['venue', 'Sales by venue'],
+  // Sales exhibition (2026-10-03) — Sales by venue until the user said a result
+  // is read by BRAND at a venue, organiser and date, not by the venue.
+  ['deposit', 'Below deposit'], ['exhibition', 'Sales exhibition'],
   // The month's two review panels, above the cards until 2026-09-30 (user:
   // 把这两个 move 去 … 让它们形成两个 tab). Drawn only when the page hands them over.
   ['changes', 'Drops & upsells'], ['claims', 'Double claims'],
 ]
 /** The tabs that are the page's panels rather than cuts of the workbench's own board. */
 const REVIEW_TABS: readonly Tab[] = ['changes', 'claims']
-type Column = 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+type Column = 'ref' | 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
 // Sales person (2026-09-30): the one column a person's own ledger rarely
 // needs — until a bill is shared, and then it names both holders.
+// Ref No. (2026-10-03): the handwritten bill's number beside the ERP's — the
+// one a bill is checked back against, and the one double claims match on.
 const COLUMNS: [Column, string][] = [
-  ['salesperson', 'Sales person'], ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
+  ['ref', 'Ref No.'], ['salesperson', 'Sales person'], ['date', 'Date'], ['venue', 'Venue'], ['event', 'Event'], ['organizer', 'Organizer'],
   ['location', 'Sales location'], ['brand', 'Brand'], ['category', 'Category'], ['sales', 'Sales value'],
   ['commissionable', 'Commissionable value'],
   ['margin', 'Margin'], ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
@@ -102,6 +108,9 @@ export interface ReviewTab {
 export interface NotCountedBill {
   orderId: string
   orderNo: string
+  /** The ERP's Ref No. and the paper number read from it (`paper-ref.ts`). */
+  refNo?: string | null
+  paperNo?: string | null
   orderDate: string
   staffId: string | null
   orderTotal: number
@@ -116,10 +125,11 @@ interface Props {
   savedTotals: { staffId: string; total: number }[]
   monthStats: CommissionMonthStats
   /**
-   * The month's bills by the fair they were written at — every live bill,
-   * matched or not, so the tab adds up to the Total sales value card.
+   * The month's bills by the exhibition they were written at — a brand at a
+   * fair (`lib/exhibitions.ts`). Every live bill, matched or not, so the tab
+   * adds up to the Total sales value card.
    */
-  venues?: FairSales[]
+  exhibitions?: ExhibitionSales[]
   monthOverview?: ReactNode
   payroll?: PayrollBarFacts
   /**
@@ -185,7 +195,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, venues = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, exhibitions = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -408,15 +418,20 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const depositNote = threshold == null
     ? 'This scheme has no deposit gate — every bill counts in the month it is written.'
     : `Below ${pct(threshold)} of the order total, so none of the commission is released yet. Nothing is lost — each one pays in the month its deposit clears.`
-  const venueTotals = { bills: venues.reduce((a, v) => a + v.orders, 0), total: sum(venues, v => v.total), commissionable: sum(venues, v => v.commissionable) }
-  const venueQuery = query.trim().toLowerCase()
-  const shownVenues = venues.filter(v => !venueQuery || [v.displayName, v.event, v.organizer].some(x => x?.toLowerCase().includes(venueQuery)))
+  const exhibitionTotals = { bills: exhibitions.reduce((a, x) => a + x.orders, 0), total: sum(exhibitions, x => x.total), commissionable: sum(exhibitions, x => x.commissionable) }
+  // The brands on the tab, bills with none last — one brand's exhibitions at a time.
+  const exhibitionBrands = [...new Set(exhibitions.map(x => x.brand))]
+    .sort((a, b) => a === null ? 1 : b === null ? -1 : a.localeCompare(b))
+  const exhibitionQueryText = query.trim().toLowerCase()
+  const shownExhibitions = exhibitions.filter(x =>
+    (!brand || (brand === NO_BRAND ? x.brand === null : x.brand === brand)) &&
+    (!exhibitionQueryText || [brandLabel(x.brand), x.displayName, x.event, x.organizer].some(v => v?.toLowerCase().includes(exhibitionQueryText))))
   const badges: Record<Tab, ReactNode> = {
     sales: new Set(data.input.orders.filter(o => !o.upsale && o.periodMonth === period).map(o => o.id)).size,
     kpi: quantity(totals.kpiQty),
     open: new Set(tags.map(t => t.orderId)).size,
     deposit: heldTotals.bills,
-    venue: venues.length,
+    exhibition: exhibitions.length,
     changes: reviews?.changes?.count ?? 0,
     claims: reviews?.claims?.count ?? 0,
   }
@@ -635,7 +650,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function matches(row: CommissionOrderRow | OverrideOrderRow) {
     const q = query.trim().toLowerCase()
     // A shared bill answers to every holder's name — ADRIAN finds the part on ANTHONY's ledger.
-    return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories, ...(row.share?.parts.map(p => p.name) ?? [])].some(v => v?.toLowerCase().includes(q)))
+    return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.refNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories, ...(row.share?.parts.map(p => p.name) ?? [])].some(v => v?.toLowerCase().includes(q)))
   }
   function pickControl(row: CommissionOrderRow) {
     const order = data.input.orders.find(o => o.id === row.orderId)
@@ -655,6 +670,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function cell(row: CommissionOrderRow | OverrideOrderRow, key: Column, overriding: boolean) {
     const own = row as CommissionOrderRow
     switch (key) {
+      // An upsale is no bill, so it has no paper of its own.
+      case 'ref': return row.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={row.refNo} paperNo={row.paperNo} />
       // A shared bill names every holder, the owner first; the ledger's own person in bold.
       case 'salesperson': return row.share
         ? <span className={s.holders}>{row.share.parts.map(p => <span key={p.staffId} className={p.staffId === row.staffId ? s.holderSelf : undefined}>
@@ -722,7 +739,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     return <div className={s.tableFrame} key={withPerson ? 'deposit-team' : 'deposit-person'}>
       <div className={s.tableScroll} role="region" aria-label="Orders below deposit, scroll horizontally" tabIndex={0}>
         <table className={s.table} aria-label={withPerson ? 'Orders below deposit' : `${selected?.name ?? 'Salesperson'} orders below deposit`}>
-          <thead><tr><th className={s.stickyFirst}>Sales order</th>{withPerson && <th>Sales person</th>}<th>Date</th><th>Venue</th>
+          <thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th>{withPerson && <th>Sales person</th>}<th>Date</th><th>Venue</th>
             <th title={SALES_VALUE_HINT}>Sales value</th><th title={COMMISSIONABLE_HINT}>Commissionable value</th>
             <th>Paid</th><th title={DEPOSIT_HINT}>Deposit needed</th><th className={s.stickyTotal}>Still to collect</th></tr></thead>
           <tbody>{filtered.map(row => {
@@ -731,6 +748,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
               <td className={s.stickyFirst}>{billCell(row, <>
                 {row.share && <small className={s.shareNote}>{shareNote(row)}</small>}
                 {row.periodMonth !== period && <small>Carried from {row.periodMonth.slice(0, 7)}</small>}</>)}</td>
+              <td><PaperRefCell refNo={row.refNo} paperNo={row.paperNo} /></td>
               {withPerson && <td><button type="button" className={s.ghostButton} onClick={() => choosePerson(row.staffId, 'deposit')}>{row.staffName}</button></td>}
               <td>{row.orderDate}</td>
               <td>{row.venue || <span className={s.muted}>Not linked</span>}{row.eventName && <small>{row.eventName}</small>}</td>
@@ -741,7 +759,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
               <td className={s.stickyTotal}>{money(short)}</td>
             </tr>
           })}</tbody>
-          <tfoot><tr><td className={s.stickyFirst}>Visible subtotal</td><td colSpan={withPerson ? 7 : 6}>{filtered.length} sales orders</td><td className={s.stickyTotal}>{money(sum(filtered, r => depositOf(r).short))}</td></tr></tfoot>
+          <tfoot><tr><td className={s.stickyFirst}>Visible subtotal</td><td colSpan={withPerson ? 8 : 7}>{filtered.length} sales orders</td><td className={s.stickyTotal}>{money(sum(filtered, r => depositOf(r).short))}</td></tr></tfoot>
         </table>
         {!filtered.length && <div className={s.empty}>{rows.length ? 'No sales orders match this view.' : 'Every bill has met its deposit.'}</div>}
       </div>
@@ -903,7 +921,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         <button role="tab" aria-selected={view === 'deposit'} className={view === 'deposit' ? s.activeTab : undefined} onClick={() => showLedger('deposit')}>Below deposit <span className={s.badge}>{personHeld.length}</span></button>
       </div>
       {view === 'deposit' && <p className={`${s.subtitle} ${s.tabNote}`}>{depositNote}</p>}
-      <div className={s.toolbar}><input className={s.search} aria-label="Search sales orders" placeholder="Search order, venue or brand…" value={query} onChange={e => setQuery(e.target.value)} />
+      <div className={s.toolbar}><input className={s.search} aria-label="Search sales orders" placeholder="Search order, Ref No., venue or brand…" value={query} onChange={e => setQuery(e.target.value)} />
         <select aria-label="Filter brand" value={brand} onChange={e => setBrand(e.target.value)}><option value="">All brands</option>{brands.map(b => <option key={b}>{b}</option>)}</select>
         {view !== 'deposit' && <select aria-label="Sort sales orders" value={sort} onChange={e => setSort(e.target.value as LedgerSort)}><option value="date_asc">Date · oldest first</option><option value="date_desc">Date · newest first</option><option value="commission_desc">Commission · highest first</option></select>}
         {view !== 'deposit' && <label className={s.chip}><input type="checkbox" checked={showExcluded} onChange={e => setShowExcluded(e.target.checked)} />Show not counted ({personNotCounted.length})</label>}
@@ -917,9 +935,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       {view === 'personal' ? orderTable(selected.personalRows, false) : view === 'overriding' ? orderTable(selected.overridingRows, true) : depositTable(personHeld, false)}
       {view !== 'deposit' && showExcluded && <div className={`${s.tableFrame} ${s.notCounted}`}>
         <div className={s.tableScroll}><table className={s.table} aria-label={`${selected.name} bills not counted`}>
-          <thead><tr><th className={s.stickyFirst}>Not counted</th><th>Date</th><th title={SALES_VALUE_HINT}>Sales value</th><th>Count</th></tr></thead>
+          <thead><tr><th className={s.stickyFirst}>Not counted</th><th>Ref No.</th><th>Date</th><th title={SALES_VALUE_HINT}>Sales value</th><th>Count</th></tr></thead>
           <tbody>{personNotCounted.map(b => <tr key={b.orderId}>
             <td className={s.stickyFirst}><Link href={orderHref({ periodMonth: period, orderId: b.orderId })}>{b.orderNo}</Link><small>Taken out by hand</small></td>
+            <td><PaperRefCell refNo={b.refNo ?? null} paperNo={b.paperNo ?? null} /></td>
             <td>{b.orderDate}</td>
             <td className={s.numeric}>{money(b.orderTotal)}</td>
             <td><button type="button" className={s.ghostButton} disabled={lockedMonths.has(period) || billPending}
@@ -944,7 +963,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {tab === 'kpi' && <>
       <div className={s.topLine}><div><h2 className={s.sectionHeading}>KPI across the team</h2><p className={s.subtitle}>Qualifying item quantities and commission expense for every salesperson.</p></div></div>
       {!effectiveInput.scheme.enableKpi && <p className={s.notice}>KPI payout is switched off in this scheme. Configured KPI sales are listed; payable expense is zero. It is switched on under Review settings › This month pays.</p>}
-      {effectiveInput.kpiItems.length === 0 && <p className={s.warning}>No KPI items are configured for this date. <Link href={`/revenue/products?tab=kpi&sub=${sub}`}>Choose the SKUs and specials and their amounts on Product List › Add-on / KPI Items</Link> to calculate quantities and expenses.</p>}
+      {effectiveInput.kpiItems.length === 0 && <p className={s.warning}>No KPI items are configured for this date. <Link href={`${revenuePath(sub, 'rules')}?tab=kpi`}>Choose the SKUs and specials and their amounts on Rules › KPI items</Link> to calculate quantities and expenses.</p>}
       <div className={s.summaryGrid}><Summary label="KPI items" value={quantity(totals.kpiQty)} /><Summary label="Base expense" value={money(totals.kpiBase)} /><Summary label="Threshold bonus" value={money(totals.kpiTotal - totals.kpiBase)} /><Summary label="Total KPI expense" value={money(totals.kpiTotal)} /></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="KPI expense by salesperson"><thead><tr><th>Sales person</th><th>Title / rank</th><th>KPI items</th><th>Base amount</th><th>Threshold bonus</th><th className={s.stickyTotal}>Total KPI expense</th></tr></thead><tbody>{board.people.map(p => <tr key={p.staffId}><td><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} ↗</button></td><td>{p.titleLabel}<small>{p.rankLabel}</small></td><td>{quantity(board.kpi.find(k => k.staffId === p.staffId)?.soldQty ?? 0)}<small>{quantity(p.statement?.kpiQty ?? 0)} payable · {quantity(board.kpi.find(k => k.staffId === p.staffId)?.heldQty ?? 0)} held</small></td><td className={s.numeric}>{money((p.statement?.kpiBase ?? 0))}</td><td className={s.numeric}>+ {money((p.statement?.kpiCommission ?? 0) - (p.statement?.kpiBase ?? 0))}<small>{pct(p.statement?.kpiThresholdPct)}</small></td><td className={s.stickyTotal}>{money((p.statement?.kpiCommission ?? 0))}</td></tr>)}</tbody><tfoot><tr><td colSpan={5}>Total KPI expense</td><td className={s.stickyTotal}>{money(totals.kpiTotal)}</td></tr></tfoot></table></div></div>
     </>}
@@ -953,8 +972,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.topLine}><div><h2 className={s.sectionHeading}>Open Bill allocation</h2><p className={s.subtitle}>Review every selected bill across the team. One rank per salesperson, per event day.</p></div><div className={s.overviewTotal}><span>Total Open Bill bonus</span><strong>{money(totals.open)}</strong></div></div>
       {!openEnabled && <p className={s.notice}>Open Bill payout is switched off for this month. Saved picks remain visible and pay zero; picks open once it is switched on under Review settings › This month pays.</p>}
       {locked && <p className={s.notice}>This month is in payroll, so its Open Bill picks cannot change.</p>}
-      <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
-      <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}><td className={s.stickyFirst}>{r.orderNo}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
+      <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order, Ref No. or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
+      <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}><td className={s.stickyFirst}>{r.orderNo}</td><td>{r.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div><div className={s.tableFooter}>Shared bills show each holder’s allocated part. All parts reconcile to the total bonus.</div></div>
       <div className={s.footerTotal}><span>All selected bills · allocated bonus</span><strong>{money(totals.open)}</strong></div>
     </>}
 
@@ -971,23 +990,31 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.footerTotal}><span>All bills below deposit · still to collect</span><strong>{money(heldTotals.short)}</strong></div>
     </>}
 
-    {tab === 'venue' && <>
-      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Sales by venue</h2><p className={s.subtitle}>Every bill of the month at the fair it was written at. The venue, the days and the organiser come with the bill from the ERP, where the salesperson picks the event — nothing is picked here. A venue that held two fairs this month has a row for each; bills no fair claims are grouped by venue, and are placed by fixing the event on the order in the ERP.</p></div>
-        <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(venueTotals.total)}</strong></div></div>
-      <div className={s.toolbar}><input className={s.search} aria-label="Search venues" placeholder="Search venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} /></div>
-      <div className={s.tableFrame}><div className={s.tableScroll} role="region" aria-label="Sales by venue, scroll horizontally" tabIndex={0}><table className={s.table} aria-label="Sales by venue">
-        <thead><tr><th className={s.stickyFirst}>Venue</th><th>Event</th><th>Organizer</th><th>Salespeople</th><th>Bills</th><th className={s.stickyTotal} title={SALES_VALUE_HINT}>Sales value</th></tr></thead>
-        <tbody>{shownVenues.map(v => <tr key={v.key}>
-          <td className={s.stickyFirst}><Link href={`/revenue/${sub}/${period}/orders?venue=${encodeURIComponent(v.venueKey)}`}>{v.displayName}</Link></td>
-          <td>{v.event || <span className={s.muted}>{v.fairId ? 'Dates not set' : 'Not linked'}</span>}</td>
-          <td>{v.organizer || <span className={s.muted}>Not linked</span>}</td>
-          <td>{v.people}</td><td>{v.orders}</td>
-          <td className={s.stickyTotal}>{money(v.total)}<NoCommission amount={v.total - v.commissionable} /></td>
+    {tab === 'exhibition' && <>
+      <div className={s.topLine}><div><h2 className={s.sectionHeading}>Sales exhibition</h2><p className={s.subtitle}>Every bill of the month at the exhibition it was written at. An exhibition is one brand’s booth at one fair: the same venue, organiser and days with another brand is another exhibition, the way the ERP opens one project per brand booth. A bill belongs to the booth the salesperson picked when opening it in the ERP, whatever its goods — a Dunlopillo pillow sold at the Akemi booth is Akemi’s — and a bill with no booth goes by its own brand. Nothing is picked here. Bills no fair claims are grouped by brand and venue, and are placed by fixing the event on the order in the ERP.</p></div>
+        <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(exhibitionTotals.total)}</strong></div></div>
+      <div className={s.toolbar}>
+        <input className={s.search} aria-label="Search exhibitions" placeholder="Search brand, venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} />
+        <select aria-label="Filter exhibitions by brand" value={brand} onChange={e => setBrand(e.target.value)}>
+          <option value="">All brands</option>
+          {exhibitionBrands.map(b => <option key={b ?? NO_BRAND} value={b ?? NO_BRAND}>{brandLabel(b)}</option>)}
+        </select>
+      </div>
+      <div className={s.tableFrame}><div className={s.tableScroll} role="region" aria-label="Sales exhibition, scroll horizontally" tabIndex={0}><table className={s.table} aria-label="Sales exhibition">
+        <thead><tr><th className={s.stickyFirst}>Brand</th><th>Venue</th><th>Event</th><th>Organizer</th><th>Salespeople</th><th>Bills</th><th className={s.stickyTotal} title={SALES_VALUE_HINT}>Sales value</th></tr></thead>
+        <tbody>{shownExhibitions.map(x => <tr key={x.key}>
+          <td className={s.stickyFirst}>{x.brand ?? <span className={s.muted}>{brandLabel(null)}</span>}</td>
+          {/* The venue opens exactly this exhibition's bills on All bills. */}
+          <td><Link href={`/revenue/${sub}/${period}/orders?${exhibitionQuery(x)}`}>{x.displayName}</Link></td>
+          <td>{x.event || <span className={s.muted}>{x.fairId ? 'Dates not set' : 'Not linked'}</span>}</td>
+          <td>{x.organizer || <span className={s.muted}>Not linked</span>}</td>
+          <td>{x.people}</td><td>{x.orders}</td>
+          <td className={s.stickyTotal}>{money(x.total)}<NoCommission amount={x.total - x.commissionable} /></td>
         </tr>)}</tbody>
-        <tfoot><tr><td className={s.stickyFirst}>{shownVenues.length < venues.length ? 'Visible venues' : 'All venues'}</td><td colSpan={3}>{shownVenues.length} {shownVenues.length === 1 ? 'row' : 'rows'}</td><td>{shownVenues.reduce((a, v) => a + v.orders, 0)}</td><td className={s.stickyTotal}>{money(sum(shownVenues, v => v.total))}</td></tr></tfoot>
+        <tfoot><tr><td className={s.stickyFirst}>{shownExhibitions.length < exhibitions.length ? 'Visible exhibitions' : 'All exhibitions'}</td><td colSpan={4}>{shownExhibitions.length} {shownExhibitions.length === 1 ? 'exhibition' : 'exhibitions'}</td><td>{shownExhibitions.reduce((a, x) => a + x.orders, 0)}</td><td className={s.stickyTotal}>{money(sum(shownExhibitions, x => x.total))}</td></tr></tfoot>
       </table>
-      {!shownVenues.length && <div className={s.empty}>{venues.length ? 'No venues match this search.' : 'No bills this month.'}</div>}
-      </div><div className={s.tableFooter}><span>{venueTotals.bills} bills · {money(venueTotals.commissionable)} of it earns commission</span><span>A venue opens every bill written there →</span></div></div>
+      {!shownExhibitions.length && <div className={s.empty}>{exhibitions.length ? 'No exhibitions match this search.' : 'No bills this month.'}</div>}
+      </div><div className={s.tableFooter}><span>{exhibitionTotals.bills} bills · {money(exhibitionTotals.commissionable)} of it earns commission</span><span>A venue opens that exhibition’s bills →</span></div></div>
     </>}
 
     {/* The page's own panels, server-built (2026-09-30). */}

@@ -69,6 +69,32 @@ export function officeClock(at: Date = new Date()): Clock {
 }
 
 /**
+ * A moment as the office reads it: `2 Oct 2026 · 12:47`.
+ *
+ * A server component that prints a time with `dayjs(x).format('HH:mm')` prints
+ * it in the SERVER's zone, and Vercel keeps UTC — the voucher page said a PV
+ * made at 12:47 was made at 04:47 (seen 2026-10-02). Anything a page renders on
+ * the server should come through here. `year: false` drops the year for a line
+ * that sits under a date already: `2 Oct · 12:47`.
+ */
+export function officeStamp(at: Date | string | null | undefined, opts: { year?: boolean } = {}): string {
+  if (at == null || at === '') return '—'
+  const when = typeof at === 'string' ? new Date(at) : at
+  if (Number.isNaN(when.getTime())) return '—'
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: OFFICE_TZ,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(when)
+  const day = `${part(parts, 'day')} ${part(parts, 'month')}${opts.year === false ? '' : ` ${part(parts, 'year')}`}`
+  return `${day} · ${part(parts, 'hour')}:${part(parts, 'minute')}`
+}
+
+/**
  * The office's calendar date, `YYYY-MM-DD` — the day the database calls
  * `(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date`. Assembled from parts, not
  * a locale's date format, which is not the same everywhere.

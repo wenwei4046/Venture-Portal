@@ -1,4 +1,5 @@
 import { requirePermission } from '@/lib/auth'
+import { canManagePermissions } from '@/lib/roles'
 import { createClient } from '@/lib/supabase/server'
 import { pickHomeSubDepartments, revenuePath, subDeptSlug } from '@/lib/revenue'
 import { ladderBreaks, type Rung } from '@/lib/ladder'
@@ -7,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import HierarchyView from './_components/HierarchyView'
 import type { ChartPerson } from './_components/TeamOrgChart'
 import type { BoardTitle } from './_components/LevelsBoard'
+import type { TitleRow } from './_components/TitlesSection'
 
 /**
  * The roster is authoritative for company titles, reporting lines, Table and
@@ -20,11 +22,11 @@ import type { BoardTitle } from './_components/LevelsBoard'
  * Pay rates stay on Revenue, where the relevant period is in scope.
  */
 export default async function TeamHierarchyPage() {
-  await requirePermission('team')
+  const user = await requirePermission('team')
   const supabase = await createClient()
   const untyped = supabase as unknown as import('@supabase/supabase-js').SupabaseClient
 
-  const [staffResult, levelsResult, titlesResult, ranksResult, subsResult, schemesResult, directorsResult, memberships] =
+  const [staffResult, levelsResult, titlesResult, ranksResult, subsResult, schemesResult, directorsResult, memberships, deptResult, templatesResult] =
     await Promise.all([
       supabase
         .from('hr_staff_costs')
@@ -38,7 +40,7 @@ export default async function TeamHierarchyPage() {
       // than dropping them off the ladder while somebody still holds one.
       supabase
         .from('titles')
-        .select('id, name, department_id, level_id, is_active, departments (name)')
+        .select('id, name, department_id, level_id, is_active, is_department_head, template_id, departments (name)')
         .order('name'),
       // Who may hold downlines, per commission department and title — the
       // recruit rule, asked the way the database asks it: on the department's
@@ -55,12 +57,16 @@ export default async function TeamHierarchyPage() {
         .eq('is_active', true).is('effective_to', null),
       untyped.from('comm_sub_department_directors').select('staff_id, sub_department_id'),
       loadOpenMemberships(untyped),
+      // The Roles tab: the department picker, and each title's template by name.
+      supabase.from('departments').select('id, name').order('name'),
+      untyped.from('permission_templates').select('id, name'),
     ])
 
   for (const [label, result] of [
     ['staff roster', staffResult], ['title levels', levelsResult], ['titles', titlesResult],
     ['commission title rules', ranksResult], ['Revenue sub-departments', subsResult],
     ['Revenue schemes', schemesResult], ['sub-department directors', directorsResult],
+    ['departments', deptResult], ['permission templates', templatesResult],
   ] as const) {
     if (result.error) throw new Error(`Could not load ${label} for the company hierarchy: ${result.error.message}`)
   }
@@ -178,6 +184,25 @@ export default async function TeamHierarchyPage() {
     }
   })
 
+  // The Roles tab (2026-10-08): every title with its rung and its template.
+  const templateNames = new Map(((templatesResult.data ?? []) as Array<{ id: string; name: string }>).map(t => [t.id, t.name]))
+  const roleTitles: TitleRow[] = (titles ?? []).map(t => {
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    const r = t as any
+    return {
+      id: r.id,
+      name: r.name,
+      departmentId: r.department_id ?? null,
+      departmentName: r.departments?.name ?? null,
+      isActive: r.is_active,
+      isDepartmentHead: r.is_department_head === true,
+      people: headcount.get(r.id) ?? 0,
+      levelRank: r.level_id ? (rungById.get(r.level_id)?.rank ?? null) : null,
+      templateId: r.template_id ?? null,
+      templateName: r.template_id ? (templateNames.get(r.template_id) ?? null) : null,
+    }
+  })
+
   // Lines the ladder, as it stands now, would refuse. The trigger only checks
   // a line when it is drawn, so a ladder edited after the fact can leave some;
   // the panel says which, and the chart paints them red.
@@ -199,6 +224,9 @@ export default async function TeamHierarchyPage() {
       rungs={rungs}
       titles={boardTitles}
       breaks={breaks}
+      roleTitles={roleTitles}
+      departments={(deptResult.data ?? []).map(d => ({ id: d.id, name: d.name }))}
+      canDeleteTitles={canManagePermissions(user)}
     />
   )
 }

@@ -1,7 +1,8 @@
 /**
  * The portal's own prices, read the way the run reads them — the TypeScript
- * twins of `catalogue_grid_price`, `catalogue_unit_price` and
- * `catalogue_line_surcharge` (migration 20260924030000); the twin of
+ * twins of `catalogue_grid_price` and `catalogue_unit_price` (migration
+ * 20260924030000), `catalogue_line_charge` and the sofa's once-a-set charge
+ * of `catalogue_apply_sofa_charges` (20261006050000); the twin of
  * `catalogue_line_cost` + `catalogue_apply_combos` built from them is the
  * member calculator's `costLines` (lib/member/calculator.ts). The Product List
  * shows what a SKU would cost with these, and the SQL costs a sales line with
@@ -125,9 +126,40 @@ export const POOLS = [
 ] as const
 export type Pool = (typeof POOLS)[number]
 
-/** A pool whose options carry a surcharge. Gaps and seat sizes do not. */
+/**
+ * What a price keyed on the Maintenance tab MEANS (user 2026-10-04, every
+ * priced pool since 2026-10-06: "我要那些价钱是不会算进 margin 的，加 100 就一定
+ * default calculator 100"):
+ *
+ *   'charge' — what the CUSTOMER pays for that option, on top: out of the
+ *              margin on both sides, in the commissionable sales, never KPI.
+ *              A bed frame's divan, leg, gap, total height and specials, per
+ *              frame (`lineCharge`); a sofa's leg height and specials, ONCE
+ *              PER SOFA however many pieces (`sofaSetCharges`).
+ *   null     — no price: a sofa's seat size, which is the grid's own axis.
+ *
+ * No option adds to a line's COST any more (catalogue_line_surcharge answers 0).
+ */
+export type PoolPrice = 'charge' | null
+
+export const CHARGED_POOLS = [
+  'bedframe_divan_heights',
+  'bedframe_leg_heights',
+  'bedframe_gaps',
+  'bedframe_total_heights',
+  'bedframe_specials',
+  'sofa_leg_heights',
+  'sofa_specials',
+] as const
+export type ChargedPool = (typeof CHARGED_POOLS)[number]
+
+export function poolPriceOf(pool: string): PoolPrice {
+  return (CHARGED_POOLS as readonly string[]).includes(pool) ? 'charge' : null
+}
+
+/** A pool whose options may carry a price. A sofa's seat sizes do not. */
 export function isPricedPool(pool: string): boolean {
-  return pool !== 'bedframe_gaps' && pool !== 'sofa_sizes'
+  return poolPriceOf(pool) !== null
 }
 
 /** An option price as keyed on the Maintenance tab. */
@@ -160,48 +192,120 @@ export class OptionPrices {
   }
 }
 
-export interface SurchargePart {
-  pool: string
+export interface ChargePart {
+  pool: ChargedPool
   value: string
-  /** Null = the option has no price keyed on the Maintenance tab; it adds nothing. */
-  price: number | null
+  /** What the customer pays for it — always above zero. */
+  price: number
+}
+
+/** The option values a line names, in the pools its category reads. */
+type ChargeFacts = Pick<LineFacts, 'divan' | 'leg' | 'gap' | 'total' | 'specials'>
+
+/**
+ * What one line's options are CHARGED to the customer, per unit — the twin of
+ * catalogue_line_charge (7 arguments, 20261006050000): a bed frame's divan,
+ * leg, gap, total height and specials; a sofa's leg height and specials. Only
+ * an option priced above zero is a charge; one nobody priced, or priced at 0,
+ * is FOC. A special named twice counts once. Anything but a bed frame or a
+ * sofa is never charged — and a sofa is charged once per SET, not per line
+ * (`sofaSetCharges`).
+ */
+export function lineCharge(
+  category: string | null,
+  facts: ChargeFacts,
+  prices: OptionPrices,
+): { amount: number; parts: ChargePart[] } {
+  const cat = (category ?? '').toUpperCase()
+  let pairs: Array<[ChargedPool, string | null]>
+  let specialsPool: ChargedPool
+  if (cat === 'BEDFRAME') {
+    pairs = [
+      ['bedframe_divan_heights', facts.divan],
+      ['bedframe_leg_heights', facts.leg],
+      ['bedframe_gaps', facts.gap],
+      ['bedframe_total_heights', facts.total],
+    ]
+    specialsPool = 'bedframe_specials'
+  } else if (cat === 'SOFA') {
+    pairs = [['sofa_leg_heights', facts.leg]]
+    specialsPool = 'sofa_specials'
+  } else {
+    return { amount: 0, parts: [] }
+  }
+  const parts: ChargePart[] = []
+  const add = (pool: ChargedPool, value: string | null) => {
+    if (value === null || value.trim() === '') return
+    const price = prices.get(pool, value)
+    if (price === null || !(price > 0)) return
+    parts.push({ pool, value, price })
+  }
+  for (const [pool, value] of pairs) add(pool, value)
+  const seen = new Set<string>()
+  for (const sp of facts.specials) {
+    const k = valueKey(sp)
+    if (k === null || seen.has(k)) continue
+    seen.add(k)
+    add(specialsPool, sp)
+  }
+  return { amount: parts.reduce((a, p) => a + p.price, 0), parts }
+}
+
+/** One sofa line as the set charge reads it: which sofa it belongs to, how many, what it names. */
+export interface SofaSetLine {
+  /** The sofa it is a piece of: its base model (one order's lines of one model are one sofa). */
+  group: string
+  qty: number
+  leg: string | null
+  specials: readonly string[]
+}
+
+export interface SofaSetCharge {
+  group: string
+  /** How many sofas: the smallest quantity among its pieces (×2 everywhere = two sofas). */
+  sets: number
+  /** What one sofa is charged: every distinct leg height and special any piece names. */
+  unit: number
+  /** unit × sets. */
+  total: number
+  parts: ChargePart[]
 }
 
 /**
- * The surcharges a line's options add, per unit — the ERP's computeMfgLineCost
- * shape: a bed frame's divan, leg and total height and its specials; a sofa
- * module's leg height and specials. Gaps and seat sizes add nothing. An option
- * with no portal price adds nothing too, and is reported so the page can say so.
+ * A sofa's options, ONCE PER SOFA (user 2026-10-06: "整组 sofa 只加一次") —
+ * the twin of catalogue_apply_sofa_charges' grouping: the lines of one base
+ * model are one sofa; each distinct leg height and special any of them names
+ * is charged once (priced above zero), times the sets — the smallest quantity
+ * among the pieces. A group nothing is charged for is left out. (The SQL then
+ * spreads each set's total over its lines by what they sell for; a quote needs
+ * only the total.)
  */
-export function lineSurcharge(
-  category: string | null,
-  facts: Pick<LineFacts, 'leg' | 'divan' | 'total' | 'specials'>,
-  prices: OptionPrices,
-): { amount: number; parts: SurchargePart[] } {
-  const cat = (category ?? '').toUpperCase()
-  const pairs: Array<[string, string | null]> =
-    cat === 'BEDFRAME'
-      ? [
-          ['bedframe_divan_heights', facts.divan],
-          ['bedframe_leg_heights', facts.leg],
-          ['bedframe_total_heights', facts.total],
-        ]
-      : cat === 'SOFA'
-        ? [['sofa_leg_heights', facts.leg]]
-        : []
-  if (pairs.length === 0) return { amount: 0, parts: [] }
-
-  const parts: SurchargePart[] = []
-  for (const [pool, value] of pairs) {
-    if (value === null) continue
-    parts.push({ pool, value, price: prices.get(pool, value) })
+export function sofaSetCharges(lines: readonly SofaSetLine[], prices: OptionPrices): SofaSetCharge[] {
+  const groups = new Map<string, SofaSetLine[]>()
+  for (const l of lines) {
+    if (!(l.qty > 0)) continue
+    groups.set(l.group, [...(groups.get(l.group) ?? []), l])
   }
-  const specialsPool = cat === 'BEDFRAME' ? 'bedframe_specials' : 'sofa_specials'
-  for (const sp of facts.specials) {
-    parts.push({ pool: specialsPool, value: sp, price: prices.get(specialsPool, sp) })
+  const out: SofaSetCharge[] = []
+  for (const [group, members] of groups) {
+    const parts: ChargePart[] = []
+    const seen = new Set<string>()
+    const add = (pool: ChargedPool, value: string | null) => {
+      const k = valueKey(value)
+      if (k === null || seen.has(`${pool}\u0000${k}`)) return
+      seen.add(`${pool}\u0000${k}`)
+      const price = prices.get(pool, value)
+      if (price === null || !(price > 0)) return
+      parts.push({ pool, value: value!.trim(), price })
+    }
+    for (const m of members) add('sofa_leg_heights', m.leg)
+    for (const m of members) for (const sp of m.specials) add('sofa_specials', sp)
+    const unit = parts.reduce((a, p) => a + p.price, 0)
+    if (!(unit > 0)) continue
+    const sets = Math.max(1, Math.floor(Math.min(...members.map(m => m.qty))))
+    out.push({ group, sets, unit, total: roundCents(unit * sets), parts })
   }
-  const amount = parts.reduce((a, p) => a + (p.price ?? 0), 0)
-  return { amount, parts }
+  return out
 }
 
 /**

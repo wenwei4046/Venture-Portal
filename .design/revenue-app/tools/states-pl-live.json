@@ -1,0 +1,34 @@
+[
+  { "name": "pl-sku", "path": "/member/products", "w": 1440, "h": 900, "settle": 4000
+  },
+  { "name": "pl-sku-sofa", "path": "/member/products", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button:has-text('Sofa')"   } ]
+  },
+  { "name": "pl-sku-edit", "path": "/member/products", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button:has-text('Edit prices')"   } ]
+  },
+  { "name": "pl-modular", "path": "/member/products?tab=modular", "w": 1440, "h": 900, "settle": 4000
+  },
+  { "name": "pl-modular-open", "path": "/member/products?tab=modular", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button[aria-label^='Configure']",     "wait": 1200   } ]
+  },
+  { "name": "pl-maintenance", "path": "/member/products?tab=maintenance", "w": 1440, "h": 900, "settle": 4000
+  },
+  { "name": "pl-maintenance-fabrics", "path": "/member/products?tab=maintenance", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button:has-text('Fabrics')"   } ]
+  },
+  { "name": "pl-combos", "path": "/member/products?tab=combos", "w": 1440, "h": 900, "settle": 4000
+  },
+  { "name": "pl-combos-new", "path": "/member/products?tab=combos", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button:has-text('+ Add combo')",     "wait": 1000   } ]
+  },
+  { "name": "pl-gaps", "path": "/member/products?tab=gaps", "w": 1440, "h": 900, "settle": 5000
+  },
+  { "name": "pl-costing", "path": "/member/products?tab=costing", "w": 1440, "h": 900, "settle": 4000
+  },
+  { "name": "pl-costing-edit", "path": "/member/products?tab=costing", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button:has-text('Edit ratios')"   } ]
+  },
+  { "name": "pl-kpi", "path": "/member/products?tab=kpi", "w": 1440, "h": 900, "settle": 4000
+  },
+  { "name": "pl-kpi-edit", "path": "/member/products?tab=kpi", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button:has-text('Edit items')"   } ]
+  },
+  { "name": "pl-module-menu", "path": "/member/products", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button[aria-label='Switch module']"   } ]
+  },
+  { "name": "pl-combos-edit", "path": "/member/products?tab=combos", "w": 1440, "h": 900, "settle": 4000, "actions": [   {     "click": "button:has-text('Edit prices')"   },   {     "click": "button[aria-label^='Remove']",     "wait": 600   } ]
+  }
+]

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
@@ -69,7 +70,7 @@ export default async function InvoiceRequestsPage() {
                       {r.description}
                     </div>
                     <div className="font-mono text-xs text-muted mt-0.5">
-                      Submitted by {submitter} · {dayjs(r.requested_at).format('D MMM HH:mm')}
+                      Submitted by {submitter} · {officeTime(r.requested_at).format('D MMM HH:mm')}
                     </div>
                   </div>
                   <div className="text-right shrink-0">

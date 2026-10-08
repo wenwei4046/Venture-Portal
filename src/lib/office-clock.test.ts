@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getGreeting, officeClock, officeDate } from './office-clock'
+import { getGreeting, officeClock, officeDate, officeStamp } from './office-clock'
 
 /**
  * Every case here is a moment where UTC and Kuala Lumpur disagree — which is
@@ -78,5 +78,26 @@ describe('officeDate', () => {
     expect(officeDate(new Date('2026-09-26T15:59:00Z'))).toBe('2026-09-26')
     expect(officeDate(new Date('2026-09-26T16:00:00Z'))).toBe('2026-09-27')
     expect(officeDate(new Date('2026-12-31T16:30:00Z'))).toBe('2027-01-01')
+  })
+})
+
+describe('officeStamp', () => {
+  // The production case: a voucher made at 12:47 in the office read 04:47 on
+  // its own page, because the page is rendered on a server that keeps UTC.
+  it('prints the office time, not the server time', () => {
+    expect(officeStamp('2026-10-02T04:47:41.516791+00:00')).toBe('2 Oct 2026 · 12:47')
+    expect(officeStamp(new Date('2026-09-29T03:54:53Z'))).toBe('29 Sep 2026 · 11:54')
+  })
+  it('rolls the date with the office, and writes midnight as 00', () => {
+    expect(officeStamp('2026-12-31T16:00:00Z')).toBe('1 Jan 2027 · 00:00')
+    expect(officeStamp('2026-09-30T15:59:00Z')).toBe('30 Sep 2026 · 23:59')
+  })
+  it('can leave the year out', () => {
+    expect(officeStamp('2026-10-02T04:51:35Z', { year: false })).toBe('2 Oct · 12:51')
+  })
+  it('is a dash for nothing, or for something that is not a time', () => {
+    expect(officeStamp(null)).toBe('—')
+    expect(officeStamp('')).toBe('—')
+    expect(officeStamp('not a date')).toBe('—')
   })
 })

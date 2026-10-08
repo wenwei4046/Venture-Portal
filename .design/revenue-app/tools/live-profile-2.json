@@ -1,0 +1,31 @@
+[
+ {
+  "name": "brandweeks-ethan-live",
+  "path": "/member?page=account&view=brandWeeks&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 12000,
+  "dump": "document.querySelector('main')?.innerText.slice(0, 1800)"
+ },
+ {
+  "name": "brandweeks-ethan-live-scrolled",
+  "path": "/member?page=account&view=brandWeeks&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 12000,
+  "actions": [{ "eval": "document.querySelector('main').scrollTop=900" }]
+ },
+ {
+  "name": "scheme-ethan-live",
+  "path": "/member?page=account&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 6000,
+  "actions": [{ "click": "button:has-text('Commission scheme')", "wait": 1200 }],
+  "dump": "document.querySelector('[role=dialog]')?.innerText.slice(0, 1500) ?? 'no dialog'"
+ },
+ {
+  "name": "income-ethan-aug",
+  "path": "/member?page=account&view=income&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995",
+  "settle": 15000,
+  "actions": [
+   { "click": "main button:has-text('2026')", "wait": 1200 },
+   { "click": "[role=dialog] button:has-text('Aug')", "wait": 15000 }
+  ],
+  "dump": "document.querySelector('main')?.innerText.slice(0, 1400)"
+ }
+]

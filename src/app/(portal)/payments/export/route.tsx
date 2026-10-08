@@ -1,13 +1,16 @@
 import React from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
-import { fetchAllRows } from '@/lib/paginate'
+import { requireAction } from '@/lib/auth'
+import { canSeePayrollPayouts } from '@/lib/roles'
+import { filterLockedBatches, isPayrollReference, lockPayrollBatches } from '@/lib/payroll-vouchers'
+import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { fetchReceiptExtras, filterReceiptExtras } from '@/lib/receipt-extras'
 import { fetchPaymentExtras } from '@/lib/payment-extras'
 import { buildVouchersXlsx } from './_format/xlsx'
 import { VouchersPdf } from './_format/pdf'
 import dayjs from 'dayjs'
+import { officeDay, officeTime } from '@/lib/office-time'
 import type { Database } from '@/lib/supabase/database.types'
 
 type PaymentVoucher = Database['public']['Tables']['payment_vouchers']['Row']
@@ -34,7 +37,8 @@ const POOL_LABELS: Record<string, string> = {
 }
 
 export async function GET(req: Request) {
-  await requirePermission('treasury')
+  const user = await requireAction('treasury', 'export')
+  const seesPayroll = canSeePayrollPayouts(user)
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 
@@ -65,10 +69,15 @@ export async function GET(req: Request) {
   const sourcesByVoucher = new Map<string, string[]>()
   const categoriesByVoucher = new Map<string, string[]>()
   {
-    const { data: srcs } = await supabase
-      .from('payment_voucher_sources')
-      .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
-      .order('amount', { ascending: false })
+    // Every source row, as the page reads them (VoucherLedger, 2026-10-08):
+    // as written while under PostgREST's 1000-row cap, paged once it is not.
+    const srcs = await fetchAllRowsAsWritten((page) => {
+      const q = supabase
+        .from('payment_voucher_sources')
+        .select('voucher_id, pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
+        .order('amount', { ascending: false })
+      return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+    }).catch(() => null)
 
     for (const s of (srcs ?? []) as Array<{
       voucher_id: string
@@ -93,9 +102,17 @@ export async function GET(req: Request) {
 
   const all = vouchers ?? []
   const tab = statusFilter ?? 'all'
+  const filters = { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter }
+
+  // Without Payroll payouts the file carries payroll the way the page shows
+  // it: one total per batch and none of its vouchers (lib/payroll-vouchers.ts).
+  const open = seesPayroll ? all : all.filter((v) => !isPayrollReference(v.reference_type))
+  const lockedBatches = seesPayroll
+    ? []
+    : filterLockedBatches(lockPayrollBatches(all.filter((v) => isPayrollReference(v.reference_type))), filters)
 
   // Apply all filters in-memory (same logic as page)
-  const filtered = all.filter((v) => {
+  const filtered = open.filter((v) => {
     if (tab !== 'all' && v.status !== tab) return false
     if (typeFilter && v.voucher_type !== typeFilter) return false
     if (poolFilter) {
@@ -106,8 +123,11 @@ export async function GET(req: Request) {
         if (!poolList || !poolList.includes(poolFilter)) return false
       }
     }
-    if (fromFilter && dayjs(v.created_at).isBefore(dayjs(fromFilter), 'day')) return false
-    if (toFilter && dayjs(v.created_at).isAfter(dayjs(toFilter), 'day')) return false
+    // The day it was made in the office — on the server's clock (UTC) a voucher
+    // made before 08:00 fell on the day before and slipped out of the range.
+    const madeOn = dayjs(officeTime(v.created_at).format('YYYY-MM-DD'))
+    if (fromFilter && madeOn.isBefore(dayjs(fromFilter), 'day')) return false
+    if (toFilter && madeOn.isAfter(dayjs(toFilter), 'day')) return false
     if (minFilter !== null && Number(v.amount) < minFilter) return false
     if (maxFilter !== null && Number(v.amount) > maxFilter) return false
     if (qFilter) {
@@ -142,7 +162,7 @@ export async function GET(req: Request) {
       raw,
       row: {
         voucher_no: v.voucher_no,
-        date: dayjs(raw).format('DD/MM/YYYY'),
+        date: officeDay(raw).format('DD/MM/YYYY'),
         direction: v.direction as 'credit' | 'debit',
         type: v.voucher_type,
         status: v.status,
@@ -154,6 +174,24 @@ export async function GET(req: Request) {
     }
   })
 
+  for (const b of lockedBatches) {
+    dated.push({
+      raw: b.latest,
+      row: {
+        voucher_no: null,
+        date: officeDay(b.latest).format('DD/MM/YYYY'),
+        direction: 'debit',
+        type: 'payroll',
+        status: b.statusText,
+        payee_name: `${b.label} (${b.count} voucher${b.count === 1 ? '' : 's'}, total only)`,
+        amount: b.total,
+        catLabel: 'Payroll',
+        poolLabel: '—',
+      },
+    })
+  }
+  if (lockedBatches.length > 0) dated.sort((a, b) => new Date(b.raw).getTime() - new Date(a.raw).getTime())
+
   // Exports mirror their pages: outside-the-voucher-flow rows ride along,
   // deduped and filtered by the same rules. Receipts: direct loan repayments +
   // Fund IN capital. Payments: direct fund-source repayments + Loan OUT
@@ -162,7 +200,7 @@ export async function GET(req: Request) {
     const isCredit = directionFilter === 'credit'
     const extras = filterReceiptExtras(
       isCredit ? await fetchReceiptExtras(supabase) : await fetchPaymentExtras(supabase),
-      { tab, typeFilter, poolFilter, fromFilter, toFilter, minFilter, maxFilter, qFilter },
+      filters,
     )
     for (const r of extras) {
       dated.push({
@@ -187,7 +225,7 @@ export async function GET(req: Request) {
 
   const rows: VoucherExportRow[] = dated.map((d) => d.row)
 
-  const filename = `payment-vouchers-${dayjs().format('YYYYMMDD')}`
+  const filename = `payment-vouchers-${officeTime().format('YYYYMMDD')}`
 
   if (format === 'xlsx') {
     return exportXlsxResponse({ filename, buffer: buildVouchersXlsx(rows) })

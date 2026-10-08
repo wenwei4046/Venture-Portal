@@ -8,6 +8,8 @@ import {
   draftsDiffer,
   newDraft,
   normalisePayLine,
+  editableLines,
+  claimLines,
   parsePayLineAmount,
   payLineLabel,
   payLineTotals,
@@ -17,8 +19,8 @@ import {
   type PayLine,
 } from './revenue-pay-lines'
 
-const claim: PayLine = { id: 'a', kind: 'special_claim', description: 'Petrol, Penang fair', amount: 500, version: 1 }
-const advance: PayLine = { id: 'b', kind: 'deduction', description: 'Salary advance', amount: 200, version: 3 }
+const claim: PayLine = { id: 'a', kind: 'special_claim', description: 'Petrol, Penang fair', amount: 500, version: 1, claimId: null }
+const advance: PayLine = { id: 'b', kind: 'deduction', description: 'Salary advance', amount: 200, version: 3, claimId: null }
 
 describe('the kinds', () => {
   it('are the four the table allows, in the dropdown’s order, and only one takes money off', () => {
@@ -46,13 +48,34 @@ describe('payLineTotals', () => {
 describe('normalisePayLine', () => {
   it('reads PostgREST’s NUMERIC string and drops a blank description', () => {
     expect(normalisePayLine({ id: 'a', staff_id: 's', kind: 'allowance', description: '  ', amount: '120.50', version: 2 }))
-      .toEqual({ id: 'a', staffId: 's', kind: 'allowance', description: null, amount: 120.5, version: 2 })
+      .toEqual({ id: 'a', staffId: 's', kind: 'allowance', description: null, amount: 120.5, version: 2, claimId: null })
   })
 
   it('refuses a row that is not a pay line rather than counting it as nothing', () => {
     expect(() => normalisePayLine({ id: 'a', staff_id: 's', kind: 'bonus', amount: '5' })).toThrow()
     expect(() => normalisePayLine({ id: 'a', staff_id: 's', kind: 'allowance', amount: 'x' })).toThrow()
     expect(() => normalisePayLine(null)).toThrow()
+  })
+})
+
+describe('a line an approved claim put there (2026-10-08)', () => {
+  const fromClaim: PayLine = { id: 'c', kind: 'special_claim', description: 'RQ-2609-004 · Airbnb · 2 pax × 1 night', amount: 220, version: 1, claimId: 'claim-1' }
+
+  it('carries its claim from the row', () => {
+    expect(normalisePayLine({ id: 'c', staff_id: 's', kind: 'special_claim', amount: '220.00', version: 1, claim_id: 'claim-1' }).claimId).toBe('claim-1')
+  })
+
+  it('is never one the editor may change', () => {
+    expect(editableLines([claim, fromClaim, advance])).toEqual([claim, advance])
+    expect(claimLines([claim, fromClaim, advance])).toEqual([fromClaim])
+  })
+
+  it('still counts in the month’s pay', () => {
+    expect(payLineTotals([claim, fromClaim, advance])).toEqual({ earnings: 720, deductions: 200 })
+  })
+
+  it('is in what the editor opened, so a save made before the claim landed is stale', () => {
+    expect(seenOf([claim, fromClaim])).toEqual(['a:1', 'c:1'])
   })
 })
 

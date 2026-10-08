@@ -3,13 +3,16 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parseLineFacts } from './facts'
 import {
+  CHARGED_POOLS,
   gridPrice,
   isPricedPool,
-  lineSurcharge,
+  lineCharge,
   OptionPrices,
+  poolPriceOf,
   POOLS,
   priceGridOf,
   roundCents,
+  sofaSetCharges,
   TIERS,
   unitPrice,
   type OptionPrice,
@@ -17,9 +20,10 @@ import {
 } from './pricing'
 
 /**
- * The twins of catalogue_grid_price, catalogue_unit_price,
- * catalogue_option_price and catalogue_line_surcharge (migration
- * 20260924030000 §6–§8). Every expectation in the agreeing blocks is what the
+ * The twins of catalogue_grid_price, catalogue_unit_price and
+ * catalogue_option_price (migration 20260924030000 §6–§8), catalogue_line_charge
+ * and the sofa's once-a-set charge of catalogue_apply_sofa_charges
+ * (20261006050000). Every expectation in the agreeing blocks is what the
  * SQL returned for the same input (the migration loaded verbatim into PGlite).
  * `it.fails` marks an input the twins answer differently: the assertion is the
  * SQL's answer.
@@ -190,9 +194,24 @@ describe('unitPrice — catalogue_unit_price', () => {
   })
 })
 
-describe('isPricedPool / POOLS / TIERS', () => {
-  it('gaps and seat sizes carry no price; every other pool does', () => {
-    expect(POOLS.filter(p => !isPricedPool(p))).toEqual(['bedframe_gaps', 'sofa_sizes'])
+describe('isPricedPool / poolPriceOf / POOLS / TIERS', () => {
+  it('a sofa’s seat sizes carry no price; every other pool does', () => {
+    expect(POOLS.filter(p => !isPricedPool(p))).toEqual(['sofa_sizes'])
+  })
+
+  // 2026-10-06 (user): "我要那些价钱是不会算进 margin 的" — every price keyed on Maintenance is the customer's.
+  it('every priced pool is charged to the customer; none is a cost', () => {
+    expect(POOLS.map(p => [p, poolPriceOf(p)])).toEqual([
+      ['bedframe_divan_heights', 'charge'],
+      ['bedframe_total_heights', 'charge'],
+      ['bedframe_gaps', 'charge'],
+      ['bedframe_leg_heights', 'charge'],
+      ['bedframe_specials', 'charge'],
+      ['sofa_sizes', null],
+      ['sofa_leg_heights', 'charge'],
+      ['sofa_specials', 'charge'],
+    ])
+    expect([...CHARGED_POOLS].sort()).toEqual(POOLS.filter(p => p !== 'sofa_sizes').sort())
   })
 
   it('POOLS is exactly the pool list erp_maintenance_options allows', () => {
@@ -245,7 +264,7 @@ describe('OptionPrices — catalogue_option_price', () => {
     expect(prices.get('sofa_specials', 'Right Drawer (10")')).toBe(70)
   })
 
-  it('a negative surcharge is kept — the ERP’s No Side Panel takes RM 40 off', () => {
+  it('reads a price as stored — a negative one too, though the table refuses one since 2026-10-06', () => {
     expect(prices.get('bedframe_specials', 'No Side Panel')).toBe(-40)
   })
 
@@ -261,67 +280,75 @@ describe('OptionPrices — catalogue_option_price', () => {
   })
 })
 
-describe('lineSurcharge — catalogue_line_surcharge', () => {
-  it('a bed frame: divan, leg and total height, then each special — in that order', () => {
-    const facts = { divan: '10”', leg: 'NO LEG', total: '24"', specials: ['Right Drawer (10")', 'No Side Panel', 'Unknown'] }
-    expect(lineSurcharge('BEDFRAME', facts, prices)).toEqual({
-      amount: 60,
+describe('lineCharge — catalogue_line_charge', () => {
+  /** The dry run's prices (20261005010000 / 20261006050000). */
+  const charged = new OptionPrices([
+    { pool: 'bedframe_leg_heights', value: '6"', price: 100 },
+    { pool: 'bedframe_divan_heights', value: '12"', price: 50 },
+    { pool: 'bedframe_gaps', value: '12"', price: 20 },
+    { pool: 'bedframe_gaps', value: '4"', price: 0 },
+    { pool: 'bedframe_total_heights', value: '30"', price: 40 },
+    { pool: 'bedframe_specials', value: 'Right Drawer', price: 50 },
+    { pool: 'bedframe_specials', value: 'HYDRAULIC', price: 300 },
+    { pool: 'sofa_leg_heights', value: '6"', price: 100 },
+    { pool: 'sofa_leg_heights', value: 'Default', price: 0 },
+    { pool: 'sofa_specials', value: 'Nylon Fabric', price: 50 },
+  ])
+  const none = { divan: null, leg: null, gap: null, total: null, specials: [] as string[] }
+
+  it('a bed frame: divan, leg, gap and total height priced above zero, in that order', () => {
+    const facts = parseLineFacts('NB-04 / DIVAN 12" + LEG 6" / GAP 12" / T.Heights 30"')
+    expect(lineCharge('BEDFRAME', facts, charged)).toEqual({
+      amount: 210,
       parts: [
-        { pool: 'bedframe_divan_heights', value: '10”', price: 30 },
-        { pool: 'bedframe_leg_heights', value: 'NO LEG', price: 0 },
-        { pool: 'bedframe_total_heights', value: '24"', price: 20 },
-        { pool: 'bedframe_specials', value: 'Right Drawer (10")', price: 50 },
-        { pool: 'bedframe_specials', value: 'No Side Panel', price: -40 },
-        // No portal price: it adds nothing, and says so.
-        { pool: 'bedframe_specials', value: 'Unknown', price: null },
+        { pool: 'bedframe_divan_heights', value: '12"', price: 50 },
+        { pool: 'bedframe_leg_heights', value: '6"', price: 100 },
+        { pool: 'bedframe_gaps', value: '12"', price: 20 },
+        { pool: 'bedframe_total_heights', value: '30"', price: 40 },
       ],
     })
   })
 
-  it('a sofa: its leg height and specials only — a divan or total height on it is ignored', () => {
-    const facts = { divan: '10"', leg: 'DEFAULT', total: '24"', specials: ['Nylon Fabric'] }
-    expect(lineSurcharge('SOFA', facts, prices)).toEqual({
-      amount: 80,
+  it('an option nobody priced, or priced at 0, is FOC — it is not listed', () => {
+    expect(lineCharge('BEDFRAME', { ...none, divan: '10"', leg: 'No Leg', gap: '4"', total: '24"' }, charged)).toEqual({ amount: 0, parts: [] })
+  })
+
+  it('looks the value up by its folded spelling, as the SQL does', () => {
+    expect(lineCharge('bedframe', { ...none, leg: '6”' }, charged).amount).toBe(100)
+  })
+
+  // 2026-10-06: a bed frame's special is the customer's too — no longer a cost.
+  it('a bed frame’s specials are charged after its heights, a special named twice once', () => {
+    const facts = parseLineFacts('PC151-01 / DIVAN 12" + NO LEG / GAP 14" / SPECIAL: Right Drawer + Hydraulic')
+    expect(lineCharge('BEDFRAME', facts, charged)).toEqual({
+      amount: 400,
       parts: [
-        { pool: 'sofa_leg_heights', value: 'DEFAULT', price: 0 },
-        { pool: 'sofa_specials', value: 'Nylon Fabric', price: 80 },
+        { pool: 'bedframe_divan_heights', value: '12"', price: 50 },
+        { pool: 'bedframe_specials', value: 'Right Drawer', price: 50 },
+        { pool: 'bedframe_specials', value: 'Hydraulic', price: 300 },
       ],
     })
+    expect(lineCharge('BEDFRAME', { ...none, specials: ['Right Drawer', 'RIGHT  DRAWER', 'Unknown'] }, charged).amount).toBe(50)
   })
 
-  it('an option the line does not name is skipped, not reported', () => {
-    expect(lineSurcharge('bedframe', { divan: null, leg: '4"', total: null, specials: [] }, prices)).toEqual({
-      amount: 15,
-      parts: [{ pool: 'bedframe_leg_heights', value: '4"', price: 15 }],
+  it('a sofa line: its leg height and specials — a divan, gap or total height on it is ignored', () => {
+    expect(lineCharge('SOFA', { divan: '12"', leg: '6"', gap: '12"', total: '30"', specials: ['Nylon Fabric', 'Wooden Arm'] }, charged)).toEqual({
+      amount: 150,
+      parts: [
+        { pool: 'sofa_leg_heights', value: '6"', price: 100 },
+        { pool: 'sofa_specials', value: 'Nylon Fabric', price: 50 },
+      ],
     })
+    expect(lineCharge('SOFA', { ...none, leg: 'DEFAULT' }, charged)).toEqual({ amount: 0, parts: [] })
   })
 
-  it('a gap never adds anything', () => {
-    const facts = parseLineFacts('NB-04 / DIVAN 10" + LEG 4" / GAP 12" / T.Heights 24"')
-    const r = lineSurcharge('BEDFRAME', facts, prices)
-    expect(r.parts.map(p => p.pool)).toEqual(['bedframe_divan_heights', 'bedframe_leg_heights', 'bedframe_total_heights'])
-    expect(r.amount).toBe(65)
-  })
-
-  it('a real bed-frame summary, end to end', () => {
-    const facts = parseLineFacts('PC151-01 / DIVAN 10" + NO LEG / GAP 14" / T.Heights 24"')
-    expect(lineSurcharge('BEDFRAME', facts, prices).amount).toBe(50)
-  })
-
-  it('a surcharge can take money off', () => {
-    expect(lineSurcharge('BEDFRAME', { divan: null, leg: null, total: null, specials: ['No Side Panel'] }, prices).amount).toBe(-40)
-  })
-
-  it.each(['MATTRESS', 'ACCESSORY', '', null])('%j carries no option surcharge', category => {
-    expect(lineSurcharge(category, { divan: '10"', leg: '4"', total: '24"', specials: ['Nylon Fabric'] }, prices)).toEqual({
-      amount: 0,
-      parts: [],
-    })
+  it.each(['MATTRESS', 'ACCESSORY', '', null])('%j is never charged', category => {
+    expect(lineCharge(category, { divan: '12"', leg: '6"', gap: '12"', total: '30"', specials: ['Nylon Fabric', 'Right Drawer'] }, charged)).toEqual({ amount: 0, parts: [] })
   })
 
   it('the category is case-folded but not trimmed, as UPPER(COALESCE(…)) is', () => {
-    expect(lineSurcharge('sofa', { divan: null, leg: '6"', total: null, specials: [] }, prices).amount).toBe(25)
-    expect(lineSurcharge(' SOFA', { divan: null, leg: '6"', total: null, specials: [] }, prices)).toEqual({ amount: 0, parts: [] })
+    expect(lineCharge('sofa', { ...none, leg: '6"' }, charged).amount).toBe(100)
+    expect(lineCharge(' SOFA', { ...none, leg: '6"' }, charged)).toEqual({ amount: 0, parts: [] })
   })
 
   it('sums in floating point; roundCents lands it where the SQL’s NUMERIC does', () => {
@@ -329,9 +356,57 @@ describe('lineSurcharge — catalogue_line_surcharge', () => {
       { pool: 'sofa_specials', value: 'A', price: 0.1 },
       { pool: 'sofa_specials', value: 'B', price: 0.2 },
     ])
-    const r = lineSurcharge('SOFA', { divan: null, leg: null, total: null, specials: ['A', 'B'] }, tenths)
+    const r = lineCharge('SOFA', { ...none, specials: ['A', 'B'] }, tenths)
     expect(r.amount).toBeCloseTo(0.3, 10)
     expect(roundCents(r.amount)).toBe(0.3)
+  })
+})
+
+// 2026-10-06 (user): "整组 sofa 只加一次" — a sofa's options once per sofa, not per piece.
+describe('sofaSetCharges — catalogue_apply_sofa_charges', () => {
+  const p = new OptionPrices([
+    { pool: 'sofa_leg_heights', value: '6"', price: 100 },
+    { pool: 'sofa_leg_heights', value: 'Default', price: 0 },
+    { pool: 'sofa_specials', value: 'Nylon Fabric', price: 50 },
+    { pool: 'sofa_specials', value: 'Wooden Arm', price: 30 },
+  ])
+  const piece = (group: string, qty: number, leg: string | null, specials: string[] = []) => ({ group, qty, leg, specials })
+  const LEG = { pool: 'sofa_leg_heights', value: '6"', price: 100 }
+  const NYLON = { pool: 'sofa_specials', value: 'Nylon Fabric', price: 50 }
+
+  it('three pieces of one sofa are charged once: RM 100 + RM 50 = RM 150, not three times', () => {
+    const lines = [piece('8030', 1, '6"', ['Nylon Fabric']), piece('8030', 1, '6"', ['Nylon Fabric']), piece('8030', 1, '6"', ['Nylon Fabric'])]
+    expect(sofaSetCharges(lines, p)).toEqual([{ group: '8030', sets: 1, unit: 150, total: 150, parts: [LEG, NYLON] }])
+  })
+
+  it('×2 on every piece is two sofas; ×1 / ×2 / ×1 is one sofa with two middle pieces', () => {
+    expect(sofaSetCharges([piece('810', 2, '6"'), piece('810', 2, '6"'), piece('810', 2, '6"')], p)[0]).toMatchObject({ sets: 2, total: 200 })
+    expect(sofaSetCharges([piece('810', 1, '6"'), piece('810', 2, '6"'), piece('810', 1, '6"')], p)[0]).toMatchObject({ sets: 1, total: 100 })
+  })
+
+  it('a special any piece names is the whole sofa’s — Wooden Arm on the two arm pieces is charged once', () => {
+    const lines = [piece('810', 1, null, ['Wooden Arm']), piece('810', 1, null), piece('810', 1, null, ['WOODEN  ARM'])]
+    expect(sofaSetCharges(lines, p)).toEqual([{ group: '810', sets: 1, unit: 30, total: 30, parts: [{ pool: 'sofa_specials', value: 'Wooden Arm', price: 30 }] }])
+  })
+
+  it('two models in one bill are two sofas', () => {
+    const r = sofaSetCharges([piece('810', 1, '6"'), piece('5030', 1, '6"', ['Nylon Fabric'])], p)
+    expect(r.map(s => [s.group, s.total])).toEqual([['810', 100], ['5030', 150]])
+  })
+
+  it('a sofa nothing is charged for is left out: a FOC leg, an unpriced special, nothing named', () => {
+    expect(sofaSetCharges([piece('810', 1, 'Default', ['Seat Firmer']), piece('9050', 1, null)], p)).toEqual([])
+  })
+
+  it('a piece with no quantity is no piece', () => {
+    expect(sofaSetCharges([piece('810', 0, '6"')], p)).toEqual([])
+    // …nor do the options it names count: the sofa is its other pieces.
+    expect(sofaSetCharges([piece('810', 0, '6"'), piece('810', 2, null)], p)).toEqual([])
+    expect(sofaSetCharges([piece('810', 0, '6"'), piece('810', 2, '6"')], p)[0]).toMatchObject({ sets: 2, total: 200 })
+  })
+
+  it('reads values by their folded spelling', () => {
+    expect(sofaSetCharges([piece('810', 1, '6”', ['NYLON FABRIC'])], p)[0].total).toBe(150)
   })
 })
 

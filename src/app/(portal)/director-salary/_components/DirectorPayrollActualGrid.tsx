@@ -508,18 +508,20 @@ function ExpandedPair({ label, children }: { label: string; children: React.Reac
   )
 }
 
-export function DirectorPayrollEmptyState({ period }: { period: string }) {
+export function DirectorPayrollEmptyState({ period, canImport = true }: { period: string; canImport?: boolean }) {
   return (
     <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
       <p className="text-sm mb-3">
         No director payroll imported for this month yet.
       </p>
-      <Link
-        href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
-        className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-      >
-        Import InfoTech →
-      </Link>
+      {canImport ? (
+        <Link
+          href={`/director-salary/import?period=${dayjs(period).format('YYYY-MM')}`}
+          className="inline-block bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
+        >
+          Import InfoTech →
+        </Link>
+      ) : null}
     </div>
   )
 }

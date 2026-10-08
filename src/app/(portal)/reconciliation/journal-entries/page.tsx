@@ -1,23 +1,39 @@
 import Link from 'next/link'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
+import { fetchAllRows, fetchAllRowsAsWritten } from '@/lib/paginate'
 import JvList, { type JvRow } from './_components/JvList'
 
 export default async function JournalEntriesPage() {
-  await requirePermission('reconciliation')
+  const user = await requirePermission('reconciliation')
+  // A new voucher (or a copy) is raised; Edit and Delete change one (2026-10-08, PR2).
+  const canCreate = canDo(user, 'reconciliation', 'create')
+  const canEdit = canDo(user, 'reconciliation', 'edit')
   const supabase = await createClient()
 
   // Manual journal vouchers + the auto payroll accrual JVs (user 2026-08-07:
   // "为什么我看没有的" — the auto ones must show HERE where Finance reviews
   // salary JVs; they render read-only with an AUTO badge). Reversed vouchers
   // stay hidden.
-  const { data: entries } = await supabase
-    .from('journal_entries')
-    .select('*')
-    .in('reference_type', ['manual_jv', 'payroll_accrual'])
-    .eq('is_reversed', false)
-    .order('transaction_date', { ascending: false })
-    .order('created_at', { ascending: false })
+  //
+  // Every one of them, and every line (2026-10-08): both reads are whole
+  // history, and PostgREST stops an unranged read at 1000 rows without a word.
+  // The lines had passed it (1,887 on 2026-10-08), so every voucher whose
+  // lines fell past the first 1000 showed too few — or "0 lines". The list
+  // keeps its own order while it fits (fetchAllRowsAsWritten: two vouchers of
+  // one date and moment tie); the counts only need every line. A failed read
+  // still shows none, as before.
+  const entries = await fetchAllRowsAsWritten((page) => {
+    const q = supabase
+      .from('journal_entries')
+      .select('*')
+      .in('reference_type', ['manual_jv', 'payroll_accrual'])
+      .eq('is_reversed', false)
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+    return page ? q.order('id', { ascending: true }).range(page.from, page.to) : q
+  }).catch(() => null)
 
   const entryList = entries ?? []
 
@@ -25,11 +41,15 @@ export default async function JournalEntriesPage() {
   // silently, so every row showed "0 lines". Filtered through the JE join
   // instead of .in('entry_id', ids) — a long id list in the URL 400s once
   // the JV history grows (the 2026-08-13 Ledger failure class).
-  const { data: allLines } = await supabase
-    .from('journal_lines')
-    .select('entry_id, journal_entries!inner(reference_type, is_reversed)')
-    .in('journal_entries.reference_type', ['manual_jv', 'payroll_accrual'])
-    .eq('journal_entries.is_reversed', false)
+  const allLines = await fetchAllRows((lo, hi) =>
+    supabase
+      .from('journal_lines')
+      .select('entry_id, journal_entries!inner(reference_type, is_reversed)')
+      .in('journal_entries.reference_type', ['manual_jv', 'payroll_accrual'])
+      .eq('journal_entries.is_reversed', false)
+      .order('id', { ascending: true })
+      .range(lo, hi),
+  ).catch(() => null)
 
   const lineCounts = new Map<string, number>()
   for (const line of allLines ?? []) {
@@ -66,12 +86,14 @@ export default async function JournalEntriesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/reconciliation/journal-entries/new"
-            className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
-          >
-            + New Entry
-          </Link>
+          {canCreate ? (
+            <Link
+              href="/reconciliation/journal-entries/new"
+              className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
+            >
+              + New Entry
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -92,7 +114,7 @@ export default async function JournalEntriesPage() {
           </p>
         </div>
       ) : (
-        <JvList rows={rows} />
+        <JvList rows={rows} canCreate={canCreate} canEdit={canEdit} />
       )}
     </div>
   )

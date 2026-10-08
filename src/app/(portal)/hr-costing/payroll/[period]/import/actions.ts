@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction, requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import type { InfotechRow } from '@/lib/import/infotech-payroll'
 import { buildStaffMatcher, type StaffMatchedBy } from '@/lib/import/staff-match'
@@ -150,7 +150,7 @@ export async function applyInfotechImport(
   rows: InfotechRow[],
   period: string,
 ): Promise<{ updated: number; created: number; skipped: number; failed: number }> {
-  const user = await requirePermission('hr_costing')
+  const user = await requireAction('hr_costing', 'create')
   const supabase = await createClient()
   await assertPeriodOpen(supabase, period)
   const preview = await previewInfotechImport(rows, period)

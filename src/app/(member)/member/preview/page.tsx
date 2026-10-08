@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { ResolvingViewport, Viewport } from "next";
 import { getUser } from "@/lib/auth";
@@ -10,6 +11,10 @@ import InsightDesignReview from "@/components/member/design-preview/InsightDesig
 import ArenaDesignReview from "@/components/member/design-preview/ArenaDesignReview";
 import ArenaDesignPreview from "@/components/member/design-preview/ArenaDesignPreview";
 import type { AdminMemberData } from "@/lib/member/server";
+import RevenueApp from "@/components/member/app/RevenueApp";
+import AppError from "@/components/member/app/shell/AppError";
+import AppLoading from "@/components/member/app/shell/AppLoading";
+import { protoData, protoFixture } from "@/components/member/app/fixtures/proto";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Revenue · Mobile & Desktop Preview" };
@@ -40,6 +45,12 @@ export default async function MemberPreview({
     design?: string;
     view?: string;
     role?: string;
+    /** `proto`: the app on the prototype's data; `loading` / `error`: what /member shows while it loads / when it cannot. */
+    app?: string;
+    brand?: string;
+    sheet?: string;
+    /** `1`: the fixture's bed frames carry charged options (2026-10-05). */
+    charges?: string;
   }>;
 }) {
   if (process.env.NODE_ENV !== "development") {
@@ -47,6 +58,17 @@ export default async function MemberPreview({
     if (!user || !["principal", "hr"].includes(user.role)) notFound();
   }
   const params = await searchParams;
+  // The rebuilt app on the prototype's own content, drawn in the prototype's
+  // device frame — laid over a screenshot of the prototype to compare.
+  if (params.app === "proto") {
+    const device = params.device === "android" || params.device === "desktop" ? params.device : "ios";
+    const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => typeof e[1] === "string")).toString();
+    return <RevenueApp initialData={protoData({ principal: params.role === "principal" })} initialSearch={search ? `?${search}` : ""} device={device} today="2026-10-03" fixture={protoFixture({ brand: params.brand, sheet: params.sheet, charges: params.charges === "1" })} />;
+  }
+  // What /member shows while it loads (loading.tsx) or when it cannot (error.tsx), held on
+  // screen: `&page=` picks the tab.
+  if (params.app === "loading") return <Suspense><AppLoading /></Suspense>;
+  if (params.app === "error") return <Suspense><AppError digest="1234567890" /></Suspense>;
   if (params.design === "live") {
     const preview = memberDemo();
     if (params.role === "principal") {

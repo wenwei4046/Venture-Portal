@@ -64,6 +64,33 @@ yesterday, one begun today changed or deleted where it stands, another
 sub-department's row refused). Run only these checks with
 `npm run test:kpi-add-ons --prefix tests/member-sql`.
 
+The default command ends with `validate-app-audit.mjs` (the app-wide history,
+2026-10-08). It applies `20261008190000` verbatim over PR1's `audit_events` and
+trigger (its md5 is the migration's guard), the old `config_audit_log` with rows
+and the triggers that wrote it, and one table of each kind the register sorts.
+Its 96 checks cover the register (people-only tables fire for a signed-in
+person only, a table left out says why, a stray trigger on one is switched
+off), the old log folded in (rows copied, one group per old save, its triggers
+switched off — nothing dropped), who is recorded (a person, the server naming
+its person, the database), what is kept (no-op and updated_at-only saves are
+not; wide tables keep what changed; the ERP's raw document is never copied),
+a payroll voucher's family needing Payroll payouts, and reading by the reader's
+own permissions — tables by `read_keys`, salary / NRIC / bank blanked by
+`current_sensitive_fields()`, filters and pages. Run only these checks with
+`npm run test:app-audit --prefix tests/member-sql`.
+
+The default command ends with `validate-permission-actions.mjs` (each action
+takes effect, 2026-10-08). Over PR1's world and migrations plus the audit
+migration it applies `20261008200000` verbatim; its 36 checks hold the shared
+accounts to exactly their keys' actions (the Principal everything, Finance no
+Treasury · Approve, HR the titles and ladder but no logins, a department
+manager at Dept), a titled person to exactly their template's cells with their
+own cells over them, `has_action()` to the reach asked and to the keys that
+open the function's pages (a Director's Approve waits for the Approvals key,
+HR Costing without Salary amounts edits nothing), and nobody, a disabled login
+and the publishable key to nothing. Run only these checks with
+`npm run test:permission-actions --prefix tests/member-sql`.
+
 Expected final output:
 
 ```text
@@ -131,3 +158,32 @@ cap alongside complete totals. Recent Income lists retain their source-month
 window while sharing each order's sales and goods-margin calculation.
 
 Auth/users, payroll and Storage scaffolding are synthetic. Selected existing Revenue migrations and every new member migration execute from repository files. This is not a full replay of the entire production migration history, a hosted Storage integration test or a multi-connection concurrency test. See [the verification handoff](../../docs/member-verification.md#sql-verification-record) for the numbered assertions, boundaries and remaining deployment checks.
+
+The default command ends with `validate-definer-login.mjs` (security,
+2026-10-09). It builds production's `current_user_role()` byte for byte with
+Supabase's own default grants, a writer and a reader guarded the way ~60
+production functions were (`IF v_role NOT IN (…)`), a row policy's helper, a
+trigger and a server-only function; shows the hole first (the publishable key,
+a sign-in with no portal account and a switched-off account all pass the
+guard), then applies `20261009000100` verbatim. Its 26 checks: the publishable
+key calls no DEFINER function but the policy helpers (which answer "nobody"),
+a sign-in without an active account is refused everywhere, an active account
+and the service role notice nothing, a trigger and a server-only function keep
+their grants, a function made later is never anon's, and a second run is a
+no-op. Run only these checks with
+`npm run test:definer-login --prefix tests/member-sql`.
+
+`validate-permission-actions.mjs` also covers approvals by domain
+(`20261009010000`, 2026-10-09): after the security hotfix it builds the
+approval world (request types, requests, payroll runs, loans, bank accounts)
+and the ten approval functions as stand-ins carrying production's exact role
+check, shows a Checker approving nothing before, then applies the migration
+twice (the second run a no-op). Its 29 further checks: hr@ no longer says it
+approves payroll runs and the Principal still holds all three through the
+queue's key; the shared accounts decide nothing; a Finance · Checker decides
+Treasury's requests — a Maker's voucher, a loan with its voucher, a booked
+loan only behind its approved cancellation — never their own, never in
+somebody else's name, never a group holding a payroll run; a Director decides
+everything in the queue; the Executive office reads it and decides nothing;
+row policies keep a Checker off their own request and hr@ off bank balances;
+with no sign-in the old Principal-only rule stands.

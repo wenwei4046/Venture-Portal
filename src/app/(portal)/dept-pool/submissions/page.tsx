@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import { requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
 import { executeHrCosting } from '../../hr-costing/actions'
@@ -91,7 +93,7 @@ export default async function PastMonthSubmissionsPage() {
                       {dayjs(sub.period_month).format('MMMM YYYY')}
                     </div>
                     <div className="font-mono text-xs text-muted mt-1">
-                      Submitted {dayjs(sub.submitted_at).format('D MMM YYYY · HH:mm')}
+                      Submitted {officeTime(sub.submitted_at).format('D MMM YYYY · HH:mm')}
                       {sub.submitted_by_name && ` · ${sub.submitted_by_name}`}
                     </div>
                   </div>
@@ -102,7 +104,7 @@ export default async function PastMonthSubmissionsPage() {
                     <span className="statement-amount compact text-num-ink">
                       {formatMoney(total)}
                     </span>
-                    {(user.role === 'finance' || user.role === 'principal') && sub.execution_state === 'approved_for_execution' && (
+                    {canDo(user, 'treasury', 'edit') && sub.execution_state === 'approved_for_execution' && (
                       <form action={executeHrCosting}>
                         <input type="hidden" name="id" value={sub.id} />
                         <button

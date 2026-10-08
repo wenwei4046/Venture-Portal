@@ -142,8 +142,10 @@ function priceAt(combo: PricedCombo, height: string): number | null {
 
 /**
  * The combo a build is costed at, or null. Candidates are live combos of the
- * same base model whose tier is the build's (or any), that the build covers,
- * and that the portal priced at this seat height. A tier-specific combo beats
+ * same base model whose tier is the build's (or any), that are EXACTLY the
+ * build — every piece fills one of their slots, nothing more, nothing less
+ * (2026-10-08, user: 完全一样才算; the ERP took a combo the build merely
+ * covered) — and that the portal priced at this seat height. A tier-specific combo beats
  * an any-tier one; then the newest effective row, the newest created, the id —
  * the ERP's own tie-breaks.
  *
@@ -157,13 +159,14 @@ export function pickCombo(
   asOf?: string,
 ): ComboHit | null {
   const bm = build.baseModel.trim().toUpperCase()
+  const pieces = build.modules.filter(m => m.trim() !== '').length
   const hits: ComboHit[] = []
   for (const combo of combos) {
     if (combo.baseModel.trim().toUpperCase() !== bm) continue
     if (combo.tier !== null && combo.tier !== build.tier) continue
     if (asOf !== undefined && combo.effectiveFrom > asOf) continue
     const matched = matchComboSlots(build.modules, combo.modules)
-    if (matched === null) continue
+    if (matched === null || matched.length !== pieces) continue
     const price = priceAt(combo, build.height)
     if (price === null) continue
     hits.push({ combo, price, matched })
@@ -178,6 +181,23 @@ export function pickCombo(
       desc(a.combo.erpId, b.combo.erpId),
   )
   return hits[0]
+}
+
+/**
+ * Could ONE build match both combos exactly? The same number of pieces, paired
+ * so each pair shares a module — "1A(R) (LHF or RHF) + 1NA" and
+ * "1A(R)(LHF) + 1NA" collide, "3+2" and "3+2+1" do not. The SQL twin,
+ * `catalogue_combos_collide`, is the same matching run on the slots
+ * themselves; Add combo refuses a set that collides with one the model has.
+ */
+export function combosCollide(a: unknown, b: unknown): boolean {
+  const sa = normaliseComboModules(a)
+  const sb = normaliseComboModules(b)
+  if (sa.length === 0 || sa.length !== sb.length) return false
+  const codes = sb.map((_slot, j) => `b${j}`)
+  const adjacency = sa.map(slot => sb.flatMap((other, j) => (other.some(m => slot.includes(m)) ? [codes[j]] : [])))
+  if (adjacency.some(c => c.length === 0)) return false
+  return matchComboSlots(codes, adjacency) !== null
 }
 
 /**

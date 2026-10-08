@@ -1,0 +1,10 @@
+[
+ { "name": "hr-claim-rates", "path": "/member-admin", "w": 1440, "h": 1100, "settle": 8000,
+   "actions": [{ "click": "button:has-text('Claim rates')", "wait": 6000 }],
+   "dump": "document.querySelector('main')?.innerText.slice(0, 1500)" },
+ { "name": "brandweeks-desk", "path": "/member?page=account&view=brandWeeks&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "w": 1440, "h": 900, "settle": 12000 },
+ { "name": "scheme-desk", "path": "/member?page=account&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "w": 1440, "h": 900, "settle": 8000,
+   "actions": [{ "click": "button:has-text('Commission scheme')", "wait": 1500 }] },
+ { "name": "scheme-phone", "path": "/member?page=account&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 8000,
+   "actions": [{ "click": "button:has-text('Commission scheme')", "wait": 1500 }] }
+]

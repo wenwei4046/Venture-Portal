@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberData, loadMemberInsight, loadMemberOrgMap } from './server'
+import { acknowledgeMemberMemo, calculateMemberQuote, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -25,6 +25,12 @@ const privateProduct = {
 function pricedCatalogue(products: unknown[], extra: Record<string, unknown> = {}) {
   return { data: { products, models: [], optionPrices: [], combos: [], ...extra }, error: null }
 }
+// The service role's two answers to a quote: the priced catalogue, and the
+// scheme's cost rules (`member_quote_cost_rules`, 2026-10-05).
+const RULES = { costDivisor: 1, costRatios: {} }
+function adminAnswers(catalogue: unknown, rules: unknown = RULES) {
+  return (fn: string) => Promise.resolve(fn === 'member_quote_cost_rules' ? { data: rules, error: null } : catalogue)
+}
 function user(overrides: Partial<User> = {}): User {
   return { id: userId, name: 'Principal', email: 'principal@example.com', role: 'principal', is_active: true, created_at: '', updated_at: '', permissions: [], ...overrides }
 }
@@ -41,7 +47,7 @@ beforeEach(() => {
   mocks.getUser.mockResolvedValue(user())
   mocks.createClient.mockResolvedValue({ rpc: mocks.rpc })
   mocks.rpc.mockResolvedValue({ data: snapshot(), error: null })
-  mocks.adminRpc.mockResolvedValue(pricedCatalogue([privateProduct]))
+  mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([privateProduct])))
   mocks.adminClient.mockReturnValue({ rpc: mocks.adminRpc })
 })
 
@@ -94,6 +100,26 @@ describe('Principal Revenue View server boundary', () => {
     expect(mocks.adminClient).not.toHaveBeenCalled()
   })
 
+  // 2026-10-08: every open of the Revenue app waited for the Quote's catalogue (551 ms of the Principal's 610 ms
+  // snapshot, 340 KB of its 480 KB). The first screen asks without it; the Quote reads it on its own.
+  it('asks for the first screen without the Quote catalogue, for the Principal and a member alike', async () => {
+    await loadMemberData({ lite: true })
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_snapshot', { p_full: false })
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal'] }))
+    await loadMemberData({ lite: true })
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_data_snapshot', { p_full: false })
+  })
+
+  it('reads the catalogue from the full snapshot through the same projection — never a cost', async () => {
+    const result = await loadMemberCatalogue()
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_principal_snapshot', undefined)
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.data.products[0]).toMatchObject({ id: productId, code: 'AK-QUEEN' })
+    expect(result.data.products[0]).not.toHaveProperty('cost')
+    expect(result.data.catalogueModels).toEqual([])
+  })
+
   it('keeps real member accounts on the own-data RPC and rejects a Principal flag in its payload', async () => {
     mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal'] }))
     mocks.rpc.mockResolvedValue({ data: { ...snapshot(), principalView: true }, error: null })
@@ -127,6 +153,7 @@ describe('Principal Revenue View server boundary', () => {
     expect(mocks.adminRpc).toHaveBeenCalledWith('member_catalogue', {
       p_brands: ['AKEMI'], p_ids: [productId], p_priced: true, p_suggest: 20,
     })
+    expect(mocks.adminRpc).toHaveBeenCalledWith('member_quote_cost_rules', { p_scheme: schemeId })
   })
 
   it('keeps a real member quotation on the member membership authorization path', async () => {
@@ -138,14 +165,42 @@ describe('Principal Revenue View server boundary', () => {
 
   // Revenue Team cost = unit cost ÷ the scheme's divisor (Fair 0.7): the RM2,000
   // mattress is judged as RM2,857.14, so RM5,000 is a 42.86% margin, not 60%.
-  it('judges the margin on the Revenue Team cost the context hands back', async () => {
-    mocks.rpc.mockResolvedValue({ data: { bands: [band], costDivisor: '0.7000' }, error: null })
+  // 2026-10-05 (user): the ratio comes from the service role only — a member's
+  // own login can call the quote context, so whatever it says is not read —
+  // and it judges the margin here and stays here.
+  it('judges the margin on the Revenue Team cost the service-role rules give, and keeps the ratio', async () => {
+    mocks.rpc.mockResolvedValue({ data: { bands: [band], costDivisor: 1 }, error: null })
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([privateProduct]), { costDivisor: '0.7000', costRatios: {} }))
     const result = await calculateMemberQuote(quote)
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
     expect(result.data.margin).toBeCloseTo(42.8572, 3)
     expect(result.data.label).toBe('Tier 1 threshold')
     expect(JSON.stringify(result.data)).not.toContain('2857')
+    expect(result.data).not.toHaveProperty('costDivisor')
+    expect(JSON.stringify(result.data)).not.toMatch(/divisor|ratio/i)
+  })
+
+  it('refuses rather than quote at the cost as keyed when the cost rules are missing', async () => {
+    mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })
+    for (const rules of [null, {}, { costDivisor: 0 }, { costDivisor: 'x' }]) {
+      mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([privateProduct]), rules))
+      expect(await calculateMemberQuote(quote)).toEqual({ ok: false, error: 'The margin rules for this department are not configured.' })
+    }
+    // A refused read says the same — never the database's own words about it.
+    mocks.adminRpc.mockImplementation((fn: string) => Promise.resolve(fn === 'member_quote_cost_rules'
+      ? { data: null, error: { message: 'permission denied for function member_quote_cost_rules' } }
+      : pricedCatalogue([privateProduct])))
+    expect(await calculateMemberQuote(quote)).toEqual({ ok: false, error: 'The margin rules for this department are not configured.' })
+  })
+
+  it('judges a SKU with a ratio of its own at that ratio', async () => {
+    mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([privateProduct]), { costDivisor: 0.7, costRatios: { 'AK-QUEEN': 0.5 } }))
+    const result = await calculateMemberQuote(quote)
+    if (!result.ok) throw new Error(result.error)
+    // 2,000 ÷ 0.5 = 4,000 → (5,000 − 4,000) ÷ 5,000
+    expect(result.data.margin).toBeCloseTo(20, 10)
   })
 
   it('lets a brand-less rider ride the mattress and costs it into the same margin', async () => {
@@ -154,8 +209,8 @@ describe('Principal Revenue View server boundary', () => {
       ...privateProduct, id: riderId, code: 'KHJ50-(Q)', name: 'Fenrir bed frame', brand: null,
       category: 'Bed frame', kind: 'BEDFRAME', baseModel: 'KHJ50', price: 500,
     }
-    mocks.adminRpc.mockResolvedValue(pricedCatalogue([privateProduct, rider]))
-    mocks.rpc.mockResolvedValue({ data: { bands: [band], costDivisor: 1 }, error: null })
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([privateProduct, rider])))
+    mocks.rpc.mockResolvedValue({ data: { bands: [band] }, error: null })
     const result = await calculateMemberQuote({ ...quote, lines: [...quote.lines, { productId: riderId, quantity: 1, gift: false }] })
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
@@ -185,6 +240,147 @@ describe('Principal Revenue View server boundary', () => {
   it('does not extend the Principal quote exception to personal member memo acknowledgements', async () => {
     expect((await acknowledgeMemberMemo(productId, true)).ok).toBe(false)
     expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// `member_claim_rates` is HR's table: asked for as a function it failed every
+// time, the claim form had no region and no rate, and nothing could be sent (2026-10-06).
+describe('the claim form reads HR’s rates', () => {
+  const rates = { base: 'Klang Valley', perSpot: 50, perPaxNight: 65, regions: [{ id: productId, name: 'Penang', spots: 4 }] }
+
+  it.each([
+    { who: 'a member', identity: { role: 'revenue_member' as const, permissions: ['member_portal', 'member_requests'] } },
+    { who: 'the Principal in View as', identity: { role: 'principal' as const } },
+  ])('through member_claim_settings, for $who', async ({ identity }) => {
+    mocks.getUser.mockResolvedValue(user(identity))
+    mocks.rpc.mockResolvedValueOnce({ data: rates, error: null })
+    expect(await loadMemberClaimRates()).toEqual({ ok: true, data: rates })
+    expect(mocks.rpc).toHaveBeenCalledTimes(1)
+    expect(mocks.rpc).toHaveBeenCalledWith('member_claim_settings', undefined)
+  })
+
+  it('asks nothing for an account without member access', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'finance', permissions: ['treasury'] }))
+    expect((await loadMemberClaimRates()).ok).toBe(false)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// What the Revenue app's three forms send (RequestForm's `submit`), as a member
+// sends it: prepared, then submitted, with nothing typed taken as money.
+describe('a member sends a request', () => {
+  const fair = '10000000-0000-4000-8000-000000000010'
+  const ir = '10000000-0000-4000-8000-000000000011'
+  const region = '10000000-0000-4000-8000-000000000020'
+  const yuny = '10000000-0000-4000-8000-000000000030'
+  const requestId = '10000000-0000-4000-8000-000000000040'
+  const key = '10000000-0000-4000-8000-000000000050'
+  const form = (fields: Record<string, string>) => {
+    const data = new FormData()
+    for (const [name, value] of Object.entries(fields)) data.set(name, value)
+    return data
+  }
+  const sent = { id: requestId, kind: 'claim', title: 'Outstation claim · MITC Melaka', status: 'submitted', createdAt: '', requestNo: 'RQ-2610-001', detail: {} }
+
+  beforeEach(() => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_requests'] }))
+    mocks.rpc
+      .mockResolvedValueOnce({ data: { id: requestId, userId, status: 'draft' }, error: null })
+      .mockResolvedValueOnce({ data: sent, error: null })
+  })
+
+  // 2026-10-06: the fair, its venue and its region are the database's — a region, place or brand the
+  // phone sends is not even passed on.
+  it('an outstation claim: only the weekend — no region, no place, no amount, no invoice', async () => {
+    const result = await submitMemberRequest(form({
+      kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02',
+      brand: 'AKEMI', location: 'Sabah', notes: '', region,
+    }))
+    expect(result).toEqual({ ok: true, data: sent })
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', {
+      p_kind: 'claim', p_sub_department: fair, p_idempotency: key, p_revision: null,
+      p_detail: { claimType: 'outstation', week: '2026-10-02', notes: '' },
+    })
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+  })
+
+  it('a plane ticket: its price and its invoice, attested before it is sent', async () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])
+    const upload = vi.fn(async () => ({ error: null }))
+    const insert = vi.fn(async () => ({ error: null }))
+    const attachments = { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) }
+    mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => attachments, storage: { from: () => ({ upload, remove: vi.fn() }) } })
+    mocks.adminClient.mockReturnValue({ from: () => ({ insert }) })
+    const data = form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02', notes: '', amount: '456.70' })
+    data.set('invoice', new File([pdf], 'flight.pdf', { type: 'application/pdf' }))
+    expect((await submitMemberRequest(data)).ok).toBe(true)
+    const prepared = mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }
+    expect(prepared.p_detail).toMatchObject({ claimType: 'outstation', week: '2026-10-02', amount: 456.7, invoiceName: 'flight.pdf' })
+    expect(prepared.p_detail.invoiceHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ request_id: requestId, mime_type: 'application/pdf', content_sha256: prepared.p_detail.invoiceHash }))
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+  })
+
+  it('refuses a plane ticket without a price it can read', async () => {
+    expect(await submitMemberRequest(form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02', notes: '', amount: '45.678' })))
+      .toEqual({ ok: false, error: 'Enter the plane ticket\'s price, as its invoice shows.' })
+    mocks.rpc.mockReset()
+  })
+
+  // User 2026-10-06: a small Airbnb group keys the invoice's total; the database caps it and says what is paid.
+  describe('an Airbnb stay', () => {
+    const airbnb = (fields: Record<string, string>) => {
+      const data = form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'airbnb', week: '2026-10-02', notes: '',
+        start: '2026-10-02', end: '2026-10-04', male: '1', female: '1', ...fields })
+      data.set('invoice', new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])], 'stay.pdf', { type: 'application/pdf' }))
+      return data
+    }
+    beforeEach(() => {
+      const attachments = { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) }
+      mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => attachments, storage: { from: () => ({ upload: vi.fn(async () => ({ error: null })), remove: vi.fn() }) } })
+      mocks.adminClient.mockReturnValue({ from: () => ({ insert: vi.fn(async () => ({ error: null })) }) })
+    })
+
+    it('passes the invoice total on as a figure for the database to cap', async () => {
+      expect((await submitMemberRequest(airbnb({ amount: '500' }))).ok).toBe(true)
+      const prepared = mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }
+      expect(prepared.p_detail).toMatchObject({ claimType: 'airbnb', start: '2026-10-02', end: '2026-10-04', male: 1, female: 1, invoiceAmount: 500, invoiceName: 'stay.pdf' })
+      expect(prepared.p_detail).not.toHaveProperty('amount')
+    })
+
+    it('a bigger group sends no total', async () => {
+      expect((await submitMemberRequest(airbnb({ male: '2', female: '2' }))).ok).toBe(true)
+      expect((mocks.rpc.mock.calls[0][1] as { p_detail: Record<string, unknown> }).p_detail).not.toHaveProperty('invoiceAmount')
+    })
+
+    it('refuses a total it cannot read', async () => {
+      expect(await submitMemberRequest(airbnb({ amount: '1,200' }))).toEqual({ ok: false, error: 'Enter the stay\'s total from its invoice.' })
+      mocks.rpc.mockReset()
+    })
+  })
+
+  it('a replacement: leaving the sub-department is the database’s member_exit', async () => {
+    expect((await submitMemberRequest(form({
+      kind: 'replacement', subDepartmentId: fair, idempotencyKey: key, originalStaffId: yuny, destination: 'department_exit',
+      replacementSource: 'new', newPerson: 'Amelia Tan', effective: '2026-11-01', reason: 'Moving to Penang',
+    }))).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', expect.objectContaining({
+      p_kind: 'replacement', p_sub_department: fair,
+      p_detail: { newPerson: 'Amelia Tan', replacementSource: 'new', originalStaffId: yuny, destination: 'member_exit', effective: '2026-11-01', reason: 'Moving to Penang' },
+    }))
+  })
+
+  it('a waiting list goes to the sub-department it prefers, signed and consented', async () => {
+    expect((await submitMemberRequest(form({
+      kind: 'waiting', subDepartmentId: fair, idempotencyKey: key, newPerson: 'Amelia Tan', contact: '012-345 6789',
+      targetDepartmentId: ir, start: '2026-11-01', consent: 'true', signature: 'Jia En',
+    }))).ok).toBe(true)
+    expect(mocks.rpc).toHaveBeenNthCalledWith(1, 'member_prepare_request', expect.objectContaining({
+      p_kind: 'waiting', p_sub_department: ir,
+      p_detail: { newPerson: 'Amelia Tan', contact: '012-345 6789', start: '2026-11-01', signature: 'Jia En', consent: true },
+    }))
   })
 })
 
@@ -225,20 +421,24 @@ describe('the catalogue behind the member calculator', () => {
 
   beforeEach(() => {
     mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_quote'] }))
-    mocks.rpc.mockResolvedValue({ data: { bands: [zanotti], costDivisor: 1 }, error: null })
-    mocks.adminRpc.mockResolvedValue(pricedCatalogue(
+    mocks.rpc.mockResolvedValue({ data: { bands: [zanotti] }, error: null })
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue(
       [sofaModule(moduleA, '1A(LHF)', 1000), sofaModule(moduleB, '2NA', 1500), bedFrame],
       { models, optionPrices },
-    ))
+    )))
   })
 
-  it('adds the build options the model was ticked for, at the portal surcharges', async () => {
+  // 2026-10-06: an option priced on Maintenance is the customer's — once for the sofa, on top, out of the margin.
+  it('charges the options the model was ticked for once for the sofa, on top of the price', async () => {
     const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2', leg: '4"', specials: ['Nylon Fabric'] }))
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
-    // (1,000 + 30 + 50) + (1,500 + 30 + 50) = 2,660 → (5,000 − 2,660) ÷ 5,000
-    expect(result.data.margin).toBeCloseTo(46.8, 10)
+    // 1,000 + 1,500 = 2,500 → (5,000 − 2,500) ÷ 5,000; the leg (30) and Nylon (50) once, on top.
+    expect(result.data.margin).toBeCloseTo(50, 10)
+    expect(result.data.optionCharge).toBe(80)
+    expect(result.data.customerPays).toBe(5080)
     expect(result.data.customerText).toContain('Sofa build: seat height 30 · Tier 2 fabric · leg 4" · Nylon Fabric')
+    expect(result.data.customerText).toContain('Option charges: RM 80.00')
   })
 
   it('refuses an option the model was not ticked for', async () => {
@@ -249,14 +449,14 @@ describe('the catalogue behind the member calculator', () => {
   })
 
   it('costs a sofa that covers a priced combo at the combo, spread over its modules', async () => {
-    mocks.adminRpc.mockResolvedValue(pricedCatalogue(
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue(
       [sofaModule(moduleA, '1A(LHF)', 1000), sofaModule(moduleB, '2NA', 1500)],
       {
         models, optionPrices,
         combos: [{ erpId: 'c1', baseModel: '8030', modules: [['1A(LHF)'], ['2NA']], tier: null, label: 'L-shape',
           effectiveFrom: '2026-01-01', createdAt: null, priceByHeight: { '30': 2000 } }],
       },
-    ))
+    )))
     const result = await calculateMemberQuote(sofaQuote({ height: '30', tier: 'PRICE_2' }))
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
@@ -264,7 +464,9 @@ describe('the catalogue behind the member calculator', () => {
     expect(result.data.margin).toBeCloseTo(60, 10)
   })
 
-  it('costs a bed frame with its divan and leg surcharges', async () => {
+  // 2026-10-05: a bed frame's divan, leg and gap are CHARGED to the customer
+  // on top of the price — out of the margin, in the commission.
+  it('charges a bed frame’s divan and leg on top of the price, out of the margin', async () => {
     const result = await calculateMemberQuote({
       schemeId, price: '2000', delivery: '0',
       lines: [{ productId: frame, quantity: 1, gift: false }],
@@ -272,9 +474,69 @@ describe('the catalogue behind the member calculator', () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error(result.error)
-    // 800 + 100 + 20 = 920 → (2,000 − 920) ÷ 2,000
-    expect(result.data.margin).toBeCloseTo(54, 10)
+    // The frame's 800 alone → (2,000 − 800) ÷ 2,000; the 100 + 20 ride on top.
+    expect(result.data.margin).toBeCloseTo(60, 10)
+    expect(result.data.optionCharge).toBe(120)
+    expect(result.data.customerPays).toBe(2120)
     expect(result.data.customerText).toContain('Bed frame build: divan 10" · leg 4" · gap 12"')
+    expect(result.data.customerText).toContain('Option charges: RM 120.00')
+    expect(result.data.customerText).toContain('Total: RM 2120.00')
+  })
+
+  it('builds each bed frame on its own: FOC, or what Maintenance charges for it', async () => {
+    const charged = models.map(m => m.id === frameModel
+      ? { ...m, charges: { divan_heights: [{ value: '10"', charge: 100 }], leg_heights: [{ value: '4"', charge: 20 }] } }
+      : m)
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([bedFrame], { models: charged, optionPrices })))
+    const result = await calculateMemberQuote({
+      schemeId, price: '4000', delivery: '0',
+      lines: [
+        { productId: frame, quantity: 1, gift: false, bedframe: { leg: '4"' } },
+        { productId: frame, quantity: 1, gift: false },
+      ],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error(result.error)
+    expect(result.data.margin).toBeCloseTo(((4000 - 1600) / 4000) * 100, 10)
+    expect(result.data.optionCharge).toBe(20)
+    expect(result.data.optionCharges).toEqual([{ label: 'Y04 · leg 4"', qty: 1, amount: 20 }])
+    expect(result.data.customerText).toContain('Product · Y04 / Queen (leg 4") × 1')
+    expect(result.data.customerText).toContain('Product · Y04 / Queen × 1')
+
+    // An option it is not charged for is FOC — not a choice the server takes.
+    const foc = await calculateMemberQuote({
+      schemeId, price: '2000', delivery: '0',
+      lines: [{ productId: frame, quantity: 1, gift: false, bedframe: { leg: 'No Leg' } }],
+    })
+    expect(foc.ok).toBe(false)
+    if (foc.ok) throw new Error('expected a refusal')
+    expect(foc.error).toMatch(/leg height is not offered for this bed frame/)
+  })
+
+  // 2026-10-06 (user): a special Maintenance leaves unpriced is not shown — nor taken.
+  it('takes a bed frame special only when Maintenance charges it', async () => {
+    const charged = models.map(m => m.id === frameModel
+      ? { ...m, options: { ...m.options, specials: ['Hydraulic', 'HB Straight'] }, charges: { specials: [{ value: 'Hydraulic', charge: 300 }] } }
+      : m)
+    mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([bedFrame], {
+      models: charged, optionPrices: [...optionPrices, { pool: 'bedframe_specials', value: 'Hydraulic', price: 300 }],
+    })))
+    const priced = await calculateMemberQuote({
+      schemeId, price: '2000', delivery: '0',
+      lines: [{ productId: frame, quantity: 1, gift: false, bedframe: { specials: ['Hydraulic'] } }],
+    })
+    expect(priced.ok).toBe(true)
+    if (!priced.ok) throw new Error(priced.error)
+    expect(priced.data.optionCharge).toBe(300)
+
+    // Turned ON on Modular, no price on Maintenance: not a choice the server takes.
+    const unpriced = await calculateMemberQuote({
+      schemeId, price: '2000', delivery: '0',
+      lines: [{ productId: frame, quantity: 1, gift: false, bedframe: { specials: ['HB Straight'] } }],
+    })
+    expect(unpriced.ok).toBe(false)
+    if (unpriced.ok) throw new Error('expected a refusal')
+    expect(unpriced.error).toMatch(/special is not offered for this bed frame/)
   })
 
   it('never lets a price or grid reach the snapshot, and keeps only well-formed dropdowns', async () => {
@@ -300,7 +562,7 @@ describe('the catalogue behind the member calculator', () => {
       grid: [{ height, tier: 'PRICE_2', price: 1000 }],
     })
     for (const height of ['STD', '75cm', '?']) {
-      mocks.adminRpc.mockResolvedValue(pricedCatalogue([odd(moduleA, height)], { models, optionPrices }))
+      mocks.adminRpc.mockImplementation(adminAnswers(pricedCatalogue([odd(moduleA, height)], { models, optionPrices })))
       const result = await calculateMemberQuote({
         schemeId, price: '5000', delivery: '0', build: { height, tier: 'PRICE_2' },
         lines: [{ productId: moduleA, quantity: 1, gift: false }],

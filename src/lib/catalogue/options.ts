@@ -31,7 +31,7 @@ export interface OptionKey {
   /** The Maintenance pool its values come from and are priced in. */
   pool: string
   label: string
-  /** True when choosing it adds a surcharge. */
+  /** True when Maintenance may price it: the customer is then charged for it (2026-10-06). */
   priced: boolean
 }
 
@@ -45,11 +45,15 @@ export function optionKeysOf(category: string | null): OptionKey[] {
       { key: 'specials', pool: 'sofa_specials', label: 'Specials', priced: true },
     ]
   }
+  // Every option is offered on the Quote only when turned ON here (user
+  // 2026-10-05) — and charged to the customer when Maintenance prices it
+  // (`MemberCatalogueModel.charges`; a bed frame per frame, a sofa once per
+  // sofa, 20261006050000). A height nobody priced is FOC; a special, free.
   if (c === 'BEDFRAME') {
     return [
       { key: 'divan_heights', pool: 'bedframe_divan_heights', label: 'Divan height', priced: true },
       { key: 'total_heights', pool: 'bedframe_total_heights', label: 'Total height', priced: true },
-      { key: 'gaps', pool: 'bedframe_gaps', label: 'Gap', priced: false },
+      { key: 'gaps', pool: 'bedframe_gaps', label: 'Gap', priced: true },
       { key: 'leg_heights', pool: 'bedframe_leg_heights', label: 'Leg height', priced: true },
       { key: 'specials', pool: 'bedframe_specials', label: 'Specials', priced: true },
     ]
@@ -57,24 +61,35 @@ export function optionKeysOf(category: string | null): OptionKey[] {
   return []
 }
 
-/** The Maintenance tab's rail, as the ERP draws it (the Products Maintenance pools are not mirrored). */
-export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: Array<{ pool: string; label: string; priced: boolean }> }> = [
+// The prototype's words (design_handoff_product_list). The bed frame's specials and
+// the sofa's leg heights and specials are charges since 2026-10-06 (the prototype
+// still calls them surcharges), so theirs follow the same voice.
+const FRAME_CHARGE = 'What the customer pays (RM) when a member picks this option for a bed frame on the Quote. Out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI. Blank or 0 is FOC.'
+const CHARGE_TAIL = 'Out of the margin on both sides, paid ordinary commission like the rest of the bill, never KPI.'
+
+/**
+ * The Maintenance tab's rail, as the ERP draws it (the Products Maintenance
+ * pools are not mirrored). `charge`: the price is the customer's, out of the
+ * margin — every priced pool since 2026-10-06 (`poolPriceOf`). `note`: what a
+ * price there does, under the table's toolbar.
+ */
+export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: Array<{ pool: string; label: string; priced: boolean; charge: boolean; note: string }> }> = [
   {
     section: 'Bedframe',
     pools: [
-      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true },
-      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true },
-      { pool: 'bedframe_gaps', label: 'Gaps', priced: false },
-      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true },
-      { pool: 'bedframe_specials', label: 'Specials', priced: true },
+      { pool: 'bedframe_divan_heights', label: 'Divan Heights', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_total_heights', label: 'Total Heights', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_gaps', label: 'Gaps', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: FRAME_CHARGE },
+      { pool: 'bedframe_specials', label: 'Specials', priced: true, charge: true, note: `What the customer pays (RM) when a member ticks this special for a bed frame on the Quote. ${CHARGE_TAIL} Blank or 0 is not offered.` },
     ],
   },
   {
     section: 'Sofa',
     pools: [
-      { pool: 'sofa_sizes', label: 'Sizes', priced: false },
-      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true },
-      { pool: 'sofa_specials', label: 'Specials', priced: true },
+      { pool: 'sofa_sizes', label: 'Sizes', priced: false, charge: false, note: 'ERP choices only. This pool has no surcharge; model availability is set on Modular.' },
+      { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: `What the customer pays (RM) for this leg height on the Quote, once per sofa. ${CHARGE_TAIL} Blank or 0 is FOC.` },
+      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: true, note: `What the customer pays (RM) for this special on the Quote, once per sofa. ${CHARGE_TAIL} Blank or 0 is not offered.` },
     ],
   },
 ]
@@ -120,18 +135,36 @@ export function erpAllows(allowed: unknown, key: string, pool: readonly string[]
 /** The brand override that marks a model a rider on Modular. */
 export const RIDER = 'RIDER'
 
+/** Only a mattress or a sofa sells under a brand (user 2026-09-12); everything else rides along. */
+export function sellsUnderBrand(category: string | null): boolean {
+  const c = (category ?? '').trim().toUpperCase()
+  return c === 'MATTRESS' || c === 'SOFA'
+}
+
+/**
+ * Whether Modular asks a person for the margin ladder and the calculator
+ * section (2026-10-06, user: 它是跟着 brand，而不是跟着我这里去选 … for those
+ * system can't detect the brand). Only a mattress or a sofa whose ERP branding
+ * names no brand the portal knows (MYLATEX, or none) — `derivedBrand` null.
+ * A branded one follows its brand, and a bed frame or an accessory is a rider
+ * whose margin follows the cart's brand: neither is asked, and a pick stored
+ * for one is not read. The twin of member_catalogue's (migration
+ * 20261006170000).
+ */
+export function needsBrandPick(category: string | null, derivedBrand: string | null): boolean {
+  return sellsUnderBrand(category) && !derivedBrand
+}
+
 /**
  * Whether a model's SKUs join any cart, the way `member_catalogue` reads it
- * (migration 20260924040000): marked Rider on Modular, or a bed frame or an
- * accessory nobody gave a brand. A mattress or a sofa decides the cart's
- * ladder, so it is never a rider by default — one whose ERP branding matches
- * no brand the portal knows is not offered until a ladder is chosen for it.
+ * (migration 20261006170000): a bed frame, an accessory or anything else that
+ * is not a mattress or a sofa, always — or a brandless mattress or sofa marked
+ * Rider on Modular. `brandPick` is the pick that counts: null wherever
+ * `needsBrandPick` is false.
  */
-export function isRiderModel(category: string | null, brandOverride: string | null): boolean {
-  if (brandOverride === RIDER) return true
-  if (brandOverride) return false
-  const c = (category ?? '').trim().toUpperCase()
-  return c !== 'MATTRESS' && c !== 'SOFA'
+export function isRiderModel(category: string | null, brandPick: string | null): boolean {
+  if (!sellsUnderBrand(category)) return true
+  return brandPick === RIDER
 }
 
 /** The calculator's section for a model — `catalogue_calc_category` in TypeScript. */

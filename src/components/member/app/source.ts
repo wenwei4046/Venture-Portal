@@ -1,0 +1,192 @@
+import type { MemberCatalogue, MemberData, MemberInsight, MemberOrgMap, MemberReadContext, MemberRequest, QuoteInput, QuoteResult } from "@/lib/member/types";
+import type { RequestEvent } from "./profile/profile-model";
+import { readClaimRates, type ClaimRates } from "@/lib/member/claim-rules";
+import type { DepartmentIncome, MemberIncome } from "@/lib/member/income";
+import type { MemberHonours } from "@/lib/member/server";
+import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
+import type { ArenaWeekPicks, ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
+import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
+import {
+  acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, submitMemberRequest,
+  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
+  type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
+  type refreshMemberData,
+} from "@/app/(member)/member/actions";
+import { saveMemberArenaBrandWeeks, savePrincipalArenaBrandWeeks, type fetchMemberArena } from "@/app/(member)/member/arena-actions";
+import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
+import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-actions";
+import { createReadBatcher } from "./read-batch";
+import { createReadMemory, idbStore, readKey, type ReadStore } from "./read-memory";
+
+export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
+export type { MemberRead };
+
+/**
+ * Pull to refresh: a read started for pull number `gen` is handed to the app,
+ * which spins until every one of them lands (and sees what threw). The caller
+ * gets it back through `settleRead`.
+ */
+export type TrackRead = <T extends { ok: boolean }>(gen: number, read: Promise<T>) => Promise<T>;
+
+/** A read that threw (offline, a newer release) answers as a failed read, so no caller is left with an unhandled rejection. */
+export function settleRead<T extends { ok: boolean }>(read: Promise<T>): Promise<T> {
+  return read.catch((error: unknown) => ({ ok: false, error: error instanceof Error ? error.message : "The read failed." }) as unknown as T);
+}
+export const untracked: TrackRead = (_gen, read) => settleRead(read);
+
+/**
+ * Each read, described once: what is sent to the server (`readMemberBatch`)
+ * and the key its answer is kept under on the phone. A read's arguments that
+ * mean the same thing are written the same way (an Arena read with its fair
+ * history is `options` absent however it was asked), so the same question is
+ * always the same key.
+ */
+export const ask = {
+  insight: (period: string | undefined, context?: MemberReadContext): MemberRead => ({ kind: "insight", period, context }),
+  kpi: (schemeId: string, context?: MemberReadContext, period?: string): MemberRead => ({ kind: "kpi", schemeId, context, period }),
+  arena: (membershipId: string, period: string, window: ArenaWindow, context?: MemberReadContext, options?: { history?: boolean }): MemberRead =>
+    ({ kind: "arena", membershipId, period, window, context, options: options?.history === false ? { history: false } : undefined }),
+  orgMap: (context?: Pick<MemberReadContext, "subDepartmentId">): MemberRead => ({ kind: "orgMap", context }),
+  orderBook: (subDepartmentId: string, from: string, until: string, context?: MemberReadContext): MemberRead =>
+    ({ kind: "orderBook", subDepartmentId, from, until, context }),
+  insightRange: (subDepartmentId: string, from: string, until: string, context?: MemberReadContext): MemberRead =>
+    ({ kind: "insightRange", subDepartmentId, from, until, context }),
+  income: (subDepartmentId: string, period: string, context?: MemberReadContext): MemberRead => ({ kind: "income", subDepartmentId, period, context }),
+  departmentIncome: (subDepartmentId: string, period: string): MemberRead => ({ kind: "departmentIncome", subDepartmentId, period }),
+  honours: (subDepartmentId: string, from: string, until: string, context?: MemberReadContext): MemberRead =>
+    ({ kind: "honours", subDepartmentId, from, until, context }),
+  memoReceipts: (staffId: string): MemberRead => ({ kind: "memoReceipts", staffId }),
+  claimRates: (): MemberRead => ({ kind: "claimRates" }),
+  requestHistory: (id: string): MemberRead => ({ kind: "requestHistory", id }),
+  catalogue: (): MemberRead => ({ kind: "catalogue" }),
+};
+
+/**
+ * Where the app's numbers come from. The live app reads the database through
+ * the member server actions; the design preview hands the same shapes from
+ * fixtures, so both run the very same screens and models.
+ */
+export interface RevenueSource {
+  refresh(): Promise<Outcome<MemberData>>;
+  insight(period: string | undefined, context?: MemberReadContext): Promise<Outcome<MemberInsight>>;
+  /** KPI items of a month ('YYYY-MM'); absent = the current month. */
+  kpi(schemeId: string, context?: MemberReadContext, period?: string): Promise<Outcome<MemberKpiSummary>>;
+  /** `history: false` leaves the booth history out (the Championship's months). */
+  arena(membershipId: string, period: string, window: ArenaWindow, context?: MemberReadContext, options?: { history?: boolean }): Promise<Outcome<MemberArenaSnapshot>>;
+  orgMap(context?: Pick<MemberReadContext, "subDepartmentId">): Promise<Outcome<MemberOrgMap>>;
+  /** One member's bills, line by line, from one month to another (inclusive). */
+  orderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberOrderBook>>;
+  /** The member and their team over a quarter or a year. */
+  insightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberInsightRange>>;
+  /** A cart's margin at a price — priced on the server; no cost ever comes back. */
+  quote(input: QuoteInput): Promise<Outcome<QuoteResult>>;
+  /** Mark a memo read (`ack` false) or acknowledge it — the member's own receipt. */
+  memo(id: string, ack: boolean): Promise<Outcome<{ acknowledgedAt: string | null }>>;
+  /** Who moved a request, when, and why. */
+  requestHistory(id: string): Promise<Outcome<RequestEvent[]>>;
+  submitRequest(form: FormData): Promise<Outcome<MemberRequest>>;
+  /** Withdraw a request HR has not acted on yet. */
+  cancelRequest(id: string): Promise<Outcome<MemberRequest>>;
+  /** HR's fair-claim rates and regions. */
+  claimRates(): Promise<Outcome<ClaimRates>>;
+  /** My income: one month as Comm Cal works it out (live until the close), and the months paid. */
+  income(subDepartmentId: string, period: string, context?: MemberReadContext): Promise<Outcome<MemberIncome>>;
+  /** Today for a Principal viewing nobody: the sub-department's commission this month, before salaries. */
+  departmentIncome(subDepartmentId: string, period: string): Promise<Outcome<DepartmentIncome>>;
+  /** My honours: the member's finishes over a window of months, and which months are final. */
+  honours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberHonours>>;
+  /** View as: the viewed person's memo receipts. */
+  memoReceipts(staffId: string): Promise<Outcome<{ memoId: string; readAt: string | null; acknowledgedAt: string | null }[]>>;
+  /** A month's brand weeks — the member's own open weeks, or (a Principal viewing them) any week. */
+  saveBrandWeeks(subDepartmentId: string, period: string, picks: ArenaWeekPicks, context?: MemberReadContext): Promise<Outcome<true>>;
+  /** The Quote's catalogue (2026-10-08) — read when the Quote needs it, no longer with every open. */
+  catalogue?(): Promise<Outcome<MemberCatalogue>>;
+  /**
+   * What the phone kept from an earlier open (the live app only, 2026-10-08):
+   * the last answer to a read (`ask.*`), shown while it is read again.
+   */
+  peek?<T>(read: MemberRead): T | undefined;
+  /** Settles once the phone's answers are loaded — the app asks for nothing before, or the first screen would miss them. */
+  ready?: Promise<void>;
+  /** How many answers the phone kept from before this open. */
+  kept?(): number;
+}
+
+/** The design preview: reads nothing — its screens come from fixtures. */
+const nothing = async () => ({ ok: false as const, error: "Preview data only." });
+export const demoSource: RevenueSource = {
+  refresh: nothing, insight: nothing, kpi: nothing, arena: nothing, orgMap: nothing, orderBook: nothing, insightRange: nothing, quote: nothing,
+  memo: nothing, requestHistory: nothing, submitRequest: nothing, cancelRequest: nothing, claimRates: nothing, memoReceipts: nothing, income: nothing, honours: nothing,
+  departmentIncome: nothing, saveBrandWeeks: nothing, catalogue: nothing,
+};
+
+/** What a read action answers. */
+type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnType<F>>;
+/**
+ * Reads asked for together leave together (`readMemberBatch`): the client runs Server Actions one at a time, and a
+ * screen's or a pull's reads one by one took the sum of their times. Writes and the quote's price go straight.
+ */
+const read = createReadBatcher(reads => readMemberBatch(reads));
+
+/**
+ * The live app's source. Given the signed-in account, every answer is also
+ * kept on the phone (read-memory.ts) and `peek` hands it back on the next
+ * open; without one it keeps nothing.
+ */
+export function createLiveSource(account?: string, store: ReadStore | null = idbStore()): RevenueSource {
+  const memory = account ? createReadMemory(account, store) : null;
+  /** Ask, and keep the answer when it is one — a refusal never replaces what the phone kept. */
+  const go = <T extends { ok: boolean }>(request: MemberRead, answer: Promise<T> = read<T>(request)): Promise<T> =>
+    !memory ? answer : answer.then(a => {
+      if (a.ok) memory.put(readKey(request), (a as unknown as { data: unknown }).data);
+      return a;
+    });
+
+  return {
+    async refresh() {
+      // The pull's snapshot: everything but the Quote's catalogue, which the Quote reads on its own.
+      const result = await read<Answer<typeof refreshMemberData>>({ kind: "refresh", lite: true });
+      return result.ok ? { ok: true, data: result.data } : { ok: false, error: result.error };
+    },
+    insight: (period, context) => go<Answer<typeof fetchMemberInsight>>(ask.insight(period, context)),
+    kpi: (schemeId, context, period) => go<Answer<typeof fetchMemberKpiSummary>>(ask.kpi(schemeId, context, period)),
+    arena: (membershipId, period, window, context, options) =>
+      go<Answer<typeof fetchMemberArena>>(ask.arena(membershipId, period, window, context, options)),
+    orgMap: context => go<Answer<typeof fetchMemberOrgMap>>(ask.orgMap(context)),
+    orderBook: (subDepartmentId, from, until, context) => go<Answer<typeof fetchMemberOrderBook>>(ask.orderBook(subDepartmentId, from, until, context)),
+    insightRange: (subDepartmentId, from, until, context) =>
+      go<Answer<typeof fetchMemberInsightRange>>(ask.insightRange(subDepartmentId, from, until, context)),
+    quote: input => calculateMemberQuote(input),
+    async memo(id, ack) {
+      const result = await acknowledgeMemberMemo(id, ack);
+      return result.ok ? { ok: true, data: { acknowledgedAt: result.data.acknowledgedAt } } : result;
+    },
+    requestHistory: id => go<Answer<typeof fetchMemberRequestHistory>>(ask.requestHistory(id)),
+    submitRequest: form => submitMemberRequest(form),
+    cancelRequest: id => cancelMemberRequest(id),
+    claimRates() {
+      const request = ask.claimRates();
+      return go(request, read<Answer<typeof fetchMemberClaimRates>>(request)
+        .then((result): Outcome<ClaimRates> => (result.ok ? { ok: true, data: readClaimRates(result.data) } : result)));
+    },
+    memoReceipts: staffId => go<Answer<typeof fetchPrincipalMemoReceipts>>(ask.memoReceipts(staffId)),
+    income: (subDepartmentId, period, context) => go<Answer<typeof fetchMemberIncome>>(ask.income(subDepartmentId, period, context)),
+    departmentIncome: (subDepartmentId, period) => go<Answer<typeof fetchDepartmentIncome>>(ask.departmentIncome(subDepartmentId, period)),
+    honours: (subDepartmentId, from, until, context) => go<Answer<typeof fetchMemberHonours>>(ask.honours(subDepartmentId, from, until, context)),
+    catalogue: () => go<Answer<typeof fetchMemberCatalogue>>(ask.catalogue()),
+    async saveBrandWeeks(subDepartmentId, period, picks, context) {
+      const result = context
+        ? await savePrincipalArenaBrandWeeks(subDepartmentId, period, picks, context)
+        : await saveMemberArenaBrandWeeks(subDepartmentId, period, picks);
+      return result.ok ? { ok: true, data: true } : { ok: false, error: result.error };
+    },
+    ...(memory ? {
+      peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
+      ready: memory.ready,
+      kept: () => memory.kept(),
+    } : {}),
+  };
+}
+
+/** The live source without a phone memory (nothing is kept): what a caller without an account uses. */
+export const liveSource: RevenueSource = createLiveSource();

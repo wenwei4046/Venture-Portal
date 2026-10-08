@@ -5,10 +5,12 @@
 
 import Link from 'next/link'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatMoney } from '@/lib/utils'
+import { fetchAllRows } from '@/lib/paginate'
 import UploadStatementForm from './_components/UploadStatementForm'
 import SessionRowActions from './_components/SessionRowActions'
 import LedgerRow from '@/components/LedgerRow'
@@ -31,7 +33,13 @@ export default async function ReconciliationPage() {
         .from('bank_recon_sessions')
         .select('id, bank_account_id, period_month, source_filename, status, created_at')
         .order('period_month', { ascending: false }),
-      supabase.from('bank_recon_lines').select('session_id, match_kind'),
+      // Every statement line of every session (2026-10-08): each upload adds
+      // a month's worth, and past PostgREST's 1000-row cap the counts below
+      // would silently come up short. Only counted, so the pages' order will
+      // do; a failed read still counts nothing, as before.
+      fetchAllRows((lo, hi) =>
+        supabase.from('bank_recon_lines').select('session_id, match_kind').order('id').range(lo, hi),
+      ).then((data) => ({ data }), () => ({ data: null })),
     ])
 
   const banks = (bankAccounts ?? []) as Array<{
@@ -128,7 +136,7 @@ export default async function ReconciliationPage() {
         </p>
         <UploadStatementForm
           banks={banks.map(b => ({ id: b.id, label: `${b.bank_name}${b.account_number ? ` — ${b.account_number}` : ''}` }))}
-          defaultMonth={dayjs().subtract(1, 'month').format('YYYY-MM')}
+          defaultMonth={officeTime().subtract(1, 'month').format('YYYY-MM')}
         />
       </section>
 

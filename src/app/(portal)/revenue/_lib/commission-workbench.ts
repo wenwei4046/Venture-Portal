@@ -4,6 +4,7 @@ import { fetchByKeys } from '@/lib/paginate'
 import { loadCommissionInput } from './commission-input'
 import { loadMonthOrders, type MonthOrder } from './month-orders'
 import { loadFairCalendar } from './fair-calendar'
+import { loadOrderFairs } from './order-fairs'
 import { fairDays } from './upsales'
 import { loadPayBoard } from './pay-preview'
 
@@ -27,7 +28,7 @@ export async function loadCommissionWorkbench(
   // preview (the slow one — a statutory lookup per wage band when no run
   // exists yet), and the carried-forward bills with every bill's fair. One
   // after another they were the whole of a month's wait.
-  const [people, pay, { allOrders, fairByOrder }] = await Promise.all([
+  const [people, pay, { allOrders, placed }] = await Promise.all([
     fetchByKeys<{ id: string; employee_name: string; employee_code: string | null }, string>(ids, keys =>
       db.from('hr_staff_costs').select('id, employee_name, employee_code').in('id', keys)),
     withPay
@@ -48,27 +49,24 @@ export async function loadCommissionWorkbench(
     (async () => {
       const earlier = await Promise.all(earlierPeriods.map(p => loadMonthOrders(db, subDepartmentId, p)))
       const everyOrder = [...monthOrders, ...earlier.flat()]
-      const assignments = await fetchByKeys<{ id: string; fair_event_id: string | null }, string>(
-        [...new Set(everyOrder.map(order => order.orderId))], keys =>
-          db.from('sales_orders').select('id, fair_event_id').in('id', keys),
-      )
-      return {
-        allOrders: everyOrder,
-        fairByOrder: new Map(assignments.map(assignment => [assignment.id, assignment.fair_event_id])),
-      }
+      return { allOrders: everyOrder, placed: await loadOrderFairs(db, everyOrder.map(order => order.orderId)) }
     })(),
   ])
   const fairById = new Map(calendar.map(fair => [fair.fairId, fair]))
   const orders = allOrders.map(o => {
     // ERP document dates can be weeks after a fair. The persisted assignment
     // also includes manually confirmed claim forms; do not guess from dates.
-    const fairId = fairByOrder.get(o.orderId)
+    const fairId = placed.get(o.orderId)?.fairId
     const fair = fairId ? fairById.get(fairId) : undefined
     return {
       orderId: o.orderId, venue: o.venueGroupName ?? o.venue, location: o.location,
+      refNo: o.refNo, paperNo: o.paperNo,
       organizer: fair?.organiserName ?? fair?.erpOrganiserText ?? o.organizer,
       eventName: fair?.startDate ? fairDays(fair.startDate, fair.endDate) : null,
       fair: fair ? { id: fair.fairId, venueKey: fair.venueKey, venueName: fair.displayName } : null,
+      // The booth the salesperson picked in the ERP: what Sales exhibition
+      // groups the bill under, whatever brand its goods are (2026-10-03).
+      booth: placed.get(o.orderId)?.booth ?? null,
     }
   })
   return {

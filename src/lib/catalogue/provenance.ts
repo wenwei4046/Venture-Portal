@@ -79,3 +79,39 @@ export function costProvenance(
     }
   }
 }
+
+const CHARGE_WORD: Record<string, string> = {
+  bedframe_divan_heights: 'divan ',
+  bedframe_leg_heights: 'leg ',
+  bedframe_gaps: 'gap ',
+  bedframe_total_heights: 'total height ',
+  bedframe_specials: '',
+  sofa_leg_heights: 'leg ',
+  sofa_specials: '',
+}
+
+/**
+ * `for divan 12" · leg 6"` — what a line's options were charged for
+ * (`cost_detail.charges`, 20261005010000; every option since 20261006050000):
+ * the customer's price for each, out of the margin and in the commission. A
+ * sofa is charged once per sofa and the set's charge spread over its pieces
+ * (`cost_detail.charge_set`), which the words say.
+ */
+export function chargeText(detail: unknown): string {
+  const d: Detail = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as Detail) : {}
+  const words = (Array.isArray(d.charges) ? d.charges : []).flatMap(c => {
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return []
+    const pool = text((c as Detail).pool)
+    const value = text((c as Detail).value)
+    const word = pool ? CHARGE_WORD[pool] : undefined
+    return word !== undefined && value ? [`${word}${value}`] : []
+  })
+  const base = words.length ? `for ${words.join(' · ')}` : 'for its options'
+  const set = d.charge_set && typeof d.charge_set === 'object' && !Array.isArray(d.charge_set) ? (d.charge_set as Detail) : null
+  if (!set) return base
+  const total = money(set.total)
+  const sets = Number(set.sets)
+  const lines = Number(set.lines)
+  const once = Number.isFinite(sets) && sets > 1 ? `for ${sets} sofas` : 'once for the sofa'
+  return `${base}${total ? ` — ${total} ${once}` : ''}${Number.isFinite(lines) && lines > 1 ? `, spread over its ${lines} pieces` : ''}`
+}

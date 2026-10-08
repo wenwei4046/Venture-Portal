@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
+import { officeToday } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requirePayrollPayoutsAction } from '@/lib/auth'
 
 /**
  * Stage E — Finance generates a payroll funding Payment Voucher against a
@@ -47,7 +48,7 @@ export async function generatePvFromRequest(
   sources: PayrollPoolSource[],
   paymentDate: string,
 ): Promise<string> {
-  const user = await requirePermission('treasury')
+  const user = await requirePayrollPayoutsAction(['treasury', 'create'])
   const supabase = await createClient()
 
   if (!Array.isArray(sources) || sources.length === 0) {
@@ -65,7 +66,7 @@ export async function generatePvFromRequest(
   // today; the approval RPC period-lock guards the chosen month.
   const payDate = /^\d{4}-\d{2}-\d{2}$/.test(paymentDate ?? '')
     ? paymentDate
-    : dayjs().format('YYYY-MM-DD')
+    : officeToday()
 
   // ── Read the request + its linked payroll_run for period context ──────────
   // Run-less requests are director salary fundings (mig 20260727100000) —
@@ -295,7 +296,7 @@ export async function financeCancelRequest(
   requestId: string,
   reason: string,
 ): Promise<void> {
-  const user = await requirePermission('treasury')
+  const user = await requirePayrollPayoutsAction(['treasury', 'void'])
   const supabase = await createClient()
 
   const trimmed = reason.trim()
@@ -346,7 +347,7 @@ export async function financeCancelRequest(
  * (HR unlocks whoever needs a change). Refused once its funding PV exists.
  */
 export async function sendBackPayrollBatch(batchId: string, reason?: string): Promise<void> {
-  await requirePermission('treasury')
+  await requirePayrollPayoutsAction(['treasury', 'void'], ['treasury', 'approve'])
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchId)) throw new Error('Which batch?')
   const supabase = await createClient()
   const { data: batch } = await supabase.from('payroll_batches').select('period_month').eq('id', batchId).maybeSingle()
@@ -375,7 +376,7 @@ export async function sendBackPayrollBatch(batchId: string, reason?: string): Pr
  * Director requests are run-less — nothing to reopen there.
  */
 export async function sendBackPayrollRun(period: string): Promise<void> {
-  const user = await requirePermission('treasury')
+  const user = await requirePayrollPayoutsAction(['treasury', 'void'], ['treasury', 'approve'])
   const supabase = await createClient()
   const p = dayjs(period).startOf('month').format('YYYY-MM-DD')
 

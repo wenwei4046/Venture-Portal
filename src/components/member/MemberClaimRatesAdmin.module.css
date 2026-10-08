@@ -1,0 +1,87 @@
+/* People › Member services › Claim rates (2026-10-05): three figures over the
+   regions' ledger table, on the sheet. */
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.fields small {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgb(var(--graphite));
+}
+.fields input,
+.regions input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 13px;
+}
+.fields input:focus-visible,
+.regions input:focus-visible {
+  outline: 2px solid rgb(var(--ink));
+  outline-offset: 1px;
+}
+.regions td {
+  vertical-align: middle;
+}
+.regions .spots {
+  max-width: 90px;
+  text-align: right;
+}
+.saved {
+  margin-left: 10px;
+  font-size: 11px;
+}
+/* A region flown to (2026-10-06): its claim is the plane ticket's price, with the invoice. */
+.tick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.tick input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+/* Venues → their regions: the ERP's venues, listed as they arrive. */
+.venuesHead {
+  margin-top: 28px;
+}
+/* Inside the table, so it outranks the member workspace's 16px controls as the inputs above do. */
+.regions .select {
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 13px;
+}
+.regions .select:focus-visible {
+  outline: 2px solid rgb(var(--ink));
+  outline-offset: 1px;
+}
+.unset {
+  margin-left: 8px;
+}
+.actions {
+  display: inline-flex;
+  gap: 8px;
+}

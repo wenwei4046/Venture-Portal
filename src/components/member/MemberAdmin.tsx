@@ -1,11 +1,15 @@
 "use client";
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { productListPath } from "@/lib/revenue";
+import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import {
   adminMemberAction,
   type AdminMemberData,
   type AdminMemberInput,
 } from "@/app/(member)/member/actions";
+import MemberBrandWeeksAdmin from "./MemberBrandWeeksAdmin";
+import MemberClaimRatesAdmin from "./MemberClaimRatesAdmin";
 import s from "./member.module.css";
 
 const names: Record<string, string> = {
@@ -42,6 +46,16 @@ const statusChips: Record<string, string> = {
 const detailLabels: Record<string, string> = {
   category: "Claim category",
   amount: "Claim amount",
+  // A fair claim (2026-10-06): the member's brand week, its fair and the region HR set for the venue.
+  week: "Brand week (Friday)",
+  brand: "Brand",
+  regionName: "Fair region",
+  spots: "Spots",
+  pax: "People",
+  nights: "Nights",
+  // A small Airbnb group (2026-10-06): what the invoice says, and the most the stay could claim.
+  invoiceAmount: "Invoice total",
+  cap: "Most for the stay",
   location: "Location",
   start: "Start / joining date",
   end: "End date",
@@ -87,7 +101,7 @@ const categoryNames: Record<string, string> = {
 function displayDetail(key: string, value: unknown, data: AdminMemberData) {
   const raw = String(value);
   if (key === "category") return categoryNames[raw] ?? raw;
-  if (key === "amount")
+  if (key === "amount" || key === "invoiceAmount" || key === "cap")
     return Number.isFinite(Number(value))
       ? new Intl.NumberFormat("en-MY", {
           style: "currency",
@@ -173,6 +187,11 @@ export default function MemberAdmin({
   const today = () =>
     new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
   const needsNote = ["qualify", "approve", "reject", "needs_info", "accept"];
+  // Approving a claim names where its money comes from (2026-10-08); the
+  // claim's own details are the record, so no note is required for that.
+  const noteRequired = (input: AdminMemberInput) =>
+    needsNote.includes(input.action) &&
+    !(input.action === "approve" && typeof input.route === "string");
 
   async function run(input: AdminMemberInput) {
     if (running.current) return;
@@ -186,7 +205,7 @@ export default function MemberAdmin({
       setMessage("Your account does not have permission for this action.");
       return;
     }
-    if (needsNote.includes(input.action) && !String(input.note ?? "").trim()) {
+    if (noteRequired(input) && !String(input.note ?? "").trim()) {
       setMessage(
         "Enter review notes or a record of the applicant’s confirmation.",
       );
@@ -398,9 +417,17 @@ export default function MemberAdmin({
             );
           event(
             r.kind === "waiting" ? "waiting" : "approved",
-            String(input.note),
+            String(input.note || "Approved"),
           );
           if (r.kind === "waiting") reserve(requestSub);
+          if (r.kind === "claim" && (input.route === "payroll" || input.route === "payment"))
+            r.payout = {
+              route: input.route,
+              payrollMonth:
+                input.route === "payroll" ? `${today().slice(0, 7)}-01` : null,
+              voucherNo: null,
+              voucherStatus: null,
+            };
         } else if (["needs_info", "reject"].includes(input.action)) {
           event(
             input.action === "reject" ? "rejected" : "needs_info",
@@ -544,6 +571,11 @@ export default function MemberAdmin({
                   ["capacity", "Capacity & waiting list"],
                 ]
               : []),
+            // The back office of My brand weeks (2026-10-03): live data, so
+            // the portal page only, not the member app's admin preview.
+            ...(portal && !demo && data.canManageRequests
+              ? [["weeks", "Brand weeks"], ["claims", "Claim rates"]]
+              : []),
             ...(data.canPublishMemos ? [["memos", "Publish memo"]] : []),
             ...(data.canConfigureProducts
               ? [["products", "Product options"]]
@@ -665,30 +697,73 @@ export default function MemberAdmin({
                   <hr className={s.divider} />
                   {request.kind === "claim" ? (
                     <>
-                      <p className={s.sub}>
-                        This request is linked to a standard claim. Complete its
-                        review and payment in the existing Claims workflow to
-                        avoid duplicate processing.
-                      </p>
-                      {request.status === "submitted" && (
+                      {/* Decided HERE, once (2026-10-08): approved into the
+                          member's payroll or as a payment request to Finance —
+                          never a second approval on the Claims page. */}
+                      {(() => {
+                        const where = claimPayoutLine(
+                          readClaimPayout(request.payout),
+                          request.status,
+                          "hr",
+                        );
+                        return where ? (
+                          <p className={s.notice}>{where}</p>
+                        ) : null;
+                      })()}
+                      {["submitted", "needs_info"].includes(request.status) && (
                         <>
+                          <h3>Decide the claim</h3>
+                          <p className={s.caption}>
+                            Approve it once, here, and choose where the money
+                            comes from: with their payroll — the month they sent
+                            it, or the next one still open for them — or as a
+                            payment Finance makes.
+                          </p>
                           <label className={s.field}>
-                            <span>Additional invoice details / reason</span>
+                            <span>Review notes / reason</span>
                             <textarea
                               value={note}
                               onChange={(e) => setNote(e.target.value)}
+                              placeholder="Needed to return the claim for information, or to reject it"
                             />
                           </label>
-                          {action("Request more information", "needs_info")}
+                          <div className={s.dialogActions}>
+                            {action("Request more information", "needs_info")}
+                            {action("Reject", "reject")}
+                            <button
+                              type="button"
+                              className={s.button}
+                              disabled={busy || !data.canManageRequests}
+                              onClick={() =>
+                                void run({
+                                  action: "approve",
+                                  route: "payment",
+                                  requestId: request.id,
+                                  note,
+                                })
+                              }
+                            >
+                              Approve · request payment
+                            </button>
+                            <button
+                              type="button"
+                              className={`${s.button} ${s.primary}`}
+                              disabled={busy || !data.canManageRequests}
+                              onClick={() =>
+                                void run({
+                                  action: "approve",
+                                  route: "payroll",
+                                  requestId: request.id,
+                                  note,
+                                })
+                              }
+                            >
+                              Approve · add to payroll
+                            </button>
+                          </div>
                         </>
                       )}
                       <div className={s.dialogActions}>
-                        <Link
-                          className={`${s.button} ${s.primary}`}
-                          href="/claims"
-                        >
-                          Open claim review
-                        </Link>
                         {action("View invoice", "invoice")}
                       </div>
                     </>
@@ -1140,11 +1215,17 @@ export default function MemberAdmin({
             ))}
           </section>
         )}
+        {tab === "weeks" && (
+          <MemberBrandWeeksAdmin
+            departments={data.departments.map(({ id, name }) => ({ id, name }))}
+          />
+        )}
+        {tab === "claims" && <MemberClaimRatesAdmin />}
         {tab === "products" && (
           <section className={s.card}>
             <div className={s.sectionHead}>
               <h2>Sales catalogue</h2>
-              <Link className={s.link} href="/revenue/products?tab=modular">
+              <Link className={s.link} href={productListPath({ tab: 'modular' })}>
                 Open Product List › Modular →
               </Link>
             </div>

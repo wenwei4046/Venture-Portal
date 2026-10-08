@@ -117,7 +117,8 @@ export interface ItemGroupRow {
 
 /**
  * A KPI item: a SKU (`product_code`) or a Maintenance special
- * (`option_pool` + `option_value`) — Product List › Add-on / KPI Items.
+ * (`option_pool` + `option_value`) — Rules › KPI items (the Product List's
+ * Add-on / KPI Items until 2026-10-08).
  * Rows written before 2026-09-27 carry no `source` and are SKUs.
  */
 export interface KpiItemRow {
@@ -182,6 +183,8 @@ export interface SalesLineRow {
   line_amount: Num
   brand_code: string | null
   cost_amount: Num
+  /** What its bed frame's divan, leg, gap and total height were charged (2026-10-05). Absent in older fixtures. */
+  option_charge_amount?: Num
   /** The ERP's option summary and structured variants — where specials are read. */
   description2?: string | null
   variants?: unknown
@@ -404,6 +407,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         lineAmount: num(l.line_amount),
         brandCode: l.brand_code ?? undefined,
         costAmount: numOrNull(l.cost_amount) ?? undefined,
+        // Only when there is one: a line without a charge reads exactly as it always has.
+        ...(numOrNull(l.option_charge_amount) ? { optionCharge: numOrNull(l.option_charge_amount)! } : {}),
         ...lineSpecials(l),
       })),
     }))

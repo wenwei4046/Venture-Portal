@@ -1,0 +1,5 @@
+[
+  { "name": "quote-live-viewas", "path": "/member?page=quote&staff=7233abae-3dcd-4d59-a29b-a590bb8fc1a7&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 7000,
+    "actions": [{ "click": "button:has-text('All Akemi models')" }, { "click": "button:has-text('APEX')" }],
+    "dump": "document.querySelector('[role=dialog][aria-label=APEX]')?.innerText.slice(-120)" }
+]

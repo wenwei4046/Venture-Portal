@@ -59,7 +59,8 @@ export async function middleware(request: NextRequest) {
     // is no `id` on it (that was the shape `getUser()` returned).
     const { data: profile } = await supabase.from('users').select('role, is_active').eq('id', user.sub).maybeSingle()
     if (!profile?.is_active) {
-      await supabase.auth.signOut()
+      // This device only — the default ('global') ends the account everywhere.
+      await supabase.auth.signOut({ scope: 'local' })
       return supabaseResponse
     }
     const url = request.nextUrl.clone()

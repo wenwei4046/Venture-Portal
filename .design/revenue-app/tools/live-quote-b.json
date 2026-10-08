@@ -1,0 +1,11 @@
+[
+  { "name": "b-commcal-sep", "path": "/revenue/fair/2026-09-01", "w": 1440, "h": 900, "settle": 8000,
+    "dump": "document.querySelector('main')?.innerText.slice(0, 1400)" },
+  { "name": "b-bill-bedframe", "path": "/revenue/fair/2026-09-01/orders/17e3de0c-cd67-476e-a2c4-49c7a76662f9", "w": 1440, "h": 1400, "settle": 5000,
+    "dump": "document.querySelector('main')?.innerText.slice(0, 2200)" },
+  { "name": "b-maintenance", "path": "/revenue/products?tab=maintenance", "w": 1440, "h": 900, "settle": 5000,
+    "dump": "document.querySelector('main')?.innerText.slice(0, 900)" },
+  { "name": "b-quote-frame", "path": "/member?page=quote&department=71709f7e-9f7c-4e28-80cf-ce21be336995", "settle": 6000,
+    "actions": [{ "click": "button:has-text('Bed frame only')" }],
+    "dump": "document.querySelector('[data-sheet-body]')?.innerText.slice(0, 900)" }
+]

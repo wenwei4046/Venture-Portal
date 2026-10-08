@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 // Per-credit-note document PDF (CN v2, 2026-08-19) — the printable CN the
 // user hands to the billed party. Mirrors invoice-doc-pdf's letterhead and
@@ -89,7 +90,7 @@ function fmtMoney(v: number): string {
 }
 
 function CreditNotePage({ cn }: { cn: CreditNoteDocData }) {
-  const generatedAt = dayjs().format('YYYY-MM-DD HH:mm')
+  const generatedAt = officeTime().format('YYYY-MM-DD HH:mm')
   const remaining = Math.round((cn.invoice_total - cn.other_settled - cn.amount) * 100) / 100
   return (
     <Page size="A4" style={styles.page}>
@@ -108,7 +109,7 @@ function CreditNotePage({ cn }: { cn: CreditNoteDocData }) {
           <Text style={styles.metaLine}>
             <Text style={styles.metaLabel}>Date  </Text>
             <Text style={styles.metaValue}>
-              {cn.created_at ? dayjs(cn.created_at).format('DD MMM YYYY') : '—'}
+              {cn.created_at ? officeTime(cn.created_at).format('DD MMM YYYY') : '—'}
             </Text>
           </Text>
           <Text style={styles.metaLine}>

@@ -1,7 +1,8 @@
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { requirePermission } from '@/lib/auth'
+import { requireAnyAction } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import type { AccountOption } from '@/components/AccountPicker'
@@ -13,7 +14,9 @@ interface Props {
 }
 
 export default async function EditFundSourcePage({ params }: Props) {
-  const user = await requirePermission('treasury')
+  // Two flows share the page: editing a pending request (Treasury · Edit) and
+  // amending a booked fund source (Treasury · Approve).
+  const user = await requireAnyAction(['treasury', 'edit'], ['treasury', 'approve'])
   const { id } = await params
   const supabase = await createClient()
 
@@ -39,8 +42,8 @@ export default async function EditFundSourcePage({ params }: Props) {
   //  - pending_approval  → Finance edits via the create/approval flow (EditFundSourceForm)
   //  - active            → Principal amends terms directly (AmendFundSourceForm)
   //  - anything else     → frozen → bounce to detail
-  const isPending = source.status === 'pending_approval'
-  const isActiveAmend = source.status === 'active' && user.role === 'principal'
+  const isPending = source.status === 'pending_approval' && canDo(user, 'treasury', 'edit')
+  const isActiveAmend = source.status === 'active' && canDo(user, 'treasury', 'approve')
   if (!isPending && !isActiveAmend) {
     redirect(`/fund-in/${id}`)
   }
@@ -78,7 +81,7 @@ export default async function EditFundSourcePage({ params }: Props) {
           repaymentDate={(source.repayment_date as string | null) ?? (source.effective_date as string)}
           compound={(source as { compound_interest?: boolean }).compound_interest === true}
           notes={source.notes ?? ''}
-          nextMonth={dayjs().add(1, 'month').format('YYYY-MM')}
+          nextMonth={officeTime().add(1, 'month').format('YYYY-MM')}
           termsFrom={((source as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null}
         />
       </div>

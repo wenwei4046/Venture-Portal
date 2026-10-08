@@ -1,10 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
-import { formatMoney, formatMoneyBare } from '@/lib/utils'
+import { requirePayrollPayouts } from '@/lib/auth'
+import { fetchAllRows } from '@/lib/paginate'
+import { formatMoney, formatMoneyBare, formatIntlDate } from '@/lib/utils'
+import { OFFICE_TZ } from '@/lib/office-clock'
 import RequestReleaseButton from './_components/RequestReleaseButton'
 
 export default async function InvoicePoolPage() {
-  const user = await requirePermission('treasury')
+  // Each director's invoice payout, by name: Treasury WITH Payroll payouts.
+  const user = await requirePayrollPayouts('treasury')
   const supabase = await createClient()
 
   const { data: transactions } = await supabase
@@ -13,10 +16,12 @@ export default async function InvoicePoolPage() {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  // Calculate balance
-  const { data: allTxns } = await supabase
-    .from('invoice_payout_pool')
-    .select('transaction_type, amount')
+  // Calculate balance — over every pool row, in 1000-row pages (2026-10-08):
+  // past PostgREST's cap an unranged read would short the balance silently.
+  // A failed read still shows the empty pool it always did.
+  const allTxns = await fetchAllRows((lo, hi) =>
+    supabase.from('invoice_payout_pool').select('transaction_type, amount').order('id').range(lo, hi),
+  ).catch(() => null)
 
   let balance = 0
   for (const t of allTxns ?? []) {
@@ -85,7 +90,7 @@ export default async function InvoicePoolPage() {
                 return (
                   <tr key={t.id} className="border-b border-hairline last:border-0 hover:bg-surface-2/40 transition-colors">
                     <td className="py-4 pr-4 font-mono text-xs text-muted">
-                      {new Date(t.created_at).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatIntlDate(new Date(t.created_at), { day: 'numeric', month: 'short', year: 'numeric', timeZone: OFFICE_TZ })}
                     </td>
                     <td className="py-4 pr-4">
                       <em className={`font-serif text-sm ${isIn ? 'text-ledger' : 'text-alert'}`}>

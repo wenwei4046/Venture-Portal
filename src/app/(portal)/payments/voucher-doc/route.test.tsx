@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ requirePermission: vi.fn(), createClient: vi.fn(), exportPdfResponse: vi.fn() }))
-vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/auth', () => ({ requirePermission: mocks.requirePermission, requireAction: mocks.requirePermission, requireAnyAction: mocks.requirePermission, requirePayrollPayoutsAction: mocks.requirePermission }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/export/response', () => ({ exportPdfResponse: mocks.exportPdfResponse }))
 import { GET } from './route'
@@ -39,7 +39,7 @@ function mockDatabase(vouchers: ReturnType<typeof voucher>[], coverageError: obj
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requirePermission.mockResolvedValue({ role: 'principal', permissions: ['treasury'] })
+  mocks.requirePermission.mockResolvedValue({ role: 'principal', permissions: ['treasury', 'payroll_payouts'] })
   mocks.exportPdfResponse.mockResolvedValue(new Response('pdf'))
 })
 
@@ -47,7 +47,7 @@ describe('voucher PDF statutory coverage', () => {
   it('adds only immutable coverage for the requested statutory PV and preserves other voucher data', async () => {
     const { from, calls } = mockDatabase([voucher('stat', 'payroll_statutory'), voucher('salary', 'payroll_disbursement')])
     await GET(new Request('http://localhost/payments/voucher-doc?ids=stat,salary'))
-    expect(mocks.requirePermission).toHaveBeenCalledWith('treasury', 'hr_costing')
+    expect(mocks.requirePermission).toHaveBeenCalledWith(['treasury', 'export'], ['hr_costing', 'export'])
     expect(calls).toContainEqual({ table: 'payroll_statutory_voucher_lines', column: 'voucher_id', values: ['stat'] })
     expect(from.mock.calls.map(([table]) => table)).not.toContain('hr_monthly_payroll')
     const docs = mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers
@@ -115,5 +115,25 @@ describe('voucher PDF statutory coverage', () => {
     const response = await GET(new Request('http://localhost/payments/voucher-doc?id=ordinary'))
     expect(response.status).toBe(404)
     expect(mocks.exportPdfResponse).not.toHaveBeenCalled()
+  })
+
+  // 2026-10-02: a payroll voucher prints who is paid what, and into which account.
+  it('prints no payroll voucher for a treasury account without Payroll payouts', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    const { from } = mockDatabase([voucher('salary', 'payroll_disbursement'), voucher('stat', 'payroll_statutory'), voucher('fund', 'payroll_payment_request')])
+    const response = await GET(new Request('http://localhost/payments/voucher-doc?ids=salary,stat,fund'))
+    expect(response.status).toBe(404)
+    expect(mocks.exportPdfResponse).not.toHaveBeenCalled()
+    expect(from).not.toHaveBeenCalledWith('payroll_voucher_lines')
+    expect(from).not.toHaveBeenCalledWith('payroll_statutory_voucher_lines')
+  })
+
+  it('…and from a mixed selection prints only what that account may see', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    const { from } = mockDatabase([voucher('ordinary', null), voucher('salary', 'payroll_disbursement')])
+    const response = await GET(new Request('http://localhost/payments/voucher-doc?ids=ordinary,salary'))
+    expect(response.status).toBe(200)
+    expect(mocks.exportPdfResponse.mock.calls[0][0].element.props.vouchers.map((v: { id: string }) => v.id)).toEqual(['ordinary'])
+    expect(from).not.toHaveBeenCalledWith('payroll_voucher_lines')
   })
 })

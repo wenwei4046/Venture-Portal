@@ -11,22 +11,26 @@ import {
   canApprove,
   canApproveClaims,
   canSeeIndividualSalary,
+  canSeePayrollPayouts,
   canAccessTeam,
 } from './roles'
 import type { UserRole } from '@/types'
+import { actionsFromKeys } from './permission-actions'
 
 // The seed in the permission_catalog migration, transcribed. Two things are
 // being pinned at once: that the helpers read permissions, and that the seed
 // still reproduces what the four roles could do before 2026-09-01 — which is
 // the whole argument for why that cutover changed nobody's access.
 const ROLE_DEFAULTS: Record<UserRole, string[]> = {
+  // No defaults at all (2026-10-08): a staff account is its title's template.
+  staff: [],
   revenue_member: ['member_portal', 'member_quote', 'member_requests', 'member_memos'],
   principal: [
     'dashboard', 'approvals', 'treasury', 'billing', 'categories', 'hr_costing',
     'revenue', 'product_list', 'director_salary', 'director_pool', 'team',
     'team_invite', 'salary_individual', 'dept_pool', 'venture_pool', 'opex',
     'claims', 'claims_approve', 'reports', 'dept_reports', 'reconciliation',
-    'audit_log', 'settings', 'override', 'permissions_manage',
+    'audit_log', 'settings', 'override', 'permissions_manage', 'payroll_payouts',
   ],
   finance: [
     'dashboard', 'treasury', 'billing', 'categories', 'dept_pool',
@@ -41,7 +45,8 @@ const ROLE_DEFAULTS: Record<UserRole, string[]> = {
 }
 
 const ALL_ROLES: UserRole[] = ['principal', 'finance', 'hr', 'dept_manager', 'revenue_member']
-const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role] })
+// As loadUser() answers an account with no template: its keys, and the actions they allow.
+const as = (role: UserRole) => ({ permissions: ROLE_DEFAULTS[role], actions: actionsFromKeys(ROLE_DEFAULTS[role], role) })
 
 /** Assert exactly which roles a gate lets through, so a widening is a failure. */
 function allows(gate: (u: { permissions: string[] }) => boolean, expected: UserRole[]) {
@@ -102,6 +107,12 @@ describe('the gates, on the seeded role defaults', () => {
   it('canAccessTeam: principal + hr', () => {
     allows(canAccessTeam, ['principal', 'hr'])
   })
+
+  it('canSeePayrollPayouts: principal + hr — a finance account does not get it from its role', () => {
+    // 2026-10-02: the finance account that existed that day holds it as a
+    // personal grant; one created later is given it by the Principal, or not.
+    allows(canSeePayrollPayouts, ['principal', 'hr'])
+  })
 })
 
 describe('the gates, on a configured title', () => {
@@ -120,6 +131,14 @@ describe('the gates, on a configured title', () => {
     expect(canAccessTreasury(juniorFinance)).toBe(true)
     expect(canAccessReports(juniorFinance)).toBe(false)
     expect(canAccessDeptPool(juniorFinance)).toBe(false)
+  })
+
+  it('lets one person be granted payroll payouts on top of what treasury gives', () => {
+    const financeExecutive = { permissions: ['dashboard', 'treasury', 'billing'] }
+    const financeManager = { permissions: [...financeExecutive.permissions, 'payroll_payouts'] }
+    expect(canAccessTreasury(financeExecutive)).toBe(true)
+    expect(canSeePayrollPayouts(financeExecutive)).toBe(false)
+    expect(canSeePayrollPayouts(financeManager)).toBe(true)
   })
 
   it('holds nothing for an empty set', () => {

@@ -4,6 +4,83 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — Nobody without a portal account reaches a DEFINER function
+`current_user_role()` refuses a sign-in with no active portal account (a self-made sign-up,
+a switched-off account whose session lives on) instead of answering NULL, and the
+publishable key may call no SECURITY DEFINER function except the five row-policy helpers.
+Before, ~60 functions guarded with `IF v_role NOT IN (…)` let all three through (NULL is
+not "not in"); the publishable key read director payouts and staff allocations that way.
+Mig `20261009000100`; CLAUDE.md › Do NOT.
+---
+⚡ AMENDMENT 2026-10-08 — Each action takes effect (PR2)
+A write now asks for the ACTION it is, not the module key: `requireAction('treasury',
+'create')` in the app, `has_action()` in the database, answered by `current_actions()` —
+a titled person's template cells (their own cells over them), else what the account's
+keys allowed (`permission_key_actions`, so the four shared accounts lost and gained
+nothing). A cell counts only while one of the keys that open its function's pages is
+held. What each cell opens:
+  Treasury       Create = raise a voucher, receipt, loan, fund source, BA, statement run,
+                 overdue escalation · Edit = change one, move it along (issue, mark
+                 paid, settle, back to draft, a paid voucher's date or GL account) ·
+                 Void = void, withdraw, cancel, reverse · Export = files ·
+                 Approve = amend a booked loan or fund source, approve a credit note
+                 (and, next step, Treasury's approvals)
+  Billing        Create = invoices, contracts, credit notes, receipts, generations ·
+                 Edit = drafts, issuing, the allocator · Void = issued invoices,
+                 approved credit notes · Export = invoice / credit-note PDFs
+  Chart of Acct  Manage = accounts and departments
+  HR Costing     Create = open a month, import, submit to Finance, raise salary and
+                 statutory PVs, a top-up · Edit = rows, Complete, unlock, Total
+                 Close, allocation splits · Export = bank and statutory files ·
+                 Approve = (next step) approving a payroll run
+  Revenue        Create = a sales import · Edit = the month and the hierarchy
+                 (picks, shares, Don't count, closes, ERP matches) · Manage = rules,
+                 KPI items, the ERP link, the cutover · Approve / Export = nothing yet
+  Product list   Edit = every Save on the Product List
+  Director Sal.  Edit = the month, its import, Complete and its undo ·
+                 Approve = (next step) Invoice Pool releases
+  Director Pool  Edit = the calculator
+  Team & roster  Create = add people (by hand or InfoTech) · Edit = change a person,
+                 the reporting line · Manage = titles and the ladder
+  Logins         Create = invite · Manage = templates, a person's cells, deleting a title
+  My Billing     Create (Dept) = the department's invoices and requests
+  Claims         Create (Own) = raise a claim · Approve = approve, reject, mark paid
+  Reconciliation Create = upload a statement, a journal voucher · Edit = match,
+                 contra, ignore, delete · Approve = mark a session done
+  Reports        Export = report files (Dept reports at Dept)
+  Settings       Manage = everything on Settings
+  Approvals      View = the queue (its own key, `approvals_queue`) · Approve = every
+                 request in it
+  Approve by domain (2026-10-09): Treasury · Approve decides vouchers, loans, fund
+  sources and their cancellations, department expenses / payment requests;
+  HR Costing · Approve decides payroll runs; Director Salary · Approve decides
+  Invoice Pool releases. Nobody decides a request they raised, except the Principal.
+A cell nothing acts on yet (Revenue · Approve, Venture Pool · Create, Claims · Edit …)
+gives nothing; the matrix does not list it as held. Reading a page still follows its
+module key, and Own / Dept rows reach RLS in the next step.
+---
+⚡ AMENDMENT 2026-10-08 — The app-wide history (Audit Log › Changes)
+Every change people make through the portal is kept (`audit_events`, as `audit_tables`
+says — CLAUDE.md › THE APP-WIDE HISTORY), and READING IT FOLLOWS THE READER'S OWN
+PERMISSIONS: a table's changes are listed only to holders of one of its `read_keys`
+(Finance: Treasury, Payments, Billing, Pools, Accounting; HR: Payroll, People, Directors,
+Revenue, Member services; `audit_log` = the Principal: everything), a payroll voucher's
+only with Payroll payouts or HR Costing, and salary / NRIC / bank values only where the
+reader's title (or account kind) may see them — blanked otherwise. Nobody reads the
+table directly; `audit_changes()` decides. Audit Log › Access (who read what) stays
+`audit_log` only. A department head reads no history until own / dept scopes reach RLS.
+---
+⚡ AMENDMENT 2026-10-08 — Permission templates (People Management › Permissions)
+The four roles below are no longer what a person gets. A TITLE points at a permission
+TEMPLATE: function × action (view create edit approve void export manage) × scope
+(own / dept / all), plus the salary / NRIC / bank fields it may see; one person can be
+raised or lowered on a cell. Ten templates are seeded (Ultimate full access, Full access,
+Director, Executive office, Finance · Checker, Finance · Maker, HR · Payroll, Department
+head, Staff · Basic, Revenue Team). Until the gates enforce each cell (the next three
+steps), a cell opens the old module key only where that key cannot reach further than
+the cell — see CLAUDE.md › Permissions › PERMISSION TEMPLATES. The four shared accounts
+(no person behind them) keep the role tables below until moved onto a person.
+---
 ⚡ AMENDMENT 2026-07-16 — Unified Portal (one login, all tabs)
 Principal 现在拥有全模块的完整写权限(write parity):下表中标 "✅ 写" 给 Finance / HR
 而 Principal 标 ❌ 的格子,一律视为 Principal 也 ✅ 写。落地在三层:

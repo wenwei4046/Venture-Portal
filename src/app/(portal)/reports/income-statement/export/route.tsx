@@ -1,8 +1,9 @@
 // GL-driven P&L export (xlsx/pdf) — same engine + block structure as the page.
 
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { buildPnl, fetchAllJournalLines, fetchCoaAccounts, monthPeriod } from '@/lib/gl-reports'
 import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
 import { pnlBlocks } from '@/lib/gl-report-blocks'
@@ -12,10 +13,10 @@ import { segmentFilterFor } from '../../_components/report-segments'
 const YM = /^\d{4}-\d{2}$/
 
 export async function GET(req: Request) {
-  await requirePermission('reports')
+  await requireAction('reports', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? ('pdf' as const) : ('xlsx' as const)
-  const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
+  const period = url.searchParams.get('period') ?? officeMonth()
   const compare = url.searchParams.get('compare') ?? '' // '' = single-month export
   const segment = url.searchParams.get('segment') ?? ''
   if (!YM.test(period) || (compare && !YM.test(compare))) {

@@ -240,12 +240,20 @@ export function downlineBranches(rows: readonly MemberDownlineRow[]): DownlineBr
     .sort((a, b) => b.total.sales - a.total.sales || a.leader.name.localeCompare(b.leader.name));
 }
 
+/**
+ * A moment's calendar fields as the office reads them (UTC+8): `getUTC*` on
+ * the result is the office's year, month and day. Read straight off the
+ * moment they were UTC's — a day behind until 08:00, a month behind on the 1st.
+ */
+const officeCalendar = (at: Date) => new Date(at.getTime() + 8 * 3_600_000);
+
 /** Days since somebody's last cleared order. Null when they have never had one. */
 export function daysSince(last: string | null, today: Date = new Date()): number | null {
   if (!last) return null;
   const then = new Date(`${last}T00:00:00Z`);
   if (!Number.isFinite(then.getTime())) return null;
-  const now = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const office = officeCalendar(today);
+  const now = Date.UTC(office.getUTCFullYear(), office.getUTCMonth(), office.getUTCDate());
   return Math.max(0, Math.round((now - then.getTime()) / 86400000));
 }
 
@@ -298,8 +306,9 @@ export function monthPace(sales: number, period: string, now: Date = new Date())
   const year = Number(match[1]);
   const month = Number(match[2]);
   const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const sameMonth = now.getUTCFullYear() === year && now.getUTCMonth() + 1 === month;
-  const elapsed = sameMonth ? Math.min(days, Math.max(1, now.getUTCDate())) : days;
+  const office = officeCalendar(now);
+  const sameMonth = office.getUTCFullYear() === year && office.getUTCMonth() + 1 === month;
+  const elapsed = sameMonth ? Math.min(days, Math.max(1, office.getUTCDate())) : days;
   // A finished month has a result, not a projection — and dividing then
   // multiplying by the same number would only add float noise to it.
   return { elapsed, days, projected: elapsed >= days ? sales : (sales / elapsed) * days };

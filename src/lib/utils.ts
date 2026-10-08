@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { officeDay, officeTime } from '@/lib/office-time'
 
 export function formatMoney(amount: number | null | undefined): string {
   const val = amount ?? 0
@@ -32,12 +32,36 @@ export function formatRate(rate: number): string {
   return `${(rate * 100).toFixed(2)}%`
 }
 
+/**
+ * The day of a date or a moment, on the office's calendar. A date column
+ * (`2026-10-09`) is the day it names; a moment (a timestamp, a Date) is the
+ * office's day it fell on — read on the server's own clock (UTC on Vercel)
+ * an ERP sync at 07:30 in the office printed as the day before.
+ */
+const officeCalendar = (date: string | Date) => (typeof date === 'string' ? officeDay(date) : officeTime(date))
+
 export function formatDate(date: string | Date): string {
-  return dayjs(date).format('DD MMM YYYY')
+  return officeCalendar(date).format('DD MMM YYYY')
 }
 
 export function formatMonth(date: string | Date): string {
-  return dayjs(date).format('MMM YYYY')
+  return officeCalendar(date).format('MMM YYYY')
+}
+
+/**
+ * `Intl.DateTimeFormat` with a three-letter month: "4 Sep 2026", never
+ * "4 Sept 2026". en-GB and en-MY spell September "Sept" in current ICU (CLDR
+ * 38+) and every other month in three letters, so a page that used them read
+ * "Sept" beside formatDate()'s "Sep" (2026-10-03, the Arena's Fair results
+ * against its brand weeks). DESIGN.md › Date format: "9 Apr 2026". The locale
+ * still sets the order and the clock ("4 Sep, 12:00 am" in en-MY); only the
+ * month's NAME is cut to three letters.
+ */
+export function formatIntlDate(date: Date, options: Intl.DateTimeFormatOptions, locale = 'en-MY'): string {
+  return new Intl.DateTimeFormat(locale, options)
+    .formatToParts(date)
+    .map((part) => (part.type === 'month' && options.month === 'short' ? part.value.slice(0, 3) : part.value))
+    .join('')
 }
 
 // Returns the first day of the month (YYYY-MM-01) for the given date, or for

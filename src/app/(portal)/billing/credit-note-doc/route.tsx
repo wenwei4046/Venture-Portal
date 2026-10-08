@@ -4,13 +4,13 @@
 // Mirrors ../invoice-doc/route.tsx so the two documents share one pattern.
 
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { exportPdfResponse } from '@/lib/export/response'
 import { CreditNoteDocPdf, type CreditNoteDocData } from '../_format/credit-note-doc-pdf'
-import dayjs from 'dayjs'
+import { officeTime } from '@/lib/office-time'
 
 export async function GET(req: Request) {
-  await requirePermission('billing')
+  await requireAction('billing', 'export')
   const url = new URL(req.url)
   const id = url.searchParams.get('id')?.trim() || null
   const idsParam = url.searchParams.get('ids')?.trim() || null
@@ -133,7 +133,7 @@ export async function GET(req: Request) {
   const filename =
     id && docs.length === 1
       ? `credit-note-${docs[0].credit_note_no ?? docs[0].id.slice(0, 8)}`
-      : `credit-notes-batch-${dayjs().format('YYYYMMDD')}-${docs.length}`
+      : `credit-notes-batch-${officeTime().format('YYYYMMDD')}-${docs.length}`
 
   return exportPdfResponse({ filename, element: <CreditNoteDocPdf creditNotes={docs} /> })
 }

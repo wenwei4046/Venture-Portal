@@ -24,9 +24,15 @@ type Listener = () => void
 const startListeners = new Set<Listener>()
 const skeletonListeners = new Set<Listener>()
 let skeletons = 0
+// When the last navigation began and a skeleton last came on screen (performance.now()) — what tells a page
+// answered from the router's memory from one the server just rendered (lib/route-freshen.ts).
+let startedAt: number | null = null
+let skeletonAt: number | null = null
+const clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
 
 /** A client navigation has begun. Called from instrumentation-client. */
 export function navigationStarted(): void {
+  startedAt = clock()
   for (const listener of startListeners) {
     try {
       listener()
@@ -46,7 +52,13 @@ export function onNavigationStart(listener: Listener): () => void {
 /** A route skeleton is on screen. Pair every call with skeletonHidden(). */
 export function skeletonShown(): void {
   skeletons += 1
+  skeletonAt = clock()
   notifySkeletons()
+}
+
+/** When the last client navigation began, and when a route skeleton last came on screen. */
+export function navigationTimes(): { startedAt: number | null; skeletonAt: number | null } {
+  return { startedAt, skeletonAt }
 }
 
 export function skeletonHidden(): void {

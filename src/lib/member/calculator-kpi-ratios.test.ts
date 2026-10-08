@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { calculateQuote, type QuotePricing } from "./calculator";
-import { quoteCostRatios, quoteKpiItems } from "./quote-rules";
+import { quoteCostRatios, quoteCostRules, quoteKpiItems } from "./quote-rules";
 import type { MemberBand, MemberProduct, QuoteInput, QuoteRules } from "./types";
 
 /**
- * Product List › Costing Setting and › Add-on / KPI Items in the calculator
+ * Product List › Costing Setting and Rules › KPI items in the calculator
  * (2026-09-27): a SKU's own cost ratio, and a cart's KPI items paid flat as
  * KPI — so its margin is the main price's, the one the run will judge.
  */
@@ -85,8 +85,12 @@ describe("a SKU's own cost ratio", () => {
   });
 });
 
-describe("KPI items in the cart — paid flat as KPI, outside the margin", () => {
-  it("takes a bed frame special's amount off the price the margin is taken on", () => {
+// 2026-10-05: the price keyed is the SELLING price (the prototype's keypad).
+// A KPI item the customer buys rides on top of it, out of the margin, paid flat
+// as KPI; one given free comes off it. The run reads the bill the same way:
+// its sales are price + K, its main sales — the rate's and the margin's — price.
+describe("KPI items in the cart — paid flat as KPI, on top of the price, outside the margin", () => {
+  it("puts a bed frame special's amount on top of the price; the margin is the price's", () => {
     const r = calculateQuote(
       quote([one("y04-q")], { bedframe: { specials: ["HB Straight"] } }, "2000"),
       products,
@@ -96,8 +100,10 @@ describe("KPI items in the cart — paid flat as KPI, outside the margin", () =>
     );
     expect(r.valid).toBe(true);
     expect(r.kpiAmount).toBe(200);
+    expect(r.addOnAmount).toBe(200);
     expect(r.kpiItems).toEqual([{ label: "HB Straight", qty: 1, amount: 200 }]);
-    expect(r.margin).toBeCloseTo(((1800 - 800) / 1800) * 100, 10);
+    expect(r.margin).toBeCloseTo(((2000 - 800) / 2000) * 100, 10);
+    expect(r.customerPays).toBe(2200);
   });
 
   it("counts a bed frame special on every bed frame", () => {
@@ -109,7 +115,8 @@ describe("KPI items in the cart — paid flat as KPI, outside the margin", () =>
       pricing,
     );
     expect(r.kpiAmount).toBe(400);
-    expect(r.margin).toBeCloseTo(((3600 - 1600) / 3600) * 100, 10);
+    expect(r.margin).toBeCloseTo(((4000 - 1600) / 4000) * 100, 10);
+    expect(r.customerPays).toBe(4400);
   });
 
   it("counts a sofa special once, however many modules the sofa has", () => {
@@ -121,23 +128,28 @@ describe("KPI items in the cart — paid flat as KPI, outside the margin", () =>
       pricing,
     );
     expect(r.kpiAmount).toBe(150);
-    // Cost: 1,000 + 1,500 plus Nylon's RM 50 surcharge on each module.
-    expect(r.margin).toBeCloseTo(((5850 - 2600) / 5850) * 100, 10);
+    // Cost: 1,000 + 1,500. Nylon's RM 50 on Maintenance is the customer's (2026-10-06),
+    // charged once for the sofa — not a cost on each module.
+    expect(r.margin).toBeCloseTo(((6000 - 2500) / 6000) * 100, 10);
+    expect(r.optionCharge).toBe(50);
+    expect(r.customerPays).toBe(6000 + 150 + 50);
   });
 
-  it("prices the next tier as K + cost ÷ (1 − t)", () => {
+  it("prices the next tier as cost ÷ (1 − t) — the selling price, the add-on still on top", () => {
     const r = calculateQuote(
-      quote([one("a")], { ...sofa, specials: ["Nylon Fabric"] }, "1400"),
+      quote([one("a")], { ...sofa, specials: ["Nylon Fabric"] }, "1250"),
       products,
       bands,
       { costDivisor: 1, kpiItems: [NYLON] },
       pricing,
     );
-    // 1,250 of main sales against 1,050 of cost: 16%, below the 20% bar.
-    expect(r.margin).toBeCloseTo(16, 10);
+    // 1,250 of selling price against 1,000 of cost: 20%, on the 20% bar. Nylon's RM 50
+    // rides on top with the KPI item — the customer's, not a cost (2026-10-06).
+    expect(r.margin).toBeCloseTo(20, 10);
     expect(r.multiplier).toBe(0.5);
     expect(r.nextThreshold).toBe(30);
-    expect(r.nextPrice).toBe(1650); // 150 + 1,050 ÷ 0.70
+    expect(r.nextPrice).toBe(1428.58); // 1,000 ÷ 0.70, up to the cent
+    expect(r.customerPays).toBe(1250 + 150 + 50);
   });
 
   it("finds a KPI SKU by its code", () => {
@@ -149,39 +161,31 @@ describe("KPI items in the cart — paid flat as KPI, outside the margin", () =>
       pricing,
     );
     expect(r.kpiAmount).toBe(100);
-    expect(r.margin).toBeCloseTo(((1900 - 800) / 1900) * 100, 10);
+    expect(r.margin).toBeCloseTo(((2000 - 800) / 2000) * 100, 10);
   });
 
   it("changes nothing for a special the cart does not carry", () => {
     const r = calculateQuote(quote([one("y04-q")], undefined, "2000"), products, bands, { costDivisor: 1, kpiItems: [HB_STRAIGHT] }, pricing);
     expect(r.kpiAmount).toBe(0);
     expect(r.margin).toBeCloseTo(60, 10);
+    expect(r.customerPays).toBe(2000);
   });
 
-  it("judges a price that does not cover the KPI items whole, and pays no KPI — as the run does", () => {
+  it("takes a FREE KPI item off the price: the customer pays nothing for it", () => {
+    const gift = { ...products.find((p) => p.id === "y04-q")!, id: "y04-gift", gift: true };
     const r = calculateQuote(
-      quote([one("y04-q")], { bedframe: { specials: ["HB Straight"] } }, "150"),
-      products,
+      quote([one("y04-q"), { productId: "y04-gift", quantity: 1, gift: true }], undefined, "2000"),
+      [...products, gift],
       bands,
-      { costDivisor: 1, kpiItems: [HB_STRAIGHT] },
+      { costDivisor: 1, kpiItems: [{ source: "sku", productCode: "Y04-(Q)", kpiAmount: 100 }] },
       pricing,
     );
     expect(r.valid).toBe(true);
-    expect(r.kpiAmount).toBe(0);
-    expect(r.kpiNotPaid).toBe(200);
-    expect(r.margin).toBeCloseTo(((150 - 800) / 150) * 100, 10);
-  });
-
-  it("asks for more when the KPI items take the whole price", () => {
-    const r = calculateQuote(
-      quote([one("y04-q")], { bedframe: { specials: ["HB Straight"] } }, "200"),
-      products,
-      bands,
-      { costDivisor: 1, kpiItems: [HB_STRAIGHT] },
-      pricing,
-    );
-    expect(r.valid).toBe(false);
-    expect(r.error).toMatch(/take the whole price/);
+    expect(r.kpiAmount).toBe(200);
+    expect(r.addOnAmount).toBe(100);
+    // 2,000 less the free one's 100, against both frames' 1,600.
+    expect(r.margin).toBeCloseTo(((1900 - 1600) / 1900) * 100, 10);
+    expect(r.customerPays).toBe(2100);
   });
 });
 
@@ -193,6 +197,17 @@ describe("the quote context's rules, read defensively", () => {
     ]);
     expect(quoteCostRatios(null)).toEqual([]);
     expect(quoteCostRatios([0.6])).toEqual([]);
+  });
+
+  // 2026-10-05: the cost rules arrive from member_quote_cost_rules (service role only).
+  it("reads the cost rules, and refuses an answer with no usable ratio", () => {
+    expect(quoteCostRules({ costDivisor: "0.7000", costRatios: { "Y04-(Q)": 0.6, bad: -1 } })).toEqual({
+      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }],
+    });
+    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [] });
+    for (const raw of [null, undefined, [], {}, { costDivisor: null }, { costDivisor: 0 }, { costDivisor: -0.7 }, { costDivisor: "abc" }, { costDivisor: "" }, { costDivisor: true }]) {
+      expect(quoteCostRules(raw)).toBeNull();
+    }
   });
 
   it("reads the KPI items the context sends, and nothing else", () => {

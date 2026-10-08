@@ -97,8 +97,9 @@ function fixture(): CommissionWorkbenchData {
       { staffId: 'leader', name: 'Alex', employeeCode: 'HV002' },
     ],
     orders: [
-      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null },
-      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null },
+      // The handwritten bill's number beside the ERP's (2026-10-03); 'two' was keyed with none.
+      { orderId: 'one', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, booth: null, refNo: 'HC13369', paperNo: 'HC13369' },
+      { orderId: 'two', venue: 'Convention Centre', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL', fair: null, booth: null, refNo: null, paperNo: null },
     ],
   }
 }
@@ -297,11 +298,13 @@ describe('CommissionWorkbench', () => {
     expect(within(table).queryByText('SO-one')).toBeNull()
     const row = salesRow(table, 'SO-two')
     const cells = within(row).getAllByRole('cell')
-    expect(cells[1]).toHaveTextContent('Anthony')
-    expect(cells[4]).toHaveTextContent('RM 2,000.00')
-    expect(cells[6]).toHaveTextContent('RM 100.005% of the bill')
-    expect(cells[7]).toHaveTextContent('RM 600.0030% of the bill')
-    expect(cells[8]).toHaveTextContent('RM 500.00')
+    // SO-two was keyed into the ERP with no Ref No. (2026-10-03).
+    expect(cells[1]).toHaveTextContent('No Ref No. in the ERP')
+    expect(cells[2]).toHaveTextContent('Anthony')
+    expect(cells[5]).toHaveTextContent('RM 2,000.00')
+    expect(cells[7]).toHaveTextContent('RM 100.005% of the bill')
+    expect(cells[8]).toHaveTextContent('RM 600.0030% of the bill')
+    expect(cells[9]).toHaveTextContent('RM 500.00')
     expect(within(row).getByRole('link', { name: 'SO-two' })).toHaveAttribute('href',
       `/revenue/fair/2026-08-01/orders/two?from=${encodeURIComponent('/revenue/fair/2026-08-01?view=deposit')}`)
     expect(screen.getByText('Still to collect', { selector: 'span' }).parentElement).toHaveTextContent('RM 500.00')
@@ -336,31 +339,63 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByText('Every bill has met its deposit.')).toBeVisible()
   })
 
-  it('shows Sales by venue as a tab in the same table, reading each fair rather than picking one', () => {
+  // Sales by venue became Sales exhibition (user 2026-10-03): one venue,
+  // organiser and days with two brands is two exhibitions, each its own row.
+  it('shows Sales exhibition as a tab in the same table — one row per brand at each fair', () => {
     render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats}
-      venues={[
-        { key: 'fair:f1', venueKey: 'ARENA', displayName: 'Arena', fairId: 'f1', event: '12–14 Aug', organizer: 'Fair Co', orders: 2, people: 1, total: 3_000, commissionable: 2_800 },
-        { key: 'place:HALL', venueKey: 'HALL', displayName: 'Hall', fairId: null, event: null, organizer: null, orders: 1, people: 1, total: 500, commissionable: 500 },
+      exhibitions={[
+        { key: 'fair:f1|AKEMI', brand: 'AKEMI', venueKey: 'ARENA', displayName: 'Arena', fairId: 'f1', event: '12–14 Aug', organizer: 'Fair Co', orders: 2, people: 1, total: 3_000, commissionable: 2_800 },
+        { key: 'fair:f1|DUNLOP', brand: 'DUNLOP', venueKey: 'ARENA', displayName: 'Arena', fairId: 'f1', event: '12–14 Aug', organizer: 'Fair Co', orders: 1, people: 1, total: 800, commissionable: 800 },
+        { key: 'place:HALL|', brand: null, venueKey: 'HALL', displayName: 'Hall', fairId: null, event: null, organizer: null, orders: 1, people: 1, total: 500, commissionable: 500 },
       ]} />)
-    const tab = screen.getByRole('tab', { name: /^Sales by venue/ })
-    expect(tab).toHaveTextContent('2')
+    expect(screen.queryByRole('tab', { name: /Sales by venue/ })).toBeNull()
+    const tab = screen.getByRole('tab', { name: /^Sales exhibition/ })
+    expect(tab).toHaveTextContent('3')
     fireEvent.click(tab)
-    const table = screen.getByRole('table', { name: 'Sales by venue' })
+    expect(window.location.search).toBe('?view=exhibition')
+    const table = screen.getByRole('table', { name: 'Sales exhibition' })
     expect(within(table).getAllByRole('columnheader').map(h => h.textContent))
-      .toEqual(['Venue', 'Event', 'Organizer', 'Salespeople', 'Bills', 'Sales value'])
-    const arena = salesRow(table, 'Arena')
-    expect(arena).toHaveTextContent('12–14 Aug')
-    expect(arena).toHaveTextContent('Fair Co')
-    expect(arena).toHaveTextContent('RM 3,000.00RM 200.00 no commission')
-    expect(within(arena).getByRole('link', { name: 'Arena' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?venue=ARENA')
-    expect(within(salesRow(table, 'Hall')).getAllByText('Not linked')).toHaveLength(2)
-    // Nothing to pick here any more: the fair calendar locates every bill.
+      .toEqual(['Brand', 'Venue', 'Event', 'Organizer', 'Salespeople', 'Bills', 'Sales value'])
+    const akemi = salesRow(table, 'AKEMI')
+    expect(akemi).toHaveTextContent('Arena')
+    expect(akemi).toHaveTextContent('12–14 Aug')
+    expect(akemi).toHaveTextContent('Fair Co')
+    expect(akemi).toHaveTextContent('RM 3,000.00RM 200.00 no commission')
+    // The venue opens exactly that exhibition's bills: this fair, this brand.
+    expect(within(akemi).getByRole('link', { name: 'Arena' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?fair=f1&brand=AKEMI')
+    expect(within(salesRow(table, 'DUNLOP')).getByRole('link', { name: 'Arena' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?fair=f1&brand=DUNLOP')
+    const hall = salesRow(table, 'Hall')
+    expect(hall).toHaveTextContent('No brand')
+    expect(within(hall).getAllByText('Not linked')).toHaveLength(2)
+    expect(within(hall).getByRole('link', { name: 'Hall' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/orders?venue=HALL&fair=none&brand=none')
+    // Nothing to pick here: the ERP names every bill's fair.
     expect(within(table).queryByRole('combobox')).toBeNull()
-    expect(within(table).queryByText(/same place as/)).toBeNull()
-    expect(salesRow(table, 'All venues')).toHaveTextContent('RM 3,500.00')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search venues' }), { target: { value: 'fair co' } })
+    expect(salesRow(table, 'All exhibitions')).toHaveTextContent('3 exhibitions')
+    expect(salesRow(table, 'All exhibitions')).toHaveTextContent('RM 4,300.00')
+
+    // One brand's exhibitions at a time, from the brands on the tab (no brand last).
+    const brands = screen.getByRole('combobox', { name: 'Filter exhibitions by brand' })
+    expect(within(brands).getAllByRole('option').map(o => o.textContent)).toEqual(['All brands', 'AKEMI', 'DUNLOP', 'No brand'])
+    fireEvent.change(brands, { target: { value: 'DUNLOP' } })
+    expect(window.location.search).toBe('?view=exhibition&brand=DUNLOP')
+    expect(within(table).queryByText('AKEMI')).toBeNull()
+    expect(salesRow(table, 'Visible exhibitions')).toHaveTextContent('RM 800.00')
+    fireEvent.change(brands, { target: { value: 'none' } })
+    expect(salesRow(table, 'Visible exhibitions')).toHaveTextContent('RM 500.00')
+    fireEvent.change(brands, { target: { value: '' } })
+
+    // The search reads the brand as well as the venue and organiser.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search exhibitions' }), { target: { value: 'akemi' } })
     expect(within(table).queryByText('Hall')).toBeNull()
-    expect(salesRow(table, 'Visible venues')).toHaveTextContent('RM 3,000.00')
+    expect(within(table).queryByText('DUNLOP')).toBeNull()
+    expect(salesRow(table, 'Visible exhibitions')).toHaveTextContent('RM 3,000.00')
+  })
+
+  it('opens Sales exhibition from a link to the old Sales by venue', () => {
+    visit('?view=venue')
+    render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats} exhibitions={[]} />)
+    expect(screen.getByRole('tab', { name: /^Sales exhibition/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('No bills this month.')).toBeVisible()
   })
 
   // The two panels that sat above the month's cards became the rail's last
@@ -492,6 +527,31 @@ describe('CommissionWorkbench', () => {
       lockedPeriods={['2026-08-01']} />)
     choose('Anthony')
     expect(within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Don’t count' })).toBeDisabled()
+  })
+
+  // User 2026-10-03: follow erp sales order number, but with reference
+  // hc123123 (which is paper sales order number).
+  it('shows each bill’s Ref No. — the handwritten bill’s number — beside the ERP’s, and finds a bill by it', () => {
+    renderBoard()
+    choose('Anthony')
+    const table = personalTable()
+    expect(within(table).getAllByRole('columnheader').slice(0, 2).map(h => h.textContent)).toEqual(['Sales order', 'Ref No.'])
+    expect(within(salesRow(table, 'SO-one')).getAllByRole('cell')[1]).toHaveTextContent('HC13369')
+    // Keyed with no Ref No.: the double-claim check cannot match it, and the row says so.
+    expect(within(salesRow(table, 'SO-two')).getAllByRole('cell')[1]).toHaveTextContent('—No Ref No. in the ERP')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search sales orders' }), { target: { value: 'hc133' } })
+    expect(within(table).getByRole('link', { name: 'SO-one' })).toBeVisible()
+    expect(within(table).queryByRole('link', { name: 'SO-two' })).toBeNull()
+  })
+
+  it('names no paper for an upsale, which is no bill', () => {
+    const data = fixture()
+    data.input.orders = [...data.input.orders, ...upsalesToOrders([{ id: 'up', staff_id: 'agent', amount: 300, sold_on: '2026-08-20', original_ref: 'HC5315' }], '2026-08-01')]
+    renderBoard(data)
+    choose('Anthony')
+    const cell = within(salesRow(personalTable(), 'UPSALE HC5315')).getAllByRole('cell')[1]
+    expect(cell).toHaveTextContent('—')
+    expect(cell).not.toHaveTextContent('No Ref No.')
   })
 
   it('toggles optional columns without losing required order or total columns or changing the money', () => {

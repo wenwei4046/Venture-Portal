@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { officeMonth } from '@/lib/office-time'
 import {
   calcAll,
   r2,
@@ -300,8 +301,7 @@ export default function DirectorPoolClient({ data }: { data: DirectorPoolData })
       const d = new Date(Date.UTC(y, m - 1 + 1, 1))
       next = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
     } else {
-      const now = new Date()
-      next = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      next = `${officeMonth()}-01` // the office's month, wherever the browser is
     }
     try {
       const { id } = await addDpMonth(next)

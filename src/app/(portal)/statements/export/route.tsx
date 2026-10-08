@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/auth'
+import { requireAction } from '@/lib/auth'
 import { exportXlsxResponse, exportPdfResponse } from '@/lib/export/response'
 import { buildInvoicesXlsx } from './_format/xlsx'
 import { InvoicesPdf } from './_format/pdf'
 import dayjs from 'dayjs'
+import { officeMonth } from '@/lib/office-time'
 
 interface Invoice {
   id: string
@@ -48,10 +49,10 @@ function formatBillingMode(mode: string): string {
 }
 
 export async function GET(req: Request) {
-  await requirePermission('treasury')
+  await requireAction('treasury', 'export')
   const url = new URL(req.url)
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
-  const period = url.searchParams.get('period') ?? dayjs().format('YYYY-MM')
+  const period = url.searchParams.get('period') ?? officeMonth()
 
   if (!/^\d{4}-\d{2}$/.test(period)) {
     return Response.json({ error: 'invalid period format (YYYY-MM)' }, { status: 400 })
