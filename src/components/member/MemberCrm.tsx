@@ -12,7 +12,7 @@ import {
 import { detectRequestedTime } from "@/lib/member/crm-datetime";
 import { crmDemo, crmTeamDemo, demoShowrooms } from "@/lib/member/crm-demo";
 import {
-  ROLE_LABELS, allTeams, assignsAds, canReassign, canReply, hasDownlines, isUnassigned, leadsHeld, setsFullTime, takesEnquiries, pickInTeam, teamHandlers, teamOf, visibleLeads, visibleMembers,
+  ROLE_LABELS, allTeams, assignsAds, canReassign, canReply, leadsPeople, isUnassigned, leadsHeld, setsFullTime, takesEnquiries, pickInTeam, teamHandlers, teamOf, visibleLeads, visibleMembers,
   type CrmAssignConfig, type CrmAssignment, type CrmMember,
 } from "@/lib/member/crm-team";
 import s from "./member.module.css";
@@ -123,7 +123,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     setTeamFilter(null);
     setInboxScope("all");
     setMemberPick([]);
-    if (next && !hasDownlines(next, members) && tab === "team") setTab("inbox");
+    if (next && !leadsPeople(next, members) && tab === "team") setTab("inbox");
     if (next?.role === "boss") setTab("overview");
     else if (tab === "overview" || tab === "assignment") setTab("inbox");
   }
@@ -473,7 +473,7 @@ export default function MemberCrm({ salesperson = "your salesperson", onExit, li
     }
   }
 
-  const manager = hasDownlines(viewer, members);
+  const manager = leadsPeople(viewer, members);
   // Assignment is for those who set it: Boss, HOD (and a Senior TL, read only) and each TL.
   const seesAssignment = manager && viewer.role !== "ta";
 

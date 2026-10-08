@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CrmAppointment, CrmLead, CrmMessage } from "./crm";
 import {
-  allDownlines, assignEnquiry, canEditTeamRules, leadsBetween, periodRange, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
+  allDownlines, assignEnquiry, canEditTeamRules, leadsBetween, leadsPeople, periodRange, withoutTeam, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
   memberStats, overLimit, pickByShare, pickTeam, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
   type CrmAssignConfig, type CrmMember,
 } from "./crm-team";
@@ -272,5 +272,42 @@ describe("the Overview's week / month", () => {
     const r = periodRange("month", now);
     expect(leadsBetween(leads, r.start, r.end)).toHaveLength(2);
     expect(leadsBetween(leads, r.prevStart, r.start)).toHaveLength(1);
+  });
+});
+
+describe("the CRM adapts to the company chart, never the other way (user 2026-10-05)", () => {
+  // As in Revenue today: a TL cannot report to the department head, so the TLs
+  // report to nobody; one TA and one RS have no upline at all.
+  const chart: CrmMember[] = [
+    { id: "boss", name: "Boss", role: "boss" },
+    { id: "hod", name: "Peter", role: "hod", uplineId: "boss" },
+    { id: "tla", name: "TL A", role: "tl" },
+    { id: "taa", name: "TA A", role: "ta", uplineId: "tla" },
+    { id: "a1", name: "Ann", role: "rs", uplineId: "taa" },
+    { id: "tlb", name: "TL B", role: "tl" },
+    { id: "loneTa", name: "Lone TA", role: "ta" },
+    { id: "loneRs", name: "Lone RS", role: "rs", uplineId: "loneTa" },
+  ];
+  const as = (id: string) => chart.find(m => m.id === id)!;
+  const names = (ms: CrmMember[]) => ms.map(m => m.id);
+
+  it("gives the HOD every team and the Team tab though no TL reports to them", () => {
+    expect(names(visibleTeams(as("hod"), chart))).toEqual(["tla", "tlb"]);
+    expect(leadsPeople(as("hod"), chart)).toBe(true);
+  });
+
+  it("lets the HOD see everyone but the Boss, and the Boss everyone", () => {
+    expect(names(visibleMembers(as("hod"), chart))).not.toContain("boss");
+    expect(visibleMembers(as("hod"), chart)).toHaveLength(chart.length - 1);
+    expect(visibleMembers(as("boss"), chart)).toHaveLength(chart.length);
+  });
+
+  it("keeps a TL to their own team and an RS to themselves", () => {
+    expect(names(visibleMembers(as("tla"), chart))).toEqual(["tla", "taa", "a1"]);
+    expect(leadsPeople(as("a1"), chart)).toBe(false);
+  });
+
+  it("names the TAs and RS no TL leads, so the Boss and HOD can fix the chart", () => {
+    expect(names(withoutTeam(chart))).toEqual(["loneTa", "loneRs"]);
   });
 });

@@ -90,11 +90,30 @@ export const teamHandlers = (tlId: string, members: CrmMember[]) =>
 /** HOD, TL, TA and RS take enquiries and reply to customers; the Boss and a Senior TL do not take them. */
 export const takesEnquiries = (m: CrmMember) => m.role === "hod" || m.role === "tl" || m.role === "ta" || m.role === "rs";
 
-/** Everyone the viewer may see: themselves and their whole downline. */
-export const visibleMembers = (viewer: CrmMember, members: CrmMember[]) => [viewer, ...allDownlines(viewer.id, members)];
+/**
+ * Everyone the viewer may see: themselves and their whole downline. The Boss
+ * and HOD see everyone (the HOD everyone but the Boss), whatever the chart
+ * says — `crm_people()` hands them every person already, and in Revenue a TL
+ * cannot report to the department head, so a HOD's line has no TL below it
+ * (user 2026-10-05: the CRM adapts, the company's chart stays as it is).
+ */
+export const visibleMembers = (viewer: CrmMember, members: CrmMember[]) => assignsAds(viewer)
+  ? [viewer, ...members.filter(m => m.id !== viewer.id && (viewer.role === "boss" || m.role !== "boss"))]
+  : [viewer, ...allDownlines(viewer.id, members)];
 
-/** The teams (TLs) the viewer may see — their own if they are inside one. */
+/** Anyone who leads people in the CRM — gets the Team tab: the Boss and HOD always, everyone else with a downline. */
+export const leadsPeople = (viewer: CrmMember, members: CrmMember[]) => assignsAds(viewer) || hasDownlines(viewer, members);
+
+/**
+ * TAs and RS with no TL above them in the chart: in no team, so no team's
+ * rules ever deal them an enquiry. The Boss and HOD see who they are.
+ */
+export const withoutTeam = (members: CrmMember[]) =>
+  members.filter(m => (m.role === "ta" || m.role === "rs") && !teamOf(m.id, members));
+
+/** The teams (TLs) the viewer may see — every one for the Boss and HOD, else their own if they are inside one. */
 export function visibleTeams(viewer: CrmMember, members: CrmMember[]): CrmMember[] {
+  if (assignsAds(viewer)) return allTeams(members);
   const own = teamOf(viewer.id, members);
   if (own) return members.filter(m => m.id === own);
   return visibleMembers(viewer, members).filter(m => m.role === "tl");

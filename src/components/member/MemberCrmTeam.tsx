@@ -3,7 +3,7 @@
 import { replyUrgency, sortByUrgency, type CrmAppointment, type CrmLead } from "@/lib/member/crm";
 import {
   MAX_DOWNLINES, ROLE_LABELS, allDownlines, allTeams, assignsAds, canReassign, isUnassigned, directDownlines, durationLabel, memberStats, teamHandlers,
-  visibleMembers, visibleTeams,
+  visibleMembers, visibleTeams, withoutTeam,
   type CrmMember,
 } from "@/lib/member/crm-team";
 import s from "./member.module.css";
@@ -95,6 +95,23 @@ export function MemberCrmTeam({ viewer, members, leads, appointments, now, teamF
             {allTeams(members).map(tl => <option key={tl.id} value={tl.id}>{tl.teamName} · {tl.name}</option>)}
           </select>}
         </div>)}
+      </section>;
+    })()}
+    {/* Boss and HOD: people the chart leaves outside every team — no team's rules will deal them an enquiry. */}
+    {assignsAds(viewer) && !teamFilter && (() => {
+      const loose = withoutTeam(members);
+      return loose.length > 0 && <section className={`${s.card} ${c.tableCard}`} aria-label="Not in a team">
+        <div className={c.cardHead}><h2>Not in a team · {loose.length}</h2></div>
+        <p className={s.caption}>No TL above them in People › Hierarchy, so no enquiry is dealt to them. Set who they report to there.</p>
+        {loose.map(p => <button key={p.id} className={c.personRow} onClick={() => onOpenMember(p.id)}>
+          <span className={c.personWho}>
+            <span className={c.leadAvatar} aria-hidden="true">{initials(p.name)}</span>
+            <span><strong>{p.name}</strong><small>{roleTag(p)}{p.uplineId ? ` · reports to ${nameOf(p.uplineId)}` : " · reports to nobody"}</small></span>
+          </span>
+          <span className={c.mono}>{leads.filter(l => l.assignedTo === p.id).length}</span>
+          <em className={c.mono} />
+          <span className={c.mono} />
+        </button>)}
       </section>;
     })()}
     {vacantStl && <p className={c.demoNote}><Icon name="info" size={16} /> Senior TL: vacant · TLs report to the HOD for now.</p>}
