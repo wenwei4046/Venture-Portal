@@ -7,8 +7,25 @@ import { TABLE_WRITES, WRITES_WITHOUT_ACTION, tableWriteRows, type Want, type Wr
 
 const MIGRATIONS = resolve(process.cwd(), 'supabase/migrations')
 const THIS_MIGRATION = '20261009020000_writes_ask_for_the_action.sql'
+const FUNCTIONS_MIGRATION = '20261009030000_functions_ask_for_the_action.sql'
 const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql')).sort()
 const sqlOf = (f: string) => readFileSync(join(MIGRATIONS, f), 'utf8').replace(/\r\n/g, '\n')
+
+/**
+ * The DEFINER functions whose check asks for an action (PR3b): the actions
+ * `has_any_action` is handed in each one's new check.
+ */
+const DEFINER_ASKS: Readonly<Record<string, readonly Want[]>> = Object.fromEntries(
+  [...sqlOf(FUNCTIONS_MIGRATION).matchAll(
+    /swap_check\('public\.([a-z_]+)\([^)]*\)',\n\s+\$q\$[\s\S]*?\$q\$,\n\s+\$q\$[^$]*?has_any_action\(ARRAY\[([^\]]*)\]\)/g,
+  )].map(m => [m[1], [...m[2].matchAll(/'([^']+)'/g)].map(a => a[1] as Want)]),
+)
+/** …of which these also let in whoever may approve the request at hand (`approvable_types()`). */
+const DEFINER_LETS_IN_APPROVERS: ReadonlySet<string> = new Set(
+  [...sqlOf(FUNCTIONS_MIGRATION).matchAll(
+    /swap_check\('public\.([a-z_]+)\([^)]*\)',\n\s+\$q\$[\s\S]*?\$q\$,\n\s+\$q\$([^$]*?)\$q\$\)/g,
+  )].filter(m => m[2].includes('approvable_types()')).map(m => m[1]),
+)
 
 describe('TABLE_WRITES', () => {
   it('is the migrations’ permission_table_writes, row for row', () => {
@@ -252,7 +269,7 @@ function scanApp(): Site[] {
             if (table) pending.push({ fn: here, site: { file, line, table, commands: COMMANDS[op] } })
           } else if (op === 'rpc') {
             const rpc = literal(n.arguments[0])
-            if (rpc && rpc in INVOKER_WRITES) pending.push({ fn: here, site: { file, line, rpc, commands: [] } })
+            if (rpc && (rpc in INVOKER_WRITES || rpc in DEFINER_ASKS)) pending.push({ fn: here, site: { file, line, rpc, commands: [] } })
           }
         }
       }
@@ -311,7 +328,7 @@ describe('the app’s writes', () => {
       const where = `${s.file}:${s.line}`
       for (const path of s.paths) {
         if (s.table) for (const c of s.commands) judge(s, where, s.table, c, path)
-        if (s.rpc) for (const [table, commands] of Object.entries(INVOKER_WRITES[s.rpc])) {
+        if (s.rpc) for (const [table, commands] of Object.entries(INVOKER_WRITES[s.rpc] ?? {})) {
           for (const c of commands) judge(s, `${where} ${s.rpc}`, table, c, path)
         }
       }
@@ -325,5 +342,68 @@ describe('the app’s writes', () => {
       .filter(s => (s.table ? s.table in TABLE_WRITES : true))
       .map(s => `${s.file}:${s.line} ${s.table ?? s.rpc}`)
     expect(ungated).toEqual([])
+  })
+})
+
+// ── The DEFINER functions ask for an action too (20261009030000) ─────────────
+// Each function's check now hands `has_any_action` a list; whoever the app's
+// gates let call it must hold one of them, at the reach it asks (All covers
+// Dept covers Own), or the database refuses somebody the app let in.
+describe('the DEFINER functions that ask for an action', () => {
+  const sites = scanApp().filter(s => s.rpc && s.rpc in DEFINER_ASKS)
+  /**
+   * Calls behind `requireApprover()` — any domain's Approve — where the action
+   * narrows it to one domain before the call, out of this scan's sight.
+   */
+  const DECIDED_IN_ONE_DOMAIN: Readonly<Record<string, string>> = {
+    'src/app/(portal)/approvals/actions.ts bump_bank_balance':
+      'A loan’s group approval: assertMayDecide(user, group) on new_loan + payment_voucher — Treasury · Approve or Approvals · Approve.',
+  }
+  const RANK: Readonly<Record<string, number>> = { own: 0, dept: 1, all: 2 }
+  const parse = (w: string) => {
+    const [fa, scope = 'all'] = w.split(':')
+    return { fa, rank: RANK[scope] ?? 2 }
+  }
+  /** Somebody who holds `held` passes `has_any_action(asked)`. */
+  const passes = (held: Want, asked: readonly Want[]) => {
+    const h = parse(held)
+    return asked.some(a => {
+      const x = parse(a)
+      return x.fa === h.fa && h.rank >= x.rank
+    })
+  }
+
+  it('reads all 70 from the migration', () => {
+    expect(Object.keys(DEFINER_ASKS)).toHaveLength(70)
+    expect(Object.values(DEFINER_ASKS).every(asked => asked.length > 0)).toBe(true)
+    expect([...DEFINER_LETS_IN_APPROVERS]).toEqual(['dept_request_pv_rejected'])
+  })
+
+  it('asks only for actions a key can give', () => {
+    const given = new Set<string>(Object.values(KEY_ACTIONS).flat())
+    const asked = new Set(Object.values(DEFINER_ASKS).flat().map(a => a.split(':')[0]))
+    expect([...asked].filter(fa => !given.has(fa))).toEqual([])
+  })
+
+  it('the app calls them', () => {
+    expect(new Set(sites.map(s => s.rpc)).size).toBeGreaterThan(50)
+  })
+
+  it('whoever gets through a call’s gates holds an action the function asks for', () => {
+    const misses: string[] = []
+    for (const s of sites) {
+      const asked = DEFINER_ASKS[s.rpc as string]
+      if (`${s.file} ${s.rpc}` in DECIDED_IN_ONE_DOMAIN) {
+        expect(asked).toEqual(expect.arrayContaining(['treasury.approve', 'approvals.approve']))
+        continue
+      }
+      for (const path of s.paths) {
+        const ok = path.some(gate => gate.approver
+          ? DEFINER_LETS_IN_APPROVERS.has(s.rpc as string) || APPROVE.every(a => passes(a, asked))
+          : gate.wants.length > 0 && gate.wants.every(w => passes(w, asked)))
+        if (!ok) misses.push(`${s.file}:${s.line} ${s.rpc}: ${path.map(g => g.text).join(' & ')}`)
+      }
+    }
+    expect(misses).toEqual([])
   })
 })
