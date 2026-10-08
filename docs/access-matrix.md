@@ -4,6 +4,17 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-09 — Own and Dept reach the rows (PR3c)
+A cell's reach now holds in the database too. Own = their own records (a claim they
+raised), Dept = their department's (its pool, expense and payment requests, contracts,
+invoices of its segment, journals of its segment), All = the company's. Before, only a
+department-manager KIND of account reached "its department", and Own reached nobody —
+somebody on Staff · Basic could raise a claim and then not see it. A claim is now raised
+only in your own name. The read functions behind the department pages (NP, OPEX,
+settlements, receipts & payments, mirror slices) answer by the same reach; payroll and
+billing aggregates ask Billing, HR Costing or Treasury · View. The shared accounts read
+the same rows as before. Mig `20261009040000`.
+---
 ⚡ AMENDMENT 2026-10-09 — The database's functions ask for the action too (PR3b)
 70 write functions decided by the caller's ROLE (or by a key, which a View cell
 opens): a Finance · Checker could book a loan through the API, a Director whose
