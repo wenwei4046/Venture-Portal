@@ -32,8 +32,9 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // rather than taken from current_permissions(), whose answer is about the
   // real account. The cookie is read first so that lookup shares the round
   // trip below instead of being a third one behind it (2026-09-11); it is
-  // honoured only once the row proves a Principal — and the Revenue View only
-  // in the member app (lib/view-as.ts, 2026-09-27).
+  // honoured only for an account that holds `view_switch` (Ultimate full
+  // access, 2026-10-08 — it was the Principal role) — and the Revenue View
+  // only in the member app (lib/view-as.ts, 2026-09-27).
   const viewAs = honouredViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value, surface)
 
   const [{ data }, { data: perms }, masked] = await Promise.all([
@@ -52,17 +53,22 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   if (!row || !row.is_active) return null
 
   const user: User = { ...row, permissions: (perms as string[] | null) ?? [] }
+  // Switching views is its own permission since 2026-10-08: Ultimate full
+  // access has it, Full access is everything else without it. Read off the
+  // REAL account's keys — a masked session keeps it, so it can switch back.
+  const canSwitchView = user.permissions.includes('view_switch')
 
-  if (user.role === 'principal' && viewAs && masked) {
+  if (canSwitchView && viewAs && masked) {
     return {
       ...user,
       role: viewAs,
-      actualRole: 'principal',
+      actualRole: user.role,
+      canSwitchView,
       permissions: (masked.data ?? []).map(r => (r as { permission_key: string }).permission_key),
     }
   }
 
-  return user
+  return { ...user, canSwitchView }
 })
 
 /** The caller, anywhere but the member app: the portal, `/`, print pages. */

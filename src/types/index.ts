@@ -1,6 +1,9 @@
 // ─── Core ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'principal' | 'finance' | 'hr' | 'dept_manager' | 'revenue_member'
+// `staff` (2026-10-08): an account whose access is wholly its title's
+// permission template — the role every template that is not one of the old
+// four hands out. Never shown; see permission_templates.base_role.
+export type UserRole = 'principal' | 'finance' | 'hr' | 'dept_manager' | 'revenue_member' | 'staff'
 
 export interface User {
   id: string
@@ -14,6 +17,10 @@ export interface User {
   // Set only while a Principal is masked by the view-as switcher: `role`
   // carries the masked role driving gates/UI, `actualRole` the real one.
   actualRole?: UserRole
+  // The REAL account holds `view_switch` (Ultimate full access, and the
+  // Principal account) — so the view switcher shows, masked or not. Full
+  // access is everything else without it (2026-10-08).
+  canSwitchView?: boolean
   // Every permission key this account holds, resolved by the database from
   // their title (or their role, while no title says otherwise). This is what
   // every gate in the portal reads; `role` survives only for the handful of

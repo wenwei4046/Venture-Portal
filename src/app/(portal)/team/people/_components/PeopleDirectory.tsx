@@ -56,6 +56,12 @@ interface Props {
   unattachedAccounts: AccountRow[]
   /** Activity is readable by the Principal only — access_log's own RLS. */
   canSeeActivity: boolean
+  /**
+   * Opens the invite drawer with this person picked — an active person with no
+   * login shows Invite in their Last seen cell (2026-10-08). Absent for a
+   * reader who may not invite.
+   */
+  onInvite?: (staffId: string) => void
 }
 
 const NO_DEPT = '— No department'
@@ -75,7 +81,7 @@ type StatusFilter = 'active' | 'inactive' | 'all'
  * the tint on their monogram and the more useful question is whether the login
  * is still being used.
  */
-export default function PeopleDirectory({ people, unattachedAccounts, canSeeActivity }: Props) {
+export default function PeopleDirectory({ people, unattachedAccounts, canSeeActivity, onInvite }: Props) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('active')
   const [folded, setFolded] = useState<Set<string>>(new Set())
@@ -390,7 +396,7 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                               </span>
                             </td>
                             <td className="m-hide whitespace-nowrap" data-label="Last seen">
-                              <LastSeen person={p} />
+                              <LastSeen person={p} onInvite={onInvite} />
                             </td>
                             <td className="text-right">
                               <button
@@ -440,8 +446,9 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
             </span>
           </div>
           <p className="text-sm mb-4 max-w-2xl">
-            These can sign in but are not on the roster above. Attaching one to a person is what
-            Invite User will do.
+            These can sign in but are not on the roster above, so no title decides what they may
+            do: each keeps the role it was made with. Somebody on the roster gets a login of their
+            own from Invite on their row.
           </p>
           <div className="table-scroll">
             <table className="ledger-table">
@@ -497,6 +504,14 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
           personId={card.id}
           startEditing={card.editing}
           onClose={() => setCard(null)}
+          onInvite={
+            onInvite
+              ? staffId => {
+                  setCard(null)
+                  onInvite(staffId)
+                }
+              : undefined
+          }
         />
       ) : null}
     </div>
@@ -509,7 +524,23 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
  * login nobody has touched in six weeks is the one worth acting on, so that
  * one is a state on an amber wash rather than one more date.
  */
-function LastSeen({ person }: { person: PersonRow }) {
+function LastSeen({ person, onInvite }: { person: PersonRow; onInvite?: (staffId: string) => void }) {
+  // An active person with no login: the drawer, with them picked (the design's
+  // Invite cell — the sheet's row-Save treatment).
+  if (!person.accountEmail && person.active && onInvite) {
+    return (
+      <button
+        type="button"
+        className="invite-cell"
+        onClick={e => {
+          e.stopPropagation()
+          onInvite(person.id)
+        }}
+      >
+        Invite
+      </button>
+    )
+  }
   if (!person.accountEmail) {
     return (
       <span className="font-mono text-[11px]" title="No login account">

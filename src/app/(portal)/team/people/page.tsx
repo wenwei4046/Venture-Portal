@@ -1,8 +1,13 @@
-import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import PeopleDirectory, { type PersonRow, type AccountRow } from './_components/PeopleDirectory'
+import { can } from '@/lib/permissions'
+import { loadPermissionsData } from '../_lib/permission-templates'
+import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
+import type { InviteCandidate } from './_components/InviteDrawer'
+import PeopleManagement from './_components/PeopleManagement'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Cast once, at the boundary — the revenue side's convention, see
  *  `revenue/_components/config/load.ts`. */
@@ -31,7 +36,9 @@ interface OpenPosition {
 }
 
 /**
- * People Management — the roster.
+ * People Management — the roster, and a tab over, the permission templates
+ * (2026-10-08, the Claude Design handoff: Permissions merged in from its own
+ * page; Invite user became a drawer here).
  *
  * The staff table is the master list of people (settled with the user on
  * 2026-09-01), so this page leads with it. Login accounts hang off a person by
@@ -39,18 +46,23 @@ interface OpenPosition {
  * account still standing on its own is listed underneath rather than hidden —
  * an unattached account is exactly the thing somebody needs to see and fix.
  */
-export default async function PeopleManagementPage() {
+export default async function PeopleManagementPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ template?: string; invite?: string }>
+}) {
   const user = await requirePermission('team')
   const supabase = await createClient()
+  const params = await searchParams
 
-  const [{ data: staff }, { data: accounts }, { data: levels }, positions] = await Promise.all([
+  const [{ data: staff }, { data: accounts }, { data: levels }, positions, permissions] = await Promise.all([
     supabase
       .from('hr_staff_costs')
       // Every status, not just 'active'. Deactivating somebody used to remove
       // them from the only page that lists people, which left no way back
       // except the database — the roster filters by status instead.
       .select(
-        'id, employee_name, employee_code, designation, user_id, status, resignation_date, nric, bank_account_no, hire_date, titles(name, level_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
+        'id, employee_name, employee_code, designation, user_id, status, resignation_date, nric, bank_account_no, hire_date, title_id, reports_to, titles(name, level_id, template_id), departments(name), users!hr_staff_costs_user_id_fkey(email, is_active, last_seen_at)',
       )
       .order('employee_name'),
     supabase.from('users').select('id, name, email, role, is_active').order('name'),
@@ -73,6 +85,8 @@ export default async function PeopleManagementPage() {
         r => r.data,
         () => null,
       ),
+    // The Permissions tab and the invite drawer read the same templates.
+    loadPermissionsData(supabase as unknown as SupabaseClient),
   ])
 
   const rungs = new Map(
@@ -156,51 +170,48 @@ export default async function PeopleManagementPage() {
       isActive: a.is_active,
     }))
 
-  return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-eyebrow">
-            <em>I.</em> PEOPLE · MANAGEMENT
-          </div>
-          <h1 className="page-title">People</h1>
-          <p className="text-sm mt-3 max-w-2xl">
-            Everyone on the payroll, the title they hold and the department it
-            sits under. An account is what lets somebody sign in — most of the
-            roster has none yet.
-          </p>
-        </div>
-        {/* One orange action — adding somebody; the other two are the sheet's
-            outlined buttons. */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {user.role === 'principal' ? (
-            <Link
-              href="/team/people/invite"
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-            >
-              Invite user
-            </Link>
-          ) : null}
-          <Link
-            href="/team/people/import"
-            className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
-          >
-            Import InfoTech
-          </Link>
-          <Link
-            href="/team/people/new"
-            className="bg-accent hover:bg-accent-hover text-ink text-sm px-4 py-2 rounded-control transition-colors"
-          >
-            + Add person
-          </Link>
-        </div>
-      </div>
+  // Who the invite drawer may pick: active, on the roster, no login yet — with
+  // the facts it shows read-only (their title, its rung and template, and who
+  // they report to), all from the rows above.
+  const staffRows = (staff ?? []) as unknown as Array<{
+    id: string; employee_name: string; employee_code: string | null; user_id: string | null; status: string | null
+    reports_to: string | null; titles: { name: string; level_id: string | null; template_id: string | null } | null
+    departments: { name: string } | null
+  }>
+  const byId = new Map(staffRows.map(s => [s.id, s]))
+  const candidates: InviteCandidate[] = staffRows
+    .filter(s => s.status !== 'inactive' && !s.user_id)
+    .map(s => {
+      const manager = s.reports_to ? byId.get(s.reports_to) : undefined
+      const rung = s.titles?.level_id ? rungs.get(s.titles.level_id) : undefined
+      return {
+        staffId: s.id,
+        name: s.employee_name,
+        code: s.employee_code,
+        department: s.departments?.name ?? null,
+        title: s.titles?.name ?? null,
+        levelRank: rung?.rank ?? null,
+        templateId: s.titles?.template_id ?? null,
+        reportsTo: manager ? [manager.employee_name, manager.titles?.name].filter(Boolean).join(' · ') : null,
+      }
+    })
 
-      <PeopleDirectory
-        people={rows}
-        unattachedAccounts={unattached}
-        canSeeActivity={user.role === 'principal'}
-      />
-    </div>
+  const invite = params.invite
+    ? { staffId: params.invite && UUID.test(params.invite) ? params.invite : null }
+    : null
+
+  return (
+    <PeopleManagement
+      people={rows}
+      unattachedAccounts={unattached}
+      canSeeActivity={can(user, 'audit_log')}
+      permissions={permissions}
+      canManagePermissions={can(user, 'permissions_manage')}
+      canSeeHistory={can(user, 'permissions_manage', 'audit_log')}
+      canInvite={can(user, 'team_invite')}
+      candidates={candidates}
+      initialTemplateId={params.template && UUID.test(params.template) ? params.template : null}
+      initialInvite={invite}
+    />
   )
 }

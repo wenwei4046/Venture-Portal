@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { setUserPermission } from '../permissions/permission-actions'
+import { setUserPermission } from '../people/permission-actions'
 
 export interface PersonPermissionRow {
   key: string

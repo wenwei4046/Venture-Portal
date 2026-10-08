@@ -3,7 +3,7 @@
 **Version:** 3.10
 **Last updated:** 2026-10-08
 **Maintained by:** HOUZS Venture Portal team
-**Status:** v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
+**Status:** v3.14 (People Management: permission templates and the invite drawer) / v3.13 (the Product List is a page of the Revenue app, drawn to its design handoff) / v3.12 (Sheet theme on Finance's view as well — every portal route) / Walnut shell — single source of truth for all UI work
 
 > **For coding agents and contributors:** This is the **only** UI design doc. If you're adding a new page or amending an existing one, this file dictates the colors, fonts, components, and page anatomy. Do not invent parallel design notes — extend this doc instead. See `## Implementation rules — read this first` below.
 
@@ -1127,6 +1127,77 @@ When it shows (`components/pwa/UpdatePrompt.tsx`, `lib/app-update.ts`): the app 
 ---
 
 ## Component Vocabulary
+
+### Permission matrix (2026-10-08 — People Management › Permissions, the invite drawer, a person's card)
+
+Drawn to the Claude Design handoff *design_handoff_people_permissions* (kept
+outside the repo; `.design/people-permissions/` in a worktree). Classes in
+`globals.css` under *Permissions*, every value the prototype's mapped onto the
+sheet's tokens:
+
+- **Page.** People Management's head is `.page-head.tabbed` with
+  `SlidingTabs variant="control"`: *People {active}* · *Permissions
+  {templates}* (`?tab=permissions`, pushState). The intro line (12px) changes
+  with the tab. A `.sheet-notice` with *Dismiss* reports a save or a new login.
+- **Rail** (`.perm-rail`, 260px, sticky): `.perm-band` head (*PERMISSION
+  TEMPLATES* · count), one `.perm-rail-item` per template — name (13px, 600
+  when selected), a `.perm-sod` chip when maker and checker meet, mono meta
+  *N keys · N titles · N people*, the titles in `--card-label`. Selected =
+  `aria-current`: accent-bg wash + inset 3px accent bar. Foot: *+ New
+  template* → an inline form (Name · What it is for · Start from: nothing
+  ticked or a copy of a template).
+- **Frame** (`.perm-frame`): head (*TEMPLATE · key* eyebrow,
+  `.sheet-heading`, `.sheet-subtitle`, *Used by* `.perm-chip`s → Hierarchy ›
+  Roles; *Discard changes* link + the orange *Save template* / disabled
+  *Saved*); `.perm-legend` (Own / Dept / All swatches); `.perm-warn` (SoD);
+  `table.perm-matrix` — section rows with a mono tally, function rows (label
+  + mono key with its scopes), seven 68px action columns; `.perm-sensitive`
+  (three checkbox cards); `.perm-keys` (*N permission keys* · *Show keys* →
+  `pre.perm-keylist`).
+- **Cell** (`.perm-cell`, 52×24, radius 5, mono): `·` dashed hairline ·
+  `.own` white · `.dept` accent-bg + accent border · `.all` accent fill,
+  600 · `.na` the hatched `--perm-hatch` gradient. `.small` 42×20 in the
+  compact matrix (drawer, person card); `.changed` = a 2px walnut ring, a
+  cell set for this person alone. A cell is a `<button>` only when it can be
+  changed; its `aria-label` says *Function · Action: value*.
+- **Held for now** (portal, not in the drawing): beside the keys, *N held for
+  now · Why* opens `.perm-held` (alert wash) listing each granted cell that
+  opens nothing yet and why — the gates still read one key per module, so a
+  cell is only in force where its key cannot reach further than it says.
+- **Titles on this template**: a 15px/600 heading on a hairline rule with
+  *N PEOPLE*, a `ledger-table tight` — Title (+ mono `L{n}`) · Department ·
+  People · Personal exceptions (mono *SR hr_costing.export:✕*) · Template (a
+  select that moves the title at once). *Titles with no template yet* repeats
+  the table for titles on none.
+- **Keep or reset** (not in the drawing): saving a template that changes a cell
+  somebody has their own value on opens a dialog — one row per person and
+  cell (theirs, the template's before → after) with a *Keep theirs | Reset*
+  pair, *Keep everybody's* / *Reset everybody to the template*, then *Save
+  template* / *Back*.
+- **History** (not in the drawing): *Show history* reads every save — When
+  (office time) · Who · What changed, a line per change, six then *Show all*.
+
+**Invite drawer** (`.drawer-scrim` walnut 28% + `.drawer-panel`, 640px,
+fixed 10px from the edges, radius 16, the modal shadow): the page eyebrow,
+Georgia 26px *Invite user* / *Invite {NAME}*, the no-email-step line, a 28px ✕.
+Three `.drawer-step` panels (surface-2, radius 12, mono step numbers):
+**01 The person** — a search over a list grouped by department
+(`.drawer-band`: walnut left bar) of active people without a login
+(`.drawer-pick` rows: mono tile, name/title, code), or, picked, a white card
+(42px tile, *HV011 · no login yet*, *Change person*) over a read-only grid
+(Department · Title + L · Reports to · Permission template); **02 The login**
+— email, and one bordered password group (mono input · *Show/Hide* ·
+*Generate* → `Hv-` + seven) over a three-segment `.pw-seg` meter; **03 What
+they can do** — the accent info box (*Template X, from the title Y …*) over the
+compact matrix (only the functions they have, *Show all N functions*), the
+walnut-ring legend and *N held for now*. Foot: orange *Create account*
+(disabled until the first blocker clears), *Cancel*, the blocker in 11px.
+On a roster row an active person with no login shows `.invite-cell`
+(*Invite*, the row-Save treatment) in Last seen.
+
+**Hierarchy › Roles** is the titles table as a fourth tab (*Roles {n}*), with
+**Level** (mono `L{n}`) and **Permission template** (an underlined *Name →*
+link to People Management › Permissions on that template) columns.
 
 ### Closing — a lock you can see (2026-09-27 — Revenue › Comm Cal's month)
 
@@ -2509,6 +2580,7 @@ If adding a new component to vocabulary, update this doc first.
 
 ## Change Log
 
+- **2026-10-08 v3.14 (People Management revamp)** — Permissions moves into People Management as its second tab: permission templates in a 260px rail, the selected one's matrix (function × action, each cell Own · Dept · All, hatched where the function has no such action), its sensitive fields, its keys, the titles on it with a select that moves a title at once, *+ New template*, *N held for now · Why*, a keep-or-reset dialog for people with their own cells, and the History. Invite user becomes a right-hand drawer (the person from the roster, the login, what they can do) opened from the head or a roster row's *Invite*. Roles becomes Hierarchy's fourth tab with Level and Permission template columns. A person's card shows their template's compact matrix with their own cells ringed in walnut. The sidebar's Roles and Permissions rows are gone. See "Permission matrix".
 - **2026-10-08 (Rules · KPI items)** — which items count as KPI moved off the Product List (its *Add-on / KPI Items* tab is gone; `?tab=kpi` redirects) onto Revenue › Rules: **KPI items** is the last tab of the rail (section XI), shown while *KPI item allowance* is on or anything is recorded on it. On the sheet: the section head and hint; an amber `.sheet-warning` while the switch is off, its *Scheme rules* link opening that tab; an *Add an item from* `.sheet-toolbar` — the Brands tab's pills (SKU Master · Bed frame specials · Sofa specials), a search box (a SKU is searched on the server, twenty at a time with *Showing 20 of N*; a special filters the pool) and *Amount RM* for the next pick — over a bordered result list (*Add* / an *On the list* chip / an amber *Off in the ERP* chip); then a `.table-frame` ledger (Item · Name · Kind · Counted · KPI amount · RM as an input · Remove / Keep / Take off; *New* (accent) and *Coming off* (danger) chips, an amber *Gone from the ERP* chip, a retyped amount on a peach wash) whose foot counts items and changes beside *Cancel* and the orange *Save N changes*; under it the **Threshold ladder** (the old tab V, rows saved one by one). The Scheme rules row *KPI item allowance* links to the tab. The screen-reader 'Remove' header is anchored to its cell (`relative`): absolutely placed, it escaped the table's scroll box and widened a phone's page by 46px.
 - **2026-10-08 (Product List · either side)** — the new-combo window offers a left/right pair as one more compartment card (`1A(R)` · *LHF / RHF*): a piece of it may be either side, saved as the ERP writes such a slot. Its THIS SET chip carries the sides in the muted weight. See "Product List — the mirror beside the portal's decisions".
 - **2026-10-08 v3.13 (Product List · in the Revenue app)** — the Product List moves from the portal into the Revenue app (`/member/products`), redrawn to the *design_handoff_product_list* prototype in the app's own palette: the app's sidebar row under PRINCIPAL (only for `product_list`) and the Module switcher, the seven tabs on the header's rule with a dot for unsaved edits and a leave bar, one filter panel per tab, the prototype's tables, cards, floating windows and motion, and Combo Pricing's *+ Add combo* window. Combos become the portal's own the same day, and *Edit prices* gains a Remove column that stays in view on the right (Remove / Keep, a REMOVING chip, the set taken away with its prices on Save). Tailwind's reset is undone where it would change the prototype's boxes (content-box rows and tiles, inputs' own 1px 2px padding, the #757575 placeholder); `tools/measure-pl.mjs` diffs every element against the prototype. The portal's `.product-theme` workspace and its CSS are gone. See "Product List — a page of the Revenue app".

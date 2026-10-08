@@ -30,7 +30,8 @@ beforeEach(() => {
     id: 'signed-in-id', name: 'Principal', email: 'principal@example.com',
     role: 'principal', is_active: true, created_at: '', updated_at: '',
   }
-  mocks.rpc.mockResolvedValue({ data: ['dashboard', 'revenue'] })
+  // The Principal account holds view_switch (role default since 2026-10-08).
+  mocks.rpc.mockResolvedValue({ data: ['dashboard', 'revenue', 'view_switch'] })
   mocks.maskLookup.mockResolvedValue({ data: [{ permission_key: 'member_portal' }, { permission_key: 'member_quote' }] })
 })
 
@@ -38,7 +39,7 @@ describe('getUser view mask', () => {
   it('in the member app, preserves the real Principal identity while using neutral Revenue View permissions', async () => {
     mocks.cookie = 'revenue_member'
     const user = await getMemberUser()
-    expect(user).toMatchObject({ id: 'signed-in-id', role: 'revenue_member', actualRole: 'principal', permissions: ['member_portal', 'member_quote'] })
+    expect(user).toMatchObject({ id: 'signed-in-id', role: 'revenue_member', actualRole: 'principal', canSwitchView: true, permissions: ['member_portal', 'member_quote'] })
     expect(mocks.maskLookup).toHaveBeenCalledWith('role', 'revenue_member')
   })
 
@@ -47,7 +48,7 @@ describe('getUser view mask', () => {
   it('outside the member app, ignores the Revenue View — the Principal stays the Principal', async () => {
     mocks.cookie = 'revenue_member'
     const user = await getUser()
-    expect(user).toMatchObject({ id: 'signed-in-id', role: 'principal', permissions: ['dashboard', 'revenue'] })
+    expect(user).toMatchObject({ id: 'signed-in-id', role: 'principal', canSwitchView: true, permissions: ['dashboard', 'revenue', 'view_switch'] })
     expect(user?.actualRole).toBeUndefined()
     expect(mocks.maskLookup).not.toHaveBeenCalled()
   })
@@ -61,11 +62,30 @@ describe('getUser view mask', () => {
 
   it.each(['revenue_member', 'hr'])('never elevates a real %s account through a forged view cookie', async role => {
     mocks.row!.role = role as User['role']
+    mocks.rpc.mockResolvedValue({ data: ['dashboard', 'revenue'] })
     mocks.cookie = 'finance'
     const user = await getUser()
     expect(user?.role).toBe(role)
     expect(user?.actualRole).toBeUndefined()
     expect(user?.permissions).toEqual(['dashboard', 'revenue'])
+  })
+
+  // 2026-10-08: switching views is Ultimate full access's key, not the role.
+  // Full access is a principal-kind account without it — never masked, no
+  // switcher, whatever cookie the browser still carries.
+  it('never masks a principal-kind account without view_switch (Full access)', async () => {
+    mocks.rpc.mockResolvedValue({ data: ['dashboard', 'revenue'] })
+    mocks.cookie = 'hr'
+    const user = await getUser()
+    expect(user).toMatchObject({ role: 'principal', canSwitchView: false, permissions: ['dashboard', 'revenue'] })
+    expect(user?.actualRole).toBeUndefined()
+  })
+
+  it('lets any account holding view_switch switch, and keeps the key across the mask', async () => {
+    mocks.row!.role = 'staff'
+    mocks.cookie = 'finance'
+    const user = await getUser()
+    expect(user).toMatchObject({ role: 'finance', actualRole: 'staff', canSwitchView: true })
   })
 
   it('ignores a forged Principal cookie rather than treating it as a role grant', async () => {

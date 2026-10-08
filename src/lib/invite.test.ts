@@ -1,89 +1,61 @@
-import { describe, it, expect } from 'vitest'
-import { validateInvite, type RawInvite } from './invite'
+import { describe, expect, it } from 'vitest'
+import { generatePassword, inviteBlocker, passwordStrength, validateInvite } from './invite'
 
-const ok: RawInvite = {
-  name: 'Chew Wee Ho',
-  email: 'Chew@Venture.my',
-  password: 'test123456',
-  role: 'finance',
-  departmentId: 'dept-1',
-  titleId: 'title-1',
-  reportsTo: 'staff-9',
-  phone: '012-3456789',
-  staffId: 'staff-1',
-}
+const STAFF = '5f0c2a8e-1b2c-4d3e-8f4a-0b1c2d3e4f5a'
 
-describe('validateInvite', () => {
-  it('normalises a good invite', () => {
-    expect(validateInvite(ok)).toEqual({
-      name: 'Chew Wee Ho',
-      email: 'chew@venture.my',
-      password: 'test123456',
-      role: 'finance',
-      departmentId: 'dept-1',
-      titleId: 'title-1',
-      reportsTo: 'staff-9',
-      phone: '012-3456789',
-      staffId: 'staff-1',
+describe('validateInvite — a login for somebody on the roster', () => {
+  it('takes the person, an email and a password, and no role', () => {
+    expect(validateInvite({ staffId: STAFF, email: '  Ong.Siew@Houzs.com ', password: 'Hv-7k2m9q' })).toEqual({
+      staffId: STAFF, email: 'ong.siew@houzs.com', password: 'Hv-7k2m9q', cells: [],
     })
   })
 
-  it('turns blank optional fields into null, not empty strings', () => {
-    const out = validateInvite({ ...ok, titleId: '  ', reportsTo: '', phone: null })
-    expect(out.titleId).toBeNull()
-    expect(out.reportsTo).toBeNull()
-    expect(out.phone).toBeNull()
+  it('refuses nobody picked, a bad email and a short password, in the drawer’s words', () => {
+    expect(() => validateInvite({ staffId: '', email: 'a@b.co', password: 'secret' })).toThrow('Pick somebody from the roster')
+    expect(() => validateInvite({ staffId: 'not-a-person', email: 'a@b.co', password: 'secret' })).toThrow('Pick somebody from the roster')
+    expect(() => validateInvite({ staffId: STAFF, email: 'nope', password: 'secret' })).toThrow('Email is required')
+    expect(() => validateInvite({ staffId: STAFF, email: 'a@b.co', password: 'short' })).toThrow('at least 6 characters')
   })
 
-  it('trims and lowercases the email', () => {
-    expect(validateInvite({ ...ok, email: '  Loo@VENTURE.MY ' }).email).toBe('loo@venture.my')
+  it('keeps a password exactly as typed — spaces are characters', () => {
+    expect(validateInvite({ staffId: STAFF, email: 'a@b.co', password: ' pass word ' }).password).toBe(' pass word ')
   })
 
-  it('does not trim the password', () => {
-    // A space is a legitimate character; eating it locks them out on the first
-    // sign-in and nobody would guess why.
-    expect(validateInvite({ ...ok, password: ' spaced ' }).password).toBe(' spaced ')
+  it('carries the cells changed for this person alone, ✕ as null', () => {
+    const cells = [
+      { function_key: 'audit_log', action: 'view', scope: 'all' },
+      { function_key: 'hr_costing', action: 'export', scope: null },
+    ]
+    expect(validateInvite({ staffId: STAFF, email: 'a@b.co', password: 'secret', cells }).cells).toEqual(cells)
   })
 
-  it('demands a name', () => {
-    expect(() => validateInvite({ ...ok, name: '   ' })).toThrow(/Name is required/)
+  it.each([
+    ['an unknown action', [{ function_key: 'claims', action: 'fly', scope: 'all' }]],
+    ['an unknown reach', [{ function_key: 'claims', action: 'view', scope: 'galaxy' }]],
+    ['the same cell twice', [{ function_key: 'claims', action: 'view', scope: 'own' }, { function_key: 'claims', action: 'view', scope: 'all' }]],
+    ['not a list', { claims: 'view' }],
+  ])('refuses %s', (_label, cells) => {
+    expect(() => validateInvite({ staffId: STAFF, email: 'a@b.co', password: 'secret', cells })).toThrow('Reload the page')
+  })
+})
+
+describe('the drawer’s footer', () => {
+  it('names the first thing missing, then nothing', () => {
+    expect(inviteBlocker({ staffId: null, email: '', password: '' })).toBe('Pick somebody from the roster')
+    expect(inviteBlocker({ staffId: STAFF, email: 'x', password: '' })).toBe('Email is required')
+    expect(inviteBlocker({ staffId: STAFF, email: 'a@b.co', password: '12345' })).toBe('Password must be at least 6 characters')
+    expect(inviteBlocker({ staffId: STAFF, email: 'a@b.co', password: '123456' })).toBe('')
   })
 
-  it('rejects an email that is not one', () => {
-    for (const email of ['nope', 'a@b', 'a b@c.my', '@venture.my']) {
-      expect(() => validateInvite({ ...ok, email })).toThrow(/does not look right/)
-    }
+  it('rates a password in three steps', () => {
+    expect([passwordStrength(''), passwordStrength('abc'), passwordStrength('abcdef'), passwordStrength('Abcdefgh12')]).toEqual([0, 1, 2, 3])
+    expect(passwordStrength('abcdefghij12')).toBe(2)
   })
 
-  it('rejects a password under the Supabase floor', () => {
-    expect(() => validateInvite({ ...ok, password: '12345' })).toThrow(/at least 6/)
-    expect(validateInvite({ ...ok, password: '123456' }).password).toBe('123456')
-  })
-
-  it('rejects a role that is not one of the four', () => {
-    expect(() => validateInvite({ ...ok, role: 'admin' })).toThrow(/Pick a role/)
-    expect(() => validateInvite({ ...ok, role: null })).toThrow(/Pick a role/)
-  })
-
-  it('makes a dept_manager carry a department', () => {
-    expect(() =>
-      validateInvite({ ...ok, role: 'dept_manager', departmentId: null }),
-    ).toThrow(/department manager needs a department/)
-    expect(
-      validateInvite({ ...ok, role: 'dept_manager', departmentId: 'dept-2' }).departmentId,
-    ).toBe('dept-2')
-  })
-
-  it('makes a brand-new person carry a department', () => {
-    // No staffId means a roster row gets created, and department_id is NOT NULL.
-    expect(() => validateInvite({ ...ok, staffId: null, departmentId: null })).toThrow(
-      /new person needs a department/,
-    )
-  })
-
-  it('lets somebody already on the roster keep their department', () => {
-    const out = validateInvite({ ...ok, departmentId: null })
-    expect(out.departmentId).toBeNull()
-    expect(out.staffId).toBe('staff-1')
+  it('generates Hv- and seven characters nobody misreads', () => {
+    let i = 0
+    const pw = generatePassword(() => (i++ % 10) / 10)
+    expect(pw).toMatch(/^Hv-[A-HJ-NP-Za-km-z2-9]{7}$/)
+    expect(generatePassword()).toHaveLength(10)
   })
 })

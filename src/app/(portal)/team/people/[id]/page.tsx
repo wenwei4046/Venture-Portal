@@ -3,13 +3,11 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
 import { formatMoney } from '@/lib/utils'
-import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
+import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { isFullyCommissionBased, isVariablePay } from '@/lib/staff-form'
 import ActivityLog from '../../_components/ActivityLog'
-import PersonPermissions, {
-  type PersonPermissionRow,
-} from '../../_components/PersonPermissions'
-import { resolvePersonPermissions } from '../../_lib/person-permissions'
+import PersonAccess from '../../_components/PersonAccess'
+import { loadPersonAccess } from '../../_lib/person-permissions'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -36,7 +34,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
   const { data: staff } = await supabase
     .from('hr_staff_costs')
     .select(
-      '*, departments(name, payroll_source), titles(name), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)',
+      '*, departments(name, payroll_source), titles(name, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active)',
     )
     .eq('id', id)
     .maybeSingle()
@@ -66,17 +64,13 @@ export default async function StaffDetailPage({ params }: PageProps) {
   // What this person's account actually resolves to. Shared with the floating
   // person card since 2026-09-01 — two copies of this would drift, and it is
   // the answer an audit reads.
-  let permissionRows: PersonPermissionRow[] = []
-  let permissionSource = ''
-  if (account) {
-    const resolved = await resolvePersonPermissions(
-      supabase,
-      { id: account.id, role: account.role },
-      { id: row.title_id ?? null, name: titleName },
-    )
-    permissionRows = resolved.rows
-    permissionSource = resolved.source
-  }
+  const access = account
+    ? await loadPersonAccess(
+        supabase,
+        { id: account.id, role: account.role },
+        { id: row.title_id ?? null, name: titleName, templateId: row.titles?.template_id ?? null },
+      )
+    : null
 
   return (
     <div>
@@ -109,9 +103,9 @@ export default async function StaffDetailPage({ params }: PageProps) {
         <div className="flex items-center gap-2 shrink-0">
           {/* One person, one login — so this is offered only while they have
               none, and only to the role that may mint one. */}
-          {viewer.role === 'principal' && !account ? (
+          {canInviteUsers(viewer) && !account && staff.status !== 'inactive' ? (
             <Link
-              href={`/team/people/invite?staff=${staff.id}`}
+              href={`/team/people?invite=${staff.id}`}
               className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-4 py-2 rounded-control transition-colors"
             >
               Invite
@@ -219,14 +213,7 @@ export default async function StaffDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      {account ? (
-        <PersonPermissions
-          userId={account.id}
-          rows={permissionRows}
-          source={permissionSource}
-          canEdit={canManagePermissions(viewer)}
-        />
-      ) : null}
+      {access ? <PersonAccess access={access} canEdit={canManagePermissions(viewer)} /> : null}
 
       {canSeeActivity ? <ActivityLog userId={account!.id} /> : null}
     </div>

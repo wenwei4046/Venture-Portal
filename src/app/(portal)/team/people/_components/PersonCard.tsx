@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import PersonPermissions from '../../_components/PersonPermissions'
+import PersonAccess, { accessCount } from '../../_components/PersonAccess'
 import EditStaffForm from './EditStaffForm'
 import Promotion from './Promotion'
 import Employment from './Employment'
@@ -22,6 +22,8 @@ interface Props {
   /** Opens straight into edit mode — what the pencil on a row does. */
   startEditing?: boolean
   onClose: () => void
+  /** Opens the invite drawer for this person, when the card sits on the roster. */
+  onInvite?: (staffId: string) => void
 }
 
 /**
@@ -37,7 +39,7 @@ interface Props {
  * why they are tabs and not sections: what they are (Details), what their
  * account may do (Permissions), and what it has been doing (Activity).
  */
-export default function PersonCard({ personId, startEditing, onClose }: Props) {
+export default function PersonCard({ personId, startEditing, onClose, onInvite }: Props) {
   const router = useRouter()
   const [data, setData] = useState<PersonCardData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -206,10 +208,8 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
                 }}
               >
                 {label}
-                {key === 'permissions' && person?.permissions ? (
-                  <span className="sheet-count">
-                    {person.permissions.rows.filter(r => (r.override ?? r.inherited)).length}
-                  </span>
+                {key === 'permissions' && person?.access ? (
+                  <span className="sheet-count">{accessCount(person.access)}</span>
                 ) : null}
               </button>
             ))}
@@ -267,13 +267,12 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
               </div>
             )
           ) : tab === 'permissions' ? (
-            person.permissions && person.account ? (
+            person.access && person.account ? (
               <div className="pb-5">
-                <PersonPermissions
-                  userId={person.account.id}
-                  rows={person.permissions.rows}
-                  source={person.permissions.source}
+                <PersonAccess
+                  access={person.access}
                   canEdit={person.canManagePermissions}
+                  onSaved={() => void load()}
                 />
               </div>
             ) : (
@@ -348,13 +347,23 @@ export default function PersonCard({ personId, startEditing, onClose }: Props) {
               >
                 Full page
               </Link>
-              {!person.account ? (
-                <Link
-                  href={`/team/people/invite?staff=${person.staff.id}`}
-                  className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
-                >
-                  Invite
-                </Link>
+              {!person.account && person.active ? (
+                onInvite ? (
+                  <button
+                    type="button"
+                    onClick={() => onInvite(person.staff.id)}
+                    className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
+                  >
+                    Invite
+                  </button>
+                ) : (
+                  <Link
+                    href={`/team/people?invite=${person.staff.id}`}
+                    className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-2 rounded-control transition-colors"
+                  >
+                    Invite
+                  </Link>
+                )
               ) : null}
             </>
           ) : null}

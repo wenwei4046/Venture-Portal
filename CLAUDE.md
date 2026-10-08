@@ -38,12 +38,22 @@ src/
 │   │   ├── billing/                 (Phase 2)
 │   │   ├── team/                    ← the sidebar's **People** section (its own
 │   │   │                              category since 2026-09-01, below
-│   │   │                              Departments): People Management /
-│   │   │                              Hierarchy / Roles / Permissions, four flat
-│   │   │                              entries. No tab rail BETWEEN them — the
-│   │   │                              sidebar is the only way from page to
-│   │   │                              page. Routes stay under /team/*. Roles =
-│   │   │                              titles. Hierarchy = the GRAPH, with a
+│   │   │                              Departments): People Management / Member
+│   │   │                              Services / Hierarchy. **Since 2026-10-08
+│   │   │                              (Claude Design handoff, the People
+│   │   │                              Management revamp)** Permissions is People
+│   │   │                              Management's 2nd tab (`?tab=permissions`:
+│   │   │                              permission TEMPLATES — see Permissions
+│   │   │                              below) and Roles is Hierarchy's 4th
+│   │   │                              (`?tab=roles`: titles + Level + their
+│   │   │                              template); /team/roles and
+│   │   │                              /team/permissions redirect there. Invite
+│   │   │                              user is a DRAWER on People Management (pick
+│   │   │                              an active person with no login, email +
+│   │   │                              password, no role); /team/people/invite?
+│   │   │                              staff= deep-links into it. Routes stay
+│   │   │                              under /team/*. Roles = titles. Hierarchy =
+│   │   │                              the GRAPH, with a
 │   │   │                              panel beside it (2026-09-07): three views
 │   │   │                              on the header's rule (`?tab=`) — **Org
 │   │   │                              chart** (default), **Table** (the same two
@@ -1975,8 +1985,7 @@ TODOS.md — Phase 1.5 tech debt, Phase 2/3 prerequisites, compliance gates
 .gstack/qa-reports/qa-report-phase1-2026-04-10.md — Phase 1 acceptance audit (6 findings, 2 fixed, 3 deferred to 1.5)
 Permissions (2026-09-01 — replaced the four hard-coded roles)
 Every gate in the portal reads a PERMISSION, not a role. A permission is granted
-by a TITLE (Team → Role & Permission), with a per-person exception available on
-somebody's page. `permission_defs` is the catalog; `has_scope()` derives the
+by a TITLE, with a per-person exception available on somebody's page. `permission_defs` is the catalog; `has_scope()` derives the
 table-level scopes RLS asks about, so a title cannot be granted a page whose
 queries then come back empty.
   App:  `requirePermission('treasury')`, `can(user, 'reports')`, `canAccessX(user)`
@@ -1991,6 +2000,42 @@ A title with NO permissions of its own falls back to the role its holder's
 account was created with — which is why the cutover changed nobody's access.
 `users.role` survives ONLY for that fallback and for the 16 dept_manager
 row-scoped policies no scope can express. Do not add new gates that read it.
+
+**PERMISSION TEMPLATES (2026-10-08, the People Management revamp — PR1 of 4;
+user: 不要 role，到最后是跟着 title 的 permission 走).** A title points at a
+TEMPLATE (`titles.template_id`): cells = function × action (view create edit
+approve void export manage) × scope (own / dept / all) in
+`permission_template_grants`, plus sensitive fields (salary / nric / bank) in
+`permission_template_sensitive`. Rows = `permission_functions` (the design's
+22 + Member Services, Revenue app, Switch views). One person is raised or
+lowered on a cell in `user_permission_cells` (scope NULL = ✕). Ten templates
+seeded, 29 titles mapped; ACCOUNTS EXECUTIVE waits for the user; the four
+shared accounts (no staff row) keep their role defaults. **Ultimate full
+access** = everything + `view_switch` (the View-as switcher reads that key on
+the REAL account — `User.canSwitchView` — not the Principal role); **Full
+access** = the same without it. THE GATES STILL READ MODULE KEYS:
+`current_permissions()` opens each cell's key via `permission_cell_keys`
+FAIL CLOSED — hr/treasury/admin-domain keys need the cell at All, hr keys need
+Salary amounts ticked, treasury keys need Treasury · View, admin keys (the
+Principal's own powers) need a Principal template — and the UI lists what is
+"held for now" with the reason (`heldCells`, `lib/permission-matrix.ts`,
+the TS twin of the SQL). The account's hidden role = the template's
+`base_role` (`sync_user_role` triggers; new role `staff` = no defaults).
+Retitling somebody WITH a login onto another template, or linking a login,
+needs `permissions_manage` (trigger `hr_staff_costs_permission_guard`) —
+HR cannot promote anybody, themselves included, by retitling. Writers are RPCs
+(`permission_template_save` w/ version + per-person reset list,
+`permission_template_create`, `permission_title_set_template`,
+`permission_user_cells_set`, `permission_user_clear_legacy`); a save that
+changes a cell somebody has their own value on asks keep-or-reset per person.
+Every change is in `audit_events` (trigger `audit_row_change(keycols,
+ignorecols)`, one txid per save; History on the Permissions tab,
+`permission_history()`, `lib/permission-history.ts`) — the general form of
+`config_audit_log`, which the app-wide audit step folds in. Old per-key
+`user_permissions` still apply on top (carrie's 3 denies) until cleared on
+her card. NEXT: PR2 actions enforced, PR3 own/dept into RLS, PR4 masking —
+then `permission_cell_keys` goes. Migs `20261008110000`–`130000`,
+`tests/member-sql/validate-permission-templates.mjs`.
 
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY

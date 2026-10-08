@@ -2,6 +2,18 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
+import {
+  type CellKey,
+  type Grants,
+  type PermFunction,
+  type PersonCells,
+  type SensitiveField,
+  cellKeysFromRows,
+  functionsFromRows,
+  grantsFromRows,
+  isSensitiveField,
+  personCellsFromRows,
+} from '@/lib/permission-matrix'
 import type { PersonPermissionRow } from '../_components/PersonPermissions'
 
 /**
@@ -27,7 +39,7 @@ export async function resolvePersonPermissions(
       supabase
         .from('role_default_permissions')
         .select('permission_key')
-        .eq('role', account.role as 'principal' | 'finance' | 'hr' | 'dept_manager'),
+        .eq('role', account.role as Database['public']['Enums']['user_role']),
       supabase.from('user_permissions').select('permission_key, granted').eq('user_id', account.id),
     ])
 
@@ -42,7 +54,7 @@ export async function resolvePersonPermissions(
   )
   const source = configured
     ? `the ${title.name ?? 'title'} title`
-    : `the ${account.role} role, because ${title.name ?? 'their title'} has no permissions of its own`
+    : `the ${account.role} role, because ${title.name ?? 'their title'} has no permission template yet`
 
   const overrideBy = new Map(
     (overrides ?? []).map(o => {
@@ -63,4 +75,79 @@ export async function resolvePersonPermissions(
   })
 
   return { rows, source }
+}
+
+/**
+ * A person's access as the person card draws it (2026-10-08): their title's
+ * permission template with their own cells over it — or, while their title has
+ * no template, the old per-key view (their account's role, and its exceptions).
+ */
+export type PersonAccessData =
+  | {
+      kind: 'template'
+      userId: string
+      titleName: string
+      template: { id: string; name: string; baseRole: string; grants: Grants; sensitive: SensitiveField[] }
+      cells: PersonCells
+      /** Old per-key exceptions, still applied on top until cleared. */
+      legacy: Array<{ key: string; label: string; granted: boolean }>
+      functions: PermFunction[]
+      cellKeys: CellKey[]
+    }
+  | { kind: 'legacy'; userId: string; rows: PersonPermissionRow[]; source: string }
+
+export async function loadPersonAccess(
+  supabase: SupabaseClient<Database>,
+  account: { id: string; role: string },
+  title: { id: string | null; name: string | null; templateId: string | null },
+): Promise<PersonAccessData> {
+  if (!title.templateId) {
+    const legacy = await resolvePersonPermissions(supabase, account, title)
+    return { kind: 'legacy', userId: account.id, ...legacy }
+  }
+  // The permission tables postdate database.types.ts.
+  const db = supabase as unknown as SupabaseClient
+  const [tpl, grants, sens, fns, keys, cells, legacy, defs] = await Promise.all([
+    db.from('permission_templates').select('id, name, base_role').eq('id', title.templateId).maybeSingle(),
+    db.from('permission_template_grants').select('function_key, action, scope').eq('template_id', title.templateId),
+    db.from('permission_template_sensitive').select('field').eq('template_id', title.templateId),
+    db.from('permission_functions').select('key, label, section, actions, scopes, description').order('sort_order'),
+    db.from('permission_cell_keys').select('function_key, action, legacy_key, min_scope, gate'),
+    db.from('user_permission_cells').select('function_key, action, scope').eq('user_id', account.id),
+    db.from('user_permissions').select('permission_key, granted').eq('user_id', account.id),
+    db.from('permission_defs').select('key, label'),
+  ])
+  for (const [label, res] of [['their template', tpl], ['its cells', grants], ['the permission catalog', fns], ['their own cells', cells]] as const) {
+    if (res.error) throw new Error(`Could not load ${label}: ${res.error.message}`)
+  }
+  const template = tpl.data as { id: string; name: string; base_role: string } | null
+  if (!template) {
+    const fallback = await resolvePersonPermissions(supabase, account, title)
+    return { kind: 'legacy', userId: account.id, ...fallback }
+  }
+  const labels = new Map(((defs.data ?? []) as Array<{ key: string; label: string }>).map(d => [d.key, d.label]))
+  return {
+    kind: 'template',
+    userId: account.id,
+    titleName: title.name ?? 'their title',
+    template: {
+      id: template.id,
+      name: template.name,
+      baseRole: template.base_role,
+      grants: grantsFromRows((grants.data ?? []) as Array<{ function_key: string; action: string; scope: string }>),
+      sensitive: ((sens.data ?? []) as Array<{ field: string }>).map(s => s.field).filter(isSensitiveField),
+    },
+    cells: personCellsFromRows((cells.data ?? []) as Array<{ function_key: string; action: string; scope: string | null }>),
+    legacy: ((legacy.data ?? []) as Array<{ permission_key: string; granted: boolean }>).map(l => ({
+      key: l.permission_key,
+      label: labels.get(l.permission_key) ?? l.permission_key,
+      granted: l.granted,
+    })),
+    functions: functionsFromRows(
+      (fns.data ?? []) as Array<{ key: string; label: string; section: string; actions: string[]; scopes: string[]; description: string | null }>,
+    ),
+    cellKeys: cellKeysFromRows(
+      (keys.data ?? []) as Array<{ function_key: string; action: string; legacy_key: string; min_scope: string; gate: string | null }>,
+    ),
+  }
 }

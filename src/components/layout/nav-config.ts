@@ -291,7 +291,7 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // the roster alongside Marketing and Revenue — but people are not one more
     // department, they are who every department is made of.
     //
-    // Flat, not a group: four pages, one section header, no chevron to open
+    // Flat, not a group: three pages, one section header, no chevron to open
     // first. The sidebar is also the only way between them — the tab rail that
     // used to sit on all of them came out with this move, the same way the
     // Revenue sub-department views did.
@@ -300,12 +300,13 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // 2026-09-03, when the user asked for them apart: Roles is what a title IS
     // (its department), Permissions is what it may DO. The ladder (Levels)
     // sat on Roles for two days and moved to Hierarchy on 2026-09-05, as a
-    // second tab beside the chart that obeys it.
+    // second tab beside the chart that obeys it. And on 2026-10-08 (the Claude
+    // Design handoff, the People Management revamp) both left the sidebar:
+    // Permissions is People Management's second tab (permission templates),
+    // Roles is Hierarchy's fourth. Their old addresses redirect there.
     { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
     { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => v.role === 'principal' || can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
-    { href: '/team/roles', label: 'Roles', section: 'People', visible: isHRorPrincipal },
-    { href: '/team/permissions', label: 'Permissions', section: 'People', visible: isHRorPrincipal },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },
@@ -435,6 +436,12 @@ export interface TabDef {
 }
 
 const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
+  // An account wholly on its title's template (2026-10-08): what it may open
+  // differs person to person, so the bar promises only the Overview and More
+  // carries the rest.
+  staff: [
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
+  ],
   revenue_member: [
     { href: '/member', label: 'My account', icon: 'home' },
   ],
@@ -479,7 +486,7 @@ export function tabsForRole(role: UserRole): TabDef[] {
 /** The fifth tab's label. Finance's and the Principal's bar reads in English
  *  (2026-10-07, user: "下面还是华语字体"); HR's and a department manager's as it was. */
 export function moreTabLabel(role: UserRole): string {
-  return role === 'finance' || role === 'principal' ? 'More' : '更多'
+  return role === 'finance' || role === 'principal' || role === 'staff' ? 'More' : '更多'
 }
 
 /** Path prefixes already reachable from the tab bar — the More sheet dims
