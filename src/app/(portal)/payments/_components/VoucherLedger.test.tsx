@@ -26,6 +26,7 @@ vi.mock('./VouchersTable', () => ({
 }))
 
 import VoucherLedger from './VoucherLedger'
+import { fetchPaymentExtras } from '@/lib/payment-extras'
 
 const base = {
   direction: 'debit', voucher_type: 'expense', status: 'paid', reference_type: null as string | null,
@@ -157,6 +158,28 @@ describe('Payments, for a treasury account without Payroll payouts', () => {
     render(await VoucherLedger({ direction: 'debit', params: { min: '4000' } }))
     expect(screen.queryByTestId('sent')).toBeNull() // TNB is under 4,000 and no batch is offered
     expect(screen.getByText('0 of 5 vouchers')).toBeVisible()
+  })
+})
+
+// 2026-10-08: the ledger's five reads were awaited one after another
+// (~400–450 ms in production) though none needs another's answer.
+describe('the ledger’s reads', () => {
+  it('asks for everything at once — nothing waits for the vouchers', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury', 'payroll_payouts'] })
+    const { from, rpc } = database()
+    let release = () => {}
+    mocks.fetchAllRows.mockImplementation(() => new Promise((resolve) => { release = () => resolve(VOUCHERS) }))
+
+    const ledger = VoucherLedger({ direction: 'debit', params: {} })
+    await vi.waitFor(() => {
+      expect(from).toHaveBeenCalledWith('payroll_payment_requests')
+      expect(from).toHaveBeenCalledWith('payment_voucher_sources')
+      expect(rpc).toHaveBeenCalledWith('claim_payment_queue')
+      expect(fetchPaymentExtras).toHaveBeenCalled()
+    })
+    release()
+    render(await ledger)
+    expect(screen.getByText('5 of 5 vouchers')).toBeVisible()
   })
 })
 
