@@ -2041,8 +2041,9 @@ queries then come back empty.
         times). The migration ends with a guard that fails if one comes back.
 A title with NO permissions of its own falls back to the role its holder's
 account was created with — which is why the cutover changed nobody's access.
-`users.role` survives ONLY for that fallback and for the 16 dept_manager
-row-scoped policies no scope can express. Do not add new gates that read it.
+`users.role` survives ONLY for that fallback (the dept_manager row-scoped
+policies it also served ask the cell's reach since PR3c, below). Do not add new
+gates that read it.
 
 **PERMISSION TEMPLATES (2026-10-08, the People Management revamp — PR1 of 4;
 user: 不要 role，到最后是跟着 title 的 permission 走).** A title points at a
@@ -2176,6 +2177,95 @@ update for Treasury approvers. The queue draws a non-decidable row with "—" an
 why (`undecidable` on PendingApprovals). hr_costing / director_salary / revenue
 keys' Approve rows moved to the `approvals` key (UPDATE, not DELETE — the MCP
 refuses DELETE): hr@ approves no payroll run, as before. Mig `20261009010000`.
+
+**THE DATABASE ASKS FOR THE ACTION TOO (2026-10-09, PR3a).** A table's row
+policies opened it to whoever held ANY key of its domain (`has_scope(ARRAY
+['treasury'])`), and a View cell opens a key — so through the API a template
+that only reads Treasury raised payment vouchers and a Director who sees the
+roster wrote payroll. Every table a domain policy lets somebody write now also
+has a RESTRICTIVE policy per command, `needs_action_insert / _update / _delete`
+→ `may_write(table, command)` → `has_any_action(actions)` over the row of
+`permission_table_writes` (TS twin `TABLE_WRITES`, lib/permission-table-writes.ts;
+`fn.action` or `fn.action:dept` / `:own`). Restrictive = only takes away. Each
+list is every way the APP writes that table under the caller's own session: the
+gate of each server action writing it straight, of each SECURITY INVOKER function
+it calls (the Revenue / catalogue / ladder RPCs — `INVOKER_WRITES` in the test),
+and of each INVOKER trigger writing on its behalf (a voucher marks its invoice
+paid, so every voucher writer is on invoices UPDATE). DEFINER functions meet no
+row policy (postgres owns tables and functions, BYPASSRLS) — they ask for their
+own action (PR3b, below). `permission-table-writes.test.ts` holds the twin, scans
+every `.from('t').insert/update/upsert/delete` and `.rpc(invoker)` in src/ with
+its gates (own function, else its callers across imports) and fails when a gate
+lets in an action the table does not ask for, or a new domain table is written
+unregistered; the migration's guard refuses a domain write policy left without
+its restrictive one. A NEW table a domain policy opens: rows in
+`permission_table_writes` + `SELECT permission_writes_guard('t')` in its
+migration. `WRITES_WITHOUT_ACTION`: table_layout_defaults only. Residual, said
+out loud: a table's UPDATE cannot tell edit from void from approve (an approver
+may update a voucher), and an action that writes a table as a side effect may
+write it straight (Claims · Approve raises the claim's voucher). Mig
+`20261009020000`, `tests/member-sql/validate-table-writes.mjs`.
+
+**THE FUNCTIONS ASK FOR THE ACTION TOO (2026-10-09, PR3b).** 70 write functions
+(DEFINER, plus `commit_sales_import_batch` and the commission trigger
+`guard_revenue_commission_adjustment`) asked who the caller WAS — `IF v_role NOT
+IN ('finance','principal')`, `EXISTS … role IN ('principal','hr')`,
+`has_perm('hr_costing')`, `has_scope(ARRAY['hr'])` — so a template's hidden kind
+decided (a Finance · Checker could book a loan through the API; a Director whose
+template HAS Treasury · Create was refused it) and a View cell, which opens the
+key, could submit payroll. Each now asks `has_any_action(…)` for the action its
+app gate asks, its one check statement swapped in place in PRODUCTION's body
+(`pg_temp.swap_check`: whitespace-blind, exactly once, nothing else moves); no
+sign-in answers as before. A function that also runs INSIDE another one — as
+the same signed-in person — asks for the outer path's actions too:
+`mark_journal_entry_reversed` (the loan / fund-source cancel executors run as the
+cancellation's approver: + Treasury · Approve, Approvals · Approve),
+`assert_commission_payroll_open` (Revenue · Edit or HR Costing · Edit — closes,
+pay lines, HR's adjustments, the payroll triggers), `payroll_send_back_batch`
+(Finance's send-back of a whole run). On production only four things moved, none
+a page of theirs did: carrie's manual JVs (her Reconciliation is held back by
+hand; the table refused them since PR3a) and hr@ closing a voided voucher's
+approvals (Treasury · Void's). `permission-table-writes.test.ts` › *the DEFINER
+functions that ask for an action* reads every swap out of the migration and fails
+when a caller's gate lets in somebody the function refuses (All covers Dept
+covers Own; a `requireApprover()` path names its domain in
+`DECIDED_IN_ONE_DOMAIN`). A NEW write function asks `has_any_action` for its app
+gate's action — never `current_user_role()`, never a key. Left on purpose: the
+approvals (PR2b, by domain), `permissions_manage`, `department_mode`, reopening a
+closed payroll month (the Principal's), the member app's own keys, the
+service-role-only `reopen_director_salary` / `reverse_staff_payroll_accruals`,
+the commission-run functions no page calls (`apply / save / reopen_commission_run`,
+INVOKER), and every READ function (reach = PR3c). Mig `20261009030000`,
+`tests/member-sql/validate-function-actions.mjs`.
+
+**OWN AND DEPT REACH THE ROWS (2026-10-09, PR3c).** A cell's reach (Own / Dept /
+All) was the app's alone: 18 row policies asked `current_user_role() =
+'dept_manager'` (or a list of kinds), so a template's Dept cells reached its
+department only on a dept_manager-kind template, and Own reached nobody (Staff ·
+Basic raised a claim it could not read). Each now asks
+`has_action(fn, action, 'own'|'dept'|'all')` — with the department / segment read
+off the person (`current_user_department_id()`, `current_user_segment()`) — and
+is `TO authenticated` (has_action is not the publishable key's to call): Claims
+own / dept / all, raised only as yourself with Claims · Create; Dept Pool its
+department's pool, expense and payment requests; My Billing its department's
+invoices, contracts, requests and its own draft invoices in its segment; Dept
+reports its segment's invoices and journals; an approval request raised as
+yourself by `may_write` (PR3a's list); a Revenue commission adjustment read by HR
+Costing / Revenue · View. 17 READ functions behind those pages swap the kind for
+the same cells (`calculate_dept_np`, `get_dept_opex_rows`,
+`dept_invoice_settlements`, `rnp_invoice_events`, `bridge_mirror_slices`: All =
+any department / segment, Dept = theirs; the HR-cost lump sums, billing
+allocations, payroll accrual / funding reads: Billing, HR Costing or Treasury ·
+View; `revenue_pay_preview` / `comm_effective_direct_line_limits`: Revenue ·
+View). Production, every active login: the same rows in all ten tables; moved only
+reads no page of theirs makes — hr@ a department's NP / OPEX, carrie report-only
+mirror slices, Finance the per-director payout summary (Director Salary is not
+Finance's). `permission-table-writes.test.ts` refuses a later row policy that asks
+`current_user_role()`. Still by kind, on purpose: `approvals_decider_update`
+(owner kind may decide their own request), `table_layout_defaults`,
+`dashboard_summary` (which dashboard to draw). Domain READS (`has_scope`) are still
+by key: a View cell of one Treasury function reads its domain's tables through
+the API. Mig `20261009040000`, `tests/member-sql/validate-reach.mjs`.
 
 View as (2026-09-27): the Principal's `vp-view-as` cookie is shared by every
 tab. *Revenue View* (`revenue_member`) is honoured by the member app ONLY
