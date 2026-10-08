@@ -1,5 +1,5 @@
 // Local PostgreSQL regression for the salesperson CRM redesign (2026-10-09,
-// mig 20261009030000). Every CRM migration runs VERBATIM; under test: visit
+// mig 20261009070000). Every CRM migration runs VERBATIM; under test: visit
 // outcomes (Won amount, No show), the showroom's slots / limit / closures,
 // customer details, each person's own prefs / labels / quick replies, share and
 // move invitations and what a share opens, replies with a quote, reactions,

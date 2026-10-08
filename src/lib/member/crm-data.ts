@@ -121,7 +121,7 @@ export interface CrmEvent {
   at: string;
 }
 
-/** Ads to teams (mig 20261009050000): how one ad's enquiries are dealt. */
+/** Ads to teams (mig 20261009090000): how one ad's enquiries are dealt. */
 export interface CrmAdRule { adId: string; label: string; mode: "even" | "split" | "people"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; startedAt: string }
 /** Full time lead allocation for one team: on these weekdays (0 = Monday) the full-time RS take their maximum or % first. */
 export interface CrmFtRule { tlId: string; mode: "cnt" | "pct"; days: number[]; vals: Record<string, Record<string, number>> }

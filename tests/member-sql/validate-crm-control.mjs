@@ -1,5 +1,5 @@
 // Local PostgreSQL regression for the Control panel's dealing rules (2026-10-09,
-// mig 20261009050000). Every CRM migration runs VERBATIM; under test: Organic
+// mig 20261009090000). Every CRM migration runs VERBATIM; under test: Organic
 // Leads, Evenly, By team %, By people (maximum / %), full-time days, the
 // Principal / Director sending and undoing, and who may answer. No live I/O.
 import assert from 'node:assert/strict'
