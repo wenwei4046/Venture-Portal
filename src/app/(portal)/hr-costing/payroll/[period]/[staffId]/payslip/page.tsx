@@ -81,7 +81,7 @@ export default async function PayslipPage({ params }: PageProps) {
   const { data: lineRows, error: lineError } = row.source === 'commission' && (payLineEarnings > 0 || payLineDeductions > 0)
     ? await supabase
         .from('revenue_pay_lines')
-        .select('id, staff_id, kind, description, amount, version')
+        .select('id, staff_id, kind, description, amount, version, claim_id')
         .eq('staff_id', staffId)
         .eq('period_month', period)
         .order('sort_order')

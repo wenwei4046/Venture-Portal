@@ -6,9 +6,10 @@ import { computeRevenuePay } from '@/lib/revenue-pay'
 import {
   MAX_DESCRIPTION,
   PAY_LINE_KINDS,
+  claimLines,
   draftLines,
+  editableLines,
   draftOf,
-  draftTotals,
   draftsDiffer,
   newDraft,
   payLineKind,
@@ -77,10 +78,13 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
   const waitingForRefresh = justSaved !== null && justSaved.base === storedKey
   const editing = drafts !== null
   const monthName = new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-  const shown = editing ? draftLines(drafts)
+  // A line an approved member claim put here (2026-10-08) is the claim's: it
+  // counts in the pay, shows in the editor, and is never sent back to change.
+  const fromClaims = claimLines(stored).map(line => ({ ...line, key: line.id }))
+  const shown = editing ? [...fromClaims, ...draftLines(drafts)]
     : waitingForRefresh ? justSaved.lines
     : stored.map(line => ({ ...line, key: line.id }))
-  const totals = editing ? draftTotals(drafts) : payLineTotals(shown)
+  const totals = payLineTotals(shown)
   const salary = source ? computeRevenuePay({
     ...source.input,
     payLineEarnings: totals.earnings,
@@ -89,7 +93,7 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
   }) : null
   const earningLines = shown.filter(line => !payLineKind(line.kind).deduction)
   const deductionLines = shown.filter(line => payLineKind(line.kind).deduction)
-  const dirty = editing && draftsDiffer(drafts, openedFrom)
+  const dirty = editing && draftsDiffer(drafts, editableLines(openedFrom))
 
   // A new line, or the first one on opening, takes the focus on its type.
   useEffect(() => {
@@ -121,7 +125,7 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
     setSavedNote('')
     setProblem(null)
     if (closedReason) { setShowClosed(true); return }
-    const start = stored.map(draftOf)
+    const start = editableLines(stored).map(draftOf)
     const first = start[0]?.key ?? freshKey()
     setOpenedFrom(stored)
     setDrafts(start.length ? start : [newDraft(first)])
@@ -158,7 +162,7 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
     startSaving(async () => {
       try {
         const result = await savePayLines({ staffId: source.staffId, period, lines: check.lines, seen: seenOf(openedFrom) })
-        setJustSaved({ base: storedKey, lines: draftLines(drafts) })
+        setJustSaved({ base: storedKey, lines: [...fromClaims, ...draftLines(drafts)] })
         setDrafts(null)
         setSavedNote(result.payrollUpdated
           ? `Pay lines saved — ${staffName}’s ${monthName} payroll is updated.`
@@ -182,6 +186,13 @@ export default function SalaryCalculation({ staffName, period, commission, sourc
             <strong id={`pay-lines-${source.staffId}`}>Pay lines · {monthName}</strong>
             <span>A special claim, allowance or incentive is paid in full, with no EPF, SOCSO or EIS. A deduction comes off take-home pay.</span>
           </div>
+          {fromClaims.length > 0 && <ul className={x.lines} aria-label="Lines from approved claims">
+            {fromClaims.map(line => <li key={line.key} className={x.claimLine}>
+              <span>{payLineLabel(line)}</span>
+              <small>From a claim approved in Member Services — it changes only with the claim</small>
+              <span className={x.claimAmount}>{money(line.amount)}</span>
+            </li>)}
+          </ul>}
           {drafts.length === 0 && <p className={x.empty}>No lines. Save to clear the month, or add one.</p>}
           <ul className={x.lines}>
             {drafts.map((draft, index) => <li key={draft.key} className={x.line} data-problem={problem?.key === draft.key ? 'true' : undefined}>

@@ -79,6 +79,19 @@ export default async function VoucherLedger({
         .select('*', { count: 'exact', head: true })
         .eq('status', 'submitted')
 
+  // Approved claims waiting for Finance's voucher (2026-10-08) — payment side
+  // only. A badge, never a reason for the ledger itself not to open.
+  const claimRequestsPending = isReceipts
+    ? 0
+    : await (async () => {
+        try {
+          const { data } = await supabase.rpc('claim_payment_queue')
+          return (data ?? []).filter(r => !r.voucher_id).length
+        } catch {
+          return 0
+        }
+      })()
+
   // Post-mig 238: PVS rows reference chart_of_accounts via account_code
   // (the COA `code` IS the GL). Load once, index by voucher_id, then derive
   // pool list + account name list for the table cells.
@@ -246,6 +259,23 @@ export default async function VoucherLedger({
               {(payrollRequestsPending ?? 0) > 0 ? (
                 <span className="bg-accent text-white font-mono text-[10px] px-1.5 py-0.5 rounded">
                   {payrollRequestsPending}
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
+          {!isReceipts ? (
+            <Link
+              href="/payments/claim-requests"
+              className={
+                claimRequestsPending > 0
+                  ? 'bg-surface hover:bg-surface-2 border border-accent-border text-accent font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
+                  : 'bg-surface hover:bg-surface-2 border border-hairline text-graphite font-serif italic text-sm px-3 py-2 rounded-md transition-colors flex items-center gap-2'
+              }
+            >
+              Claim Requests
+              {claimRequestsPending > 0 ? (
+                <span className="bg-accent text-white font-mono text-[10px] px-1.5 py-0.5 rounded">
+                  {claimRequestsPending}
                 </span>
               ) : null}
             </Link>

@@ -114,7 +114,7 @@ function taxMode(v: string): TaxMode {
 export async function loadPayLines(supabase: SupabaseClient, period: string): Promise<Map<string, PayLine[]>> {
   const rows = await fetchAllRows<unknown>((from, to) => supabase
     .from('revenue_pay_lines')
-    .select('id, staff_id, kind, description, amount, version, sort_order, created_at')
+    .select('id, staff_id, kind, description, amount, version, sort_order, created_at, claim_id')
     .eq('period_month', period)
     .order('staff_id')
     .order('sort_order')

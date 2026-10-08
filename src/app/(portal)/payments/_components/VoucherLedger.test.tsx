@@ -40,7 +40,7 @@ const VOUCHERS = [
   { ...base, id: 'v-fund', voucher_no: 'HV-PV-202610-0454', amount: 4225, payee_name: 'HR custody', description: 'Payroll bank transfer — Sep 2026 (Zeta)', reference_type: 'payroll_payment_request', voucher_type: 'payroll_bank_transfer', status: 'pending_approval' },
 ]
 
-function database() {
+function database(claimQueue: Array<{ voucher_id: string | null }> = []) {
   const from = vi.fn((table: string) => {
     const result = table === 'payroll_payment_requests' ? { count: 2, data: null, error: null } : { data: [], error: null }
     const q = {
@@ -49,9 +49,11 @@ function database() {
     }
     return q
   })
-  mocks.createClient.mockResolvedValue({ from })
+  // Payments › Claim requests' queue (2026-10-08).
+  const rpc = vi.fn(async () => ({ data: claimQueue, error: null }))
+  mocks.createClient.mockResolvedValue({ from, rpc })
   mocks.fetchAllRows.mockResolvedValue(VOUCHERS)
-  return { from }
+  return { from, rpc }
 }
 
 const sent = () => JSON.parse(screen.getByTestId('sent').textContent ?? '[]') as Array<{
@@ -78,6 +80,27 @@ describe('Payments, for an account with Payroll payouts', () => {
     expect(sent().some((r) => r.locked)).toBe(false)
     expect(screen.getByRole('link', { name: /Payroll Requests/ })).toHaveTextContent('2')
     expect(screen.getByText('5 of 5 vouchers')).toBeVisible()
+  })
+})
+
+// A member's claim HR approved as a payment request waits here for Finance's
+// voucher (2026-10-08) — the badge counts only those still without one.
+describe('Payments › Claim Requests', () => {
+  it('counts the claims still waiting for a voucher', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    const { rpc } = database([{ voucher_id: null }, { voucher_id: null }, { voucher_id: 'v-1' }])
+    render(await VoucherLedger({ direction: 'debit', params: {} }))
+    expect(rpc).toHaveBeenCalledWith('claim_payment_queue')
+    expect(screen.getByRole('link', { name: /Claim Requests/ })).toHaveAttribute('href', '/payments/claim-requests')
+    expect(screen.getByRole('link', { name: /Claim Requests/ })).toHaveTextContent('2')
+  })
+
+  it('is not asked on the receipts side', async () => {
+    mocks.requirePermission.mockResolvedValue({ role: 'finance', permissions: ['treasury'] })
+    const { rpc } = database()
+    render(await VoucherLedger({ direction: 'credit', params: {} }))
+    expect(rpc).not.toHaveBeenCalled()
+    expect(screen.queryByRole('link', { name: /Claim Requests/ })).toBeNull()
   })
 })
 

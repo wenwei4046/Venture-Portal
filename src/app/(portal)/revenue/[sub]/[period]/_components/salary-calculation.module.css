@@ -58,6 +58,25 @@
 .line :is(select, input):focus { border-color: rgb(var(--accent)); outline: none; box-shadow: 0 0 0 2px rgb(var(--accent-bg)); }
 .line[data-problem='true'] :is(select, input) { border-color: #b02822; }
 
+/* A line an approved member claim put here (2026-10-08): read-only, on the
+   panel's own tint so it reads as a fact, not a field. */
+.claimLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 8px 10px;
+  border: 1px dashed rgb(var(--hairline));
+  border-radius: 6px;
+  font-size: 12px;
+}
+.claimLine > small { grid-column: 1; font-size: 11px; }
+.claimAmount {
+  grid-column: 2;
+  grid-row: 1;
+  font-family: var(--font-mono, 'Chivo Mono'), monospace;
+  font-variant-numeric: tabular-nums;
+}
 .amount { position: relative; display: block; }
 .amount > span { position: absolute; top: 50%; left: 10px; transform: translateY(-50%); font-size: 11px; pointer-events: none; }
 .amount > input {

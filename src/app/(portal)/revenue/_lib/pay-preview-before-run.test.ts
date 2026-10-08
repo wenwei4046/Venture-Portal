@@ -99,8 +99,8 @@ describe('salary before a saved commission run', () => {
     const row = board.rows[0]
     expect(row.input).toMatchObject({ payLineEarnings: 500, payLineDeductions: 120 })
     expect(row.lines).toEqual([
-      { id: 'l1', kind: 'special_claim', description: 'Petrol', amount: 500, version: 1 },
-      { id: 'l2', kind: 'deduction', description: null, amount: 120, version: 2 },
+      { id: 'l1', kind: 'special_claim', description: 'Petrol', amount: 500, version: 1, claimId: null },
+      { id: 'l2', kind: 'deduction', description: null, amount: 120, version: 2, claimId: null },
     ])
     expect(row.pay.payLineEarnings).toBe(500)
     expect(row.pay.payLineDeductions).toBe(120)
