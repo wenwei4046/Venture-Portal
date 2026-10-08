@@ -13,12 +13,14 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions }
 // just-provisioned dept, and the provision action re-primes immediately.
 //
 // Off the critical path (2026-10-08): only an instance's FIRST prime is
-// awaited (its registry is empty until then). After that a due refresh runs
-// beside the request instead of in front of it — on prod it had been adding
-// 40–60 ms to about a third of all requests, and the registry it replaces is
-// never older than the 30 s the throttle already allowed.
+// awaited (its registry is empty until then) — by every request that arrives
+// while it is out, not only the one that started it. After that a due refresh
+// runs beside the request instead of in front of it — on prod it had been
+// adding 40–60 ms to about a third of all requests, and the registry it
+// replaces is never older than the 30 s the throttle already allowed.
 let lastPrimeAt = 0
 let primedOnce = false
+let firstPrime: Promise<void> | null = null
 const PRIME_INTERVAL_MS = 30_000
 
 export async function createClient() {
@@ -53,8 +55,9 @@ export async function createClient() {
       () => { primedOnce = true },
       () => {},
     )
-    if (!primedOnce) await prime
+    if (!primedOnce) firstPrime = prime
   }
+  if (!primedOnce && firstPrime) await firstPrime
 
   return client
 }

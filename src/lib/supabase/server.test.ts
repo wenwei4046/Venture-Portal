@@ -34,6 +34,19 @@ describe('the department registry is refreshed beside the request, not in front 
     expect(await settlesBeforePrime(createClient)).toBe(false)
   })
 
+  it('a request that arrives while that first read is out waits for it too', async () => {
+    const { createClient } = await import('./server')
+    let resolvePrime!: () => void
+    mocks.prime.mockImplementation(() => new Promise<void>(r => { resolvePrime = r }))
+    const settled = [false, false]
+    const pending = [0, 1].map(i => createClient().then(() => { settled[i] = true }))
+    await new Promise(r => setTimeout(r, 0))
+    expect(settled).toEqual([false, false])
+    resolvePrime()
+    await Promise.all(pending)
+    expect(mocks.prime).toHaveBeenCalledTimes(1)
+  })
+
   it('a later refresh, 30 s on, does not hold the request up', async () => {
     const { createClient } = await import('./server')
     mocks.prime.mockResolvedValue(undefined)
