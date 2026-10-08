@@ -1056,3 +1056,20 @@
 
 /* ── loading (the tab's own pending) ── */
 .pending { opacity: .55; transition: opacity 160ms; }
+
+/* ── a phone (2026-10-08) ──
+   The prototype draws the desktop only. The page itself folds on its own; a
+   floating window takes the whole screen, its calculator box stacks, and a
+   section head wraps its buttons under the title rather than out of the window. */
+@media (max-width: 640px) {
+  .overlay { padding: 0; }
+  .win { border-radius: 0; }
+  .winHead { padding: 16px 16px 12px; }
+  .winBody { padding: 16px; }
+  .winFoot { padding: 10px 16px; }
+  .winFootRow { flex-wrap: wrap; justify-content: flex-end; }
+  .winFootRow .status { flex-basis: 100%; }
+  .calc, .calc[data-picks] { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .sectionHead { flex-wrap: wrap; }
+  .sectionCount { white-space: nowrap; }
+}
