@@ -3,8 +3,8 @@
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
+import { officeTime } from '@/lib/office-time'
 import { useStickySelection } from '@/lib/useStickySelection'
 import SortableTable, { type SortableColumn } from '@/components/SortableTable'
 import type { QueueRow } from '@/lib/approval-queue'
@@ -205,7 +205,7 @@ export default function PendingApprovals({ rows, canSetDefault = false }: { rows
             {r.voucherLine ? <span className="q-sub-no">{r.voucherLine}</span> : null}
             <span className="q-sub-by">
               <span className="by">{r.submitterName}</span>
-              <span className="on">{dayjs(r.submittedAt).format('D MMM')}</span>
+              <span className="on">{officeTime(r.submittedAt).format('D MMM')}</span>
             </span>
           </span>
         </>
@@ -247,7 +247,11 @@ export default function PendingApprovals({ rows, canSetDefault = false }: { rows
       group: '日期',
       label: 'Submitted',
       mobile: 'detail',
-      render: (r) => dayjs(r.submittedAt).format('D MMM HH:mm'),
+      // On the office clock, never the machine's: this table is rendered on the
+      // server (UTC) and again in the browser, and the two must print the same
+      // time — "2 Oct 04:35" against "2 Oct 12:35" made React throw the
+      // server's page away (2026-10-08, lib/office-time.ts).
+      render: (r) => officeTime(r.submittedAt).format('D MMM HH:mm'),
       sortValue: (r) => new Date(r.submittedAt),
       cellClassName: 'font-mono text-[12px] text-graphite whitespace-nowrap',
     },

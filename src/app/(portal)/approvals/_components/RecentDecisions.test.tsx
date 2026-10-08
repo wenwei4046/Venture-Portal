@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import type { DecisionRow } from '@/lib/approval-queue'
+import { inTimeZone } from '@/test/time-zone'
 
 // 2026-10-07 — Recent decisions as a table under the queue (the approved
 // Approvals sample): number, text, type, the decision as a chip, who sent it,
@@ -16,7 +18,8 @@ vi.mock('@/lib/supabase/client', () => ({
 
 import RecentDecisions from './RecentDecisions'
 
-const at = (day: number, hour = 10) => new Date(2026, 9, day, hour, 0, 0).toISOString()
+// A moment in the office (UTC+8) — what the table prints, whatever zone runs the suite.
+const at = (day: number, hour = 10) => `2026-10-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00+08:00`
 const rows: DecisionRow[] = [
   { id: 'r1', voucherNo: 'HV-PV-202610-0463', description: 'Payroll bank transfer — Sep 2026', typeLabel: 'Payment voucher', decision: 'approved', submitterName: 'Finance Manager', decidedAt: at(5, 14), amount: 105519.29, href: '/approvals/r1' },
   { id: 'r2', voucherNo: 'HV-PV-202610-0448', description: 'Hostel & Accommodation', typeLabel: 'Payment voucher', decision: 'rejected', submitterName: 'ONG MEI SHUANG', decidedAt: at(4, 9), amount: 3450, href: '/approvals/r2' },
@@ -74,5 +77,23 @@ describe('recent decisions', () => {
   it('shows nothing at all when nothing has been decided', () => {
     const { container } = render(<RecentDecisions rows={[]} />)
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+// 2026-10-08: the day a decision was taken came from the MACHINE's clock, so
+// one taken after midnight in the office was the day before on the server
+// (UTC) and that day in the browser (UTC+8) — two different tables, and React
+// threw the server's away.
+describe('on the office clock', () => {
+  it('the server (UTC) and the browser (UTC+8) render the same table, on the office day', () => {
+    // 17:10 UTC on the 4th is ten past one on the 5th in the office.
+    const late: DecisionRow[] = [{ ...rows[0], id: 'late', decidedAt: '2026-10-04T17:10:00Z' }]
+    const html = (zone: string) => inTimeZone(zone, () => renderToString(<RecentDecisions rows={late} />))
+    const server = html('UTC')
+    expect(html('Asia/Kuala_Lumpur')).toBe(server)
+    const page = document.createElement('div')
+    page.innerHTML = server
+    expect(page.querySelector('.q-sub .on')).toHaveTextContent('5 Oct')
+    expect(server).not.toContain('4 Oct')
   })
 })
