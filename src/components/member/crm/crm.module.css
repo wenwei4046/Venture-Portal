@@ -57,3 +57,6 @@
 .loading { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; font-size: 14px; color: #806B60; }
 .problem { margin: 0; padding: 10px 20px; font-size: 13px; color: #A3371A; background: #FBEAE6; }
 .panel { background: #FBF7F3; }
+/* The reply box's hint stays on one line ("Reply to Hakimi…"), cut with an ellipsis, and the box shows no scrollbar. */
+.app textarea[data-draft]::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app textarea[data-draft] { scrollbar-width: none; }

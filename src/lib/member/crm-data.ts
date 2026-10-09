@@ -162,10 +162,11 @@ export const DEFAULT_QUICK_REPLIES: Omit<CrmQuickReply, "id">[] = [
   { shortcut: "Hours", message: "Thanks for your message! We're open 8am–8pm daily and will reply first thing tomorrow." },
 ];
 
+/** Everyone starts with auto-replies empty and off (user 2026-10-09); they write and switch on their own. */
 export const DEFAULT_AUTO_REPLY_SET: CrmAutoReplySet = {
-  welcome: { on: true, text: "Hi! Thanks for messaging HOUZS. A salesperson will reply shortly." },
-  after: { on: true, text: "Thanks for your message! Our showrooms are open 10 am – 9 pm. We'll reply first thing tomorrow.", from: "08:00", to: "20:00" },
-  kws: [{ id: "1", on: true, words: "price, how much, harga", text: "Our prices depend on size and finish. Could you share which item you're looking at?" }],
+  welcome: { on: false, text: "" },
+  after: { on: false, text: "", from: "08:00", to: "20:00" },
+  kws: [],
 };
 
 /* ── The rows, as PostgREST returns them (the new ones) ────────────────── */

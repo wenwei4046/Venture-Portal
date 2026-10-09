@@ -46,9 +46,14 @@ function systemLines(ctx: SalesCtx, c: CrmCustomer): { at: string; text: string 
     if (e.kind === "lost") out.push({ at: e.at, text: `Lost · ${e.data.reason === "other" && e.data.note ? String(e.data.note) : CRM_LOST_REASONS.find(r => r.value === e.data.reason)?.label ?? ""}` });
     if (e.kind === "shared") out.push({ at: e.at, text: `${nameOf(String(e.data.to ?? ""))} joined the chat` });
     if (e.kind === "moved") out.push({ at: e.at, text: `${nameOf(String(e.data.to ?? ""))} took over this chat` });
+    if (e.kind === "share_declined") out.push({ at: e.at, text: `${nameOf(String(e.data.to ?? ""))} declined the invitation` });
+    if (e.kind === "move_declined") out.push({ at: e.at, text: `${nameOf(String(e.data.to ?? ""))} declined the move request` });
   }
-  for (const i of data.invites.filter(x => x.customerId === c.id && x.from === owner.id && x.state === "pending")) {
-    out.push({ at: i.createdAt, text: i.kind === "share" ? `You invited ${nameOf(i.to)} to this chat · waiting to accept` : `Move request sent to ${nameOf(i.to)} · waiting to accept` });
+  // The invitation stays in the chat once answered (user 2026-10-09): the invite, then "joined" when it is accepted.
+  // Lines like these are ours only — nothing here is ever sent to the customer.
+  for (const i of data.invites.filter(x => x.customerId === c.id)) {
+    const who = i.from === owner.id ? "You" : nameOf(i.from), wait = i.state === "pending" ? " · waiting to accept" : "";
+    out.push({ at: i.createdAt, text: i.kind === "share" ? `${who} invited ${nameOf(i.to)} to this chat${wait}` : `${who === "You" ? "Move request" : `${who}'s move request`} sent to ${nameOf(i.to)}${wait}` });
   }
   return out;
 }
@@ -226,7 +231,8 @@ export function chatVM(ctx: SalesCtx) {
     };
     const dd = new Date(b.day), dLabel = dayLabel(dd);
     const ready = b.slot != null && !taken(b.day, b.slot);
-    const mv = (b.view ?? "week") === "month";
+    // Book visit opens on the month (user 2026-10-09).
+    const mv = (b.view ?? "month") === "month";
     const m0 = new Date(dd.getFullYear(), dd.getMonth(), 1), lead = (m0.getDay() + 6) % 7, dim = new Date(dd.getFullYear(), dd.getMonth() + 1, 0).getDate();
     const strip = (e: MouseEvent) => (e.currentTarget as HTMLElement).closest("main")?.querySelector<HTMLElement>("[data-date-strip]");
     const py = b.pickYear ?? dd.getFullYear(), curIdx = (dd.getFullYear() - now.getFullYear()) * 12 + dd.getMonth() - now.getMonth();
