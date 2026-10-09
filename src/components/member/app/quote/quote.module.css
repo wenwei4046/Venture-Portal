@@ -156,7 +156,10 @@
 /* ── the product sheet ── */
 .psLayer { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; box-sizing: border-box; }
 .psDim { position: absolute; inset: 0; background: var(--rv-dim-brown); }
-.psPanel { position: relative; width: auto; height: auto; background: var(--rv-white); border-radius: 28px 28px 0 0; max-height: 88%; display: flex; flex-direction: column; box-shadow: 0 -10px 40px var(--rv-ink-15); }
+/* Its foot (Add to quote) and the bed-frame picker stay above the phone's own bar, the white
+   running on under it: a transparent border of `--sheet-safe` (shell.module.css .screen), taken
+   out of the height so the sheet covers as much of the screen as it was drawn to. */
+.psPanel { position: relative; width: auto; height: auto; background: var(--rv-white); border-radius: 28px 28px 0 0; border-bottom: var(--sheet-safe, 0px) solid transparent; max-height: calc(88% - var(--sheet-safe, 0px)); display: flex; flex-direction: column; box-shadow: 0 -10px 40px var(--rv-ink-15); }
 @container rv (min-width: 1024px) {
   .psLayer { padding-left: 240px; padding-top: 60px; align-items: flex-end; }
   .psDim { background: transparent; }
@@ -241,7 +244,7 @@
 .pickLayerOpen { pointer-events: auto; }
 .pickDim { position: absolute; inset: 0; background: var(--rv-dim-35); opacity: 0; transition: opacity 220ms ease; }
 .pickLayerOpen .pickDim { opacity: 1; }
-.pickPanel { position: absolute; left: 0; right: 0; bottom: 0; top: auto; height: 72%; background: var(--rv-white); border-radius: 28px 28px 0 0; box-shadow: 0 -10px 40px var(--rv-ink-20); display: flex; flex-direction: column; transform: translateY(105%); transition: transform 320ms cubic-bezier(.2,.8,.2,1); }
+.pickPanel { position: absolute; left: 0; right: 0; bottom: 0; top: auto; height: calc(72% - var(--sheet-safe, 0px)); background: var(--rv-white); border-radius: 28px 28px 0 0; border-bottom: var(--sheet-safe, 0px) solid transparent; box-shadow: 0 -10px 40px var(--rv-ink-20); display: flex; flex-direction: column; transform: translateY(105%); transition: transform 320ms cubic-bezier(.2,.8,.2,1); }
 .pickLayerOpen .pickPanel { transform: translateY(0); }
 @container rv (min-width: 1024px) {
   .pickDim { background: transparent; }
