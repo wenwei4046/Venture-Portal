@@ -5053,3 +5053,172 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 }
 .fin-tabbar .fin-pill + svg { position: relative; }
 .fin-tabbar .fin-tab-lit svg { stroke-width: 1.8; }
+
+/* The voucher panel's group headings (2026-10-09, the Finance revamp):
+   "When & where" over the date and bank, "Booking" over the pool and account. */
+.deal-side-sec {
+  margin-top: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgb(62 78 112);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(130 143 170);
+}
+
+/* A page-head menu (2026-10-09, the Finance revamp — ActMenu): the button,
+   and the list of the controls it holds. */
+.act-menu { position: relative; display: inline-block; }
+.act-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgb(var(--ink));
+  white-space: nowrap;
+  cursor: pointer;
+}
+.act-menu-btn:hover { background: rgb(var(--surface-2)); }
+.act-menu-btn.primary { border-color: rgb(var(--accent)); background: rgb(var(--accent)); color: #000; font-weight: 600; }
+.act-menu-btn.primary:hover { background: rgb(var(--accent-hover)); }
+.act-menu-chev { font-size: 10px; opacity: 0.7; }
+.act-menu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 240px;
+  padding: 6px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 10px;
+  background: rgb(var(--surface));
+  box-shadow: 0 10px 30px rgb(43 31 23 / 0.14);
+}
+/* Each control the menu holds reads as a row of it, whatever it wore outside. */
+.act-menu-pop > * { display: block; }
+.act-menu-pop > :is(a, button),
+.act-menu-pop > * > :is(a, button) {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400;
+  text-align: left;
+  color: rgb(var(--ink));
+  text-decoration: none;
+}
+.act-menu-pop > :is(a, button):hover,
+.act-menu-pop > * > :is(a, button):hover { background: rgb(var(--accent-bg)); }
+.act-menu-pop :is(a, button):disabled { opacity: 0.5; }
+@media (max-width: 767px) {
+  .act-menu-pop { right: auto; left: 0; }
+}
+
+/* Facts in groups (2026-10-09, the Finance revamp — DetailGroups): cards side
+   by side, each with a banded title and label / value rows. */
+.dl-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 9px; }
+.dl-group {
+  overflow: hidden;
+  border: 1px solid rgb(var(--card-border, var(--hairline)));
+  border-radius: 12px;
+  background: rgb(var(--surface));
+  box-shadow: 0 3px 12px rgb(var(--walnut) / 5.5%);
+}
+.dl-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgb(var(--card-border, var(--hairline)));
+  background: rgb(246 242 236);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(var(--walnut));
+}
+.dl-group-bar { width: 16px; height: 3px; border-radius: 3px; background: rgb(205 184 162); }
+.dl-group-list { margin: 0; }
+.dl-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgb(236 234 229);
+}
+.dl-item:last-child { border-bottom: 0; }
+.dl-item dt { font-size: 11px; color: rgb(117 100 86); }
+.dl-item dd {
+  margin: 0;
+  font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dl-item dd.text { font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif; font-weight: 500; }
+@media (max-width: 767px) { .dl-groups { grid-template-columns: minmax(0, 1fr); } }
+
+/* A page's Actions (the handoff's form section): a quiet panel with the
+   buttons and a line on what they do. */
+.fin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 18px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 12px;
+  background: rgb(246 246 244);
+}
+.fin-actions .note { flex: 1 1 260px; font-size: 11px; line-height: 1.5; color: rgb(138 119 101); }
+.fin-actions .btn-pri {
+  display: inline-block;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(var(--accent));
+  color: #000;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fin-actions .btn-pri:hover { background: rgb(var(--accent-hover)); }
+.fin-actions .btn-pri:disabled { opacity: 0.5; cursor: not-allowed; }
+.fin-actions .btn-sec {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.fin-actions .btn-sec:hover { background: rgb(var(--surface-2)); }
+.fin-actions .btn-danger {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid rgb(var(--danger) / 0.4);
+  border-radius: 6px;
+  background: rgb(var(--surface));
+  color: rgb(var(--danger));
+  font-size: 13px;
+  cursor: pointer;
+}
+.fin-actions .btn-danger:hover { background: rgb(var(--danger-bg)); }

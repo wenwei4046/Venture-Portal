@@ -30,6 +30,7 @@ vi.mock('./AmendDateButton', () => ({
 }))
 
 import VouchersTable, { type VoucherRow } from './VouchersTable'
+import { FinViewProvider } from '@/components/layout/fin-view'
 
 const voucher: VoucherRow = {
   id: 'pv-1',
@@ -239,5 +240,55 @@ describe('on the office clock', () => {
     expect(server).toContain('29 Sep') // TNB's payment date
     expect(server).toContain('11 Sep') // GDex, and the batch's header
     expect(server).not.toContain('10 Sep')
+  })
+})
+
+// 2026-10-09 — the Finance revamp (the user's Claude Design handoff): the
+// status as a chip (pending in blue), the voucher number in the body face,
+// a range on the amount and the date, the list in a scroll box, the receipt
+// side's own words and its bank, and English on the Finance view.
+describe('the Finance revamp', () => {
+  const pending: VoucherRow = { ...voucher, id: 'pv-2', voucher_no: 'HV-PV-202609-0438', status: 'pending_approval', amount: 300 }
+  const fin = (ui: React.ReactElement) => render(<FinViewProvider value={true}>{ui}</FinViewProvider>)
+
+  it('shows the status as a chip, pending in blue', () => {
+    render(<VouchersTable rows={[voucher, pending]} />)
+    expect(screen.getByText('paid').closest('.chip')).toHaveClass('ledger')
+    expect(screen.getByText('pending approval').closest('.chip')).toHaveClass('wait')
+  })
+
+  it('sets the voucher number in the body face, and the list in a scroll box', () => {
+    render(<VouchersTable rows={[voucher]} />)
+    const cell = screen.getByText('HV-PV-202609-0437').closest('td') as HTMLElement
+    expect(cell.className).toContain('font-sans')
+    expect(cell.className).not.toContain('font-mono')
+    expect(document.querySelector('.st-box table')).not.toBeNull()
+  })
+
+  it('offers a range on the amount and on the date', () => {
+    render(<VouchersTable rows={[voucher, pending]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    expect(within(screen.getByRole('dialog', { name: 'Filter Amount' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Date' }))
+    expect(within(screen.getByRole('dialog', { name: 'Filter Date' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+  })
+
+  it('on the receipt side says Receipt # and Payer, and names the bank', () => {
+    render(<VouchersTable side="receipts" rows={[{ ...voucher, direction: 'credit', bankLabel: 'Hong Leong' }]} />)
+    const heads = Array.from(document.querySelectorAll('thead th')).map((th) => th.textContent?.replace(/[▲▼↕]/g, '').trim())
+    expect(heads).toEqual(expect.arrayContaining(['Receipt #', 'Payer', 'Bank']))
+    expect(heads).not.toContain('Voucher #')
+    expect(screen.getByText('Hong Leong')).toBeInTheDocument()
+  })
+
+  it('speaks English on the Finance view: the row menu and a payroll batch', () => {
+    const a = { ...voucher, id: 'pv-a', voucher_no: 'HV-PV-202609-0300', payee_name: 'Aina', batchKey: 'Payroll disbursement Aug 2026' }
+    const b = { ...voucher, id: 'pv-b', voucher_no: 'HV-PV-202609-0301', payee_name: 'Bala', batchKey: 'Payroll disbursement Aug 2026' }
+    fin(<VouchersTable rows={[repayment, a, b]} />)
+    expect(screen.getByText(/2 vouchers/)).toBeInTheDocument()
+    expect(screen.getByText('Expand')).toBeInTheDocument()
+    fireEvent.contextMenu(screen.getByText('The Cont').closest('tr') as HTMLElement)
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Openor double-click', 'Open in new tab', 'Change datewhen the date was keyed wrong', 'Change amountloan repayment rows'])
   })
 })

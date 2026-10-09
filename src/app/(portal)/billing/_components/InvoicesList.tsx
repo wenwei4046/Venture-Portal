@@ -558,6 +558,10 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
               layoutId="billing.invoices"
               layoutTitle="Invoices"
               canSetDefault={canSetDefault}
+              // The Finance revamp (2026-10-09): the list in a scroll box, columns
+              // resized against their neighbour.
+              scrollBox
+              resizeMode="neighbour"
               openLabel="Open the invoice →"
               rowClassName={(inv) =>
                 [selectedIds.has(inv.id) ? 'st-selected' : '', inv.status === 'voided' ? 'inv-void' : ''].filter(Boolean).join(' ') || undefined
@@ -647,6 +651,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   mobile: 'drop',
                   render: (inv) => <InvoiceDetailButton {...detailOf(inv)} />,
                   sortValue: (inv) => inv.invoice_no ?? inv.id,
+                  cellClassName: 'whitespace-nowrap',
                 },
                 {
                   // 2026-10-02 (user: "invoice 没有日期"). The date printed on the
@@ -659,6 +664,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   render: (inv) =>
                     inv.invoice_date ? dayjs(inv.invoice_date).format('D MMM YYYY') : <span className="text-muted">—</span>,
                   sortValue: (inv) => (inv.invoice_date ? new Date(inv.invoice_date) : null),
+                  filterable: true,
+                  range: 'date',
                   cellClassName: 'text-graphite whitespace-nowrap',
                 },
                 {
@@ -743,6 +750,8 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
                   label: 'Amount',
                   align: 'right',
                   mobile: 'keep',
+                  filterable: true,
+                  range: 'number',
                   render: (inv) => {
                     const paid = paidByInvoice[inv.id] ?? 0
                     const credited = cnByInvoice[inv.id] ?? 0
@@ -1156,7 +1165,7 @@ export default function InvoicesList({ invoices, companyMap, departmentMap, peri
 
 function InvoiceStatus({ status }: { status: string }) {
   // The sheet's chip (2026-10-07): issued waits, paid is done, the rest is quiet.
-  const tone = status === 'issued' ? ' alert' : status === 'paid' || status === 'paid_via_netting' ? ' ledger' : ''
+  const tone = status === 'issued' ? ' alert' : status === 'paid' || status === 'paid_via_netting' ? ' ledger' : status === 'voided' ? ' danger' : ''
   return (
     <span className={`chip${tone}`}>
       <i className="dot" />

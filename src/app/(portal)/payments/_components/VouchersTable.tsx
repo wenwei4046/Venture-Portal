@@ -5,6 +5,7 @@ import { formatMoney } from '@/lib/utils'
 import { officeDay } from '@/lib/office-time'
 import SortableTable from '@/components/SortableTable'
 import { useRowLinks } from '@/components/row-links'
+import { useFinView } from '@/components/layout/fin-view'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
 import AmendRepaymentButton from './AmendRepaymentButton'
 import AmendDateButton from './AmendDateButton'
@@ -36,19 +37,23 @@ export interface VoucherRow {
    *  "hr 的 payroll voucher 我不想要显示这么多"): payroll disbursements are
    *  one voucher per person, 26 a month, and drowned the ledger. */
   batchKey?: string
+  /** The bank a receipt came into (2026-10-09, the receipt side's Bank column). */
+  bankLabel?: string
   /** A payroll batch standing as its total, for an account that may not see
    *  one person's pay (2026-10-02 — lib/payroll-vouchers.ts). The server sends
    *  this row INSTEAD of the batch's vouchers; it opens nothing. */
   locked?: boolean
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: 'text-graphite',
-  pending_approval: 'text-alert',
-  approved: 'text-info',
-  paid: 'text-ledger',
-  received: 'text-ledger',
-  voided: 'text-muted',
+// The status as a chip (2026-10-09, the Finance revamp): pending waits in
+// blue, approved is the accent, paid green, voided grey.
+const STATUS_TONE: Record<string, string> = {
+  draft: '',
+  pending_approval: 'wait',
+  approved: 'accent',
+  paid: 'ledger',
+  received: 'ledger',
+  voided: 'info',
 }
 
 interface Batch {
@@ -96,7 +101,10 @@ export default function VouchersTable({
   layoutId = 'payments.vouchers',
   layoutTitle = 'Payments',
   canSetDefault = false,
+  side = 'payments',
 }: {
+  /** The receipt side says Receipt # and Payer, and names the bank (2026-10-09). */
+  side?: 'payments' | 'receipts'
   /** What the Columns panel calls this table. */
   layoutTitle?: string
   /** The viewer may set the arrangement on show as everyone's default (2026-10-07). */
@@ -110,6 +118,9 @@ export default function VouchersTable({
   collapseBatches?: boolean
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // English on the Finance view (2026-10-09).
+  const fin = useFinView()
+  const receipts = side === 'receipts'
   // 2026-10-02: the View column is gone (user: "view … 可以 remove,我希望双击
   // 点开"). A double-click opens the row; a right-click offers the same, and
   // 改金额 on the rows that have it. That dialog is mounted once, for the row
@@ -123,10 +134,10 @@ export default function VouchersTable({
     // in-place amount fix (user 2026-09-03: "不能直接点开 receipt 的单去 edit?").
     more: (v) => [
       ...(v.amendDate
-        ? [{ key: 'redate', label: '改日期', hint: '日期录错时用', onSelect: () => setRedate({ row: v, nonce: Date.now() }) }]
+        ? [{ key: 'redate', label: fin ? 'Change date' : '改日期', hint: fin ? 'when the date was keyed wrong' : '日期录错时用', onSelect: () => setRedate({ row: v, nonce: Date.now() }) }]
         : []),
       ...(v.id.startsWith('rpy-')
-        ? [{ key: 'amend', label: '改金额', hint: '金额录错时用', onSelect: () => setAmend({ row: v, nonce: Date.now() }) }]
+        ? [{ key: 'amend', label: fin ? 'Change amount' : '改金额', hint: fin ? 'loan repayment rows' : '金额录错时用', onSelect: () => setAmend({ row: v, nonce: Date.now() }) }]
         : []),
     ],
   })
@@ -157,18 +168,18 @@ export default function VouchersTable({
                     <span className="font-mono text-xs text-muted w-3 shrink-0">{open ? '▾' : '▸'}</span>
                     <span className="font-serif text-[15px] text-ink truncate">{b.key}</span>
                     <span className="font-mono text-xs text-muted whitespace-nowrap">
-                      {b.members.length} 张 · {b.statusText}
+                      {b.members.length} {fin ? (b.members.length === 1 ? 'voucher' : 'vouchers') : '张'} · {b.statusText}
                     </span>
                   </span>
                   <span className="flex items-baseline gap-4 shrink-0">
                     <span className="font-mono text-sm font-semibold">−{formatMoney(b.total).replace('RM ', '')}</span>
                     <span className="font-mono text-xs text-graphite">{b.latest ? officeDay(b.latest).format('D MMM') : ''}</span>
-                    <span className="text-xs font-serif italic text-accent">{open ? '收起' : '展开'}</span>
+                    <span className="text-xs font-serif italic text-accent">{open ? (fin ? 'Collapse' : '收起') : fin ? 'Expand' : '展开'}</span>
                   </span>
                 </button>
                 {open ? (
                   <div className="px-3 pb-3 pt-1 bg-paper">
-                    <VouchersTable rows={b.members} collapseBatches={false} layoutId={layoutId} layoutTitle={layoutTitle} />
+                    <VouchersTable rows={b.members} collapseBatches={false} layoutId={layoutId} layoutTitle={layoutTitle} side={side} />
                   </div>
                 ) : null}
               </div>
@@ -181,6 +192,10 @@ export default function VouchersTable({
       layoutId={layoutId}
       layoutTitle={layoutTitle}
       canSetDefault={canSetDefault}
+      // The Finance revamp (2026-10-09): the list in a scroll box, columns
+      // resized against their neighbour.
+      scrollBox={collapseBatches}
+      resizeMode="neighbour"
       onRowOpen={links.onRowOpen}
       onRowContextMenu={links.onRowContextMenu}
       rowOpens={(v) => !v.locked}
@@ -195,10 +210,11 @@ export default function VouchersTable({
         {
           key: 'voucher_no',
           group: '基本',
-          label: 'Voucher #',
+          label: receipts ? 'Receipt #' : 'Voucher #',
           render: (v) => v.voucher_no ?? '—',
           sortValue: (v) => v.voucher_no ?? '',
-          cellClassName: 'font-mono text-[12px] text-ink font-medium',
+          // The number in the body face, not the mono (2026-10-09, the handoff).
+          cellClassName: 'font-sans text-[12px] text-ink font-medium whitespace-nowrap',
         },
         {
           key: 'catLabel',
@@ -221,7 +237,7 @@ export default function VouchersTable({
         {
           key: 'payee_name',
           group: '基本',
-          label: 'Payee',
+          label: receipts ? 'Payer' : 'Payee',
           render: (v) =>
             v.locked ? (
               // The name is the whole of what this row says, month last: it wraps
@@ -254,11 +270,26 @@ export default function VouchersTable({
           filterable: true,
           cellClassName: 'font-serif italic text-graphite text-sm',
         },
+        ...(receipts
+          ? [
+              {
+                key: 'bank',
+                group: '入账',
+                label: 'Bank',
+                render: (v: VoucherRow) => v.bankLabel ?? '—',
+                sortValue: (v: VoucherRow) => v.bankLabel ?? '',
+                filterable: true,
+                cellClassName: 'text-graphite',
+              },
+            ]
+          : []),
         {
           key: 'amount',
           group: '金额',
           label: 'Amount',
           align: 'right',
+          filterable: true,
+          range: 'number',
           render: (v) => (
             <span className={v.direction === 'credit' ? 'text-ledger font-semibold' : 'font-semibold'}>
               {v.direction === 'credit' ? '+' : '−'}
@@ -271,11 +302,15 @@ export default function VouchersTable({
           key: 'status',
           group: '基本',
           label: 'Status',
-          render: (v) => (
-            <em className={`font-serif text-sm ${STATUS_STYLES[v.status] ?? 'text-muted'}`}>
-              {v.status.replace('_', ' ')}
-            </em>
-          ),
+          render: (v) => {
+            const tone = STATUS_TONE[v.status] ?? ''
+            return (
+              <span className={`chip${tone ? ` ${tone}` : ''}`}>
+                {tone ? <i className="dot" /> : null}
+                {v.status.replace('_', ' ')}
+              </span>
+            )
+          },
           sortValue: (v) => v.status,
           filterValue: (v) => v.status.replace('_', ' '),
           filterable: true,
@@ -289,7 +324,9 @@ export default function VouchersTable({
           // different days for one voucher (2026-10-08, lib/office-time.ts).
           render: (v) => officeDay(v.paymentOrCreatedDate).format('D MMM'),
           sortValue: (v) => new Date(v.paymentOrCreatedDate),
-          cellClassName: 'text-graphite',
+          filterable: true,
+          range: 'date',
+          cellClassName: 'text-graphite whitespace-nowrap',
         },
       ]}
         />

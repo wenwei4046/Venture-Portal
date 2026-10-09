@@ -159,6 +159,20 @@ describe('the voucher page, laid out like the deal forms', () => {
     expect(within(side).getByTestId('voucher-actions')).toBeInTheDocument()
   })
 
+  // 2026-10-09 (the Finance revamp): the panel's rows sit under When & where
+  // and Booking, and a pending voucher's chip is the blue wait.
+  it('groups the panel under When & where and Booking, and waits in blue', async () => {
+    asFinance()
+    const { voucher } = database('ordinary_payment')
+    voucher.payment_date = '2026-09-12'
+    render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
+    const side = panel()
+    const heads = Array.from(side.querySelectorAll('.deal-side-sec')).map((h) => h.textContent)
+    expect(heads).toEqual(['When & where', 'Booking'])
+    const number = screen.getByRole('heading', { level: 1, name: 'TEST-STAT-PV' })
+    expect(number.parentElement?.querySelector('.chip')).toHaveClass('wait')
+  })
+
   it('says so when no payment date was set', async () => {
     asFinance()
     database('ordinary_payment')

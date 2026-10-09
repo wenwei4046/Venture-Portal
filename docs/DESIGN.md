@@ -78,6 +78,10 @@ Open in new tab; a list keeps its scroll on Back; on a phone the top bar is
 cream with the H tile and the page's name, the lit tab sits on a peach pill,
 and a detail page goes back on an edge swipe. Numbers never come from the
 prototype.
+Its page-head menus (`ActMenu`: "From payroll ▾", "Export ▾", "+ Create
+Invoice ▾") hold the controls a captioned band used to lay out; a page's
+facts sit in `DetailGroups` (banded group cards of label / value rows) and
+its actions in a `.fin-actions` panel with a line on what they do.
 
 **What it is.** PortalFrame draws, for those routes, the content column inset
 10px around ONE white sheet (`.sheet-frame` › `.sheet`, 16px radius, hairline

@@ -1,5 +1,47 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 b (SHIPPED) — Finance revamp · Phase 2, the converted pages re-aligned
+
+Phase 1 (the Finance view) is live. Phase 2 brings the five pages converted
+before the handoff onto the handoff's rules:
+- **Payments / Receipts** (`VoucherLedger`, `VouchersTable`, `PaymentTabs`):
+  Pending approval card → `wait`; the status as a chip (pending wait, approved
+  accent, paid ledger, voided info); the voucher number in the body face;
+  Range on Amount and Date; `scrollBox` + `resizeMode="neighbour"`; a
+  **Payroll batches** tab on the payment side (`?status=payroll` — the payroll
+  disbursements only, `counts.payroll` = batches + locked batches); the
+  receipt side says Receipt # / Payer and has a **Bank** column
+  (`bank_account_id` + a `bank_accounts` read → `bankLabel`); the row menu
+  and the batch rows in English on the Finance view (Change date / Change
+  amount / n vouchers / Expand). Eyebrow "DAILY OPERATIONS · …".
+- **Voucher page** (`payments/[id]`): the panel's rows under "When & where"
+  and "Booking" (`.deal-side-sec`); a pending voucher's chip is `wait`. The
+  panel's labels stay Chinese (the page's tests and the trail are).
+- **Service Billing** (`BillingView`, `InvoicesList`): the `.act-band` is
+  gone — ONE row beside the title: the month, then `ActMenu`s "From payroll
+  ▾" / "Export ▾" / "+ Create Invoice ▾" (`components/sheet/ActMenu.tsx`: the
+  very same buttons and links, stacked in a popover; `.act-menu*` CSS);
+  Outstanding → `wait`; voided chip red; Range on Amount and Date; scroll
+  box + neighbour resize; the number in the body face. The invoice DETAIL PAGE
+  the handoff wants (Billable / Contra apart) is NOT built yet — the row still
+  opens the detail popup; it is the next item.
+- **Statements**: the list's Draft card rests in the default tone (the
+  prototype's); the detail page is rebuilt — `ReturnLink` back, the company
+  with its chip, three cards (Net primary / Subtotal invoice / Subtotal
+  contra), Invoice items and Contra items as `ledger-table`s with subtotal
+  feet, the Net summary as `DetailGroups` (`components/sheet/DetailGroups.tsx`,
+  the handoff's "dl" block; `.dl-*` CSS) and Actions in a `.fin-actions` panel.
+- **Billing Allocator**: NOT touched — the prototype's Records table has ONE
+  "Split" column (text "HC 30% · HM 20%") and a record detail page, while the
+  user picked 每家一栏 (the matrix) two days earlier; asked the user which.
+- Tests: VouchersTable +5, VoucherLedger +2 (and two adjusted), PaymentTabs 2,
+  voucher page +1, BillingView (one rewritten), InvoicesList +2, statement
+  page 2, statements list adjusted.
+
+Next: the user's answer on the allocator; the invoice detail page; then
+Phase 3 (Daily Bank, Fund IN/OUT + details, Invoice Financing, Repayment
+Schedule calendar, Overdue).
+
 ## CHECKPOINT 2026-10-09 a (SHIPPED) — Finance revamp · Phase 1, the Finance view
 
 The user handed over a Claude Design project, **Finance Revamp** (zip →

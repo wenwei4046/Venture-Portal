@@ -386,3 +386,25 @@ describe('the invoices table on the sheet', () => {
     expect(screen.getByTestId('dialog-detail')).toHaveTextContent('INV-1 · issued')
   })
 })
+
+// 2026-10-09 — the Finance revamp: the status chip's tones (a voided invoice in
+// red), a range on the amount and the date, the list in a scroll box, and the
+// number in the body face.
+describe('the Finance revamp', () => {
+  it('chips every status — issued waits, paid is green, voided red', () => {
+    render(list('2026-09-01', [invoice('a', 'INV-1', '2026-09-01'), { ...invoice('b', 'INV-2', '2026-09-01'), status: 'voided' }, { ...invoice('c', 'INV-3', '2026-09-01'), status: 'paid' }]))
+    expect(screen.getAllByText('issued')[0].closest('.chip')).toHaveClass('alert')
+    expect(screen.getAllByText('voided')[0].closest('.chip')).toHaveClass('danger')
+    expect(screen.getAllByText('paid')[0].closest('.chip')).toHaveClass('ledger')
+  })
+
+  it('offers a range on the amount and on the date, and sits in a scroll box', () => {
+    render(list('2026-09-01', [invoice('a', 'INV-1', '2026-09-01')]))
+    expect(document.querySelector('.st-box table')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    expect(within(screen.getByRole('dialog', { name: 'Filter Amount' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Amount' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Date' }))
+    expect(within(screen.getByRole('dialog', { name: 'Filter Date' })).getByRole('button', { name: 'Range' })).toBeInTheDocument()
+  })
+})

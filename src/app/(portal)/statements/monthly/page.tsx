@@ -99,8 +99,8 @@ export default async function MonthlyStatementsPage() {
           icon="swap"
           note={summary.latestPeriod ? `invoice ${formatMoney(summary.latestInvoice).replace('RM ', '')} − contra ${formatMoney(summary.latestContra).replace('RM ', '')}` : '—'}
         />
+        {/* A draft waits on Finance itself, so it rests in the default tone (2026-10-09, the handoff). */}
         <StatCard
-          tone={summary.draft > 0 ? 'alert' : 'default'}
           label="Draft"
           value={String(summary.draft)}
           icon="clock"
