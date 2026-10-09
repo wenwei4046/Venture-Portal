@@ -19,6 +19,7 @@ import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
 import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
 import { MatrixPdf } from '@/lib/export/matrix-pdf'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
@@ -32,8 +33,8 @@ export async function GET(req: Request) {
   const throughMonth = Number(period.slice(5, 7))
 
   const supabase = await createClient()
-  const isDeptMgr = user.role === 'dept_manager'
-  const consolidated = user.role !== 'dept_manager' && !segment
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
+  const consolidated = reportsCompanyWide(user) && !segment
   // As on the page (2026-10-08): the bridge starts beside the journal read
   // with the bank codes still pending, and is not read where its lines are
   // dropped.

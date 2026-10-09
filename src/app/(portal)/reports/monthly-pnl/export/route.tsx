@@ -10,6 +10,7 @@ import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
 import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
 import { MatrixPdf } from '@/lib/export/matrix-pdf'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export async function GET(req: Request) {
   // dept_manager may export their own segment (RLS scopes journal_lines).
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
 
   const supabase = await createClient()
   // Mirror the page: consolidated only for finance/principal with no segment.
-  const consolidated = user.role !== 'dept_manager' && !segment
+  const consolidated = reportsCompanyWide(user) && !segment
   const [rawLines, accounts, savedRaw, elim] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { resolveLiveApprovalAmounts, type ApprovalAmountRow } from '@/lib/approval-amounts'
 import { startRead } from '@/lib/start-read'
+import { decidesEverything, overviewFor, raisesForSignOff } from '@/lib/surfaces'
 import { fetchAllRows } from '@/lib/paginate'
 import { fetchDeptInvoiceSettlements } from '@/lib/dept-receipt-payment'
 import LedgerRow from '@/components/LedgerRow'
@@ -136,16 +137,20 @@ export default async function DashboardPage() {
   const user = await requireAuth()
   const supabase = await createClient()
 
-  // HR / Dept Manager dashboards branch on the APP-LAYER role (user.role) so
-  // the Principal's view-as mask is honoured — dashboard_summary()'s own gate
-  // keys off current_user_role(), the real DB role, so a masked Principal
-  // would otherwise always land on the treasury dashboard.
-  const roleDashboard = user.role === 'hr' || user.role === 'dept_manager'
+  // Which Overview, read off the viewer's own cells (2026-10-09, Q7 — it was
+  // the account's kind, so a Director's title holding Treasury · View drew
+  // the "Principal and Finance only" well): treasury for whoever reads the
+  // treasury, HR's for whoever reads payroll, a department's for whoever reads
+  // their own department's pool (lib/surfaces.ts). App-layer, so the
+  // Principal's view-as mask is honoured — the masked account's actions.
+  const overview = overviewFor(user)
+  const roleDashboard = overview !== 'treasury'
 
-  // App-layer role, not summary.role: a Principal masked as Finance must get
-  // the Finance dashboard (the RPC reports the real DB role).
-  const isPrincipal = user.role === 'principal'
-  const isFinance = user.role === 'finance'
+  // Inside the treasury Overview: the sign-off queue for whoever approves
+  // everything, Finance's own queues for whoever raises what somebody else
+  // signs off.
+  const isPrincipal = decidesEverything(user)
+  const isFinance = raisesForSignOff(user)
 
   // ── The treasury dashboard's reads, started together (2026-10-08) ──────
   // The bank accounts and Finance's two queues need nothing from
@@ -228,9 +233,7 @@ export default async function DashboardPage() {
   // The RPC also returns { error: 'Access denied' } for a real HR/dept_manager
   // session (not a Supabase error) — kept as a belt-and-braces fallback.
   if (roleDashboard || (raw && typeof raw === 'object' && 'error' in raw && (raw as Record<string, unknown>).error === 'Access denied')) {
-    const userRole = user.role
-
-    if (userRole === 'hr') {
+    if (overview === 'hr') {
       // HR Dashboard — data overview. Under the post-mig-278 flow HR's job is
       // three actions (Import Employment List · Import Payroll · Calculate
       // Director Salary), so the dashboard is three entry cards over the live
@@ -546,7 +549,7 @@ export default async function DashboardPage() {
       )
     }
 
-    if (userRole === 'dept_manager') {
+    if (overview === 'department') {
       // Dept Manager Dashboard — shows the manager's own department pool
       // state + their submitted expense requests awaiting Principal sign-off.
       if (!user.department_id) {
@@ -814,8 +817,8 @@ export default async function DashboardPage() {
       )
     }
 
-    // Any other non-treasury role (future-proofing — currently only hr/dept_manager hit
-    // the Access denied branch, so this is dead-ish code but keeps the type checker happy)
+    // Nobody's Overview of their own: no treasury, payroll or department pool
+    // among their cells (an Executive office, Staff · Basic).
     return (
       <div>
         <div className="page-head">
@@ -827,8 +830,8 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className={EMPTY_WELL}>
-          <p className="text-sm font-medium">Treasury data is available to Principal and Finance only.</p>
-          <p className="text-xs mt-1">Use the sidebar to navigate to your modules.</p>
+          <p className="text-sm font-medium">Your title opens no treasury, payroll or department figures to sum up here.</p>
+          <p className="text-xs mt-1">Use the sidebar to open your modules.</p>
         </div>
       </div>
     )

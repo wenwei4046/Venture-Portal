@@ -37,6 +37,7 @@ import ExportLinks from '../_components/ExportLinks'
 import { REPORT_SEGMENTS, segmentFilterFor } from '../_components/report-segments'
 import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,7 +54,7 @@ export default async function ReceiptPaymentPage({ searchParams }: Props) {
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   const compare = params.compare ?? ''
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const consolidated = !isDeptMgr && !segment
   // ── 未收 To collect — the block Cash Flow doesn't have ────────────────────

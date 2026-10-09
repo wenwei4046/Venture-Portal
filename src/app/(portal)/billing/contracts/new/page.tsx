@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { requireAnyAction } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import ContractForm from '../../_components/ContractForm'
+import { canDo } from '@/lib/permission-actions'
 
 export default async function NewContractPage() {
   const user = await requireAnyAction(['billing', 'create'], ['my_billing', 'create', 'dept'])
@@ -11,7 +12,9 @@ export default async function NewContractPage() {
   // Dept Manager restriction: must be Marketing's manager (it's the only
   // department that owns service_contracts today — mig 207 RLS enforces this
   // at the DB level too).
-  if (user.role === 'dept_manager') {
+  // A department's own requester (My Billing, not Billing · Create) — Q7.
+  const ownDepartment = !canDo(user, 'billing', 'create')
+  if (ownDepartment) {
     const { data: marketing } = await supabase
       .from('departments')
       .select('id')
@@ -28,8 +31,8 @@ export default async function NewContractPage() {
     .eq('is_active', true)
     .order('short_code')
 
-  const backHref = user.role === 'dept_manager' ? '/dept-pool/marketing' : '/billing'
-  const backLabel = user.role === 'dept_manager' ? 'Back to Marketing Dept Pool' : 'Back to Billing'
+  const backHref = ownDepartment ? '/dept-pool/marketing' : '/billing'
+  const backLabel = ownDepartment ? 'Back to Marketing Dept Pool' : 'Back to Billing'
 
   return (
     <div>

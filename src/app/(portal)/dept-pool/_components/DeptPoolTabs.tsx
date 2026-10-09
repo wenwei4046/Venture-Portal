@@ -2,25 +2,26 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import type { UserRole } from '@/types'
 
 type Tab = 'overview' | 'history' | 'pnl' | 'request-payment' | 'request-credit'
 
 interface Props {
   basePath: string
-  role: UserRole
+  /** Raises their own department's requests (My Billing · Create at Dept —
+   *  lib/surfaces.ts; it was the dept_manager kind until 2026-10-09). */
+  raisesRequests: boolean
   isOwnDept: boolean
   // Extra tabs inserted between History and the Request tabs. Used by Marketing
   // for the P&L view; other dept pools don't pass this.
   extraTabs?: { key: Tab; label: string }[]
 }
 
-export default function DeptPoolTabs({ basePath, role, isOwnDept, extraTabs }: Props) {
+export default function DeptPoolTabs({ basePath, raisesRequests, isOwnDept, extraTabs }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activeTab = (searchParams.get('tab') as Tab | null) ?? 'overview'
 
-  const showRequestTabs = role === 'dept_manager' && isOwnDept
+  const showRequestTabs = raisesRequests && isOwnDept
 
   const tabs: { key: Tab; label: string; href: string }[] = [
     { key: 'overview', label: 'Overview', href: basePath },

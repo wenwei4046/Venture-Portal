@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requirePayrollPayouts } from '@/lib/auth'
+import { raisesForSignOff } from '@/lib/surfaces'
 import { fetchAllRows } from '@/lib/paginate'
 import { formatMoney, formatMoneyBare, formatIntlDate } from '@/lib/utils'
 import { OFFICE_TZ } from '@/lib/office-clock'
@@ -56,7 +57,7 @@ export default async function InvoicePoolPage() {
           </div>
         </div>
         <div className="lg:col-span-5 flex items-start justify-end">
-          <RequestReleaseButton userRole={user.role} balance={balance} />
+          <RequestReleaseButton canRequest={raisesForSignOff(user)} balance={balance} />
         </div>
       </div>
 

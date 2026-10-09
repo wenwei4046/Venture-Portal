@@ -2,7 +2,6 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SlidingTabs, type TabItem } from '@/components/motion/SlidingTabs'
-import type { UserRole } from '@/types'
 
 export type SettingsTab =
   | 'treasury'
@@ -38,11 +37,11 @@ export function isSettingsTab(s: string | undefined): s is SettingsTab {
   return !!s && ALL_TABS.some((t) => t.key === s)
 }
 
-export default function SettingsTabs({ active, role }: { active: SettingsTab; role?: UserRole }) {
+export default function SettingsTabs({ active, allTabs = false }: { active: SettingsTab; allTabs?: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const allowed = role === 'finance' ? FINANCE_TABS : null
+  const allowed = allTabs ? null : FINANCE_TABS
   const tabs = allowed
     ? ALL_TABS.filter((t) => allowed.includes(t.key as SettingsTab))
     : ALL_TABS

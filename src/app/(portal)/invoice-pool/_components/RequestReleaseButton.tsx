@@ -5,11 +5,12 @@ import { requestRelease } from '../actions'
 import { formatMoney } from '@/lib/utils'
 
 interface Props {
-  userRole: string
+  /** Raises for somebody else's sign-off (lib/surfaces.ts — the Finance kind until 2026-10-09). */
+  canRequest: boolean
   balance: number
 }
 
-export default function RequestReleaseButton({ userRole, balance }: Props) {
+export default function RequestReleaseButton({ canRequest, balance }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showForm, setShowForm] = useState(false)
   const [amount, setAmount] = useState('')
@@ -17,7 +18,7 @@ export default function RequestReleaseButton({ userRole, balance }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  if (userRole !== 'finance') return null
+  if (!canRequest) return null
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

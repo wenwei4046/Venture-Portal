@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
+import { decidesPoolClaims } from '@/lib/surfaces'
 import { formatMoney } from '@/lib/utils'
 import { officeTime } from '@/lib/office-time'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
@@ -128,7 +129,7 @@ export default async function ClaimsPage() {
                         <ClaimActions
                           claimId={c.id}
                           claimStatus={c.status}
-                          userRole={user.role}
+                          canDecide={decidesPoolClaims(user)}
                         />
                       )}
                     </td>

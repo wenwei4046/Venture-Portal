@@ -17,6 +17,7 @@ import MonthlyMatrix from '../_components/MonthlyMatrix'
 import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
+import { reportsCompanyWide } from '@/lib/surfaces'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const params = await searchParams
   const period = /^\d{4}-\d{2}$/.test(params.period ?? '') ? params.period! : officeMonth()
   // Dept managers see ONLY their own segment (RLS) — force empty + hide picker.
-  const isDeptMgr = user.role === 'dept_manager'
+  const isDeptMgr = !reportsCompanyWide(user) // own segment only (Q7: by cell, not kind)
   const segment = isDeptMgr ? '' : (params.segment ?? '')
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))

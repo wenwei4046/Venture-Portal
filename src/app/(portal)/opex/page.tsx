@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, getPeriodMonth } from '@/lib/utils'
 import OpexTrendChart from './_components/OpexTrendChart'
 import LedgerRow from '@/components/LedgerRow'
+import { canDo } from '@/lib/permission-actions'
 
 interface PayrollRow {
   basic_salary: number | string
@@ -32,7 +33,7 @@ export default async function OpexPage({ searchParams }: Props) {
   // internal pool dept — no payroll, excluded like the dashboard does.
   let deptId = user.department_id
   let allDepts: { id: string; name: string }[] = []
-  if (user.role === 'principal') {
+  if (canDo(user, 'opex', 'view')) {
     const { data: deptRows } = await supabase
       .from('departments')
       .select('id, name')
