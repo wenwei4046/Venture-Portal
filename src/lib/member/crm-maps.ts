@@ -45,3 +45,20 @@ export function messengerVisitMessage(text: string, card: CrmCard) {
     },
   };
 }
+
+/**
+ * WhatsApp's reply with one link button (cta_url — no template, no review,
+ * free inside the 24-hour window; one button only, user chose 2026-10-09:
+ * Google Maps as the button, Waze as a link under the words).
+ */
+export function whatsappVisitMessage(to: string, text: string, card: CrmCard) {
+  const l = mapLinks(card.addr);
+  return {
+    to, type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: { text: `${withoutMapLinks(text)}\n\n🚗 Waze: ${l.waze}`.slice(0, 1024) },
+      action: { name: "cta_url", parameters: { display_text: "Google Maps", url: l.google } },
+    },
+  };
+}

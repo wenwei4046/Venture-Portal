@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardHasWay, mapLinks, messengerVisitMessage, withMapLinks, withoutMapLinks } from "./crm-maps";
+import { cardHasWay, mapLinks, messengerVisitMessage, whatsappVisitMessage, withMapLinks, withoutMapLinks } from "./crm-maps";
 import type { CrmCard } from "./crm-data";
 
 const card: CrmCard = { kind: "Confirmed", start: "2026-10-09T05:00:00Z", room: "Kuala Lumpur Showroom", addr: "Jalan Puchong, Puchong, Selangor" };
@@ -27,5 +27,14 @@ describe("the way to the showroom on a visit card", () => {
     expect(cardHasWay({ ...card, kind: "Cancelled" })).toBe(false);
     expect(withMapLinks(words, { ...card, addr: "" })).toBe(words);
     expect(cardHasWay(null)).toBe(false);
+  });
+
+  it("WhatsApp: one Google Maps button (cta_url), Waze as a link under the words", () => {
+    const m = whatsappVisitMessage("60166199278", withMapLinks(words, card), card);
+    expect(m.type).toBe("interactive");
+    expect(m.interactive.type).toBe("cta_url");
+    expect(m.interactive.action.parameters).toEqual({ display_text: "Google Maps", url: mapLinks(card.addr).google });
+    expect(m.interactive.body.text).toBe(`${words}\n\n🚗 Waze: ${mapLinks(card.addr).waze}`);
+    expect(m.interactive.body.text).not.toContain("google.com");
   });
 });

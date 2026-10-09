@@ -7,7 +7,7 @@ import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type
 import type { CrmMessage } from "@/lib/member/crm";
 import { cleanText, fetchWhatsAppTemplates, fillTemplate, mediaMessage, reactionMessage, sendWhatsApp, sendWhatsAppText, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
 import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
-import { cardHasWay, messengerVisitMessage } from "@/lib/member/crm-maps";
+import { cardHasWay, messengerVisitMessage, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
@@ -257,7 +257,9 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
     } else {
-      const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: textMessage(contact.external_id, clean.text, quote) });
+      // A visit card with an address: the words, Waze as a link, Google Maps as the one button WhatsApp allows.
+      const message = cardHasWay(opts.card) ? whatsappVisitMessage(contact.external_id, clean.text, opts.card) : textMessage(contact.external_id, clean.text, quote);
+      const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.wamid;
     }
