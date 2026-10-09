@@ -14,6 +14,7 @@ import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../..
 import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
 import { customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
+import { oneAtATime } from "../../shared/once";
 
 const RUST = "#BD4A19", INK = "#3F2B22", SUB = "rgb(128 107 96)", BD = "#EBDDD2";
 const parts = (text: string) => String(text).split(/(\*[^*\n]+\*)/).filter(Boolean).map(t => (/^\*[^*]+\*$/.test(t) ? { t: t.slice(1, -1), w: 650 } : { t, w: "inherit" as const }));
@@ -276,7 +277,7 @@ export function chatVM(ctx: SalesCtx) {
       }),
       confirmLabel: ready ? `${b.visitId ? "Change to" : "Book"} ${dLabel}, ${b.slot}` : "Pick a time",
       confirmBg: ready ? RUST : "#D9C7BA",
-      confirmBook: ready && room ? async () => {
+      confirmBook: ready && room ? () => void oneAtATime(`book:${c.id}`, async () => {
         const start = slotAt(b.day, b.slot!).toISOString();
         let ok: boolean;
         if (b.visitId) ok = await act.moveVisit(b.visitId, room.id, start);
@@ -286,7 +287,7 @@ export function chatVM(ctx: SalesCtx) {
           ok = await act.book(c.id, room.id, start);
         }
         if (ok) { set(u => ({ ...u, book: null, rebookFor: null })); scrollDown(); }
-      } : undefined,
+      }) : undefined,
       dateLeft: (e: MouseEvent) => strip(e)?.scrollBy({ left: -260, behavior: "smooth" }),
       dateRight: (e: MouseEvent) => strip(e)?.scrollBy({ left: 260, behavior: "smooth" }),
       dateWheel: (e: WheelEvent<HTMLElement>) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY; },
@@ -324,12 +325,13 @@ export function chatVM(ctx: SalesCtx) {
         : tpls.map(t => {
           const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? first : ""));
           return { name: t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
-            send: async () => { if (await act.sendTemplate(c.id, t, params)) { patch({ tpl: false }); scrollDown(); } } };
+            send: async () => { if (await oneAtATime(`send:${c.id}`, () => act.sendTemplate(c.id, t, params))) { patch({ tpl: false }); scrollDown(); } } };
         });
   const sendDraft = async () => {
     const text = draft.trim(); if (!text || ui.sending) return;
     patch({ sending: true });
-    const ok = await act.send(c.id, text, ui.reply?.msgId ?? null);
+    const ok = await oneAtATime(`send:${c.id}`, () => act.send(c.id, text, ui.reply?.msgId ?? null));
+    if (ok === undefined) return; // the first tap is still sending
     set(u => ({ ...u, sending: false, ...(ok ? { draft: { ...u.draft, [c.id]: "" }, reply: null } : {}) }));
     if (ok) scrollDown();
   };
@@ -363,7 +365,7 @@ export function chatVM(ctx: SalesCtx) {
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]; e.target.value = "";
       if (!file) return;
-      if (await act.sendMedia(c.id, file, draft.trim())) { setDraft(""); scrollDown(); }
+      if (await oneAtATime(`send:${c.id}`, () => act.sendMedia(c.id, file, draft.trim()))) { setDraft(""); scrollDown(); }
     },
     qrOpen: ui.qr, closeQR: () => patch({ qr: false }),
     qrList: qrs.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid #EBDDD2" : "0",

@@ -12,6 +12,7 @@ import { DAY, day0, dayLabel, daySep, msgTime } from "../../sales/vm/common";
 import { roomClosed, roomSlots, slotAt, windowLeft } from "../../sales/vm/chat";
 import { infoRows } from "../../sales/vm/customer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
+import { oneAtATime } from "../../shared/once";
 
 /**
  * Send or move a customer, then offer 30 s to undo it (Organic Leads' Send to,
@@ -70,7 +71,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const setB = (p: Partial<NonNullable<typeof B>>) => set(u => (u.pBook ? { ...u, pBook: { ...u.pBook, ...p } } : u));
   const send = async () => {
     if (!c || !has) return;
-    if (await act.send(c.id, draft.trim())) set(u => ({ ...u, pDraft: "" }));
+    if (await oneAtATime(`send:${c.id}`, () => act.send(c.id, draft.trim()))) set(u => ({ ...u, pDraft: "" }));
   };
   const room = B ? rooms[B.room] ?? rooms[0] : undefined;
   const taken = (start: Date) => data.visits.filter(v => v.showroomId === room?.id && v.state === "booked" && new Date(v.start).getTime() === start.getTime()).length;
@@ -100,7 +101,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       bookLabel: B.slot ? `Book ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "#BD4A19" : "#D9C7BA",
       confirm: B.slot && c && room ? () => {
         const name = c.name;
-        void act.book(c.id, room.id, slotAt(B.day, B.slot!).toISOString()).then(ok => { if (ok) { patch({ pBook: null }); act.toast(`Visit booked for ${name}`); } });
+        void oneAtATime(`book:${c.id}`, () => act.book(c.id, room.id, slotAt(B.day, B.slot!).toISOString())).then(ok => { if (ok) { patch({ pBook: null }); act.toast(`Visit booked for ${name}`); } });
       } : undefined,
     };
   })() : null;
@@ -118,7 +119,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]; e.target.value = "";
       if (!file || !c) return;
-      if (await act.sendMedia(c.id, file, draft.trim())) set(u => ({ ...u, pDraft: "" }));
+      if (await oneAtATime(`send:${c.id}`, () => act.sendMedia(c.id, file, draft.trim()))) set(u => ({ ...u, pDraft: "" }));
     },
     ph: c ? `Reply to ${first(c.name)}…` : "", sendIcon: has ? "M5 12h14m-6-6 6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3", sendTitle: has ? "Send" : "Voice note",
     chC: c?.channel === "messenger" ? "#2F6FB5" : "#1F7A4D", menuOpen: on && ui.pMenu, toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
