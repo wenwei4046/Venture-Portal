@@ -42,4 +42,9 @@ export function teamOf(id: string | null | undefined, people: CrmPerson[]): CrmP
 /** The team's name, as the design shows it: "Team Aina". */
 export const teamName = (tl: CrmPerson | undefined) => (tl ? `Team ${tl.name.trim().split(/\s+/)[0]}` : "");
 
-export const titleOf = (p: CrmPerson) => ROLE_TITLE[p.role] + (p.role === "rs" ? ` · ${p.fullTime ? "Full time" : "Part time"}` : "");
+/** Their title as People holds it (user 2026-10-09: 顯示 People 裡的原職稱); the role's name only when People gives none. */
+export const jobTitle = (p: CrmPerson) => p.title?.trim() || ROLE_TITLE[p.role];
+/** "Senior Revenue Specialist · Full time": the title, and full / part time for the RS the CRM keeps it for. */
+export const titleOf = (p: CrmPerson) => jobTitle(p) + (p.role === "rs" ? ` · ${p.fullTime ? "Full time" : "Part time"}` : "");
+/** The short form a crowded row shows: "Senior Revenue Specialist" → "SRS", "Team Leader" → "TL". */
+export const titleShort = (p: CrmPerson) => { const w = jobTitle(p).split(/\s+/).filter(Boolean); return w.length > 1 ? w.map(x => x[0]!.toUpperCase()).join("") : jobTitle(p); };

@@ -6,7 +6,7 @@
  */
 import type { ChangeEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmAutoReplySet } from "@/lib/member/crm-data";
-import { downlineOf, ROLE_TITLE, titleOf } from "../../shared/people";
+import { downlineOf, jobTitle, titleOf } from "../../shared/people";
 import { firstName, ini, stop, type SalesCtx } from "./common";
 import { salesNotifs, unreadNotifs } from "./notifs";
 
@@ -40,7 +40,7 @@ export function profileVM(ctx: SalesCtx) {
   return {
     stop, stopTeam: stop,
     profMain: !ui.profSub, profNotif: ui.profSub === "notif", profAuto: ui.profSub === "auto", profQuick: ui.profSub === "quick",
-    meNameX: owner.name, meTitleX: ROLE_TITLE[owner.role], meIniX: ini(owner.name),
+    meNameX: owner.name, meTitleX: jobTitle(owner), meIniX: ini(owner.name),
     meRankX: owner.role === "rs" ? (owner.fullTime ? "Full time" : "Part time") : "—",
     hasTeam: team.length > 0, teamSub: team.map(p => firstName(p.name)).join(", "),
     teamOpen: ui.teamOpen, openTeam: () => patch({ teamOpen: true }), closeTeam: () => patch({ teamOpen: false }),

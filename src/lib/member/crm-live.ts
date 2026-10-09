@@ -12,7 +12,7 @@ import type { CrmAssignConfig, CrmMember, CrmRole } from "./crm-team";
 export interface CrmPeopleRow {
   me: string | null;
   role: CrmRole | null;
-  people: { id: string; name: string; role: CrmRole; uplineId: string | null; fullTime: boolean }[];
+  people: { id: string; name: string; role: CrmRole; uplineId: string | null; fullTime: boolean; title?: string | null }[];
 }
 
 export interface CrmContactRow {

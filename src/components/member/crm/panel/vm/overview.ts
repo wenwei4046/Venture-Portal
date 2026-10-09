@@ -6,6 +6,7 @@
  * its people, a person opens their own CRM.
  */
 import { urgencyOf } from "../../sales/vm/common";
+import { jobTitle } from "../../shared/people";
 import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, ini, numbersOf, pct, periodRange, tagOf, type PanelCtx } from "./common";
 
 export function overviewVM(ctx: PanelCtx) {
@@ -46,7 +47,7 @@ export function overviewVM(ctx: PanelCtx) {
     ...dateSheetVM(ctx),
     onOverview: ui.tab === "overview",
     exitApp: ctx.exitApp,
-    meIni: ini(me.name), meFirst: me.role === "boss" ? "Principal" : first(me.name), meTitle: me.role === "boss" ? "Principal" : "Revenue Director",
+    meIni: ini(me.name), meFirst: me.role === "boss" ? "Principal" : first(me.name), meTitle: me.role === "boss" ? "Principal" : jobTitle(me),
     todayLabel: gb(now, { weekday: "short", day: "numeric", month: "short" }),
     rdToggle: me.role === "hod", rdPanelBg: "#fff", rdPanelFg: "#3F2B22", rdPanelSh: "0 1px 3px rgba(63,43,34,.14)",
     rdCrmBg: "transparent", rdCrmFg: "#806B60", rdCrmSh: "none", toPanel: () => {}, toCrm: () => ctx.toMyCrm?.(),

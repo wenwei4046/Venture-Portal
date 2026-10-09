@@ -10,7 +10,7 @@
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
-import { personOf, ROLE_TITLE, teamOf, teamName, downlineOf, titleOf } from "../../shared/people";
+import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../../shared/people";
 import { BORDER, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
 import { customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
@@ -186,7 +186,7 @@ export function chatVM(ctx: SalesCtx) {
       setTimeout(() => set(u => (u.hm?.toast ? { ...u, hm: null } : u)), 3000);
     } : undefined,
     moveOpen: !!hm.move,
-    people: superior ? [{ name: superior.name, role: ROLE_TITLE[superior.role], ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "#D9C7BA", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }) }] : [],
+    people: superior ? [{ name: superior.name, role: jobTitle(superior), ini: ini(superior.name), ring: hm.sel === superior.id ? RUST : "#D9C7BA", dot: hm.sel === superior.id ? RUST : "transparent", pick: () => setHm({ sel: superior.id }) }] : [],
     cLabel: superior && hm.sel ? `Send move request to ${superior.name}` : "Choose a person", cBg: superior && hm.sel ? RUST : "#D9C7BA",
     confirm: superior && hm.sel ? async () => {
       if (!(await act.invite("move", c.id, superior.id))) return;

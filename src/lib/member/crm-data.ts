@@ -17,6 +17,8 @@ export interface CrmPerson {
   role: CrmRole;
   uplineId: string | null;
   fullTime: boolean;
+  /** Their title in People ("Senior Revenue Specialist"); the CRM shows it. Empty = the role's own name. */
+  title?: string;
 }
 
 export interface CrmCard { kind: "Confirmed" | "Updated" | "Cancelled" | "Reminder"; start: string; room: string; addr: string }
@@ -307,7 +309,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
   return {
     viewerId: rows.people.role ? rows.people.me : null,
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
-    people: rows.people.people.map(p => ({ id: p.id, name: p.name, role: p.role, uplineId: p.uplineId, fullTime: p.fullTime })),
+    people: rows.people.people.map(p => ({ id: p.id, name: p.name, role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "" })),
     customers: rows.contacts.map(c => customerFromRow(c, rows.messages)),
     visits: rows.visits.map(visitFromRow),
     rooms: [...rows.rooms].sort((a, b) => a.sort_order - b.sort_order).map(roomFromRow),

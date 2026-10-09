@@ -7,7 +7,7 @@
 import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
 import type { CrmCustomer, CrmData, CrmPerson, CrmVisit } from "@/lib/member/crm-data";
 import { formatIntlDate } from "@/lib/utils";
-import { downlineOf, ROLE_ORDER, teamName } from "../../shared/people";
+import { downlineOf, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
 import type { PanelActions } from "../actions";
 import type { PanelUi, Period, Range } from "../ui";
 
@@ -61,9 +61,8 @@ export function teamsOf(data: CrmData): Team[] {
 }
 
 /** "RS · Full time", "TL", "Senior TL" — as the design tags people. */
-export const tagOf = (p: CrmPerson) => p.role === "rs" ? `RS · ${p.fullTime ? "Full time" : "Part time"}` : p.role === "tl" ? "TL" : p.role === "ta" ? "TA" : p.role === "stl" ? "Senior TL" : p.role === "hod" ? "HOD" : "Principal";
-export const FULL_TITLE: Record<string, string> = { stl: "Senior Team Leader", tl: "Team Leader", ta: "Team Assistant", rs: "Revenue Specialist", hod: "Head of Department · sells too" };
-export const subOf = (p: CrmPerson) => p.role === "rs" ? `Revenue Specialist · ${p.fullTime ? "Full time" : "Part time"}` : FULL_TITLE[p.role] ?? "";
+export const tagOf = (p: CrmPerson) => titleShort(p) + (p.role === "rs" ? ` · ${p.fullTime ? "Full time" : "Part time"}` : "");
+export const subOf = (p: CrmPerson) => titleOf(p);
 
 /** The period on screen: today, this week (Mon–Sun), this month, or the custom range. */
 export function periodRange(per: Period, custom: Range | null, now: Date): Range {
@@ -193,7 +192,7 @@ export function seatOf(ctx: PanelCtx, staffId: string | null | undefined): Seat 
 export const NO_SEAT: Seat = { id: "", name: "", c: "#806B60", tint: "#F5EEE9", own: "#F5EEE9" };
 
 /** "Revenue Specialist · Full time" — the sheets' second line. */
-export const subLine = (p: CrmPerson) => (p.role === "hod" ? "Head of Department · sells too" : subOf(p));
+export const subLine = (p: CrmPerson) => (p.role === "hod" ? `${jobTitle(p)} · sells too` : subOf(p));
 const sortKey = (p: CrmPerson) => ROLE_ORDER[p.role] * 2 + (p.role === "rs" && !p.fullTime ? 1 : 0);
 
 export interface PickRow { id: string; label: string; c: string; sub: string; on: boolean; ring: string; dot: string; bg: string; r: string; pick: () => void }

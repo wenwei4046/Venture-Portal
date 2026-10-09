@@ -131,4 +131,9 @@ check(await as('boss', `select notif_read from crm_staff_prefs`), [{ notif_read:
 await as('boss', `select public.crm_read_notifs('{}', true)`)
 check(await as('boss', `select notif_read, notifs_seen_at is not null as seen from crm_staff_prefs`), [{ notif_read: [], seen: true }], 'Mark all read')
 
+// 10. crm_people() hands over each person's title from People (mig 20261009100000).
+const crmPpl = (await as('boss', `select public.crm_people() as p`))[0].p.people
+check(crmPpl.every(p => typeof p.title === 'string' && p.title.length > 0), true, 'every person comes with their People title')
+check(crmPpl.find(p => p.id === S('ann')).title, (await q(`select t.name from titles t join hr_staff_costs s on s.title_id = t.id where s.id = $1`, [S('ann')]))[0].name, 'the title is the one People holds')
+
 console.log(`crm control panel: ${checks} checks passed`)
