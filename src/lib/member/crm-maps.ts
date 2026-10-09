@@ -46,19 +46,42 @@ export function messengerVisitMessage(text: string, card: CrmCard) {
   };
 }
 
+const OFFICE_TZ = "Asia/Kuala_Lumpur";
+const WA_HEAD: Record<CrmCard["kind"], string> = {
+  Confirmed: "Your showroom visit is confirmed",
+  Updated: "Your showroom visit is changed to",
+  Reminder: "Reminder: your showroom visit",
+  Cancelled: "Your showroom visit is cancelled",
+};
+
+/**
+ * A visit card as WhatsApp words (user 2026-10-09): the heading and each
+ * label in bold (WhatsApp's *…*), a line each for date, time and place, then
+ * the address. Day and time are the office's — the server keeps UTC.
+ */
+export function whatsappCardText(card: CrmCard): string {
+  const d = new Date(card.start);
+  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: OFFICE_TZ, ...o }).format(d);
+  const date = `${part({ day: "numeric", month: "short", year: "numeric" }).replace("Sept", "Sep")} (${part({ weekday: "short" })})`;
+  const time = new Intl.DateTimeFormat("en-MY", { timeZone: OFFICE_TZ, hour: "numeric", minute: "2-digit", hour12: true }).format(d).toLowerCase();
+  const lines = [`*${WA_HEAD[card.kind]}*`, "", `🗓️ *Date:* ${date}`, `⏰ *Time:* ${time}`, `📍 *Location:* ${card.room}`];
+  if (card.kind === "Cancelled") lines.push("", "Reply here to book another time.");
+  else if (card.addr.trim()) lines.push("", `🔸 *Address:* ${card.addr.trim()}`);
+  return lines.join("\n").slice(0, 1024);
+}
+
 /**
  * WhatsApp's reply with one link button (cta_url — no template, no review,
- * free inside the 24-hour window; one button only, user chose 2026-10-09:
- * Google Maps as the button, Waze as a link under the words).
+ * free inside the 24-hour window; one button only): the card's words and
+ * Google Maps as the button (user 2026-10-09: no Waze link on WhatsApp).
  */
-export function whatsappVisitMessage(to: string, text: string, card: CrmCard) {
-  const l = mapLinks(card.addr);
+export function whatsappVisitMessage(to: string, card: CrmCard) {
   return {
     to, type: "interactive",
     interactive: {
       type: "cta_url",
-      body: { text: `${withoutMapLinks(text)}\n\n🚗 Waze: ${l.waze}`.slice(0, 1024) },
-      action: { name: "cta_url", parameters: { display_text: "Google Maps", url: l.google } },
+      body: { text: whatsappCardText(card) },
+      action: { name: "cta_url", parameters: { display_text: "Google Maps", url: mapLinks(card.addr).google } },
     },
   };
 }
