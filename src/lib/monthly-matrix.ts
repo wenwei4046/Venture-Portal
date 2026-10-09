@@ -164,3 +164,34 @@ export function buildHierarchyRows(
   for (const node of sorted(roots)) emit(node, baseDepth)
   return rows
 }
+
+/**
+ * The months From..To of a matrix built through To (2026-10-09, the Finance
+ * revamp handoff: a From – To period). Keeps Accumulated first and the months
+ * latest-first; Accumulated becomes what the kept months add up to — except a
+ * point-in-time row, which reads its balance on the period's edge: an opening
+ * (`isStart`) its first month's, a closing or a balance (`isEnd`) its last
+ * month's. `base` (the % column's sales) is cut the same way. A From of
+ * January keeps the matrix as built.
+ */
+export function sliceMatrixMonths<R extends { key: string; values: number[] }>(
+  columns: MatrixColumn[],
+  rows: R[],
+  fromYM: string,
+  opts: { base?: number[]; isStart?: (key: string) => boolean; isEnd?: (key: string) => boolean } = {},
+): { columns: MatrixColumn[]; rows: R[]; base?: number[] } {
+  const kept = columns.map((c, i) => (i > 0 && c.key >= fromYM ? i : -1)).filter((i) => i > 0)
+  if (kept.length === columns.length - 1) return { columns, rows, base: opts.base }
+  const isStart = opts.isStart ?? ((k: string) => k === 'OPENING_CASH')
+  const isEnd = opts.isEnd ?? ((k: string) => k === 'CLOSING_CASH' || k.startsWith('AR_'))
+  const cut = (values: number[], key: string): number[] => {
+    const months = kept.map((i) => values[i] ?? 0)
+    const acc = months.length === 0 ? 0 : isStart(key) ? months[months.length - 1] : isEnd(key) ? months[0] : r2(months.reduce((s, v) => s + v, 0))
+    return [acc, ...months]
+  }
+  return {
+    columns: [columns[0], ...kept.map((i) => columns[i])],
+    rows: rows.map((r) => ({ ...r, values: cut(r.values, r.key) })),
+    base: opts.base ? cut(opts.base, '') : undefined,
+  }
+}

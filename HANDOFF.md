@@ -1,5 +1,45 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-09 i (SHIPPED) — Finance revamp · Phase 4b: Reports, Reconciliation / Journal, Settings — the revamp is complete
+
+- **Reports, company-wide readers only** (`reportsCompanyWide(user)` — a department
+  manager keeps every report page as it was; tests pin it). Shared pieces:
+  `lib/report-range.ts` (From – To within one year, `period` = To, `from` new;
+  `rangeLabel`, `toChoices`, `fromChoices`), `lib/monthly-matrix.ts`
+  `sliceMatrixMonths` (cut a matrix built through To down to From:
+  Accumulated = sum of kept months, except OPENING_CASH = first kept month,
+  CLOSING_CASH / AR_* = last kept month), `_components/ReportToolbar` (Period
+  From – To, Find account, Segment dropdown, Detail level L1–L3 on one row; level
+  now lives in `ReportSearchProvider` when a page passes `level`, and
+  `MonthlyMatrix` hides its own pills then; `separated` adds `.mx-sep` rules
+  before each column), `_components/ReportModeSwitch` (Single month · P&L /
+  Monthly P&L in the head; CF / R&P: Single month / Month by month),
+  `GlReportView controls="row"` (+ `periodLabel`, "As at" on the BS), `ExportLinks
+  variant="sheet"`, CSS `.rpt-*`, `tr.rpt-all` (the navy All row).
+- Pages: Monthly P&L / Cash Flow / R&P (cards; exports take `from` too),
+  single P&L / CF / R&P (cards, consolidated note on P&L), Balance Sheet (cards,
+  Check = Balanced), Trial Balance (cards, as-at row, navy Total), Debtor Aging
+  (cards, `AgingByCustomer allRow` → navy "All companies"), Loan Aging (five
+  cards, navy All borrowers / All lenders), Company Statement (To collect / To
+  repay / Net). Sidebar: P&L → /reports/monthly-pnl for `canAccessReports`,
+  /reports/income-statement for dept-only readers.
+- **Reconciliation**: `?upload=1` opens the upload form (head button), one card
+  per bank ("✓ Ties to GL" / the difference, Cache · GL), sessions with chips and
+  Continue / Open / Report. **Journal Entries**: list → **`/reconciliation/
+  journal-entries/[id]`** (new page: chip posted / auto · payroll, Date /
+  Segment / Amount cards, Lines with totals, Delete (`JvDeleteButton`) / Copy /
+  Edit, or Fix mistakes for an auto accrual); AUTO as a chip, total foot; the
+  voucher form adds a line on **Ins** (focus to its account); new / edit heads
+  say "Press Ins to add a line".
+- **Settings**: accounts tab = "Chart of Accounts" (Active / Inactive cards),
+  departments tab = "Departments" (count + cost centers, Bill back salary); the
+  Principal's own tabs keep "Settings". **Base Rate History**: four cards
+  (current, weighted cost, op margin, change vs last quarter), History section.
+- `src/test/read-paths.ts`: the dashboard's treasury branch also reads
+  `treasury_terms_history` (upstream PR3d test).
+- Not done on purpose: "Request credit" on Dept Pool (Marketing's own form);
+  Reverse on a voucher stays "Delete" (the existing reversing delete).
+
 ## CHECKPOINT 2026-10-09 h (SHIPPED) — Finance revamp · Phase 4a: Overview, Dept Pool, Venture Pool, General Ledger
 
 - **Overview** (treasury branch of `dashboard/page.tsx` only — HR's and a

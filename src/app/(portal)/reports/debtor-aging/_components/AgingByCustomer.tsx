@@ -18,13 +18,15 @@ interface Props {
   byPayer: AgingPayerRow[]
   invoices: AgingInvoice[]
   totals: { buckets: Record<AgingBucket, number>; total: number; count: number }
+  /** Close on the handoff's navy "All companies" row (2026-10-09, Finance's view). */
+  allRow?: boolean
 }
 
 function money(v: number) {
   return v ? <span className="num">{formatMoney(v)}</span> : <span className="num text-muted">—</span>
 }
 
-export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
+export default function AgingByCustomer({ byPayer, invoices, totals, allRow = false }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const invoicesByPayer = useMemo(() => {
@@ -128,9 +130,9 @@ export default function AgingByCustomer({ byPayer, invoices, totals }: Props) {
                 </Fragment>
               )
             })}
-            <tr className="border-t-2 border-hairline bg-surface-2 font-semibold">
-              <td className="font-serif italic text-ink">
-                Total <span className="text-muted text-xs">· {totals.count}</span>
+            <tr className={allRow ? 'rpt-all' : 'border-t-2 border-hairline bg-surface-2 font-semibold'}>
+              <td className={allRow ? undefined : 'font-serif italic text-ink'}>
+                {allRow ? 'All companies' : 'Total'} <span className={allRow ? 'text-xs font-normal' : 'text-muted text-xs'}>· {totals.count}</span>
               </td>
               {AGING_BUCKETS.map((b) => (
                 <td key={b.key} className="num">{money(totals.buckets[b.key as AgingBucket])}</td>

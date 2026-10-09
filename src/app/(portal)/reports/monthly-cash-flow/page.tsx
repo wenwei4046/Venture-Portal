@@ -18,11 +18,18 @@ import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
 import { reportsCompanyWide } from '@/lib/surfaces'
+import { formatMoney } from '@/lib/utils'
+import { sliceMatrixMonths } from '@/lib/monthly-matrix'
+import { fromChoices, rangeLabel, reportRange, toChoices } from '@/lib/report-range'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { REPORT_SEGMENTS } from '../_components/report-segments'
+import ReportToolbar from '../_components/ReportToolbar'
+import ReportModeSwitch from '../_components/ReportModeSwitch'
 
 export const dynamic = 'force-dynamic'
 
 interface Props {
-  searchParams: Promise<{ period?: string; segment?: string }>
+  searchParams: Promise<{ period?: string; segment?: string; from?: string }>
 }
 
 export default async function MonthlyCashFlowPage({ searchParams }: Props) {
@@ -75,6 +82,81 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
     { key: 'OPENING_CASH', label: 'Opening cash', depth: 0, kind: 'subtotal', tone: 'ledger', values: data.openingByCol },
     { key: 'CLOSING_CASH', label: 'Closing cash', depth: 0, kind: 'subtotal', tone: 'ledger', emphasis: 'strong', values: data.closingByCol },
   ]
+
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the period From – To, the two views and the exports in
+  // the head, the cards, one control row, the months separated. A department
+  // manager keeps the page below, as it was.
+  if (!isDeptMgr) {
+    const nowYM = officeMonth()
+    const range = reportRange({ from: params.from, period }, nowYM)
+    const cut = sliceMatrixMonths(data.columns, rows, range.from)
+    // A card reads the Accumulated of its line as cut to From: a flow adds up, an
+    // opening reads its first month, a closing or a balance its last.
+    const pick = (values: number[], key = 'flow') => sliceMatrixMonths(data.columns, [{ key, values }], range.from).rows[0].values[0]
+    const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+    const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
+    const exportHref = (format: 'xlsx' | 'pdf') => {
+      const qs = new URLSearchParams({ format, period: range.to })
+      if (segment) qs.set('segment', segment)
+      if (!range.wholeYear) qs.set('from', range.from)
+      return `/reports/monthly-cash-flow/export?${qs.toString()}`
+    }
+    const startLevel = rows.some((r) => r.kind === 'category') ? 1 : 3
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · CASH FLOW · {rangeLabel(range.from, range.to).toUpperCase()}
+            </div>
+            <h1 className="page-title">Cash Flow</h1>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ReportModeSwitch pair="cash-flow" active="monthly" period={range.to} segment={segment || undefined} />
+            <Link href="/reports/cash-flow/layout" className="btn-quiet-sheet">
+              Edit layout
+            </Link>
+            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
+              Excel
+            </a>
+            <a href={exportHref('pdf')} className="btn-quiet-sheet">
+              PDF
+            </a>
+          </div>
+        </div>
+
+        <StatCards label="Cash flow">
+          <StatCard label="Opening cash" value={formatMoney(pick(data.openingByCol, 'OPENING_CASH'))} icon="wallet" note="Start of period" />
+          <StatCard label="Money in" value={formatMoney(pick(data.inflowTotalByCol))} icon="inbox" tone="ledger" note="Selected period" />
+          <StatCard label="Money out" value={formatMoney(pick(data.outflowTotalByCol))} icon="send" tone="danger" note="Selected period" />
+          <StatCard label="Net change" value={formatMoney(pick(data.netChangeByCol))} icon="swap" tone={pick(data.netChangeByCol) < 0 ? 'danger' : 'ledger'} note="All movements" />
+          <StatCard label="Closing cash" value={formatMoney(pick(data.closingByCol, 'CLOSING_CASH'))} icon="bank" tone="primary" note="End of period" />
+        </StatCards>
+
+        <ReportSearchProvider level={startLevel}>
+          <section className="mb-6">
+            <div className="sect-head">
+              <h2>Monthly cash flow</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                {segName.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
+              </span>
+            </div>
+            <ReportToolbar
+              from={range.from}
+              to={range.to}
+              fromOptions={fromChoices(range.to)}
+              toOptions={toChoices(nowYM)}
+              segment={segment}
+              segments={segments}
+            />
+            <MonthlyMatrix columns={cut.columns} rows={cut.rows} nowKey={nowYM} separated />
+          </section>
+        </ReportSearchProvider>
+      </div>
+    )
+  }
 
   return (
     <div>

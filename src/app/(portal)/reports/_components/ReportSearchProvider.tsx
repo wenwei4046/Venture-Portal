@@ -23,11 +23,17 @@ interface ReportSearchValue {
    *  scroll effect would never re-fire and Enter looked dead (user 2026-07-31);
    *  watching this too makes every Enter jump, however many matches there are. */
   jump: number
+  /** The detail level, when the page's control row holds it (2026-10-09, the
+   *  Finance revamp handoff); null = the matrix keeps its own. */
+  level: 1 | 2 | 3 | null
+  setLevel: (level: 1 | 2 | 3) => void
 }
 
 const Ctx = createContext<ReportSearchValue | null>(null)
 
-export function ReportSearchProvider({ children }: { children: React.ReactNode }) {
+export function ReportSearchProvider({ children, level: initialLevel }: { children: React.ReactNode; level?: 1 | 2 | 3 }) {
+  const [level, setLevelRaw] = useState<1 | 2 | 3 | null>(initialLevel ?? null)
+  const setLevel = useCallback((l: 1 | 2 | 3) => setLevelRaw(l), [])
   const [search, setSearchRaw] = useState('')
   const [hitCount, setHitCount] = useState(0)
   const [activeHit, setActiveHit] = useState(0)
@@ -50,8 +56,8 @@ export function ReportSearchProvider({ children }: { children: React.ReactNode }
   )
 
   const value = useMemo(
-    () => ({ search, setSearch, hitCount, setHitCount, activeHit, step, jump }),
-    [search, setSearch, hitCount, activeHit, step, jump],
+    () => ({ search, setSearch, hitCount, setHitCount, activeHit, step, jump, level, setLevel }),
+    [search, setSearch, hitCount, activeHit, step, jump, level, setLevel],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

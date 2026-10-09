@@ -8,12 +8,14 @@ import { formatMoney } from '@/lib/utils'
 import { buildDebtorAging, type RawInvoice } from '@/lib/debtor-aging'
 import { fetchPaidByInvoice } from '@/lib/debtor-aging-data'
 import AgingByCustomer from './_components/AgingByCustomer'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DebtorAgingPage() {
   // dept_manager sees only their own segment's invoices (RLS on invoices).
-  await requirePermission('dept_reports')
+  const user = await requirePermission('dept_reports')
   const supabase = await createClient()
 
   const [invoices, companies, departments] = await Promise.all([
@@ -60,6 +62,75 @@ export default async function DebtorAgingPage() {
 
   const today = officeToday()
   const aging = buildDebtorAging(raw, today)
+
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the date in the eyebrow, Excel / PDF, four cards, the
+  // table closing on a navy "All companies" row. A department manager keeps
+  // the page below, as it was.
+  if (reportsCompanyWide(user)) {
+    const b = aging.totals.buckets
+    const current = b.this_month
+    const overOne = Math.round((aging.totals.total - current) * 100) / 100
+    const overThree = Math.round((b.m3 + b.m4 + b.m5_plus) * 100) / 100
+    const exportHref = (format: 'xlsx' | 'pdf', view: 'detail' | 'summary') => `/reports/debtor-aging/export?format=${format}&view=${view}`
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · DEBTOR AGING · AS AT {dayjs(today).format('D MMM YYYY').toUpperCase()}
+            </div>
+            <h1 className="page-title">Debtor Aging</h1>
+            <p className="page-sub">Invoices billed out and not yet collected, by how many months they have been open.</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <a href={exportHref('xlsx', 'detail')} className="btn-quiet-sheet">
+              Excel
+            </a>
+            <a href={exportHref('pdf', 'detail')} className="btn-quiet-sheet">
+              PDF
+            </a>
+            <a href={exportHref('xlsx', 'summary')} className="btn-quiet-sheet">
+              Summary Excel
+            </a>
+            <a href={exportHref('pdf', 'summary')} className="btn-quiet-sheet">
+              Summary PDF
+            </a>
+          </div>
+        </div>
+
+        <StatCards label="Debtor aging">
+          <StatCard
+            label="Total receivable"
+            value={formatMoney(aging.totals.total)}
+            icon="receipt"
+            tone="primary"
+            note={`${aging.byPayer.length} ${aging.byPayer.length === 1 ? 'company' : 'companies'} · ${aging.totals.count} ${aging.totals.count === 1 ? 'invoice' : 'invoices'}`}
+          />
+          <StatCard label="Current" value={formatMoney(current)} icon="check" note="Billed this month" />
+          <StatCard label="Over 1 month" value={formatMoney(overOne)} icon="clock" tone={overOne > 0 ? 'danger' : 'default'} note="Open a month or more" />
+          <StatCard label="Over 3 months" value={formatMoney(overThree)} icon="alert" tone={overThree > 0 ? 'danger' : 'default'} note="Open three months or more" />
+        </StatCards>
+
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>By customer</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {aging.byPayer.length} {aging.byPayer.length === 1 ? 'COMPANY' : 'COMPANIES'} · {aging.totals.count} {aging.totals.count === 1 ? 'INVOICE' : 'INVOICES'}
+            </span>
+          </div>
+          {aging.totals.count === 0 ? (
+            <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
+              <p className="text-sm">Nothing outstanding — every issued invoice has been collected.</p>
+            </div>
+          ) : (
+            <AgingByCustomer byPayer={aging.byPayer} invoices={aging.invoices} totals={aging.totals} allRow />
+          )}
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div>

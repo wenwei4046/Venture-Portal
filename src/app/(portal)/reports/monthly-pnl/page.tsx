@@ -13,11 +13,19 @@ import MonthlyReportControls from '../_components/MonthlyReportControls'
 import { ReportSearchProvider } from '../_components/ReportSearchProvider'
 import ReportViewToggle from '../_components/ReportViewToggle'
 import { reportsCompanyWide } from '@/lib/surfaces'
+import { formatMoney } from '@/lib/utils'
+import { r2, sliceMatrixMonths } from '@/lib/monthly-matrix'
+import { fromChoices, rangeLabel, reportRange, toChoices } from '@/lib/report-range'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import { REPORT_SEGMENTS } from '../_components/report-segments'
+import ReportToolbar from '../_components/ReportToolbar'
+import ReportModeSwitch from '../_components/ReportModeSwitch'
+import dayjs from 'dayjs'
 
 export const dynamic = 'force-dynamic'
 
 interface Props {
-  searchParams: Promise<{ period?: string; segment?: string }>
+  searchParams: Promise<{ period?: string; segment?: string; from?: string }>
 }
 
 export default async function MonthlyPnlPage({ searchParams }: Props) {
@@ -49,6 +57,90 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
     ? saved
     : defaultPnlLayout(data.accounts)
   const rows = buildCustomPnlRows(data, layout)
+
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the period From – To, the two views and the exports in
+  // the head, four cards, one control row, the months separated. A
+  // department manager keeps the page below, as it was.
+  if (!isDeptMgr) {
+    const nowYM = officeMonth()
+    const range = reportRange({ from: params.from, period }, nowYM)
+    const cost = data.accounts.filter((a) => a.defaultCategory === 'cost' || a.defaultCategory === 'expense')
+    const expenses = data.columns.map((_, i) => r2(-cost.reduce((s, a) => s + (a.values[i] ?? 0), 0)))
+    const net = rows.find((r) => r.key === 'NET_INCOME')?.values ?? data.columns.map(() => 0)
+    const cut = sliceMatrixMonths(data.columns, rows, range.from, { base: data.salesByColumn })
+    const sums = sliceMatrixMonths(data.columns, [
+      { key: 'rev', values: data.salesByColumn },
+      { key: 'exp', values: expenses },
+      { key: 'net', values: net },
+    ], range.from).rows
+    const [rev, exp, netCut] = sums.map((s) => s.values)
+    const toName = dayjs(`${range.to}-01`).format('MMM') + (range.to === nowYM ? ' (to date)' : '')
+    const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+    const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
+    const exportHref = (format: 'xlsx' | 'pdf') => {
+      const qs = new URLSearchParams({ format, period: range.to })
+      if (segment) qs.set('segment', segment)
+      if (!range.wholeYear) qs.set('from', range.from)
+      return `/reports/monthly-pnl/export?${qs.toString()}`
+    }
+    const margin = Math.abs(rev[0]) < 0.005 ? '—' : `${((netCut[0] / rev[0]) * 100).toFixed(1)}%`
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · P&amp;L · {rangeLabel(range.from, range.to).toUpperCase()}
+            </div>
+            <h1 className="page-title">P&amp;L</h1>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ReportModeSwitch pair="pnl" active="monthly" period={range.to} segment={segment || undefined} />
+            <Link href="/reports/monthly-pnl/layout" className="btn-quiet-sheet">
+              Edit layout
+            </Link>
+            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
+              Excel
+            </a>
+            <a href={exportHref('pdf')} className="btn-quiet-sheet">
+              PDF
+            </a>
+          </div>
+        </div>
+
+        <StatCards label="P&L">
+          <StatCard label={`Revenue · ${toName}`} value={formatMoney(rev[1] ?? 0)} icon="receipt" tone="ledger" note={`Accumulated ${formatMoney(rev[0])}`} />
+          <StatCard label={`Expenses · ${toName}`} value={formatMoney(exp[1] ?? 0)} icon="wallet" tone="danger" note={`Accumulated ${formatMoney(exp[0])}`} />
+          <StatCard label="Net profit · accumulated" value={formatMoney(netCut[0])} icon="chart" tone={netCut[0] < 0 ? 'danger' : 'primary'} note="Selected period" />
+          <StatCard label="Net margin · accumulated" value={margin} icon="percent" note="Against accumulated sales" />
+        </StatCards>
+
+        <ReportSearchProvider level={3}>
+          <section className="mb-6">
+            <div className="sect-head">
+              <h2>Monthly P&amp;L</h2>
+              <span className="rule" aria-hidden />
+              <span className="count">
+                {segName.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
+              </span>
+            </div>
+            <ReportToolbar
+              from={range.from}
+              to={range.to}
+              fromOptions={fromChoices(range.to)}
+              toOptions={toChoices(nowYM)}
+              segment={segment}
+              segments={segments}
+            />
+            {consolidated ? (
+              <p className="fin-notice mb-3">Consolidated view eliminates inter-billing between segments — pick a segment to see its own charges.</p>
+            ) : null}
+            <MonthlyMatrix columns={cut.columns} rows={cut.rows} pctBaseByColumn={cut.base} nowKey={nowYM} separated />
+          </section>
+        </ReportSearchProvider>
+      </div>
+    )
+  }
 
   return (
     <div>

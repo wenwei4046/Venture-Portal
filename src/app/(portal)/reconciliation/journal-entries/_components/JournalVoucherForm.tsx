@@ -130,9 +130,19 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
     updateLine(key, value ? { credit: value, debit: '' } : { credit: value })
   }
 
+  // A line added from the keyboard (Ins) or the button takes the cursor to
+  // its account (2026-10-09, the handoff: "Ins adds a line").
+  const focusNewLine = useRef(false)
   function addLine() {
     setLines((prev) => [...prev, emptyLine()])
+    focusNewLine.current = true
   }
+  useEffect(() => {
+    if (!focusNewLine.current) return
+    focusNewLine.current = false
+    const rows = formRef.current?.querySelectorAll<HTMLElement>('[data-jv-line]')
+    rows?.[rows.length - 1]?.querySelector<HTMLInputElement>('input')?.focus()
+  }, [lines.length])
 
   function removeLine(key: string) {
     setLines((prev) => (prev.length > 2 ? prev.filter((l) => l.key !== key) : prev))
@@ -215,6 +225,12 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
   return (
     <form
       ref={formRef}
+      onKeyDown={(e) => {
+        if (e.key === 'Insert') {
+          e.preventDefault()
+          addLine()
+        }
+      }}
       onSubmit={handleSubmit}
       className="bg-surface border border-hairline rounded-md p-4 sm:p-8 max-w-4xl"
     >
@@ -302,6 +318,7 @@ export default function JournalVoucherForm({ accounts, entry, prefill }: Props) 
           {lines.map((line) => (
             <div
               key={line.key}
+              data-jv-line
               className="grid grid-cols-1 sm:grid-cols-[2fr_1.2fr_1.2fr_1.8fr_auto] gap-2 px-3 py-2 border-t border-hairline first:border-t-0 sm:border-t items-center"
             >
               {/* Type-ahead account search (user 2026-06-12) — same picker as

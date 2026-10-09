@@ -9,6 +9,8 @@ import { readReportLayout, type ReportLayout } from '@/lib/report-layouts'
 import { segmentFilterFor } from '../../_components/report-segments'
 import { exportPdfResponse, exportXlsxResponse } from '@/lib/export/response'
 import { buildMatrixXlsx } from '@/lib/export/monthly-matrix-export'
+import { sliceMatrixMonths } from '@/lib/monthly-matrix'
+import { rangeLabel, reportRange } from '@/lib/report-range'
 import { MatrixPdf } from '@/lib/export/matrix-pdf'
 import { reportsCompanyWide } from '@/lib/surfaces'
 
@@ -19,6 +21,8 @@ export async function GET(req: Request) {
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
   const period = /^\d{4}-\d{2}$/.test(periodRaw) ? periodRaw : officeMonth()
+  // From – To (2026-10-09, the Finance revamp): the months cut as the page cuts them.
+  const range = reportRange({ from: url.searchParams.get('from') ?? undefined, period }, officeMonth())
   const segment = url.searchParams.get('segment') ?? ''
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
@@ -38,9 +42,10 @@ export async function GET(req: Request) {
   const layout = saved && Array.isArray(saved.categories) && saved.categories.length > 0
     ? saved
     : defaultPnlLayout(data.accounts)
-  const matrix = { columns: data.columns, rows: buildCustomPnlRows(data, layout) }
+  const cut = sliceMatrixMonths(data.columns, buildCustomPnlRows(data, layout), range.from, { base: data.salesByColumn })
+  const matrix = { columns: cut.columns, rows: cut.rows }
 
-  const filename = `monthly-pnl-${period}${segment ? `-${segment}` : ''}`
+  const filename = `monthly-pnl-${range.wholeYear ? period : `${range.from}-${period}`}${segment ? `-${segment}` : ''}`
   if (format === 'pdf') {
     return exportPdfResponse({
       filename,
@@ -48,11 +53,11 @@ export async function GET(req: Request) {
         <MatrixPdf
           title="Monthly P&L"
           subtitle={`FY ${year} · all amounts RM`}
-          periodLabel={`Up to ${dayjs(`${period}-01`).format('MMMM YYYY')}`}
+          periodLabel={range.wholeYear ? `Up to ${dayjs(`${period}-01`).format('MMMM YYYY')}` : rangeLabel(range.from, range.to)}
           data={matrix}
         />
       ),
     })
   }
-  return exportXlsxResponse({ filename, buffer: buildMatrixXlsx('Monthly P&L', matrix, data.salesByColumn) })
+  return exportXlsxResponse({ filename, buffer: buildMatrixXlsx('Monthly P&L', matrix, cut.base ?? data.salesByColumn) })
 }

@@ -324,7 +324,11 @@ export function buildNavEntries(data: NavData): NavEntry[] {
         // Each statement page carries a 单月 ｜ 逐月 toggle to its monthly
         // matrix twin (ReportViewToggle, 2026-09-15), so the Monthly * entries
         // no longer need their own sidebar rows.
-        { href: '/reports/income-statement', label: 'P&L', alsoPaths: ['/reports/monthly-pnl'], visible: canAccessDeptReports },
+        // P&L opens month by month for whoever reads the reports company-wide
+        // (2026-10-09, the Finance revamp handoff: "P&L defaults to Monthly
+        // P&L"); a department manager's still opens their single month.
+        { href: '/reports/monthly-pnl', label: 'P&L', alsoPaths: ['/reports/income-statement'], visible: canAccessReports },
+        { href: '/reports/income-statement', label: 'P&L', alsoPaths: ['/reports/monthly-pnl'], visible: (v) => canAccessDeptReports(v) && !canAccessReports(v) },
         { href: '/reports/cash-flow', label: 'Cash Flow', alsoPaths: ['/reports/monthly-cash-flow'], visible: canAccessDeptReports },
         { href: '/reports/receipt-payment', label: 'Receipt & Payment', alsoPaths: ['/reports/monthly-receipt-payment'], visible: canAccessDeptReports },
         { href: '/reports/balance-sheet', label: 'Balance Sheet', visible: canAccessReports },

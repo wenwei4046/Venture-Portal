@@ -18,6 +18,7 @@ import { loadDepartmentModes } from '@/lib/department-mode-server'
 import AccountsSection from './_components/AccountsSection'
 import PeriodsSection from './_components/PeriodsSection'
 import SettingsTabs, { type SettingsTab } from './_components/SettingsTabs'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
 const VALID_TABS: SettingsTab[] = ['treasury', 'overdue', 'splits', 'directors', 'companies', 'departments', 'banks', 'accounts', 'periods', 'simulator']
 function isValidTab(s: string | undefined): s is SettingsTab {
@@ -122,20 +123,71 @@ export default async function SettingsPage({ searchParams }: Props) {
     treasury.find((r) => r.config_key === 'saving_rate')?.config_value ?? 0
   )
 
+  // Finance's tabs are each headed as a page of their own, with cards
+  // (2026-10-09, the user's Claude Design handoff); the Principal's own tabs
+  // keep the Settings head.
+  const accountList = (accountRows ?? []) as Array<{ type: string; is_active: boolean }>
+  const activeAccounts = accountList.filter((a) => a.is_active)
+  const accountTypes = new Set(activeAccounts.map((a) => a.type)).size
+  const realDepartments = ((departmentRows ?? []) as Array<{ is_internal: boolean; own_share_billback?: boolean }>).filter((d) => !d.is_internal)
+  const costCenters = departmentModes.filter((m) => !m.isInternal && m.costModel === 'cost_center').length
+  const billBack = realDepartments.filter((d) => d.own_share_billback).length
+  const head =
+    activeTabResolved === 'accounts'
+      ? { eyebrow: 'ADMIN · CONFIGURATION · ACCOUNTS', title: 'Chart of Accounts', sub: null }
+      : activeTabResolved === 'departments'
+        ? {
+            eyebrow: 'ADMIN · CONFIGURATION · DEPARTMENTS',
+            title: 'Departments',
+            sub: 'Finance can add departments; editing segment, pool GL and billing mode is Principal-only.',
+          }
+        : { eyebrow: 'ADMIN · CONFIGURATION', title: 'Settings', sub: null }
+
   return (
     <div>
       <div className="page-head">
-        <div>
+        <div className="min-w-0">
           <div className="page-eyebrow">
-            <em>I.</em> ADMIN · CONFIGURATION
+            <em>I.</em> {head.eyebrow}
           </div>
-          <h1 className="page-title">Settings</h1>
+          <h1 className="page-title">{head.title}</h1>
+          {head.sub ? <p className="page-sub">{head.sub}</p> : null}
         </div>
       </div>
 
       <Suspense fallback={null}>
         <SettingsTabs active={activeTabResolved} allTabs={isPrincipal} />
       </Suspense>
+
+      {activeTabResolved === 'accounts' ? (
+        <div className="mt-6">
+          <StatCards label="Chart of accounts">
+            <StatCard
+              label="Active accounts"
+              value={String(activeAccounts.length)}
+              icon="layers"
+              tone="primary"
+              note={`${accountTypes} account ${accountTypes === 1 ? 'type' : 'types'}`}
+            />
+            <StatCard label="Inactive" value={String(accountList.length - activeAccounts.length)} icon="clock" note="Hidden until Show inactive" />
+          </StatCards>
+        </div>
+      ) : null}
+
+      {activeTabResolved === 'departments' ? (
+        <div className="mt-6">
+          <StatCards label="Departments">
+            <StatCard
+              label="Departments"
+              value={String(realDepartments.length)}
+              icon="layers"
+              tone="primary"
+              note={`${costCenters} cost ${costCenters === 1 ? 'center' : 'centers'}`}
+            />
+            <StatCard label="Bill back salary" value={String(billBack)} icon="swap" note="Own-share salary billed back" />
+          </StatCards>
+        </div>
+      ) : null}
 
       {activeTabResolved === 'treasury' && (
         <TreasuryConfigSection

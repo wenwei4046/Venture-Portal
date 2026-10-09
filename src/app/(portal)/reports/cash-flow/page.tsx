@@ -31,6 +31,9 @@ import { extraReportSegments, primedRegistryRows } from '@/lib/dept-registry'
 import ExportLinks from '../_components/ExportLinks'
 import ReportViewToggle from '../_components/ReportViewToggle'
 import { reportsCompanyWide } from '@/lib/surfaces'
+import { formatMoney } from '@/lib/utils'
+import { StatCard, StatCards } from '@/components/sheet/StatCard'
+import ReportModeSwitch from '../_components/ReportModeSwitch'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,6 +104,65 @@ export default async function CashFlowPage({ searchParams }: Props) {
     outflow: buildCashFlowSideSections(cf.outflowLeaves, coaWithSynthetic, outLayoutRaw as ReportLayout | null, '现金流出 · Money out', 'out'),
   })
   const periodLabel = dayjs(`${period}-01`).format('MMMM YYYY')
+
+  // Whoever reads the reports company-wide (2026-10-09, the user's Claude
+  // Design handoff): the two views and the exports in the head, the cards,
+  // the controls on one row over the statement. A department manager keeps
+  // the page below, as it was.
+  if (!isDeptMgr) {
+    const segChoices = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
+    const segName = (segChoices.find((s) => s.value === segment) ?? segChoices[0]).label
+    const isNow = period === officeMonth()
+    const mon = dayjs(`${period}-01`).format('MMM')
+    return (
+      <div>
+        <div className="page-head">
+          <div className="min-w-0">
+            <div className="page-eyebrow">
+              <em>I.</em> REPORTS · CASH FLOW · {periodLabel.toUpperCase()}
+            </div>
+            <h1 className="page-title">Cash Flow</h1>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ReportModeSwitch pair="cash-flow" active="single" period={period} segment={segment || undefined} />
+            <Link href="/reports/cash-flow/layout" className="btn-quiet-sheet">
+              Edit layout
+            </Link>
+            <ExportLinks variant="sheet" basePath="/reports/cash-flow/export" period={period} compare={compare} segment={segment} />
+          </div>
+        </div>
+
+        <StatCards label="Cash flow">
+          <StatCard label="Opening cash" value={formatMoney(cf.openingCash.current)} icon="wallet" note="Start of month" />
+          <StatCard label="Money in" value={formatMoney(cf.inflow.current)} icon="inbox" tone="ledger" note={periodLabel} />
+          <StatCard label="Money out" value={formatMoney(cf.outflow.current)} icon="send" tone="danger" note={periodLabel} />
+          <StatCard label="Net change" value={formatMoney(cf.netChange.current)} icon="swap" tone={cf.netChange.current < 0 ? 'danger' : 'ledger'} note="All movements" />
+          <StatCard label="Closing cash" value={formatMoney(cf.closingCash.current)} icon="bank" tone="primary" note={isNow ? 'To date' : 'End of month'} />
+        </StatCards>
+
+        <section className="mb-6">
+          <div className="sect-head">
+            <h2>Cash flow statement</h2>
+            <span className="rule" aria-hidden />
+            <span className="count">
+              {segName.toUpperCase()} · {mon.toUpperCase()} {period.slice(0, 4)}
+            </span>
+          </div>
+          <GlReportView
+            basePath="/reports/cash-flow"
+            period={period}
+            compare={compare}
+            segment={segment}
+            segments={segChoices}
+            blocks={blocks}
+            currentLabel={dayjs(`${period}-01`).format('MMM YYYY')}
+            compareLabel={compare ? dayjs(`${compare}-01`).format('MMM YYYY') : ''}
+            controls="row"
+          />
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div>

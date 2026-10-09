@@ -33,6 +33,12 @@ export interface GlReportViewProps {
    *  then "report 那边的颜色等等弄到和 cash flow 的一样"); 'ledger' = the
    *  portal's plain ledger look. */
   skin?: 'cf' | 'ledger'
+  /** 'row' = period, compare, find, segment and detail level on one row over
+   *  the statement (2026-10-09, the Finance revamp handoff); 'rail' (default)
+   *  = the left rail, as a department manager's view keeps it. */
+  controls?: 'rail' | 'row'
+  /** The period control's name — "As at" on the Balance Sheet. */
+  periodLabel?: string
 }
 
 /** Collapse key for a headed section that is NOT a merged root (its own row
@@ -96,6 +102,8 @@ export default function GlReportView({
   currentLabel,
   compareLabel,
   skin = 'cf',
+  controls = 'rail',
+  periodLabel = 'Period',
 }: GlReportViewProps) {
   const router = useRouter()
   // A statement with layout (headed) sections opens folded to its category
@@ -114,7 +122,12 @@ export default function GlReportView({
     return { allGroupCodes: k.groups, allTxnCodes: k.txns }
   }, [blocks])
 
+  // Which level was last asked for — the control row shows it pressed.
+  const [level, setLevelShown] = useState<1 | 2 | 3>(() =>
+    blocks.some((b) => b.kind === 'section' && b.section.headed) ? 1 : 2,
+  )
   const setLevel = (level: 1 | 2 | 3) => {
+    setLevelShown(level)
     setCollapsed(level === 1 ? new Set(allGroupCodes) : new Set())
     setOpenTxns(level === 3 ? new Set(allTxnCodes) : new Set())
   }
@@ -199,6 +212,181 @@ export default function GlReportView({
   const railHead = 'font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-muted mb-2'
   const railBtn =
     'px-2 py-1.5 bg-surface hover:bg-surface-2 border border-hairline rounded-md text-xs font-mono text-graphite hover:text-ink transition-colors'
+
+  const table = (
+      <table className={`ledger-table gl-report${skin === 'cf' ? ' cf-report' : ''}`}>
+        <thead>
+          <tr>
+            <th>Account</th>
+            <th className="num">{currentLabel}</th>
+            {withCompare ? <th className="num m-hide">{compareLabel}</th> : null}
+            {withCompare ? <th className="num m-hide">Δ%</th> : null}
+            {pctBase ? <th className="num m-hide">% Rev</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {blocks.map((b, i) =>
+            b.kind === 'section' ? (
+              <SectionRows
+                key={b.section.key}
+                section={b.section}
+                collapsed={collapsed}
+                openTxns={openTxns}
+                onToggleGroup={(code) => toggle(collapsed, code, setCollapsed)}
+                onToggleTxns={(code) => toggle(openTxns, code, setOpenTxns)}
+                pctBase={pctBase}
+                colCount={colCount}
+                withCompare={withCompare}
+                search={search}
+                hitSet={hitSet}
+                activeCode={activeCode}
+                forceOpen={forceOpen}
+              />
+            ) : (
+              <tr
+                key={`summary-${i}`}
+                className={
+                  b.row.emphasis === 'strong'
+                    ? 'row-summary-strong border-t-2 border-hairline'
+                    : 'row-summary border-t border-hairline'
+                }
+              >
+                <td className={`font-serif italic ${b.row.emphasis === 'strong' ? 'text-ink font-semibold' : 'text-ink font-medium'}`}>
+                  {b.row.label}
+                  {b.row.sub ? (
+                    <span className="ml-2 font-mono not-italic text-[11px] text-graphite">{b.row.sub}</span>
+                  ) : null}
+                </td>
+                <td
+                  className={`num ${b.row.emphasis === 'strong' ? 'font-semibold' : 'font-medium'} ${
+                    b.row.tone === 'auto'
+                      ? b.row.current >= 0
+                        ? 'text-ledger'
+                        : 'text-danger'
+                      : b.row.tone === 'ledger'
+                        ? 'text-ledger'
+                        : b.row.tone === 'danger'
+                          ? 'text-danger'
+                          : ''
+                  }`}
+                >
+                  {b.row.current < 0 ? <span className="neg">{money(b.row.current)}</span> : money(b.row.current)}
+                </td>
+                {withCompare ? (
+                  <td className="num text-graphite m-hide">
+                    {b.row.previous < 0 ? <span className="neg">{money(b.row.previous)}</span> : money(b.row.previous)}
+                  </td>
+                ) : null}
+                {withCompare ? (
+                  <td className="num text-graphite m-hide">{deltaPct(b.row.current, b.row.previous)}</td>
+                ) : null}
+                {pctBase ? (
+                  <td className="num text-graphite m-hide">{pctOf(b.row.current, pctBase.current)}</td>
+                ) : null}
+              </tr>
+            ),
+          )}
+        </tbody>
+      </table>
+  )
+
+  if (controls === 'row') {
+    const compareChoices = Array.from({ length: 12 }, (_, i) => stepMonth(period, -(i + 1)))
+    const monthName = (ym: string) => dayjs(`${ym}-01`).format('MMM YYYY')
+    return (
+      <div>
+        <div className="rpt-toolbar" role="group" aria-label="Report controls">
+          <div className="rpt-field">
+            <span>{periodLabel}</span>
+            <div className="rpt-range">
+              <button type="button" className="rpt-step" onClick={() => navigate(stepMonth(period, -1), compare, segment)} aria-label="Previous month">
+                ‹
+              </button>
+              <input type="month" aria-label={periodLabel} value={period} onChange={(e) => e.target.value && navigate(e.target.value, compare, segment)} />
+              <button type="button" className="rpt-step" onClick={() => navigate(stepMonth(period, 1), compare, segment)} aria-label="Next month">
+                ›
+              </button>
+            </div>
+          </div>
+          <div className="rpt-field">
+            <span>Compare</span>
+            <select aria-label="Compare" value={compare} onChange={(e) => navigate(period, e.target.value, segment)}>
+              <option value="">No compare</option>
+              {compare && !compareChoices.includes(compare) ? <option value={compare}>{monthName(compare)}</option> : null}
+              {compareChoices.map((ym) => (
+                <option key={ym} value={ym}>
+                  {monthName(ym)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="rpt-field rpt-find">
+            <span>Find account</span>
+            <div className="rpt-find-box">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    stepHit(e.shiftKey ? -1 : 1)
+                  } else if (e.key === 'Escape') {
+                    setSearch('')
+                  }
+                }}
+                placeholder="Code or name…"
+                aria-label="Find account by code or name"
+                className="search-plain"
+              />
+              {search.trim() ? (
+                <>
+                  <small>{hitCodes.length === 0 ? 'No match' : `${activeHit + 1} / ${hitCodes.length}`}</small>
+                  {hitCodes.length > 0 ? (
+                    <>
+                      <button type="button" className="rpt-step" onClick={() => stepHit(-1)} aria-label="Previous match">
+                        ‹
+                      </button>
+                      <button type="button" className="rpt-step" onClick={() => stepHit(1)} aria-label="Next match">
+                        ›
+                      </button>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </div>
+          {segments.length > 0 ? (
+            <div className="rpt-field">
+              <span>Segment</span>
+              <select aria-label="Segment" value={segment} onChange={(e) => navigate(period, compare, e.target.value)}>
+                {segments.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          <div className="rpt-field">
+            <span>Detail level</span>
+            <div className="rpt-levels">
+              {([
+                [1, 'Top accounts only'],
+                [2, 'All account levels'],
+                [3, 'Everything incl. transactions'],
+              ] as const).map(([l, title]) => (
+                <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)} title={title}>
+                  L{l}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="min-w-0 overflow-x-auto">{table}</div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -366,80 +554,7 @@ export default function GlReportView({
 
       {/* ── Statement table ── */}
       <div className="flex-1 min-w-0 overflow-x-auto">
-      <table className={`ledger-table gl-report${skin === 'cf' ? ' cf-report' : ''}`}>
-        <thead>
-          <tr>
-            <th>Account</th>
-            <th className="num">{currentLabel}</th>
-            {withCompare ? <th className="num m-hide">{compareLabel}</th> : null}
-            {withCompare ? <th className="num m-hide">Δ%</th> : null}
-            {pctBase ? <th className="num m-hide">% Rev</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {blocks.map((b, i) =>
-            b.kind === 'section' ? (
-              <SectionRows
-                key={b.section.key}
-                section={b.section}
-                collapsed={collapsed}
-                openTxns={openTxns}
-                onToggleGroup={(code) => toggle(collapsed, code, setCollapsed)}
-                onToggleTxns={(code) => toggle(openTxns, code, setOpenTxns)}
-                pctBase={pctBase}
-                colCount={colCount}
-                withCompare={withCompare}
-                search={search}
-                hitSet={hitSet}
-                activeCode={activeCode}
-                forceOpen={forceOpen}
-              />
-            ) : (
-              <tr
-                key={`summary-${i}`}
-                className={
-                  b.row.emphasis === 'strong'
-                    ? 'row-summary-strong border-t-2 border-hairline'
-                    : 'row-summary border-t border-hairline'
-                }
-              >
-                <td className={`font-serif italic ${b.row.emphasis === 'strong' ? 'text-ink font-semibold' : 'text-ink font-medium'}`}>
-                  {b.row.label}
-                  {b.row.sub ? (
-                    <span className="ml-2 font-mono not-italic text-[11px] text-graphite">{b.row.sub}</span>
-                  ) : null}
-                </td>
-                <td
-                  className={`num ${b.row.emphasis === 'strong' ? 'font-semibold' : 'font-medium'} ${
-                    b.row.tone === 'auto'
-                      ? b.row.current >= 0
-                        ? 'text-ledger'
-                        : 'text-danger'
-                      : b.row.tone === 'ledger'
-                        ? 'text-ledger'
-                        : b.row.tone === 'danger'
-                          ? 'text-danger'
-                          : ''
-                  }`}
-                >
-                  {b.row.current < 0 ? <span className="neg">{money(b.row.current)}</span> : money(b.row.current)}
-                </td>
-                {withCompare ? (
-                  <td className="num text-graphite m-hide">
-                    {b.row.previous < 0 ? <span className="neg">{money(b.row.previous)}</span> : money(b.row.previous)}
-                  </td>
-                ) : null}
-                {withCompare ? (
-                  <td className="num text-graphite m-hide">{deltaPct(b.row.current, b.row.previous)}</td>
-                ) : null}
-                {pctBase ? (
-                  <td className="num text-graphite m-hide">{pctOf(b.row.current, pctBase.current)}</td>
-                ) : null}
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
+      {table}
       </div>
     </div>
   )
