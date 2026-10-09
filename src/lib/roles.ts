@@ -119,6 +119,16 @@ export function canAccessTeam(u: PermissionHolder): boolean {
   return can(u, 'team')
 }
 
+/**
+ * People Management and Hierarchy open (2026-10-10, PR4b): the `team` key —
+ * HR and the Principal, who read the staff table itself — or Team · View held
+ * without the Salary tick (`team_directory`: the Executive office, a
+ * Department head), who read it through the directory (lib/team-directory.ts).
+ */
+export function canOpenPeople(u: PermissionHolder): boolean {
+  return can(u, 'team', 'team_directory')
+}
+
 export function canAccessAuditLog(u: PermissionHolder): boolean {
   // The whole history, and Audit Log › Access (who read what).
   return can(u, 'audit_log')

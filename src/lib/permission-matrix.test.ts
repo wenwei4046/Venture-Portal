@@ -79,6 +79,8 @@ const CELL_KEYS: CellKey[] = [
   K('director_salary', 'view', 'director_salary', 'all', 'salary'),
   K('director_pool', 'view', 'director_pool', 'all', 'salary'),
   K('team', 'view', 'team', 'all', 'salary'),
+  // People without the staff table (20261010010000, PR4b): Team · View at any reach, no gate.
+  K('team', 'view', 'team_directory', 'own'),
   K('accounts', 'create', 'team_invite', 'all', 'principal'),
   K('accounts', 'manage', 'permissions_manage', 'all', 'principal'),
   K('member', 'manage', 'member_requests_manage', 'all'),
@@ -282,14 +284,16 @@ describe('one person', () => {
 describe('what a template opens today — the database rule, in TypeScript', () => {
   const opens = (key: keyof typeof T) => openedKeys(T[key].grants, T[key].sensitive, T[key].baseRole, CELL_KEYS)
 
-  it('Ultimate and Full are the Principal role (and My Billing and the queue); only Ultimate switches views', () => {
-    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing', 'view_switch'].sort())
-    expect(opens('full')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing'].sort())
+  it('Ultimate and Full are the Principal role (and My Billing, the queue and the directory); only Ultimate switches views', () => {
+    expect(opens('ultimate')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing', 'team_directory', 'view_switch'].sort())
+    expect(opens('full')).toEqual([...PRINCIPAL, 'approvals_queue', 'my_billing', 'team_directory'].sort())
   })
 
-  it('the checker, the department head and the Revenue team are their old roles exactly', () => {
+  it('the checker and the Revenue team are their old roles exactly; the department head also reads People', () => {
     expect(opens('fin_checker')).toEqual(FINANCE)
-    expect(opens('dept_head')).toEqual(DEPT_MANAGER)
+    // PR4b (2026-10-10): Team · View at Dept opens the directory — its own
+    // department's roster and the company chart, never the staff table.
+    expect(opens('dept_head')).toEqual([...DEPT_MANAGER, 'team_directory'].sort())
     expect(opens('revenue_team')).toEqual(REVENUE_MEMBER)
   })
 
@@ -297,19 +301,20 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     // The queue's own key (2026-10-09) opens for Approvals · View; the admin-scope
     // `approvals` key still needs an owner's template.
     expect(opens('director')).toEqual(['approvals_queue', 'claims', 'dashboard', 'dept_reports', 'director_pool', 'director_salary',
-      'payroll_payouts', 'reports', 'salary_individual', 'team', 'treasury', 'venture_pool'])
-    expect(opens('office')).toEqual(['approvals_queue', 'claims', 'dashboard'])
+      'payroll_payouts', 'reports', 'salary_individual', 'team', 'team_directory', 'treasury', 'venture_pool'])
+    // Team · View without Salary amounts: the directory, not the `team` key (PR4b).
+    expect(opens('office')).toEqual(['approvals_queue', 'claims', 'dashboard', 'team_directory'])
     expect(opens('staff')).toEqual(['claims', 'dashboard'])
     expect(opens('hr')).toEqual(['claims', 'dashboard', 'director_pool', 'director_salary', 'hr_costing',
-      'member_memos_manage', 'member_requests_manage', 'payroll_payouts', 'revenue', 'salary_individual', 'team'])
+      'member_memos_manage', 'member_requests_manage', 'payroll_payouts', 'revenue', 'salary_individual', 'team', 'team_directory'])
   })
 
   it('says why, cell by cell', () => {
     const held = (key: keyof typeof T) => heldCells(T[key].grants, T[key].sensitive, T[key].baseRole, CELL_KEYS, FUNCTIONS)
-    expect(held('office').map(h => h.key)).toEqual(['team.view', 'reports.view'])
-    expect(held('office').find(h => h.key === 'team.view')?.reason).toMatch(/Salary amounts/)
+    // Team · View is in force without Salary amounts since PR4b (the directory).
+    expect(held('office').map(h => h.key)).toEqual(['reports.view'])
     expect(held('office').find(h => h.key === 'reports.view')?.reason).toMatch(/Treasury · View/)
-    expect(held('dept_head').map(h => h.key)).toEqual(['team.view', 'claims.approve'])
+    expect(held('dept_head').map(h => h.key)).toEqual(['claims.approve'])
     expect(held('dept_head')[0].reason).toMatch(/^Dept is not enforced/)
     // Since PR2 a write asks for its cell: Treasury · Approve (amending a booked
     // loan) is in force wherever Treasury opens, and since approvals go by

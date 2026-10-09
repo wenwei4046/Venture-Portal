@@ -169,8 +169,10 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {/* The edit form is built around pay, so it is offered only to a
-                  viewer whose title ticks Salary amounts (2026-10-09, PR4). */}
-              {person && !editing && person.canSee.salary ? (
+                  viewer whose title ticks Salary amounts (2026-10-09, PR4) —
+                  and holds Team · Edit (2026-10-10, PR4b: a directory reader
+                  opens the card to read it). */}
+              {person && !editing && person.can.edit ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -231,7 +233,7 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
           ) : !person ? (
             <p className="text-sm pb-5">Reading their record…</p>
           ) : tab === 'details' ? (
-            editing ? (
+            editing && person.can.edit ? (
               <EditStaffForm
                 staff={person.staff}
                 titles={person.titles}
@@ -247,7 +249,7 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
             ) : (
               <div className="pb-5">
                 <Details person={person} />
-                {person.active ? (
+                {person.active && person.can.promote ? (
                   <Promotion
                     personId={person.staff.id}
                     personName={person.staff.employee_name}
@@ -260,15 +262,17 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
                     }}
                   />
                 ) : null}
-                <Employment
-                  personId={person.staff.id}
-                  personName={person.staff.employee_name}
-                  active={person.active}
-                  onDone={() => {
-                    void load()
-                    router.refresh()
-                  }}
-                />
+                {person.can.promote ? (
+                  <Employment
+                    personId={person.staff.id}
+                    personName={person.staff.employee_name}
+                    active={person.active}
+                    onDone={() => {
+                      void load()
+                      router.refresh()
+                    }}
+                  />
+                ) : null}
               </div>
             )
           ) : tab === 'permissions' ? (
@@ -352,7 +356,7 @@ export default function PersonCard({ personId, startEditing, onClose, onInvite }
               >
                 Full page
               </Link>
-              {!person.account && person.active ? (
+              {!person.account && person.active && person.can.invite ? (
                 onInvite ? (
                   <button
                     type="button"

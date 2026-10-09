@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TeamHierarchyPage from './page'
 
+vi.mock('server-only', () => ({}))
+
 type Result = { data: unknown[] | null; error: { message: string } | null }
 const adapters = vi.hoisted(() => ({
   results: new Map<string, Result>(),
   calls: [] as Array<{ table: string; method: string; args: unknown[] }>,
   permission: vi.fn(),
+  rpc: vi.fn(),
 }))
 
 vi.mock('@/lib/auth', () => ({ requirePermission: adapters.permission }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
+    rpc: (fn: string, args?: unknown) => adapters.rpc(fn, args),
     from: (table: string) => {
       let from: number | undefined, to: number | undefined
       const query = {
@@ -38,10 +42,16 @@ function data(table: string, rows: unknown[]) {
   adapters.results.set(table, { data: rows, error: null })
 }
 
+/** HR: the roster's own key, every Team action. */
+const HR = { permissions: ['team'], actions: { 'team.view': 'all', 'team.create': 'all', 'team.edit': 'all', 'team.manage': 'all' } }
+/** A Department head: Team · View at Dept, no Salary tick — the directory (PR4b). */
+const HEAD = { permissions: ['dept_pool', 'team_directory'], actions: { 'team.view': 'dept' } }
+
 beforeEach(() => {
   vi.clearAllMocks()
   adapters.results.clear()
   adapters.calls = []
+  adapters.permission.mockResolvedValue(HR)
   const staff = (id: string, titleId: string, titleName: string, head = false) => ({
     id, employee_name: id, employee_code: id.toUpperCase(), reports_to: null,
     designation: null, title_id: titleId, department_id: 'revenue',
@@ -71,7 +81,9 @@ beforeEach(() => {
 describe('company hierarchy role loading', () => {
   it('passes separate role cards to the chart while keeping Table and Levels on the active roster', async () => {
     const view = await TeamHierarchyPage()
-    expect(adapters.permission).toHaveBeenCalledWith('team')
+    expect(adapters.permission).toHaveBeenCalledWith('team', 'team_directory')
+    expect(view.props).toMatchObject({ canEdit: true, chartOnly: false })
+    expect(adapters.rpc).not.toHaveBeenCalled()
     expect(view.props.people).toHaveLength(3)
     expect(view.props.chartPeople).toHaveLength(5)
     expect(view.props.titles[0].people).toBe(2)
@@ -103,5 +115,29 @@ describe('company hierarchy role loading', () => {
     expect(view.props.chartPeople).toHaveLength(5)
     expect(view.props.chartPeople.some((person: { id: string }) => person.id === 'ir-scheme:rachael')).toBe(true)
     expect(adapters.calls).toContainEqual({ table: 'comm_hierarchy', method: 'range', args: [1000, 1999] })
+  })
+
+  // PR4b (2026-10-10): Team · View without the Salary tick — the whole
+  // company's chart from team_org_chart(), names and titles, read only.
+  it('draws a directory reader the chart alone, from team_org_chart, without the staff table or Revenue\'s rows', async () => {
+    adapters.permission.mockResolvedValue(HEAD)
+    const person = (id: string, title: string, head = false, reportsTo: string | null = null) => ({
+      id, employee_name: id, employee_code: id.toUpperCase(), reports_to: reportsTo, designation: null, title_id: title,
+      department_id: 'revenue', titles: { name: title, level_id: head ? null : 'manager', is_department_head: head },
+      departments: { name: 'Revenue', payroll_source: 'commission' },
+    })
+    adapters.rpc.mockImplementation(async (fn: string) => fn === 'team_org_chart'
+      ? { data: {
+          people: [person('peter', 'Revenue Director', true), person('rachael', 'Team Leader'), person('chea', 'Team Leader', false, 'rachael')],
+          sub_departments: [{ id: 'fair', name: 'Fair', department_id: 'revenue', created_at: '2026-01-01' }],
+          directors: [{ staff_id: 'peter', sub_department_id: 'fair' }],
+        }, error: null }
+      : { data: null, error: { message: `unexpected rpc ${fn}` } })
+    const view = await TeamHierarchyPage()
+    expect(view.props).toMatchObject({ canEdit: false, chartOnly: true })
+    expect(view.props.chartPeople.map((p: { id: string }) => p.id).sort()).toEqual(['chea', 'peter', 'rachael'])
+    // The top of the tree hangs from the sub-department's director, as on HR's chart.
+    expect(view.props.chartPeople.find((p: { id: string }) => p.id === 'rachael')).toMatchObject({ leadIds: ['peter'] })
+    expect(adapters.calls.some(c => c.table === 'hr_staff_costs' || c.table.startsWith('comm_'))).toBe(false)
   })
 })

@@ -4,6 +4,19 @@ Overview
 9 Modules + Settings + Approval (横切)
 Permission Types: 看 (Read), 写 (Write), 批 (Approve), 设定 (Configure)
 ---
+⚡ AMENDMENT 2026-10-10 — Team · View without the Salary tick opens People (PR4b)
+The Executive office (Team · View at All) and the Department head (Team · View at
+Dept) templates hold Team · View without Salary amounts, so People stayed shut for
+them: the roster's `team` key reads the staff table, pay columns and all. They now
+read People through two database readers, never the table (the user chose 1b / 2b):
+People Management and a person's page show the rows their reach covers — All:
+everybody, Dept: their own department, Own: themselves — with everything but pay
+(blank without Salary amounts) and NRIC / account numbers (•••• without their
+ticks); Hierarchy shows the whole company's org chart, names and titles only, read
+only (no Table, Levels or Roles). Nothing writes: Team · Create / Edit / Manage still
+need the `team` key. No account that signs in today changes: nobody holding one of
+those two titles has a login yet. Mig `20261010010000`.
+---
 ⚡ AMENDMENT 2026-10-09 — The database asks for the action on a read too (PR3d)
 A table used to be readable by anybody holding any key of its area (Treasury, HR or
 Admin), through the API even where no page of theirs reads it: Revenue alone opened

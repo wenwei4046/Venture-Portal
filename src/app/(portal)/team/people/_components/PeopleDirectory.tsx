@@ -63,6 +63,8 @@ interface Props {
    * reader who may not invite.
    */
   onInvite?: (staffId: string) => void
+  /** Team · Edit with the Salary tick: the row's pencil (2026-10-10, PR4b — a directory reader only reads). */
+  canEdit: boolean
 }
 
 const NO_DEPT = '— No department'
@@ -82,7 +84,7 @@ type StatusFilter = 'active' | 'inactive' | 'all'
  * the tint on their monogram and the more useful question is whether the login
  * is still being used.
  */
-export default function PeopleDirectory({ people, unattachedAccounts, canSeeActivity, onInvite }: Props) {
+export default function PeopleDirectory({ people, unattachedAccounts, canSeeActivity, onInvite, canEdit }: Props) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('active')
   const [folded, setFolded] = useState<Set<string>>(new Set())
@@ -400,29 +402,31 @@ export default function PeopleDirectory({ people, unattachedAccounts, canSeeActi
                               <LastSeen person={p} onInvite={onInvite} />
                             </td>
                             <td className="text-right">
-                              <button
-                                type="button"
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  setCard({ id: p.id, editing: true })
-                                }}
-                                className="icon-btn"
-                                title={`Edit ${p.name}`}
-                                aria-label={`Edit ${p.name}`}
-                              >
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.8"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="w-[15px] h-[15px]"
+                              {canEdit ? (
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    setCard({ id: p.id, editing: true })
+                                  }}
+                                  className="icon-btn"
+                                  title={`Edit ${p.name}`}
+                                  aria-label={`Edit ${p.name}`}
                                 >
-                                  <path d="M12 20h9" />
-                                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                                </svg>
-                              </button>
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="w-[15px] h-[15px]"
+                                  >
+                                    <path d="M12 20h9" />
+                                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                  </svg>
+                                </button>
+                              ) : null}
                             </td>
                           </LedgerRow>
                         ))

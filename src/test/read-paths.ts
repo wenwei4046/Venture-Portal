@@ -202,7 +202,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'reverse_voucher_pool_rows', 'revert_terms_change', 'rnp_invoice_events', 'save_revenue_payroll_row',
   'set_fund_source_min_pay_interest', 'set_fund_source_notes', 'set_fund_source_repayment_start', 'set_loan_funding_source',
   'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields', 'submit_dept_payment_request',
-  'submit_invoice_request', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
+  'submit_invoice_request', 'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
   'withdraw_pending_fund_source',
 ])
 

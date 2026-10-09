@@ -3,7 +3,9 @@
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
 import { requirePermission } from '@/lib/auth'
-import { canAccessAuditLog, canManagePermissions } from '@/lib/roles'
+import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
+import { canDo } from '@/lib/permission-actions'
+import { readDirectory, readOrgChart, readsStaffTable } from '@/lib/team-directory'
 import { navLabelByPath } from '@/components/layout/nav-config'
 import { describeActivity, type ActivityRow } from '@/lib/activity'
 import { ladderAllows, nextRung, type LadderTitle, type Rung } from '@/lib/ladder'
@@ -56,6 +58,13 @@ export interface PersonCardData {
    *  `staff` above already carries •••• where it does not; the edit form uses
    *  this to show those fields without sending them. */
   canSee: { salary: boolean; nric: boolean; bank: boolean }
+  /**
+   * What the viewer may do from the card (2026-10-10, PR4b): edit them (Team ·
+   * Edit, and the Salary tick — the form saves pay), promote or end their
+   * employment (Team · Edit), invite them (Logins & invites · Create). A
+   * directory reader — Team · View without the staff table — may none of it.
+   */
+  can: { edit: boolean; promote: boolean; invite: boolean }
 }
 
 /**
@@ -73,27 +82,40 @@ export interface PersonCardData {
  * would put them above their line manager, which the ladder refuses.
  */
 export async function getPersonCard(id: string): Promise<PersonCardData> {
-  const viewer = await requirePermission('team')
+  // The roster's own key — or Team · View without the Salary tick, which reads
+  // them through the directory, inside its reach (2026-10-10, PR4b).
+  const viewer = await requirePermission('team', 'team_directory')
   const supabase = await createClient()
+  const direct = readsStaffTable(viewer)
 
   // One read of the title table serves both the edit form's dropdown (every
   // title, active or not) and the ladder (active ones, with their rung).
-  const [{ data: staff }, { data: titleRows }, { data: levels }, privateFields] = await Promise.all([
-    supabase
-      .from('hr_staff_costs')
-      .select(
-        `${STAFF_ROW_COLUMNS}, departments(name, payroll_source, segment_key), titles(id, name, level_id, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)` as const,
-      )
-      .eq('id', id)
-      .maybeSingle(),
+  const [{ data: tableRow }, { data: titleRows }, { data: levels }, privateFields, directory] = await Promise.all([
+    direct
+      ? supabase
+          .from('hr_staff_costs')
+          .select(
+            `${STAFF_ROW_COLUMNS}, departments(name, payroll_source, segment_key), titles(id, name, level_id, template_id), users!hr_staff_costs_user_id_fkey(id, name, email, role, is_active, last_seen_at)` as const,
+          )
+          .eq('id', id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     supabase.from('titles').select('id, name, department_id, level_id, is_active').order('name'),
     supabase.from('title_levels').select('id, rank, name'),
     // NRIC and the account numbers, through the reader (2026-10-09, PR4).
-    readStaffPrivate(supabase, viewer, [id]),
+    direct
+      ? readStaffPrivate(supabase, viewer, [id])
+      : Promise.resolve(new Map<string, { nric: string | null; bank_account_no: string | null; bank_account_no_2: string | null }>()),
+    // The directory carries them itself, masked as the ticks say.
+    direct ? Promise.resolve([]) : readDirectory(supabase, viewer, [id]),
   ])
 
+  const directoryRow = directory[0] ?? null
+  const staff = tableRow ?? directoryRow
   if (!staff) throw new Error('That person is no longer on the roster.')
-  const priv = privateFields.get(id) ?? { nric: null, bank_account_no: null, bank_account_no_2: null }
+  const priv = directoryRow
+    ? { nric: directoryRow.nric, bank_account_no: directoryRow.bank_account_no, bank_account_no_2: directoryRow.bank_account_no_2 }
+    : (privateFields.get(id) ?? { nric: null, bank_account_no: null, bank_account_no_2: null })
   const seesSalary = sees(viewer, 'salary')
 
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -109,11 +131,16 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
   let reportsTo: string | null = null
   let manager: { name: string; title: string | null; levelId: string | null } | null = null
   if (row.reports_to) {
-    const { data: mgr } = await supabase
-      .from('hr_staff_costs')
-      .select('employee_name, status, titles(name, level_id)')
-      .eq('id', row.reports_to)
-      .maybeSingle()
+    // A directory reader's manager may stand outside their reach (a
+    // Department head's line runs up out of the department): the chart names
+    // everybody active, which is all the card says of a manager.
+    const { data: mgr } = direct
+      ? await supabase
+          .from('hr_staff_costs')
+          .select('employee_name, status, titles(name, level_id)')
+          .eq('id', row.reports_to)
+          .maybeSingle()
+      : { data: await managerFromChart(supabase, row.reports_to) }
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     const m = mgr as any
     if (m) {
@@ -128,7 +155,8 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     }
   }
 
-  const access = acct
+  // What their login may do: beside the roster's own key only.
+  const access = acct && direct
     ? await loadPersonAccess(
         supabase,
         { id: acct.id, role: acct.role },
@@ -260,5 +288,19 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
     canManagePermissions: canManagePermissions(viewer),
     activity,
     canSee: { salary: seesSalary, nric: sees(viewer, 'nric'), bank: sees(viewer, 'bank') },
+    can: {
+      edit: direct && canDo(viewer, 'team', 'edit') && seesSalary,
+      promote: direct && canDo(viewer, 'team', 'edit'),
+      invite: direct && canInviteUsers(viewer),
+    },
   }
+}
+
+/** The manager as the chart names them: active people only, an inactive one reads as nobody's line. */
+async function managerFromChart(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  managerId: string,
+): Promise<{ employee_name: string; status: string; titles: { name: string; level_id: string | null } | null } | null> {
+  const m = (await readOrgChart(supabase)).people.find(p => p.id === managerId)
+  return m ? { employee_name: m.employee_name, status: 'active', titles: m.titles ? { name: m.titles.name, level_id: m.titles.level_id } : null } : null
 }

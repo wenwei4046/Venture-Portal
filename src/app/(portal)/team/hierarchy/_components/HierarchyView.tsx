@@ -62,6 +62,8 @@ export default function HierarchyView({
   roleTitles,
   departments,
   canDeleteTitles,
+  canEdit,
+  chartOnly = false,
 }: {
   people: ChartPerson[]
   /** Includes extra scheme-specific roles; Table and Levels keep the roster. */
@@ -75,9 +77,17 @@ export default function HierarchyView({
   roleTitles: TitleRow[]
   departments: DepartmentOption[]
   canDeleteTitles: boolean
+  /** Team · Edit: the chart's lines may be dragged and redrawn. */
+  canEdit: boolean
+  /**
+   * Somebody who reads People through the directory (Team · View without the
+   * Salary tick, 2026-10-10, PR4b): the whole company's chart, names and
+   * titles only — no Table, Levels or Roles.
+   */
+  chartOnly?: boolean
 }) {
   const searchParams = useSearchParams()
-  const tab = hierarchyTab(searchParams.get('tab'))
+  const tab = chartOnly ? 'chart' : hierarchyTab(searchParams.get('tab'))
   // Who is lit up. Held here rather than in the canvas because it survives a
   // switch to the table and back, so somebody found by name is still found
   // after a detour.
@@ -87,12 +97,14 @@ export default function HierarchyView({
   // outside the department currently in focus.
   const [focusDept, setFocusDept] = useState<string>(ALL_DEPARTMENTS)
 
-  const tabs: TabItem[] = [
-    { key: 'chart', label: 'Org chart' },
-    { key: 'table', label: 'Table', count: people.length },
-    { key: 'levels', label: 'Levels' },
-    { key: 'roles', label: 'Roles', count: roleTitles.length },
-  ]
+  const tabs: TabItem[] = chartOnly
+    ? [{ key: 'chart', label: 'Org chart' }]
+    : [
+        { key: 'chart', label: 'Org chart' },
+        { key: 'table', label: 'Table', count: people.length },
+        { key: 'levels', label: 'Levels' },
+        { key: 'roles', label: 'Roles', count: roleTitles.length },
+      ]
 
   function goTo(key: string) {
     const params = new URLSearchParams(searchParams.toString())
@@ -174,6 +186,7 @@ export default function HierarchyView({
                 onFocus={setFocused}
                 focusDept={focusDept}
                 onFocusDept={setFocusDept}
+                canEdit={canEdit}
               />
             </>
           )}

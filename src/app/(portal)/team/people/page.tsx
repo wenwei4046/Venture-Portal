@@ -4,8 +4,9 @@ import { requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { can } from '@/lib/permissions'
 import { readStaffPrivate } from '@/lib/private-fields'
-import { onFile } from '@/lib/sensitive'
-import { loadPermissionsData } from '../_lib/permission-templates'
+import { onFile, sees } from '@/lib/sensitive'
+import { readDirectory, readsStaffTable } from '@/lib/team-directory'
+import { loadPermissionsData, type PermissionsData } from '../_lib/permission-templates'
 import type { PersonRow, AccountRow } from './_components/PeopleDirectory'
 import type { InviteCandidate } from './_components/InviteDrawer'
 import PeopleManagement from './_components/PeopleManagement'
@@ -38,6 +39,26 @@ interface OpenPosition {
     | null
 }
 
+/** A roster row, whichever way it was read: the staff table, or the directory (PR4b). */
+interface RosterRow {
+  id: string
+  employee_name: string
+  employee_code: string | null
+  designation: string | null
+  user_id: string | null
+  status: string | null
+  resignation_date: string | null
+  hire_date: string | null
+  title_id: string | null
+  reports_to: string | null
+  titles: { name: string; level_id: string | null; template_id: string | null } | null
+  departments: { name: string } | null
+  users: { email: string; is_active: boolean; last_seen_at: string | null } | null
+}
+
+/** Nothing to draw a template from: the directory's readers never see the Permissions tab. */
+const NO_PERMISSIONS: PermissionsData = { functions: [], cellKeys: [], templates: [], titles: [], logins: [] }
+
 /**
  * People Management — the roster, and a tab over, the permission templates
  * (2026-10-08, the Claude Design handoff: Permissions merged in from its own
@@ -54,9 +75,12 @@ export default async function PeopleManagementPage({
 }: {
   searchParams: Promise<{ template?: string; invite?: string }>
 }) {
-  const user = await requirePermission('team')
+  // The roster's own key — or Team · View without the Salary tick, which reads
+  // it through the directory instead of the table (2026-10-10, PR4b).
+  const user = await requirePermission('team', 'team_directory')
   const supabase = await createClient()
   const params = await searchParams
+  if (!readsStaffTable(user)) return <DirectoryPeople supabase={supabase} user={user} />
 
   const [{ data: staff }, { data: accounts }, { data: levels }, positions, permissions, privateFields] = await Promise.all([
     supabase
@@ -128,44 +152,9 @@ export default async function PeopleManagementPage({
     p_metadata: { staff_count: staff?.length ?? 0 },
   })
 
-  const rows: PersonRow[] = (staff ?? []).map(s => {
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    const r = s as any
-    const active = r.status !== 'inactive'
-    const priv = privateFields.get(r.id)
-    const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
-    const rank = rankByStaff.get(r.id) ?? null
-    return {
-      id: r.id,
-      name: r.employee_name,
-      code: r.employee_code ?? null,
-      // title_id is authoritative; designation is the free text it was
-      // backfilled from and still what the InfoTech import writes.
-      title: r.titles?.name ?? r.designation ?? null,
-      levelRank: rung?.rank ?? null,
-      levelName: rung?.name ?? null,
-      rankLabel: rank?.label ?? null,
-      rankRate: rank?.rate ?? null,
-      department: r.departments?.name ?? null,
-      active,
-      resignedOn: r.resignation_date ?? null,
-      accountEmail: r.users?.email ?? null,
-      accountActive: r.users?.is_active ?? null,
-      lastSeenAt: r.users?.last_seen_at ?? null,
-      // The three fields whose absence breaks something downstream: payroll
-      // needs an NRIC for the statutory files and an account number to pay
-      // into, and the InfoTech import matches on the hire date. Only asked of
-      // people still employed — a resigned row missing a bank account is not
-      // a chore anybody has to do.
-      missing: active
-        ? [
-            !onFile(priv?.nric) && 'NRIC',
-            !onFile(priv?.bank_account_no) && 'bank account',
-            !r.hire_date && 'hire date',
-          ].filter((x): x is string => typeof x === 'string')
-        : [],
-    }
-  })
+  const rows: PersonRow[] = untypedRows<RosterRow>(staff).map(r =>
+    personRow(r, rungs, rankByStaff.get(r.id) ?? null, privateFields.get(r.id)),
+  )
 
   const attached = new Set(rows.map(r => r.accountEmail).filter(Boolean))
   const unattached: AccountRow[] = (accounts ?? [])
@@ -214,13 +203,101 @@ export default async function PeopleManagementPage({
       unattachedAccounts={unattached}
       canSeeActivity={can(user, 'audit_log')}
       permissions={permissions}
+      showPermissions
       canManagePermissions={canDo(user, 'accounts', 'manage')}
       canSeeHistory={can(user, 'permissions_manage', 'audit_log')}
       canInvite={canDo(user, 'accounts', 'create')}
       canAddPeople={canDo(user, 'team', 'create')}
+      canEditPeople={canDo(user, 'team', 'edit') && sees(user, 'salary')}
       candidates={candidates}
       initialTemplateId={params.template && UUID.test(params.template) ? params.template : null}
       initialInvite={invite}
     />
   )
+}
+
+/**
+ * The roster for a Team · View holder who does not read the staff table — the
+ * Executive office (everybody), a Department head (their department): the
+ * directory's rows (lib/team-directory.ts), no unattached logins, no Rank
+ * column (the commission positions answer to Revenue), no Permissions tab.
+ * Nothing here writes: Team · Create / Edit still need the `team` key.
+ */
+async function DirectoryPeople({
+  supabase,
+  user,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>
+  user: Awaited<ReturnType<typeof requirePermission>>
+}) {
+  const [directory, { data: levels }] = await Promise.all([
+    readDirectory(supabase, user, null),
+    supabase.from('title_levels').select('id, rank, name'),
+  ])
+  const rungs = new Map(
+    ((levels ?? []) as Array<{ id: string; rank: number; name: string }>).map(l => [l.id, l]),
+  )
+  void supabase.rpc('log_data_access', {
+    p_resource_type: 'hr_staff_costs',
+    p_action: 'view',
+    p_metadata: { staff_count: directory.length, via: 'team_directory' },
+  })
+  return (
+    <PeopleManagement
+      people={directory.map(r => personRow(r, rungs, null, r))}
+      unattachedAccounts={[]}
+      canSeeActivity={can(user, 'audit_log')}
+      permissions={NO_PERMISSIONS}
+      showPermissions={false}
+      canManagePermissions={false}
+      canSeeHistory={false}
+      canInvite={false}
+      canAddPeople={false}
+      canEditPeople={false}
+      candidates={[]}
+      initialTemplateId={null}
+      initialInvite={null}
+    />
+  )
+}
+
+/** One roster row, as PeopleDirectory draws it — from either read. */
+function personRow(
+  r: RosterRow,
+  rungs: Map<string, { id: string; rank: number; name: string }>,
+  rank: { label: string; rate: number } | null,
+  priv: { nric: string | null; bank_account_no: string | null } | undefined,
+): PersonRow {
+  const active = r.status !== 'inactive'
+  const rung = r.titles?.level_id ? (rungs.get(r.titles.level_id) ?? null) : null
+  return {
+    id: r.id,
+    name: r.employee_name,
+    code: r.employee_code ?? null,
+    // title_id is authoritative; designation is the free text it was
+    // backfilled from and still what the InfoTech import writes.
+    title: r.titles?.name ?? r.designation ?? null,
+    levelRank: rung?.rank ?? null,
+    levelName: rung?.name ?? null,
+    rankLabel: rank?.label ?? null,
+    rankRate: rank?.rate ?? null,
+    department: r.departments?.name ?? null,
+    active,
+    resignedOn: r.resignation_date ?? null,
+    accountEmail: r.users?.email ?? null,
+    accountActive: r.users?.is_active ?? null,
+    lastSeenAt: r.users?.last_seen_at ?? null,
+    // The three fields whose absence breaks something downstream: payroll
+    // needs an NRIC for the statutory files and an account number to pay
+    // into, and the InfoTech import matches on the hire date. Only asked of
+    // people still employed — a resigned row missing a bank account is not
+    // a chore anybody has to do. (•••• counts as on file.)
+    missing: active
+      ? [
+          !onFile(priv?.nric) && 'NRIC',
+          !onFile(priv?.bank_account_no) && 'bank account',
+          !r.hire_date && 'hire date',
+        ].filter((x): x is string => typeof x === 'string')
+      : [],
+  }
 }

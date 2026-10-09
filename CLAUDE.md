@@ -2301,13 +2301,38 @@ three. `build_hr_cost_submission_payload` copies no number;
 production nobody's page changed — every login on a page that shows a number
 holds its tick (dry-run per login: same rows, same values through the readers,
 same `payment_cycle`); a Salary-only title read 29 NRICs and 29 accounts as
-`••••`, 0 digits. Team · View without the Salary tick (Executive office,
-Department head) still keeps People shut — the `team` key opens the raw staff
-table. TWO migrations so the deploy has no window: `20261009050000` (readers +
+`••••`, 0 digits. Team · View without the Salary tick opens People through the
+directory since PR4b (below). TWO migrations so the deploy has no window: `20261009050000` (readers +
 functions; columns still readable) before the code, `20261009050100` (the
 revoke; refuses to run without the readers) once the code is live.
 `tests/member-sql/validate-sensitive-fields.mjs`,
 `src/lib/private-columns.test.ts`.
+
+**PEOPLE WITHOUT THE SALARY TICK (2026-10-10, PR4b; the user chose 1b and
+2b).** The Executive office (Team · View at All) and the Department head (Team ·
+View at Dept) hold Team · View without Salary amounts, and the `team` key the
+People pages asked for opens `hr_staff_costs` itself — pay columns and all — so
+PR1's fail-closed rule kept People shut for both. They get a key of their own,
+`team_directory` (scope `none`: no domain, so no row policy ever opens for it;
+`permission_cell_keys` team.view → it at ANY reach, no gate; NOT a View key of
+Team — no `permission_key_actions` row — so Team · Create / Edit / Manage still
+need `team`), and read People through two DEFINER readers, never the table
+(`lib/team-directory.ts`; `readsStaffTable(user)` = the `team` key decides which
+path a page takes, `canOpenPeople` the sidebar): `team_directory(ids)` = the
+rows their Team · View reaches (All everybody, Dept their department, Own
+themselves; `current_actions()->>'team.view'`), every column named one by one
+(a column added later stays out) — 1b: everything but pay (NULL without Salary
+amounts) and NRIC / account numbers (•••• without their ticks, PR4's rule);
+`team_org_chart()` = every active person's name, code, title, department and
+line, plus the Revenue sub-departments and their directors (so a tree hangs from
+its director) — 2b: a Department head reads the whole company's chart, names
+and titles only. People Management (no unattached logins, no Rank column, no
+Permissions tab), the person page and its floating card (no Permissions /
+Activity, no Edit / Promote / Employment / Invite — `PersonCardData.can`) and
+Hierarchy (Org chart only, read only: `TeamOrgChart`'s `canEdit` = Team · Edit
+stops drag, line drawing and Detach) open for them. marketing@ (untemplated
+dept_manager) does NOT get it — no role default; a template is the way. Mig
+`20261010010000`, `tests/member-sql/validate-team-directory.mjs` (32).
 
 **PAGES ASK THE CELLS, NOT THE KIND (2026-10-09, Q7).** The KIND
 (`users.role`) is a template's hidden base_role and a custom template's cells

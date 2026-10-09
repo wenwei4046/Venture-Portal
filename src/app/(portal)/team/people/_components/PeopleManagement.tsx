@@ -21,11 +21,15 @@ interface Props {
   unattachedAccounts: AccountRow[]
   canSeeActivity: boolean
   permissions: PermissionsData
+  /** The Permissions tab: not for somebody who reads People through the directory (PR4b). */
+  showPermissions: boolean
   canManagePermissions: boolean
   canSeeHistory: boolean
   canInvite: boolean
   /** Team · Create — adding somebody, by hand or from InfoTech (2026-10-08, PR2). */
   canAddPeople: boolean
+  /** Team · Edit with the Salary tick — the roster's pencil (PR4b). */
+  canEditPeople: boolean
   candidates: InviteCandidate[]
   /** `?template=` — the template a Hierarchy › Roles link opens on. */
   initialTemplateId: string | null
@@ -45,16 +49,18 @@ export default function PeopleManagement({
   unattachedAccounts,
   canSeeActivity,
   permissions,
+  showPermissions,
   canManagePermissions,
   canSeeHistory,
   canInvite,
   canAddPeople,
+  canEditPeople,
   candidates,
   initialTemplateId,
   initialInvite,
 }: Props) {
   const searchParams = useSearchParams()
-  const tab = peopleTab(searchParams.get('tab'))
+  const tab = showPermissions ? peopleTab(searchParams.get('tab')) : 'people'
   const [notice, setNotice] = useState<string | null>(null)
   const [invite, setInvite] = useState<{ staffId: string | null } | null>(canInvite ? initialInvite : null)
 
@@ -80,7 +86,7 @@ export default function PeopleManagement({
 
   const tabs: TabItem[] = [
     { key: 'people', label: 'People', count: people.filter(p => p.active).length },
-    { key: 'permissions', label: 'Permissions', count: permissions.templates.length },
+    ...(showPermissions ? [{ key: 'permissions', label: 'Permissions', count: permissions.templates.length }] : []),
   ]
 
   return (
@@ -153,6 +159,7 @@ export default function PeopleManagement({
           unattachedAccounts={unattachedAccounts}
           canSeeActivity={canSeeActivity}
           onInvite={canInvite ? staffId => setInvite({ staffId }) : undefined}
+          canEdit={canEditPeople}
         />
       )}
 

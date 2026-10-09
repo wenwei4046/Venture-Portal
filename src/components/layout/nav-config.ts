@@ -28,6 +28,7 @@ import {
   canAccessSettings,
   canAccessTeam,
   canAccessTreasury,
+  canOpenPeople,
   canAccessVenturePool,
   canApprove,
   canSeeAuditChanges,
@@ -339,9 +340,11 @@ export function buildNavEntries(data: NavData): NavEntry[] {
     // Design handoff, the People Management revamp) both left the sidebar:
     // Permissions is People Management's second tab (permission templates),
     // Roles is Hierarchy's fourth. Their old addresses redirect there.
-    { href: '/team/people', label: 'People Management', section: 'People', visible: isHRorPrincipal },
+    // The roster's own key, or Team · View without the Salary tick — the
+    // directory (2026-10-10, PR4b: the Executive office, a Department head).
+    { href: '/team/people', label: 'People Management', section: 'People', visible: canOpenPeople },
     { href: '/member-admin', label: 'Member Services', section: 'People', visible: v => can(v, 'member_requests_manage') || can(v, 'member_memos_manage') },
-    { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: isHRorPrincipal },
+    { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: canOpenPeople },
 
     // ── Reports & Admin ──
     { href: '/reports/ledger', label: 'General Ledger', section: 'Reports & Admin', visible: canAccessReports },
