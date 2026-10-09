@@ -8,5 +8,10 @@ module.exports = {
     ["{v.ld.ownerName}'s customer · reply window open 20h 15m", "{v.ld.ownerName}'s customer{v.ld.windowNote}"],
     // The Principal / Director do reply — from Inbox, in the owner's CRM (crm_can_reply). This page only reads.
     ["View only · {v.ld.ownerFirst}'s customer. The Principal reads chats but doesn't reply.", "View only · {v.ld.ownerFirst}'s customer. To reply, open this chat from Inbox."],
+    // + and the camera (user 2026-10-09): a document, a photo — sent with the typed text as its caption.
+    ['<span style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#806B60" }}>',
+     '<span onClick={v.lx.attach} title="Send a file" style={{ flex: "none", width: "44px", height: "44px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#806B60" }}>'],
+    ['<span style={{ flex: "none", width: "38px", height: "44px", display: "grid", placeItems: "center", color: "#806B60" }}>',
+     '<span onClick={v.lx.photo} title="Send a photo" style={{ flex: "none", width: "38px", height: "44px", display: "grid", placeItems: "center", color: "#806B60" }}>'],
   ],
 };

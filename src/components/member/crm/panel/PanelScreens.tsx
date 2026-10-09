@@ -48,7 +48,15 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
     <PanelHead v={headVM(ctx)} />
     {tab === "overview" && !ui.lead && <PanelOverview v={overviewVM(ctx)} />}
     {tab === "inbox" && !ui.lead && <PanelInbox v={inboxVM(ctx)} />}
-    {!!ui.lead && <PanelLead v={leadVM(ctx)} />}
+    {!!ui.lead && (() => {
+      const lead = leadVM(ctx);
+      return (<>
+        <PanelLead v={lead} />
+        {/* The chat's + (a document) and camera (a photo) open these. */}
+        <input id="crm-panel-photo" type="file" accept="image/jpeg,image/png" onChange={lead.lx.pickMedia} style={{ display: "none" }} />
+        <input id="crm-panel-file" type="file" onChange={lead.lx.pickMedia} style={{ display: "none" }} />
+      </>);
+    })()}
     {tab === "ads" && <PanelAds v={adsVM(ctx)} />}
     {tab === "assign" && !ui.lead && <PanelAssign v={assignVM(ctx)} />}
     {tab === "calendar" && !ui.lead && <PanelCalendar v={calendarVM(ctx)} />}

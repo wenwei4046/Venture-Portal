@@ -67,7 +67,10 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
     clearTimeout(refs.panelToastT);
     refs.panelToastT = setTimeout(() => setPanelUi(u => (u.toast === text ? { ...u, toast: "" } : u)), 4000);
   }, [refs]);
-  const panelAct = useMemo(() => makePanelActions({ ...act, toast: panelToast }, { live, data: () => dataRef.current!, setData: setDataSafe }), [act, panelToast, live, setDataSafe]);
+  // The panel's own copy of the chat's actions, so what they say (a failed send, a 4 MB file) shows on the panel.
+  const panelAct = useMemo(() => makePanelActions(
+    makeSalesActions({ live, me: data?.viewerId ?? "", data: () => dataRef.current!, setData: setDataSafe, toast: panelToast }),
+    { live, data: () => dataRef.current!, setData: setDataSafe }), [panelToast, live, data?.viewerId, setDataSafe]);
 
   // Book visit greys a full slot: the showroom's booked counts around the chosen day.
   const book = ui.book, rooms = data?.rooms.filter(r => r.active) ?? [];

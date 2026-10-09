@@ -112,6 +112,14 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   return {
     inbox: on, viewOnly: false, draft, setDraft: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pDraft: v })); },
     send: has ? () => void send() : undefined, sendBg: has ? "#BD4A19" : "#D9C7BA",
+    // + = a document, the camera = a photo (PanelScreens' hidden pickers); the typed text goes as the caption.
+    attach: () => document.getElementById("crm-panel-file")?.click(),
+    photo: () => document.getElementById("crm-panel-photo")?.click(),
+    pickMedia: async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]; e.target.value = "";
+      if (!file || !c) return;
+      if (await act.sendMedia(c.id, file, draft.trim())) set(u => ({ ...u, pDraft: "" }));
+    },
     ph: c ? `Reply to ${first(c.name)}…` : "", sendIcon: has ? "M5 12h14m-6-6 6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3", sendTitle: has ? "Send" : "Voice note",
     chC: c?.channel === "messenger" ? "#2F6FB5" : "#1F7A4D", menuOpen: on && ui.pMenu, toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
     menu: [
