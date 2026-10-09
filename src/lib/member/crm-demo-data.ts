@@ -16,7 +16,7 @@ export function crmDemoData(you = "You", viewer = "a1"): CrmData {
     return {
       id: l.id, name: l.name, phone: l.phone.replace(/\D/g, ""), channel: (i % 3 === 1 ? "messenger" : "whatsapp") as "whatsapp" | "messenger",
       adId: l.campaign || null, ad: l.adName, status: l.status, ...(l.lost ? { lost: l.lost } : {}),
-      wonAmount: l.status === "won" ? 3280 : null, assignedTo: l.assignedTo ?? "a1", teamId: l.teamId ?? null,
+      wonAmount: l.status === "won" ? 3280 : null, assignedTo: l.assignedTo ?? null, teamId: l.teamId ?? null,
       lastCustomerAt: lastIn?.at ?? null, createdAt: l.createdAt, unread: l.unread,
       details: { type: "", size: "", loc: "", req: "", budget: "" }, detailsSaved: false,
       messages: msgs.map(m => ({ id: `${l.id}-${m.id}`, from: m.from as "lead" | "me", kind: "text", text: m.text, at: m.at, ...(m.from === "me" ? { status: "read" as const } : {}), ...(m.auto ? { auto: true } : {}) })),

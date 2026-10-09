@@ -22,9 +22,14 @@
   background: #FFFFFF;
   color: #3F2B22;
   font-family: Inter, var(--font-sans), sans-serif;
+  /* The prototype keeps the browser's own line height; the portal's body sets 1.55. */
+  line-height: normal;
   -webkit-font-smoothing: antialiased;
 }
-.app * { box-sizing: border-box; }
+/* The prototype keeps the browser's box sizing (content-box; the design says border-box inline where
+   it wants it). Tailwind and the member workspace switch everything to border-box, which shrinks every
+   bordered chip and box by its border. Doubled class: above .workspace *. */
+.app.app, .app.app *, .app.app ::before, .app.app ::after { box-sizing: revert; }
 .app a { color: #BD4A19; }
 .app a:hover { color: rgb(150 58 20); }
 /* Inputs take the design's look, not the browser's. */
@@ -32,6 +37,18 @@
 /* The portal sets headings in its serif; the design inherits Inter everywhere. */
 .app :where(h1, h2, h3, h4, p, strong, small, b, em, label, span, input, textarea) { font-family: inherit; }
 .app :where(h1, h2, h3, p) { font-size: inherit; line-height: inherit; }
+/* The portal, and the member workspace the CRM opens in (.workspace h2: line height 1.35,
+   letter spacing −0.02em), style headings; the design's inherit all three, as a browser's do
+   (where a heading wants its own, the design says so inline). Doubled class: above .workspace h2. */
+.app.app :is(h1, h2, h3, h4) { color: inherit; line-height: inherit; letter-spacing: inherit; }
+/* The workspace's other element rules, undone inside the CRM: an icon may shrink, focus is the browser's. */
+.app.app svg { flex-shrink: 1; }
+.app.app :is(button, a, input, select, textarea):focus-visible { outline: revert; outline-offset: revert; }
+/* Tailwind's reset greys every border; the browser's default — and the prototype's — is the text colour. */
+.app :where(*) { border-color: currentColor; }
+/* …and sets every border solid; the browser's is none until the design draws one (inline, always with
+   its style). Doubled class: above Tailwind's reset. */
+.app.app :where(*) { border-style: revert; border-width: revert; }
 .app ::-webkit-scrollbar { display: none; }
 /* On a wide screen the CRM keeps a phone's width, centred. */
 @media (min-width: 560px) {
