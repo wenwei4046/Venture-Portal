@@ -388,7 +388,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
           <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "4px" }}>
             <span style={{ alignSelf: "center", width: "36px", height: "4px", borderRadius: "2px", background: "#EBDDD2", marginBottom: "8px" }}>
             </span>
-            <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "700" }}>Move {v.cl.name} to</h2>
+            <h2 style={{ margin: "0", fontSize: "20px", fontWeight: "700" }}>{v.hm.moveTitle}</h2>
             {(v.hm.people).map((p, p_i) => (<Fragment key={p_i}>
               <div onClick={p.pick} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid #EBDDD2", cursor: "pointer" }}>
                 <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center", fontSize: "12px", fontWeight: "650" }}>{p.ini}</span>

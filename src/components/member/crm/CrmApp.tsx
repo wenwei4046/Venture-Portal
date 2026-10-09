@@ -158,6 +158,7 @@ export default function CrmApp({ live, salesperson, onExit }: { live: boolean; s
       rdMode: me.role === "hod",
       toPanel: () => { setHodMode("panel"); setViewing(null); },
       switchList: byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people),
+      assignTo: full ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
       onSwitch: id => { setViewing(id); setUi(u => ({ ...u, tab: "inbox", chat: null, filter: null, profSub: null })); },
       // Leaving someone's CRM goes back where it was opened: the Control panel, or one's own Profile.
       exitAs: () => { setViewing(null); setUi(u => ({ ...u, tab: full ? "inbox" : "profile", chat: null, filter: null })); },

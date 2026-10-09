@@ -85,6 +85,7 @@ export default function PanelLead({ v }: { v: LeadVM }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <span style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", display: "grid", placeItems: "center", fontSize: "17px", fontWeight: "650" }}>{v.ld.ini}</span>
                   <strong style={{ fontSize: "19px", fontWeight: "700" }}>{v.ld.name}</strong>
+                  <span onClick={v.lx.editInfo} style={{ marginLeft: "auto", height: "36px", padding: "0 16px", boxSizing: "border-box", borderRadius: "18px", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>Edit</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", borderRadius: "14px", border: "1px solid #EBDDD2" }}>
                   {(v.lx.info).map((r, r_i) => (<Fragment key={r_i}>

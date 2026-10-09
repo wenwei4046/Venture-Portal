@@ -33,6 +33,9 @@ import { overlaysVM } from "./vm/overlays";
 import { navVM } from "./vm/nav";
 import type { PanelCtx } from "./vm/common";
 import { useFollowNewest } from "../shared/stick";
+import SalesCustomerForm from "../sales/SalesCustomerForm";
+import { customerForm } from "../sales/vm/customer";
+import { DAY, day0 } from "../sales/vm/common";
 
 export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const { ui, set } = ctx;
@@ -45,6 +48,12 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   }, [undoOn, set]);
   const tab = ui.tab;
   useFollowNewest(ui.lead, ctx.data.customers.find(c => c.id === ui.lead)?.messages.length ?? 0);
+  // The salesperson's customer form: a first Book visit asks for the details, then goes on to the time.
+  const form = customerForm({
+    form: ui.pForm, data: ctx.data, saveDetails: ctx.act.saveDetails,
+    setForm: f => set(u => ({ ...u, pForm: typeof f === "function" ? (u.pForm ? f(u.pForm) : null) : f })),
+    onSaved: (c, edit) => set(u => ({ ...u, pForm: null, pBook: edit ? u.pBook : { customerId: c.id, room: 0, day: day0(ctx.now) + DAY, slot: null, view: "month" } })),
+  });
   return (<>
     <PanelBell v={bellVM(ctx)} />
     <PanelHead v={headVM(ctx)} />
@@ -54,6 +63,7 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
       const lead = leadVM(ctx);
       return (<>
         <PanelLead v={lead} />
+        <SalesCustomerForm v={form} />
         {/* The chat's + (a document) and camera (a photo) open these. */}
         <input id="crm-panel-photo" type="file" accept="image/jpeg,image/png" onChange={lead.lx.pickMedia} style={{ display: "none" }} />
         <input id="crm-panel-file" type="file" onChange={lead.lx.pickMedia} style={{ display: "none" }} />

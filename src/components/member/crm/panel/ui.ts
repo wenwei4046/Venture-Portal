@@ -1,3 +1,4 @@
+import type { CustomerForm } from "../sales/ui";
 /** The Control panel's screen state (design 1a) — what is open and typed, not data. */
 export type PanelTab = "overview" | "inbox" | "assign" | "calendar" | "profile" | "ads";
 export type Period = "day" | "week" | "month" | "custom";
@@ -28,6 +29,8 @@ export interface PanelUi {
   lead: string | null;
   pMenu: boolean;
   pInfo: boolean;
+  /** The customer form (Book visit step 1 of 2 for a customer with no details yet, or Customer info › Edit). */
+  pForm: CustomerForm | null;
   pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number] } | null;
   reSheet: boolean;
   pick: string;
@@ -69,7 +72,7 @@ export interface PanelUi {
 export const initialPanelUi = (): PanelUi => ({
   tab: "overview", period: "month", ovRange: null, cmp: null, cmpFold: false, ovSheet: null, openT: {},
   inbTeam: "", inbWho: "", pcOpen: false, pcQ: "",
-  lead: null, pMenu: false, pInfo: false, pBook: null, reSheet: false, pick: "", pDraft: "", toast: "",
+  lead: null, pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "", pDraft: "", toast: "",
   sendFor: null, sdSel: null, mvFor: null, mvSel: null, undo: null, movedRec: {}, adEd: null, ftEd: null, att: false, attF: "all", asgF: null,
   viewAs: false, vaQ: "", nfOpen: false, nfF: "", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null,
   cView: "list", cTeam: "all", cPerson: "", cpSheet: false, cDay: null, cGM: null, cRange: null, crSheet: null,

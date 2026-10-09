@@ -43,7 +43,7 @@ export function leadVM(ctx: PanelCtx) {
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? "#FFF0E4" : "#fff", bd: mine ? "#FFF0E4" : "#EBDDD2", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px" };
   });
   return {
-    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, toast: "", pMenu: false, pInfo: false, pBook: null, reSheet: false, pick: "" }),
+    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       windowNote: c && windowLeft(c, now) ? " " + windowLeft(c, now) : "",
@@ -67,7 +67,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const rooms = data.rooms.filter(r => r.active);
   const B = c && ui.pBook && ui.pBook.customerId === c.id ? ui.pBook : null;
   const T = day0(now);
-  const openBook = () => { if (c) patch({ pMenu: false, pBook: { customerId: c.id, room: 0, day: T + DAY, slot: null, view: "month" } }); };
+  const toBook = (id: string) => patch({ pMenu: false, pInfo: false, pForm: null, pBook: { customerId: id, room: 0, day: T + DAY, slot: null, view: "month" } });
+  // A first booking asks for the customer's details first (step 1 of 2), as the salesperson's does.
+  const openBook = () => { if (!c) return; if (c.detailsSaved) toBook(c.id); else patch({ pMenu: false, pInfo: false, pForm: { customerId: c.id, edit: false } }); };
   const setB = (p: Partial<NonNullable<typeof B>>) => set(u => (u.pBook ? { ...u, pBook: { ...u.pBook, ...p } } : u));
   const send = async () => {
     if (!c || !has) return;
@@ -130,6 +132,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     ],
     shareOpen: false, closeShare: NONE, shareList: [] as { name: string; role: string; ini: string; pick: () => void }[],
     infoOpen: on && ui.pInfo, closeInfo: () => patch({ pInfo: false }), info,
+    editInfo: () => { if (c) patch({ pInfo: false, pForm: { customerId: c.id, edit: true } }); },
     openBook, bookOpen: on && !!B, closeBook: () => patch({ pBook: null }),
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
     vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "#3F2B22", vWeekFg: book?.vWeekFg ?? "#806B60",

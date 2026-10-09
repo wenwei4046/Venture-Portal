@@ -4,7 +4,9 @@
  */
 import type { ChangeEvent } from "react";
 import type { CrmCustomer } from "@/lib/member/crm-data";
-import { CHANNEL, STATUS_LABEL, day0, type SalesCtx } from "./common";
+import type { CrmData } from "@/lib/member/crm-data";
+import type { CustomerForm } from "../ui";
+import { CHANNEL, STATUS_LABEL, day0, stop, type SalesCtx } from "./common";
 
 /** A Malaysian number as people write it: 60123456789 → 012-345 6789. */
 export function phoneLabel(raw: string): string {
@@ -36,10 +38,25 @@ const SIZES = ["3R 2R", "2R 1R", "2R 2R", "3R 3R", "4R 2R", "4R 3R", "4R 4R"];
 
 /** The customer form's fields and Save (the first booking goes on to choose a time). */
 export function customerFormVM(ctx: SalesCtx) {
-  const { ui, set, data, act } = ctx;
-  const f = ui.cform, c = f ? data.customers.find(x => x.id === f.customerId) : undefined;
+  const { set } = ctx;
+  return customerForm({
+    form: ctx.ui.cform, data: ctx.data, saveDetails: ctx.act.saveDetails,
+    setForm: f => set(u => ({ ...u, cform: typeof f === "function" ? (u.cform ? f(u.cform) : null) : f })),
+    // A first booking goes on to the time (step 2 of 2).
+    onSaved: (c, edit) => set(u => ({ ...u, cform: null, book: edit ? u.book : { customerId: c.id, room: 0, day: day0(new Date()), slot: null } })),
+  });
+}
+
+/** The form itself, for whichever screen holds it (the salesperson's chat and Contacts, the Control panel's chat). */
+export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
+  form: CustomerForm | null; data: CrmData;
+  saveDetails: SalesCtx["act"]["saveDetails"];
+  setForm: (f: CustomerForm | null | ((f: CustomerForm) => CustomerForm)) => void;
+  onSaved: (c: CrmCustomer, edit: boolean) => void;
+}) {
+  const c = f ? data.customers.find(x => x.id === f.customerId) : undefined;
   if (!f || !c) return {
-    cfOpen: false, cfClose: () => {}, cfStep: "", cfName: "", cfSetName: (_: ChangeEvent<HTMLInputElement>) => {}, cfPhone: "", cfSetPhone: (_: ChangeEvent<HTMLInputElement>) => {},
+    stop, cfOpen: false, cfClose: () => {}, cfStep: "", cfName: "", cfSetName: (_: ChangeEvent<HTMLInputElement>) => {}, cfPhone: "", cfSetPhone: (_: ChangeEvent<HTMLInputElement>) => {},
     cfType: [] as Chip[], cfSize: [] as Chip[], cfLoc: "", cfSetLoc: (_: ChangeEvent<HTMLInputElement>) => {}, cfReq: "", cfSetReq: (_: ChangeEvent<HTMLTextAreaElement>) => {},
     cfReqPh: "", cfBudget: "", cfSetBudget: (_: ChangeEvent<HTMLInputElement>) => {}, cfSave: undefined as undefined | (() => void), cfSaveBg: "#D9C7BA", cfSaveLabel: "",
   };
@@ -49,14 +66,14 @@ export function customerFormVM(ctx: SalesCtx) {
     if (k === "phone") return phoneLabel(c.phone);
     return c.details[k];
   };
-  const put = (p: Partial<NonNullable<typeof ui.cform>>) => set(u => (u.cform ? { ...u, cform: { ...u.cform, ...p } } : u));
+  const put = (p: Partial<CustomerForm>) => setForm(x => ({ ...x, ...p }));
   const chip = (k: "type" | "size", opts: string[]): Chip[] => opts.map(o => {
     const on = v(k) === o;
     return { label: o, pick: () => put({ [k]: on ? "" : o }), bg: on ? "#3F2B22" : "#fff", fg: on ? "#fff" : "#3F2B22", bd: on ? "#3F2B22" : "#EBDDD2" };
   });
   const ok = !!v("name").trim();
   return {
-    cfOpen: true, cfClose: () => set(u => ({ ...u, cform: null })),
+    stop, cfOpen: true, cfClose: () => setForm(null),
     cfStep: f.edit ? "" : "Step 1 of 2",
     cfName: v("name"), cfSetName: (e: ChangeEvent<HTMLInputElement>) => put({ name: e.target.value }),
     cfPhone: v("phone"), cfSetPhone: (e: ChangeEvent<HTMLInputElement>) => put({ phone: e.target.value }),
@@ -66,11 +83,10 @@ export function customerFormVM(ctx: SalesCtx) {
     cfBudget: v("budget"), cfSetBudget: (e: ChangeEvent<HTMLInputElement>) => put({ budget: e.target.value.replace(/[^\d,.\s–-]/g, "") }),
     cfSaveBg: ok ? "#BD4A19" : "#D9C7BA", cfSaveLabel: f.edit ? "Save" : "Save & choose a time",
     cfSave: ok ? async () => {
-      const saved = await act.saveDetails(c.id, { name: v("name"), phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget") });
-      if (!saved) return;
-      // A first booking goes on to the time (step 2 of 2).
-      set(u => ({ ...u, cform: null, book: f.edit ? u.book : { customerId: c.id, room: 0, day: day0(new Date()), slot: null } }));
+      const saved = await saveDetails(c.id, { name: v("name"), phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget") });
+      if (saved) onSaved(c, f.edit);
     } : undefined,
   };
 }
+export type CustomerFormVM = ReturnType<typeof customerForm>;
 interface Chip { label: string; pick: () => void; bg: string; fg: string; bd: string }

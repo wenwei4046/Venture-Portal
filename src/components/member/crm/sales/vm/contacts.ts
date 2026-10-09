@@ -30,7 +30,7 @@ export function contactsVM(ctx: SalesCtx) {
     const cancel = (e?: { stopPropagation(): void }) => { e?.stopPropagation(); patch({ rename: null }); };
     const sx = sw ? sw.x : 0;
     return {
-      head, name: c.name, ini: ini(c.name), status: STATUS_LABEL[c.status], phone: phoneLabel(c.phone) || "—", tel: telHref(c.phone),
+      head, name: c.name, ini: ini(c.name), status: STATUS_LABEL[c.status], phone: phoneLabel(c.phone) || "—", tel: telHref(c.phone), hasTel: !!c.phone.replace(/D/g, ""),
       sx, sTrans: sw && sw.drag ? "none" : "transform 220ms ease", actOp: sx < -4 ? 1 : 0,
       open: () => { if (refs.moved) { refs.moved = false; return; } if (sw) { patch({ cSwipe: null }); return; } if (!ui.rename) patch({ cInfo: c.id, cSwipe: null }); },
       sDown: (e: PEvent) => { if (ui.rename) return; refs.cs = { id: c.id, x0: e.clientX, b: sx }; refs.moved = false; },
@@ -63,7 +63,7 @@ export function contactsVM(ctx: SalesCtx) {
   const ci = ui.cInfo ? data.customers.find(c => c.id === ui.cInfo) : undefined;
   return {
     cq: ui.cq, setCq: (e: ChangeEvent<HTMLInputElement>) => patch({ cq: e.target.value }),
-    contacts, contactsEmpty: !contacts.length, stop,
+    contacts, contactsEmpty: !contacts.length, // stop comes with the customer form below
     azIndex: AZ.map((l, k) => ({
       l, color: have.has(l) ? "#BD4A19" : "#C9B5A8",
       go: (e: MouseEvent<HTMLElement>) => {

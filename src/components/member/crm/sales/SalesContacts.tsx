@@ -164,12 +164,12 @@ export default function SalesContacts({ v }: { v: ContactsVM }) {
                     </>)}
                   </span>
                 </div>
-                <a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#387557", textDecoration: "none" }}>
+                {!!p.hasTel && (<a href={p.tel} title={`Call ${p.name}`} style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", display: "grid", placeItems: "center", color: "#387557", textDecoration: "none" }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z">
                     </path>
                   </svg>
-                </a>
+                </a>)}
               </div>
             </div>
           </Fragment>))}
