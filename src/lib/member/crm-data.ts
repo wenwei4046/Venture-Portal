@@ -131,8 +131,42 @@ export interface CrmAdRule { adId: string; label: string; mode: "even" | "split"
 /** Full time lead allocation for one team: on these weekdays (0 = Monday) the full-time RS take their maximum or % first. */
 export interface CrmFtRule { tlId: string; mode: "cnt" | "pct"; days: number[]; vals: Record<string, Record<string, number>> }
 
+/**
+ * What the signed-in person may do in the CRM — their CRM cells in the
+ * permission matrix (crm_my_can, mig 20261010030000). The database refuses
+ * the rest whatever the screens draw; the screens only stop offering it.
+ */
+export interface CrmCan {
+  /** CRM · View at All: everybody's customers — the Control panel. */
+  viewAll: boolean;
+  /** CRM · Edit at Own: work their own line's customers. */
+  editOwn: boolean;
+  /** CRM · Edit at All: act in anybody's chat. */
+  editAll: boolean;
+  /** CRM · Manage: assignment, ads, full time, showrooms. */
+  manage: boolean;
+}
+
+/**
+ * Before the database answered (a page left open across the release): what the
+ * CRM role gave until 2026-10-10 — the Boss and the HOD everything, a
+ * salesperson their own line.
+ */
+export function canFromRole(role: CrmRole | null): CrmCan {
+  if (role === "boss" || role === "hod") return { viewAll: true, editOwn: true, editAll: true, manage: true };
+  return { viewAll: false, editOwn: !!role, editAll: false, manage: false };
+}
+
+export function canFrom(value: unknown, role: CrmRole | null): CrmCan {
+  if (!value || typeof value !== "object") return canFromRole(role);
+  const v = value as Record<string, unknown>;
+  return { viewAll: v.viewAll === true, editOwn: v.editOwn === true, editAll: v.editAll === true, manage: v.manage === true };
+}
+
 export interface CrmData {
   viewerId: string | null;
+  /** Their CRM cells (crm_my_can). */
+  can: CrmCan;
   setup: "not_linked" | "no_role" | null;
   people: CrmPerson[];
   customers: CrmCustomer[];
@@ -225,6 +259,8 @@ export interface CrmDataRows {
   staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null }[];
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string }[];
   ftRules: { tl_id: string; mode: "cnt" | "pct"; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
+  /** crm_my_can()'s answer; null when the database did not give one. */
+  can?: unknown;
 }
 
 /* ── Rows → screens ────────────────────────────────────────────────────── */
@@ -315,6 +351,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
   for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
   return {
     viewerId: rows.people.role ? rows.people.me : null,
+    can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
     people: rows.people.people.map(p => ({ id: p.id, name: p.name, role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "" })),
     customers: rows.contacts.map(c => customerFromRow(c, rows.messages)),

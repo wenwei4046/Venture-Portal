@@ -49,7 +49,7 @@ export function overviewVM(ctx: PanelCtx) {
     exitApp: ctx.exitApp,
     meIni: ini(me.name), meFirst: me.role === "boss" ? "Principal" : first(me.name), meTitle: me.role === "boss" ? "Principal" : jobTitle(me),
     todayLabel: gb(now, { weekday: "short", day: "numeric", month: "short" }),
-    rdToggle: me.role === "hod", rdPanelBg: "#fff", rdPanelFg: "#3F2B22", rdPanelSh: "0 1px 3px rgba(63,43,34,.14)",
+    rdToggle: !!ctx.toMyCrm, rdPanelBg: "#fff", rdPanelFg: "#3F2B22", rdPanelSh: "0 1px 3px rgba(63,43,34,.14)",
     rdCrmBg: "transparent", rdCrmFg: "#806B60", rdCrmSh: "none", toPanel: () => {}, toCrm: () => ctx.toMyCrm?.(),
     heroLabel: isC && ui.ovRange ? `${gb(ui.ovRange.a, { day: "numeric", month: "short" })} – ${gb(ui.ovRange.b, { day: "numeric", month: "short" })}` : { day: "Today", week: "This week", month: gb(now, { month: "long" }), custom: "" }[ui.period],
     all: { leads: all.leads, rate: pct(all.booked, all.leads), booked: all.booked },

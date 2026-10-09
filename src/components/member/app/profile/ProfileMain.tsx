@@ -26,7 +26,7 @@ export interface ProfileMainActions {
 }
 
 /** Profile — the peach card, Your workspace, Privacy and Sign out (lines 1132–1187). */
-export default function ProfileMain({ vm, hidden, actions }: { vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions }) {
+export default function ProfileMain({ vm, hidden, actions, crm = true }: { vm: ProfileMainVM; hidden: boolean; actions: ProfileMainActions; crm?: boolean }) {
   return (
     <div className={s.main}>
       <div className={s.glow} />
@@ -66,7 +66,8 @@ export default function ProfileMain({ vm, hidden, actions }: { vm: ProfileMainVM
       <div className={s.body}>
         <section className={s.work}>
           <h2 className={s.h2}>Your workspace</h2>
-          {ROWS.map(r => (
+          {/* My leads & appointments: only for an account the CRM is open to (CRM · View, 2026-10-10). */}
+          {ROWS.filter(r => r.key !== "crm" || crm).map(r => (
             <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.7} /></span>
               <span className={s.workText}>

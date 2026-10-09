@@ -174,7 +174,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'amend_loan_from', 'amend_loan_repayment', 'amend_loan_repayment_date', 'amend_voucher_date', 'approve_dept_payment_expense',
   'approve_payroll_run', 'approve_single_voucher', 'approve_voucher_batch', 'approve_voucher_batch_partial', 'audit_changes', 'audit_overview',
   // The CRM (crm-actions.ts): each asks who may first — crm_me / crm_can_reply / crm_sees_all, the IR scope (migs 20261002*–20261009230000).
-  'crm_can_reply', 'crm_people', 'crm_record_out', 'crm_record_reply', 'crm_set_reaction',
+  'crm_can_reply', 'crm_my_can', 'crm_people', 'crm_record_out', 'crm_record_reply', 'crm_set_reaction',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',

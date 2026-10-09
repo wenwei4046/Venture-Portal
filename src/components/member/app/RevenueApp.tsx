@@ -85,6 +85,8 @@ export interface RevenueAppProps {
   children?: ReactNode;
   /** Shows the Product List in the sidebar — only for an account holding `product_list`. */
   productList?: ProductListAccess | null;
+  /** Profile › My leads & appointments: the account holds CRM · View (2026-10-10). Previews keep it. */
+  crm?: boolean;
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -147,7 +149,7 @@ function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
   return desk;
 }
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -1045,7 +1047,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "requests") {
       page = <RequestsPage rows={reqRows} filter={reqFilter} onFilter={setReqFilter} onBack={back}
         onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
-    } else if (pf === "crm") {
+    } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} onExit={back} />;
     } else if (pf === "memos") {
@@ -1054,7 +1056,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       page = <BrandWeeksPage months={bwMonths} backOffice={backOffice} busy={bwBusy} error={bwError} saved={bwSaved}
         onPick={pickBrandWeek} onSave={() => void saveBrandWeeks()} onBack={back} />;
     } else {
-      page = <ProfileMain vm={profileVM} hidden={hidden} actions={{
+      page = <ProfileMain vm={profileVM} hidden={hidden} crm={crm} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: () => setSchemeOpen(true),
         brandWeeks: () => goScreen("account", { pf: "brandWeeks" }),

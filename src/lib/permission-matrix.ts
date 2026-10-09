@@ -359,7 +359,7 @@ export interface CellKey {
   gate: CellGate | null
 }
 
-const MEMBER_APP_KEYS = ['member_portal', 'member_quote', 'member_requests', 'member_memos', 'member_insight']
+const MEMBER_APP_KEYS = ['member_portal', 'member_quote', 'member_requests', 'member_memos', 'member_insight', 'member_crm', 'crm_manage']
 
 /**
  * The module keys these cells open while the gates still read module keys —

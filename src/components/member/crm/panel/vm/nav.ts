@@ -20,7 +20,8 @@ export function navVM(ctx: PanelCtx) {
     calendar: data.visits.filter(v => v.state === "booked" && new Date(v.start) > now).length,
   };
   return {
-    nav: NAV.map(([id, label, icon]) => {
+    // Assignment is CRM · Manage's (2026-10-10); the database refuses its writes without it anyway.
+    nav: NAV.filter(([id]) => id !== "assign" || data.can.manage).map(([id, label, icon]) => {
       // Ads Performance lives under Profile, so Profile stays lit while it is open.
       const on = ui.tab === id || (id === "profile" && ui.tab === "ads");
       return { label, icon, badge: badge[id] || 0, color: on ? "#BD4A19" : "#806B60", w: on ? 600 : 500,

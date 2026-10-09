@@ -9,7 +9,8 @@ const ROLE_DEFAULTS = {
   principal: ['approvals', 'audit_log', 'billing', 'categories', 'claims', 'claims_approve', 'dashboard', 'department_mode',
     'dept_pool', 'dept_reports', 'director_pool', 'director_salary', 'hr_costing', 'member_memos_manage',
     'member_requests_manage', 'opex', 'override', 'payroll_payouts', 'permissions_manage', 'product_list', 'reconciliation',
-    'reports', 'revenue', 'salary_individual', 'settings', 'team', 'team_invite', 'treasury', 'venture_pool', 'view_switch'],
+    'reports', 'revenue', 'salary_individual', 'settings', 'team', 'team_invite', 'treasury', 'venture_pool', 'view_switch',
+    'crm_manage'],
   finance: ['billing', 'categories', 'claims', 'claims_approve', 'dashboard', 'dept_pool', 'dept_reports', 'reconciliation',
     'reports', 'treasury', 'venture_pool'],
   hr: ['claims', 'claims_approve', 'dashboard', 'director_pool', 'director_salary', 'hr_costing', 'member_memos_manage',
@@ -48,6 +49,28 @@ describe('KEY_ACTIONS', () => {
   it('names only keys the portal has', () => {
     const keys = new Set<string>([...PERMISSIONS, 'view_switch', 'member_insight'])
     expect(Object.keys(KEY_ACTIONS).filter(k => !keys.has(k))).toEqual([])
+  })
+})
+
+describe('the CRM (20261010020000)', () => {
+  it('the shared Principal login runs the Control panel, as the CRM gave it', () => {
+    const p = holder('principal')
+    expect([canDo(p, 'crm', 'view'), canDo(p, 'crm', 'edit'), canDo(p, 'crm', 'manage')]).toEqual([true, true, true])
+  })
+
+  it('a Revenue Team title works its own line and runs nothing', () => {
+    const team = { permissions: ['member_portal', 'member_crm'], actions: { 'crm.view': 'own', 'crm.edit': 'own' } as const }
+    expect([canDo(team, 'crm', 'view', 'own'), canDo(team, 'crm', 'edit', 'own'), canDo(team, 'crm', 'view'), canDo(team, 'crm', 'manage')])
+      .toEqual([true, true, false, false])
+  })
+
+  it('a cell alone opens nothing without one of the CRM’s keys', () => {
+    expect(viewKeysOf('crm')).toEqual(['member_crm', 'crm_manage'])
+    expect(canDo({ permissions: [], actions: { 'crm.view': 'all' } }, 'crm', 'view')).toBe(false)
+  })
+
+  it('HR, Finance and a department manager have no CRM', () => {
+    for (const role of ['hr', 'finance', 'dept_manager'] as const) expect(canDo(holder(role), 'crm', 'view', 'own'), role).toBe(false)
   })
 })
 

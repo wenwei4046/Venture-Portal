@@ -50,6 +50,9 @@ export const PERMISSIONS = [
   'member_memos',
   'member_requests_manage',
   'member_memos_manage',
+  // The CRM (2026-10-10): CRM · View opens the first, CRM · Manage the second.
+  'member_crm',
+  'crm_manage',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

@@ -22,7 +22,7 @@ export type FunctionKey =
   | 'dashboard' | 'approvals' | 'treasury' | 'billing' | 'categories' | 'hr_costing' | 'revenue' | 'product_list'
   | 'director_salary' | 'director_pool' | 'team' | 'accounts' | 'member' | 'revenue_app' | 'dept_pool'
   | 'venture_pool' | 'opex' | 'my_billing' | 'claims' | 'reports' | 'dept_reports' | 'reconciliation'
-  | 'audit_log' | 'settings' | 'view_switch'
+  | 'audit_log' | 'settings' | 'view_switch' | 'crm'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -96,6 +96,9 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   member_memos: ['revenue_app.view'],
   member_quote: ['revenue_app.create'],
   member_requests: ['revenue_app.create'],
+  // The CRM (20261010020000): their own line, or the Control panel.
+  member_crm: ['crm.view', 'crm.edit'],
+  crm_manage: ['crm.view', 'crm.edit', 'crm.manage'],
   view_switch: ['view_switch.view'],
 }
 
@@ -137,6 +140,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'categories.manage': 'all',
   'claims.approve': 'all',
   'claims.create': 'own',
+  'crm.edit': 'own',
+  'crm.manage': 'all',
+  'crm.view': 'own',
   'dept_pool.view': 'own',
   'dept_reports.export': 'dept',
   'director_pool.edit': 'all',

@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { readFile, readdir } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
+import { CRM_PERMISSION_STANDIN } from './crm-permission-standin.mjs'
 
 const db = new PGlite()
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
@@ -33,9 +34,11 @@ await db.exec(`
     p_needs text default null, p_actor_column text default null, p_reason text default null)
   returns text language sql as $$ select p_mode $$;
 `)
+// The CRM asks the permission matrix (20261010030000): each person holds their role's seeded cells.
+await db.exec(CRM_PERMISSION_STANDIN)
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 for (const file of (await readdir(dir)).filter(f => /^20261(00[2-9]|01\d)\d+_crm_.*\.sql$/.test(f)).sort()) {
-  await db.exec(await readFile(new URL(file, dir), 'utf8'))
+  await db.exec((await readFile(new URL(file, dir), 'utf8')).replace(/\r\n/g, '\n'))
 }
 
 const id = (prefix, who) => {
