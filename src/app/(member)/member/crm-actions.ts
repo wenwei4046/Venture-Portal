@@ -1,13 +1,14 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 import { getMemberUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { crmFromRows, messageFromRow, type CrmLiveData, type CrmMessageRow, type CrmPeopleRow, type CrmRows } from "@/lib/member/crm-live";
 import type { CrmMessage } from "@/lib/member/crm";
 import { cleanText, fetchWhatsAppTemplates, fillTemplate, mediaMessage, reactionMessage, sendWhatsApp, sendWhatsAppText, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
 import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
-import { cardHasWay, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
+import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
@@ -148,6 +149,12 @@ export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): P
 type Db = SupabaseClient;
 /** The largest photo or file a member sends from the CRM (the client checks the same). */
 const CRM_MEDIA_BYTES = 4 * 1024 * 1024;
+/** This site, as the request reached it: where a Messenger map button sends the customer (/nav.html). */
+const siteBase = async () => {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  return `${h.get("x-forwarded-proto") ?? "https"}://${host}`;
+};
 const session = async (): Promise<Db> => {
   const user = await getMemberUser();
   if (!user?.is_active) throw new Error("Sign in with an active work account.");
@@ -251,8 +258,9 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
     if (contact.channel === "messenger") {
       const pageAccess = await pageToken(contact.account_id, token);
       if (!pageAccess) throw new Error("This Facebook Page is not connected to the CRM. Ask your administrator.");
-      // A visit card with an address: the words and Google Maps · Waze as buttons.
-      const message = cardHasWay(opts.card) ? messengerVisitMessage(clean.text, opts.card) : undefined;
+      // A visit card: WhatsApp's layout without bold, and Google Maps · Waze as buttons (through our /nav.html) when there is an address.
+      const message = cardHasWay(opts.card) ? messengerVisitMessage(opts.card, await siteBase())
+        : opts.card ? { text: messengerCardText(opts.card) } : undefined;
       const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: window as "open" | "human_agent", message });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
